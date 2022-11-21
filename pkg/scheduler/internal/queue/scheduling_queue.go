@@ -90,7 +90,7 @@ type PreEnqueueCheck func(pod *v1.Pod) bool
 type SchedulingQueue interface {
 	framework.PodNominator
 	Add(pod *v1.Pod) error
-	// Activate moves the given pods to activeQ iff they're in unschedulablePods or backoffQ.
+	// Activate moves the given pods to activeQ if they're in unschedulablePods or backoffQ.
 	// The passed-in pods are originally compiled from plugins that want to activate Pods,
 	// by injecting the pods through a reserved CycleState struct (PodsToActivate).
 	Activate(pods map[string]*v1.Pod)
