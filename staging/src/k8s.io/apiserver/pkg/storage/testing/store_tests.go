@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1055,11 +1056,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, ign
 			}
 
 			if tt.expectedAlternatives == nil {
+				sort.Sort(sortablePodList(tt.expectedOut))
 				ExpectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
 			} else {
 				toInterfaceSlice := func(podLists [][]example.Pod) []interface{} {
 					result := make([]interface{}, 0, len(podLists))
 					for i := range podLists {
+						sort.Sort(sortablePodList(podLists[i]))
 						result = append(result, podLists[i])
 					}
 					return result
