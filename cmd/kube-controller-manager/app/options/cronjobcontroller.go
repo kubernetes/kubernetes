@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
