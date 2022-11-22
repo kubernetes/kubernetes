@@ -43,6 +43,10 @@ import (
 	"google.golang.org/grpc/tap"
 )
 
+// ErrNoHeaders is used as a signal that a trailers only response was received,
+// and is not a real error.
+var ErrNoHeaders = errors.New("stream has no headers")
+
 const logLevel = 2
 
 type bufferPool struct {
@@ -366,9 +370,15 @@ func (s *Stream) Header() (metadata.MD, error) {
 		return s.header.Copy(), nil
 	}
 	s.waitOnHeader()
+
 	if !s.headerValid {
 		return nil, s.status.Err()
 	}
+
+	if s.noHeaders {
+		return nil, ErrNoHeaders
+	}
+
 	return s.header.Copy(), nil
 }
 
@@ -573,8 +583,8 @@ type ConnectOptions struct {
 
 // NewClientTransport establishes the transport with the required ConnectOptions
 // and returns it to the caller.
-func NewClientTransport(connectCtx, ctx context.Context, addr resolver.Address, opts ConnectOptions, onPrefaceReceipt func(), onGoAway func(GoAwayReason), onClose func()) (ClientTransport, error) {
-	return newHTTP2Client(connectCtx, ctx, addr, opts, onPrefaceReceipt, onGoAway, onClose)
+func NewClientTransport(connectCtx, ctx context.Context, addr resolver.Address, opts ConnectOptions, onGoAway func(GoAwayReason), onClose func()) (ClientTransport, error) {
+	return newHTTP2Client(connectCtx, ctx, addr, opts, onGoAway, onClose)
 }
 
 // Options provides additional hints and information for message

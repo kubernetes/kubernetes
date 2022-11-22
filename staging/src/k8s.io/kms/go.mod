@@ -6,7 +6,7 @@ go 1.19
 
 require (
 	github.com/gogo/protobuf v1.3.2
-	google.golang.org/grpc v1.49.0
+	google.golang.org/grpc v1.51.0
 )
 
 require (
