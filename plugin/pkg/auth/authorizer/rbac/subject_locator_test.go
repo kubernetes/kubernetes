@@ -23,6 +23,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
@@ -139,7 +141,7 @@ func TestSubjectLocator(t *testing.T) {
 		ruleResolver, lister := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := SubjectAccessEvaluator{tt.superUser, lister, lister, ruleResolver}
 		for i, action := range tt.actionsToSubjects {
-			actualSubjects, err := a.AllowedSubjects(action.action)
+			actualSubjects, err := a.AllowedSubjects(genericapirequest.NewContext(), action.action)
 			if err != nil {
 				t.Errorf("case %q %d: error %v", tt.name, i, err)
 			}
