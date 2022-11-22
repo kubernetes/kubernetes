@@ -304,7 +304,7 @@ func (w *wrapPreviousError) Error() string {
 func checkWait(resp *http.Response) (int, bool) {
 	switch r := resp.StatusCode; {
 	// any 500 error code and 429 can trigger a wait
-	case r == http.StatusTooManyRequests, r >= 500:
+	case r == http.StatusTooManyRequests, r >= http.StatusInternalServerError:
 	default:
 		return 0, false
 	}

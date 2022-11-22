@@ -23,6 +23,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -954,7 +955,7 @@ func TestServerHealth(t *testing.T) {
 			certs:       currentCerts,
 
 			failureType:      createError,
-			clientErr:        apierrors.NewGenericServerResponse(401, "POST", schema.GroupResource{}, "", "", 0, true),
+			clientErr:        apierrors.NewGenericServerResponse(http.StatusUnauthorized, "POST", schema.GroupResource{}, "", "", 0, true),
 			expectRotateFail: true,
 			expectHealthy:    true,
 		},
@@ -963,7 +964,7 @@ func TestServerHealth(t *testing.T) {
 			certs:       currentCerts,
 
 			failureType:      createError,
-			clientErr:        apierrors.NewGenericServerResponse(404, "POST", schema.GroupResource{}, "", "", 0, true),
+			clientErr:        apierrors.NewGenericServerResponse(http.StatusUnauthorized, "POST", schema.GroupResource{}, "", "", 0, true),
 			expectRotateFail: true,
 			expectHealthy:    false,
 		},
@@ -972,7 +973,7 @@ func TestServerHealth(t *testing.T) {
 			certs:       currentCerts,
 
 			failureType:      createError,
-			clientErr:        apierrors.NewGenericServerResponse(404, "POST", schema.GroupResource{}, "", "", 0, false),
+			clientErr:        apierrors.NewGenericServerResponse(http.StatusUnauthorized, "POST", schema.GroupResource{}, "", "", 0, false),
 			expectRotateFail: true,
 			expectHealthy:    true,
 		},

@@ -295,7 +295,7 @@ type testTransport struct {
 
 func (rt *testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Header["Authorization"][0] == "Bearer bad" {
-		return &http.Response{StatusCode: 401}, nil
+		return &http.Response{StatusCode: http.StatusUnauthorized}, nil
 	}
 	return nil, nil
 }

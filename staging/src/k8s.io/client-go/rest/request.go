@@ -837,7 +837,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 		}
 
 		switch {
-		case (resp.StatusCode >= 200) && (resp.StatusCode < 300):
+		case (resp.StatusCode >= http.StatusOK) && (resp.StatusCode < http.StatusMultipleChoices):
 			handleWarnings(resp.Header, r.warningHandler)
 			return resp.Body, nil
 

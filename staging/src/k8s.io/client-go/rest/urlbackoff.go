@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"net/http"
 	"net/url"
 	"time"
 
@@ -88,7 +89,7 @@ func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode i
 	if responseCode > maxResponseCode || serverIsOverloadedSet.Has(responseCode) {
 		b.Backoff.Next(b.baseUrlKey(actualUrl), b.Backoff.Clock.Now())
 		return
-	} else if responseCode >= 300 || err != nil {
+	} else if responseCode >= http.StatusMultipleChoices || err != nil {
 		klog.V(4).Infof("Client is returning errors: code %v, error %v", responseCode, err)
 	}
 

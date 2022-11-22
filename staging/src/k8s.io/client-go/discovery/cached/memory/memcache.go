@@ -19,6 +19,7 @@ package memory
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"syscall"
 
@@ -79,7 +80,7 @@ func isTransientError(err error) bool {
 		return true
 	}
 
-	if t, ok := err.(errorsutil.APIStatus); ok && t.Status().Code >= 500 {
+	if t, ok := err.(errorsutil.APIStatus); ok && t.Status().Code >= http.StatusInternalServerError {
 		return true
 	}
 

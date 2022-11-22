@@ -108,7 +108,7 @@ func (tst *tokenSourceTransport) RoundTrip(req *http.Request) (*http.Response, e
 	// and proceed.
 	start := time.Now()
 	resp, err := tst.ort.RoundTrip(req)
-	if err == nil && resp != nil && resp.StatusCode == 401 && tst.src != nil {
+	if err == nil && resp != nil && resp.StatusCode == http.StatusUnauthorized && tst.src != nil {
 		tst.src.ResetTokenOlderThan(start)
 	}
 	return resp, err

@@ -99,7 +99,7 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), status)
 	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:   404,
+		StatusCode:   http.StatusNotFound,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}

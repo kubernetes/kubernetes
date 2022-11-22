@@ -981,7 +981,7 @@ func TestRequestWatch(t *testing.T) {
 					Type: watch.Error,
 					Object: &metav1.Status{
 						Status:  "Failure",
-						Code:    500,
+						Code:    http.StatusInternalServerError,
 						Reason:  "InternalError",
 						Message: `an error on the server ("unable to decode an event from the watch stream: test error") has prevented the request from succeeding`,
 						Details: &metav1.StatusDetails{
