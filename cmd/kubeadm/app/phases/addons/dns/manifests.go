@@ -23,7 +23,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    k8s-app: kube-dns # deprecated
+    k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "CoreDNS"
     app.kubernetes.io/name: "coredns"
@@ -62,7 +62,7 @@ metadata:
   name: {{ .DeploymentName }}
   namespace: kube-system
   labels:
-    k8s-app: kube-dns # deprecated
+    k8s-app: kube-dns
     app.kubernetes.io/name: "coredns"
 spec:
   replicas: {{ .Replicas }}
@@ -72,11 +72,11 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      k8s-app: kube-dns # deprecated
+      k8s-app: kube-dns
   template:
     metadata:
       labels:
-        k8s-app: kube-dns # deprecated
+        k8s-app: kube-dns
         app.kubernetes.io/name: "coredns"
     spec:
       priorityClassName: system-cluster-critical
