@@ -32,10 +32,11 @@ import (
 // https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class/README.md
 type RuntimeClass struct {
 	metav1.TypeMeta
+
 	// +optional
 	metav1.ObjectMeta
 
-	// Handler specifies the underlying runtime and configuration that the CRI
+	// handler specifies the underlying runtime and configuration that the CRI
 	// implementation will use to handle pods of this class. The possible values
 	// are specific to the node & CRI configuration.  It is assumed that all
 	// handlers are available on every node, and handlers of the same name are
@@ -47,13 +48,13 @@ type RuntimeClass struct {
 	// immutable.
 	Handler string
 
-	// Overhead represents the resource overhead associated with running a pod for a
+	// overhead represents the resource overhead associated with running a pod for a
 	// given RuntimeClass. For more details, see
 	// https://git.k8s.io/enhancements/keps/sig-network/580-pod-readiness-gates
 	// +optional
 	Overhead *Overhead
 
-	// Scheduling holds the scheduling constraints to ensure that pods running
+	// scheduling holds the scheduling constraints to ensure that pods running
 	// with this RuntimeClass are scheduled to nodes that support it.
 	// If scheduling is nil, this RuntimeClass is assumed to be supported by all
 	// nodes.
@@ -63,7 +64,7 @@ type RuntimeClass struct {
 
 // Overhead structure represents the resource overhead associated with running a pod.
 type Overhead struct {
-	//  PodFixed represents the fixed resource overhead associated with running a pod.
+	// podFixed represents the fixed resource overhead associated with running a pod.
 	// +optional
 	PodFixed core.ResourceList
 }
@@ -91,9 +92,10 @@ type Scheduling struct {
 // RuntimeClassList is a list of RuntimeClass objects.
 type RuntimeClassList struct {
 	metav1.TypeMeta
+
 	// +optional
 	metav1.ListMeta
 
-	// Items is a list of schema objects.
+	// items is a list of schema objects.
 	Items []RuntimeClass
 }
