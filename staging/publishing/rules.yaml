@@ -349,10 +349,15 @@ rules:
 - destination: kms
   library: true
   branches:
-  - source:
+  - name: master
+    source:
       branch: master
       dir: staging/src/k8s.io/kms
-    name: master
+  - name: release-1.26
+    go: 1.19
+    source:
+      branch: release-1.26
+      dir: staging/src/k8s.io/kms
 - destination: apiserver
   branches:
   - name: master
@@ -2390,6 +2395,22 @@ rules:
       branch: master
     source:
       branch: master
+      dir: staging/src/k8s.io/dynamic-resource-allocation
+  - name: release-1.26
+    go: 1.19
+    dependencies:
+      - repository: apimachinery
+        branch: release-1.26
+      - repository: api
+        branch: release-1.26
+      - repository: client-go
+        branch: release-1.26
+      - repository: component-base
+        branch: release-1.26
+      - repository: kubelet
+        branch: release-1.26
+    source:
+      branch: release-1.26
       dir: staging/src/k8s.io/dynamic-resource-allocation
 recursive-delete-patterns:
 - '*/.gitattributes'
