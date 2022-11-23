@@ -34,7 +34,7 @@ LATEST_ETCD_VERSION?=3.5.6
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=1
+REVISION?=0
 
 # IMAGE_TAG Uniquely identifies registry.k8s.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -83,7 +83,7 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION?=1.16.15
+GOLANG_VERSION := 1.17.13
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
