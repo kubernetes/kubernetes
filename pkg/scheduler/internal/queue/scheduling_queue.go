@@ -368,12 +368,13 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	defer p.lock.Unlock()
 
 	pInfo := p.newQueuedPodInfo(pod)
+	gated := pInfo.Gated
 	if added, err := p.addToActiveQ(pInfo); !added {
 		return err
 	}
 	if p.unschedulablePods.get(pod) != nil {
 		klog.ErrorS(nil, "Error: pod is already in the unschedulable queue", "pod", klog.KObj(pod))
-		p.unschedulablePods.delete(pInfo)
+		p.unschedulablePods.delete(pod, gated)
 	}
 	// Delete pod from backoffQ if it is backing off
 	if err := p.podBackoffQ.Delete(pInfo); err == nil {
@@ -428,10 +429,11 @@ func (p *PriorityQueue) activate(pod *v1.Pod) bool {
 		return false
 	}
 
+	gated := pInfo.Gated
 	if added, _ := p.addToActiveQ(pInfo); !added {
 		return false
 	}
-	p.unschedulablePods.delete(pInfo)
+	p.unschedulablePods.delete(pInfo.Pod, gated)
 	p.podBackoffQ.Delete(pInfo)
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", ForceActivate).Inc()
 	p.PodNominator.AddNominatedPod(pInfo.PodInfo, nil)
@@ -621,17 +623,18 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 		pInfo := updatePod(usPodInfo, newPod)
 		p.PodNominator.UpdateNominatedPod(oldPod, pInfo.PodInfo)
 		if isPodUpdated(oldPod, newPod) {
+			gated := usPodInfo.Gated
 			if p.isPodBackingoff(usPodInfo) {
 				if err := p.podBackoffQ.Add(pInfo); err != nil {
 					return err
 				}
-				p.unschedulablePods.delete(usPodInfo)
+				p.unschedulablePods.delete(usPodInfo.Pod, gated)
 				klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", PodUpdate, "queue", backoffQName)
 			} else {
 				if added, err := p.addToActiveQ(pInfo); !added {
 					return err
 				}
-				p.unschedulablePods.delete(usPodInfo)
+				p.unschedulablePods.delete(usPodInfo.Pod, gated)
 				klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", BackoffComplete, "queue", activeQName)
 				p.cond.Broadcast()
 			}
@@ -663,7 +666,9 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 	if err := p.activeQ.Delete(pInfo); err != nil {
 		// The item was probably not found in the activeQ.
 		p.podBackoffQ.Delete(pInfo)
-		p.unschedulablePods.delete(pInfo)
+		if pInfo = p.unschedulablePods.get(pod); pInfo != nil {
+			p.unschedulablePods.delete(pod, pInfo.Gated)
+		}
 	}
 	return nil
 }
@@ -718,14 +723,15 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 			} else {
 				klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQName)
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event.Label).Inc()
-				p.unschedulablePods.delete(pInfo)
+				p.unschedulablePods.delete(pod, pInfo.Gated)
 			}
 		} else {
+			gated := pInfo.Gated
 			if added, _ := p.addToActiveQ(pInfo); added {
 				klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQName)
 				activated = true
 				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event.Label).Inc()
-				p.unschedulablePods.delete(pInfo)
+				p.unschedulablePods.delete(pod, gated)
 			}
 		}
 	}
@@ -875,7 +881,7 @@ type UnschedulablePods struct {
 	unschedulableRecorder, gatedRecorder metrics.MetricRecorder
 }
 
-// Add adds a pod to the unschedulable podInfoMap.
+// addOrUpdate adds a pod to the unschedulable podInfoMap.
 func (u *UnschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo) {
 	podID := u.keyFunc(pInfo.Pod)
 	if _, exists := u.podInfoMap[podID]; !exists {
@@ -888,20 +894,21 @@ func (u *UnschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo) {
 	u.podInfoMap[podID] = pInfo
 }
 
-// Delete deletes a pod from the unschedulable podInfoMap.
-func (u *UnschedulablePods) delete(pInfo *framework.QueuedPodInfo) {
-	podID := u.keyFunc(pInfo.Pod)
+// delete deletes a pod from the unschedulable podInfoMap.
+// The `gated` parameter is used to figure out which metric should be decreased.
+func (u *UnschedulablePods) delete(pod *v1.Pod, gated bool) {
+	podID := u.keyFunc(pod)
 	if _, exists := u.podInfoMap[podID]; exists {
-		if pInfo.Gated && u.gatedRecorder != nil {
+		if gated && u.gatedRecorder != nil {
 			u.gatedRecorder.Dec()
-		} else if !pInfo.Gated && u.unschedulableRecorder != nil {
+		} else if !gated && u.unschedulableRecorder != nil {
 			u.unschedulableRecorder.Dec()
 		}
 	}
 	delete(u.podInfoMap, podID)
 }
 
-// Get returns the QueuedPodInfo if a pod with the same key as the key of the given "pod"
+// get returns the QueuedPodInfo if a pod with the same key as the key of the given "pod"
 // is found in the map. It returns nil otherwise.
 func (u *UnschedulablePods) get(pod *v1.Pod) *framework.QueuedPodInfo {
 	podKey := u.keyFunc(pod)
@@ -911,7 +918,7 @@ func (u *UnschedulablePods) get(pod *v1.Pod) *framework.QueuedPodInfo {
 	return nil
 }
 
-// Clear removes all the entries from the unschedulable podInfoMap.
+// clear removes all the entries from the unschedulable podInfoMap.
 func (u *UnschedulablePods) clear() {
 	u.podInfoMap = make(map[string]*framework.QueuedPodInfo)
 	if u.unschedulableRecorder != nil {

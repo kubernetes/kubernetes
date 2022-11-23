@@ -115,6 +115,8 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		Timestamp:               pqi.Timestamp,
 		Attempts:                pqi.Attempts,
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
+		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
+		Gated:                   pqi.Gated,
 	}
 }
 
