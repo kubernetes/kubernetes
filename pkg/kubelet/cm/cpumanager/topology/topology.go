@@ -62,6 +62,34 @@ func (topo *CPUTopology) CPUsPerSocket() int {
 	return topo.NumCPUs / topo.NumSockets
 }
 
+// CPUCoreID returns the physical core ID which the given logical CPU
+// belongs to.
+func (topo *CPUTopology) CPUCoreID(cpu int) (int, error) {
+	info, ok := topo.CPUDetails[cpu]
+	if !ok {
+		return -1, fmt.Errorf("unknown CPU ID: %d", cpu)
+	}
+	return info.CoreID, nil
+}
+
+// CPUCoreID returns the socket ID which the given logical CPU belongs to.
+func (topo *CPUTopology) CPUSocketID(cpu int) (int, error) {
+	info, ok := topo.CPUDetails[cpu]
+	if !ok {
+		return -1, fmt.Errorf("unknown CPU ID: %d", cpu)
+	}
+	return info.SocketID, nil
+}
+
+// CPUCoreID returns the NUMA node ID which the given logical CPU belongs to.
+func (topo *CPUTopology) CPUNUMANodeID(cpu int) (int, error) {
+	info, ok := topo.CPUDetails[cpu]
+	if !ok {
+		return -1, fmt.Errorf("unknown CPU ID: %d", cpu)
+	}
+	return info.NUMANodeID, nil
+}
+
 // CPUInfo contains the NUMA, socket, and core IDs associated with a CPU.
 type CPUInfo struct {
 	NUMANodeID int

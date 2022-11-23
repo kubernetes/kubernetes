@@ -923,3 +923,180 @@ func TestCPUDetailsCPUsInCores(t *testing.T) {
 		})
 	}
 }
+
+func TestCPUCoreID(t *testing.T) {
+	topoDualSocketHT := &CPUTopology{
+		NumCPUs:    12,
+		NumSockets: 2,
+		NumCores:   6,
+		CPUDetails: map[int]CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			3:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			5:  {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+			6:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			7:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			8:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			9:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+			10: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		topo    *CPUTopology
+		id      int
+		want    int
+		wantErr bool
+	}{{
+		name: "Known Core ID",
+		topo: topoDualSocketHT,
+		id:   2,
+		want: 2,
+	}, {
+		name: "Known Core ID (core sibling).",
+		topo: topoDualSocketHT,
+		id:   8,
+		want: 2,
+	}, {
+		name:    "Unknown Core ID.",
+		topo:    topoDualSocketHT,
+		id:      -2,
+		want:    -1,
+		wantErr: true,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.topo.CPUCoreID(tt.id)
+			gotErr := (err != nil)
+			if gotErr != tt.wantErr {
+				t.Errorf("CPUCoreID() returned err %v, want %v", gotErr, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("CPUCoreID() returned %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCPUSocketID(t *testing.T) {
+	topoDualSocketHT := &CPUTopology{
+		NumCPUs:    12,
+		NumSockets: 2,
+		NumCores:   6,
+		CPUDetails: map[int]CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			3:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			5:  {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+			6:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			7:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			8:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			9:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+			10: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		topo    *CPUTopology
+		id      int
+		want    int
+		wantErr bool
+	}{{
+		name: "Known Core ID",
+		topo: topoDualSocketHT,
+		id:   3,
+		want: 1,
+	}, {
+		name: "Known Core ID (core sibling).",
+		topo: topoDualSocketHT,
+		id:   9,
+		want: 1,
+	}, {
+		name:    "Unknown Core ID.",
+		topo:    topoDualSocketHT,
+		id:      1000,
+		want:    -1,
+		wantErr: true,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.topo.CPUSocketID(tt.id)
+			gotErr := (err != nil)
+			if gotErr != tt.wantErr {
+				t.Errorf("CPUSocketID() returned err %v, want %v", gotErr, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("CPUSocketID() returned %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCPUNUMANodeID(t *testing.T) {
+	topoDualSocketHT := &CPUTopology{
+		NumCPUs:    12,
+		NumSockets: 2,
+		NumCores:   6,
+		CPUDetails: map[int]CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			3:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			5:  {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+			6:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+			7:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
+			8:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+			9:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
+			10: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
+			11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		topo    *CPUTopology
+		id      int
+		want    int
+		wantErr bool
+	}{{
+		name: "Known Core ID",
+		topo: topoDualSocketHT,
+		id:   0,
+		want: 0,
+	}, {
+		name: "Known Core ID (core sibling).",
+		topo: topoDualSocketHT,
+		id:   6,
+		want: 0,
+	}, {
+		name:    "Unknown Core ID.",
+		topo:    topoDualSocketHT,
+		id:      1000,
+		want:    -1,
+		wantErr: true,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.topo.CPUNUMANodeID(tt.id)
+			gotErr := (err != nil)
+			if gotErr != tt.wantErr {
+				t.Errorf("CPUSocketID() returned err %v, want %v", gotErr, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("CPUSocketID() returned %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
