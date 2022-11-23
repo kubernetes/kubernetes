@@ -80,13 +80,17 @@ func TestJitterWithNegativeMaxFactor(t *testing.T) {
 	// jitter := duration + time.Duration(rand.Float64()*maxFactor*float64(duration))
 	// If maxFactor is 0.0 or less than 0.0, a suggested default value will be chosen.
 	// rand.Float64() returns, as a float64, a pseudo-random number in [0.0,1.0).
-	duration := time.Duration(time.Second)
+	duration := time.Second
 	maxFactor := -3.0
 	res := jitter(duration, maxFactor)
-	defaultMaxFactor := 1.0
-	expected := jitter(duration, defaultMaxFactor)
-	assert.Equal(t, expected-res >= time.Duration(0.0*float64(duration)), true)
-	assert.Equal(t, expected-res < time.Duration(1.0*float64(duration)), true)
+	// jitter with negative maxFactor should not be negative
+	assert.Equal(t, res >= duration, true)
+	assert.Equal(t, res <= 2*duration, true)
+
+	maxFactor = 2.0
+	res = jitter(duration, maxFactor)
+	assert.Equal(t, res >= duration, true)
+	assert.Equal(t, res <= 3*duration, true)
 }
 
 func TestDoExponentialBackoffRetry(t *testing.T) {
