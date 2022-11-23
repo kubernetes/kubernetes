@@ -217,36 +217,28 @@ func TotalReady(c clientset.Interface) (int, error) {
 	return len(nodes.Items), nil
 }
 
-// GetExternalIP returns node external IP concatenated with port 22 for ssh
+// GetSSHExternalIP returns node external IP concatenated with port 22 for ssh
 // e.g. 1.2.3.4:22
-func GetExternalIP(node *v1.Node) (string, error) {
+func GetSSHExternalIP(node *v1.Node) (string, error) {
 	framework.Logf("Getting external IP address for %s", node.Name)
-	host := ""
+
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
+			return net.JoinHostPort(a.Address, sshPort), nil
 		}
 	}
-	if host == "" {
-		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host, nil
+	return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 }
 
-// GetInternalIP returns node internal IP
-func GetInternalIP(node *v1.Node) (string, error) {
-	host := ""
+// GetSSHInternalIP returns node internal IP concatenated with port 22 for ssh
+func GetSSHInternalIP(node *v1.Node) (string, error) {
 	for _, address := range node.Status.Addresses {
 		if address.Type == v1.NodeInternalIP && address.Address != "" {
-			host = net.JoinHostPort(address.Address, sshPort)
-			break
+			return net.JoinHostPort(address.Address, sshPort), nil
 		}
 	}
-	if host == "" {
-		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host, nil
+
+	return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 }
 
 // FirstAddressByTypeAndFamily returns the first address that matches the given type and family of the list of nodes
