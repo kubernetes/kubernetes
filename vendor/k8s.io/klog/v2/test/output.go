@@ -388,6 +388,30 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 			expectedOutput: `I output.go:<LINE>] "map keys" map[test:%!s(bool=true)]="test"
 `,
 		},
+		"structured error": {
+			text: "structured error",
+			err:  structuredError{error: errors.New("fake error"), Attributes: logr.KeysAndValues{{"x", 1}, {"y", "multi-line\nstring"}}},
+			expectedOutput: `E output.go:<LINE>] "structured error" err="fake error" errDetails={ x=1 y=<
+	multi-line
+	string
+ > }
+`,
+		},
+		"structured error value": {
+			text:   "structured error",
+			values: []interface{}{"someErr", structuredError{error: errors.New("fake error"), Attributes: logr.KeysAndValues{{"x", 1}, {"y", "multi-line\nstring"}}}},
+			expectedOutput: `I output.go:<LINE>] "structured error" someErr="fake error" someErrDetails={ x=1 y=<
+	multi-line
+	string
+ > }
+`,
+		},
+		"KeysAndValues": {
+			text:   "keys and values",
+			values: []interface{}{"parent", logr.KeysAndValues{{"boolsub", true}, {"intsub", 1}, {"recursive", logr.KeysAndValues{{"sub", "level2"}}}}},
+			expectedOutput: `I output.go:<LINE>] "keys and values" parent={ boolsub=true intsub=1 recursive={ sub="level2" } }
+`,
+		},
 	}
 	for n, test := range tests {
 		t.Run(n, func(t *testing.T) {
@@ -846,3 +870,16 @@ func (f faultyError) Error() string {
 }
 
 var _ error = faultyError{}
+
+// Structured error with additional values that are not part of the message
+// returned by Error().
+type structuredError struct {
+	error
+	Attributes logr.KeysAndValues
+}
+
+// MarshalLog gets called in addition to Error function to
+// log additional information.
+func (err structuredError) MarshalLog() interface{} {
+	return err.Attributes
+}

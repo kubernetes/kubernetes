@@ -11,6 +11,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.9.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
+	github.com/go-logr/logr v1.2.3
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cel-go v0.12.5
 	github.com/google/gnostic v0.5.7-v3refs
@@ -68,7 +69,6 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
-	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.20.0 // indirect
@@ -122,10 +122,12 @@ require (
 )
 
 replace (
+	github.com/go-logr/logr => github.com/pohly/logr v1.0.1-0.20221123084031-5a74e449aa62
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20221123181939-72bb78b1e07a
 	k8s.io/kms => ../kms
 )

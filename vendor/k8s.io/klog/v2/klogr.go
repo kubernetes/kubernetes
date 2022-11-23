@@ -83,5 +83,9 @@ func (l klogger) WithCallDepth(depth int) logr.LogSink {
 	return &l
 }
 
+// UsesKlog signals to klog that this LogSink must not be called.
+func (l klogger) UsesKlog() {}
+
 var _ logr.LogSink = &klogger{}
 var _ logr.CallDepthLogSink = &klogger{}
+var _ serialize.KlogLogSink = &klogger{}

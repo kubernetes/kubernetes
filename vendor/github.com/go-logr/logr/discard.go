@@ -22,9 +22,12 @@ package logr
 func Discard() Logger {
 	return Logger{
 		level: 0,
-		sink:  discardLogSink{},
+		sink:  discardLogSinkInstance,
 	}
 }
+
+// discardLogSinkInstance is the LogSink that all Discard Loggers use.
+var discardLogSinkInstance LogSink = discardLogSink{}
 
 // discardLogSink is a LogSink that discards all messages.
 type discardLogSink struct{}

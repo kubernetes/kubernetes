@@ -169,7 +169,7 @@ limitations under the License.
 //
 // Logger grants access to the sink to enable type assertions like this:
 //   func DoSomethingWithImpl(log logr.Logger) {
-//       if underlier, ok := log.GetSink()(impl.Underlier) {
+//       if underlier, ok := log.GetSink().(impl.Underlier); ok {
 //          implLogger := underlier.GetUnderlying()
 //          ...
 //       }
@@ -181,7 +181,7 @@ limitations under the License.
 //   // new logger with that modified sink.  It does nothing for loggers where
 //   // the sink doesn't support that parameter.
 //   func WithFoobar(log logr.Logger, foobar int) logr.Logger {
-//      if foobarLogSink, ok := log.GetSink()(FoobarSink); ok {
+//      if foobarLogSink, ok := log.GetSink().(FoobarSink); ok {
 //         log = log.WithSink(foobarLogSink.WithFooBar(foobar))
 //      }
 //      return log
@@ -237,14 +237,16 @@ func (l Logger) WithSink(sink LogSink) Logger {
 // Glass" in the package documentation). Normally the sink should be used only
 // indirectly.
 type Logger struct {
-	sink  LogSink
-	level int
+	sink            LogSink
+	level           int
+	ctx             context.Context
+	contextHandlers *[]ContextHandler // Has to be a pointer to keep the struct comparable.
 }
 
 // Enabled tests whether this Logger is enabled.  For example, commandline
 // flags might be used to set the logging verbosity and disable some info logs.
 func (l Logger) Enabled() bool {
-	return l.sink.Enabled(l.level)
+	return l.sink != nil && l.sink.Enabled(l.level)
 }
 
 // Info logs a non-error message with the given key/value pairs as context.
@@ -258,7 +260,12 @@ func (l Logger) Info(msg string, keysAndValues ...interface{}) {
 		if withHelper, ok := l.sink.(CallStackHelperLogSink); ok {
 			withHelper.GetCallStackHelper()()
 		}
-		l.sink.Info(l.level, msg, keysAndValues...)
+		sink := l.sink
+		contextKeysAndValues := l.valuesFromContext()
+		if len(contextKeysAndValues) > 0 {
+			sink = sink.WithValues(contextKeysAndValues...)
+		}
+		sink.Info(l.level, msg, keysAndValues...)
 	}
 }
 
@@ -273,10 +280,18 @@ func (l Logger) Info(msg string, keysAndValues ...interface{}) {
 // triggered this log line, if present. The err parameter is optional
 // and nil may be passed instead of an error instance.
 func (l Logger) Error(err error, msg string, keysAndValues ...interface{}) {
+	if l.sink == nil {
+		return
+	}
 	if withHelper, ok := l.sink.(CallStackHelperLogSink); ok {
 		withHelper.GetCallStackHelper()()
 	}
-	l.sink.Error(err, msg, keysAndValues...)
+	sink := l.sink
+	contextKeysAndValues := l.valuesFromContext()
+	if len(contextKeysAndValues) > 0 {
+		sink = sink.WithValues(contextKeysAndValues...)
+	}
+	sink.Error(err, msg, keysAndValues...)
 }
 
 // V returns a new Logger instance for a specific verbosity level, relative to
@@ -294,6 +309,9 @@ func (l Logger) V(level int) Logger {
 // WithValues returns a new Logger instance with additional key/value pairs.
 // See Info for documentation on how key/value pairs work.
 func (l Logger) WithValues(keysAndValues ...interface{}) Logger {
+	if l.sink == nil {
+		return l
+	}
 	l.setSink(l.sink.WithValues(keysAndValues...))
 	return l
 }
@@ -304,6 +322,9 @@ func (l Logger) WithValues(keysAndValues ...interface{}) Logger {
 // contain only letters, digits, and hyphens (see the package documentation for
 // more information).
 func (l Logger) WithName(name string) Logger {
+	if l.sink == nil {
+		return l
+	}
 	l.setSink(l.sink.WithName(name))
 	return l
 }
@@ -357,12 +378,79 @@ func (l Logger) WithCallStackHelper() (func(), Logger) {
 	return helper, l
 }
 
+// IsZero returns true if this logger is an uninitialized zero value
+func (l Logger) IsZero() bool {
+	return l.sink == nil
+}
+
+// WithContext stores a context in the Logger. If the Logger also has keys set
+// that it is meant to log from a context, then the values for those keys from
+// the given context will be added to all log entries.
+func (l Logger) WithContext(ctx context.Context) Logger {
+	if l.sink == discardLogSinkInstance {
+		return l
+	}
+
+	l.ctx = ctx
+	return l
+}
+
+// WithContextHandlers extends the list of context handlers. When
+// given a context through WithContext later, the Logger will invoke
+// each handler and log the key/value pairs that they return as
+// as if they had been passed to WithValues.
+func (l Logger) WithContextHandlers(handlers ...ContextHandler) Logger {
+	if l.sink == discardLogSinkInstance {
+		return l
+	}
+
+	if l.contextHandlers == nil {
+		// Copy the parameters to avoid surprises when the caller changes the content
+		// of the parameter slice later.
+		cp := make([]ContextHandler, len(handlers))
+		copy(cp, handlers)
+		l.contextHandlers = &cp
+	} else {
+		// We must create a new slice because the existing one is shared between
+		// Logger instances.
+		cp := make([]ContextHandler, len(*l.contextHandlers)+len(handlers))
+		copy(cp, *l.contextHandlers)
+		copy(cp[len(*l.contextHandlers):], handlers)
+		l.contextHandlers = &cp
+	}
+	return l
+}
+
+func (l Logger) valuesFromContext() []interface{} {
+	if l.ctx == nil || l.contextHandlers == nil {
+		return nil
+	}
+	// We don't really know how large this has to be. Let's
+	// assume that each handler returns at most two key/value
+	// pairs, of which each needs two entries.
+	keysAndValues := make([]interface{}, 0, 4*len(*l.contextHandlers))
+	for _, handler := range *l.contextHandlers {
+		for _, keyAndValue := range handler.ValuesFromContext(l.ctx) {
+			keysAndValues = append(keysAndValues, keyAndValue.Key, keyAndValue.Value)
+		}
+	}
+	return keysAndValues
+}
+
+// ContextHandler provides callbacks for working with a context.
+// More functionality might get added in the future.
+type ContextHandler struct {
+	ValuesFromContext func(ctx context.Context) KeysAndValues
+}
+
 // contextKey is how we find Loggers in a context.Context.
 type contextKey struct{}
 
 // FromContext returns a Logger from ctx or an error if no Logger is found.
+// The value returned has already had WithContext called.
 func FromContext(ctx context.Context) (Logger, error) {
 	if v, ok := ctx.Value(contextKey{}).(Logger); ok {
+		v.ctx = ctx
 		return v, nil
 	}
 
@@ -382,8 +470,10 @@ func (notFoundError) IsNotFound() bool {
 
 // FromContextOrDiscard returns a Logger from ctx.  If no Logger is found, this
 // returns a Logger that discards all log messages.
+// The value returned has already had WithContext called.
 func FromContextOrDiscard(ctx context.Context) Logger {
 	if v, ok := ctx.Value(contextKey{}).(Logger); ok {
+		v.ctx = ctx
 		return v
 	}
 
@@ -507,4 +597,20 @@ type Marshaler interface {
 	//
 	// It may return any value of any type.
 	MarshalLog() interface{}
+}
+
+// KeysAndValues is a special type that will get logged like a struct. The
+// main advantage is that keys and values can get constructed dynamically and
+// that some LogSinks may render it more nicely than plain structs.
+//
+// Not all LogSinks support this special type. Those that don't
+// will log it like an array.
+type KeysAndValues []KeyAndValue
+
+// KeyAndValue is one entry in KeysAndValues.
+type KeyAndValue struct {
+	// Key is used to log the value.
+	Key string
+	// Value is an arbitrary value that is to be logged.
+	Value interface{}
 }

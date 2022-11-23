@@ -233,6 +233,24 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 `: `{"caller":"test/output.go:<LINE>","msg":"non-string key argument passed to logging, ignoring all later arguments","invalid key":{"test":true}}
 {"caller":"test/output.go:<LINE>","msg":"map keys","v":0}
 `,
+		// In contrast to klogr, zapr doesn't resolve recursive usage
+		// of KeysAndValues and falls back to the normal zap behavior
+		// for the instance inside. That's okay.
+		`I output.go:<LINE>] "keys and values" parent={ boolsub=true intsub=1 recursive={ sub="level2" } }
+`: `{"caller":"test/output.go:<LINE>","msg":"keys and values","v":0,"parent":{"boolsub":true,"intsub":1,"recursive":[{"Key":"sub","Value":"level2"}]}}
+`,
+		`E output.go:<LINE>] "structured error" err="fake error" errDetails={ x=1 y=<
+	multi-line
+	string
+ > }
+`: `{"caller":"test/output.go:<LINE>","msg":"structured error","err":"fake error","errDetails":{"x":1,"y":"multi-line\nstring"}}
+`,
+		`I output.go:<LINE>] "structured error" someErr="fake error" someErrDetails={ x=1 y=<
+	multi-line
+	string
+ > }
+`: `{"caller":"test/output.go:<LINE>","msg":"structured error","v":0,"someErr":"fake error","someErrDetails":{"x":1,"y":"multi-line\nstring"}}
+`,
 	}
 }
 

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	"k8s.io/klog/v2/internal/serialize"
 )
 
 // This file provides the implementation of
@@ -70,7 +71,15 @@ func SetLogger(logger logr.Logger) {
 // routing log entries through klogr into klog and then into the actual Logger
 // backend.
 func SetLoggerWithOptions(logger logr.Logger, opts ...LoggerOption) {
-	logging.logger = &logger
+	if _, ok := logger.GetSink().(serialize.KlogLogSink); ok {
+		// Danger! klogr cannot be used by klog itself, it would
+		// lead to recursion and a stack overflow. But it can be used
+		// below as contextual logger.
+		logging.logger = nil
+	} else {
+		logging.logger = &logger
+	}
+	logging.contextualLogger = &logger
 	logging.loggerOptions = loggerOptions{}
 	for _, opt := range opts {
 		opt(&logging.loggerOptions)
@@ -109,6 +118,7 @@ type loggerOptions struct {
 // goroutines invoke log calls, usually during program initialization.
 func ClearLogger() {
 	logging.logger = nil
+	logging.contextualLogger = nil
 	logging.loggerOptions = loggerOptions{}
 }
 
@@ -128,13 +138,15 @@ func EnableContextualLogging(enabled bool) {
 // falls back to the program's global logger (a Logger instance or klog
 // itself).
 func FromContext(ctx context.Context) Logger {
-	if logging.contextualLoggingEnabled {
-		if logger, err := logr.FromContext(ctx); err == nil {
-			return logger
-		}
+	if !logging.contextualLoggingEnabled {
+		return Background()
 	}
 
-	return Background()
+	if logger, err := logr.FromContext(ctx); err == nil {
+		return logger
+	}
+
+	return Background().WithContext(ctx)
 }
 
 // TODO can be used as a last resort by code that has no means of
@@ -152,7 +164,7 @@ func Background() Logger {
 	if logging.loggerOptions.contextualLogger {
 		// Is non-nil because logging.loggerOptions.contextualLogger is
 		// only true if a logger was set.
-		return *logging.logger
+		return *logging.contextualLogger
 	}
 
 	return klogLogger

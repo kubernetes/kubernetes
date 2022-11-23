@@ -452,8 +452,14 @@ type settings struct {
 	contextualLoggingEnabled bool
 
 	// logger is the global Logger chosen by users of klog, nil if
-	// none is available.
+	// none is available. It is used by klog itself to write log entries.
 	logger *Logger
+
+	// contextualLogger is the global Logger chosen by users of klog, nil if
+	// none is available. It contrast to logger, it is only used when
+	// the user of klog asks for a logger with Background, TODO, or FromContext.
+	// It is not used by klog itself.
+	contextualLogger *Logger
 
 	// loggerOptions contains the options that were supplied for
 	// globalLogger.

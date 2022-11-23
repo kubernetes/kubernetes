@@ -37,6 +37,7 @@ package funcr
 import (
 	"bytes"
 	"encoding"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -217,7 +218,7 @@ func newFormatter(opts Options, outfmt outputFormat) Formatter {
 		prefix:       "",
 		values:       nil,
 		depth:        0,
-		opts:         opts,
+		opts:         &opts,
 	}
 	return f
 }
@@ -231,7 +232,7 @@ type Formatter struct {
 	values       []interface{}
 	valuesStr    string
 	depth        int
-	opts         Options
+	opts         *Options
 }
 
 // outputFormat indicates which outputFormat to use.
@@ -418,6 +419,24 @@ func (f Formatter) prettyWithFlags(value interface{}, flags uint32, depth int) s
 			buf.WriteByte('}')
 		}
 		return buf.String()
+	case logr.KeysAndValues:
+		buf := bytes.NewBuffer(make([]byte, 0, 1024))
+		if flags&flagRawStruct == 0 {
+			buf.WriteByte('{')
+		}
+		for i, keyAndValue := range v {
+			if i > 0 {
+				buf.WriteByte(',')
+			}
+			// arbitrary keys might need escaping
+			buf.WriteString(prettyString(keyAndValue.Key))
+			buf.WriteByte(':')
+			buf.WriteString(f.prettyWithFlags(keyAndValue.Value, 0, depth+1))
+		}
+		if flags&flagRawStruct == 0 {
+			buf.WriteByte('}')
+		}
+		return buf.String()
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0, 256))
@@ -500,6 +519,20 @@ func (f Formatter) prettyWithFlags(value interface{}, flags uint32, depth int) s
 		}
 		return buf.String()
 	case reflect.Slice, reflect.Array:
+		// If this is outputing as JSON make sure this isn't really a json.RawMessage.
+		// If so just emit "as-is" and don't pretty it as that will just print
+		// it as [X,Y,Z,...] which isn't terribly useful vs the string form you really want.
+		if f.outputFormat == outputJSON {
+			if rm, ok := value.(json.RawMessage); ok {
+				// If it's empty make sure we emit an empty value as the array style would below.
+				if len(rm) > 0 {
+					buf.Write(rm)
+				} else {
+					buf.WriteString("null")
+				}
+				return buf.String()
+			}
+		}
 		buf.WriteByte('[')
 		for i := 0; i < v.Len(); i++ {
 			if i > 0 {
