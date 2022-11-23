@@ -26,7 +26,9 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/semconv/v1.12.0"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+	"github.com/go-logr/logr"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -39,6 +41,7 @@ import (
 	tracing "k8s.io/component-base/tracing"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"k8s.io/utils/path"
+	"k8s.io/klog/v2"
 )
 
 const apiserverService = "apiserver"
@@ -123,7 +126,32 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 	if c.LoopbackClientConfig != nil {
 		c.LoopbackClientConfig.Wrap(tracing.WrapperFor(c.TracerProvider))
 	}
+
+	// Also enable logging of span and trace ID.
+	//
+	// This has to run after applying the logging configuration, something
+	// that intentionally is done as early as possible before applying
+	// other configuration options.
+	logger := klog.Background()
+	logger = logger.WithContextHandlers(logr.ContextHandler{ValuesFromContext: traceIDsFromContext})
+	klog.SetLoggerWithOptions(logger, klog.ContextualLogger(true))
+
 	return nil
+}
+
+func traceIDsFromContext(ctx context.Context) logr.KeysAndValues {
+	spanContext := trace.SpanContextFromContext(ctx)
+	if !spanContext.IsValid() {
+		return nil
+	}
+
+	// A valid span context has both IDs set. These key names are
+	// determined by
+	// https://github.com/open-telemetry/opentelemetry-specification/tree/a87fb8c5a60f942d08c67c1582034eb8b4322009/specification/logs#trace-context-in-legacy-formats
+	return logr.KeysAndValues{
+		{ Key: "trace_id", Value: spanContext.TraceID().String() },
+		{ Key: "span_id", Value: spanContext.SpanID().String() },
+	}
 }
 
 // Validate verifies flags passed to TracingOptions.
