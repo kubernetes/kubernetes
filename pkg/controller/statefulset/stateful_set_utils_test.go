@@ -589,6 +589,101 @@ func TestIsRunningAndReady(t *testing.T) {
 	}
 }
 
+func TestIsPodInRightStatus(t *testing.T) {
+	now := metav1.Now()
+	set := newStatefulSet(3)
+
+	testCases := []struct {
+		name            string
+		podPhase        v1.PodPhase
+		podCondition    v1.PodCondition
+		podDeletionTime metav1.Time
+		testFn          func(pod *v1.Pod) bool
+		expected        bool
+	}{
+		{
+			name:     "isCreated: pod phase is nil",
+			testFn:   isCreated,
+			expected: false,
+		},
+		{
+			name:     "isCreated: pod phase is not nil",
+			podPhase: v1.PodPending,
+			testFn:   isCreated,
+			expected: true,
+		},
+		{
+			name:     "isFailed: pod phase is nil",
+			testFn:   isFailed,
+			expected: false,
+		},
+		{
+			name:     "isFailed: pod phase is not nil",
+			podPhase: v1.PodFailed,
+			testFn:   isFailed,
+			expected: true,
+		},
+		{
+			name:     "isTerminating: pod deletionTime is nil",
+			testFn:   isTerminating,
+			expected: false,
+		},
+		{
+			name:            "isTerminating: pod deletionTime is not nil",
+			podDeletionTime: now,
+			testFn:          isTerminating,
+			expected:        true,
+		},
+		{
+			name:     "isHealthy: pod phase/deletionTime are nil, and pod condition does not set",
+			testFn:   isHealthy,
+			expected: false,
+		},
+		{
+			name:     "isHealthy: pod deletionTime is nil, and pod condition does not set",
+			podPhase: v1.PodRunning,
+			testFn:   isHealthy,
+			expected: false,
+		},
+		{
+			name:     "isHealthy: pod deletionTime is nil",
+			podPhase: v1.PodRunning,
+			podCondition: v1.PodCondition{
+				Type:   v1.PodReady,
+				Status: v1.ConditionTrue,
+			},
+			testFn:   isHealthy,
+			expected: true,
+		},
+		{
+			name:     "isHealthy: pod deletionTime is not nil",
+			podPhase: v1.PodRunning,
+			podCondition: v1.PodCondition{
+				Type:   v1.PodReady,
+				Status: v1.ConditionTrue,
+			},
+			podDeletionTime: now,
+			testFn:          isHealthy,
+			expected:        false,
+		},
+	}
+	for _, tc := range testCases {
+		pod := newStatefulSetPod(set, 1)
+		pod.Status.Phase = tc.podPhase
+		if tc.podDeletionTime == now {
+			pod.DeletionTimestamp = &tc.podDeletionTime
+		}
+		condition := tc.podCondition
+		podutil.UpdatePodCondition(&pod.Status, &condition)
+
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.testFn(pod); got != tc.expected {
+				t.Errorf("isPodInRightStatus want %v, got %v", tc.expected, got)
+			}
+		})
+	}
+}
+
 func TestAscendingOrdinal(t *testing.T) {
 	set := newStatefulSet(10)
 	pods := make([]*v1.Pod, 10)
