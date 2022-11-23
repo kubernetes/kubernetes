@@ -708,9 +708,12 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 	qs.reqsGaugePair.RequestsExecuting.Add(1)
 	qs.execSeatsGauge.Add(float64(req.MaxSeats()))
 	qs.seatDemandIntegrator.Set(float64(qs.totSeatsInUse + qs.totSeatsWaiting))
-	klogV := klog.V(5)
-	if klogV.Enabled() {
-		klogV.Infof("QS(%s) at t=%s R=%v: immediate dispatch of request %q %#+v %#+v, qs will have %d executing", qs.qCfg.Name, now.Format(nsTimeFmt), qs.currentR, fsName, descr1, descr2, qs.totRequestsExecuting)
+	// TODO (?): store the logger in the request to avoid repeated FromContext calls.
+	// TODO: use WithValues to avoid repeating the same values.
+	// However, beware that of transition period where WithValues might have no effect (alpha feature).
+	logger := klog.FromContext(ctx)
+	if loggerV := logger.V(5); loggerV.Enabled() {
+		loggerV.Info("Immediate dispatch", "QS", qs.qCfg.Name, "t", now.Format(nsTimeFmt), "R", qs.currentR, "request", fsName, "description1", descr1, "description2", descr2, "qsExecuting", qs.totRequestsExecuting)
 	}
 	return req
 }
