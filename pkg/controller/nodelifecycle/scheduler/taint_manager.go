@@ -514,9 +514,10 @@ func (tc *NoExecuteTaintManager) emitPodDeletionEvent(nsName types.NamespacedNam
 		return
 	}
 	ref := &v1.ObjectReference{
-		Kind:      "Pod",
-		Name:      nsName.Name,
-		Namespace: nsName.Namespace,
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Name:       nsName.Name,
+		Namespace:  nsName.Namespace,
 	}
 	tc.recorder.Eventf(ref, v1.EventTypeNormal, "TaintManagerEviction", "Marking for deletion Pod %s", nsName.String())
 }
@@ -526,9 +527,10 @@ func (tc *NoExecuteTaintManager) emitCancelPodDeletionEvent(nsName types.Namespa
 		return
 	}
 	ref := &v1.ObjectReference{
-		Kind:      "Pod",
-		Name:      nsName.Name,
-		Namespace: nsName.Namespace,
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Name:       nsName.Name,
+		Namespace:  nsName.Namespace,
 	}
 	tc.recorder.Eventf(ref, v1.EventTypeNormal, "TaintManagerEviction", "Cancelling deletion of Pod %s", nsName.String())
 }
