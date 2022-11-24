@@ -303,7 +303,7 @@ A security issue was discovered in Kubernetes where users authorized to list or 
 **Fixed Versions**:
   - kube-apiserver v1.25.4
   - kube-apiserver v1.24.8
-  - kube-apiserver v1.23.13
+  - kube-apiserver v1.23.14
   - kube-apiserver v1.22.16
 
 This vulnerability was reported by Richard Turnbull of NCC Group as part of the Kubernetes Audit
@@ -329,7 +329,7 @@ The merged fix enforces validation against the proxying address for a Node. In s
 **Fixed Versions**:
   - kube-apiserver v1.25.4
   - kube-apiserver v1.24.8
-  - kube-apiserver v1.23.13
+  - kube-apiserver v1.23.14
   - kube-apiserver v1.22.16
 
 This vulnerability was reported by Yuval Avrahami of Palo Alto Networks
