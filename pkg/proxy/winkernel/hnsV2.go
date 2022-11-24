@@ -160,6 +160,8 @@ func (hns hnsV2) getEndpointByName(name string) (*endpointsInfo, error) {
 	}, nil
 }
 func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
+	klog.V(3).InfoS("#====  Prince createEndpoint invoked", "networkName", networkName, "ep", ep)
+	defer klog.V(3).InfoS("#====  Prince createEndpoint completed", "networkName", networkName, "ep", ep)
 	hnsNetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
 		return nil, err
@@ -217,6 +219,8 @@ func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 	}, nil
 }
 func (hns hnsV2) deleteEndpoint(hnsID string) error {
+	klog.V(3).InfoS("#====  Prince deleteEndpoint invoked", "hnsID", hnsID)
+	defer klog.V(3).InfoS("#====  Prince deleteEndpoint completed", "hnsID", hnsID)
 	hnsendpoint, err := hcn.GetEndpointByID(hnsID)
 	if err != nil {
 		return err
@@ -318,7 +322,9 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, ep.hnsID)
 	}
 
+	klog.V(3).InfoS("#====  Prince loadBalancer.Create() invoked", "lb", loadBalancer.Id)
 	lb, err := loadBalancer.Create()
+	klog.V(3).InfoS("#====  Prince loadBalancer.Create() completed", "lb", loadBalancer.Id, "lb", lb)
 
 	if err != nil {
 		return nil, err
@@ -334,12 +340,19 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 }
 
 func (hns hnsV2) deleteLoadBalancer(hnsID string) error {
+
+	klog.V(3).InfoS("#====  Prince GetLoadBalancerByID invoked of deleteLoadBalancer", "hnsID", hnsID)
+
 	lb, err := hcn.GetLoadBalancerByID(hnsID)
+
+	klog.V(3).InfoS("#====  Prince GetLoadBalancerByID completed of deleteLoadBalancer", "hnsID", hnsID, "error", err)
 	if err != nil {
 		// Return silently
 		return nil
 	}
 
+	klog.V(3).InfoS("#====  Prince Delete invoked of deleteLoadBalancer", "hnsID", hnsID, "LB ID", lb.Id)
 	err = lb.Delete()
+	klog.V(3).InfoS("#====  Prince Delete completed of deleteLoadBalancer", "hnsID", hnsID, "LB ID", lb.Id, "error", err)
 	return err
 }

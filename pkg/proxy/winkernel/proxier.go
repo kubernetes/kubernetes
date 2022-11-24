@@ -117,16 +117,17 @@ type loadBalancerFlags struct {
 // internal struct for string service information
 type serviceInfo struct {
 	*proxy.BaseServiceInfo
-	targetPort             int
-	externalIPs            []*externalIPInfo
-	loadBalancerIngressIPs []*loadBalancerIngressInfo
-	hnsID                  string
-	nodePorthnsID          string
-	policyApplied          bool
-	remoteEndpoint         *endpointsInfo
-	hns                    HostNetworkService
-	preserveDIP            bool
-	localTrafficDSR        bool
+	targetPort                int
+	externalIPs               []*externalIPInfo
+	loadBalancerIngressIPs    []*loadBalancerIngressInfo
+	hnsID                     string
+	nodePorthnsID             string
+	policyApplied             bool
+	remoteEndpoint            *endpointsInfo
+	hns                       HostNetworkService
+	preserveDIP               bool
+	localTrafficDSR           bool
+	skipClusterIPLoadbalancer bool
 }
 
 type hnsNetworkInfo struct {
@@ -436,6 +437,8 @@ func (ep *endpointsInfo) Cleanup() {
 		// Remove only remote endpoints created by this service
 		if *ep.refCount <= 0 && !ep.GetIsLocal() {
 			klog.V(4).InfoS("Removing endpoints, since no one is referencing it", "endpoint", ep)
+			klog.V(3).InfoS("#====  Prince deleteRemoteEndpoint of cleanup invoked", "ep.hnsID", ep.hnsID)
+			defer klog.V(3).InfoS("#====  Prince deleteRemoteEndpoint of cleanup completed", "ep.hnsID", ep.hnsID)
 			err := ep.hns.deleteEndpoint(ep.hnsID)
 			if err == nil {
 				ep.hnsID = ""
@@ -461,6 +464,7 @@ func (refCountMap endPointsReferenceCountMap) getRefCount(hnsID string) *uint16 
 func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
 	info := &serviceInfo{BaseServiceInfo: baseInfo}
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
+	skipClusterLB := service.Annotations["skip-clusterip-loadbalancer"] == "true"
 	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 	err := hcn.DSRSupported()
 	if err != nil {
@@ -475,6 +479,8 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	}
 
 	info.preserveDIP = preserveDIP
+	info.skipClusterIPLoadbalancer = skipClusterLB
+	klog.V(3).InfoS("#====  Prince inside newServiceInfo", "skipClusterIPLoadbalancer", skipClusterLB)
 	info.targetPort = targetPort
 	info.hns = proxier.hns
 	info.localTrafficDSR = localTrafficDSR
@@ -994,6 +1000,9 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
+	klog.V(3).InfoS("#====  Prince syncProxyRules invoked")
+	defer klog.V(3).InfoS("#====  Prince syncProxyRules completed")
+
 	// don't sync rules till we've received services and endpoints
 	if !proxier.isInitialized() {
 		klog.V(2).InfoS("Not syncing hns until Services and Endpoints have been received from master")
@@ -1262,23 +1271,28 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.InfoS("Session Affinity is not supported on this version of Windows")
 		}
 
-		hnsLoadBalancer, err := hns.getLoadBalancer(
-			hnsEndpoints,
-			loadBalancerFlags{isDSR: proxier.isDSR, isIPv6: proxier.isIPv6Mode, sessionAffinity: sessionAffinityClientIP},
-			sourceVip,
-			svcInfo.ClusterIP().String(),
-			Enum(svcInfo.Protocol()),
-			uint16(svcInfo.targetPort),
-			uint16(svcInfo.Port()),
-			queriedLoadBalancers,
-		)
-		if err != nil {
-			klog.ErrorS(err, "Policy creation failed")
-			continue
-		}
+		if !svcInfo.skipClusterIPLoadbalancer {
 
-		svcInfo.hnsID = hnsLoadBalancer.hnsID
-		klog.V(3).InfoS("Hns LoadBalancer resource created for cluster ip resources", "clusterIP", svcInfo.ClusterIP(), "hnsID", hnsLoadBalancer.hnsID)
+			hnsLoadBalancer, err := hns.getLoadBalancer(
+				hnsEndpoints,
+				loadBalancerFlags{isDSR: proxier.isDSR, isIPv6: proxier.isIPv6Mode, sessionAffinity: sessionAffinityClientIP},
+				sourceVip,
+				svcInfo.ClusterIP().String(),
+				Enum(svcInfo.Protocol()),
+				uint16(svcInfo.targetPort),
+				uint16(svcInfo.Port()),
+				queriedLoadBalancers,
+			)
+			if err != nil {
+				klog.ErrorS(err, "Policy creation failed")
+				continue
+			}
+
+			svcInfo.hnsID = hnsLoadBalancer.hnsID
+			klog.V(3).InfoS("Hns LoadBalancer resource created for cluster ip resources", "clusterIP", svcInfo.ClusterIP(), "hnsID", hnsLoadBalancer.hnsID)
+		} else {
+			klog.V(3).InfoS("#====  Prince Skipping create cluster IP load balancer. skipClusterIPLoadbalancer set to true")
+		}
 
 		// If nodePort is specified, user should be able to use nodeIP:nodePort to reach the backend endpoints
 		if svcInfo.NodePort() > 0 {
