@@ -216,7 +216,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "buster-v1.6.7"}
 	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.3"}
-	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.4.13-0"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.6-0"}
 	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
 	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-1"}
 	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-1"}
