@@ -101,8 +101,7 @@ func kubernetesReleaseVersion(version string, fetcher func(string, time.Duration
 		if err != nil {
 			if clientVersionErr == nil {
 				// Handle air-gapped environments by falling back to the client version.
-				klog.Warningf("could not fetch a Kubernetes version from the internet: %v", err)
-				klog.Warningf("falling back to the local client version: %s", clientVersion)
+				klog.Warningf("falling back to the local client version: %s, could not fetch a Kubernetes version from the internet: %v", clientVersion, err)
 				return kubernetesReleaseVersion(clientVersion, fetcher)
 			}
 		}

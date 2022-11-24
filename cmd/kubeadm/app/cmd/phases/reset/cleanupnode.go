@@ -66,8 +66,7 @@ func runCleanupNode(c workflow.RunData) error {
 	klog.V(1).Infoln("[reset] Getting init system")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		klog.Warningln("[reset] The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
-		klog.Warningln("[reset] Please ensure kubelet is stopped manually")
+		klog.Warningln("[reset] The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!Please ensure kubelet is stopped manually.")
 	} else {
 		if !r.DryRun() {
 			fmt.Println("[reset] Stopping the kubelet service")
