@@ -268,7 +268,7 @@
     - [CPU and Memory manager are not working correctly for Guaranteed Pods with multiple containers](#cpu-and-memory-manager-are-not-working-correctly-for-guaranteed-pods-with-multiple-containers)
     - [`CSIMigrationvSphere` feature gate has not migrated to new CRD APIs](#csimigrationvsphere-feature-gate-has-not-migrated-to-new-crd-apis)
     - [Workloads that saturate nodes with pods may see pods that fail due to node admission](#workloads-that-saturate-nodes-with-pods-may-see-pods-that-fail-due-to-node-admission)
-    - [Etcd v3.5.[0-2] data corruption](#etcd-v350-2-data-corruption)
+    - [Etcd v3.5.\[0-2\] data corruption](#etcd-v350-2-data-corruption)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
   - [Changes by Kind](#changes-by-kind-15)
@@ -498,7 +498,7 @@ A security issue was discovered in Kubernetes where users authorized to list or 
 **Fixed Versions**:
   - kube-apiserver v1.25.4
   - kube-apiserver v1.24.8
-  - kube-apiserver v1.23.13
+  - kube-apiserver v1.23.14
   - kube-apiserver v1.22.16
 
 This vulnerability was reported by Richard Turnbull of NCC Group as part of the Kubernetes Audit
@@ -524,7 +524,7 @@ The merged fix enforces validation against the proxying address for a Node. In s
 **Fixed Versions**:
   - kube-apiserver v1.25.4
   - kube-apiserver v1.24.8
-  - kube-apiserver v1.23.13
+  - kube-apiserver v1.23.14
   - kube-apiserver v1.22.16
 
 This vulnerability was reported by Yuval Avrahami of Palo Alto Networks
