@@ -351,7 +351,7 @@ func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName)
 		}
 
 		klog.V(3).InfoS("Endpoints are modified. Service is stale", "servicePortName", svcPortName)
-		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName])
+		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName], true)
 	} else {
 		// If no service exists, just cleanup the remote endpoints
 		klog.V(3).InfoS("Endpoints are orphaned, cleaning up")
@@ -398,7 +398,7 @@ func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
 		}
 
 		klog.V(3).InfoS("Updating existing service port", "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP(), "port", svcInfo.Port(), "protocol", svcInfo.Protocol())
-		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName])
+		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName], false)
 	}
 }
 
@@ -441,6 +441,13 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 	}
 	ep, err := hns.createEndpoint(hnsEndpoint, network)
 	return ep, err
+}
+
+func (ep *endpointsInfo) DecrementRefCount() {
+	klog.V(3).InfoS("Endpoint cleanup", "endpointsInfo", ep)
+	if !ep.GetIsLocal() && ep.refCount != nil {
+		*ep.refCount--
+	}
 }
 
 func (ep *endpointsInfo) Cleanup() {
@@ -802,15 +809,20 @@ func CleanupLeftovers() (encounteredError bool) {
 	return encounteredError
 }
 
-func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
+func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, isEndpointChange bool) {
 	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
 	// Skip the svcInfo.policyApplied check to remove all the policies
-	svcInfo.deleteAllHnsLoadBalancerPolicy()
+	svcInfo.deleteAllHnsLoadBalancerPolicy(isEndpointChange)
 	// Cleanup Endpoints references
 	for _, ep := range endpoints {
 		epInfo, ok := ep.(*endpointsInfo)
 		if ok {
-			epInfo.Cleanup()
+			// TODOPrince
+			if isEndpointChange {
+				epInfo.DecrementRefCount()
+			} else {
+				epInfo.Cleanup()
+			}
 		}
 	}
 	if svcInfo.remoteEndpoint != nil {
@@ -820,7 +832,7 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
 	svcInfo.policyApplied = false
 }
 
-func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
+func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy(isEndpointChange bool) {
 	// Remove the Hns Policy corresponding to this service
 	hns := svcInfo.hns
 	hns.deleteLoadBalancer(svcInfo.hnsID)
@@ -833,9 +845,12 @@ func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
 		hns.deleteLoadBalancer(externalIP.hnsID)
 		externalIP.hnsID = ""
 	}
+
 	for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
-		hns.deleteLoadBalancer(lbIngressIP.hnsID)
-		lbIngressIP.hnsID = ""
+		if !isEndpointChange {
+			hns.deleteLoadBalancer(lbIngressIP.hnsID)
+			lbIngressIP.hnsID = ""
+		}
 		if lbIngressIP.healthCheckHnsID != "" {
 			hns.deleteLoadBalancer(lbIngressIP.healthCheckHnsID)
 			lbIngressIP.healthCheckHnsID = ""
@@ -993,7 +1008,7 @@ func (proxier *Proxier) cleanupAllPolicies() {
 			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
 			continue
 		}
-		svcInfo.cleanupAllPolicies(proxier.endpointsMap[svcName])
+		svcInfo.cleanupAllPolicies(proxier.endpointsMap[svcName], false)
 	}
 }
 
@@ -1380,6 +1395,11 @@ func (proxier *Proxier) syncProxyRules() {
 				lbIngressEndpoints = hnsLocalEndpoints
 			}
 
+			if lbIngressIP.hnsID != "" {
+				hns.deleteLoadBalancer(lbIngressIP.hnsID)
+				lbIngressIP.hnsID = ""
+			}
+
 			if len(lbIngressEndpoints) > 0 {
 				hnsLoadBalancer, err := hns.getLoadBalancer(
 					lbIngressEndpoints,
@@ -1425,6 +1445,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 		svcInfo.policyApplied = true
+
 		klog.V(2).InfoS("Policy successfully applied for service", "serviceInfo", svcInfo)
 	}
 
@@ -1452,7 +1473,10 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// remove stale endpoint refcount entries
 	for hnsID, referenceCount := range proxier.endPointsRefCount {
+		// This list will always give remote endpoints
 		if *referenceCount <= 0 {
+			klog.V(3).InfoS("Deleting unreferenced remote endpoint", "hnsID", hnsID)
+			proxier.hns.deleteEndpoint(hnsID)
 			delete(proxier.endPointsRefCount, hnsID)
 		}
 	}
