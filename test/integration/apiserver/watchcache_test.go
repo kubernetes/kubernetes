@@ -19,6 +19,7 @@ package apiserver
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -162,5 +163,70 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 		return res.ResourceVersion == se.ResourceVersion, nil
 	}); err == nil || err != wait.ErrWaitTimeout {
 		t.Errorf("Events watchcache unexpected synced: %v", err)
+	}
+}
+
+func BenchmarkListFromWatchCache(b *testing.B) {
+	c, _, tearDownFn := framework.StartTestServer(b, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Switch off endpoints reconciler to avoid unnecessary operations.
+			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
+		},
+	})
+	defer tearDownFn()
+
+	namespaces, secretsPerNamespace := 100, 1000
+	wg := sync.WaitGroup{}
+
+	errCh := make(chan error, namespaces)
+	for i := 0; i < namespaces; i++ {
+		wg.Add(1)
+		index := i
+		go func() {
+			defer wg.Done()
+
+			ctx := context.Background()
+			ns := &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("namespace-%d", index)},
+			}
+			ns, err := c.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			for j := 0; j < secretsPerNamespace; j++ {
+				secret := &v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("secret-%d", j),
+					},
+				}
+				_, err := c.CoreV1().Secrets(ns.Name).Create(ctx, secret, metav1.CreateOptions{})
+				if err != nil {
+					errCh <- err
+					return
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		b.Error(err)
+	}
+
+	b.ResetTimer()
+
+	ctx := context.Background()
+	opts := metav1.ListOptions{
+		ResourceVersion: "0",
+	}
+	for i := 0; i < b.N; i++ {
+		secrets, err := c.CoreV1().Secrets("").List(ctx, opts)
+		if err != nil {
+			b.Errorf("failed to list secrets: %v", err)
+		}
+		b.Logf("Number of secrets: %d", len(secrets.Items))
 	}
 }
