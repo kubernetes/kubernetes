@@ -13,7 +13,7 @@
 # limitations under the License.
 
 TAG=v2
-REGISTRY=staging-k8s.gcr.io
+REGISTRY=staging-registry.k8s.io
 IMAGE=gci-mounter
 
 all: container
