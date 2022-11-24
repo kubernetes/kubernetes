@@ -65,9 +65,11 @@ type nodeUpdateItem struct {
 }
 
 type podUpdateItem struct {
-	podName      string
-	podNamespace string
-	nodeName     string
+	podAPIVersion      string
+	podNamespacedName  types.NamespacedName
+	podResourceVersion string
+	podUID             types.UID
+	nodeName           string
 }
 
 func hash(val string, max int) int {
@@ -101,13 +103,13 @@ type NoExecuteTaintManager struct {
 	podUpdateQueue  workqueue.Interface
 }
 
-func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName)) func(ctx context.Context, args *WorkArgs) error {
+func deletePodHandler(c clientset.Interface, emitEventFunc func(string, types.NamespacedName, string, types.UID)) func(ctx context.Context, args *WorkArgs) error {
 	return func(ctx context.Context, args *WorkArgs) error {
 		ns := args.NamespacedName.Namespace
 		name := args.NamespacedName.Name
 		klog.InfoS("NoExecuteTaintManager is deleting pod", "pod", args.NamespacedName.String())
 		if emitEventFunc != nil {
-			emitEventFunc(args.NamespacedName)
+			emitEventFunc(args.APIVersion, args.NamespacedName, args.ResourceVersion, args.UID)
 		}
 		var err error
 		for i := 0; i < retries; i++ {
@@ -308,20 +310,29 @@ func (tc *NoExecuteTaintManager) worker(ctx context.Context, worker int, done fu
 
 // PodUpdated is used to notify NoExecuteTaintManager about Pod changes.
 func (tc *NoExecuteTaintManager) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
+	var podUID types.UID
+	podAPIVersion := ""
 	podName := ""
 	podNamespace := ""
+	podResourceVersion := ""
 	nodeName := ""
 	oldTolerations := []v1.Toleration{}
 	if oldPod != nil {
+		podAPIVersion = oldPod.APIVersion
 		podName = oldPod.Name
 		podNamespace = oldPod.Namespace
+		podResourceVersion = oldPod.ResourceVersion
+		podUID = oldPod.GetUID()
 		nodeName = oldPod.Spec.NodeName
 		oldTolerations = oldPod.Spec.Tolerations
 	}
 	newTolerations := []v1.Toleration{}
 	if newPod != nil {
+		podAPIVersion = newPod.APIVersion
 		podName = newPod.Name
 		podNamespace = newPod.Namespace
+		podResourceVersion = newPod.ResourceVersion
+		podUID = newPod.GetUID()
 		nodeName = newPod.Spec.NodeName
 		newTolerations = newPod.Spec.Tolerations
 	}
@@ -330,9 +341,11 @@ func (tc *NoExecuteTaintManager) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 		return
 	}
 	updateItem := podUpdateItem{
-		podName:      podName,
-		podNamespace: podNamespace,
-		nodeName:     nodeName,
+		podAPIVersion:      podAPIVersion,
+		podNamespacedName:  types.NamespacedName{Namespace: podNamespace, Name: podName},
+		podResourceVersion: podResourceVersion,
+		podUID:             podUID,
+		nodeName:           nodeName,
 	}
 
 	tc.podUpdateQueue.Add(updateItem)
@@ -363,63 +376,83 @@ func (tc *NoExecuteTaintManager) NodeUpdated(oldNode *v1.Node, newNode *v1.Node)
 	tc.nodeUpdateQueue.Add(updateItem)
 }
 
-func (tc *NoExecuteTaintManager) cancelWorkWithEvent(nsName types.NamespacedName) {
+func (tc *NoExecuteTaintManager) cancelWorkWithEvent(apiVersion string, nsName types.NamespacedName, resourceVersion string, uid types.UID) {
 	if tc.taintEvictionQueue.CancelWork(nsName.String()) {
-		tc.emitCancelPodDeletionEvent(nsName)
+		tc.emitCancelPodDeletionEvent(apiVersion, nsName, resourceVersion, uid)
 	}
 }
 
 func (tc *NoExecuteTaintManager) processPodOnNode(
 	ctx context.Context,
-	podNamespacedName types.NamespacedName,
-	nodeName string,
+	podUpdate podUpdateItem,
 	tolerations []v1.Toleration,
 	taints []v1.Taint,
 	now time.Time,
 ) {
 	if len(taints) == 0 {
-		tc.cancelWorkWithEvent(podNamespacedName)
+		tc.cancelWorkWithEvent(podUpdate.podAPIVersion, podUpdate.podNamespacedName, podUpdate.podResourceVersion, podUpdate.podUID)
 	}
 	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(taints, tolerations)
 	if !allTolerated {
-		klog.V(2).InfoS("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
+		klog.V(2).InfoS("Not all taints are tolerated after update for pod on node", "pod", podUpdate.podNamespacedName.String(), "node", klog.KRef("", podUpdate.nodeName))
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
-		tc.cancelWorkWithEvent(podNamespacedName)
-		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), time.Now(), time.Now())
+		tc.cancelWorkWithEvent(podUpdate.podAPIVersion, podUpdate.podNamespacedName, podUpdate.podResourceVersion, podUpdate.podUID)
+		tc.taintEvictionQueue.AddWork(
+			ctx,
+			NewWorkArgs(
+				podUpdate.podAPIVersion,
+				podUpdate.podNamespacedName.Name,
+				podUpdate.podNamespacedName.Namespace,
+				podUpdate.podResourceVersion,
+				podUpdate.podUID,
+			),
+			time.Now(),
+			time.Now(),
+		)
 		return
 	}
 	minTolerationTime := getMinTolerationTime(usedTolerations)
 	// getMinTolerationTime returns negative value to denote infinite toleration.
 	if minTolerationTime < 0 {
-		klog.V(4).InfoS("Current tolerations for pod tolerate forever, cancelling any scheduled deletion", "pod", podNamespacedName.String())
-		tc.cancelWorkWithEvent(podNamespacedName)
+		klog.V(4).InfoS("Current tolerations for pod tolerate forever, cancelling any scheduled deletion", "pod", podUpdate.podNamespacedName.String())
+		tc.cancelWorkWithEvent(podUpdate.podAPIVersion, podUpdate.podNamespacedName, podUpdate.podResourceVersion, podUpdate.podUID)
 		return
 	}
 
 	startTime := now
 	triggerTime := startTime.Add(minTolerationTime)
-	scheduledEviction := tc.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String())
+	scheduledEviction := tc.taintEvictionQueue.GetWorkerUnsafe(podUpdate.podNamespacedName.String())
 	if scheduledEviction != nil {
 		startTime = scheduledEviction.CreatedAt
 		if startTime.Add(minTolerationTime).Before(triggerTime) {
 			return
 		}
-		tc.cancelWorkWithEvent(podNamespacedName)
+		tc.cancelWorkWithEvent(podUpdate.podAPIVersion, podUpdate.podNamespacedName, podUpdate.podResourceVersion, podUpdate.podUID)
 	}
-	tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)
+	tc.taintEvictionQueue.AddWork(
+		ctx,
+		NewWorkArgs(
+			podUpdate.podAPIVersion,
+			podUpdate.podNamespacedName.Name,
+			podUpdate.podNamespacedName.Namespace,
+			podUpdate.podResourceVersion,
+			podUpdate.podUID,
+		),
+		startTime,
+		triggerTime,
+	)
 }
 
 func (tc *NoExecuteTaintManager) handlePodUpdate(ctx context.Context, podUpdate podUpdateItem) {
-	pod, err := tc.podLister.Pods(podUpdate.podNamespace).Get(podUpdate.podName)
+	pod, err := tc.podLister.Pods(podUpdate.podNamespacedName.Namespace).Get(podUpdate.podNamespacedName.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Delete
-			podNamespacedName := types.NamespacedName{Namespace: podUpdate.podNamespace, Name: podUpdate.podName}
-			klog.V(4).InfoS("Noticed pod deletion", "pod", podNamespacedName)
-			tc.cancelWorkWithEvent(podNamespacedName)
+			klog.V(4).InfoS("Noticed pod deletion", "pod", podUpdate.podNamespacedName)
+			tc.cancelWorkWithEvent(podUpdate.podAPIVersion, podUpdate.podNamespacedName, podUpdate.podResourceVersion, podUpdate.podUID)
 			return
 		}
-		utilruntime.HandleError(fmt.Errorf("could not get pod %s/%s: %v", podUpdate.podName, podUpdate.podNamespace, err))
+		utilruntime.HandleError(fmt.Errorf("could not get pod %s/%s: %v", podUpdate.podNamespacedName.Name, podUpdate.podNamespacedName.Namespace, err))
 		return
 	}
 
@@ -429,8 +462,7 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(ctx context.Context, podUpdate 
 	}
 
 	// Create or Update
-	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-	klog.V(4).InfoS("Noticed pod update", "pod", podNamespacedName)
+	klog.V(4).InfoS("Noticed pod update", "pod", podUpdate.podNamespacedName)
 	nodeName := pod.Spec.NodeName
 	if nodeName == "" {
 		return
@@ -446,7 +478,7 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(ctx context.Context, podUpdate 
 	if !ok {
 		return
 	}
-	tc.processPodOnNode(ctx, podNamespacedName, nodeName, pod.Spec.Tolerations, taints, time.Now())
+	tc.processPodOnNode(ctx, podUpdate, pod.Spec.Tolerations, taints, time.Now())
 }
 
 func (tc *NoExecuteTaintManager) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdateItem) {
@@ -493,38 +525,50 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(ctx context.Context, nodeUpdat
 	if len(taints) == 0 {
 		klog.V(4).InfoS("All taints were removed from the node. Cancelling all evictions...", "node", node.Name)
 		for i := range pods {
-			tc.cancelWorkWithEvent(types.NamespacedName{Namespace: pods[i].Namespace, Name: pods[i].Name})
+			tc.cancelWorkWithEvent(pods[i].APIVersion, types.NamespacedName{Namespace: pods[i].Namespace, Name: pods[i].Name}, pods[i].ResourceVersion, pods[i].GetUID())
 		}
 		return
 	}
 
 	now := time.Now()
 	for _, pod := range pods {
-		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-		tc.processPodOnNode(ctx, podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
+		podUpdate := podUpdateItem{
+			podAPIVersion:      pod.APIVersion,
+			podNamespacedName:  types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+			podResourceVersion: pod.ResourceVersion,
+			podUID:             pod.GetUID(),
+			nodeName:           nodeUpdate.nodeName,
+		}
+		tc.processPodOnNode(ctx, podUpdate, pod.Spec.Tolerations, taints, now)
 	}
 }
 
-func (tc *NoExecuteTaintManager) emitPodDeletionEvent(nsName types.NamespacedName) {
+func (tc *NoExecuteTaintManager) emitPodDeletionEvent(apiVersion string, nsName types.NamespacedName, resourceVersion string, uid types.UID) {
 	if tc.recorder == nil {
 		return
 	}
 	ref := &v1.ObjectReference{
-		Kind:      "Pod",
-		Name:      nsName.Name,
-		Namespace: nsName.Namespace,
+		APIVersion:      apiVersion,
+		Kind:            "Pod",
+		Name:            nsName.Name,
+		Namespace:       nsName.Namespace,
+		ResourceVersion: resourceVersion,
+		UID:             uid,
 	}
 	tc.recorder.Eventf(ref, v1.EventTypeNormal, "TaintManagerEviction", "Marking for deletion Pod %s", nsName.String())
 }
 
-func (tc *NoExecuteTaintManager) emitCancelPodDeletionEvent(nsName types.NamespacedName) {
+func (tc *NoExecuteTaintManager) emitCancelPodDeletionEvent(apiVersion string, nsName types.NamespacedName, resourceVersion string, uid types.UID) {
 	if tc.recorder == nil {
 		return
 	}
 	ref := &v1.ObjectReference{
-		Kind:      "Pod",
-		Name:      nsName.Name,
-		Namespace: nsName.Namespace,
+		APIVersion:      apiVersion,
+		Kind:            "Pod",
+		Name:            nsName.Name,
+		Namespace:       nsName.Namespace,
+		ResourceVersion: resourceVersion,
+		UID:             uid,
 	}
 	tc.recorder.Eventf(ref, v1.EventTypeNormal, "TaintManagerEviction", "Cancelling deletion of Pod %s", nsName.String())
 }
