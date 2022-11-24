@@ -43,7 +43,8 @@ var (
 // can be used for encryption and decryption, if given an remote encryption
 // service (remote KMS).
 func NewKeyManagementService(remoteCipher encryption.EncrypterDecrypter) (api.KeyManagementServiceServer, error) {
-	mk, err := encryption.NewManagedCipher(remoteCipher)
+	ctx := context.Background()
+	mk, err := encryption.NewManagedCipher(ctx, remoteCipher)
 	if err != nil {
 		klog.Infof("create key management service: %w", err)
 		return nil, err
@@ -94,7 +95,7 @@ func (s *Service) Decrypt(ctx context.Context, req *api.DecryptRequest) (*api.De
 		}, nil
 	}
 
-	pt, err := s.managedKeys.DecryptRemotely(keyID, req.Ciphertext)
+	pt, err := s.managedKeys.DecryptRemotely(ctx, keyID, req.Ciphertext)
 	if err != nil {
 		klog.Infof("decrypt remotely (id: %q) failed: %w", req.Uid, err)
 	}

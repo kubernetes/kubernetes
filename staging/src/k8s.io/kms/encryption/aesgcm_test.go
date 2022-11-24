@@ -26,7 +26,11 @@ import (
 
 func TestAESGCM(t *testing.T) {
 	ctx := context.Background()
-	aesgcmNew, err := encryption.NewAESGCM()
+	key, err := encryption.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	aesgcmNew, err := encryption.NewAESGCM(key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,57 +51,6 @@ func TestAESGCM(t *testing.T) {
 			t.Fatalf(
 				"want: %q,\nhave: %q", plaintext, decrypted,
 			)
-		}
-	})
-
-	for _, tt := range []struct {
-		name       string
-		key        []byte
-		shouldFail bool
-	}{
-		{
-			name: "should be able to re-use given key",
-			key:  aesgcmNew.Key(),
-		},
-		{
-			name:       "shouldn't be able to use non-sense key",
-			key:        []byte("lorem ipsum dolor"),
-			shouldFail: true,
-		},
-	} {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			aesgcmOld, err := encryption.FromKey(tt.key)
-			if err != nil && !tt.shouldFail {
-				t.Fatal(err)
-			}
-			if tt.shouldFail {
-				return
-			}
-
-			encrypted, err := aesgcmOld.Encrypt(ctx, plaintext)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			decrypted, err := aesgcmNew.Decrypt(ctx, encrypted)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if !bytes.Equal(plaintext, decrypted) {
-				t.Fatalf(
-					"want: %q,\nhave: %q", plaintext, decrypted,
-				)
-			}
-		})
-	}
-
-	t.Run("should not be able to encrypt on empty byte slice", func(t *testing.T) {
-		var plaintext []byte
-		nonceKey, err := aesgcmNew.Encrypt(ctx, plaintext)
-		if err == nil {
-			t.Errorf("empty plaintext could've been used: %q", nonceKey)
 		}
 	})
 

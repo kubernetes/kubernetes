@@ -21,82 +21,100 @@ import (
 	"crypto/aes"
 	"crypto/rand"
 	"errors"
+	"sync/atomic"
+	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
 	kaes "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 )
 
 const (
+	// MaxUsage with 2^21 is a very defensive value. 2^32 is more commonly used.
+	Usage    uint32 = 1 << 21
+	MaxUsage uint32 = 1 << 31
 	// keySize is the key size in bytes
 	keySize = 128 / 8
 )
 
 var (
-	ErrEmptyPlaintext = errors.New("plaintext for encryption is empty")
+	skew = time.Hour * 24
+	week = time.Hour * 24 * 7
+
+	// ErrKeyExpired means that the expiration time of a key has come and it shouldn't be used any more.
+	ErrKeyExpired = errors.New("key is out of date and shouldn't be used anymore for encryption")
 )
 
 // AESGCM is a struct that contains a key of random bytes and additional
 // information to re-use it in a safe way.
 type AESGCM struct {
-	key []byte
+	key     []byte
+	counter uint32
+	expiry  time.Time
 
-	aesGCM value.Transformer
+	transformer value.Transformer
 }
 
 // NewAESGCM returns a pointer to a AESGCM with a key and cipher.AEAD created.
-func NewAESGCM() (*AESGCM, error) {
-	key, err := randomBytes(keySize)
-	if err != nil {
-		return nil, err
-	}
-
-	return FromKey(key)
+func NewAESGCM(key []byte) (*AESGCM, error) {
+	return fromKey(key, 0, time.Now().Add(week))
 }
 
-// FromKey initializes a cipher.AEAD from bytes so the block cipher doesn't need
-// to be initialized every time.
+// FromKey initializes a cipher.AEAD from bytes, which is marked as expired.
+// It is marked as expired, because it is unknown how often it is already used.
 func FromKey(key []byte) (*AESGCM, error) {
+	return fromKey(
+		key,
+		1<<31,
+		time.Now().Add(-week).Add(-skew),
+	)
+}
+
+func fromKey(key []byte, counter uint32, expiry time.Time) (*AESGCM, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
 
-	transformer, _, err := kaes.NewGCMTransformer(block)
-	if err != nil {
-		return nil, err
-	}
-
 	return &AESGCM{
-		key:    key,
-		aesGCM: transformer,
+		counter:     counter,
+		expiry:      expiry,
+		key:         key,
+		transformer: kaes.NewGCMTransformer(block),
 	}, nil
 
 }
 
-// Key returns the internal Key used for encryption. One should be cautious with
-// this value as it is confidential data that must not leak.
-func (c *AESGCM) Key() []byte {
-	return c.key
+func (c *AESGCM) isReplaceable() bool {
+	return c.counter > Usage || time.Now().After(c.expiry)
 }
 
 // Encrypt encrypts given plaintext. The nonce is prepended. Therefore any
 // change to the standard nonceSize is a breaking change.
 func (c *AESGCM) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
-	return c.aesGCM.TransformToStorage(ctx, plaintext, value.DefaultContext)
+	if c.counter > MaxUsage || time.Now().After(c.expiry) {
+		return nil, ErrKeyExpired
+	}
+
+	_ = atomic.AddUint32(&c.counter, 1)
+
+	return c.transformer.TransformToStorage(ctx, plaintext, value.DefaultContext{})
 }
 
 // Decrypt decrypts a ciphertext. The nonce is assumed to be prepended.
 // Therefore any change to the standard nonceSize is a breaking change.
 func (k *AESGCM) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
-	plaintext, _, err := k.aesGCM.TransformFromStorage(ctx, ciphertext, value.DefaultContext)
+	plaintext, _, err := k.transformer.TransformFromStorage(ctx, ciphertext, value.DefaultContext{})
 	return plaintext, err
+}
+
+func NewKey() ([]byte, error) {
+	return randomBytes(keySize)
 }
 
 // randomBytes generates length amount of bytes.
 func randomBytes(length int) (key []byte, err error) {
 	key = make([]byte, length)
 
-	// TODO@ibihim: diff between rand.Read and ioutil.ReadFull?
 	if _, err = rand.Read(key); err != nil {
 		return nil, err
 	}

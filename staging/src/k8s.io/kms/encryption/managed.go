@@ -24,160 +24,127 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
 const (
-	// MaxUsage with 2^21 is a very defensive value. 2^32 is more commonly used.
-	MaxUsage = 2097151
-	// nonceSize is the size of the nonce. Do not change, without breaking version change.
-	// The nonceSize is a de facto standard.
-	nonceSize = 12
 	// cacheSize is set to 100 keys, which can be used to decrypt up to 200 million encrypted
 	// files or data encrypted within nearly 2 years.
 	cacheSize = 100
 )
 
 var (
-	// ErrKeyExpired means that the expiration time of a key has come and it shouldn't be used any more.
-	ErrKeyExpired = errors.New("key is out of date and shouldn't be used anymore for encryption")
 	// ErrNoCipher means that there is no remote kms given and therefore the keys in use can't be protected.
 	ErrNoCipher = errors.New("no remote encryption service was specified")
-
-	week = time.Hour * 24 * 7
 )
 
 // ManagedCipher is a set of keys. Only one key is used for encryption at one
 // time. New keys are created automatically, when hitting safety thresholds.
 type ManagedCipher struct {
-	counter uint32
-	expires time.Time
+	lock sync.RWMutex
 
-	keys *cache
+	remoteKMSID []byte
+	remoteKMS   EncrypterDecrypter
 
-	currentRemoteKMSID []byte
-	currentLocalKEK    []byte
-
-	fallbackRemoteKMSID []byte
-	fallbackLocalKEK    []byte
-
-	remoteKMS EncrypterDecrypter
-
-	m sync.Mutex
+	localKEK []byte
+	keys     *cache
 }
 
 // EncrypterDecrypter is a default encryption / decryption interface with an ID
 // to support remote state.
 type EncrypterDecrypter interface {
-	// TODO: consider adding context to interface.
-	Encrypt(plaintext []byte) (keyID, ciphertext []byte, err error)
-	Decrypt(keyID, ciphertext []byte) (plaintext []byte, err error)
+	Encrypt(ctx context.Context, plaintext []byte) (keyID, ciphertext []byte, err error)
+	Decrypt(ctx context.Context, keyID, ciphertext []byte) (plaintext []byte, err error)
 }
 
 // CurrentKeyID returns the currently assumed remote Key ID.
 func (m *ManagedCipher) CurrentKeyID() []byte {
-	return m.currentRemoteKMSID
+	return m.remoteKMSID
 }
 
 // NewManagedCipher returns a pointer to a ManagedCipher. It is initialized with
-// a cache, a reference to an remote cipher (like a KMS service or HMS) and
-// does an initial encryption call to the remote cipher.
-func NewManagedCipher(remoteCipher EncrypterDecrypter) (*ManagedCipher, error) {
-	if remoteCipher == nil {
+// a cache, a reference to an remote kms and does an initial encryption call to
+// the remote cipher.
+func NewManagedCipher(ctx context.Context, remoteKMS EncrypterDecrypter) (*ManagedCipher, error) {
+	if remoteKMS == nil {
 		klog.Infof("create managed cipher without remote encryption failed")
 		return nil, ErrNoCipher
 	}
 
-	cipher, err := NewAESGCM()
+	key, err := NewKey()
+	if err != nil {
+		return nil, err
+	}
+
+	cipher, err := NewAESGCM(key)
 	if err != nil {
 		klog.Infof("create new cipher: %w", err)
 		return nil, err
 	}
 
-	keyID, encCipher, err := remoteCipher.Encrypt(cipher.Key())
+	keyID, encKey, err := remoteKMS.Encrypt(ctx, key)
 	if err != nil {
 		klog.Infof("encrypt with remote: %w", err)
 		return nil, err
 	}
 
 	cache := newCache(cacheSize)
-	cache.Add(encCipher, cipher)
+	cache.Add(encKey, cipher)
 
 	mc := ManagedCipher{
-		keys:               cache,
-		counter:            0,
-		expires:            time.Now().Add(week),
-		remoteKMS:          remoteCipher,
-		currentRemoteKMSID: keyID,
-		currentLocalKEK:    encCipher,
+		remoteKMS:   remoteKMS,
+		remoteKMSID: keyID,
+
+		keys:     cache,
+		localKEK: encKey,
 	}
 
 	klog.Infof("new managed cipher is created")
 
-	go func() {
-		if err := mc.addFallbackCipher(); err != nil {
-			klog.Infof("set up fallback cipher: %w", err)
-		}
-	}()
-
 	return &mc, nil
 }
 
-func (m *ManagedCipher) addFallbackCipher() error {
-	cipher, err := NewAESGCM()
+func (m *ManagedCipher) Run(ctx context.Context) {
+	go wait.Until(func() {
+		cipher, ok := m.keys.Get(m.localKEK)
+		if ok {
+			klog.Warning("KMS Plugin points to a local KEK that can't be found")
+			return
+		}
+
+		if cipher.isReplaceable() {
+			m.addNewKey(ctx)
+		}
+	}, time.Second*10, ctx.Done())
+}
+
+func (m *ManagedCipher) addNewKey(ctx context.Context) error {
+	key, err := NewKey()
 	if err != nil {
-		klog.Infof("create new currentCipher: %w", err)
 		return err
 	}
 
-	keyID, encCipher, err := m.remoteKMS.Encrypt(cipher.Key())
+	cipher, err := NewAESGCM(key)
+	if err != nil {
+		klog.Infof("create new cipher: %w", err)
+		return err
+	}
+
+	keyID, encKey, err := m.remoteKMS.Encrypt(ctx, key)
 	if err != nil {
 		klog.Infof("encrypt with remote: %w", err)
 		return err
 	}
 
-	m.keys.Add(encCipher, cipher)
-	m.fallbackLocalKEK = encCipher
-	m.fallbackRemoteKMSID = keyID
+	m.keys.lruCache.Add(encKey, cipher)
 
-	return nil
-}
-
-func (m *ManagedCipher) manageKey() error {
-	m.m.Lock()
-	defer m.m.Unlock() // should be bound to main thread
-
-	// If the key is safe to use, do nothing.
-	m.counter = m.counter + 1
-	if m.counter < MaxUsage && time.Now().Before(m.expires) {
-		return nil
+	m.lock.Lock()
+	{
+		m.localKEK = encKey
+		m.remoteKMSID = keyID
 	}
-
-	// If fallback cipher doesn't exist, create one synchronously.
-	if m.fallbackLocalKEK == nil {
-		// In case that an error happened, while setting the fallback cipher
-		// asynchronously, do it now synchronously.
-		if err := m.addFallbackCipher(); err != nil {
-			return err
-		}
-	}
-
-	// Switch from current to fallback cipher
-	m.currentRemoteKMSID = m.fallbackRemoteKMSID
-	m.fallbackRemoteKMSID = nil
-	m.currentLocalKEK = m.fallbackLocalKEK
-	m.fallbackLocalKEK = nil
-
-	// Reset checks.
-	m.expires = time.Now().Add(week)
-	m.counter = 0
-
-	go func() {
-		// Add fallback cipher asynchronously and optimistically.
-		if err := m.addFallbackCipher(); err != nil {
-			klog.Infof("set up fallback cipher: %w", err)
-		}
-	}()
+	m.lock.Unlock()
 
 	return nil
 }
@@ -185,35 +152,33 @@ func (m *ManagedCipher) manageKey() error {
 // Encrypt encrypts given plaintext and returns the key used in encrypted form.
 // The encrypted key is encrypted by the given remote KMS.
 func (m *ManagedCipher) Encrypt(ctx context.Context, pt []byte) ([]byte, []byte, []byte, error) {
-	if err := m.manageKey(); err != nil {
-		return nil, nil, nil, fmt.Errorf("manage keys upfront of an encryption: %w", err)
-	}
-
-	cipher, ok := m.keys.Get(m.currentLocalKEK)
+	cipher, ok := m.keys.Get(m.localKEK)
 	if !ok {
 		klog.Infof(
 			"current plugin key (%q) has no value in cache",
-			base64.StdEncoding.EncodeToString(m.currentLocalKEK),
+			base64.StdEncoding.EncodeToString(m.localKEK),
 		)
+
 		return nil, nil, nil, fmt.Errorf(
 			"plugin is broken, current key is unknown (%q)",
-			base64.StdEncoding.EncodeToString(m.currentLocalKEK),
+			base64.StdEncoding.EncodeToString(m.localKEK),
 		)
 	}
 
+	// It can happen that cipher.Encrypt fails on an exhausted key. The probability is very low.
 	ct, err := cipher.Encrypt(ctx, pt)
 	if err != nil {
 		klog.Infof("encrypt plaintext: %w", err)
 		return nil, nil, nil, err
 	}
 
-	return m.currentRemoteKMSID, m.currentLocalKEK, ct, nil
+	return m.remoteKMSID, m.localKEK, ct, nil
 }
 
 // DecryptRemotely decrypts given ciphertext by sending it directly to the
 // remote kms.
-func (m *ManagedCipher) DecryptRemotely(id, ct []byte) ([]byte, error) {
-	return m.remoteKMS.Decrypt(id, ct)
+func (m *ManagedCipher) DecryptRemotely(ctx context.Context, id, ct []byte) ([]byte, error) {
+	return m.remoteKMS.Decrypt(ctx, id, ct)
 }
 
 // Decrypt decrypts the given ciphertext. If the given encrypted key is unknown,
@@ -239,7 +204,7 @@ func (m *ManagedCipher) Decrypt(ctx context.Context, keyID, encKey, ct []byte) (
 	)
 
 	// plainKey is a plaintext key and should be handled cautiously.
-	plainKey, err := m.remoteKMS.Decrypt(keyID, encKey)
+	plainKey, err := m.remoteKMS.Decrypt(ctx, keyID, encKey)
 	if err != nil {
 		klog.Infof(
 			"decrypt key (%q) by remote:",

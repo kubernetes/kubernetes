@@ -98,7 +98,7 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("decrypt by remote kms", func(t *testing.T) {
-		_, ct, err := kms.Encrypt(plaintext)
+		_, ct, err := kms.Encrypt(context.TODO(), plaintext)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,7 +116,12 @@ type remoteKMS struct {
 }
 
 func newRemoteKMS(id []byte) (*remoteKMS, error) {
-	cipher, err := encryption.NewAESGCM()
+	key, err := encryption.NewKey()
+	if err != nil {
+		return nil, err
+	}
+
+	cipher, err := encryption.NewAESGCM(key)
 	if err != nil {
 		return nil, err
 	}
@@ -127,8 +132,8 @@ func newRemoteKMS(id []byte) (*remoteKMS, error) {
 	}, nil
 }
 
-func (k *remoteKMS) Encrypt(pt []byte) ([]byte, []byte, error) {
-	ct, err := k.cipher.Encrypt(context.Background(), pt)
+func (k *remoteKMS) Encrypt(ctx context.Context, pt []byte) ([]byte, []byte, error) {
+	ct, err := k.cipher.Encrypt(ctx, pt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -136,8 +141,8 @@ func (k *remoteKMS) Encrypt(pt []byte) ([]byte, []byte, error) {
 	return k.currentKeyID, ct, nil
 }
 
-func (k *remoteKMS) Decrypt(observedID, encryptedKey []byte) ([]byte, error) {
-	pt, err := k.cipher.Decrypt(context.Background(), encryptedKey)
+func (k *remoteKMS) Decrypt(ctx context.Context, observedID, encryptedKey []byte) ([]byte, error) {
+	pt, err := k.cipher.Decrypt(ctx, encryptedKey)
 	if err != nil {
 		return nil, err
 	}
