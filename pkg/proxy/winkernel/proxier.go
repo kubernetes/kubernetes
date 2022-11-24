@@ -313,13 +313,29 @@ func conjureMac(macPrefix string, ip net.IP) string {
 }
 
 func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap) {
-	for svcPortName := range oldEndpointsMap {
+	klog.V(3).InfoS("#====  Prince  endpointsMapChange invoked.")
+	eMap := "OldEPS : \n"
+	for svcPortName, eps := range oldEndpointsMap {
+		eMap = "[ " + eMap + svcPortName.String() + " = "
+		for _, v := range eps {
+			state := fmt.Sprintf("{Ready:%v,Serving:%v,Terminating:%v,IsRemote:%v}", v.IsReady(), v.IsServing(), v.IsTerminating(), !v.GetIsLocal())
+			eMap = eMap + "\n" + v.String() + state + ","
+		}
+		eMap = eMap + "\n]\n"
 		proxier.onEndpointsMapChange(&svcPortName)
 	}
 
-	for svcPortName := range newEndpointsMap {
-		proxier.onEndpointsMapChange(&svcPortName)
+	eMap = eMap + "NewEPS : \n"
+	for svcPortName, eps := range newEndpointsMap {
+		eMap = "[ " + eMap + svcPortName.String() + " = "
+		for _, v := range eps {
+			state := fmt.Sprintf("{Ready:%v,Serving:%v,Terminating:%v,IsRemote:%v}", v.IsReady(), v.IsServing(), v.IsTerminating(), !v.GetIsLocal())
+			eMap = eMap + "\n" + v.String() + state + ","
+		}
+		eMap = eMap + "\n]\n"
 	}
+	eMap = eMap + "\n"
+	klog.V(3).InfoS("#====  Prince  endpointsMapChange completed ", "EPS", eMap)
 }
 
 func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName) {
