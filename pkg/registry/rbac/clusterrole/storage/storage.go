@@ -30,6 +30,14 @@ type REST struct {
 	*genericregistry.Store
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+        return []string{"cr"}
+}
+
 // NewREST returns a RESTStorage object that will work against ClusterRole objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
