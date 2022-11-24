@@ -1097,7 +1097,7 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 	// heartbeat leases, the node controller will assume the node is healthy and
 	// take no action.
 	observedLease, _ := nc.leaseLister.Leases(v1.NamespaceNodeLease).Get(node.Name)
-	if observedLease != nil && (savedLease == nil || savedLease.Spec.RenewTime.Before(observedLease.Spec.RenewTime)) {
+	if observedLease != nil && (savedLease == nil || !savedLease.Spec.RenewTime.Equal(observedLease.Spec.RenewTime)) {
 		nodeHealth.lease = observedLease
 		nodeHealth.probeTimestamp = nc.now()
 	}
