@@ -845,14 +845,14 @@ func checkReasons(t *testing.T, actual, expected ConflictReasons) {
 
 // findPodVolumes gets and finds volumes for given pod and node
 func findPodVolumes(binder SchedulerVolumeBinder, pod *v1.Pod, node *v1.Node) (*PodVolumes, ConflictReasons, error) {
-	boundClaims, claimsToBind, unboundClaimsImmediate, err := binder.GetPodVolumes(pod)
+	podVolumeClaims, err := binder.GetPodVolumeClaims(pod)
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(unboundClaimsImmediate) > 0 {
+	if len(podVolumeClaims.unboundClaimsImmediate) > 0 {
 		return nil, nil, fmt.Errorf("pod has unbound immediate PersistentVolumeClaims")
 	}
-	return binder.FindPodVolumes(pod, boundClaims, claimsToBind, node)
+	return binder.FindPodVolumes(pod, podVolumeClaims, node)
 }
 
 func TestFindPodVolumesWithoutProvisioning(t *testing.T) {

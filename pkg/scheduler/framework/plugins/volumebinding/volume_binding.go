@@ -47,14 +47,13 @@ const (
 // framework.CycleState, in the later phases we don't need to call Write method
 // to update the value
 type stateData struct {
-	skip         bool // set true if pod does not have PVCs
-	boundClaims  []*v1.PersistentVolumeClaim
-	claimsToBind []*v1.PersistentVolumeClaim
-	allBound     bool
+	skip     bool // set true if pod does not have PVCs
+	allBound bool
 	// podVolumesByNode holds the pod's volume information found in the Filter
 	// phase for each node
 	// it's initialized in the PreFilter phase
 	podVolumesByNode map[string]*PodVolumes
+	podVolumeClaims  *PodVolumeClaims
 	sync.Mutex
 }
 
@@ -170,11 +169,11 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 		state.Write(stateKey, &stateData{skip: true})
 		return nil, nil
 	}
-	boundClaims, claimsToBind, unboundClaimsImmediate, err := pl.Binder.GetPodVolumes(pod)
+	podVolumeClaims, err := pl.Binder.GetPodVolumeClaims(pod)
 	if err != nil {
 		return nil, framework.AsStatus(err)
 	}
-	if len(unboundClaimsImmediate) > 0 {
+	if len(podVolumeClaims.unboundClaimsImmediate) > 0 {
 		// Return UnschedulableAndUnresolvable error if immediate claims are
 		// not bound. Pod will be moved to active/backoff queues once these
 		// claims are bound by PV controller.
@@ -184,13 +183,20 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 	}
 	// Attempt to reduce down the number of nodes to consider in subsequent scheduling stages if pod has bound claims.
 	var result *framework.PreFilterResult
-	if eligibleNodes := pl.Binder.GetEligibleNodes(boundClaims); eligibleNodes != nil {
+	if eligibleNodes := pl.Binder.GetEligibleNodes(podVolumeClaims.boundClaims); eligibleNodes != nil {
 		result = &framework.PreFilterResult{
 			NodeNames: eligibleNodes,
 		}
 	}
 
-	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind, podVolumesByNode: make(map[string]*PodVolumes)})
+	state.Write(stateKey, &stateData{
+		podVolumesByNode: make(map[string]*PodVolumes),
+		podVolumeClaims: &PodVolumeClaims{
+			boundClaims:                podVolumeClaims.boundClaims,
+			unboundClaimsDelayBinding:  podVolumeClaims.unboundClaimsDelayBinding,
+			unboundVolumesDelayBinding: podVolumeClaims.unboundVolumesDelayBinding,
+		},
+	})
 	return result, nil
 }
 
@@ -241,7 +247,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return nil
 	}
 
-	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.boundClaims, state.claimsToBind, node)
+	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.podVolumeClaims, node)
 
 	if err != nil {
 		return framework.AsStatus(err)
