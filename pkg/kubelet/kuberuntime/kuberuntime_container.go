@@ -457,8 +457,24 @@ func makeUID() string {
 // getTerminationMessage looks on the filesystem for the provided termination message path, returning a limited
 // amount of those bytes, or returns true if the logs should be checked.
 func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessagePath string, fallbackToLogs bool) (string, bool) {
-	if len(terminationMessagePath) == 0 {
+	path, found := getTerminationMessagePath(status, terminationMessagePath)
+	if !found {
 		return "", fallbackToLogs
+	}
+
+	data, _, err := tail.ReadAtMost(path, kubecontainer.MaxContainerTerminationMessageLength)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fallbackToLogs
+		}
+		return fmt.Sprintf("Error on reading termination log %s: %v", path, err), false
+	}
+	return string(data), fallbackToLogs && len(data) == 0
+}
+
+func getTerminationMessagePath(status *runtimeapi.ContainerStatus, terminationMessagePath string) (string, bool) {
+	if status == nil || len(terminationMessagePath) == 0 {
+		return "", false
 	}
 	// Volume Mounts fail on Windows if it is not of the form C:/
 	terminationMessagePath = volumeutil.MakeAbsolutePath(goruntime.GOOS, terminationMessagePath)
@@ -466,17 +482,9 @@ func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessag
 		if mount.ContainerPath != terminationMessagePath {
 			continue
 		}
-		path := mount.HostPath
-		data, _, err := tail.ReadAtMost(path, kubecontainer.MaxContainerTerminationMessageLength)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return "", fallbackToLogs
-			}
-			return fmt.Sprintf("Error on reading termination log %s: %v", path, err), false
-		}
-		return string(data), (fallbackToLogs && len(data) == 0)
+		return mount.HostPath, true
 	}
-	return "", fallbackToLogs
+	return "", false
 }
 
 // readLastStringFromContainerLogs attempts to read up to the max log length from the end of the CRI log represented
@@ -967,12 +975,32 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(ctx context.Context, cont
 	}
 	// Remove the legacy container log symlink.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	if err := m.removeLegacyLogSymlink(containerID, status); err != nil {
+		return err
+	}
+
+	return m.removeTerminationMessagePath(containerID, status)
+}
+
+func (m *kubeGenericRuntimeManager) removeLegacyLogSymlink(containerID string, status *runtimeapi.ContainerStatus) error {
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	legacySymlink := legacyLogSymlink(containerID, labeledInfo.ContainerName, labeledInfo.PodName,
 		labeledInfo.PodNamespace)
 	if err := m.osInterface.Remove(legacySymlink); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove container %q log legacy symbolic link %q: %v",
 			containerID, legacySymlink, err)
+	}
+	return nil
+}
+
+func (m *kubeGenericRuntimeManager) removeTerminationMessagePath(containerID string, status *runtimeapi.ContainerStatus) error {
+	path, found := getTerminationMessagePath(status, getContainerInfoFromAnnotations(status.Annotations).TerminationMessagePath)
+	if !found {
+		return nil
+	}
+	if err := m.osInterface.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove container %q termination log %q: %v",
+			containerID, path, err)
 	}
 	return nil
 }
