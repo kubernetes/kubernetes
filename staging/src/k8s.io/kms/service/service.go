@@ -18,7 +18,6 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
 
 	"k8s.io/klog/v2"
 	api "k8s.io/kms/apis/v2alpha1"
@@ -62,7 +61,7 @@ func (s *Service) Status(ctx context.Context, _ *api.StatusRequest) (*api.Status
 	return &api.StatusResponse{
 		Version: version,
 		Healthz: "ok",
-		KeyId:   base64.StdEncoding.EncodeToString(s.managedKeys.CurrentKeyID()),
+		KeyId:   s.managedKeys.CurrentKeyID(),
 	}, nil
 }
 
@@ -74,15 +73,9 @@ func (s *Service) Status(ctx context.Context, _ *api.StatusRequest) (*api.Status
 func (s *Service) Decrypt(ctx context.Context, req *api.DecryptRequest) (*api.DecryptResponse, error) {
 	klog.V(4).Infof("decrypt request (id: %q) received", req.Uid)
 
-	keyID, err := base64.StdEncoding.DecodeString(req.KeyId)
-	if err != nil {
-		klog.V(4).Infof("ObservedKeyID decode attempt failed for request (id: %q): %w", req.Uid, err)
-		return nil, err
-	}
-
 	encryptedLocalKEK, ok := req.Annotations[encryptedLocalKEKKey]
 	if ok {
-		pt, err := s.managedKeys.Decrypt(ctx, keyID, encryptedLocalKEK, req.Ciphertext)
+		pt, err := s.managedKeys.Decrypt(ctx, req.KeyId, encryptedLocalKEK, req.Ciphertext)
 		if err != nil {
 			klog.V(4).Infof("decrypt attempt (id: %q) failed: %w", req.Uid, err)
 			return nil, err
@@ -95,7 +88,7 @@ func (s *Service) Decrypt(ctx context.Context, req *api.DecryptRequest) (*api.De
 		}, nil
 	}
 
-	pt, err := s.managedKeys.DecryptRemotely(ctx, keyID, req.Ciphertext)
+	pt, err := s.managedKeys.DecryptRemotely(ctx, req.KeyId, req.Ciphertext)
 	if err != nil {
 		klog.V(4).Infof("decrypt remotely (id: %q) failed: %w", req.Uid, err)
 	}
@@ -124,7 +117,7 @@ func (s *Service) Encrypt(ctx context.Context, req *api.EncryptRequest) (*api.En
 	klog.V(4).Infof("encrypt request (id: %q) succeeded", req.Uid)
 
 	return &api.EncryptResponse{
-		KeyId:      base64.StdEncoding.EncodeToString(remoteKeyID),
+		KeyId:      remoteKeyID,
 		Ciphertext: ct,
 		Annotations: map[string][]byte{
 			encryptedLocalKEKKey: encryptedLocalKEK,

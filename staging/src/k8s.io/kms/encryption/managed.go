@@ -43,7 +43,7 @@ var (
 type ManagedCipher struct {
 	lock sync.RWMutex
 
-	remoteKMSID []byte
+	remoteKMSID string
 	remoteKMS   EncrypterDecrypter
 
 	localKEK []byte
@@ -53,12 +53,12 @@ type ManagedCipher struct {
 // EncrypterDecrypter is a default encryption / decryption interface with an ID
 // to support remote state.
 type EncrypterDecrypter interface {
-	Encrypt(ctx context.Context, plaintext []byte) (keyID, ciphertext []byte, err error)
-	Decrypt(ctx context.Context, keyID, ciphertext []byte) (plaintext []byte, err error)
+	Encrypt(ctx context.Context, plaintext []byte) (keyID string, ciphertext []byte, err error)
+	Decrypt(ctx context.Context, keyID string, ciphertext []byte) (plaintext []byte, err error)
 }
 
 // CurrentKeyID returns the currently assumed remote Key ID.
-func (m *ManagedCipher) CurrentKeyID() []byte {
+func (m *ManagedCipher) CurrentKeyID() string {
 	return m.remoteKMSID
 }
 
@@ -148,19 +148,19 @@ func (m *ManagedCipher) addNewKey(ctx context.Context) error {
 
 // Encrypt encrypts given plaintext and returns the key used in encrypted form.
 // The encrypted key is encrypted by the given remote KMS.
-func (m *ManagedCipher) Encrypt(ctx context.Context, pt []byte) ([]byte, []byte, []byte, error) {
+func (m *ManagedCipher) Encrypt(ctx context.Context, pt []byte) (string, []byte, []byte, error) {
 	cipher, ok := m.keys.Get(m.localKEK)
 	if !ok {
 		klog.Warning("can't find local kek in cache")
 
-		return nil, nil, nil, errors.New("local kek is not in cache")
+		return "", nil, nil, errors.New("local kek is not in cache")
 	}
 
 	// It can happen that cipher.Encrypt fails on an exhausted key. The probability is very low.
 	ct, err := cipher.Encrypt(ctx, pt)
 	if err != nil {
 		klog.V(4).Infof("encrypt plaintext: %w", err)
-		return nil, nil, nil, err
+		return "", nil, nil, err
 	}
 
 	return m.remoteKMSID, m.localKEK, ct, nil
@@ -168,13 +168,13 @@ func (m *ManagedCipher) Encrypt(ctx context.Context, pt []byte) ([]byte, []byte,
 
 // DecryptRemotely decrypts given ciphertext by sending it directly to the
 // remote kms.
-func (m *ManagedCipher) DecryptRemotely(ctx context.Context, id, ct []byte) ([]byte, error) {
+func (m *ManagedCipher) DecryptRemotely(ctx context.Context, id string, ct []byte) ([]byte, error) {
 	return m.remoteKMS.Decrypt(ctx, id, ct)
 }
 
 // Decrypt decrypts the given ciphertext. If the given encrypted key is unknown,
 // Remote KMS is asked for decryption of the encrypted key.
-func (m *ManagedCipher) Decrypt(ctx context.Context, keyID, encKey, ct []byte) ([]byte, error) {
+func (m *ManagedCipher) Decrypt(ctx context.Context, keyID string, encKey, ct []byte) ([]byte, error) {
 	// Lookup key from cache.
 	cipher, ok := m.keys.Get(encKey)
 	if ok {

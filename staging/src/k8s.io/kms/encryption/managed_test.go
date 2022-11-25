@@ -26,10 +26,11 @@ import (
 )
 
 func TestManagedCipher(t *testing.T) {
-	var id, encryptedLocalKEK, ct []byte
+	var id string
+	var encryptedLocalKEK, ct []byte
 	plaintext := []byte("lorem ipsum")
 	ctx := context.Background()
-	remoteKMS, err := newRemoteKMS([]byte("helloworld"))
+	remoteKMS, err := newRemoteKMS("remoteKMSID")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +102,7 @@ func TodoTestExpiry(t *testing.T) {
 
 	counter := 0
 	remoteKMS := remoteKMS{
-		encrypt: func(ctx context.Context, plaintext []byte) ([]byte, []byte, error) {
+		encrypt: func(ctx context.Context, plaintext []byte) (string, []byte, error) {
 			counter = counter + 1
 			if counter > 2 {
 				time.Sleep(sleepDuration)
@@ -110,12 +111,12 @@ func TodoTestExpiry(t *testing.T) {
 
 			ct, err := cipher.Encrypt(ctx, plaintext)
 			if err != nil {
-				return nil, nil, err
+				return "", nil, err
 			}
 
-			return []byte("112358"), ct, nil
+			return "112358", ct, nil
 		},
-		decrypt: func(ctx context.Context, keyID, ciphertext []byte) ([]byte, error) {
+		decrypt: func(ctx context.Context, keyID string, ciphertext []byte) ([]byte, error) {
 			return cipher.Decrypt(ctx, ciphertext)
 		},
 	}
@@ -164,15 +165,15 @@ func TodoTestExpiry(t *testing.T) {
 }
 
 type remoteKMS struct {
-	encrypt func(context.Context, []byte) ([]byte, []byte, error)
-	decrypt func(context.Context, []byte, []byte) ([]byte, error)
+	encrypt func(context.Context, []byte) (string, []byte, error)
+	decrypt func(context.Context, string, []byte) ([]byte, error)
 }
 
 var (
 	_ EncrypterDecrypter = (*remoteKMS)(nil)
 )
 
-func newRemoteKMS(keyID []byte) (*remoteKMS, error) {
+func newRemoteKMS(keyID string) (*remoteKMS, error) {
 	key, err := NewKey()
 	if err != nil {
 		return nil, err
@@ -183,15 +184,15 @@ func newRemoteKMS(keyID []byte) (*remoteKMS, error) {
 	}
 
 	return &remoteKMS{
-		encrypt: func(ctx context.Context, pt []byte) ([]byte, []byte, error) {
+		encrypt: func(ctx context.Context, pt []byte) (string, []byte, error) {
 			ct, err := cipher.Encrypt(ctx, pt)
 			if err != nil {
-				return nil, nil, err
+				return "", nil, err
 			}
 
 			return keyID, ct, nil
 		},
-		decrypt: func(ctx context.Context, keyID []byte, encryptedKey []byte) ([]byte, error) {
+		decrypt: func(ctx context.Context, keyID string, encryptedKey []byte) ([]byte, error) {
 			pt, err := cipher.Decrypt(ctx, encryptedKey)
 			if err != nil {
 				return nil, err
@@ -202,11 +203,11 @@ func newRemoteKMS(keyID []byte) (*remoteKMS, error) {
 	}, nil
 }
 
-func (k *remoteKMS) Encrypt(ctx context.Context, plaintext []byte) ([]byte, []byte, error) {
+func (k *remoteKMS) Encrypt(ctx context.Context, plaintext []byte) (string, []byte, error) {
 	return k.encrypt(ctx, plaintext)
 }
 
-func (k *remoteKMS) Decrypt(ctx context.Context, keyID, ciphertext []byte) ([]byte, error) {
+func (k *remoteKMS) Decrypt(ctx context.Context, keyID string, ciphertext []byte) ([]byte, error) {
 	return k.decrypt(ctx, keyID, ciphertext)
 }
 
