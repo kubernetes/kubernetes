@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 )
 
@@ -53,9 +54,13 @@ type ActualStateOfWorld interface {
 	// If a plugin does not exist with the given socket path, this is a no-op.
 	RemovePlugin(socketPath string)
 
-	// PluginExists checks if the given plugin exists in the current actual
+	// Deprecated: PluginExistsWithCorrectTimestamp checks if the given plugin exists in the current actual
 	// state of world cache with the correct timestamp
 	PluginExistsWithCorrectTimestamp(pluginInfo PluginInfo) bool
+
+	// PluginExistsWithCorrectUUID checks if the given plugin exists in the current actual
+	// state of world cache with the correct UUID
+	PluginExistsWithCorrectUUID(pluginInfo PluginInfo) bool
 }
 
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld
@@ -79,6 +84,7 @@ var _ ActualStateOfWorld = &actualStateOfWorld{}
 type PluginInfo struct {
 	SocketPath string
 	Timestamp  time.Time
+	UUID       types.UID
 	Handler    PluginHandler
 	Name       string
 }
@@ -123,4 +129,14 @@ func (asw *actualStateOfWorld) PluginExistsWithCorrectTimestamp(pluginInfo Plugi
 	// matches the given plugin (from the desired state cache) timestamp
 	actualStatePlugin, exists := asw.socketFileToInfo[pluginInfo.SocketPath]
 	return exists && (actualStatePlugin.Timestamp == pluginInfo.Timestamp)
+}
+
+func (asw *actualStateOfWorld) PluginExistsWithCorrectUUID(pluginInfo PluginInfo) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	// We need to check both if the socket file path exists, and the UUID
+	// matches the given plugin (from the desired state cache) UUID
+	actualStatePlugin, exists := asw.socketFileToInfo[pluginInfo.SocketPath]
+	return exists && (actualStatePlugin.UUID == pluginInfo.UUID)
 }

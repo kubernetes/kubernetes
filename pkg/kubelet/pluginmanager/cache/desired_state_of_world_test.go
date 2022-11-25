@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -54,11 +53,6 @@ func Test_DSW_AddOrUpdatePlugin_Positive_NewPlugin(t *testing.T) {
 // Verifies the timestamp the existing plugin is updated
 // Verifies newly added plugin returns true for PluginExists()
 func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
 	dsw := NewDesiredStateOfWorld()
 	socketPath := "/var/lib/kubelet/device-plugins/test-plugin.sock"
 	// Adding the plugin for the first time
@@ -75,7 +69,7 @@ func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
 	if dswPlugins[0].SocketPath != socketPath {
 		t.Fatalf("Expected\n%s\nin desired state of world, but got\n%v\n", socketPath, dswPlugins[0])
 	}
-	oldTimestamp := dswPlugins[0].Timestamp
+	oldUUID := dswPlugins[0].UUID
 
 	// Adding the plugin again so that the timestamp will be updated
 	err = dsw.AddOrUpdatePlugin(socketPath)
@@ -90,9 +84,9 @@ func Test_DSW_AddOrUpdatePlugin_Positive_ExistingPlugin(t *testing.T) {
 		t.Fatalf("Expected\n%s\nin desired state of world, but got\n%v\n", socketPath, newDswPlugins[0])
 	}
 
-	// Verify that the new timestamp is newer than the old timestamp
-	if !newDswPlugins[0].Timestamp.After(oldTimestamp) {
-		t.Fatal("New timestamp is not newer than the old timestamp", newDswPlugins[0].Timestamp, oldTimestamp)
+	// Verify that the new UUID is different from the old UUID
+	if newDswPlugins[0].UUID == oldUUID {
+		t.Fatal("New UUID is not different from the old UUID", newDswPlugins[0].UUID, oldUUID)
 	}
 
 }
