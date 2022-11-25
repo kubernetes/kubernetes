@@ -356,8 +356,12 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions + 1
 	}
 
-	// update the lock itself
-	if err = le.config.Lock.Update(ctx, leaderElectionRecord); err != nil {
+	// update the lock itself.
+    // (Note) We use TODO context to ensure the update isn't canceled by 'ctx',
+    // otherwise the 'release' call may fail because this update may actually be done by the apiserver,
+    // but seeing as failed by the client under some race condition. That will cause the lease
+    // isn't released, which isn't something we expected.
+	if err = le.config.Lock.Update(context.TODO(), leaderElectionRecord); err != nil {
 		klog.Errorf("Failed to update lock: %v", err)
 		return false
 	}
