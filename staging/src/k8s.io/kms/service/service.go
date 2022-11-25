@@ -46,11 +46,11 @@ func NewKeyManagementService(remoteCipher encryption.EncrypterDecrypter) (api.Ke
 	ctx := context.Background()
 	mk, err := encryption.NewManagedCipher(ctx, remoteCipher)
 	if err != nil {
-		klog.Infof("create key management service: %w", err)
+		klog.V(2).Infof("create key management service: %w", err)
 		return nil, err
 	}
 
-	klog.Infof("new key management service created")
+	klog.V(4).Infof("new key management service created")
 
 	return &Service{
 		managedKeys: mk,
@@ -72,11 +72,11 @@ func (s *Service) Status(ctx context.Context, _ *api.StatusRequest) (*api.Status
 // Returns the assumed current key id. It is being synced if the
 // local kek is unknown or not given at all.
 func (s *Service) Decrypt(ctx context.Context, req *api.DecryptRequest) (*api.DecryptResponse, error) {
-	klog.Infof("decrypt request (id: %q) received", req.Uid)
+	klog.V(4).Infof("decrypt request (id: %q) received", req.Uid)
 
 	keyID, err := base64.StdEncoding.DecodeString(req.KeyId)
 	if err != nil {
-		klog.Infof("ObservedKeyID decode attempt failed for request (id: %q): %w", req.Uid, err)
+		klog.V(4).Infof("ObservedKeyID decode attempt failed for request (id: %q): %w", req.Uid, err)
 		return nil, err
 	}
 
@@ -84,11 +84,11 @@ func (s *Service) Decrypt(ctx context.Context, req *api.DecryptRequest) (*api.De
 	if ok {
 		pt, err := s.managedKeys.Decrypt(ctx, keyID, encryptedLocalKEK, req.Ciphertext)
 		if err != nil {
-			klog.Infof("decrypt attempt (id: %q) failed: %w", req.Uid, err)
+			klog.V(4).Infof("decrypt attempt (id: %q) failed: %w", req.Uid, err)
 			return nil, err
 		}
 
-		klog.Infof("decrypt request (id: %q) succeeded", req.Uid)
+		klog.V(4).Infof("decrypt request (id: %q) succeeded", req.Uid)
 
 		return &api.DecryptResponse{
 			Plaintext: pt,
@@ -97,7 +97,7 @@ func (s *Service) Decrypt(ctx context.Context, req *api.DecryptRequest) (*api.De
 
 	pt, err := s.managedKeys.DecryptRemotely(ctx, keyID, req.Ciphertext)
 	if err != nil {
-		klog.Infof("decrypt remotely (id: %q) failed: %w", req.Uid, err)
+		klog.V(4).Infof("decrypt remotely (id: %q) failed: %w", req.Uid, err)
 	}
 
 	return &api.DecryptResponse{
@@ -113,15 +113,15 @@ func (s *Service) Decrypt(ctx context.Context, req *api.DecryptRequest) (*api.De
 // Returns also the assumed current key id. It is synchronized on local kek
 // rotation.
 func (s *Service) Encrypt(ctx context.Context, req *api.EncryptRequest) (*api.EncryptResponse, error) {
-	klog.Infof("encrypt request received (id: %q)", req.Uid)
+	klog.V(4).Infof("encrypt request received (id: %q)", req.Uid)
 
 	remoteKeyID, encryptedLocalKEK, ct, err := s.managedKeys.Encrypt(ctx, req.Plaintext)
 	if err != nil {
-		klog.Infof("encrypt attempt (id: %q) failed: %w", req.Uid, err)
+		klog.V(4).Infof("encrypt attempt (id: %q) failed: %w", req.Uid, err)
 		return nil, err
 	}
 
-	klog.Infof("encrypt request (id: %q) succeeded", req.Uid)
+	klog.V(4).Infof("encrypt request (id: %q) succeeded", req.Uid)
 
 	return &api.EncryptResponse{
 		KeyId:      base64.StdEncoding.EncodeToString(remoteKeyID),

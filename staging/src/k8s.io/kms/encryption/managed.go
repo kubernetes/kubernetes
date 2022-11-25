@@ -19,9 +19,7 @@ package encryption
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -69,7 +67,7 @@ func (m *ManagedCipher) CurrentKeyID() []byte {
 // the remote cipher.
 func NewManagedCipher(ctx context.Context, remoteKMS EncrypterDecrypter) (*ManagedCipher, error) {
 	if remoteKMS == nil {
-		klog.Infof("create managed cipher without remote encryption failed")
+		klog.V(2).Infof("create managed cipher without remote encryption failed")
 		return nil, ErrNoCipher
 	}
 
@@ -80,13 +78,13 @@ func NewManagedCipher(ctx context.Context, remoteKMS EncrypterDecrypter) (*Manag
 
 	cipher, err := NewAESGCM(key)
 	if err != nil {
-		klog.Infof("create new cipher: %w", err)
+		klog.V(4).Infof("create new cipher: %w", err)
 		return nil, err
 	}
 
 	keyID, encKey, err := remoteKMS.Encrypt(ctx, key)
 	if err != nil {
-		klog.Infof("encrypt with remote: %w", err)
+		klog.V(2).Infof("encrypt with remote: %w", err)
 		return nil, err
 	}
 
@@ -100,8 +98,6 @@ func NewManagedCipher(ctx context.Context, remoteKMS EncrypterDecrypter) (*Manag
 		keys:     cache,
 		localKEK: encKey,
 	}
-
-	klog.Infof("new managed cipher is created")
 
 	return &mc, nil
 }
@@ -128,13 +124,13 @@ func (m *ManagedCipher) addNewKey(ctx context.Context) error {
 
 	cipher, err := NewAESGCM(key)
 	if err != nil {
-		klog.Infof("create new cipher: %w", err)
+		klog.V(4).Infof("create new cipher: %w", err)
 		return err
 	}
 
 	keyID, encKey, err := m.remoteKMS.Encrypt(ctx, key)
 	if err != nil {
-		klog.Infof("encrypt with remote: %w", err)
+		klog.Warning("encrypt with remote: %w", err)
 		return err
 	}
 
@@ -155,21 +151,15 @@ func (m *ManagedCipher) addNewKey(ctx context.Context) error {
 func (m *ManagedCipher) Encrypt(ctx context.Context, pt []byte) ([]byte, []byte, []byte, error) {
 	cipher, ok := m.keys.Get(m.localKEK)
 	if !ok {
-		klog.Infof(
-			"current plugin key (%q) has no value in cache",
-			base64.StdEncoding.EncodeToString(m.localKEK),
-		)
+		klog.Warning("can't find local kek in cache")
 
-		return nil, nil, nil, fmt.Errorf(
-			"plugin is broken, current key is unknown (%q)",
-			base64.StdEncoding.EncodeToString(m.localKEK),
-		)
+		return nil, nil, nil, errors.New("local kek is not in cache")
 	}
 
 	// It can happen that cipher.Encrypt fails on an exhausted key. The probability is very low.
 	ct, err := cipher.Encrypt(ctx, pt)
 	if err != nil {
-		klog.Infof("encrypt plaintext: %w", err)
+		klog.V(4).Infof("encrypt plaintext: %w", err)
 		return nil, nil, nil, err
 	}
 
@@ -190,7 +180,7 @@ func (m *ManagedCipher) Decrypt(ctx context.Context, keyID, encKey, ct []byte) (
 	if ok {
 		pt, err := cipher.Decrypt(ctx, ct)
 		if err != nil {
-			klog.Infof("decrypt ciphertext: %w", err)
+			klog.V(4).Infof("decrypt ciphertext: %w", err)
 			return nil, err
 		}
 
@@ -198,20 +188,12 @@ func (m *ManagedCipher) Decrypt(ctx context.Context, keyID, encKey, ct []byte) (
 	}
 
 	// not in cache flow
-
-	klog.Infof(
-		"key (%q) has no value in cache",
-		base64.StdEncoding.EncodeToString(encKey),
-	)
+	klog.V(4).Infof("key has no value in cache")
 
 	// plainKey is a plaintext key and should be handled cautiously.
 	plainKey, err := m.remoteKMS.Decrypt(ctx, keyID, encKey)
 	if err != nil {
-		klog.Infof(
-			"decrypt key by remote:",
-			base64.StdEncoding.EncodeToString(encKey),
-			err,
-		)
+		klog.Warning("decrypt key by remote:", err)
 
 		return nil, err
 	}
@@ -219,25 +201,19 @@ func (m *ManagedCipher) Decrypt(ctx context.Context, keyID, encKey, ct []byte) (
 	// Set up the cipher for the given key.
 	cipher, err = FromKey(plainKey)
 	if err != nil {
-		klog.Infof(
-			"use key (%q) for encryption: %w",
-			base64.StdEncoding.EncodeToString(encKey),
-			err,
-		)
+		klog.V(4).Infof("use key for encryption: %w", err)
+
 		return nil, err
 	}
 
 	// Add to cache.
 	m.keys.Add(encKey, cipher)
-	klog.Infof(
-		"key (%q) from ciphertext added to cache",
-		base64.StdEncoding.EncodeToString(encKey),
-	)
+	klog.V(4).Infof("key from ciphertext added to cache")
 
 	// Eventually decrypt with new key.
 	pt, err := cipher.Decrypt(ctx, ct)
 	if err != nil {
-		klog.Infof("decrypt ciphertext: %w", err)
+		klog.V(4).Infof("decrypt ciphertext: %w", err)
 		return nil, err
 	}
 
