@@ -271,6 +271,21 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 	return loadBalancers, nil
 }
 
+// findLoadBalancerID will construct a id from the provided loadbalancer fields
+func findLoadBalancerID(endpoints []endpointsInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
+	// Compute hash from backends (endpoint IDs)
+	hash, err := hashEndpoints(endpoints)
+	if err != nil {
+		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
+		return loadBalancerIdentifier{}, err
+	}
+	if len(vip) > 0 {
+		return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}, nil
+	}
+	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}, nil
+
+}
+
 func (hns hns) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
 	var id loadBalancerIdentifier
 	vips := []string{}
@@ -395,6 +410,7 @@ func hashEndpoints[T string | endpointsInfo](endpoints []T) (hash [20]byte, err 
 		case string:
 			id = x
 		}
+		id = strings.ToUpper(id)
 		if len(id) > 0 {
 			// We XOR the hashes of endpoints, since they are an unordered set.
 			// This can cause collisions, but is sufficient since we are using other keys to identify the load balancer.
