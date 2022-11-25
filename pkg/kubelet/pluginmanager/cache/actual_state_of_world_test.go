@@ -21,15 +21,17 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 // Calls AddPlugin() to add a plugin
 // Verifies newly added plugin exists in GetRegisteredPlugins()
-// Verifies PluginExistsWithCorrectTimestamp returns true for the plugin
+// Verifies PluginExistsWithCorrectUUID returns true for the plugin
 func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
 	pluginInfo := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 		Handler:    nil,
 		Name:       "test",
 	}
@@ -49,20 +51,21 @@ func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
 		t.Fatalf("Expected\n%v\nin actual state of world, but got\n%v\n", pluginInfo, aswPlugins[0])
 	}
 
-	// Check PluginExistsWithCorrectTimestamp returns true
-	if !asw.PluginExistsWithCorrectTimestamp(pluginInfo) {
-		t.Fatalf("PluginExistsWithCorrectTimestamp returns false for plugin that should be registered")
+	// Check PluginExistsWithCorrectUUID returns true
+	if !asw.PluginExistsWithCorrectUUID(pluginInfo) {
+		t.Fatalf("PluginExistsWithCorrectUUID returns false for plugin that should be registered")
 	}
 }
 
 // Calls AddPlugin() to add an empty string for socket path
 // Verifies the plugin does not exist in GetRegisteredPlugins()
-// Verifies PluginExistsWithCorrectTimestamp returns false
+// Verifies PluginExistsWithCorrectUUID returns false
 func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
 		SocketPath: "",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 		Handler:    nil,
 		Name:       "test",
 	}
@@ -75,21 +78,22 @@ func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
 		t.Fatalf("Actual state of world length should be zero but it's %d", len(aswPlugins))
 	}
 
-	// Check PluginExistsWithCorrectTimestamp returns false
-	if asw.PluginExistsWithCorrectTimestamp(pluginInfo) {
-		t.Fatalf("PluginExistsWithCorrectTimestamp returns true for plugin that's not registered")
+	// Check PluginExistsWithCorrectUUID returns false
+	if asw.PluginExistsWithCorrectUUID(pluginInfo) {
+		t.Fatalf("PluginExistsWithCorrectUUID returns true for plugin that's not registered")
 	}
 }
 
 // Calls RemovePlugin() to remove a plugin
 // Verifies newly removed plugin no longer exists in GetRegisteredPlugins()
-// Verifies PluginExistsWithCorrectTimestamp returns false
+// Verifies PluginExistsWithCorrectUUID returns false
 func Test_ASW_RemovePlugin_Positive(t *testing.T) {
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 		Handler:    nil,
 		Name:       "test",
 	}
@@ -108,20 +112,21 @@ func Test_ASW_RemovePlugin_Positive(t *testing.T) {
 		t.Fatalf("Actual state of world length should be zero but it's %d", len(aswPlugins))
 	}
 
-	// Check PluginExistsWithCorrectTimestamp returns false
-	if asw.PluginExistsWithCorrectTimestamp(pluginInfo) {
-		t.Fatalf("PluginExistsWithCorrectTimestamp returns true for the removed plugin")
+	// Check PluginExistsWithCorrectUUID returns false
+	if asw.PluginExistsWithCorrectUUID(pluginInfo) {
+		t.Fatalf("PluginExistsWithCorrectUUID returns true for the removed plugin")
 	}
 }
 
-// Verifies PluginExistsWithCorrectTimestamp returns false for an existing
-// plugin with the wrong timestamp
-func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testing.T) {
+// Verifies PluginExistsWithCorrectUUID returns false for an existing
+// plugin with the wrong UUID
+func Test_ASW_PluginExistsWithCorrectUUID_Negative_WrongUUID(t *testing.T) {
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 		Handler:    nil,
 		Name:       "test",
 	}
@@ -134,9 +139,10 @@ func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testin
 	newerPlugin := PluginInfo{
 		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 	}
-	// Check PluginExistsWithCorrectTimestamp returns false
-	if asw.PluginExistsWithCorrectTimestamp(newerPlugin) {
-		t.Fatalf("PluginExistsWithCorrectTimestamp returns true for a plugin with newer timestamp")
+	// Check PluginExistsWithCorrectUUID returns false
+	if asw.PluginExistsWithCorrectUUID(newerPlugin) {
+		t.Fatalf("PluginExistsWithCorrectUUID returns true for a plugin with newer timestamp")
 	}
 }
