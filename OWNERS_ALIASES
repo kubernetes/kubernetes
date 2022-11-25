@@ -99,12 +99,14 @@ aliases:
   # SIG Release
   release-engineering-approvers:
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
-    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
+    - jeremyrickard # SIG Chair / RelEng subproject owner / Release Manager
     - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
+    - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
   release-managers:
     - cpanato
+    - jeremyrickard
     - justaugustus
     - palnabarun
     - puerco
@@ -116,23 +118,24 @@ aliases:
     - cblecker
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
+    - jeremyrickard # SIG Chair / RelEng subproject owner / Release Manager
     - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
     - palnabarun # Release Manager
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
-    - Verolop # Release Manager
+    - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
     - xmudrii # Release Manager
   build-image-reviewers:
     - BenTheElder
     - cblecker
     - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
-    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
+    - jeremyrickard # SIG Chair / RelEng subproject owner / Release Manager
     #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
     - palnabarun # Release Manager
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
-    - Verolop # Release Manager
+    - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
     - xmudrii # Release Manager
   sig-storage-approvers:
     - saad-ali
