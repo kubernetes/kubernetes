@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service_test
+package service
 
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"testing"
 
 	api "k8s.io/kms/apis/v2alpha1"
 	"k8s.io/kms/encryption"
-	"k8s.io/kms/service"
 )
 
 func TestService(t *testing.T) {
@@ -32,7 +32,7 @@ func TestService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svc, err := service.NewKeyManagementService(kms)
+	svc, err := NewKeyManagementService(kms)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("decrypt by other kms plugin", func(t *testing.T) {
-		anotherSvc, err := service.NewKeyManagementService(kms)
+		anotherSvc, err := NewKeyManagementService(kms)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,7 +116,7 @@ type remoteKMS struct {
 }
 
 func newRemoteKMS(id []byte) (*remoteKMS, error) {
-	key, err := encryption.NewKey()
+	key, err := newKey()
 	if err != nil {
 		return nil, err
 	}
@@ -148,4 +148,15 @@ func (k *remoteKMS) Decrypt(ctx context.Context, observedID, encryptedKey []byte
 	}
 
 	return pt, nil
+}
+
+// newKey generates length amount of bytes.
+func newKey() (key []byte, err error) {
+	key = make([]byte, 128/8)
+
+	if _, err = rand.Read(key); err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }

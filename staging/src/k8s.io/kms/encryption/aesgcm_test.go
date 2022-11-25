@@ -14,23 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package encryption_test
+package encryption
 
 import (
 	"bytes"
 	"context"
 	"testing"
-
-	"k8s.io/kms/encryption"
 )
 
 func TestAESGCM(t *testing.T) {
 	ctx := context.Background()
-	key, err := encryption.NewKey()
+	key, err := NewKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	aesgcmNew, err := encryption.NewAESGCM(key)
+	aesgcmNew, err := NewAESGCM(key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,9 +46,7 @@ func TestAESGCM(t *testing.T) {
 		}
 
 		if !bytes.Equal(plaintext, decrypted) {
-			t.Fatalf(
-				"want: %q,\nhave: %q", plaintext, decrypted,
-			)
+			t.Fatalf("want: %q,\nhave: %q", plaintext, decrypted)
 		}
 	})
 

@@ -19,7 +19,6 @@ package encryption
 import (
 	"context"
 	"crypto/aes"
-	"crypto/rand"
 	"errors"
 	"sync/atomic"
 	"time"
@@ -29,9 +28,9 @@ import (
 )
 
 const (
-	// MaxUsage with 2^21 is a very defensive value. 2^32 is more commonly used.
-	Usage    uint32 = 1 << 21
-	MaxUsage uint32 = 1 << 31
+	// maxUsage with 2^21 is a very defensive value. 2^32 is more commonly used.
+	usage    uint32 = 1 << 21
+	maxUsage uint32 = 1 << 31
 	// keySize is the key size in bytes
 	keySize = 128 / 8
 )
@@ -85,13 +84,13 @@ func fromKey(key []byte, counter uint32, expiry time.Time) (*AESGCM, error) {
 }
 
 func (c *AESGCM) isReplaceable() bool {
-	return c.counter > Usage || time.Now().After(c.expiry)
+	return c.counter > usage || time.Now().After(c.expiry)
 }
 
 // Encrypt encrypts given plaintext. The nonce is prepended. Therefore any
 // change to the standard nonceSize is a breaking change.
 func (c *AESGCM) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
-	if c.counter > MaxUsage || time.Now().After(c.expiry) {
+	if c.counter > maxUsage || time.Now().After(c.expiry) {
 		return nil, ErrKeyExpired
 	}
 
@@ -105,19 +104,4 @@ func (c *AESGCM) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) 
 func (k *AESGCM) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
 	plaintext, _, err := k.transformer.TransformFromStorage(ctx, ciphertext, value.DefaultContext{})
 	return plaintext, err
-}
-
-func NewKey() ([]byte, error) {
-	return randomBytes(keySize)
-}
-
-// randomBytes generates length amount of bytes.
-func randomBytes(length int) (key []byte, err error) {
-	key = make([]byte, length)
-
-	if _, err = rand.Read(key); err != nil {
-		return nil, err
-	}
-
-	return key, nil
 }

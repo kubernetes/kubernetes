@@ -18,6 +18,7 @@ package encryption
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -207,7 +208,7 @@ func (m *ManagedCipher) Decrypt(ctx context.Context, keyID, encKey, ct []byte) (
 	plainKey, err := m.remoteKMS.Decrypt(ctx, keyID, encKey)
 	if err != nil {
 		klog.Infof(
-			"decrypt key (%q) by remote:",
+			"decrypt key by remote:",
 			base64.StdEncoding.EncodeToString(encKey),
 			err,
 		)
@@ -241,4 +242,19 @@ func (m *ManagedCipher) Decrypt(ctx context.Context, keyID, encKey, ct []byte) (
 	}
 
 	return pt, nil
+}
+
+func NewKey() ([]byte, error) {
+	return randomBytes(keySize)
+}
+
+// randomBytes generates length amount of bytes.
+func randomBytes(length int) (key []byte, err error) {
+	key = make([]byte, length)
+
+	if _, err = rand.Read(key); err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }

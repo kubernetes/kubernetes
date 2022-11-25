@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package encryption_test
+package encryption
 
 import (
 	"bytes"
@@ -23,8 +23,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"k8s.io/kms/encryption"
 )
 
 func TestManagedCipher(t *testing.T) {
@@ -37,7 +35,7 @@ func TestManagedCipher(t *testing.T) {
 	}
 
 	t.Run("encrypt with ManagedCipher", func(t *testing.T) {
-		mc, err := encryption.NewManagedCipher(ctx, remoteKMS)
+		mc, err := NewManagedCipher(ctx, remoteKMS)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +59,7 @@ func TestManagedCipher(t *testing.T) {
 	})
 
 	t.Run("decrypt with another ManagedCipher", func(t *testing.T) {
-		mc, err := encryption.NewManagedCipher(ctx, remoteKMS)
+		mc, err := NewManagedCipher(ctx, remoteKMS)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,12 +89,12 @@ func TodoTestExpiry(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	key, err := encryption.NewKey()
+	key, err := NewKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cipher, err := encryption.NewAESGCM(key)
+	cipher, err := NewAESGCM(key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +120,7 @@ func TodoTestExpiry(t *testing.T) {
 		},
 	}
 
-	mc, err := encryption.NewManagedCipher(ctx, &remoteKMS)
+	mc, err := NewManagedCipher(ctx, &remoteKMS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +133,7 @@ func TodoTestExpiry(t *testing.T) {
 		plaintext := []byte("lorem ipsum")
 		ctx := context.Background()
 
-		beyondCollision := encryption.Usage + 5
+		beyondCollision := usage + 5
 		var wg sync.WaitGroup
 		var m safeMap
 
@@ -171,15 +169,15 @@ type remoteKMS struct {
 }
 
 var (
-	_ encryption.EncrypterDecrypter = (*remoteKMS)(nil)
+	_ EncrypterDecrypter = (*remoteKMS)(nil)
 )
 
 func newRemoteKMS(keyID []byte) (*remoteKMS, error) {
-	key, err := encryption.NewKey()
+	key, err := NewKey()
 	if err != nil {
 		return nil, err
 	}
-	cipher, err := encryption.NewAESGCM(key)
+	cipher, err := NewAESGCM(key)
 	if err != nil {
 		return nil, err
 	}
