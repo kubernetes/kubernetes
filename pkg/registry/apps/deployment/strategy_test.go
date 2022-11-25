@@ -18,6 +18,7 @@ package deployment
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -146,8 +147,13 @@ func TestSelectorImmutability(t *testing.T) {
 		if len(test.expectedErrorList) == 0 && len(errorList) == 0 {
 			continue
 		}
-		if !reflect.DeepEqual(test.expectedErrorList, errorList) {
+		if len(test.expectedErrorList) != len(errorList) {
 			t.Errorf("Unexpected error list, expected: %v, actual: %v", test.expectedErrorList, errorList)
+		}
+		for i := 0; i < len(errorList); i++ {
+			if !strings.Contains(errorList[i].Detail, test.expectedErrorList[i].Detail) {
+				t.Errorf("Unexpected error list, expected: %v, actual: %v", test.expectedErrorList[i], errorList[i])
+			}
 		}
 	}
 }

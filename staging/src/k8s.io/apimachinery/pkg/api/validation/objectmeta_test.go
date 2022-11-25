@@ -372,7 +372,7 @@ func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 			continue
 		}
 		for i := range errs {
-			if errs[i].Error() != tc.ExpectedErrs[i] {
+			if !strings.Contains(errs[i].Error(), tc.ExpectedErrs[i]) {
 				t.Errorf("%s: error #%d: expected %q, got %q", k, i, tc.ExpectedErrs[i], errs[i].Error())
 			}
 		}
@@ -497,4 +497,66 @@ func TestValidateAnnotations(t *testing.T) {
 			t.Errorf("case[%d] expected failure", i)
 		}
 	}
+}
+
+func TestValidateImmutableField(t *testing.T) {
+	type TestCaseStruct struct {
+		FieldString1 string
+		FieldString2 string
+		FieldInt1    int
+	}
+	type TestCaseStruct2 struct {
+		FieldString1 string
+		FieldString2 string
+	}
+	successTestCases := [][]interface{}{
+		{TestCaseStruct{"aaa", "bbb", 1}, TestCaseStruct{"aaa", "bbb", 1}},
+		{TestCaseStruct{"", "bbb", 1}, TestCaseStruct{"", "bbb", 1}},
+		{TestCaseStruct{}, TestCaseStruct{}},
+		{1, 1},
+		{nil, nil},
+		{map[string]interface{}{}, map[string]interface{}{}},
+		{map[string]interface{}{"aa": "bb", "cc": "dd"}, map[string]interface{}{"cc": "dd", "aa": "bb"}},
+		{map[string]interface{}{"aa": TestCaseStruct{"aaa", "bbb", 1}}, map[string]interface{}{"aa": TestCaseStruct{"aaa", "bbb", 1}}},
+	}
+
+	failTestCases := [][]interface{}{
+		{TestCaseStruct{}, TestCaseStruct2{}},
+		{TestCaseStruct{"aaa", "bbb", 1}, TestCaseStruct{"aaa", "bbb", 2}},
+		{TestCaseStruct{"aaa", "bbb", 1}, TestCaseStruct{"aaa", "bsbb", 1}},
+		{1, map[string]interface{}{}},
+		{map[string]interface{}{"aa": "bb", "cc": "dd"}, map[string]interface{}{"cc": "dd", "aa": "abb"}},
+		{map[string]interface{}{"aa": "bb", "cc": "dd"}, nil},
+		{map[string]interface{}{"aa": TestCaseStruct{"aaa", "bbb", 1}}, map[string]interface{}{"aa": TestCaseStruct{"aaa", "bbb", 2}}},
+	}
+
+	for i, arr := range successTestCases {
+		errs := ValidateImmutableField(arr[0], arr[1], field.NewPath("field"))
+		if len(errs) != 0 {
+			t.Errorf("successTestCases[%d] expected failure", i)
+		}
+	}
+	for i, arr := range failTestCases {
+		errs := ValidateImmutableField(arr[0], arr[1], field.NewPath("field"))
+		if len(errs) != 1 {
+			t.Errorf("failTestCases[%d] expected failure", i)
+		}
+	}
+
+	for i, arr := range successTestCases {
+		errs := ValidateImmutableField(arr[0], arr[1], field.NewPath("spec"))
+		if len(errs) != 0 {
+			t.Errorf("successTestCases[%d] expected failure", i)
+		}
+	}
+	for i, arr := range failTestCases {
+		errs := ValidateImmutableField(arr[0], arr[1], field.NewPath("spec"))
+		if len(errs) != 1 {
+			t.Errorf("failTestCases[%d] expected failure", i)
+		}
+		if !strings.Contains(errs[0].Error(), FieldImmutableErrorMsg) {
+			t.Errorf("failTestCases[%d]: incorrect error", i)
+		}
+	}
+
 }

@@ -307,7 +307,10 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			scenario.oldClaimTemplate.ResourceVersion = "1"
 			errs := ValidateClaimTemplateUpdate(scenario.update(scenario.oldClaimTemplate.DeepCopy()), scenario.oldClaimTemplate)
-			assert.Equal(t, scenario.wantFailures, errs)
+			assert.Equal(t, len(scenario.wantFailures), len(errs))
+			for i := 0; i < len(errs); i++ {
+				assert.Contains(t, errs[i].Detail, scenario.wantFailures[i].Detail, "Error #%d", i)
+			}
 		})
 	}
 }

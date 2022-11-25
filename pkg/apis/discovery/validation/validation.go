@@ -71,7 +71,7 @@ func ValidateEndpointSliceCreate(endpointSlice *discovery.EndpointSlice) field.E
 // ValidateEndpointSliceUpdate validates an EndpointSlice when it is updated.
 func ValidateEndpointSliceUpdate(newEndpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
 	allErrs := ValidateEndpointSlice(newEndpointSlice)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType"))...)
 
 	return allErrs
 }

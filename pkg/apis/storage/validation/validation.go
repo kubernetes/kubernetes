@@ -76,7 +76,7 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden."))
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 	return allErrs
 }
 

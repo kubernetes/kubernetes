@@ -540,7 +540,7 @@ func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.
 // validateIngressClassSpecUpdate ensures that IngressClassSpec updates are
 // valid.
 func validateIngressClassSpecUpdate(newSpec, oldSpec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
-	return apivalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
+	return apimachineryvalidation.ValidateImmutableField(newSpec.Controller, oldSpec.Controller, fldPath.Child("controller"))
 }
 
 // validateIngressTypedLocalObjectReference ensures that Parameters fields are valid.
@@ -734,10 +734,10 @@ func ValidateClusterCIDRUpdate(update, old *networking.ClusterCIDR) field.ErrorL
 func validateClusterCIDRUpdateSpec(update, old *networking.ClusterCIDRSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.NodeSelector, old.NodeSelector, fldPath.Child("nodeSelector"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.PerNodeHostBits, old.PerNodeHostBits, fldPath.Child("perNodeHostBits"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv4, old.IPv4, fldPath.Child("ipv4"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv6, old.IPv6, fldPath.Child("ipv6"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(update.NodeSelector, old.NodeSelector, fldPath.Child("nodeSelector"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(update.PerNodeHostBits, old.PerNodeHostBits, fldPath.Child("perNodeHostBits"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(update.IPv4, old.IPv4, fldPath.Child("ipv4"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(update.IPv6, old.IPv6, fldPath.Child("ipv6"))...)
 
 	return allErrs
 }

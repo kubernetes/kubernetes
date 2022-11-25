@@ -335,10 +335,6 @@ func ValidatePositiveQuantityValue(value resource.Quantity, fldPath *field.Path)
 	return allErrs
 }
 
-func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
-	return apimachineryvalidation.ValidateImmutableField(newVal, oldVal, fldPath)
-}
-
 func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -1982,15 +1978,16 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 	}
 
 	// PersistentVolumeSource should be immutable after creation.
-	if !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
-		pvcSourceDiff := cmp.Diff(oldPv.Spec.PersistentVolumeSource, newPv.Spec.PersistentVolumeSource)
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), fmt.Sprintf("spec.persistentvolumesource is immutable after creation\n%v", pvcSourceDiff)))
-	}
-	allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(
+		newPv.Spec.PersistentVolumeSource,
+		oldPv.Spec.PersistentVolumeSource,
+		field.NewPath("spec", "persistentvolumesource"))...,
+	)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("spec", "volumeMode"))...)
 
 	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
 	if oldPv.Spec.NodeAffinity != nil {
-		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
 	}
 
 	return allErrs
@@ -2241,6 +2238,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		specDiff := cmp.Diff(oldPvcClone.Spec, newPvcClone.Spec)
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests for bound claims\n%v", specDiff)))
 	}
+
 	if newSize.Cmp(oldSize) < 0 {
 		if !opts.EnableRecoverFromExpansionFailure {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
@@ -2254,7 +2252,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		}
 	}
 
-	allErrs = append(allErrs, ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newPvc.Spec.VolumeMode, oldPvc.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
 	return allErrs
 }
@@ -4690,10 +4688,12 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 	for _, old := range oldPod.Spec.EphemeralContainers {
 		if new, ok := newContainerIndex[old.Name]; !ok {
 			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be removed\n", old.Name)))
-		} else if !apiequality.Semantic.DeepEqual(old, *new) {
-			specDiff := cmp.Diff(old, *new)
-			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be changed\n%v", old.Name, specDiff)))
+		} else {
+			allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(
+				old, *new, specPath)...,
+			)
 		}
+
 	}
 
 	return allErrs
@@ -5813,7 +5813,7 @@ func ValidateSecret(secret *core.Secret) field.ErrorList {
 func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newSecret.ObjectMeta, &oldSecret.ObjectMeta, field.NewPath("metadata"))
 
-	allErrs = append(allErrs, ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(newSecret.Type, oldSecret.Type, field.NewPath("type"))...)
 	if oldSecret.Immutable != nil && *oldSecret.Immutable {
 		if newSecret.Immutable == nil || !*newSecret.Immutable {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("immutable"), "field is immutable when `immutable` is set"))

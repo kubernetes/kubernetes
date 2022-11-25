@@ -12719,7 +12719,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			}}),
-			"may not be changed",
+			"Invalid value",
 		},
 		{
 			"Ephemeral container with potential conflict with regular containers, but conflict not present",

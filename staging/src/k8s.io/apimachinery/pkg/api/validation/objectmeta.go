@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -130,8 +131,24 @@ func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fld
 // ValidateImmutableField validates the new value and the old value are deeply equal.
 func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	defer func() {
+		if r := recover(); r != nil {
+			// If we ever get here, then either DeepEqual or cmp.Diff failed.
+			// The former is unlikely and indicates a serious problem with the data,
+			// the latter only gets called when we already know that there is a difference.
+			// In both cases we reject the new value.
+			allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("panic happened in ValidateImmutableFieldWithErr, oldVal %v, newVal %v", oldVal, newVal)))
+		}
+	}()
+	// We don't do this with cmp.Diff because it is only meant for testing.
+	// It might have bugs that make it less reliable than DeepEqual.
 	if !apiequality.Semantic.DeepEqual(oldVal, newVal) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newVal, FieldImmutableErrorMsg))
+		err := &field.Error{Type: field.ErrorTypeInvalid, Field: fldPath.String(), BadValue: newVal, Detail: FieldImmutableErrorMsg}
+		// However, producing a good error message in those unlikely cases
+		// where a problem was detected is fine and useful, with the defer
+		// above guarding against unexpected panics.
+		err.Detail += "\n" + cmp.Diff(oldVal, newVal)
+		allErrs = append(allErrs, err)
 	}
 	return allErrs
 }
