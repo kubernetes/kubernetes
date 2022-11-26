@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/testutil"
+	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/utils/pointer"
@@ -90,6 +91,102 @@ func TestReconcile(t *testing.T) {
 		expectedNumSlices:      1,
 		expectedClientActions:  1,
 		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, numCreated: 1},
+	}, {
+		testName: "Endpoints with 2 subset, different port and address",
+		subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{{
+					Name:     "http",
+					Port:     80,
+					Protocol: corev1.ProtocolTCP,
+				}},
+				Addresses: []corev1.EndpointAddress{{
+					IP:       "10.0.0.1",
+					Hostname: "pod-1",
+					NodeName: pointer.String("node-1"),
+				}},
+			},
+			{
+				Ports: []corev1.EndpointPort{{
+					Name:     "https",
+					Port:     443,
+					Protocol: corev1.ProtocolTCP,
+				}},
+				Addresses: []corev1.EndpointAddress{{
+					IP:       "10.0.0.2",
+					Hostname: "pod-2",
+					NodeName: pointer.String("node-1"),
+				}},
+			},
+		},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      2,
+		expectedClientActions:  2,
+		expectedMetrics:        &expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 2, addedPerSync: 2, numCreated: 2},
+	}, {
+		testName: "Endpoints with 2 subset, different port and same address",
+		subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{{
+					Name:     "http",
+					Port:     80,
+					Protocol: corev1.ProtocolTCP,
+				}},
+				Addresses: []corev1.EndpointAddress{{
+					IP:       "10.0.0.1",
+					Hostname: "pod-1",
+					NodeName: pointer.String("node-1"),
+				}},
+			},
+			{
+				Ports: []corev1.EndpointPort{{
+					Name:     "https",
+					Port:     443,
+					Protocol: corev1.ProtocolTCP,
+				}},
+				Addresses: []corev1.EndpointAddress{{
+					IP:       "10.0.0.1",
+					Hostname: "pod-1",
+					NodeName: pointer.String("node-1"),
+				}},
+			},
+		},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, numCreated: 1},
+	}, {
+		testName: "Endpoints with 2 subset, different address and same port",
+		subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{{
+					Name:     "http",
+					Port:     80,
+					Protocol: corev1.ProtocolTCP,
+				}},
+				Addresses: []corev1.EndpointAddress{{
+					IP:       "10.0.0.1",
+					Hostname: "pod-1",
+					NodeName: pointer.String("node-1"),
+				}},
+			},
+			{
+				Ports: []corev1.EndpointPort{{
+					Name:     "http",
+					Port:     80,
+					Protocol: corev1.ProtocolTCP,
+				}},
+				Addresses: []corev1.EndpointAddress{{
+					IP:       "10.0.0.2",
+					Hostname: "pod-2",
+					NodeName: pointer.String("node-1"),
+				}},
+			},
+		},
+		existingEndpointSlices: []*discovery.EndpointSlice{},
+		expectedNumSlices:      1,
+		expectedClientActions:  1,
+		expectedMetrics:        &expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 2, addedPerSync: 2, numCreated: 1},
 	}, {
 		testName: "Endpoints with 1 subset, port, and address, pending deletion",
 		subsets: []corev1.EndpointSubset{{
@@ -1015,7 +1112,10 @@ func expectEndpointSlices(t *testing.T, num, maxEndpointsPerSubset int, endpoint
 		}
 	}
 
-	for _, epSubset := range endpoints.Subsets {
+	// canonicalize endpoints to match the expected endpoints, otherwise the test
+	// that creates more endpoints than allowed fail becaused the list of final
+	// endpoints doesn't match.
+	for _, epSubset := range endpointsv1.RepackSubsets(endpoints.Subsets) {
 		if len(epSubset.Addresses) == 0 && len(epSubset.NotReadyAddresses) == 0 {
 			continue
 		}
