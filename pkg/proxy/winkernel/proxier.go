@@ -795,13 +795,20 @@ func CleanupLeftovers() (encounteredError bool) {
 
 func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, isEndpointChange bool) {
 	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
-	// Skip the svcInfo.policyApplied check to remove all the policies
-	svcInfo.deleteLoadBalancerPolicy(isEndpointChange)
+	// if it's an endpoint change and winProxyOptimization annotation enable, skip lb deletion and remoteEndpoint deletion
+	winProxyOptimization := isEndpointChange && svcInfo.winProxyOptimization
+	if winProxyOptimization {
+		klog.V(3).InfoS("Skipped loadbalancer deletion.", "hnsID", svcInfo.hnsID, "nodePorthnsID", svcInfo.nodePorthnsID, "winProxyOptimization", svcInfo.winProxyOptimization, "isEndpointChange", isEndpointChange)
+	} else {
+		// Skip the svcInfo.policyApplied check to remove all the policies
+		svcInfo.deleteLoadBalancerPolicy()
+	}
+
 	// Cleanup Endpoints references
 	for _, ep := range endpoints {
 		epInfo, ok := ep.(*endpointsInfo)
 		if ok {
-			if isEndpointChange && svcInfo.winProxyOptimization {
+			if winProxyOptimization {
 				epInfo.DecrementRefCount()
 			} else {
 				epInfo.Cleanup()
@@ -815,15 +822,7 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, isEnd
 	svcInfo.policyApplied = false
 }
 
-func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(endpointChange bool) {
-
-	// if it's an endpoint change and winProxyOptimization annotation enable, skip ingressLb deleteion
-	skipLBDeletion := endpointChange && svcInfo.winProxyOptimization
-	if skipLBDeletion {
-		klog.V(3).InfoS("Skipped loadbalancer deletion.", "hnsID", svcInfo.hnsID, "nodePorthnsID", svcInfo.nodePorthnsID, "winProxyOptimization", svcInfo.winProxyOptimization, "endpointChange", endpointChange)
-		return
-	}
-
+func (svcInfo *serviceInfo) deleteLoadBalancerPolicy() {
 	// Remove the Hns Policy corresponding to this service
 	hns := svcInfo.hns
 	if err := hns.deleteLoadBalancer(svcInfo.hnsID); err != nil {
@@ -1555,16 +1554,8 @@ func deleteStaleLoadBalancer(hns HostNetworkService, winProxyOptimization bool, 
 		extPort,
 	)
 
-	deleteLB := func() bool {
-		klog.V(3).InfoS("Hns LoadBalancer delete triggered for loadBalancer resources", "lbHnsID", *lbHnsID)
-		hns.deleteLoadBalancer(*lbHnsID)
-		*lbHnsID = ""
-		return true
-	}
-
 	if lbIdErr != nil {
-		klog.V(3).ErrorS(lbIdErr, "Error constructing loadBalancer ID from existing lb resources")
-		return deleteLB()
+		return deleteLoadBalancer(hns, lbHnsID)
 	}
 
 	if _, ok := queriedLoadBalancers[lbID]; ok {
@@ -1572,5 +1563,12 @@ func deleteStaleLoadBalancer(hns HostNetworkService, winProxyOptimization bool, 
 		return false
 	}
 
-	return deleteLB()
+	return deleteLoadBalancer(hns, lbHnsID)
+}
+
+func deleteLoadBalancer(hns HostNetworkService, lbHnsID *string) bool {
+	klog.V(3).InfoS("Hns LoadBalancer delete triggered for loadBalancer resources", "lbHnsID", *lbHnsID)
+	hns.deleteLoadBalancer(*lbHnsID)
+	*lbHnsID = ""
+	return true
 }

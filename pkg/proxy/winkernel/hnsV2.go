@@ -396,7 +396,7 @@ func hashEndpointIds(endpoints []string) (hash [20]byte, err error) {
 func hashEndpointInfos(endpoints []endpointsInfo) (hash [20]byte, err error) {
 	var id string
 	for _, ep := range endpoints {
-		id = ep.hnsID
+		id = strings.ToUpper(ep.hnsID)
 		hash, err = hashNextEndpoint(id, hash)
 		if err != nil {
 			return [20]byte{}, err
