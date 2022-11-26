@@ -11,8 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-
 // Package adapter provides gRPC adapters between client and server
 // gRPC interfaces without needing to go through a gRPC connection.
 package adapter
