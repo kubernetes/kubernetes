@@ -816,6 +816,14 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, isEnd
 }
 
 func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(endpointChange bool) {
+
+	// if it's an endpoint change and winProxyOptimization annotation enable, skip ingressLb deleteion
+	skipLBDeletion := endpointChange && svcInfo.winProxyOptimization
+	if skipLBDeletion {
+		klog.V(3).InfoS("Skipped loadbalancer deletion.", "hnsID", svcInfo.hnsID, "nodePorthnsID", svcInfo.nodePorthnsID, "winProxyOptimization", svcInfo.winProxyOptimization, "endpointChange", endpointChange)
+		return
+	}
+
 	// Remove the Hns Policy corresponding to this service
 	hns := svcInfo.hns
 	if err := hns.deleteLoadBalancer(svcInfo.hnsID); err != nil {
@@ -841,21 +849,14 @@ func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(endpointChange bool) {
 		}
 	}
 
-	// if it's an endpoint change and winProxyOptimization annotation enable, skip ingressLb deleteion
-	skipLBDeletion := endpointChange && svcInfo.winProxyOptimization
-
 	for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 
-		if !skipLBDeletion {
-			klog.V(3).InfoS("Loadbalancer Hns LoadBalancer delete triggered for loadBalancer Ingress resources in cleanup", "lbIngressIP", lbIngressIP)
-			if err := hns.deleteLoadBalancer(lbIngressIP.hnsID); err != nil {
-				klog.V(1).ErrorS(err, "Error deleting Hns IngressIP policy resource.", "hnsID", lbIngressIP.hnsID, "IP", lbIngressIP.ip)
-			} else {
-				// On successful delete, remove hnsId
-				lbIngressIP.hnsID = ""
-			}
+		klog.V(3).InfoS("Loadbalancer Hns LoadBalancer delete triggered for loadBalancer Ingress resources in cleanup", "lbIngressIP", lbIngressIP)
+		if err := hns.deleteLoadBalancer(lbIngressIP.hnsID); err != nil {
+			klog.V(1).ErrorS(err, "Error deleting Hns IngressIP policy resource.", "hnsID", lbIngressIP.hnsID, "IP", lbIngressIP.ip)
 		} else {
-			klog.V(3).InfoS("Skipped Ingress LB deletion.", "hnsID", lbIngressIP.hnsID, "IP", lbIngressIP.ip, "endpointChange", endpointChange, "winProxyOptimization", svcInfo.winProxyOptimization)
+			// On successful delete, remove hnsId
+			lbIngressIP.hnsID = ""
 		}
 
 		if lbIngressIP.healthCheckHnsID != "" {
@@ -1345,6 +1346,8 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.InfoS("Session Affinity is not supported on this version of Windows")
 		}
 
+		deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
+
 		if !allEndpointsTerminating {
 			// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
 			// Cluster IP LoadBalancer creation
@@ -1379,6 +1382,8 @@ func (proxier *Proxier) syncProxyRules() {
 				nodePortEndpoints = hnsLocalEndpoints
 			}
 
+			deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.nodePorthnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), nodePortEndpoints, queriedLoadBalancers)
+
 			if len(nodePortEndpoints) > 0 && !allEndpointsTerminating {
 				// If all endpoints are in terminating stage, then no need to create Node Port LoadBalancer
 				hnsLoadBalancer, err := hns.getLoadBalancer(
@@ -1411,6 +1416,8 @@ func (proxier *Proxier) syncProxyRules() {
 				externalIPEndpoints = hnsLocalEndpoints
 			}
 
+			deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &externalIP.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), externalIPEndpoints, queriedLoadBalancers)
+
 			if len(externalIPEndpoints) > 0 && !allEndpointsTerminating {
 				// If all endpoints are in terminating stage, then no need to External IP LoadBalancer
 				// Try loading existing policies, if already available
@@ -1442,11 +1449,7 @@ func (proxier *Proxier) syncProxyRules() {
 				lbIngressEndpoints = hnsLocalEndpoints
 			}
 
-			if svcInfo.winProxyOptimization && lbIngressIP.hnsID != "" {
-				klog.V(3).InfoS("Loadbalancer Hns LoadBalancer delete triggered for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
-				hns.deleteLoadBalancer(lbIngressIP.hnsID)
-				lbIngressIP.hnsID = ""
-			}
+			deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &lbIngressIP.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), lbIngressEndpoints, queriedLoadBalancers)
 
 			if len(lbIngressEndpoints) > 0 {
 				hnsLoadBalancer, err := hns.getLoadBalancer(
@@ -1475,6 +1478,9 @@ func (proxier *Proxier) syncProxyRules() {
 				if svcInfo.HealthCheckNodePort() != 0 {
 					nodeport = svcInfo.HealthCheckNodePort()
 				}
+
+				deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &lbIngressIP.healthCheckHnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), []endpointsInfo{*gatewayHnsendpoint}, queriedLoadBalancers)
+
 				hnsHealthCheckLoadBalancer, err := hns.getLoadBalancer(
 					[]endpointsInfo{*gatewayHnsendpoint},
 					loadBalancerFlags{isDSR: false, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP},
@@ -1530,4 +1536,41 @@ func (proxier *Proxier) syncProxyRules() {
 			delete(proxier.endPointsRefCount, hnsID)
 		}
 	}
+}
+
+// deleteStaleLoadBalancer checks whether loadbalancer delete is needed or not.
+// If it is needed, the function will delete the existing loadbalancer and return true, else false.
+func deleteStaleLoadBalancer(hns HostNetworkService, winProxyOptimization bool, lbHnsID *string, sourceVip string, protocol, intPort, extPort uint16, endpoints []endpointsInfo, queriedLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) bool {
+
+	if !winProxyOptimization || *lbHnsID == "" {
+		// Loadbalancer delete not needed
+		return false
+	}
+
+	lbID, lbIdErr := hns.findLoadBalancerID(
+		endpoints,
+		sourceVip,
+		protocol,
+		intPort,
+		extPort,
+	)
+
+	deleteLB := func() bool {
+		klog.V(3).InfoS("Hns LoadBalancer delete triggered for loadBalancer resources", "lbHnsID", *lbHnsID)
+		hns.deleteLoadBalancer(*lbHnsID)
+		*lbHnsID = ""
+		return true
+	}
+
+	if lbIdErr != nil {
+		klog.V(3).ErrorS(lbIdErr, "Error constructing loadBalancer ID from existing lb resources")
+		return deleteLB()
+	}
+
+	if _, ok := queriedLoadBalancers[lbID]; ok {
+		// The existing loadbalancer in the system is same as what we try to delete and recreate. So we skip deleting.
+		return false
+	}
+
+	return deleteLB()
 }

@@ -368,6 +368,20 @@ func (hns hnsV2) deleteLoadBalancer(hnsID string) error {
 	return err
 }
 
+// findLoadBalancerID will construct a id from the provided loadbalancer fields
+func (hns hnsV2) findLoadBalancerID(endpoints []endpointsInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
+	// Compute hash from backends (endpoint IDs)
+	hash, err := hashEndpointInfos(endpoints)
+	if err != nil {
+		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
+		return loadBalancerIdentifier{}, err
+	}
+	if len(vip) > 0 {
+		return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}, nil
+	}
+	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}, nil
+}
+
 func hashEndpointIds(endpoints []string) (hash [20]byte, err error) {
 	hash = [20]byte{}
 	for _, ep := range endpoints {

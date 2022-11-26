@@ -37,6 +37,7 @@ type HostNetworkService interface {
 	getEndpointByName(id string) (*endpointsInfo, error)
 	createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error)
 	deleteEndpoint(hnsID string) error
+	findLoadBalancerID(endpoints []endpointsInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error)
 	getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error)
 	getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error)
 	deleteLoadBalancer(hnsID string) error
@@ -318,4 +319,18 @@ func (hns hnsV1) deleteLoadBalancer(hnsID string) error {
 
 	_, err = hnsloadBalancer.Delete()
 	return err
+}
+
+// findLoadBalancerID will construct a id from the provided loadbalancer fields
+func (hns hnsV1) findLoadBalancerID(endpoints []endpointsInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
+	// Compute hash from backends (endpoint IDs)
+	hash, err := hashEndpointInfos(endpoints)
+	if err != nil {
+		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
+		return loadBalancerIdentifier{}, err
+	}
+	if len(vip) > 0 {
+		return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}, nil
+	}
+	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}, nil
 }
