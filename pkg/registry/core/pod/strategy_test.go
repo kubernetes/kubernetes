@@ -1267,6 +1267,262 @@ func TestPodStrategyValidate(t *testing.T) {
 	}
 }
 
+func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
+
+	test := []struct {
+		name   string
+		newPod *api.Pod
+		oldPod *api.Pod
+	}{
+		{
+			name: "add ephemeral container to regular pod and expect success",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// expect no errors
+	for _, tc := range test {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := EphemeralContainersStrategy.ValidateUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod); len(errs) != 0 {
+				t.Errorf("unexpected error:%v", errs)
+			}
+		})
+	}
+
+	test = []struct {
+		name   string
+		newPod *api.Pod
+		oldPod *api.Pod
+	}{
+		{
+			name: "add ephemeral container to static pod and expect failure",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					Annotations:     map[string]string{api.MirrorPodAnnotationKey: "someVal"},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					NodeName: "example.com",
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					Annotations:     map[string]string{api.MirrorPodAnnotationKey: "someVal"},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+					NodeName: "example.com",
+				},
+			},
+		},
+		{
+			name: "remove ephemeral container from regular pod and expect failure",
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+				},
+			},
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "change ephemeral container from regular pod and expect failure",
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image2",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+				},
+			},
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{
+							EphemeralContainerCommon: api.EphemeralContainerCommon{
+								Name:                     "debugger",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// expect one error
+	for _, tc := range test {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := EphemeralContainersStrategy.ValidateUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
+			if len(errs) == 0 {
+				t.Errorf("unexpected success:ephemeral containers are not supported for static pods")
+			} else if len(errs) != 1 {
+				t.Errorf("unexpected errors:expected one error about ephemeral containers are not supported for static pods:got:%v:", errs)
+			}
+		})
+	}
+}
+
 func TestPodStrategyValidateUpdate(t *testing.T) {
 	test := []struct {
 		name   string

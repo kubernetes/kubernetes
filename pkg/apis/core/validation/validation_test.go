@@ -12776,6 +12776,34 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 			makeWindowsHostPod(nil),
 			"spec.ephemeralContainers[0].securityContext.windowsOptions.hostProcess: Invalid value: false: pod hostProcess value must be identical",
 		},
+		{
+			"Add ephemeral container to static pod",
+			func() *core.Pod {
+				p := makePod(nil)
+				p.Spec.NodeName = "some-name"
+				p.ObjectMeta.Annotations = map[string]string{
+					core.MirrorPodAnnotationKey: "foo",
+				}
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debian",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+					},
+				}}
+				return p
+			}(),
+			func() *core.Pod {
+				p := makePod(nil)
+				p.Spec.NodeName = "some-name"
+				p.ObjectMeta.Annotations = map[string]string{
+					core.MirrorPodAnnotationKey: "foo",
+				}
+				return p
+			}(),
+			"Forbidden: static pods do not support ephemeral containers",
+		},
 	}
 
 	for _, tc := range tests {
