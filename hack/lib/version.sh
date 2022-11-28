@@ -60,6 +60,8 @@ kube::version::get_version_vars() {
 
   local git=(git --work-tree "${KUBE_ROOT}")
 
+  "${git[@]}" log -n 1 >&2
+
   if [[ -n ${KUBE_GIT_COMMIT-} ]] || KUBE_GIT_COMMIT=$("${git[@]}" rev-parse "HEAD^{commit}" 2>/dev/null); then
     if [[ -z ${KUBE_GIT_TREE_STATE-} ]]; then
       # Check if the tree is dirty.  default to dirty
