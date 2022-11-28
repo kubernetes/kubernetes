@@ -119,11 +119,11 @@ kube::version::get_version_vars() {
         KUBE_GIT_MAJOR=${BASH_REMATCH[1]}
         echo "KUBE_GIT_MAJOR=${KUBE_GIT_MAJOR}"
         KUBE_GIT_MINOR=${BASH_REMATCH[2]}
-        echo "KUBE_GIT_MINOR=${KUBE_GIKUBE_GIT_MINORT_MAJOR}"
+        echo "KUBE_GIT_MINOR=${KUBE_GIT_MINOR}"
         if [[ -n "${BASH_REMATCH[4]}" ]]; then
           echo "we have a 4th pattern match"
           KUBE_GIT_MINOR+="+"
-          echo "KUBE_GIT_MINOR=${KUBE_GIKUBE_GIT_MINORT_MAJOR}"
+          echo "KUBE_GIT_MINOR=${KUBE_GIT_MINOR}"
         fi
       fi
 
