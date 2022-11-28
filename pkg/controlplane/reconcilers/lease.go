@@ -221,7 +221,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	// Next, we compare the current list of endpoints with the list of master IP keys
 	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
 	if !skipMirrorChanged && formatCorrect && ipCorrect && portsCorrect {
-		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
+		return r.epAdapter.EnsureEndpointSliceFromEndpoints(e)
 	}
 
 	if !formatCorrect {
@@ -250,11 +250,11 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 
 	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
 	if shouldCreate {
-		if _, err = r.epAdapter.Create(corev1.NamespaceDefault, e); errors.IsAlreadyExists(err) {
+		if _, err = r.epAdapter.Create(e); errors.IsAlreadyExists(err) {
 			err = nil
 		}
 	} else {
-		_, err = r.epAdapter.Update(corev1.NamespaceDefault, e)
+		_, err = r.epAdapter.Update(e)
 	}
 	return err
 }

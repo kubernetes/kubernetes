@@ -151,7 +151,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
-			endpoints, err := epAdapter.Create(testServiceNamespace, testCase.endpointsParam)
+			endpoints, err := epAdapter.Create(testCase.endpointsParam)
 
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
@@ -257,7 +257,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
-			endpoints, err := epAdapter.Update(testServiceNamespace, testCase.endpointsParam)
+			endpoints, err := epAdapter.Update(testCase.endpointsParam)
 
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
@@ -367,7 +367,7 @@ func TestEndpointManagerEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
 			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
 
-			err := epAdapter.EnsureEndpointSliceFromEndpoints(testServiceNamespace, testCase.endpointsParam)
+			err := epAdapter.EnsureEndpointSliceFromEndpoints(testCase.endpointsParam)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
 			}

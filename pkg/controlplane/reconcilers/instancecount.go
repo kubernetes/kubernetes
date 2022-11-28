@@ -87,7 +87,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		_, err = r.epAdapter.Create(metav1.NamespaceDefault, e)
+		_, err = r.epAdapter.Create(e)
 		return err
 	}
 
@@ -101,12 +101,12 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Ports:     endpointPorts,
 		}}
 		klog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
-		_, err = r.epAdapter.Update(metav1.NamespaceDefault, e)
+		_, err = r.epAdapter.Update(e)
 		return err
 	}
 
 	if !skipMirrorChanged && ipCorrect && portsCorrect {
-		return r.epAdapter.EnsureEndpointSliceFromEndpoints(metav1.NamespaceDefault, e)
+		return r.epAdapter.EnsureEndpointSliceFromEndpoints(e)
 	}
 	if !ipCorrect {
 		// We *always* add our own IP address.
@@ -138,7 +138,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		e.Subsets[0].Ports = endpointPorts
 	}
 	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
-	_, err = r.epAdapter.Update(metav1.NamespaceDefault, e)
+	_, err = r.epAdapter.Update(e)
 	return err
 }
 
@@ -169,7 +169,7 @@ func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip n
 	e.Subsets[0].Addresses = new
 	e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		_, err := r.epAdapter.Update(metav1.NamespaceDefault, e)
+		_, err := r.epAdapter.Update(e)
 		return err
 	})
 	return err
