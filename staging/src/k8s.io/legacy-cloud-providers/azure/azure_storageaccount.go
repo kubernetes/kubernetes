@@ -199,7 +199,7 @@ func (az *Cloud) EnsureStorageAccount(accountOptions *AccountOptions, genAccount
 			defer cancel()
 			rerr := az.StorageAccountClient.Create(ctx, resourceGroup, accountName, cp)
 			if rerr != nil {
-				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %v", accountName, rerr))
+				return "", "", fmt.Errorf("failed to create storage account %s, error: %v", accountName, rerr)
 			}
 		}
 	}
