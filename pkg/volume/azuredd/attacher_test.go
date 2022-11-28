@@ -70,7 +70,7 @@ func TestWaitForAttach(t *testing.T) {
 
 	for _, test := range tests {
 		result, err := attacher.WaitForAttach(spec, test.devicePath, nil, 3000*time.Millisecond)
-		assert.Equal(t, result, test.expected)
-		assert.Equal(t, err != nil, test.expectError, fmt.Sprintf("error msg: %v", err))
+		assert.Equal(t, test.expected, result)
+		assert.Equal(t, test.expectError, err != nil, fmt.Sprintf("error msg: %v", err))
 	}
 }
