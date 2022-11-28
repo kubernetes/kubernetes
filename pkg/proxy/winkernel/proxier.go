@@ -313,13 +313,20 @@ func conjureMac(macPrefix string, ip net.IP) string {
 }
 
 func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap) {
+
+	var svcPortMap = make(map[proxy.ServicePortName]bool)
+
 	for svcPortName := range oldEndpointsMap {
+		svcPortMap[svcPortName] = true
 		proxier.onEndpointsMapChange(&svcPortName)
 	}
 
 	for svcPortName := range newEndpointsMap {
-		proxier.onEndpointsMapChange(&svcPortName)
+		if _, ok := svcPortMap[svcPortName]; !ok {
+			proxier.onEndpointsMapChange(&svcPortName)
+		}
 	}
+
 }
 
 func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName) {
@@ -472,6 +479,9 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	// Annotation introduced to enable optimized loadbalancing
 	winProxyOptimization := strings.ToUpper(service.Annotations["winProxyOptimization"]) == "ENABLED"
 	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
+	// TODO : Enabling by Default. Implement Opt-out model once changes works fine.
+	winProxyOptimization = true
+
 	err := hcn.DSRSupported()
 	if err != nil {
 		preserveDIP = false
