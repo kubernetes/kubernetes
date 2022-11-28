@@ -32,9 +32,9 @@
 # If KUBE_GIT_VERSION_FILE, this function will load from that file instead of
 # querying git.
 kube::version::get_version_vars() {
-  printf "kube::version::get_version_vars: KUBE_ROOT=${KUBE_ROOT}\n"
+  printf "kube::version::get_version_vars: KUBE_ROOT=${KUBE_ROOT}\n" >&2
   if [[ -n ${KUBE_GIT_VERSION_FILE-} ]]; then
-    printf "kube::version::get_version_vars: KUBE_GIT_VERSION_FILE is not empty\n"
+    printf "kube::version::get_version_vars: KUBE_GIT_VERSION_FILE is not empty\n" >&2
     kube::version::load_version_vars "${KUBE_GIT_VERSION_FILE}"
     return
   fi
@@ -45,16 +45,16 @@ kube::version::get_version_vars() {
   # Disabled as we're not expanding these at runtime, but rather expecting
   # that another tool may have expanded these and rewritten the source (!)
   if [[ '$Format:%%$' == "%" ]]; then
-    printf "kube::version::get_version_vars: exported through git archive\n"
+    printf "kube::version::get_version_vars: exported through git archive\n" >&2
     KUBE_GIT_COMMIT='$Format:%H$'
     KUBE_GIT_TREE_STATE="archive"
     # When a 'git archive' is exported, the '$Format:%D$' below will look
     # something like 'HEAD -> release-1.8, tag: v1.8.3' where then 'tag: '
     # can be extracted from it.
     if [[ '$Format:%D$' =~ tag:\ (v[^ ,]+) ]]; then
-     printf "kube::version::get_version_vars: we can extract tag\n"
+     printf "kube::version::get_version_vars: we can extract tag\n" >&2
      KUBE_GIT_VERSION="${BASH_REMATCH[1]}"
-     printf "KUBE_GIT_VERSION=${KUBE_GIT_VERSION}\n"
+     printf "KUBE_GIT_VERSION=${KUBE_GIT_VERSION}\n" >&2
     fi
   fi
 
@@ -69,11 +69,7 @@ kube::version::get_version_vars() {
         KUBE_GIT_TREE_STATE="dirty"
       fi
     fi
-    printf "kube::version::get_version_vars: KUBE_GIT_TREE_STATE=${KUBE_GIT_TREE_STATE}\n"
-
-    if [[ -n ${KUBE_GIT_VERSION-} ]]; then
-      printf "KUBE_GIT_VERSION is not empty\n"
-    fi
+    printf "kube::version::get_version_vars: KUBE_GIT_TREE_STATE=${KUBE_GIT_TREE_STATE}\n" >&2
 
     # Use git describe to find the version based on tags.
     if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --match='v*' --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
@@ -88,7 +84,7 @@ kube::version::get_version_vars() {
       # We don't want to do them in pure shell, so disable SC2001
       # shellcheck disable=SC2001
       DASHES_IN_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/[^-]//g")
-      printf "kube::version::get_version_vars: DASHES_IN_VERSION=${DASHES_IN_VERSION}\n"
+      printf "kube::version::get_version_vars: DASHES_IN_VERSION=${DASHES_IN_VERSION}\n" >&2
       if [[ "${DASHES_IN_VERSION}" == "---" ]] ; then
         # shellcheck disable=SC2001
         # We have distance to subversion (v1.1.0-subversion-1-gCommitHash)
@@ -104,7 +100,7 @@ kube::version::get_version_vars() {
         # so use our idea of "dirty" from git status instead.
         KUBE_GIT_VERSION+="-dirty"
       fi
-      printf "kube::version::get_version_vars: KUBE_GIT_VERSION=${KUBE_GIT_VERSION}\n"
+      printf "kube::version::get_version_vars: KUBE_GIT_VERSION=${KUBE_GIT_VERSION}\n" >&2
 
 
       # Try to match the "git describe" output to a regex to try to extract
