@@ -156,8 +156,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		ns1 := f.Namespace.Name // LB1 in ns1 on TCP
 		framework.Logf("namespace for TCP test: %s", ns1)
 
-		nodeIP, err := e2enode.PickIP(cs) // for later
-		framework.ExpectNoError(err)
+		nodeIP, err := getRandomNodeIP(cs)
+		framework.ExpectNoError(err, "Could not obtain a valid Node IP")
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
 		tcpJig := e2eservice.NewTestJig(cs, ns1, serviceName)
@@ -171,6 +171,10 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		_, err = tcpJig.Run(nil)
 		framework.ExpectNoError(err)
 
+		execPod := e2epod.CreateExecPodOrFail(cs, ns1, "execpod", nil)
+		err = tcpJig.CheckServiceReachability(tcpService, execPod)
+		framework.ExpectNoError(err)
+
 		// Change the services to NodePort.
 
 		ginkgo.By("changing the TCP service to type=NodePort")
@@ -180,6 +184,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
 		framework.Logf("TCP node port: %d", tcpNodePort)
+
+		err = tcpJig.CheckServiceReachability(tcpService, execPod)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's NodePort")
 		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
@@ -250,6 +257,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 				staticIPName = ""
 			}
 		}
+
+		err = tcpJig.CheckServiceReachability(tcpService, execPod)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's NodePort")
 		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
@@ -363,8 +373,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		ns2 := f.Namespace.Name // LB1 in ns2 on TCP
 		framework.Logf("namespace for TCP test: %s", ns2)
 
-		nodeIP, err := e2enode.PickIP(cs) // for later
-		framework.ExpectNoError(err)
+		nodeIP, err := getRandomNodeIP(cs)
+		framework.ExpectNoError(err, "Could not obtain a valid Node IP")
 
 		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in namespace " + ns2)
 		udpJig := e2eservice.NewTestJig(cs, ns2, serviceName)
@@ -378,6 +388,10 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		_, err = udpJig.Run(nil)
 		framework.ExpectNoError(err)
 
+		execPod := e2epod.CreateExecPodOrFail(cs, ns2, "execpod", nil)
+		err = udpJig.CheckServiceReachability(udpService, execPod)
+		framework.ExpectNoError(err)
+
 		// Change the services to NodePort.
 
 		ginkgo.By("changing the UDP service to type=NodePort")
@@ -387,6 +401,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 		udpNodePort := int(udpService.Spec.Ports[0].NodePort)
 		framework.Logf("UDP node port: %d", udpNodePort)
+
+		err = udpJig.CheckServiceReachability(udpService, execPod)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's NodePort")
 		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
@@ -450,6 +467,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		}
 		udpIngressIP = e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
 		framework.Logf("UDP load balancer: %s", udpIngressIP)
+
+		err = udpJig.CheckServiceReachability(udpService, execPod)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's NodePort")
 		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
@@ -1918,4 +1938,29 @@ func testRollingUpdateLBConnectivityDisruption(f *framework.Framework, externalT
 
 	// assert that the load balancer address is still reachable after the rolling updates are finished
 	e2eservice.TestReachableHTTP(lbNameOrAddress, svcPort, timeout)
+}
+
+// getRandomNodeIP gets an IP address from a random worker node.
+// These tests exercise traffic coming from outside the traffic,
+// so it prefers ExternalIPs over InternalIPs.
+func getRandomNodeIP(cs clientset.Interface) (string, error) {
+	family := v1.IPv4Protocol
+	if framework.TestContext.ClusterIsIPv6() {
+		family = v1.IPv6Protocol
+	}
+
+	node, err := e2enode.GetRandomReadySchedulableNode(cs)
+	if err != nil {
+		return "", err
+	}
+	ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeExternalIP, family)
+	if len(ips) > 0 {
+		return ips[0], nil
+	}
+
+	ips = e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, family)
+	if len(ips) > 0 {
+		return ips[0], nil
+	}
+	return "", fmt.Errorf("node %v does not contain any valid IP", node)
 }
