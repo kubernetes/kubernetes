@@ -64,7 +64,6 @@ kube::version::get_version_vars() {
 
   if [[ -n ${KUBE_GIT_COMMIT-} ]] || KUBE_GIT_COMMIT=$("${git[@]}" rev-parse "HEAD^{commit}" 2>/dev/null); then
     if [[ -z ${KUBE_GIT_TREE_STATE-} ]]; then
-      echo "KUBE_GIT_TREE_STATE=${KUBE_GIT_TREE_STATE}"
       # Check if the tree is dirty.  default to dirty
       if git_status=$("${git[@]}" status --porcelain 2>/dev/null) && [[ -z ${git_status} ]]; then
         echo "git_status=${git_status}"
