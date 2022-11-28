@@ -225,7 +225,8 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				}
 
 				restoredPod = StartInPodWithVolumeSource(ctx, cs, volSrc, restoredPVC.Namespace, "restored-pvc-tester", "sleep 300", config.ClientNodeSelection)
-				ginkgo.DeferCleanup(StopPod, cs, restoredPod)
+				ginkgo.DeferCleanup(e2epod.DeletePodWithWait, cs, restoredPod)
+
 				framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(cs, restoredPod.Name, restoredPod.Namespace, f.Timeouts.PodStartSlow))
 				if pattern.VolType != storageframework.GenericEphemeralVolume {
 					commands := e2evolume.GenerateReadFileCmd(datapath)
@@ -234,14 +235,16 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				}
 
 				ginkgo.By("should delete the VolumeSnapshotContent according to its deletion policy")
-
 				// Delete both Snapshot and restored Pod/PVC at the same time because different storage systems
 				// have different ordering of deletion. Some may require delete the restored PVC first before
 				// Snapshot deletion and some are opposite.
 				err = storageutils.DeleteSnapshotWithoutWaiting(dc, vs.GetNamespace(), vs.GetName())
 				framework.ExpectNoError(err)
-
+				framework.Logf("deleting restored pod %q/%q", restoredPod.Namespace, restoredPod.Name)
+				err = cs.CoreV1().Pods(restoredPod.Namespace).Delete(context.TODO(), restoredPod.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
 				deleteVolumeSnapshot(f, dc, sr, pattern, vscontent)
+
 			})
 
 			ginkgo.It("should check snapshot fields, check restore correctly works after modifying source data, check deletion (persistent)", func(ctx context.Context) {
