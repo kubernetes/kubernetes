@@ -683,11 +683,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 		kubeReserved, err := parseResourceList(s.KubeReserved)
 		if err != nil {
-			return err
+			return fmt.Errorf("--kube-reserved value failed to parse: %w", err)
 		}
 		systemReserved, err := parseResourceList(s.SystemReserved)
 		if err != nil {
-			return err
+			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
 		}
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
@@ -699,7 +699,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 		experimentalQOSReserved, err := cm.ParseQOSReserved(s.QOSReserved)
 		if err != nil {
-			return err
+			return fmt.Errorf("--qos-reserved value failed to parse: %w", err)
 		}
 
 		var cpuManagerPolicyOptions map[string]string
@@ -1265,7 +1265,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
 			q, err := resource.ParseQuantity(v)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
 			}
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
