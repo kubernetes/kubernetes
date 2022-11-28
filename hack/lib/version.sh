@@ -32,7 +32,9 @@
 # If KUBE_GIT_VERSION_FILE, this function will load from that file instead of
 # querying git.
 kube::version::get_version_vars() {
+  echo "inside get_version_vars"
   if [[ -n ${KUBE_GIT_VERSION_FILE-} ]]; then
+    echo "KUBE_GIT_VERSION_FILE is not empty"
     kube::version::load_version_vars "${KUBE_GIT_VERSION_FILE}"
     return
   fi
@@ -43,22 +45,29 @@ kube::version::get_version_vars() {
   # Disabled as we're not expanding these at runtime, but rather expecting
   # that another tool may have expanded these and rewritten the source (!)
   if [[ '$Format:%%$' == "%" ]]; then
+    echo "exported through git archive"
     KUBE_GIT_COMMIT='$Format:%H$'
     KUBE_GIT_TREE_STATE="archive"
     # When a 'git archive' is exported, the '$Format:%D$' below will look
     # something like 'HEAD -> release-1.8, tag: v1.8.3' where then 'tag: '
     # can be extracted from it.
     if [[ '$Format:%D$' =~ tag:\ (v[^ ,]+) ]]; then
+     echo "we can extract tag"
      KUBE_GIT_VERSION="${BASH_REMATCH[1]}"
+     echo "KUBE_GIT_VERSION=${KUBE_GIT_VERSION}"
     fi
   fi
 
+  echo "KUBE_ROOT=${KUBE_ROOT}"
   local git=(git --work-tree "${KUBE_ROOT}")
+  echo "git=${git}"
 
   if [[ -n ${KUBE_GIT_COMMIT-} ]] || KUBE_GIT_COMMIT=$("${git[@]}" rev-parse "HEAD^{commit}" 2>/dev/null); then
     if [[ -z ${KUBE_GIT_TREE_STATE-} ]]; then
+      echo "KUBE_GIT_TREE_STATE=${KUBE_GIT_TREE_STATE}"
       # Check if the tree is dirty.  default to dirty
       if git_status=$("${git[@]}" status --porcelain 2>/dev/null) && [[ -z ${git_status} ]]; then
+        echo "git_status=${git_status}"
         KUBE_GIT_TREE_STATE="clean"
       else
         KUBE_GIT_TREE_STATE="dirty"
@@ -67,6 +76,7 @@ kube::version::get_version_vars() {
 
     # Use git describe to find the version based on tags.
     if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --match='v*' --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
+      echo "KUBE_GIT_VERSION=${KUBE_GIT_VERSION}"
       # This translates the "git describe" to an actual semver.org
       # compatible semantic version that looks something like this:
       #   v1.1.0-alpha.0.6+84c76d1142ea4d
@@ -78,20 +88,27 @@ kube::version::get_version_vars() {
       # We don't want to do them in pure shell, so disable SC2001
       # shellcheck disable=SC2001
       DASHES_IN_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/[^-]//g")
+      echo "DASHES_IN_VERSION=${DASHES_IN_VERSION}"
       if [[ "${DASHES_IN_VERSION}" == "---" ]] ; then
+        echo "there are three dashes"
         # shellcheck disable=SC2001
         # We have distance to subversion (v1.1.0-subversion-1-gCommitHash)
         KUBE_GIT_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/-\([0-9]\{1,\}\)-g\([0-9a-f]\{14\}\)$/.\1\+\2/")
+        echo "KUBE_GIT_VERSION=${KUBE_GIT_VERSION}"
       elif [[ "${DASHES_IN_VERSION}" == "--" ]] ; then
+        echo "there are two dashes"
         # shellcheck disable=SC2001
         # We have distance to base tag (v1.1.0-1-gCommitHash)
         KUBE_GIT_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/-g\([0-9a-f]\{14\}\)$/+\1/")
+        echo "KUBE_GIT_VERSION=${KUBE_GIT_VERSION}"
       fi
       if [[ "${KUBE_GIT_TREE_STATE}" == "dirty" ]]; then
+        echo "dirty git tree state"
         # git describe --dirty only considers changes to existing files, but
         # that is problematic since new untracked .go files affect the build,
         # so use our idea of "dirty" from git status instead.
         KUBE_GIT_VERSION+="-dirty"
+        echo "KUBE_GIT_VERSION=${KUBE_GIT_VERSION}"
       fi
 
 
@@ -99,10 +116,15 @@ kube::version::get_version_vars() {
       # the "major" and "minor" versions and whether this is the exact tagged
       # version or whether the tree is between two tagged versions.
       if [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?([-].*)?([+].*)?$ ]]; then
+        echo "we have major and minor"
         KUBE_GIT_MAJOR=${BASH_REMATCH[1]}
+        echo "KUBE_GIT_MAJOR=${KUBE_GIT_MAJOR}"
         KUBE_GIT_MINOR=${BASH_REMATCH[2]}
+        echo "KUBE_GIT_MINOR=${KUBE_GIKUBE_GIT_MINORT_MAJOR}"
         if [[ -n "${BASH_REMATCH[4]}" ]]; then
+          echo "we have a 4th pattern match"
           KUBE_GIT_MINOR+="+"
+          echo "KUBE_GIT_MINOR=${KUBE_GIKUBE_GIT_MINORT_MAJOR}"
         fi
       fi
 
