@@ -60,6 +60,9 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 	if s.MinTLSVersion > 0 {
 		tlsConfig.MinVersion = s.MinTLSVersion
 	}
+	if s.MaxTLSVersion > 0 {
+		tlsConfig.MaxVersion = s.MaxTLSVersion
+	}
 	if len(s.CipherSuites) > 0 {
 		tlsConfig.CipherSuites = s.CipherSuites
 		insecureCiphers := flag.InsecureTLSCiphers()
