@@ -60,7 +60,7 @@ rules:
     go: 1.19
     source: 
       branch: release-1.26
-      dir: staging/src/k8s.io/code-generator
+      dir: staging/src/k8s.io/apimachinery
   library: true
 - destination: api
   branches:
