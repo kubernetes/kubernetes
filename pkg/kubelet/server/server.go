@@ -937,12 +937,14 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 	for _, container := range pod.Spec.Containers {
 		if container.Name == containerName {
 			found = true
+			break
 		}
 	}
 	if !found {
 		for _, container := range pod.Spec.InitContainers {
 			if container.Name == containerName {
 				found = true
+				break
 			}
 		}
 	}
@@ -950,6 +952,7 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 		for _, container := range pod.Spec.EphemeralContainers {
 			if container.Name == containerName {
 				found = true
+				break
 			}
 		}
 	}
