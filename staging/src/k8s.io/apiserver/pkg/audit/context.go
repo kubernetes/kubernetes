@@ -18,6 +18,7 @@ package audit
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -90,7 +91,15 @@ func AddAuditAnnotations(ctx context.Context, keysAndValues ...string) {
 	defer ac.annotationMutex.Unlock()
 
 	if len(keysAndValues)%2 != 0 {
+		// Option 1: (original) Don't touch unstructured log lines.
 		klog.Errorf("Dropping mismatched audit annotation %q", keysAndValues[len(keysAndValues)-1])
+
+		// Option 2: Munge with format string
+		logger := klog.FromContext(ctx)
+		logger.Error(nil, fmt.Sprintf("Dropping mismatched audit annotation %q", keysAndValues[len(keysAndValues)-1]))
+
+		// Option 3: Rewrite as structured logs
+		logger.Error(nil, "Dropping mismatched audit annotation", "annotation", keysAndValues[len(keysAndValues)-1])
 	}
 	for i := 0; i < len(keysAndValues); i += 2 {
 		addAuditAnnotationLocked(ac, keysAndValues[i], keysAndValues[i+1])
