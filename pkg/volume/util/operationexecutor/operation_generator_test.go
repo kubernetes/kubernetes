@@ -184,7 +184,7 @@ func TestOperationGenerator_GenerateExpandAndRecoverVolumeFunc(t *testing.T) {
 				t.Fatalf("GenerateExpandAndRecoverVolumeFunc failed: %v", expansionResponse.err)
 			}
 			updatedPVC := expansionResponse.pvc
-			assert.Equal(t, *updatedPVC.Status.ResizeStatus, test.expectedResizeStatus)
+			assert.Equal(t, test.expectedResizeStatus, *updatedPVC.Status.ResizeStatus)
 			actualAllocatedSize := updatedPVC.Status.AllocatedResources.Storage()
 			if test.expectedAllocatedSize.Cmp(*actualAllocatedSize) != 0 {
 				t.Fatalf("GenerateExpandAndRecoverVolumeFunc failed: expected allocated size %s, got %s", test.expectedAllocatedSize.String(), actualAllocatedSize.String())
