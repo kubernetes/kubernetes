@@ -124,7 +124,7 @@ func stripAddresses(in string) string {
 // locally) or one of a few relative paths (built in the Kubernetes CI).
 var stackLocation = regexp.MustCompile(`(?:/|vendor/|test/|GOROOT/).*/([[:^space:]]+.go:[[:digit:]]+)( \+0x[0-9a-fA-F]+)?`)
 
-// functionArgs matches "<function name>(...)" where <function name> may be an anoymous function (e.g. "pod_test.glob..func1.1")
+// functionArgs matches "<function name>(...)" where <function name> may be an anonymous function (e.g. "pod_test.glob..func1.1")
 var functionArgs = regexp.MustCompile(`([[:alpha:][:digit:].]+)\(.*\)`)
 
 // klogPrefix matches "I0822 16:10:39.343790  989127 "
