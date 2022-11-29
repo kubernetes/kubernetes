@@ -61,6 +61,11 @@ type authorizingVisitor struct {
 }
 
 func (v *authorizingVisitor) visit(ctx context.Context, source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool {
+	if ctx.Err() == context.Canceled {
+		v.errors = append(v.errors, ctx.Err())
+		return false
+	}
+
 	if rule != nil && RuleAllows(v.requestAttributes, rule) {
 		v.allowed = true
 		v.reason = fmt.Sprintf("RBAC: allowed by %s", source.String())

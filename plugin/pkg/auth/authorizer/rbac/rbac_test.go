@@ -145,6 +145,13 @@ func TestAuthorizer(t *testing.T) {
 
 		shouldPass []authorizer.Attributes
 		shouldFail []authorizer.Attributes
+
+		shouldFailWithReason []struct {
+			attr       authorizer.Attributes
+			wantReason string
+		}
+
+		cancel bool
 	}{
 		{
 			clusterRoles: []*rbacv1.ClusterRole{
@@ -244,19 +251,76 @@ func TestAuthorizer(t *testing.T) {
 				&defaultAttributes{"admin", "", "get", "pods", "", "ns1", ""},
 			},
 		},
+		{
+			// test cancellation
+			clusterRoles: []*rbacv1.ClusterRole{
+				newClusterRole("admin", newRule("*", "*", "pods", "*")),
+			},
+			roleBindings: []*rbacv1.RoleBinding{
+				newRoleBinding("ns1", "admin", bindToClusterRole, "User:admin", "Group:admins"),
+			},
+			shouldFail: []authorizer.Attributes{
+				&defaultAttributes{"admin", "", "get", "pods", "", "ns1", ""},
+				&defaultAttributes{"admin", "", "get", "pods", "status", "ns1", ""},
+			},
+			shouldFailWithReason: []struct {
+				attr       authorizer.Attributes
+				wantReason string
+			}{
+				{
+					attr:       &defaultAttributes{"admin", "", "get", "pods", "", "ns1", ""},
+					wantReason: "RBAC: context canceled",
+				},
+				{
+					attr:       &defaultAttributes{"admin", "", "get", "pods", "status", "ns1", ""},
+					wantReason: "RBAC: context canceled",
+				},
+			},
+			cancel: true,
+		},
 	}
 	for i, tt := range tests {
+		ctx := context.Background()
+		if tt.cancel {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithCancel(ctx)
+			cancel()
+		}
+
 		ruleResolver, _ := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := RBACAuthorizer{ruleResolver}
 		for _, attr := range tt.shouldPass {
-			if decision, _, _ := a.Authorize(context.Background(), attr); decision != authorizer.DecisionAllow {
+			decision, _, err := a.Authorize(context.Background(), attr)
+			if err != nil {
+				t.Errorf("case %d: error %v", i, err)
+				continue
+			}
+			if decision != authorizer.DecisionAllow {
 				t.Errorf("case %d: incorrectly restricted %s", i, attr)
 			}
 		}
 
 		for _, attr := range tt.shouldFail {
-			if decision, _, _ := a.Authorize(context.Background(), attr); decision == authorizer.DecisionAllow {
+			decision, _, err := a.Authorize(ctx, attr)
+			if err != nil {
+				t.Errorf("case %d: error %v", i, err)
+				continue
+			}
+			if decision == authorizer.DecisionAllow {
 				t.Errorf("case %d: incorrectly passed %s", i, attr)
+			}
+		}
+
+		for _, tc := range tt.shouldFailWithReason {
+			decision, reason, err := a.Authorize(ctx, tc.attr)
+			if err != nil {
+				t.Errorf("case %d: error %v", i, err)
+			}
+			if decision == authorizer.DecisionAllow {
+				t.Errorf("case %d: incorrectly passed %s", i, tc.attr)
+			}
+			if reason != tc.wantReason {
+				t.Errorf("want reason %q got %q", tc.wantReason, reason)
 			}
 		}
 	}

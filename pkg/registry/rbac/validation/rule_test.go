@@ -118,6 +118,8 @@ func TestDefaultRuleResolver(t *testing.T) {
 		user           user.Info
 		namespace      string
 		effectiveRules []rbacv1.PolicyRule
+		cancel         bool
+		expectedErr    string
 	}{
 		{
 			StaticRoles:    staticRoles1,
@@ -142,12 +144,28 @@ func TestDefaultRuleResolver(t *testing.T) {
 			user:           &user.DefaultInfo{},
 			effectiveRules: nil,
 		},
+		{
+			StaticRoles: staticRoles1,
+			user:        &user.DefaultInfo{Name: "foobar"},
+			namespace:   "namespace1",
+			cancel:      true,
+			expectedErr: "context canceled",
+		},
 	}
 
 	for i, tc := range tests {
 		ruleResolver := newMockRuleResolver(&tc.StaticRoles)
-		rules, err := ruleResolver.RulesFor(context.TODO(), tc.user, tc.namespace)
-		if err != nil {
+		ctx := context.Background()
+		if tc.cancel {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithCancel(ctx)
+			cancel()
+		}
+		rules, err := ruleResolver.RulesFor(ctx, tc.user, tc.namespace)
+		if tc.expectedErr != "" && err != nil && tc.expectedErr != err.Error() {
+			t.Errorf("expected error %q, got %q", tc.expectedErr, err.Error())
+			continue
+		} else if tc.expectedErr == "" && err != nil {
 			t.Errorf("case %d: GetEffectivePolicyRules(context)=%v", i, err)
 			continue
 		}

@@ -126,6 +126,11 @@ type ruleAccumulator struct {
 }
 
 func (r *ruleAccumulator) visit(ctx context.Context, source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool {
+	if ctx.Err() == context.Canceled {
+		r.errors = append(r.errors, ctx.Err())
+		return false
+	}
+
 	if rule != nil {
 		r.rules = append(r.rules, *rule)
 	}
