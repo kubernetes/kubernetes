@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -57,6 +57,8 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 			responsewriters.InternalError(w, req, errors.New("no user found for request"))
 			return
 		}
+
+		logger := klog.FromContext(ctx)
 
 		// if groups are not specified, then we need to look them up differently depending on the type of user
 		// if they are specified, then they are the authority (including the inclusion of system:authenticated/system:unauthenticated groups)
@@ -109,14 +111,14 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 				actingAsAttributes.Resource = "uids"
 
 			default:
-				klog.V(4).InfoS("unknown impersonation request type", "Request", impersonationRequest)
+				logger.V(4).Info("unknown impersonation request type", "Request", impersonationRequest)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
 				return
 			}
 
 			decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 			if err != nil || decision != authorizer.DecisionAllow {
-				klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "Reason", reason, "Error", err)
+				logger.V(4).Info("Forbidden", "URI", req.RequestURI, "Reason", reason, "Error", err)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
 				return
 			}
