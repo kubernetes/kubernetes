@@ -126,6 +126,7 @@ type Config struct {
 
 	EnableIndex     bool
 	EnableProfiling bool
+	DebugSocketPath string
 	EnableDiscovery bool
 
 	// Requires generic profiling enabled
@@ -360,6 +361,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		EnableIndex:                 true,
 		EnableDiscovery:             true,
 		EnableProfiling:             true,
+		DebugSocketPath:             "",
 		EnableMetrics:               true,
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
@@ -631,6 +633,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		return c.BuildHandlerChainFunc(handler, c.Config)
 	}
 
+	var debugSocket *routes.DebugSocket
+	if c.DebugSocketPath != "" {
+		debugSocket = routes.NewDebugSocket(c.DebugSocketPath)
+	}
+
 	apiServerHandler := NewAPIServerHandler(name, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
 
 	s := &GenericAPIServer{
@@ -645,6 +652,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		EquivalentResourceRegistry: c.EquivalentResourceRegistry,
 		HandlerChainWaitGroup:      c.HandlerChainWaitGroup,
 		Handler:                    apiServerHandler,
+		UnprotectedDebugSocket:     debugSocket,
 
 		listedPathProvider: apiServerHandler,
 
@@ -913,6 +921,13 @@ func installAPI(s *GenericAPIServer, c *Config) {
 		}
 		// so far, only logging related endpoints are considered valid to add for these debug flags.
 		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
+	}
+	if s.UnprotectedDebugSocket != nil {
+		s.UnprotectedDebugSocket.InstallProfiling()
+		s.UnprotectedDebugSocket.InstallDebugFlag("v", routes.StringFlagPutHandler(logs.GlogSetter))
+		if c.EnableContentionProfiling {
+			goruntime.SetBlockProfileRate(1)
+		}
 	}
 
 	if c.EnableMetrics {

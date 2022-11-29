@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
@@ -135,6 +136,10 @@ type GenericAPIServer struct {
 	// "Outputs"
 	// Handler holds the handlers being used by this API server
 	Handler *APIServerHandler
+
+	// UnprotectedDebugSocket is used to serve pprof information in a unix-domain socket. This socket is
+	// not protected by authentication/authorization.
+	UnprotectedDebugSocket *routes.DebugSocket
 
 	// listedPathProvider is a lister which provides the set of paths to show at /
 	listedPathProvider routes.ListedPathProvider
@@ -466,6 +471,14 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	// Clean up resources on shutdown.
 	defer s.Destroy()
+
+	// If UDS profiling is enabled, start a local http server listening on that socket
+	if s.UnprotectedDebugSocket != nil {
+		go func() {
+			defer utilruntime.HandleCrash()
+			klog.Error(s.UnprotectedDebugSocket.Run(stopCh))
+		}()
+	}
 
 	// spawn a new goroutine for closing the MuxAndDiscoveryComplete signal
 	// registration happens during construction of the generic api server
