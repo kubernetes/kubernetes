@@ -91,6 +91,30 @@ func TestPatchNode(t *testing.T) {
 			success:   false,
 			fakeError: apierrors.NewConflict(schema.GroupResource{}, "fake conflict", nil),
 		},
+		{
+			name:       "patch node when server timeout",
+			lookupName: "testnode",
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "testnode",
+					Labels: map[string]string{v1.LabelHostname: ""},
+				},
+			},
+			success:   false,
+			fakeError: apierrors.NewServerTimeout(schema.GroupResource{}, "fake server timeout", nil),
+		},
+		{
+			name:       "patch node when service unavailable",
+			lookupName: "testnode",
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "testnode",
+					Labels: map[string]string{v1.LabelHostname: ""},
+				},
+			},
+			success:   false,
+			fakeError: apierrors.NewServiceUnavailable(schema.GroupResource{}, "fake service unavailable", nil),
+		},
 	}
 
 	for _, tc := range testcases {
