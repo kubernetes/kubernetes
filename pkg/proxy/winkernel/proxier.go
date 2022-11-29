@@ -313,23 +313,20 @@ func conjureMac(macPrefix string, ip net.IP) string {
 }
 
 func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap) {
-
+	// This will optimize remote endpoint and loadbalancer deletion based on the annotation
 	var svcPortMap = make(map[proxy.ServicePortName]bool)
-
 	for svcPortName := range oldEndpointsMap {
 		svcPortMap[svcPortName] = true
-		proxier.onEndpointsMapChange(&svcPortName)
+		proxier.onEndpointsMapChange(&svcPortName, false)
 	}
-
 	for svcPortName := range newEndpointsMap {
-		if _, ok := svcPortMap[svcPortName]; !ok {
-			proxier.onEndpointsMapChange(&svcPortName)
-		}
+		// duplicateCleanup true means cleanup is called second time on the same svcPort
+		duplicateCleanup := svcPortMap[svcPortName]
+		proxier.onEndpointsMapChange(&svcPortName, duplicateCleanup)
 	}
-
 }
 
-func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName) {
+func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName, duplicateCleanup bool) {
 
 	svc, exists := proxier.serviceMap[*svcPortName]
 
@@ -338,6 +335,13 @@ func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName)
 
 		if !ok {
 			klog.ErrorS(nil, "Failed to cast serviceInfo", "servicePortName", svcPortName)
+			return
+		}
+
+		if svcInfo.winProxyOptimization && duplicateCleanup {
+			// This is a second cleanup call.
+			// Second cleanup on the same svcPort will be ignored if the
+			// winProxyOptimization is Enabled
 			return
 		}
 
@@ -477,10 +481,8 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	info := &serviceInfo{BaseServiceInfo: baseInfo}
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
 	// Annotation introduced to enable optimized loadbalancing
-	winProxyOptimization := strings.ToUpper(service.Annotations["winProxyOptimization"]) == "ENABLED"
+	winProxyOptimization := !(strings.ToUpper(service.Annotations["winProxyOptimization"]) == "DISABLED")
 	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
-	// TODO : Enabling by Default. Implement Opt-out model once changes works fine.
-	winProxyOptimization = true
 
 	err := hcn.DSRSupported()
 	if err != nil {
