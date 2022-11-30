@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -920,7 +921,7 @@ spec:
 	}
 
 	invalidLastApplied := "invalid-object"
-	if err := setLastApplied(newObj, invalidLastApplied); err != nil {
+	if err := internal.SetLastApplied(newObj, invalidLastApplied); err != nil {
 		t.Errorf("failed to set last applied: %v", err)
 	}
 
@@ -1223,7 +1224,7 @@ func setLastAppliedFromEncoded(obj runtime.Object, lastApplied []byte) error {
 	if err != nil {
 		return err
 	}
-	return setLastApplied(obj, lastAppliedJSON)
+	return internal.SetLastApplied(obj, lastAppliedJSON)
 }
 
 func getLastApplied(obj runtime.Object) (string, error) {
