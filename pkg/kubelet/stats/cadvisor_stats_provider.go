@@ -76,10 +76,11 @@ func newCadvisorStatsProvider(
 }
 
 // ListPodStats returns the stats of all the pod-managed containers.
-func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodStats, error) {
+func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	// Gets node root filesystem information and image filesystem stats, which
 	// will be used to populate the available and capacity bytes/inodes in
 	// container stats.
+	logger := klog.FromContext(ctx)
 	rootFsInfo, err := p.cadvisor.RootFsInfo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
@@ -132,7 +133,7 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 			podUID := types.UID(podStats.PodRef.UID)
 			logs, err := p.hostStatsProvider.getPodContainerLogStats(podStats.PodRef.Namespace, podStats.PodRef.Name, podUID, containerName, &rootFsInfo)
 			if err != nil {
-				klog.ErrorS(err, "Unable to fetch container log stats", "containerName", containerName)
+				logger.Error(err, "Unable to fetch container log stats", "containerName", containerName)
 			} else {
 				containerStat.Logs = logs
 			}
@@ -175,7 +176,7 @@ func (p *cadvisorStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx contex
 }
 
 // ListPodCPUAndMemoryStats returns the cpu and memory stats of all the pod-managed containers.
-func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]statsapi.PodStats, error) {
+func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	infos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)

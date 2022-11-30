@@ -83,6 +83,7 @@ func (cgc *realContainerGC) GarbageCollect(ctx context.Context) error {
 }
 
 func (cgc *realContainerGC) DeleteAllUnusedContainers(ctx context.Context) error {
-	klog.InfoS("Attempting to delete unused containers")
+	logger := klog.FromContext(ctx)
+	logger.Info("Attempting to delete unused containers")
 	return cgc.runtime.GarbageCollect(ctx, cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
 }

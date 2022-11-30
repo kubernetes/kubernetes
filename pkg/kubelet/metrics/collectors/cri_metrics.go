@@ -40,8 +40,9 @@ var _ metrics.StableCollector = &criMetricsCollector{}
 // NewCRIMetricsCollector implements the metrics.Collector interface
 func NewCRIMetricsCollector(ctx context.Context, listPodSandboxMetricsFn func(context.Context) ([]*runtimeapi.PodSandboxMetrics, error), listMetricDescriptorsFn func(context.Context) ([]*runtimeapi.MetricDescriptor, error)) metrics.StableCollector {
 	descs, err := listMetricDescriptorsFn(ctx)
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Error reading MetricDescriptors")
+		logger.Error(err, "Error reading MetricDescriptors")
 		return &criMetricsCollector{
 			listPodSandboxMetricsFn: listPodSandboxMetricsFn,
 		}
@@ -68,9 +69,11 @@ func (c *criMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 // Collect implements the metrics.CollectWithStability interface.
 // TODO(haircommander): would it be better if these were processed async?
 func (c *criMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	podMetrics, err := c.listPodSandboxMetricsFn(context.Background())
+	ctx := context.Background()
+	logger := klog.FromContext(ctx)
+	podMetrics, err := c.listPodSandboxMetricsFn(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Failed to get pod metrics")
+		logger.Error(err, "Failed to get pod metrics")
 		return
 	}
 

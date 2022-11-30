@@ -1610,9 +1610,10 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
 	// Currently, using that context causes test failures.
 	ctx := context.TODO()
-	klog.V(4).InfoS("syncPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("syncPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer func() {
-		klog.V(4).InfoS("syncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID, "isTerminal", isTerminal)
+		logger.V(4).Info("syncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID, "isTerminal", isTerminal)
 	}()
 
 	// Latency measurements for the main workflow are relative to the
@@ -1630,7 +1631,7 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 			// since kubelet first saw the pod if firstSeenTime is set.
 			metrics.PodWorkerStartDuration.Observe(metrics.SinceInSeconds(firstSeenTime))
 		} else {
-			klog.V(3).InfoS("First seen time not recorded for pod",
+			logger.V(3).Info("First seen time not recorded for pod",
 				"podUID", pod.UID,
 				"pod", klog.KObj(pod))
 		}
@@ -1693,7 +1694,7 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 
 	// Pods that are not runnable must be stopped - return a typed error to the pod worker
 	if !runnable.Admit {
-		klog.V(2).InfoS("Pod is not runnable and must have running containers stopped", "pod", klog.KObj(pod), "podUID", pod.UID, "message", runnable.Message)
+		logger.V(2).Info("Pod is not runnable and must have running containers stopped", "pod", klog.KObj(pod), "podUID", pod.UID, "message", runnable.Message)
 		var syncErr error
 		p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 		if err := kl.killPod(ctx, pod, p, nil); err != nil {
@@ -1751,7 +1752,7 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 			if err := kl.killPod(ctx, pod, p, nil); err == nil {
 				podKilled = true
 			} else {
-				klog.ErrorS(err, "KillPod failed", "pod", klog.KObj(pod), "podStatus", podStatus)
+				logger.Error(err, "KillPod failed", "pod", klog.KObj(pod), "podStatus", podStatus)
 			}
 		}
 		// Create and Update pod's Cgroups
@@ -1764,7 +1765,7 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 		if !(podKilled && pod.Spec.RestartPolicy == v1.RestartPolicyNever) {
 			if !pcm.Exists(pod) {
 				if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
-					klog.V(2).InfoS("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
+					logger.V(2).Info("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
 				}
 				if err := pcm.EnsureExists(pod); err != nil {
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
@@ -1781,25 +1782,25 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 			if mirrorPod.DeletionTimestamp != nil || !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
 				// The mirror pod is semantically different from the static pod. Remove
 				// it. The mirror pod will get recreated later.
-				klog.InfoS("Trying to delete pod", "pod", klog.KObj(pod), "podUID", mirrorPod.ObjectMeta.UID)
+				logger.Info("Trying to delete pod", "pod", klog.KObj(pod), "podUID", mirrorPod.ObjectMeta.UID)
 				podFullName := kubecontainer.GetPodFullName(pod)
 				var err error
 				deleted, err = kl.podManager.DeleteMirrorPod(podFullName, &mirrorPod.ObjectMeta.UID)
 				if deleted {
-					klog.InfoS("Deleted mirror pod because it is outdated", "pod", klog.KObj(mirrorPod))
+					logger.Info("Deleted mirror pod because it is outdated", "pod", klog.KObj(mirrorPod))
 				} else if err != nil {
-					klog.ErrorS(err, "Failed deleting mirror pod", "pod", klog.KObj(mirrorPod))
+					logger.Error(err, "Failed deleting mirror pod", "pod", klog.KObj(mirrorPod))
 				}
 			}
 		}
 		if mirrorPod == nil || deleted {
 			node, err := kl.GetNode()
 			if err != nil || node.DeletionTimestamp != nil {
-				klog.V(4).InfoS("No need to create a mirror pod, since node has been removed from the cluster", "node", klog.KRef("", string(kl.nodeName)))
+				logger.V(4).Info("No need to create a mirror pod, since node has been removed from the cluster", "node", klog.KRef("", string(kl.nodeName)))
 			} else {
-				klog.V(4).InfoS("Creating a mirror pod for static pod", "pod", klog.KObj(pod))
+				logger.V(4).Info("Creating a mirror pod for static pod", "pod", klog.KObj(pod))
 				if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-					klog.ErrorS(err, "Failed creating a mirror pod for", "pod", klog.KObj(pod))
+					logger.Error(err, "Failed creating a mirror pod for", "pod", klog.KObj(pod))
 				}
 			}
 		}
@@ -1808,7 +1809,7 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error making pod data directories: %v", err)
-		klog.ErrorS(err, "Unable to make pod data directories for pod", "pod", klog.KObj(pod))
+		logger.Error(err, "Unable to make pod data directories for pod", "pod", klog.KObj(pod))
 		return false, err
 	}
 
@@ -1818,7 +1819,7 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 		// Wait for volumes to attach/mount
 		if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
-			klog.ErrorS(err, "Unable to attach or mount volumes for pod; skipping pod", "pod", klog.KObj(pod))
+			logger.Error(err, "Unable to attach or mount volumes for pod; skipping pod", "pod", klog.KObj(pod))
 			return false, err
 		}
 	}
@@ -1855,8 +1856,9 @@ func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
 	// Currently, using that context causes test failures.
 	ctx := context.Background()
-	klog.V(4).InfoS("syncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
-	defer klog.V(4).InfoS("syncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("syncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
+	defer logger.V(4).Info("syncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	// when we receive a runtime only pod (runningPod != nil) we don't need to update the status
 	// manager or refresh the status of the cache, because a successful killPod will ensure we do
@@ -1864,9 +1866,9 @@ func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	if runningPod != nil {
 		// we kill the pod with the specified grace period since this is a termination
 		if gracePeriod != nil {
-			klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
+			logger.V(4).Info("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
 		} else {
-			klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
+			logger.V(4).Info("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
 		}
 		if err := kl.killPod(ctx, pod, *runningPod, gracePeriod); err != nil {
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
@@ -1874,7 +1876,7 @@ func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 			utilruntime.HandleError(err)
 			return err
 		}
-		klog.V(4).InfoS("Pod termination stopped all running orphan containers", "pod", klog.KObj(pod), "podUID", pod.UID)
+		logger.V(4).Info("Pod termination stopped all running orphan containers", "pod", klog.KObj(pod), "podUID", pod.UID)
 		return nil
 	}
 
@@ -1885,9 +1887,9 @@ func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	if gracePeriod != nil {
-		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
+		logger.V(4).Info("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
 	} else {
-		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
+		logger.V(4).Info("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
 	}
 
 	kl.probeManager.StopLivenessAndStartup(pod)
@@ -1913,7 +1915,7 @@ func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	//  cache immediately
 	podStatus, err := kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
-		klog.ErrorS(err, "Unable to read pod status prior to final pod termination", "pod", klog.KObj(pod), "podUID", pod.UID)
+		logger.Error(err, "Unable to read pod status prior to final pod termination", "pod", klog.KObj(pod), "podUID", pod.UID)
 		return err
 	}
 	var runningContainers []string
@@ -1936,7 +1938,7 @@ func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	}
 	if klogVEnabled {
 		sort.Slice(containers, func(i, j int) bool { return containers[i].Name < containers[j].Name })
-		klog.V(4).InfoS("Post-termination container state", "pod", klog.KObj(pod), "podUID", pod.UID, "containers", containers)
+		logger.V(4).Info("Post-termination container state", "pod", klog.KObj(pod), "podUID", pod.UID, "containers", containers)
 	}
 	if len(runningContainers) > 0 {
 		return fmt.Errorf("detected running containers after a successful KillPod, CRI violation: %v", runningContainers)
@@ -1952,7 +1954,7 @@ func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	}
 
 	// we have successfully stopped all containers, the pod is terminating, our status is "done"
-	klog.V(4).InfoS("Pod termination stopped all running containers", "pod", klog.KObj(pod), "podUID", pod.UID)
+	logger.V(4).Info("Pod termination stopped all running containers", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	return nil
 }
@@ -1962,8 +1964,9 @@ func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 // gates pod deletion). When this method exits the pod is expected to be ready for cleanup.
 // TODO: make this method take a context and exit early
 func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
-	klog.V(4).InfoS("syncTerminatedPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
-	defer klog.V(4).InfoS("syncTerminatedPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("syncTerminatedPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
+	defer logger.V(4).Info("syncTerminatedPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
@@ -1976,7 +1979,7 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	if err := kl.volumeManager.WaitForUnmount(pod); err != nil {
 		return err
 	}
-	klog.V(4).InfoS("Pod termination unmounted volumes", "pod", klog.KObj(pod), "podUID", pod.UID)
+	logger.V(4).Info("Pod termination unmounted volumes", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	// After volume unmount is complete, let the secret and configmap managers know we're done with this pod
 	if kl.secretManager != nil {
@@ -1997,14 +2000,14 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 		if err := pcm.Destroy(name); err != nil {
 			return err
 		}
-		klog.V(4).InfoS("Pod termination removed cgroups", "pod", klog.KObj(pod), "podUID", pod.UID)
+		logger.V(4).Info("Pod termination removed cgroups", "pod", klog.KObj(pod), "podUID", pod.UID)
 	}
 
 	kl.usernsManager.Release(pod.UID)
 
 	// mark the final pod status
 	kl.statusManager.TerminatePod(pod)
-	klog.V(4).InfoS("Pod is terminated and will need no more status updates", "pod", klog.KObj(pod), "podUID", pod.UID)
+	logger.V(4).Info("Pod is terminated and will need no more status updates", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	return nil
 }
@@ -2110,7 +2113,8 @@ func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
 // no changes are seen to the configuration, will synchronize the last known desired
 // state every sync-frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
-	klog.InfoS("Starting kubelet main sync loop")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting kubelet main sync loop")
 	// The syncTicker wakes up kubelet to checks if there are any pod workers
 	// that need to be sync'd. A one-second period is sufficient because the
 	// sync interval is defaulted to 10s.
@@ -2134,7 +2138,7 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 
 	for {
 		if err := kl.runtimeState.runtimeErrors(); err != nil {
-			klog.ErrorS(err, "Skipping pod synchronization")
+			logger.Error(err, "Skipping pod synchronization")
 			// exponential backoff
 			time.Sleep(duration)
 			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
@@ -2185,41 +2189,42 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 //     containers have failed health checks
 func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubetypes.PodUpdate, handler SyncHandler,
 	syncCh <-chan time.Time, housekeepingCh <-chan time.Time, plegCh <-chan *pleg.PodLifecycleEvent) bool {
+	logger := klog.FromContext(ctx)
 	select {
 	case u, open := <-configCh:
 		// Update from a config source; dispatch it to the right handler
 		// callback.
 		if !open {
-			klog.ErrorS(nil, "Update channel is closed, exiting the sync loop")
+			logger.Error(nil, "Update channel is closed, exiting the sync loop")
 			return false
 		}
 
 		switch u.Op {
 		case kubetypes.ADD:
-			klog.V(2).InfoS("SyncLoop ADD", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+			logger.V(2).Info("SyncLoop ADD", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
 			// After restarting, kubelet will get all existing pods through
 			// ADD as if they are new pods. These pods will then go through the
 			// admission process and *may* be rejected. This can be resolved
 			// once we have checkpointing.
 			handler.HandlePodAdditions(u.Pods)
 		case kubetypes.UPDATE:
-			klog.V(2).InfoS("SyncLoop UPDATE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+			logger.V(2).Info("SyncLoop UPDATE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.REMOVE:
-			klog.V(2).InfoS("SyncLoop REMOVE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+			logger.V(2).Info("SyncLoop REMOVE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
 			handler.HandlePodRemoves(u.Pods)
 		case kubetypes.RECONCILE:
-			klog.V(4).InfoS("SyncLoop RECONCILE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+			logger.V(4).Info("SyncLoop RECONCILE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
 			handler.HandlePodReconcile(u.Pods)
 		case kubetypes.DELETE:
-			klog.V(2).InfoS("SyncLoop DELETE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+			logger.V(2).Info("SyncLoop DELETE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
 			// DELETE is treated as a UPDATE because of graceful deletion.
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
-			klog.ErrorS(nil, "Kubelet does not support snapshot update")
+			logger.Error(nil, "Kubelet does not support snapshot update")
 		default:
-			klog.ErrorS(nil, "Invalid operation type received", "operation", u.Op)
+			logger.Error(nil, "Invalid operation type received", "operation", u.Op)
 		}
 
 		kl.sourcesReady.AddSource(u.Source)
@@ -2228,11 +2233,11 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.
 			if pod, ok := kl.podManager.GetPodByUID(e.ID); ok {
-				klog.V(2).InfoS("SyncLoop (PLEG): event for pod", "pod", klog.KObj(pod), "event", e)
+				logger.V(2).Info("SyncLoop (PLEG): event for pod", "pod", klog.KObj(pod), "event", e)
 				handler.HandlePodSyncs([]*v1.Pod{pod})
 			} else {
 				// If the pod no longer exists, ignore the event.
-				klog.V(4).InfoS("SyncLoop (PLEG): pod does not exist, ignore irrelevant event", "event", e)
+				logger.V(4).Info("SyncLoop (PLEG): pod does not exist, ignore irrelevant event", "event", e)
 			}
 		}
 
@@ -2247,7 +2252,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		if len(podsToSync) == 0 {
 			break
 		}
-		klog.V(4).InfoS("SyncLoop (SYNC) pods", "total", len(podsToSync), "pods", klog.KObjSlice(podsToSync))
+		logger.V(4).Info("SyncLoop (SYNC) pods", "total", len(podsToSync), "pods", klog.KObjSlice(podsToSync))
 		handler.HandlePodSyncs(podsToSync)
 	case update := <-kl.livenessManager.Updates():
 		if update.Result == proberesults.Failure {
@@ -2275,18 +2280,18 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
 			// skip housekeeping, as we may accidentally delete pods from unready sources.
-			klog.V(4).InfoS("SyncLoop (housekeeping, skipped): sources aren't ready yet")
+			logger.V(4).Info("SyncLoop (housekeeping, skipped): sources aren't ready yet")
 		} else {
 			start := time.Now()
-			klog.V(4).InfoS("SyncLoop (housekeeping)")
+			logger.V(4).Info("SyncLoop (housekeeping)")
 			if err := handler.HandlePodCleanups(ctx); err != nil {
-				klog.ErrorS(err, "Failed cleaning pods")
+				logger.Error(err, "Failed cleaning pods")
 			}
 			duration := time.Since(start)
 			if duration > housekeepingWarningDuration {
-				klog.ErrorS(fmt.Errorf("housekeeping took too long"), "Housekeeping took longer than 15s", "seconds", duration.Seconds())
+				logger.Error(fmt.Errorf("housekeeping took too long"), "Housekeeping took longer than 15s", "seconds", duration.Seconds())
 			}
-			klog.V(4).InfoS("SyncLoop (housekeeping) end")
+			logger.V(4).Info("SyncLoop (housekeeping) end")
 		}
 	}
 	return true

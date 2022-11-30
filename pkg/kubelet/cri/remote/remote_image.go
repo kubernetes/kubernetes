@@ -90,11 +90,12 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 // validateServiceConnection tries to connect to the remote image service by
 // using the CRI v1 API version and fails if that's not possible.
 func (r *remoteImageService) validateServiceConnection(ctx context.Context, conn *grpc.ClientConn, endpoint string) error {
-	klog.V(4).InfoS("Validating the CRI v1 API image version")
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Validating the CRI v1 API image version")
 	r.imageClient = runtimeapi.NewImageServiceClient(conn)
 
 	if _, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{}); err == nil {
-		klog.V(2).InfoS("Validated CRI v1 image API")
+		logger.V(2).Info("Validated CRI v1 image API")
 
 	} else if status.Code(err) == codes.Unimplemented {
 		return fmt.Errorf("CRI v1 image API is not implemented for endpoint %q: %w", endpoint, err)
@@ -115,8 +116,9 @@ func (r *remoteImageService) listImagesV1(ctx context.Context, filter *runtimeap
 	resp, err := r.imageClient.ListImages(ctx, &runtimeapi.ListImagesRequest{
 		Filter: filter,
 	})
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		klog.ErrorS(err, "ListImages with filter from image service failed", "filter", filter)
+		logger.Error(err, "ListImages with filter from image service failed", "filter", filter)
 		return nil, err
 	}
 
@@ -136,8 +138,9 @@ func (r *remoteImageService) imageStatusV1(ctx context.Context, image *runtimeap
 		Image:   image,
 		Verbose: verbose,
 	})
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Get ImageStatus from image service failed", "image", image.Image)
+		logger.Error(err, "Get ImageStatus from image service failed", "image", image.Image)
 		return nil, err
 	}
 
@@ -145,7 +148,7 @@ func (r *remoteImageService) imageStatusV1(ctx context.Context, image *runtimeap
 		if resp.Image.Id == "" || resp.Image.Size_ == 0 {
 			errorMessage := fmt.Sprintf("Id or size of image %q is not set", image.Image)
 			err := errors.New(errorMessage)
-			klog.ErrorS(err, "ImageStatus failed", "image", image.Image)
+			logger.Error(err, "ImageStatus failed", "image", image.Image)
 			return nil, err
 		}
 	}
@@ -167,13 +170,14 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 		Auth:          auth,
 		SandboxConfig: podSandboxConfig,
 	})
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		klog.ErrorS(err, "PullImage from image service failed", "image", image.Image)
+		logger.Error(err, "PullImage from image service failed", "image", image.Image)
 		return "", err
 	}
 
 	if resp.ImageRef == "" {
-		klog.ErrorS(errors.New("PullImage failed"), "ImageRef of image is not set", "image", image.Image)
+		logger.Error(errors.New("PullImage failed"), "ImageRef of image is not set", "image", image.Image)
 		errorMessage := fmt.Sprintf("imageRef of image %q is not set", image.Image)
 		return "", errors.New(errorMessage)
 	}
@@ -184,12 +188,13 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 // RemoveImage removes the image.
 func (r *remoteImageService) RemoveImage(ctx context.Context, image *runtimeapi.ImageSpec) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	logger := klog.FromContext(ctx)
 	defer cancel()
 
 	if _, err = r.imageClient.RemoveImage(ctx, &runtimeapi.RemoveImageRequest{
 		Image: image,
 	}); err != nil {
-		klog.ErrorS(err, "RemoveImage from image service failed", "image", image.Image)
+		logger.Error(err, "RemoveImage from image service failed", "image", image.Image)
 		return err
 	}
 
@@ -208,8 +213,9 @@ func (r *remoteImageService) ImageFsInfo(ctx context.Context) ([]*runtimeapi.Fil
 
 func (r *remoteImageService) imageFsInfoV1(ctx context.Context) ([]*runtimeapi.FilesystemUsage, error) {
 	resp, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{})
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		klog.ErrorS(err, "ImageFsInfo from image service failed")
+		logger.Error(err, "ImageFsInfo from image service failed")
 		return nil, err
 	}
 	return resp.GetImageFilesystems(), nil

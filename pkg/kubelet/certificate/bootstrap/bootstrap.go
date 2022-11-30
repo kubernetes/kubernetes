@@ -111,12 +111,13 @@ func LoadClientCert(ctx context.Context, kubeconfigPath, bootstrapPath, certDir 
 	if err != nil {
 		return err
 	}
+	logger := klog.FromContext(ctx)
 	if ok {
-		klog.V(2).InfoS("Kubeconfig exists and is valid, skipping bootstrap", "path", kubeconfigPath)
+		logger.V(2).Info("Kubeconfig exists and is valid, skipping bootstrap", "path", kubeconfigPath)
 		return nil
 	}
 
-	klog.V(2).InfoS("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
+	logger.V(2).Info("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
 
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
 	if err != nil {
@@ -147,7 +148,7 @@ func LoadClientCert(ctx context.Context, kubeconfigPath, bootstrapPath, certDir 
 	// managed by the store.
 	privKeyPath := filepath.Join(certDir, tmpPrivateKeyFile)
 	if !verifyKeyData(keyData) {
-		klog.V(2).InfoS("No valid private key and/or certificate found, reusing existing private key or creating a new one")
+		logger.V(2).Info("No valid private key and/or certificate found, reusing existing private key or creating a new one")
 		// Note: always call LoadOrGenerateKeyFile so that private key is
 		// reused on next startup if CSR request fails.
 		keyData, _, err = keyutil.LoadOrGenerateKeyFile(privKeyPath)
@@ -157,7 +158,7 @@ func LoadClientCert(ctx context.Context, kubeconfigPath, bootstrapPath, certDir 
 	}
 
 	if err := waitForServer(ctx, *bootstrapClientConfig, 1*time.Minute); err != nil {
-		klog.InfoS("Error waiting for apiserver to come up", "err", err)
+		logger.Info("Error waiting for apiserver to come up", "err", err)
 	}
 
 	certData, err := requestNodeCertificate(ctx, bootstrapClient, keyData, nodeName)
@@ -168,7 +169,7 @@ func LoadClientCert(ctx context.Context, kubeconfigPath, bootstrapPath, certDir 
 		return err
 	}
 	if err := os.Remove(privKeyPath); err != nil && !os.IsNotExist(err) {
-		klog.V(2).InfoS("Failed cleaning up private key file", "path", privKeyPath, "err", err)
+		logger.V(2).Info("Failed cleaning up private key file", "path", privKeyPath, "err", err)
 	}
 
 	return writeKubeconfigFromBootstrapping(bootstrapClientConfig, kubeconfigPath, store.CurrentPath())
@@ -290,9 +291,10 @@ func waitForServer(ctx context.Context, cfg restclient.Config, deadline time.Dur
 	defer cancel()
 
 	var connected bool
+	logger := klog.FromContext(ctx)
 	wait.JitterUntil(func() {
 		if _, err := cli.Get().AbsPath("/healthz").Do(ctx).Raw(); err != nil {
-			klog.InfoS("Failed to connect to apiserver", "err", err)
+			logger.Info("Failed to connect to apiserver", "err", err)
 			return
 		}
 		cancel()
@@ -352,7 +354,8 @@ func requestNodeCertificate(ctx context.Context, client clientset.Interface, pri
 	ctx, cancel := context.WithTimeout(ctx, 3600*time.Second)
 	defer cancel()
 
-	klog.V(2).InfoS("Waiting for client certificate to be issued")
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Waiting for client certificate to be issued")
 	return csr.WaitForCertificate(ctx, client, reqName, reqUID)
 }
 

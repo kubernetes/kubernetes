@@ -428,10 +428,11 @@ func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) 
 // pod status was actually updated in the cache. It will return false if the pod status
 // was ignored by the cache.
 func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, pid types.UID) (error, bool) {
+	logger := klog.FromContext(ctx)
 	if pod == nil {
 		// The pod is missing in the current relist. This means that
 		// the pod has no visible (active or inactive) containers.
-		klog.V(4).InfoS("PLEG: Delete status for pod", "podUID", string(pid))
+		logger.V(4).Info("PLEG: Delete status for pod", "podUID", string(pid))
 		g.cache.Delete(pid)
 		return nil, true
 	}
@@ -443,16 +444,16 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 		// nolint:logcheck // Not using the result of klog.V inside the
 		// if branch is okay, we just use it to determine whether the
 		// additional "podStatus" key and its value should be added.
-		if klog.V(6).Enabled() {
-			klog.ErrorS(err, "PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name), "podStatus", status)
+		if logger.V(6).Enabled() {
+			logger.Error(err, "PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name), "podStatus", status)
 		} else {
-			klog.ErrorS(err, "PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name))
+			logger.Error(err, "PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name))
 		}
 	} else {
-		if klogV := klog.V(6); klogV.Enabled() {
-			klogV.InfoS("PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name), "podStatus", status)
+		if klogV := logger.V(6); klogV.Enabled() {
+			logger.Info("PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name), "podStatus", status)
 		} else {
-			klog.V(4).InfoS("PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name))
+			logger.V(4).Info("PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name))
 		}
 		// Preserve the pod IP across cache updates if the new IP is empty.
 		// When a pod is torn down, kubelet may race with PLEG and retrieve

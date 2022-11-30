@@ -753,9 +753,10 @@ func buildContainerMapFromRuntime(ctx context.Context, runtimeService internalap
 
 	containerMap := containermap.NewContainerMap()
 	containerList, _ := runtimeService.ListContainers(ctx, nil)
+	logger := klog.FromContext(ctx)
 	for _, c := range containerList {
 		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
-			klog.InfoS("no PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)
+			logger.Info("no PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)
 			continue
 		}
 		containerMap.Add(podSandboxMap[c.PodSandboxId], c.Metadata.Name, c.Id)

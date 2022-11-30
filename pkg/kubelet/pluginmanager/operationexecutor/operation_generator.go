@@ -118,8 +118,9 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 			Handler:    handler,
 			Name:       infoResp.Name,
 		})
+		logger := klog.FromContext(ctx)
 		if err != nil {
-			klog.ErrorS(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
+			logger.Error(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
 		}
 		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 			return og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))

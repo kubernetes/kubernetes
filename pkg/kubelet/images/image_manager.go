@@ -99,8 +99,9 @@ func (m *imageManager) logIt(ref *v1.ObjectReference, eventtype, event, prefix, 
 func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
 	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, container.Image)
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod), "containerName", container.Name)
+		logger.Error(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 
 	// If the image contains no tag or digest, a default tag should be applied.

@@ -344,29 +344,30 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		})
 	}
 
+	logger := klog.FromContext(ctx)
 	if kl.enableControllerAttachDetach {
 		if node.Annotations == nil {
 			node.Annotations = make(map[string]string)
 		}
 
-		klog.V(2).InfoS("Setting node annotation to enable volume controller attach/detach")
+		logger.V(2).Info("Setting node annotation to enable volume controller attach/detach")
 		node.Annotations[volutil.ControllerManagedAttachAnnotation] = "true"
 	} else {
-		klog.V(2).InfoS("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
+		logger.V(2).Info("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
 	if kl.keepTerminatedPodVolumes {
 		if node.Annotations == nil {
 			node.Annotations = make(map[string]string)
 		}
-		klog.V(2).InfoS("Setting node annotation to keep pod volumes of terminated pods attached to the node")
+		logger.V(2).Info("Setting node annotation to keep pod volumes of terminated pods attached to the node")
 		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
 	}
 
 	// @question: should this be place after the call to the cloud provider? which also applies labels
 	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {
-			klog.InfoS("the node label will overwrite default setting", "labelKey", k, "labelValue", v, "default", cv)
+			logger.Info("the node label will overwrite default setting", "labelKey", k, "labelValue", v, "default", cv)
 		}
 		node.ObjectMeta.Labels[k] = v
 	}
@@ -397,9 +398,9 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 			return nil, err
 		}
 		if instanceType != "" {
-			klog.InfoS("Adding label from cloud provider", "labelKey", v1.LabelInstanceType, "labelValue", instanceType)
+			logger.Info("Adding label from cloud provider", "labelKey", v1.LabelInstanceType, "labelValue", instanceType)
 			node.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
-			klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelInstanceTypeStable, "labelValue", instanceType)
+			logger.Info("Adding node label from cloud provider", "labelKey", v1.LabelInstanceTypeStable, "labelValue", instanceType)
 			node.ObjectMeta.Labels[v1.LabelInstanceTypeStable] = instanceType
 		}
 		// If the cloud has zone information, label the node with the zone information
@@ -410,15 +411,15 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelFailureDomainBetaZone, "labelValue", zone.FailureDomain)
+				logger.Info("Adding node label from cloud provider", "labelKey", v1.LabelFailureDomainBetaZone, "labelValue", zone.FailureDomain)
 				node.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone] = zone.FailureDomain
-				klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelTopologyZone, "labelValue", zone.FailureDomain)
+				logger.Info("Adding node label from cloud provider", "labelKey", v1.LabelTopologyZone, "labelValue", zone.FailureDomain)
 				node.ObjectMeta.Labels[v1.LabelTopologyZone] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelFailureDomainBetaRegion, "labelValue", zone.Region)
+				logger.Info("Adding node label from cloud provider", "labelKey", v1.LabelFailureDomainBetaRegion, "labelValue", zone.Region)
 				node.ObjectMeta.Labels[v1.LabelFailureDomainBetaRegion] = zone.Region
-				klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelTopologyRegion, "labelValue", zone.Region)
+				logger.Info("Adding node label from cloud provider", "labelKey", v1.LabelTopologyRegion, "labelValue", zone.Region)
 				node.ObjectMeta.Labels[v1.LabelTopologyRegion] = zone.Region
 			}
 		}
@@ -448,20 +449,21 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 		}
 	}()
 
+	logger := klog.FromContext(ctx)
 	if timeout {
-		klog.ErrorS(nil, "Node not becoming ready in time after startup")
+		logger.Error(nil, "Node not becoming ready in time after startup")
 		return true
 	}
 
 	originalNode, err := kl.GetNode()
 	if err != nil {
-		klog.ErrorS(err, "Error getting the current node from lister")
+		logger.Error(err, "Error getting the current node from lister")
 		return false
 	}
 
 	readyIdx, originalNodeReady := nodeutil.GetNodeCondition(&originalNode.Status, v1.NodeReady)
 	if readyIdx == -1 {
-		klog.ErrorS(nil, "Node does not have NodeReady condition", "originalNode", originalNode)
+		logger.Error(nil, "Node does not have NodeReady condition", "originalNode", originalNode)
 		return false
 	}
 
@@ -482,7 +484,7 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 
 	readyIdx, nodeReady := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
 	if readyIdx == -1 {
-		klog.ErrorS(nil, "Node does not have NodeReady condition", "node", node)
+		logger.Error(nil, "Node does not have NodeReady condition", "node", node)
 		return false
 	}
 
@@ -490,11 +492,11 @@ func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (comp
 		return false
 	}
 
-	klog.InfoS("Fast updating node status as it just became ready")
+	logger.Info("Fast updating node status as it just became ready")
 	if _, err := kl.patchNodeStatus(originalNode, node); err != nil {
 		// The originalNode is probably stale, but we know that the current state of kubelet would turn
 		// the node to be ready. Retry using syncNodeStatus() which fetches from the apiserver.
-		klog.ErrorS(err, "Error updating node status, will retry with syncNodeStatus")
+		logger.Error(err, "Error updating node status, will retry with syncNodeStatus")
 
 		// The reversed kl.syncNodeStatusMux.Unlock/Lock() below to allow kl.syncNodeStatus() execution.
 		kl.syncNodeStatusMux.Unlock()
@@ -531,13 +533,14 @@ func (kl *Kubelet) syncNodeStatus() {
 // updateNodeStatus updates node status to master with retries if there is any
 // change or enough time passed from the last sync.
 func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
-	klog.V(5).InfoS("Updating node status")
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := kl.tryUpdateNodeStatus(ctx, i); err != nil {
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
 			}
-			klog.ErrorS(err, "Error updating node status, will retry")
+			logger.Error(err, "Error updating node status, will retry")
 		} else {
 			return nil
 		}
@@ -586,6 +589,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 func (kl *Kubelet) updateNode(ctx context.Context, originalNode *v1.Node) (*v1.Node, bool) {
 	node := originalNode.DeepCopy()
 
+	logger := klog.FromContext(ctx)
 	podCIDRChanged := false
 	if len(node.Spec.PodCIDRs) != 0 {
 		// Pod CIDR could have been updated before, so we cannot rely on
@@ -594,7 +598,7 @@ func (kl *Kubelet) updateNode(ctx context.Context, originalNode *v1.Node) (*v1.N
 		var err error
 		podCIDRs := strings.Join(node.Spec.PodCIDRs, ",")
 		if podCIDRChanged, err = kl.updatePodCIDR(ctx, podCIDRs); err != nil {
-			klog.ErrorS(err, "Error updating pod CIDR")
+			logger.Error(err, "Error updating pod CIDR")
 		}
 	}
 
@@ -696,9 +700,10 @@ func (kl *Kubelet) recordNodeSchedulableEvent(ctx context.Context, node *v1.Node
 // refactor the node status condition code out to a different file.
 func (kl *Kubelet) setNodeStatus(ctx context.Context, node *v1.Node) {
 	for i, f := range kl.setNodeStatusFuncs {
-		klog.V(5).InfoS("Setting node status condition code", "position", i, "node", klog.KObj(node))
+		logger := klog.FromContext(ctx)
+		logger.V(5).Info("Setting node status condition code", "position", i, "node", klog.KObj(node))
 		if err := f(ctx, node); err != nil {
-			klog.ErrorS(err, "Failed to set some node status fields", "node", klog.KObj(node))
+			logger.Error(err, "Failed to set some node status fields", "node", klog.KObj(node))
 		}
 	}
 }

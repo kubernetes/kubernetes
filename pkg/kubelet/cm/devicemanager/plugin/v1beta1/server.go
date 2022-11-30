@@ -141,23 +141,24 @@ func (s *server) SocketPath() string {
 }
 
 func (s *server) Register(ctx context.Context, r *api.RegisterRequest) (*api.Empty, error) {
-	klog.InfoS("Got registration request from device plugin with resource", "resourceName", r.ResourceName)
+	logger := klog.FromContext(ctx)
+	logger.Info("Got registration request from device plugin with resource", "resourceName", r.ResourceName)
 	metrics.DevicePluginRegistrationCount.WithLabelValues(r.ResourceName).Inc()
 
 	if !s.isVersionCompatibleWithPlugin(r.Version) {
 		err := fmt.Errorf(errUnsupportedVersion, r.Version, api.SupportedVersions)
-		klog.InfoS("Bad registration request from device plugin with resource", "resourceName", r.ResourceName, "err", err)
+		logger.Info("Bad registration request from device plugin with resource", "resourceName", r.ResourceName, "err", err)
 		return &api.Empty{}, err
 	}
 
 	if !v1helper.IsExtendedResourceName(core.ResourceName(r.ResourceName)) {
 		err := fmt.Errorf(errInvalidResourceName, r.ResourceName)
-		klog.InfoS("Bad registration request from device plugin", "err", err)
+		logger.Info("Bad registration request from device plugin", "err", err)
 		return &api.Empty{}, err
 	}
 
 	if err := s.connectClient(r.ResourceName, filepath.Join(s.socketDir, r.Endpoint)); err != nil {
-		klog.InfoS("Error connecting to device plugin client", "err", err)
+		logger.Info("Error connecting to device plugin client", "err", err)
 		return &api.Empty{}, err
 	}
 

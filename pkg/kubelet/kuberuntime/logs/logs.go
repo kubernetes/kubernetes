@@ -318,9 +318,10 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	found := true
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
+	logger := klog.FromContext(ctx)
 	for {
 		if stop || (limitedMode && limitedNum == 0) {
-			klog.V(2).InfoS("Finished parsing log file", "path", path)
+			logger.V(2).Info("Finished parsing log file", "path", path)
 			return nil
 		}
 		l, err := r.ReadBytes(eol[0])
@@ -368,7 +369,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 					defer newF.Close()
 					f.Close()
 					if err := watcher.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
-						klog.ErrorS(err, "Failed to remove file watch", "path", f.Name())
+						logger.Error(err, "Failed to remove file watch", "path", f.Name())
 					}
 					f = newF
 					if err := watcher.Add(f.Name()); err != nil {
@@ -384,7 +385,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 			if len(l) == 0 {
 				continue
 			}
-			klog.InfoS("Incomplete line in log file", "path", path, "line", l)
+			logger.Info("Incomplete line in log file", "path", path, "line", l)
 		}
 		if parse == nil {
 			// Initialize the log parsing function.
@@ -396,16 +397,16 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 		// Parse the log line.
 		msg.reset()
 		if err := parse(l, msg); err != nil {
-			klog.ErrorS(err, "Failed when parsing line in log file", "path", path, "line", l)
+			logger.Error(err, "Failed when parsing line in log file", "path", path, "line", l)
 			continue
 		}
 		// Write the log line into the stream.
 		if err := writer.write(msg, isNewLine); err != nil {
 			if err == errMaximumWrite {
-				klog.V(2).InfoS("Finished parsing log file, hit bytes limit", "path", path, "limit", opts.bytes)
+				logger.V(2).Info("Finished parsing log file, hit bytes limit", "path", path, "limit", opts.bytes)
 				return nil
 			}
-			klog.ErrorS(err, "Failed when writing line to log file", "path", path, "line", msg)
+			logger.Error(err, "Failed when writing line to log file", "path", path, "line", msg)
 			return err
 		}
 		if limitedMode {
@@ -429,8 +430,9 @@ func isContainerRunning(ctx context.Context, id string, r internalapi.RuntimeSer
 		return false, remote.ErrContainerStatusNil
 	}
 	// Only keep following container log when it is running.
+	logger := klog.FromContext(ctx)
 	if status.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
-		klog.V(5).InfoS("Container is not running", "containerId", id, "state", status.State)
+		logger.V(5).Info("Container is not running", "containerId", id, "state", status.State)
 		// Do not return error because it's normal that the container stops
 		// during waiting.
 		return false, nil
@@ -447,6 +449,7 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 		return false, false, err
 	}
 	errRetry := 5
+	logger := klog.FromContext(ctx)
 	for {
 		select {
 		case <-ctx.Done():
@@ -464,10 +467,10 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 			case fsnotify.Chmod:
 				return true, true, nil
 			default:
-				klog.ErrorS(nil, "Received unexpected fsnotify event, retrying", "event", e)
+				logger.Error(nil, "Received unexpected fsnotify event, retrying", "event", e)
 			}
 		case err := <-w.Errors:
-			klog.ErrorS(err, "Received fsnotify watch error, retrying unless no more retries left", "retries", errRetry)
+			logger.Error(err, "Received fsnotify watch error, retrying unless no more retries left", "retries", errRetry)
 			if errRetry == 0 {
 				return false, false, err
 			}

@@ -141,7 +141,8 @@ func (r *draPluginClient) NodeUnprepareResource(
 	claimName string,
 	cdiDevices []string,
 ) (*drapbv1.NodeUnprepareResourceResponse, error) {
-	klog.V(4).InfoS(
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info(
 		log("calling NodeUnprepareResource rpc"),
 		"namespace", namespace,
 		"claim UID", claimUID,

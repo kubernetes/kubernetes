@@ -136,6 +136,7 @@ func (p *criStatsProvider) listPodStats(ctx context.Context, updateCPUNanoCoreUs
 		return nil, fmt.Errorf("failed to get pod or container map: %v", err)
 	}
 
+	logger := klog.FromContext(ctx)
 	if p.podAndContainerStatsFromCRI {
 		result, err := p.listPodStatsStrictlyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
 		if err == nil {
@@ -148,7 +149,7 @@ func (p *criStatsProvider) listPodStats(ctx context.Context, updateCPUNanoCoreUs
 			return nil, err
 		}
 		// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
-		klog.V(5).ErrorS(err,
+		logger.V(5).Error(err,
 			"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
 		)
 	}
@@ -237,9 +238,10 @@ func (p *criStatsProvider) listPodStatsStrictlyFromCRI(ctx context.Context, upda
 
 	fsIDtoInfo := make(map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo)
 	summarySandboxStats := make([]statsapi.PodStats, 0, len(podSandboxMap))
+	logger := klog.FromContext(ctx)
 	for _, criSandboxStat := range criSandboxStats {
 		if criSandboxStat == nil || criSandboxStat.Attributes == nil {
-			klog.V(5).InfoS("Unable to find CRI stats for sandbox")
+			logger.V(5).Info("Unable to find CRI stats for sandbox")
 			continue
 		}
 		podSandbox, found := podSandboxMap[criSandboxStat.Attributes.Id]
@@ -275,6 +277,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 		return nil, fmt.Errorf("failed to get pod or container map: %v", err)
 	}
 
+	logger := klog.FromContext(ctx)
 	result := make([]statsapi.PodStats, 0, len(podSandboxMap))
 	if p.podAndContainerStatsFromCRI {
 		criSandboxStats, err := p.runtimeService.ListPodSandboxStats(ctx, &runtimeapi.PodSandboxStatsFilter{})
@@ -299,7 +302,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 			return nil, err
 		}
 		// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
-		klog.ErrorS(err,
+		logger.Error(err,
 			"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
 		)
 	}

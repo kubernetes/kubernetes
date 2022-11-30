@@ -51,6 +51,7 @@ func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error)
 		return false, nil
 	}
 
+	logger := klog.FromContext(ctx)
 	// kubelet -> generic runtime -> runtime shim -> network plugin
 	// docker/non-cri implementations have a passthrough UpdatePodCIDR
 	if err := kl.getRuntime().UpdatePodCIDR(ctx, cidr); err != nil {
@@ -58,7 +59,7 @@ func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error)
 		// But it is better to be on the safe side to still return true here.
 		return true, fmt.Errorf("failed to update pod CIDR: %v", err)
 	}
-	klog.InfoS("Updating Pod CIDR", "originalPodCIDR", podCIDR, "newPodCIDR", cidr)
+	logger.Info("Updating Pod CIDR", "originalPodCIDR", podCIDR, "newPodCIDR", cidr)
 	kl.runtimeState.setPodCIDR(cidr)
 	return true, nil
 }

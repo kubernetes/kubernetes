@@ -87,7 +87,8 @@ func (kl *Kubelet) runOnce(ctx context.Context, pods []*v1.Pod, retryDelay time.
 		}(pod)
 	}
 
-	klog.InfoS("Waiting for pods", "numPods", len(admitted))
+	logger := klog.FromContext(ctx)
+	logger.Info("Waiting for pods", "numPods", len(admitted))
 	failedPods := []string{}
 	for i := 0; i < len(admitted); i++ {
 		res := <-ch
@@ -95,19 +96,19 @@ func (kl *Kubelet) runOnce(ctx context.Context, pods []*v1.Pod, retryDelay time.
 		if res.Err != nil {
 			failedContainerName, err := kl.getFailedContainers(ctx, res.Pod)
 			if err != nil {
-				klog.InfoS("Unable to get failed containers' names for pod", "pod", klog.KObj(res.Pod), "err", err)
+				logger.Info("Unable to get failed containers' names for pod", "pod", klog.KObj(res.Pod), "err", err)
 			} else {
-				klog.InfoS("Unable to start pod because container failed", "pod", klog.KObj(res.Pod), "containerName", failedContainerName)
+				logger.Info("Unable to start pod because container failed", "pod", klog.KObj(res.Pod), "containerName", failedContainerName)
 			}
 			failedPods = append(failedPods, format.Pod(res.Pod))
 		} else {
-			klog.InfoS("Started pod", "pod", klog.KObj(res.Pod))
+			logger.Info("Started pod", "pod", klog.KObj(res.Pod))
 		}
 	}
 	if len(failedPods) > 0 {
 		return results, fmt.Errorf("error running pods: %v", failedPods)
 	}
-	klog.InfoS("Pods started", "numPods", len(pods))
+	logger.Info("Pods started", "numPods", len(pods))
 	return results, err
 }
 
@@ -122,15 +123,16 @@ func (kl *Kubelet) runPod(ctx context.Context, pod *v1.Pod, retryDelay time.Dura
 			return fmt.Errorf("unable to get status for pod %q: %v", format.Pod(pod), err)
 		}
 
+		logger := klog.FromContext(ctx)
 		if kl.isPodRunning(pod, status) {
-			klog.InfoS("Pod's containers running", "pod", klog.KObj(pod))
+			logger.Info("Pod's containers running", "pod", klog.KObj(pod))
 			return nil
 		}
-		klog.InfoS("Pod's containers not running: syncing", "pod", klog.KObj(pod))
+		logger.Info("Pod's containers not running: syncing", "pod", klog.KObj(pod))
 
-		klog.InfoS("Creating a mirror pod for static pod", "pod", klog.KObj(pod))
+		logger.Info("Creating a mirror pod for static pod", "pod", klog.KObj(pod))
 		if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-			klog.ErrorS(err, "Failed creating a mirror pod", "pod", klog.KObj(pod))
+			logger.Error(err, "Failed creating a mirror pod", "pod", klog.KObj(pod))
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		if isTerminal, err = kl.syncPod(ctx, kubetypes.SyncPodUpdate, pod, mirrorPod, status); err != nil {
@@ -140,7 +142,7 @@ func (kl *Kubelet) runPod(ctx context.Context, pod *v1.Pod, retryDelay time.Dura
 			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", format.Pod(pod), runOnceMaxRetries)
 		}
 		// TODO(proppy): health checking would be better than waiting + checking the state at the next iteration.
-		klog.InfoS("Pod's containers synced, waiting", "pod", klog.KObj(pod), "duration", delay)
+		logger.Info("Pod's containers synced, waiting", "pod", klog.KObj(pod), "duration", delay)
 		time.Sleep(delay)
 		retry++
 		delay *= runOnceRetryDelayBackoff

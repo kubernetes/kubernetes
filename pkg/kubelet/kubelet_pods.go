@@ -856,12 +856,13 @@ func containerResourceRuntimeValue(fs *v1.ResourceFieldSelector, pod *v1.Pod, co
 // the pod status contains the result of the last syncPod, otherwise it may fail to
 // terminate newly created containers and sandboxes.
 func (kl *Kubelet) killPod(ctx context.Context, pod *v1.Pod, p kubecontainer.Pod, gracePeriodOverride *int64) error {
+	logger := klog.FromContext(ctx)
 	// Call the container runtime KillPod method which stops all known running containers of the pod
 	if err := kl.containerRuntime.KillPod(ctx, pod, p, gracePeriodOverride); err != nil {
 		return err
 	}
 	if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
-		klog.V(2).InfoS("Failed to update QoS cgroups while killing pod", "err", err)
+		logger.V(2).Info("Failed to update QoS cgroups while killing pod", "err", err)
 	}
 	return nil
 }
@@ -1074,6 +1075,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// in the cgroup tree prior to inspecting the set of pods in our pod manager.
 	// this ensures our view of the cgroup tree does not mistakenly observe pods
 	// that are added after the fact...
+	logger := klog.FromContext(ctx)
 	var (
 		cgroupPods map[types.UID]cm.CgroupName
 		err        error
@@ -1099,7 +1101,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// These two conditions could be alleviated by checkpointing kubelet.
 
 	// Stop the workers for terminated pods not in the config source
-	klog.V(3).InfoS("Clean up pod workers for terminated pods")
+	logger.V(3).Info("Clean up pod workers for terminated pods")
 	workingPods := kl.podWorkers.SyncKnownPods(allPods)
 
 	allPodsByUID := make(map[types.UID]*v1.Pod)
@@ -1128,14 +1130,14 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	}
 
 	// Stop probing pods that are not running
-	klog.V(3).InfoS("Clean up probes for terminated pods")
+	logger.V(3).Info("Clean up probes for terminated pods")
 	kl.probeManager.CleanupPods(possiblyRunningPods)
 
 	// Terminate any pods that are observed in the runtime but not
 	// present in the list of known running pods from config.
 	runningRuntimePods, err := kl.runtimeCache.GetPods(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Error listing containers")
+		logger.Error(err, "Error listing containers")
 		return err
 	}
 	for _, runningPod := range runningRuntimePods {
@@ -1151,7 +1153,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 			// know that another pod wasn't started in the background so we are safe to terminate the
 			// unknown pods.
 			if _, ok := allPodsByUID[runningPod.ID]; !ok {
-				klog.V(3).InfoS("Clean up orphaned pod containers", "podUID", runningPod.ID)
+				logger.V(3).Info("Clean up orphaned pod containers", "podUID", runningPod.ID)
 				one := int64(1)
 				kl.podWorkers.UpdatePod(UpdatePodOptions{
 					UpdateType: kubetypes.SyncPodKill,
@@ -1165,7 +1167,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	}
 
 	// Remove orphaned pod statuses not in the total list of known config pods
-	klog.V(3).InfoS("Clean up orphaned pod statuses")
+	logger.V(3).Info("Clean up orphaned pod statuses")
 	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
 	// Note that we just killed the unwanted pods. This may not have reflected
 	// in the cache. We need to bypass the cache to get the latest set of
@@ -1173,14 +1175,14 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// TODO: Evaluate the performance impact of bypassing the runtime cache.
 	runningRuntimePods, err = kl.containerRuntime.GetPods(ctx, false)
 	if err != nil {
-		klog.ErrorS(err, "Error listing containers")
+		logger.Error(err, "Error listing containers")
 		return err
 	}
 
 	// Remove orphaned pod user namespace allocations (if any).
-	klog.V(3).InfoS("Clean up orphaned pod user namespace allocations")
+	logger.V(3).Info("Clean up orphaned pod user namespace allocations")
 	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(allPods, runningRuntimePods); err != nil {
-		klog.ErrorS(err, "Failed cleaning up orphaned pod user namespaces allocations")
+		logger.Error(err, "Failed cleaning up orphaned pod user namespaces allocations")
 	}
 
 	// Remove orphaned volumes from pods that are known not to have any
@@ -1190,25 +1192,25 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// TODO: this method could more aggressively cleanup terminated pods
 	// in the future (volumes, mount dirs, logs, and containers could all be
 	// better separated)
-	klog.V(3).InfoS("Clean up orphaned pod directories")
+	logger.V(3).Info("Clean up orphaned pod directories")
 	err = kl.cleanupOrphanedPodDirs(allPods, runningRuntimePods)
 	if err != nil {
 		// We want all cleanup tasks to be run even if one of them failed. So
 		// we just log an error here and continue other cleanup tasks.
 		// This also applies to the other clean up tasks.
-		klog.ErrorS(err, "Failed cleaning up orphaned pod directories")
+		logger.Error(err, "Failed cleaning up orphaned pod directories")
 	}
 
 	// Remove any orphaned mirror pods (mirror pods are tracked by name via the
 	// pod worker)
-	klog.V(3).InfoS("Clean up orphaned mirror pods")
+	logger.V(3).Info("Clean up orphaned mirror pods")
 	kl.deleteOrphanedMirrorPods()
 
 	// Remove any cgroups in the hierarchy for pods that are definitely no longer
 	// running (not in the container runtime).
 	if kl.cgroupsPerQOS {
 		pcm := kl.containerManager.NewPodContainerManager()
-		klog.V(3).InfoS("Clean up orphaned pod cgroups")
+		logger.V(3).Info("Clean up orphaned pod cgroups")
 		kl.cleanupOrphanedPodCgroups(pcm, cgroupPods, possiblyRunningPods)
 	}
 
@@ -1227,12 +1229,12 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 			continue
 		}
 		if kl.isAdmittedPodTerminal(pod) {
-			klog.V(3).InfoS("Pod is restartable after termination due to UID reuse, but pod phase is terminal", "pod", klog.KObj(pod), "podUID", pod.UID)
+			logger.V(3).Info("Pod is restartable after termination due to UID reuse, but pod phase is terminal", "pod", klog.KObj(pod), "podUID", pod.UID)
 			continue
 		}
 		start := kl.clock.Now()
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		klog.V(3).InfoS("Pod is restartable after termination due to UID reuse", "pod", klog.KObj(pod), "podUID", pod.UID)
+		logger.V(3).Info("Pod is restartable after termination due to UID reuse", "pod", klog.KObj(pod), "podUID", pod.UID)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
 	}
 
@@ -2065,6 +2067,7 @@ func hasHostNamespace(pod *v1.Pod) bool {
 
 // hasHostMountPVC returns true if a PVC is referencing a HostPath volume.
 func (kl *Kubelet) hasHostMountPVC(ctx context.Context, pod *v1.Pod) bool {
+	logger := klog.FromContext(ctx)
 	for _, volume := range pod.Spec.Volumes {
 		pvcName := ""
 		switch {
@@ -2077,13 +2080,13 @@ func (kl *Kubelet) hasHostMountPVC(ctx context.Context, pod *v1.Pod) bool {
 		}
 		pvc, err := kl.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(ctx, pvcName, metav1.GetOptions{})
 		if err != nil {
-			klog.InfoS("Unable to retrieve pvc", "pvc", klog.KRef(pod.Namespace, pvcName), "err", err)
+			logger.Info("Unable to retrieve pvc", "pvc", klog.KRef(pod.Namespace, pvcName), "err", err)
 			continue
 		}
 		if pvc != nil {
 			referencedVolume, err := kl.kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
 			if err != nil {
-				klog.InfoS("Unable to retrieve pv", "pvName", pvc.Spec.VolumeName, "err", err)
+				logger.Info("Unable to retrieve pv", "pvName", pvc.Spec.VolumeName, "err", err)
 				continue
 			}
 			if referencedVolume != nil && referencedVolume.Spec.HostPath != nil {

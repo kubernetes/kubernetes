@@ -161,7 +161,8 @@ func (m *Stub) Stop() error {
 
 // GetInfo is the RPC which return pluginInfo
 func (m *Stub) GetInfo(ctx context.Context, req *watcherapi.InfoRequest) (*watcherapi.PluginInfo, error) {
-	klog.InfoS("GetInfo")
+	logger := klog.FromContext(ctx)
+	logger.Info("GetInfo")
 	return &watcherapi.PluginInfo{
 		Type:              watcherapi.DevicePlugin,
 		Name:              m.resourceName,
@@ -175,7 +176,8 @@ func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.
 		m.registrationStatus <- *status
 	}
 	if !status.PluginRegistered {
-		klog.InfoS("Registration failed", "err", status.Error)
+		logger := klog.FromContext(ctx)
+		logger.Info("Registration failed", "err", status.Error)
 	}
 	return &watcherapi.RegistrationStatusResponse{}, nil
 }
@@ -228,7 +230,8 @@ func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (
 
 // PreStartContainer resets the devices received
 func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
-	klog.InfoS("PreStartContainer", "request", r)
+	logger := klog.FromContext(ctx)
+	logger.Info("PreStartContainer", "request", r)
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
@@ -255,7 +258,8 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 
 // GetPreferredAllocation gets the preferred allocation from a set of available devices
 func (m *Stub) GetPreferredAllocation(ctx context.Context, r *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
-	klog.InfoS("GetPreferredAllocation", "request", r)
+	logger := klog.FromContext(ctx)
+	logger.Info("GetPreferredAllocation", "request", r)
 
 	devs := make(map[string]pluginapi.Device)
 
@@ -268,7 +272,8 @@ func (m *Stub) GetPreferredAllocation(ctx context.Context, r *pluginapi.Preferre
 
 // Allocate does a mock allocation
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
-	klog.InfoS("Allocate", "request", r)
+	logger := klog.FromContext(ctx)
+	logger.Info("Allocate", "request", r)
 
 	devs := make(map[string]pluginapi.Device)
 

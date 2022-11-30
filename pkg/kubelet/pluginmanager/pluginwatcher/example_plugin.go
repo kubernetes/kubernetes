@@ -50,7 +50,8 @@ type pluginServiceV1Beta1 struct {
 }
 
 func (s *pluginServiceV1Beta1) GetExampleInfo(ctx context.Context, rqt *v1beta1.ExampleRequest) (*v1beta1.ExampleResponse, error) {
-	klog.InfoS("GetExampleInfo v1beta1field", "field", rqt.V1Beta1Field)
+	logger := klog.FromContext(ctx)
+	logger.Info("GetExampleInfo v1beta1field", "field", rqt.V1Beta1Field)
 	return &v1beta1.ExampleResponse{}, nil
 }
 
@@ -63,7 +64,8 @@ type pluginServiceV1Beta2 struct {
 }
 
 func (s *pluginServiceV1Beta2) GetExampleInfo(ctx context.Context, rqt *v1beta2.ExampleRequest) (*v1beta2.ExampleResponse, error) {
-	klog.InfoS("GetExampleInfo v1beta2_field", "field", rqt.V1Beta2Field)
+	logger := klog.FromContext(ctx)
+	logger.Info("GetExampleInfo v1beta2_field", "field", rqt.V1Beta2Field)
 	return &v1beta2.ExampleResponse{}, nil
 }
 
@@ -105,7 +107,8 @@ func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoReques
 }
 
 func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
-	klog.InfoS("Notify registration status", "status", status)
+	logger := klog.FromContext(ctx)
+	logger.Info("Notify registration status", "status", status)
 
 	if e.registrationStatus != nil {
 		e.registrationStatus <- *status

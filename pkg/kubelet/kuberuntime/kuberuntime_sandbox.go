@@ -40,9 +40,10 @@ import (
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
 func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, attempt)
+	logger := klog.FromContext(ctx)
 	if err != nil {
 		message := fmt.Sprintf("Failed to generate sandbox config for pod %q: %v", format.Pod(pod), err)
-		klog.ErrorS(err, "Failed to generate sandbox config for pod", "pod", klog.KObj(pod))
+		logger.Error(err, "Failed to generate sandbox config for pod", "pod", klog.KObj(pod))
 		return "", message, err
 	}
 
@@ -50,7 +51,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 	err = m.osInterface.MkdirAll(podSandboxConfig.LogDirectory, 0755)
 	if err != nil {
 		message := fmt.Sprintf("Failed to create log directory for pod %q: %v", format.Pod(pod), err)
-		klog.ErrorS(err, "Failed to create log directory for pod", "pod", klog.KObj(pod))
+		logger.Error(err, "Failed to create log directory for pod", "pod", klog.KObj(pod))
 		return "", message, err
 	}
 
@@ -62,14 +63,14 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 			return "", message, err
 		}
 		if runtimeHandler != "" {
-			klog.V(2).InfoS("Running pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
+			logger.V(2).Info("Running pod with runtime handler", "pod", klog.KObj(pod), "runtimeHandler", runtimeHandler)
 		}
 	}
 
 	podSandBoxID, err := m.runtimeService.RunPodSandbox(ctx, podSandboxConfig, runtimeHandler)
 	if err != nil {
 		message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
-		klog.ErrorS(err, "Failed to create sandbox for pod", "pod", klog.KObj(pod))
+		logger.Error(err, "Failed to create sandbox for pod", "pod", klog.KObj(pod))
 		return "", message, err
 	}
 
@@ -295,9 +296,10 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(ctx context.Context, all
 		}
 	}
 
+	logger := klog.FromContext(ctx)
 	resp, err := m.runtimeService.ListPodSandbox(ctx, filter)
 	if err != nil {
-		klog.ErrorS(err, "Failed to list pod sandboxes")
+		logger.Error(err, "Failed to list pod sandboxes")
 		return nil, err
 	}
 
@@ -348,8 +350,9 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(ctx context.Context, po
 		}
 	}
 	sandboxes, err := m.runtimeService.ListPodSandbox(ctx, filter)
+	logger := klog.FromContext(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Failed to list sandboxes for pod", "podUID", podUID)
+		logger.Error(err, "Failed to list sandboxes for pod", "podUID", podUID)
 		return nil, err
 	}
 

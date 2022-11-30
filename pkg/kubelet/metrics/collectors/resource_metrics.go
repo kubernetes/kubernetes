@@ -118,6 +118,7 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 // custom collector in a way that only collects metrics for active containers.
 func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	ctx := context.Background()
+	logger := klog.FromContext(ctx)
 	var errorCount float64
 	defer func() {
 		ch <- metrics.NewLazyConstMetric(resourceScrapeResultDesc, metrics.GaugeValue, errorCount)
@@ -125,7 +126,7 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 	statsSummary, err := rc.provider.GetCPUAndMemoryStats(ctx)
 	if err != nil {
 		errorCount = 1
-		klog.ErrorS(err, "Error getting summary for resourceMetric prometheus endpoint")
+		logger.Error(err, "Error getting summary for resourceMetric prometheus endpoint")
 		return
 	}
 
