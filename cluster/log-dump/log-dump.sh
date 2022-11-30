@@ -565,7 +565,7 @@ function dump_nodes_with_logexporter() {
   KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
   if ! "${KUBECTL}" create -f "${manifest_yaml}"; then
     echo 'Failed to create logexporter daemonset.. falling back to logdump through SSH'
-    "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
+    "${KUBECTL}" delete --timeout=1m namespace "${logexporter_namespace}" || true
     dump_nodes "${NODE_NAMES[@]}"
     logexporter_failed=1
     return
@@ -615,7 +615,7 @@ function dump_nodes_with_logexporter() {
       echo "Attempt ${retry} failed to list marker files for successful nodes"
       if [[ "${retry}" == 10 ]]; then
         echo 'Final attempt to list marker files failed.. falling back to logdump through SSH'
-        "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
+        "${KUBECTL}" delete --timeout=1m namespace "${logexporter_namespace}" || true
         dump_nodes "${NODE_NAMES[@]}"
         logexporter_failed=1
         return
@@ -641,7 +641,7 @@ function dump_nodes_with_logexporter() {
 
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
   "${KUBECTL}" get pods --namespace "${logexporter_namespace}" || true
-  "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
+  "${KUBECTL}" delete --timeout=1m namespace "${logexporter_namespace}" || true
   if [[ "${#failed_nodes[@]}" != 0 ]]; then
     echo -e "Dumping logs through SSH for the following nodes:\n${failed_nodes[*]}"
     dump_nodes "${failed_nodes[@]}"
