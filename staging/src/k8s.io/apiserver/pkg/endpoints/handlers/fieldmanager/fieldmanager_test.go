@@ -77,6 +77,16 @@ type fakeObjectDefaulter struct{}
 
 func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
 
+type sameVersionConverter struct{}
+
+func (sameVersionConverter) Convert(object *typed.TypedValue, version fieldpath.APIVersion) (*typed.TypedValue, error) {
+	return object, nil
+}
+
+func (sameVersionConverter) IsMissingVersionError(error) bool {
+	return false
+}
+
 type TestFieldManager struct {
 	fieldManager *FieldManager
 	apiVersion   string
@@ -91,9 +101,8 @@ func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainFieldManager func(Manager) Manager) TestFieldManager {
 	m := NewFakeOpenAPIModels()
 	typeConverter := NewFakeTypeConverter(m)
-	converter := newVersionConverter(typeConverter, &fakeObjectConvertor{}, gvk.GroupVersion())
 	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
-	objectConverter := &fakeObjectConvertor{converter, apiVersion}
+	objectConverter := &fakeObjectConvertor{sameVersionConverter{}, apiVersion}
 	f, err := NewStructuredMergeManager(
 		typeConverter,
 		objectConverter,
