@@ -18,6 +18,7 @@
       "github.com/influxdata/influxdb1-client": "",
       "github.com/json-iterator/go": "refer to #105030",
       "github.com/miekg/dns": "no dns client/server should be required",
+      "github.com/mindprince/gonvml": "depends on nvml.h that does not appear to permit modification, redistribution",
       "github.com/mndrix/tap-go": "unmaintained",
       "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
       "github.com/spf13/viper": "refer to #102598",
@@ -56,6 +57,9 @@
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v4"
+      ],
+      "github.com/mindprince/gonvml": [
+        "github.com/google/cadvisor"
       ]
     }
   }
