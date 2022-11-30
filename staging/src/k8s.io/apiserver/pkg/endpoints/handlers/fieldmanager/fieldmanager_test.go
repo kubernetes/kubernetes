@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package fieldmanager_test
 
 import (
 	"errors"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
@@ -89,7 +90,7 @@ func (sameVersionConverter) IsMissingVersionError(error) bool {
 }
 
 type TestFieldManager struct {
-	fieldManager *FieldManager
+	fieldManager *fieldmanager.FieldManager
 	apiVersion   string
 	emptyObj     runtime.Object
 	liveObj      runtime.Object
@@ -99,12 +100,12 @@ func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 	return NewTestFieldManager(gvk, "", nil)
 }
 
-func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainFieldManager func(Manager) Manager) TestFieldManager {
+func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainFieldManager func(fieldmanager.Manager) fieldmanager.Manager) TestFieldManager {
 	m := NewFakeOpenAPIModels()
 	typeConverter := NewFakeTypeConverter(m)
 	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
 	objectConverter := &fakeObjectConvertor{sameVersionConverter{}, apiVersion}
-	f, err := NewStructuredMergeManager(
+	f, err := fieldmanager.NewStructuredMergeManager(
 		typeConverter,
 		objectConverter,
 		&fakeObjectDefaulter{},
@@ -118,14 +119,14 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainF
 	live := &unstructured.Unstructured{}
 	live.SetKind(gvk.Kind)
 	live.SetAPIVersion(gvk.GroupVersion().String())
-	f = NewLastAppliedUpdater(
-		NewLastAppliedManager(
-			NewProbabilisticSkipNonAppliedManager(
-				NewBuildManagerInfoManager(
-					NewManagedFieldsUpdater(
-						NewStripMetaManager(f),
+	f = fieldmanager.NewLastAppliedUpdater(
+		fieldmanager.NewLastAppliedManager(
+			fieldmanager.NewProbabilisticSkipNonAppliedManager(
+				fieldmanager.NewBuildManagerInfoManager(
+					fieldmanager.NewManagedFieldsUpdater(
+						fieldmanager.NewStripMetaManager(f),
 					), gvk.GroupVersion(), subresource,
-				), &fakeObjectCreater{gvk: gvk}, gvk, DefaultTrackOnCreateProbability,
+				), &fakeObjectCreater{gvk: gvk}, gvk, fieldmanager.DefaultTrackOnCreateProbability,
 			), typeConverter, objectConverter, gvk.GroupVersion(),
 		),
 	)
@@ -133,15 +134,15 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainF
 		f = chainFieldManager(f)
 	}
 	return TestFieldManager{
-		fieldManager: NewFieldManager(f, subresource),
+		fieldManager: fieldmanager.NewFieldManager(f, subresource),
 		apiVersion:   gvk.GroupVersion().String(),
 		emptyObj:     live,
 		liveObj:      live.DeepCopyObject(),
 	}
 }
 
-func NewFakeTypeConverter(m proto.Models) TypeConverter {
-	tc, err := NewTypeConverter(m, false)
+func NewFakeTypeConverter(m proto.Models) fieldmanager.TypeConverter {
+	tc, err := fieldmanager.NewTypeConverter(m, false)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to build TypeConverter: %v", err))
 	}

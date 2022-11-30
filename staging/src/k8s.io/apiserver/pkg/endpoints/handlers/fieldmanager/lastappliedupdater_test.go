@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package fieldmanager_test
 
 import (
 	"fmt"
@@ -26,14 +26,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"sigs.k8s.io/yaml"
 )
 
 func TestLastAppliedUpdater(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
 		"",
-		func(m Manager) Manager {
-			return NewLastAppliedUpdater(m)
+		func(m fieldmanager.Manager) fieldmanager.Manager {
+			return fieldmanager.NewLastAppliedUpdater(m)
 		})
 
 	originalLastApplied := `nonempty`
@@ -189,8 +190,8 @@ func TestLargeLastApplied(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"),
 				"",
-				func(m Manager) Manager {
-					return NewLastAppliedUpdater(m)
+				func(m fieldmanager.Manager) fieldmanager.Manager {
+					return fieldmanager.NewLastAppliedUpdater(m)
 				})
 
 			if err := f.Apply(test.oldObject, "kubectl", false); err != nil {

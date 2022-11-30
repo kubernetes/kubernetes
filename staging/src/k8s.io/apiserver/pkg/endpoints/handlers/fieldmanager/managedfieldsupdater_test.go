@@ -14,19 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package fieldmanager_test
 
 import (
 	"fmt"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"testing"
 	"time"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/yaml"
 )
@@ -425,11 +427,11 @@ func TestTakingOverManagedFieldsDuringApplyDoesNotModifyPreviousManagerTime(t *t
 
 type NoopManager struct{}
 
-func (NoopManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
+func (NoopManager) Apply(liveObj, appliedObj runtime.Object, managed fieldmanager.Managed, fieldManager string, force bool) (runtime.Object, fieldmanager.Managed, error) {
 	return nil, managed, nil
 }
 
-func (NoopManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+func (NoopManager) Update(liveObj, newObj runtime.Object, managed fieldmanager.Managed, manager string) (runtime.Object, fieldmanager.Managed, error) {
 	return nil, nil, nil
 }
 
@@ -495,12 +497,12 @@ func TestNilNewObjectReplacedWithDeepCopyExcludingManagedFields(t *testing.T) {
 	}
 
 	// Decode the managed fields in the live object, since it isn't allowed in the patch.
-	managed, err := DecodeManagedFields(accessor.GetManagedFields())
+	managed, err := fieldmanager.DecodeManagedFields(accessor.GetManagedFields())
 	if err != nil {
 		t.Fatalf("failed to decode managed fields: %v", err)
 	}
 
-	updater := NewManagedFieldsUpdater(NoopManager{})
+	updater := fieldmanager.NewManagedFieldsUpdater(NoopManager{})
 
 	newObject, _, err := updater.Apply(obj, obj.DeepCopyObject(), managed, "some_manager", false)
 	if err != nil {
