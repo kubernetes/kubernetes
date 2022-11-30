@@ -875,7 +875,8 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 
 			_, needsRetry := nc.nodesToRetry.Load(node.Name)
 			switch {
-			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
+			//MarkPodsNotReady is run when nodeready changes from Ready -> Unknown or False -> Unkown
+			case currentReadyCondition.Status != v1.ConditionTrue && (observedReadyCondition.Status == v1.ConditionTrue || observedReadyCondition.Status == v1.ConditionFalse):
 				// Report node event only once when status changed.
 				controllerutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
 				fallthrough
