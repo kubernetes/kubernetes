@@ -19,11 +19,12 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -415,6 +416,9 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 	ginkgo.It("should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
 		//TODO: remove skip when issue is resolved - https://github.com/kubernetes/kubernetes/issues/113359
+		// To show me which integration test this hits
+		gomega.Expect(true).To(gomega.BeFalse())
+
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("Test is not valid Windows - skipping")
 		}
