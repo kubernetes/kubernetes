@@ -88,10 +88,6 @@ func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 	return NewTestFieldManager(gvk, "", nil)
 }
 
-func NewSubresourceTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, "scale", nil)
-}
-
 func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainFieldManager func(Manager) Manager) TestFieldManager {
 	m := NewFakeOpenAPIModels()
 	typeConverter := NewFakeTypeConverter(m)
@@ -1239,7 +1235,7 @@ func getLastApplied(obj runtime.Object) (string, error) {
 }
 
 func TestUpdateViaSubresources(t *testing.T) {
-	f := NewSubresourceTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), "scale", nil)
 
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
