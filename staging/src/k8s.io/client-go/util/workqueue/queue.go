@@ -34,16 +34,33 @@ type Interface interface {
 }
 
 // New constructs a new work queue (see the package comment).
-func New() *Type {
-	return NewNamed("")
+func New(opts ...QueueOption) *Type {
+	return NewNamed("", opts...)
 }
 
-func NewNamed(name string) *Type {
-	rc := clock.RealClock{}
+func NewNamed(name string, opts ...QueueOption) *Type {
+	return newNamedQueueWithCustomClock(clock.RealClock{}, name, defaultUnfinishedWorkUpdatePeriod, opts...)
+}
+
+// newNamedQueueWithCustomClock constructs a new named workqueue
+// with ability to inject real or fake clock for testing purposes
+// TODO(austince): should WithUpdatePeriod be a QueueOption? Could this func then be public?
+func newNamedQueueWithCustomClock(clock clock.WithTicker, name string, updatePeriod time.Duration, opts ...QueueOption) *Type {
+	config := NewConfig(opts...)
+
+	var metricsFactory *queueMetricsFactory
+	if config.metricsProvider != nil {
+		metricsFactory = &queueMetricsFactory{
+			metricsProvider: config.metricsProvider,
+		}
+	} else {
+		metricsFactory = &globalMetricsFactory
+	}
+
 	return newQueue(
-		rc,
-		globalMetricsFactory.newQueueMetrics(name, rc),
-		defaultUnfinishedWorkUpdatePeriod,
+		clock,
+		metricsFactory.newQueueMetrics(name, clock),
+		updatePeriod,
 	)
 }
 

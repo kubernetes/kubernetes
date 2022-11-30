@@ -276,3 +276,113 @@ func TestMetrics(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
+
+func TestPerQueueMetrics(t *testing.T) {
+	// TODO(austince): refactor TestMetrics to make this test just another case
+	mp := testMetricsProvider{}
+	t0 := time.Unix(0, 0)
+	c := testingclock.NewFakeClock(t0)
+
+	q := newNamedQueueWithCustomClock(c, "test", time.Millisecond, WithMetricsProvider(&mp))
+	defer q.ShutDown()
+	for !c.HasWaiters() {
+		// Wait for the go routine to call NewTicker()
+		time.Sleep(time.Millisecond)
+	}
+
+	q.Add("foo")
+	if e, a := 1.0, mp.adds.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	if e, a := 1.0, mp.depth.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	c.Step(50 * time.Microsecond)
+
+	// Start processing
+	i, _ := q.Get()
+	if i != "foo" {
+		t.Errorf("Expected %v, got %v", "foo", i)
+	}
+
+	if e, a := 5e-05, mp.latency.observationValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1, mp.latency.observationCount(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	// Add it back while processing; multiple adds of the same item are
+	// de-duped.
+	q.Add(i)
+	q.Add(i)
+	q.Add(i)
+	q.Add(i)
+	q.Add(i)
+	if e, a := 2.0, mp.adds.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	// One thing remains in the queue
+	if e, a := 1.0, mp.depth.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	c.Step(25 * time.Microsecond)
+
+	// Finish it up
+	q.Done(i)
+
+	if e, a := 2.5e-05, mp.duration.observationValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 1, mp.duration.observationCount(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	// One thing remains in the queue
+	if e, a := 1.0, mp.depth.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	// It should be back on the queue
+	i, _ = q.Get()
+	if i != "foo" {
+		t.Errorf("Expected %v, got %v", "foo", i)
+	}
+
+	if e, a := 2.5e-05, mp.latency.observationValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 2, mp.latency.observationCount(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	// use a channel to ensure we don't look at the metric before it's
+	// been set.
+	ch := make(chan struct{}, 1)
+	longestCh := make(chan struct{}, 1)
+	mp.unfinished.notifyCh = ch
+	mp.longest.notifyCh = longestCh
+	c.Step(time.Millisecond)
+	<-ch
+	mp.unfinished.notifyCh = nil
+	if e, a := .001, mp.unfinished.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	<-longestCh
+	mp.longest.notifyCh = nil
+	if e, a := .001, mp.longest.gaugeValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	// Finish that one up
+	q.Done(i)
+	if e, a := .001, mp.duration.observationValue(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := 2, mp.duration.observationCount(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}

@@ -36,8 +36,8 @@ type DelayingInterface interface {
 // NewDelayingQueue constructs a new workqueue with delayed queuing ability.
 // NewDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewNamedDelayingQueue instead.
-func NewDelayingQueue() DelayingInterface {
-	return NewDelayingQueueWithCustomClock(clock.RealClock{}, "")
+func NewDelayingQueue(opts ...QueueOption) DelayingInterface {
+	return NewDelayingQueueWithCustomClock(clock.RealClock{}, "", opts...)
 }
 
 // NewDelayingQueueWithCustomQueue constructs a new workqueue with ability to
@@ -47,14 +47,14 @@ func NewDelayingQueueWithCustomQueue(q Interface, name string) DelayingInterface
 }
 
 // NewNamedDelayingQueue constructs a new named workqueue with delayed queuing ability
-func NewNamedDelayingQueue(name string) DelayingInterface {
+func NewNamedDelayingQueue(name string, opts ...QueueOption) DelayingInterface {
 	return NewDelayingQueueWithCustomClock(clock.RealClock{}, name)
 }
 
 // NewDelayingQueueWithCustomClock constructs a new named workqueue
 // with ability to inject real or fake clock for testing purposes
-func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) DelayingInterface {
-	return newDelayingQueue(clock, NewNamed(name), name)
+func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string, opts ...QueueOption) DelayingInterface {
+	return newDelayingQueue(clock, NewNamed(name, opts...), name)
 }
 
 func newDelayingQueue(clock clock.WithTicker, q Interface, name string) *delayingType {
