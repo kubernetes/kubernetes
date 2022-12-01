@@ -1758,7 +1758,7 @@ function prepare-kube-proxy-manifest-variables {
       exit 1
     fi
   fi
-  params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
+  params+=" --iptables-sync-period=1m --iptables-min-sync-period=1s --ipvs-sync-period=1m --ipvs-min-sync-period=1s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
