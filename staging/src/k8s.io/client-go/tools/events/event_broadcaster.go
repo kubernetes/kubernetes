@@ -248,6 +248,14 @@ func recordEvent(sink EventSink, event *eventsv1.Event) (*eventsv1.Event, bool) 
 		return nil, false
 	case *errors.StatusError:
 		if errors.IsAlreadyExists(err) {
+			// If we tried to create an Event from an EventSerie, it means that
+			// the original Patch request failed because the Event we were
+			// trying to patch didn't exist. If the creation failed because the
+			// Event now exists, it is safe to retry.  This occurs when a new
+			// Event is emitted twice in a very short period of time.
+			if isEventSeries {
+				return nil, true
+			}
 			klog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		} else {
 			klog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
