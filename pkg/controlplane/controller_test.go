@@ -26,6 +26,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
@@ -576,6 +577,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.config.APIServerIDConfig = &rest.Config{}
 			c := &completedConfig{
 				GenericConfig: tt.config.Complete(nil),
 				ExtraConfig:   tt.extraConfig,

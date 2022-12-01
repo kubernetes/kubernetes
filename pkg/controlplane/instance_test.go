@@ -102,6 +102,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	config.GenericConfig.Version = &kubeVersion
 	config.ExtraConfig.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
+	config.GenericConfig.APIServerIDConfig = config.GenericConfig.LoopbackClientConfig
 	config.GenericConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}

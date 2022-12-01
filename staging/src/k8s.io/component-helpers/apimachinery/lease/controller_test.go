@@ -287,7 +287,7 @@ func TestRetryUpdateNodeLease(t *testing.T) {
 				onRepeatedHeartbeatFailure: tc.onRepeatedHeartbeatFailure,
 				newLeasePostProcessFunc:    setNodeOwnerFunc(cl, node.Name),
 			}
-			if err := c.retryUpdateLease(nil); tc.expectErr != (err != nil) {
+			if err := c.retryUpdateLease(context.TODO(), nil); tc.expectErr != (err != nil) {
 				t.Fatalf("got %v, expected %v", err != nil, tc.expectErr)
 			}
 		})
@@ -426,7 +426,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 				newLeasePostProcessFunc: setNodeOwnerFunc(cl, node.Name),
 			}
 
-			c.sync()
+			c.sync(context.TODO())
 
 			if tc.expectLatestLease {
 				if tc.expectLeaseResourceVersion != c.latestLease.ResourceVersion {

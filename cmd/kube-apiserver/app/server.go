@@ -482,6 +482,9 @@ func buildGenericConfig(
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager()
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
+		genericConfig.APIServerIDConfig = genericConfig.LoopbackClientConfig // kube-apiserver talks back to itself to manage identity leases
+	}
 
 	return
 }

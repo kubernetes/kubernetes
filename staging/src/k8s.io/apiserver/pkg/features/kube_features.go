@@ -66,8 +66,10 @@ const (
 	// Enables compression of REST responses (GET and LIST only)
 	APIResponseCompression featuregate.Feature = "APIResponseCompression"
 
-	// owner: @roycaihw
+	// owner: @andrewsykim @enj
+	// kep: https://kep.k8s.io/1965
 	// alpha: v1.20
+	// beta: v1.26
 	//
 	// Assigns each kube-apiserver an ID in a cluster.
 	APIServerIdentity featuregate.Feature = "APIServerIdentity"
@@ -89,7 +91,7 @@ const (
 	AdvancedAuditing featuregate.Feature = "AdvancedAuditing"
 
 	// owner: @cici37 @jpbetz
-	// kep: http://kep.k8s.io/3488
+	// kep: https://kep.k8s.io/3488
 	// alpha: v1.26
 	//
 	// Enables expression validation in Admission Control

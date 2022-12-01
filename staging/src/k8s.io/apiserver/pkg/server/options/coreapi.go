@@ -82,6 +82,11 @@ func (o *CoreAPIOptions) ApplyTo(config *server.RecommendedConfig) error {
 	config.ClientConfig = kubeconfig
 	config.SharedInformerFactory = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
+	// optimistically use this config for identity leases
+	if feature.DefaultFeatureGate.Enabled(features.APIServerIdentity) && config.APIServerIDConfig == nil {
+		config.APIServerIDConfig = kubeconfig
+	}
+
 	return nil
 }
 

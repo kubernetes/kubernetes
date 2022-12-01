@@ -33,14 +33,17 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/google/uuid"
 
+	coordinationv1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
@@ -69,11 +72,13 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/tracing"
+	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -90,6 +95,31 @@ const (
 
 	// APIGroupPrefix is where non-legacy API group will be located.
 	APIGroupPrefix = "/apis"
+
+	// IdentityLeaseComponentLabelKey is used to apply a component label to identity lease objects, indicating:
+	//   1. the lease is an identity lease (different from leader election leases)
+	//   2. which component owns this lease
+	IdentityLeaseComponentLabelKey = "k8s.io/component"
+	// IdentityLeaseComponentLabelValueForAPIServers defines the value used when referring to api server components
+	// TODO(enj): this value seems wrong because these leases are used by all API servers, not just the Kube API server
+	IdentityLeaseComponentLabelValueForAPIServers = "kube-apiserver"
+	// APIServerIdentityLeaseLabelSelector selects api server identity leases
+	APIServerIdentityLeaseLabelSelector = IdentityLeaseComponentLabelKey + "=" + IdentityLeaseComponentLabelValueForAPIServers
+)
+
+var (
+	// IdentityLeaseGCPeriod is the interval which the lease GC controller checks for expired leases
+	// IdentityLeaseGCPeriod is exposed so integration tests can tune this value.
+	IdentityLeaseGCPeriod = 3600 * time.Second
+	// IdentityLeaseDurationSeconds is the duration of an api server lease in seconds
+	// IdentityLeaseDurationSeconds is exposed so integration tests can tune this value.
+	IdentityLeaseDurationSeconds = 3600
+	// IdentityLeaseRenewIntervalPeriod is the interval of an api server renewing its lease in seconds
+	// IdentityLeaseRenewIntervalPeriod is exposed so integration tests can tune this value.
+	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+	// IdentityLeaseGetHostname is the function used to determine the hostname of an api server.
+	// IdentityLeaseGetHostname is exposed so integration tests can tune this value.
+	IdentityLeaseGetHostname = os.Hostname
 )
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -263,6 +293,10 @@ type Config struct {
 	// APIServerID is the ID of this API server
 	APIServerID string
 
+	// APIServerIDConfig is the rest config used to manage identity leases
+	// If unspecified, the in-cluster config is used
+	APIServerIDConfig *restclient.Config
+
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
 
@@ -337,7 +371,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	var id string
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
-		hostname, err := os.Hostname()
+		hostname, err := IdentityLeaseGetHostname()
 		if err != nil {
 			klog.Fatalf("error getting hostname for apiserver identity: %v", err)
 		}
@@ -604,6 +638,22 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
+		config := c.APIServerIDConfig
+		if config == nil {
+			inClusterConfig, err := restclient.InClusterConfig()
+			if err != nil {
+				klog.Fatalf("cannot determine config for API server lease management: %v", err)
+			}
+			config = inClusterConfig
+		}
+
+		config = restclient.CopyConfig(config)
+		// use protobuf here because we know the kube-apiserver supports it for leases
+		config.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+		c.APIServerIDConfig = config
+	}
+
 	return CompletedConfig{&completedConfig{c, informers}}
 }
 
@@ -676,6 +726,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		ShutdownSendRetryAfter: c.ShutdownSendRetryAfter,
 
 		APIServerID:           c.APIServerID,
+		APIServerIDConfig:     c.APIServerIDConfig,
 		StorageVersionManager: c.StorageVersionManager,
 
 		Version: c.Version,
@@ -798,6 +849,57 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 	}
 
+	// this lives here because all API servers need identities, not just the Kube API server
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
+		const apiServerIdentityHookName = "start-generic-apiserver-identity-lease-controller"
+		if !s.isPostStartHookRegistered(apiServerIdentityHookName) {
+			if err := s.AddPostStartHook(apiServerIdentityHookName, func(context PostStartHookContext) error {
+				kubeClient, err := kubernetes.NewForConfig(s.APIServerIDConfig)
+				if err != nil {
+					return err
+				}
+
+				leaseName := s.APIServerID
+				holderIdentity := s.APIServerID + "_" + string(uuid.NewUUID())
+
+				controller := lease.NewController(
+					clock.RealClock{},
+					kubeClient,
+					holderIdentity,
+					int32(IdentityLeaseDurationSeconds),
+					nil,
+					IdentityLeaseRenewIntervalPeriod,
+					leaseName,
+					metav1.NamespaceSystem,
+					func(lease *coordinationv1.Lease) error {
+						if lease.Labels == nil {
+							lease.Labels = map[string]string{}
+						}
+						// This label indicates that an apiserver owns this identity lease object
+						lease.Labels[IdentityLeaseComponentLabelKey] = IdentityLeaseComponentLabelValueForAPIServers
+
+						hostname, err := IdentityLeaseGetHostname()
+						if err != nil {
+							return err
+						}
+
+						// convenience label to easily map a lease object to a specific apiserver
+						lease.Labels[corev1.LabelHostname] = hostname
+						return nil
+					},
+				)
+
+				// we ignore the cancel func because this context should only be canceled when context.StopCh is closed
+				ctx, _ := wait.ContextForChannel(context.StopCh)
+				go controller.Run(ctx)
+
+				return nil
+			}); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	for _, delegateCheck := range delegationTarget.HealthzChecks() {
 		skip := false
 		for _, existingCheck := range c.HealthzChecks {
@@ -809,7 +911,9 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		if skip {
 			continue
 		}
-		s.AddHealthChecks(delegateCheck)
+		if err := s.AddHealthChecks(delegateCheck); err != nil {
+			return nil, err
+		}
 	}
 	s.RegisterDestroyFunc(func() {
 		if err := c.Config.TracerProvider.Shutdown(context.Background()); err != nil {
@@ -992,11 +1096,10 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 	}
 
 	privilegedLoopbackToken := loopback.BearerToken
-	var uid = uuid.New().String()
 	tokens := make(map[string]*user.DefaultInfo)
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,
-		UID:    uid,
+		UID:    string(uuid.NewUUID()),
 		Groups: []string{user.SystemPrivilegedGroup},
 	}
 

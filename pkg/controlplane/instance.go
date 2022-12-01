@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"reflect"
 	"strconv"
 	"time"
@@ -63,7 +62,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -75,7 +73,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
-	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
@@ -89,7 +86,6 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/utils/clock"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -120,28 +116,8 @@ const (
 	DefaultEndpointReconcilerInterval = 10 * time.Second
 	// DefaultEndpointReconcilerTTL is the default TTL timeout for the storage layer
 	DefaultEndpointReconcilerTTL = 15 * time.Second
-	// IdentityLeaseComponentLabelKey is used to apply a component label to identity lease objects, indicating:
-	//   1. the lease is an identity lease (different from leader election leases)
-	//   2. which component owns this lease
-	IdentityLeaseComponentLabelKey = "k8s.io/component"
-	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
-	KubeAPIServer = "kube-apiserver"
-	// KubeAPIServerIdentityLeaseLabelSelector selects kube-apiserver identity leases
-	KubeAPIServerIdentityLeaseLabelSelector = IdentityLeaseComponentLabelKey + "=" + KubeAPIServer
 	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops
 	repairLoopInterval = 3 * time.Minute
-)
-
-var (
-	// IdentityLeaseGCPeriod is the interval which the lease GC controller checks for expired leases
-	// IdentityLeaseGCPeriod is exposed so integration tests can tune this value.
-	IdentityLeaseGCPeriod = 3600 * time.Second
-	// IdentityLeaseDurationSeconds is the duration of kube-apiserver lease in seconds
-	// IdentityLeaseDurationSeconds is exposed so integration tests can tune this value.
-	IdentityLeaseDurationSeconds = 3600
-	// IdentityLeaseRenewIntervalSeconds is the interval of kube-apiserver renewing its lease in seconds
-	// IdentityLeaseRenewIntervalSeconds is exposed so integration tests can tune this value.
-	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
 )
 
 // ExtraConfig defines extra configuration for the master
@@ -488,28 +464,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
-		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
-			if err != nil {
-				return err
-			}
-
-			leaseName := m.GenericAPIServer.APIServerID
-			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
-
-			controller := lease.NewController(
-				clock.RealClock{},
-				kubeClient,
-				holderIdentity,
-				int32(IdentityLeaseDurationSeconds),
-				nil,
-				IdentityLeaseRenewIntervalPeriod,
-				leaseName,
-				metav1.NamespaceSystem,
-				labelAPIServerHeartbeat)
-			go controller.Run(hookContext.StopCh)
-			return nil
-		})
+		// the identity lease GC controller lives only in the Kube API server (it decides when to delete them) whereas
+		// the identity lease creating controller lives in k8s.io/apiserver because it is generally used by all API servers
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
 			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
@@ -517,9 +473,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			}
 			go apiserverleasegc.NewAPIServerLeaseGC(
 				kubeClient,
-				IdentityLeaseGCPeriod,
+				genericapiserver.IdentityLeaseGCPeriod,
 				metav1.NamespaceSystem,
-				KubeAPIServerIdentityLeaseLabelSelector,
+				genericapiserver.APIServerIdentityLeaseLabelSelector,
 			).Run(hookContext.StopCh)
 			return nil
 		})
@@ -535,23 +491,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	})
 
 	return m, nil
-}
-
-func labelAPIServerHeartbeat(lease *coordinationapiv1.Lease) error {
-	if lease.Labels == nil {
-		lease.Labels = map[string]string{}
-	}
-	// This label indicates that kube-apiserver owns this identity lease object
-	lease.Labels[IdentityLeaseComponentLabelKey] = KubeAPIServer
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
-	}
-
-	// convenience label to easily map a lease object to a specific apiserver
-	lease.Labels[apiv1.LabelHostname] = hostname
-	return nil
 }
 
 // InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.

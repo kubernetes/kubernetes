@@ -124,13 +124,14 @@ func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeo
 	}
 }
 
-// setUp is a convience function for setting up for (most) tests.
+// setUp is a convenience function for setting up for (most) tests.
 func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
 	config.ExternalAddress = "192.168.10.4:443"
 	config.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
+	config.APIServerIDConfig = config.LoopbackClientConfig
 
 	clientset := fake.NewSimpleClientset()
 	if clientset == nil {

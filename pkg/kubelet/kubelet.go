@@ -1530,7 +1530,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		go kl.fastStatusUpdateOnce()
 
 		// start syncing lease
-		go kl.nodeLeaseController.Run(wait.NeverStop)
+		go kl.nodeLeaseController.Run(context.TODO())
 	}
 	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
 

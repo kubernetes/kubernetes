@@ -370,6 +370,8 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: component-helpers
+      branch: master
     - repository: kms
       branch: master
     source:
@@ -459,6 +461,8 @@ rules:
     - repository: apiserver
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     - repository: kms
       branch: master
@@ -574,6 +578,8 @@ rules:
     - repository: kms
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     source:
       branch: master
@@ -828,6 +834,8 @@ rules:
     - repository: code-generator
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     - repository: kms
       branch: master
@@ -1450,6 +1458,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     - repository: apiserver
       branch: master
@@ -2292,6 +2302,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     - repository: kms
       branch: master

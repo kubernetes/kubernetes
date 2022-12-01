@@ -229,6 +229,10 @@ type GenericAPIServer struct {
 	// APIServerID is the ID of this API server
 	APIServerID string
 
+	// APIServerIDConfig is the rest config used to manage identity leases
+	// If unspecified, the in-cluster config is used
+	APIServerIDConfig *restclient.Config
+
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
 

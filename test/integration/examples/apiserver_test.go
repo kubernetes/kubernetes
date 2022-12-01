@@ -36,14 +36,19 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/features"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/cert"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -486,6 +491,161 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 		t.Errorf("expect server to reject redirect response, but forwarded")
 	} else if !strings.Contains(string(bytes), expectedMsg) {
 		t.Errorf("expect response contains %s, got %s", expectedMsg, string(bytes))
+	}
+}
+
+func TestAggregatedAPIServerIdentity(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
+
+	oldIdentityLeaseGetHostname := genericapiserver.IdentityLeaseGetHostname
+	t.Cleanup(func() {
+		// reset the default values for leases after this test
+		genericapiserver.IdentityLeaseGetHostname = oldIdentityLeaseGetHostname
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	t.Cleanup(cancel)
+
+	// makes the kube-apiserver very responsive.  it's normally a minute
+	dynamiccertificates.FileRefreshDuration = 1 * time.Second
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	// we need the wardle port information first to set up the service resolver
+	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// endpoints cannot have loopback IPs so we need to override the resolver itself
+	t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(fmt.Sprintf("https://127.0.0.1:%d", wardlePort))))
+
+	// override the hostname for the Kube API server
+	genericapiserver.IdentityLeaseGetHostname = func() (string, error) {
+		return "the-kube-apiserver", nil
+	}
+
+	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true}, nil, framework.SharedEtcd())
+	defer testServer.TearDownFn()
+	kubeClientConfig := rest.CopyConfig(testServer.ClientConfig)
+	// force json because everything speaks it
+	kubeClientConfig.ContentType = ""
+	kubeClientConfig.AcceptContentTypes = ""
+	kubeClient := client.NewForConfigOrDie(kubeClientConfig)
+	aggregatorClient := aggregatorclient.NewForConfigOrDie(kubeClientConfig)
+
+	// create the bare minimum resources required to be able to get the API service into an available state
+	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-wardle",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = kubeClient.CoreV1().Services("kube-wardle").Create(ctx, &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "api",
+		},
+		Spec: corev1.ServiceSpec{
+			ExternalName: "needs-to-be-non-empty",
+			Type:         corev1.ServiceTypeExternalName,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// override the hostname for the wardle API server
+	genericapiserver.IdentityLeaseGetHostname = func() (string, error) {
+		return "the-wardle-apiserver", nil
+	}
+
+	// start the wardle server to prove we can aggregate it
+	wardleToKASKubeConfigFile := writeKubeConfigForWardleServerToKASConnection(t, rest.CopyConfig(kubeClientConfig))
+	defer os.Remove(wardleToKASKubeConfigFile)
+	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
+	defer os.RemoveAll(wardleCertDir)
+	go func() {
+		o := sampleserver.NewWardleServerOptions(os.Stdout, os.Stderr)
+		// ensure this is a SAN on the generated cert for service FQDN
+		o.AlternateDNS = []string{
+			"api.kube-wardle.svc",
+		}
+		o.RecommendedOptions.SecureServing.Listener = listener
+		o.RecommendedOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
+		wardleCmd := sampleserver.NewCommandStartWardleServer(o, stopCh)
+		wardleCmd.SetArgs([]string{
+			"--authentication-kubeconfig", wardleToKASKubeConfigFile,
+			"--authorization-kubeconfig", wardleToKASKubeConfigFile,
+			"--etcd-servers", framework.GetEtcdURL(),
+			"--cert-dir", wardleCertDir,
+			"--kubeconfig", wardleToKASKubeConfigFile,
+		})
+		if err := wardleCmd.Execute(); err != nil {
+			t.Error(err)
+		}
+	}()
+	directWardleClientConfig, err := waitForWardleRunning(ctx, t, kubeClientConfig, wardleCertDir, wardlePort)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wardleCA, err := os.ReadFile(directWardleClientConfig.CAFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = aggregatorClient.ApiregistrationV1().APIServices().Create(ctx, &apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.example.com"},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Service: &apiregistrationv1.ServiceReference{
+				Namespace: "kube-wardle",
+				Name:      "api",
+			},
+			Group:                "wardle.example.com",
+			Version:              "v1alpha1",
+			CABundle:             wardleCA,
+			GroupPriorityMinimum: 200,
+			VersionPriority:      200,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the API service to be available
+	if err := wait.Poll(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+		apiService, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1alpha1.wardle.example.com", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		var available bool
+		for _, condition := range apiService.Status.Conditions {
+			if condition.Type == apiregistrationv1.Available && condition.Status == apiregistrationv1.ConditionTrue {
+				available = true
+				break
+			}
+		}
+		if !available {
+			t.Log("api service is not available", apiService.Status.Conditions)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	leases, err := kubeClient.CoordinationV1().Leases(metav1.NamespaceSystem).
+		List(ctx, metav1.ListOptions{LabelSelector: genericapiserver.APIServerIdentityLeaseLabelSelector})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostnames := sets.NewString()
+	for _, lease := range leases.Items {
+		hostnames.Insert(lease.Labels[corev1.LabelHostname])
+	}
+	if !hostnames.Equal(sets.NewString("the-kube-apiserver", "the-wardle-apiserver")) || len(leases.Items) != 2 {
+		t.Fatalf("unexpected identity leases seen, hostnames=%q leases=%#v", hostnames.List(), leases.Items)
 	}
 }
 

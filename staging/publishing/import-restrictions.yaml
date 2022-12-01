@@ -105,6 +105,7 @@
   - k8s.io/apiserver
   - k8s.io/client-go
   - k8s.io/component-base
+  - k8s.io/component-helpers
   - k8s.io/kube-openapi
   - k8s.io/utils
   - k8s.io/klog

@@ -29,13 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
-	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
 )
@@ -172,7 +172,7 @@ func createTestAPIServerIdentityLease(t *testing.T, client kubernetes.Interface,
 			Name:      name,
 			Namespace: metav1.NamespaceSystem,
 			Labels: map[string]string{
-				controlplane.IdentityLeaseComponentLabelKey: controlplane.KubeAPIServer,
+				genericapiserver.IdentityLeaseComponentLabelKey: genericapiserver.IdentityLeaseComponentLabelValueForAPIServers,
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{
