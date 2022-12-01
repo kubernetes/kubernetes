@@ -333,6 +333,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kubeadm
   kubectl
   kubectl-convert
+  kubelet
   kubemark
 )
 
