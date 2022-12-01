@@ -184,19 +184,21 @@ func (e *eventBroadcasterImpl) recordToSink(event *eventsv1.Event, clock clock.C
 					Count:            1,
 					LastObservedTime: metav1.MicroTime{Time: clock.Now()},
 				}
-				return isomorphicEvent
+				// Make a copy of the Event to make sure that recording it
+				// doesn't mess with the object stored in cache.
+				return isomorphicEvent.DeepCopy()
 			}
 			e.eventCache[eventKey] = eventCopy
-			return eventCopy
+			// Make a copy of the Event to make sure that recording it doesn't
+			// mess with the object stored in cache.
+			return eventCopy.DeepCopy()
 		}()
 		if evToRecord != nil {
-			recordedEvent := e.attemptRecording(evToRecord)
-			if recordedEvent != nil {
-				recordedEventKey := getKey(recordedEvent)
-				e.mu.Lock()
-				defer e.mu.Unlock()
-				e.eventCache[recordedEventKey] = recordedEvent
-			}
+			// TODO: Add a metric counting the number of recording attempts
+			e.attemptRecording(evToRecord)
+			// We don't want the new recorded Event to be reflected in the
+			// client's cache because server-side mutations could mess with the
+			// aggregation mechanism used by the client.
 		}
 	}()
 }
