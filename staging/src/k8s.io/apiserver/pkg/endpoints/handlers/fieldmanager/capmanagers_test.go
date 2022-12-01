@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -47,7 +48,7 @@ func (*fakeManager) Apply(_, _ runtime.Object, _ fieldmanager.Managed, _ string,
 }
 
 func TestCapManagersManagerMergesEntries(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"),
+	f := fieldmanagertest.NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"),
 		"",
 		func(m fieldmanager.Manager) fieldmanager.Manager {
 			return fieldmanager.NewCapManagersManager(m, 3)
@@ -113,7 +114,7 @@ func TestCapManagersManagerMergesEntries(t *testing.T) {
 }
 
 func TestCapUpdateManagers(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"),
+	f := fieldmanagertest.NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"),
 		"",
 		func(m fieldmanager.Manager) fieldmanager.Manager {
 			return fieldmanager.NewCapManagersManager(m, 3)
@@ -233,12 +234,13 @@ func TestCapUpdateManagers(t *testing.T) {
 
 	for _, tc := range testCases {
 		f.Reset()
-		accessor, err := meta.Accessor(f.liveObj)
+		live := f.Live()
+		accessor, err := meta.Accessor(live)
 		if err != nil {
 			t.Fatalf("%v: couldn't get accessor: %v", tc.name, err)
 		}
 		accessor.SetManagedFields(tc.input)
-		if err := f.Update(f.liveObj, "no-op-update"); err != nil {
+		if err := f.Update(live, "no-op-update"); err != nil {
 			t.Fatalf("%v: failed to do no-op update to object: %v", tc.name, err)
 		}
 
@@ -250,13 +252,13 @@ func TestCapUpdateManagers(t *testing.T) {
 }
 
 // expectIdempotence does a no-op update and ensures that managedFields doesn't change by calling capUpdateManagers.
-func expectIdempotence(t *testing.T, f TestFieldManager) {
+func expectIdempotence(t *testing.T, f fieldmanagertest.TestFieldManager) {
 	before := []metav1.ManagedFieldsEntry{}
 	for _, m := range f.ManagedFields() {
 		before = append(before, *m.DeepCopy())
 	}
 
-	if err := f.Update(f.liveObj, "no-op-update"); err != nil {
+	if err := f.Update(f.Live(), "no-op-update"); err != nil {
 		t.Fatalf("failed to do no-op update to object: %v", err)
 	}
 
@@ -266,7 +268,7 @@ func expectIdempotence(t *testing.T, f TestFieldManager) {
 }
 
 // expectManagesField ensures that manager m currently manages field path p.
-func expectManagesField(t *testing.T, f TestFieldManager, m string, p fieldpath.Path) {
+func expectManagesField(t *testing.T, f fieldmanagertest.TestFieldManager, m string, p fieldpath.Path) {
 	for _, e := range f.ManagedFields() {
 		if e.Manager == m {
 			var s fieldpath.Set
