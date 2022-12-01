@@ -17,8 +17,14 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
 
@@ -40,6 +46,11 @@ func TestAuthzValidate(t *testing.T) {
 		{
 			name:      "At least one authorizationMode is necessary",
 			modes:     []string{},
+			expectErr: true,
+		},
+		{
+			name:      "ModeAlwaysAllow specified more than once",
+			modes:     []string{modes.ModeAlwaysAllow, modes.ModeAlwaysAllow},
 			expectErr: true,
 		},
 		{
@@ -100,5 +111,58 @@ func TestAuthzValidate(t *testing.T) {
 				t.Errorf("should return an error")
 			}
 		})
+	}
+
+	// invalid number of webhook retry attempts
+	opts := NewBuiltInAuthorizationOptions()
+	opts.WebhookRetryBackoff = &wait.Backoff{
+		Steps: 0,
+	}
+	if errs := opts.Validate(); len(errs) == 0 {
+		t.Error("expected errors, no errors found")
+	}
+
+	// nil pointer
+	opts = nil
+	if errs := opts.Validate(); errs != nil {
+		t.Errorf("expected no errors, error found %+v", errs)
+	}
+}
+
+func TestBuiltInAuthorizationOptionsAddFlags(t *testing.T) {
+	var args = []string{
+		fmt.Sprintf("--authorization-mode=%s,%s,%s,%s", modes.ModeAlwaysAllow, modes.ModeAlwaysDeny, modes.ModeABAC, modes.ModeWebhook),
+		"--authorization-policy-file=policy_file.json",
+		"--authorization-webhook-config-file=webhook_config_file.yaml",
+		"--authorization-webhook-version=v1",
+		"--authorization-webhook-cache-authorized-ttl=60s",
+		"--authorization-webhook-cache-unauthorized-ttl=30s",
+	}
+
+	expected := &BuiltInAuthorizationOptions{
+		Modes:                       []string{modes.ModeAlwaysAllow, modes.ModeAlwaysDeny, modes.ModeABAC, modes.ModeWebhook},
+		PolicyFile:                  "policy_file.json",
+		WebhookConfigFile:           "webhook_config_file.yaml",
+		WebhookVersion:              "v1",
+		WebhookCacheAuthorizedTTL:   60 * time.Second,
+		WebhookCacheUnauthorizedTTL: 30 * time.Second,
+		WebhookRetryBackoff: &wait.Backoff{
+			Duration: 500 * time.Millisecond,
+			Factor:   1.5,
+			Jitter:   0.2,
+			Steps:    5,
+		},
+	}
+
+	opts := NewBuiltInAuthorizationOptions()
+	pf := pflag.NewFlagSet("test-builtin-authorization-opts", pflag.ContinueOnError)
+	opts.AddFlags(pf)
+
+	if err := pf.Parse(args); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(opts, expected) {
+		t.Error(cmp.Diff(opts, expected))
 	}
 }
