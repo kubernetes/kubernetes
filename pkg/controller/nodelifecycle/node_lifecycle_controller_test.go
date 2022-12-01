@@ -1567,7 +1567,7 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 			expectedNodes:           nil,
 			expectedPodStatusUpdate: false,
 		},
-		// Node created long time ago, with status updated by kubelet exceeds grace period.
+		// Node created long time ago, ad status updated by kubelet exceeds grace period.
 		// Expect Unknown status posted from node controller.
 		{
 			fakeNodeHandler: &testutil.FakeNodeHandler{
