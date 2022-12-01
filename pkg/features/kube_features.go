@@ -534,7 +534,7 @@ const (
 
 	// owner: @zshihang
 	// kep: http://kep.k8s.io/2800
-	// alpha: v1.25
+	// alpha: v1.26
 	//
 	// Enables tracking of secret-based service account tokens usage.
 	LegacyServiceAccountTokenTracking featuregate.Feature = "LegacyServiceAccountTokenTracking"
