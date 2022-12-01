@@ -2441,7 +2441,7 @@ func (om *fakeObjectManager) DeletePod(pod *v1.Pod) error {
 	return nil // Not found, no error in deleting.
 }
 
-func (om *fakeObjectManager) CreatePersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
+func (om *fakeObjectManager) createPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	for _, claim := range getPersistentVolumeClaims(set, pod) {
 		om.claimsIndexer.Update(&claim)
 	}

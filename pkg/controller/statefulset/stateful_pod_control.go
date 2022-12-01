@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
@@ -114,7 +114,7 @@ func (om *realStatefulPodControlObjectManager) UpdateClaim(claim *v1.PersistentV
 
 func (spc *StatefulPodControl) CreateStatefulPod(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) error {
 	// Create the Pod's PVCs prior to creating the Pod
-	if err := spc.CreatePersistentVolumeClaims(set, pod); err != nil {
+	if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
 		spc.recordPodEvent("create", set, pod, err)
 		return err
 	}
@@ -150,7 +150,7 @@ func (spc *StatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod *v1.
 		if !storageMatches(set, pod) {
 			updateStorage(set, pod)
 			consistent = false
-			if err := spc.CreatePersistentVolumeClaims(set, pod); err != nil {
+			if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
 				spc.recordPodEvent("update", set, pod, err)
 				return err
 			}
@@ -315,11 +315,11 @@ func (spc *StatefulPodControl) recordClaimEvent(verb string, set *apps.StatefulS
 	}
 }
 
-// CreatePersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which must be a member of
+// createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which must be a member of
 // set. If all of the claims for Pod are successfully created, the returned error is nil. If creation fails, this method
 // may be called again until no error is returned, indicating the PersistentVolumeClaims for pod are consistent with
 // set's Spec.
-func (spc *StatefulPodControl) CreatePersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
+func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	var errs []error
 	for _, claim := range getPersistentVolumeClaims(set, pod) {
 		pvc, err := spc.objectMgr.GetClaim(claim.Namespace, claim.Name)
