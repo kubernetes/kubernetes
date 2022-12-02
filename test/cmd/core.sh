@@ -1289,6 +1289,15 @@ run_rc_tests() {
   # Clean-up
   kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
 
+  ### Scale a deployment with piped input
+  kubectl create -f test/fixtures/doc-yaml/user-guide/deployment.yaml "${kube_flags[@]}"
+  # Command
+  kubectl get deployment/nginx-deployment -o json | kubectl scale --replicas=2 -f -
+  # Post-condition: 2 replica for nginx-deployment
+  kube::test::get_object_assert 'deployment nginx-deployment' "{{${deployment_replicas:?}}}" '2'
+  # Clean-up
+  kubectl delete deployment/nginx-deployment "${kube_flags[@]}"
+
   ### Expose deployments by creating a service
   # Uses deployment selectors for created service
   output_message=$(kubectl expose -f test/fixtures/pkg/kubectl/cmd/expose/appsv1deployment.yaml --port 80 2>&1 "${kube_flags[@]}")
