@@ -36,8 +36,8 @@ type DelayingInterface interface {
 // NewDelayingQueue constructs a new workqueue with delayed queuing ability.
 // NewDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewNamedDelayingQueue instead.
-func NewDelayingQueue(opts ...QueueOption) DelayingInterface {
-	return NewDelayingQueueWithCustomClock(clock.RealClock{}, "", opts...)
+func NewDelayingQueue() DelayingInterface {
+	return NewDelayingQueueWithCustomClock(clock.RealClock{}, "")
 }
 
 // NewDelayingQueueWithCustomQueue constructs a new workqueue with ability to

@@ -36,9 +36,9 @@ type RateLimitingInterface interface {
 // Remember to call Forget!  If you don't, you may end up tracking failures forever.
 // NewRateLimitingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewNamedRateLimitingQueue instead.
-func NewRateLimitingQueue(rateLimiter RateLimiter, opts ...QueueOption) RateLimitingInterface {
+func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
 	return &rateLimitingType{
-		DelayingInterface: NewDelayingQueue(opts...),
+		DelayingInterface: NewDelayingQueue(),
 		rateLimiter:       rateLimiter,
 	}
 }
