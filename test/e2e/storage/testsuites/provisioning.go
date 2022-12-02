@@ -414,10 +414,8 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.testCase.TestDynamicProvisioning(ctx)
 	})
 
-	ginkgo.It("should provision correct filesystem size when restoring snapshot to larger size pvc [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
+	ginkgo.It("should use existing filesystem size when restoring snapshot to larger size pvc when in ROX mode [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
 		//TODO: remove skip when issue is resolved - https://github.com/kubernetes/kubernetes/issues/113359
-		// To show me which integration test this hits
-		gomega.Expect(true).To(gomega.BeFalse())
 
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("Test is not valid Windows - skipping")
@@ -445,6 +443,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 
 		init()
+
 		pvc2 := l.pvc.DeepCopy()
 		l.pvc.Name = "pvc-origin"
 		dc := l.config.Framework.DynamicClient
@@ -478,6 +477,8 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		// Set PVC snapshot data source.
 		pvc2.Spec.DataSource = dataSource
 
+		pvc2.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
+
 		// Create a new claim and a pod that will use the new PVC.
 		c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
@@ -499,8 +500,8 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			"HINT: Your driver needs to check the volume in NodeStageVolume and resize fs if needed.\n"+
 			"HINT: For an example patch see: https://github.com/kubernetes/cloud-provider-openstack/pull/1563/files",
 			restoredFSSize, originFSSize)
-		gomega.Expect(restoredFSSize).Should(gomega.BeNumerically(">", originFSSize), msg)
-	})
+			gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
+		})
 
 	ginkgo.It("should provision storage with pvc data source", func(ctx context.Context) {
 		if !dInfo.Capabilities[storageframework.CapPVCDataSource] {
