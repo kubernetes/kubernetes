@@ -369,7 +369,7 @@ func (hns hnsV2) deleteLoadBalancer(hnsID string) error {
 }
 
 // findLoadBalancerID will construct a id from the provided loadbalancer fields
-func (hns hnsV2) findLoadBalancerID(endpoints []endpointsInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
+func findLoadBalancerID(endpoints []endpointsInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
 	// Compute hash from backends (endpoint IDs)
 	hash, err := hashEndpointInfos(endpoints)
 	if err != nil {
