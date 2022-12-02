@@ -211,10 +211,11 @@ func (o *ScaleOptions) RunScale() error {
 		return err
 	}
 
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
+	// We don't immediately return infoErr if it is not nil.
+	// Because we want to proceed for other valid resources and
+	// at the end of the function, we'll return this
+	// to show invalid resources to the user.
+	infos, infoErr := r.Infos()
 
 	if len(o.ResourceVersion) != 0 && len(infos) > 1 {
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
@@ -270,7 +271,7 @@ func (o *ScaleOptions) RunScale() error {
 		}
 	}
 
-	return nil
+	return infoErr
 }
 
 func scaler(f cmdutil.Factory) (scale.Scaler, error) {
