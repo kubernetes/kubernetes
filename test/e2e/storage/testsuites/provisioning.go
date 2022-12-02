@@ -448,7 +448,13 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.pvc.Name = "pvc-origin"
 		dc := l.config.Framework.DynamicClient
 		testConfig := storageframework.ConvertTestConfig(l.config)
-		pvc2.Spec.DataSource = prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
+		dataSource := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
+		localDataSource := &v1.TypedLocalObjectReference{
+			APIGroup: dataSource.APIGroup,
+			Kind: dataSource.Kind,
+			Name: dataSource.Name,
+		}
+		pvc2.Spec.DataSource = localDataSource
 
 		// Get the created PVC and record the actual size of the pv (from pvc status).
 		c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
