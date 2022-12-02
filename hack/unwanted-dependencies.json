@@ -18,6 +18,7 @@
       "github.com/influxdata/influxdb1-client": "",
       "github.com/json-iterator/go": "refer to #105030",
       "github.com/miekg/dns": "no dns client/server should be required",
+      "github.com/mindprince/gonvml":"contains notice that license scanners flag, see https://github.com/kubernetes/community/issues/6992",
       "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
       "github.com/spf13/viper": "refer to #102598",
       "go.mongodb.org/mongo-driver": "",
