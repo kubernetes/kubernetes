@@ -218,7 +218,7 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-func (f *FakeMounter) canSafelySkipMountPointCheck() bool {
+func (f *FakeMounter) CanSafelySkipMountPointCheck() bool {
 	return f.skipMountPointCheck
 }
 
