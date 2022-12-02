@@ -44,7 +44,6 @@ func NewNamed(name string, opts ...QueueOption) *Type {
 
 // newNamedQueueWithCustomClock constructs a new named workqueue
 // with ability to inject real or fake clock for testing purposes
-// TODO(austince): should WithUpdatePeriod be a QueueOption? Could this func then be public?
 func newNamedQueueWithCustomClock(clock clock.WithTicker, name string, updatePeriod time.Duration, opts ...QueueOption) *Type {
 	config := NewConfig(opts...)
 
