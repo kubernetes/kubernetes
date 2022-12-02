@@ -19,6 +19,9 @@ package v1
 import (
 	"encoding/json"
 	"time"
+
+	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // Time is a wrapper around time.Time which supports correct
@@ -161,15 +164,36 @@ func (t Time) ToUnstructured() interface{} {
 	return string(buf)
 }
 
-// OpenAPISchemaType is used by the kube-openapi generator when constructing
+// OpenAPIDefinition is used by the kube-openapi generator when constructing
 // the OpenAPI spec of this type.
 //
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
-func (_ Time) OpenAPISchemaType() []string { return []string{"string"} }
+func (_ Time) OpenAPIDefinition() common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"string"},
+				Format: "date-time",
+			},
+		},
+	}
+}
 
-// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
+// OpenAPIV3Definition is used by the kube-openapi generator when constructing
 // the OpenAPI spec of this type.
-func (_ Time) OpenAPISchemaFormat() string { return "date-time" }
+//
+// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
+func (_ Time) OpenAPIV3Definition() common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:     []string{"string"},
+				Format:   "date-time",
+				Nullable: true,
+			},
+		},
+	}
+}
 
 // MarshalQueryParameter converts to a URL query parameter value
 func (t Time) MarshalQueryParameter() (string, error) {
