@@ -8,13 +8,12 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/client-go/kubernetes"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 
@@ -169,7 +168,7 @@ func constraintSupportsGroup(group string, constraintGroups []string) bool {
 
 // CreateProvidersFromConstraints creates providers from the constraints supplied, including
 // looking up pre-allocated values if necessary using the pod's namespace.
-func CreateProvidersFromConstraints(ctx context.Context, namespaceName string, sccs []*securityv1.SecurityContextConstraints, client kubernetes.Interface) ([]SecurityContextConstraintsProvider, []error) {
+func CreateProvidersFromConstraints(ctx context.Context, namespaceName string, sccs []*securityv1.SecurityContextConstraints, namespaceLister corev1listers.NamespaceLister) ([]SecurityContextConstraintsProvider, []error) {
 	var (
 		// namespace is declared here for reuse but we will not fetch it unless required by the matched constraints
 		namespace *corev1.Namespace
@@ -179,9 +178,10 @@ func CreateProvidersFromConstraints(ctx context.Context, namespaceName string, s
 		errs []error
 	)
 
+	// because we're willing to wait for 10s on a single request, we only use the namespace lister, not a live lookup.
 	var lastErr error
 	err := wait.PollImmediateWithContext(ctx, 1*time.Second, 10*time.Second, func(ctx context.Context) (bool, error) {
-		namespace, lastErr = client.CoreV1().Namespaces().Get(ctx, namespaceName, metav1.GetOptions{})
+		namespace, lastErr = namespaceLister.Get(namespaceName)
 		if lastErr != nil {
 			return false, nil
 		}
