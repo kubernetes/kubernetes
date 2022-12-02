@@ -37,6 +37,7 @@ const (
 	gatewayAddress    = "192.168.1.1"
 	epMacAddress      = "00-11-22-33-44-55"
 	epIpAddress       = "192.168.1.3"
+	epIpAddressB      = "192.168.1.4"
 	epIpAddressRemote = "192.168.2.3"
 	epPaAddress       = "10.0.0.3"
 	protocol          = 6
@@ -359,15 +360,20 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 	if err != nil {
 		t.Error(err)
 	}
-	// We populate this to ensure we test for getting existing load balancer
-	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsCount: len(Endpoints)}
-	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
-
 	endpoint := &endpointsInfo{
 		ip:    Endpoint.IpConfigurations[0].IpAddress,
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
+	hash, err := hashEndpointInfos(endpoints)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// We populate this to ensure we test for getting existing load balancer
+	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsHash: hash}
+	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
+
 	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 	if err != nil {
 		t.Error(err)
@@ -502,6 +508,81 @@ func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 	}
 	return network
 }
+
+func TestHashEndpoints(t *testing.T) {
+	Network := mustTestNetwork(t)
+	// Create endpoint A
+	ipConfigA := &hcn.IpConfig{
+		IpAddress: epIpAddress,
+	}
+	endpointASpec := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipConfigA},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	endpointA, err := Network.CreateEndpoint(endpointASpec)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointInfoA := &endpointsInfo{
+		ip:    endpointA.IpConfigurations[0].IpAddress,
+		hnsID: endpointA.Id,
+	}
+	// Create Endpoint B
+	ipConfigB := &hcn.IpConfig{
+		IpAddress: epIpAddressB,
+	}
+	endpointBSpec := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipConfigB},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	endpointB, err := Network.CreateEndpoint(endpointBSpec)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointInfoB := &endpointsInfo{
+		ip:    endpointB.IpConfigurations[0].IpAddress,
+		hnsID: endpointB.Id,
+	}
+	endpoints := []endpointsInfo{*endpointInfoA, *endpointInfoB}
+	endpointsReverse := []endpointsInfo{*endpointInfoB, *endpointInfoA}
+	h1, err := hashEndpointInfos(endpoints)
+	if err != nil {
+		t.Error(err)
+	} else if h1 == [20]byte{} {
+		t.Error("HashEndpoints failed for endpoints", endpoints)
+	}
+
+	h2, err := hashEndpointInfos(endpointsReverse)
+	if err != nil {
+		t.Error(err)
+	}
+	if h1 != h2 {
+		t.Errorf("%x does not match %x", h1, h2)
+	}
+
+	// Clean up
+	err = endpointA.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+	err = endpointB.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+	err = Network.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func createTestNetwork() (*hcn.HostComputeNetwork, error) {
 	network := &hcn.HostComputeNetwork{
 		Type: NETWORK_TYPE_OVERLAY,
