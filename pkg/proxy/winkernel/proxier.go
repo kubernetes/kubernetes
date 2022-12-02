@@ -1079,7 +1079,30 @@ func (proxier *Proxier) isAllEndpointsTerminating(svcName proxy.ServicePortName,
 			// KEP-1669: Ignore remote endpoints when the ExternalTrafficPolicy is Local (DSR Mode)
 			continue
 		}
+		// Ready:false, Terminating:False, Serving:True is not a valid combination
+		if !ep.IsReady() && !ep.IsTerminating() {
+			// Ready:false, Terminating:False, ignore
+			continue
+		}
 		if !ep.IsTerminating() {
+			return false
+		}
+	}
+	return true
+}
+
+// isAllEndpointsNonServing function will return true if all the endpoints are non serving.
+// If atleast one is serving, then return false
+func (proxier *Proxier) isAllEndpointsNonServing(svcName proxy.ServicePortName, isLocalTrafficDSR bool) bool {
+	for _, epInfo := range proxier.endpointsMap[svcName] {
+		ep, ok := epInfo.(*endpointsInfo)
+		if !ok {
+			continue
+		}
+		if isLocalTrafficDSR && !ep.GetIsLocal() {
+			continue
+		}
+		if ep.IsServing() {
 			return false
 		}
 	}
@@ -1215,12 +1238,16 @@ func (proxier *Proxier) syncProxyRules() {
 		containsPublicIP := false
 		containsNodeIP := false
 		allEndpointsTerminating := false
+		allEndpointsNonServing := false
+		var someEndpointsServing bool
 
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ProxyTerminatingEndpoints) && len(svcInfo.loadBalancerIngressIPs) > 0 {
 			// Check should be done only if comes under the feature gate or enabled
 			// The check should be done only if Spec.Type == Loadbalancer.
 			allEndpointsTerminating = proxier.isAllEndpointsTerminating(svcName, svcInfo.localTrafficDSR)
-			klog.V(3).InfoS("Terminating status checked for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "allEndpointsTerminating", allEndpointsTerminating, "localTrafficDSR", svcInfo.localTrafficDSR)
+			allEndpointsNonServing = proxier.isAllEndpointsNonServing(svcName, svcInfo.localTrafficDSR)
+			someEndpointsServing = !allEndpointsNonServing
+			klog.V(3).InfoS("Terminating status checked for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "allEndpointsTerminating", allEndpointsTerminating, "allEndpointsNonServing", allEndpointsNonServing, "localTrafficDSR", svcInfo.localTrafficDSR)
 		} else {
 			klog.V(3).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "proxyEndpointsFeatureGateEnabled", utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ProxyTerminatingEndpoints), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
 		}
@@ -1232,14 +1259,21 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
-			if !allEndpointsTerminating && !ep.IsReady() {
-				klog.V(3).InfoS("Skipping the endpoint for LB creation. Endpoint is either not ready or all not all endpoints are terminating", "EpIP", ep.ip, " EpPort", ep.port, "allEndpointsTerminating", allEndpointsTerminating, "IsEpReady", ep.IsReady())
-				continue
-			}
+			// If there are no endpoints to consider, consider old loadbalancers with existing endpoints.
+			if someEndpointsServing {
 
-			if !ep.IsServing() {
+				if !allEndpointsTerminating && !ep.IsReady() {
+					klog.V(3).InfoS("Skipping the endpoint for LB creation. Endpoint is either not ready or all not all endpoints are terminating", "EpIP", ep.ip, " EpPort", ep.port, "allEndpointsTerminating", allEndpointsTerminating, "IsEpReady", ep.IsReady())
+					continue
+				}
+
 				klog.V(3).InfoS("Skipping the endpoint for LB creation. Endpoint is not serving", "EpIP", ep.ip, " EpPort", ep.port, "IsEpServing", ep.IsServing())
-				continue
+
+				if !ep.IsServing() {
+					klog.V(3).InfoS("Skipping the endpoint for LB creation. Endpoint is not serving", "EpIP", ep.ip, " EpPort", ep.port, "IsEpServing", ep.IsServing())
+					continue
+				}
+
 			}
 
 			var newHnsEndpoint *endpointsInfo
@@ -1359,7 +1393,14 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.InfoS("Load Balancer already exists -- Debug ", "hnsID", svcInfo.hnsID)
 		}
 
+		// ETP:Cluster
+		// hnsEndpoints : if all are termination, it will have serving and terminating, else only ready and serving
 		if len(hnsEndpoints) == 0 {
+			if svcInfo.winProxyOptimization {
+				// Deleting loadbalancers when there are no endpoints to serve.
+				klog.V(3).InfoS("Cleanup existing ", "endpointsInfo", hnsEndpoints, "serviceName", svcName)
+				svcInfo.deleteLoadBalancerPolicy()
+			}
 			klog.ErrorS(nil, "Endpoint information not available for service, not applying any policy", "serviceName", svcName)
 			continue
 		}
@@ -1378,7 +1419,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
 
-		if !allEndpointsTerminating {
+		if !allEndpointsTerminating && !allEndpointsNonServing {
 			// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
 			// Cluster IP LoadBalancer creation
 			hnsLoadBalancer, err := hns.getLoadBalancer(
@@ -1414,7 +1455,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.nodePorthnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), nodePortEndpoints, queriedLoadBalancers)
 
-			if len(nodePortEndpoints) > 0 && !allEndpointsTerminating {
+			if len(nodePortEndpoints) > 0 && !allEndpointsTerminating && !allEndpointsNonServing {
 				// If all endpoints are in terminating stage, then no need to create Node Port LoadBalancer
 				hnsLoadBalancer, err := hns.getLoadBalancer(
 					nodePortEndpoints,
@@ -1448,7 +1489,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &externalIP.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), externalIPEndpoints, queriedLoadBalancers)
 
-			if len(externalIPEndpoints) > 0 && !allEndpointsTerminating {
+			if len(externalIPEndpoints) > 0 && !allEndpointsTerminating && !allEndpointsNonServing {
 				// If all endpoints are in terminating stage, then no need to External IP LoadBalancer
 				// Try loading existing policies, if already available
 				hnsLoadBalancer, err = hns.getLoadBalancer(
@@ -1502,7 +1543,7 @@ func (proxier *Proxier) syncProxyRules() {
 				klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 			}
 
-			if proxier.forwardHealthCheckVip && gatewayHnsendpoint != nil && !allEndpointsTerminating {
+			if proxier.forwardHealthCheckVip && gatewayHnsendpoint != nil && !allEndpointsTerminating && !allEndpointsNonServing {
 				// Avoid creating health check loadbalancer if all the endpoints are terminating
 				nodeport := proxier.healthzPort
 				if svcInfo.HealthCheckNodePort() != 0 {
