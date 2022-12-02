@@ -313,17 +313,36 @@ func conjureMac(macPrefix string, ip net.IP) string {
 }
 
 func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap) {
+	klog.V(3).InfoS("#====  Prince  endpointsMapChange invoked.")
+	eMap := "OldEPS : \n"
 	// This will optimize remote endpoint and loadbalancer deletion based on the annotation
 	var svcPortMap = make(map[proxy.ServicePortName]bool)
-	for svcPortName := range oldEndpointsMap {
+	for svcPortName, eps := range oldEndpointsMap {
+		eMap = "[ " + eMap + svcPortName.String() + " = "
+		for _, v := range eps {
+			state := fmt.Sprintf("{Ready:%v,Serving:%v,Terminating:%v,IsRemote:%v}", v.IsReady(), v.IsServing(), v.IsTerminating(), !v.GetIsLocal())
+			eMap = eMap + "\n" + v.String() + state + ","
+		}
+		eMap = eMap + "\n]\n"
 		svcPortMap[svcPortName] = true
 		proxier.onEndpointsMapChange(&svcPortName, false)
 	}
-	for svcPortName := range newEndpointsMap {
+
+	eMap = eMap + "NewEPS : \n"
+	for svcPortName, eps := range newEndpointsMap {
+		eMap = "[ " + eMap + svcPortName.String() + " = "
+		for _, v := range eps {
+			state := fmt.Sprintf("{Ready:%v,Serving:%v,Terminating:%v,IsRemote:%v}", v.IsReady(), v.IsServing(), v.IsTerminating(), !v.GetIsLocal())
+			eMap = eMap + "\n" + v.String() + state + ","
+		}
+		eMap = eMap + "\n]\n"
 		// duplicateCleanup true means cleanup is called second time on the same svcPort
 		duplicateCleanup := svcPortMap[svcPortName]
 		proxier.onEndpointsMapChange(&svcPortName, duplicateCleanup)
 	}
+
+	eMap = eMap + "\n"
+	klog.V(3).InfoS("#====  Prince  endpointsMapChange completed ", "EPS", eMap)
 }
 
 func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName, duplicateCleanup bool) {
