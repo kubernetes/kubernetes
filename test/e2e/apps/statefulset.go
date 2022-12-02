@@ -1349,8 +1349,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	ginkgo.It("PVC should be recreated when pod is pending due to missing PVC [Feature:AutomaticPVCRecreation][Disruptive][Serial]", func() {
-		// This test must be run in an environment that will allow the test pod to be scheduled on a node with local volumes
+	ginkgo.It("PVC should be recreated when pod is pending due to missing PVC [Disruptive][Serial]", func() {
 		ssName := "test-ss"
 		headlessSvcName := "test"
 		// Define StatefulSet Labels
@@ -1359,11 +1358,18 @@ var _ = SIGDescribe("StatefulSet", func() {
 			"pod":  WebserverImageName,
 		}
 
+		readyNode, err := e2enode.GetReadySchedulableWorkerNode(c)
+		framework.ExpectNoError(err)
+		hostLabel := "kubernetes.io/hostname"
+		hostLabelVal := readyNode.Labels[hostLabel]
+
 		statefulPodMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, statefulPodMounts, nil, ssPodLabels)
+		ss.Spec.Template.Spec.NodeSelector = map[string]string{hostLabel: hostLabelVal} // force the pod on a specific node
+
 		e2epv.SkipIfNoDefaultStorageClass(c)
 		ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-		_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+		_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Confirming PVC exists")
@@ -1377,6 +1383,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+		framework.ExpectEqual(nodeName, readyNode.Name)
 		node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
@@ -1432,8 +1439,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		ginkgo.By("Confirming Pod is ready after being recreated")
 		e2estatefulset.WaitForStatusReadyReplicas(c, ss, 1)
-		_, err = c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+		pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
+		framework.ExpectEqual(pod.Spec.NodeName, readyNode.Name) // confirm the pod was scheduled back to the original node
 	})
 })
 
