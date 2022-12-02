@@ -307,10 +307,10 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	}
 }
 
-// Replace will delete the contents of 'f', using instead the given map.
-// 'f' takes ownership of the map, you should not reference the map again
+// Replace will delete the contents of 'f', using instead the given list.
+// 'f' takes ownership of the list, you should not reference the list again
 // after calling this function. f's queue is reset, too; upon return, it
-// will contain the items in the map, in no particular order.
+// will contain the items in the list, in no particular order.
 func (f *FIFO) Replace(list []interface{}, resourceVersion string) error {
 	items := make(map[string]interface{}, len(list))
 	for _, item := range list {
