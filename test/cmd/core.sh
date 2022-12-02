@@ -1272,6 +1272,20 @@ run_rc_tests() {
   ### Scale multiple replication controllers
   kubectl create -f test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml "${kube_flags[@]}"
   kubectl create -f test/e2e/testing-manifests/guestbook/legacy/redis-slave-controller.yaml "${kube_flags[@]}"
+  # Command dry-run client
+  output_message=$(kubectl scale rc/redis-master rc/redis-slave --replicas=4 --dry-run=client "${kube_flags[@]}")
+  # Post-condition dry-run client: 1 replicas each
+  kube::test::if_has_string "${output_message}" 'replicationcontroller/redis-master scaled (dry run)'
+  kube::test::if_has_string "${output_message}" 'replicationcontroller/redis-slave scaled (dry run)'
+  kube::test::get_object_assert 'rc redis-master' "{{$rc_replicas_field}}" '1'
+  kube::test::get_object_assert 'rc redis-slave' "{{$rc_replicas_field}}" '2'
+  # Command dry-run server
+  output_message=$(kubectl scale rc/redis-master rc/redis-slave --replicas=4 --dry-run=server "${kube_flags[@]}")
+  # Post-condition dry-run server: 1 replicas each
+  kube::test::if_has_string "${output_message}" 'replicationcontroller/redis-master scaled (server dry run)'
+  kube::test::if_has_string "${output_message}" 'replicationcontroller/redis-slave scaled (server dry run)'
+  kube::test::get_object_assert 'rc redis-master' "{{$rc_replicas_field}}" '1'
+  kube::test::get_object_assert 'rc redis-slave' "{{$rc_replicas_field}}" '2'
   # Command
   kubectl scale rc/redis-master rc/redis-slave --replicas=4 "${kube_flags[@]}"
   # Post-condition: 4 replicas each
@@ -1282,6 +1296,16 @@ run_rc_tests() {
 
   ### Scale a deployment
   kubectl create -f test/fixtures/doc-yaml/user-guide/deployment.yaml "${kube_flags[@]}"
+  # Command dry-run client
+  output_message=$(kubectl scale --current-replicas=3 --replicas=1 deployment/nginx-deployment --dry-run=client)
+  # Post-condition: 3 replica for nginx-deployment dry-run client
+  kube::test::if_has_string "${output_message}" 'nginx-deployment scaled (dry run)'
+  kube::test::get_object_assert 'deployment nginx-deployment' "{{${deployment_replicas:?}}}" '3'
+  # Command dry-run server
+  output_message=$(kubectl scale --current-replicas=3 --replicas=1 deployment/nginx-deployment --dry-run=server)
+  # Post-condition: 3 replica for nginx-deployment dry-run server
+  kube::test::if_has_string "${output_message}" 'nginx-deployment scaled (server dry run)'
+  kube::test::get_object_assert 'deployment nginx-deployment' "{{${deployment_replicas:?}}}" '3'
   # Command
   kubectl scale --current-replicas=3 --replicas=1 deployment/nginx-deployment
   # Post-condition: 1 replica for nginx-deployment

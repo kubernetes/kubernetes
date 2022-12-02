@@ -144,16 +144,18 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
+
+	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
 	o.PrintObj = printer.PrintObj
 
-	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
-	if err != nil {
-		return err
-	}
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return err
@@ -238,7 +240,10 @@ func (o *ScaleOptions) RunScale() error {
 	for _, info := range infos {
 		mapping := info.ResourceMapping()
 		if o.dryRunStrategy == cmdutil.DryRunClient {
-			return o.PrintObj(info.Object, o.Out)
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
 		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource, o.dryRunStrategy == cmdutil.DryRunServer); err != nil {
