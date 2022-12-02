@@ -26,17 +26,20 @@ import (
 	"github.com/spf13/pflag"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/webhook"
 	corev1 "k8s.io/client-go/listers/core/v1"
+	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 	netutils "k8s.io/utils/net"
 )
 
@@ -98,6 +101,8 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig((func(_ kubeopenapi.ReferenceCallback) map[string]kubeopenapi.OpenAPIDefinition{ return nil}), openapinamer.NewDefinitionNamer(runtime.NewScheme()))
+
 	if err := o.ServerRunOptions.ApplyTo(&serverConfig.Config); err != nil {
 		return nil, err
 	}
