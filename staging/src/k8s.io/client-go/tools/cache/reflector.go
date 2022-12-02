@@ -217,48 +217,49 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		r.name = naming.GetNameFromCallsite(internalPackages...)
 	}
 
-	r.setTypeDescription(expectedType)
-	r.setExpectedGVK(expectedType)
+	if r.typeDescription == "" {
+		r.typeDescription = getTypeDescriptionFromObject(expectedType)
+	}
+
+	if r.expectedGVK == nil {
+		r.expectedGVK = getExpectedGVKFromObject(expectedType)
+	}
 
 	return r
 }
 
-func (r *Reflector) setTypeDescription(expectedType interface{}) {
-	if r.typeDescription != "" {
-		return
+func getTypeDescriptionFromObject(expectedType interface{}) string {
+	if expectedType == nil {
+		return defaultExpectedTypeName
 	}
 
-	if expectedType == nil {
-		r.typeDescription = defaultExpectedTypeName
-	} else {
-		r.typeDescription = reflect.TypeOf(expectedType).String()
-	}
+	reflectDescription := reflect.TypeOf(expectedType).String()
 
 	obj, ok := expectedType.(*unstructured.Unstructured)
 	if !ok {
-		return
+		return reflectDescription
 	}
 
 	gvk := obj.GroupVersionKind()
 	if gvk.Empty() {
-		return
+		return reflectDescription
 	}
 
-	r.typeDescription = gvk.String()
+	return gvk.String()
 }
 
-func (r *Reflector) setExpectedGVK(expectedType interface{}) {
+func getExpectedGVKFromObject(expectedType interface{}) *schema.GroupVersionKind {
 	obj, ok := expectedType.(*unstructured.Unstructured)
 	if !ok {
-		return
+		return nil
 	}
 
 	gvk := obj.GroupVersionKind()
 	if gvk.Empty() {
-		return
+		return nil
 	}
 
-	r.expectedGVK = &gvk
+	return &gvk
 }
 
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
