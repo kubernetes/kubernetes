@@ -448,7 +448,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.pvc.Name = "pvc-origin"
 		dc := l.config.Framework.DynamicClient
 		testConfig := storageframework.ConvertTestConfig(l.config)
-		dataSource := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
+		pvc2.Spec.DataSource = prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
 
 		// Get the created PVC and record the actual size of the pv (from pvc status).
 		c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
@@ -473,9 +473,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		pvc2.Spec.Resources.Requests = v1.ResourceList{
 			v1.ResourceStorage: *storageRequest,
 		}
-
-		// Set PVC snapshot data source.
-		pvc2.Spec.DataSource = dataSource
 
 		pvc2.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
 
