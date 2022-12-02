@@ -249,8 +249,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRW
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e h1:fD57ERR4JtEqsWbfPhv4DMiApHyliiK5xCTNVSPiaAs=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/onsi/gomega v1.20.1 h1:PA/3qinGoukvymdIDV8pii6tiZgC8kbmJO6Z5+b002Q=
-github.com/openshift/library-go v0.0.0-20221101142545-76526edf66e8 h1:KJdLbBWfSFSpWpCkTwBB71NNmISB/d4jpBYtHu1Vrhs=
-github.com/openshift/library-go v0.0.0-20221101142545-76526edf66e8/go.mod h1:KPBAXGaq7pPmA+1wUVtKr5Axg3R68IomWDkzaOxIhxM=
+github.com/openshift/library-go v0.0.0-20221201214333-d679fe6f8248 h1:w2mf0aNEohFDKKhggbv4ZeFA6oiYoTBSUu6MP12Hits=
+github.com/openshift/library-go v0.0.0-20221201214333-d679fe6f8248/go.mod h1:KPBAXGaq7pPmA+1wUVtKr5Axg3R68IomWDkzaOxIhxM=
 github.com/openshift/onsi-ginkgo/v2 v2.0.0-20221005160638-5fa9cd70cd8c h1:bRjMBrKdts7PdEHiF7Z9Q+LZR8NFVfF0HsDQJJzWLco=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

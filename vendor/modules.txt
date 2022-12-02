@@ -893,7 +893,7 @@ github.com/openshift/client-go/user/informers/externalversions/internalinterface
 github.com/openshift/client-go/user/informers/externalversions/user
 github.com/openshift/client-go/user/informers/externalversions/user/v1
 github.com/openshift/client-go/user/listers/user/v1
-# github.com/openshift/library-go v0.0.0-20221101142545-76526edf66e8 => github.com/openshift/library-go v0.0.0-20221101142545-76526edf66e8
+# github.com/openshift/library-go v0.0.0-20221201214333-d679fe6f8248 => github.com/openshift/library-go v0.0.0-20221201214333-d679fe6f8248
 ## explicit; go 1.18
 github.com/openshift/library-go/pkg/apiserver/admission/admissionregistrationtesting
 github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig
@@ -3007,7 +3007,7 @@ sigs.k8s.io/yaml
 # github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20221118165437-6006085c7412
 # github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20220720161851-9b4f0386f6b0
 # github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20220831193253-4950ae70c8ea
-# github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20221101142545-76526edf66e8
+# github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20221201214333-d679fe6f8248
 # github.com/opentracing/opentracing-go => github.com/opentracing/opentracing-go v1.1.0
 # github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 # github.com/pkg/errors => github.com/pkg/errors v0.9.1
