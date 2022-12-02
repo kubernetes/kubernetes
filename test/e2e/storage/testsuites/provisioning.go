@@ -451,8 +451,8 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		dataSource := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
 		localDataSource := &v1.TypedLocalObjectReference{
 			APIGroup: dataSource.APIGroup,
-			Kind: dataSource.Kind,
-			Name: dataSource.Name,
+			Kind:     dataSource.Kind,
+			Name:     dataSource.Name,
 		}
 		pvc2.Spec.DataSource = localDataSource
 
@@ -503,8 +503,8 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			"HINT: Your driver needs to check the volume in NodeStageVolume and resize fs if needed.\n"+
 			"HINT: For an example patch see: https://github.com/kubernetes/cloud-provider-openstack/pull/1563/files",
 			restoredFSSize, originFSSize)
-			gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
-		})
+		gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
+	})
 
 	ginkgo.It("should provision storage with pvc data source", func(ctx context.Context) {
 		if !dInfo.Capabilities[storageframework.CapPVCDataSource] {
