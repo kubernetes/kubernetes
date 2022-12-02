@@ -23,7 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
+	"k8s.io/apiextensions-apiserver/pkg/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/features"

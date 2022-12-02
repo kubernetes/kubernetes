@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
+	"k8s.io/apiextensions-apiserver/pkg/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"

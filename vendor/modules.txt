@@ -1319,7 +1319,6 @@ k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
-k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation
 k8s.io/apiextensions-apiserver/pkg/apiserver
 k8s.io/apiextensions-apiserver/pkg/apiserver/conversion
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema
@@ -1357,6 +1356,7 @@ k8s.io/apiextensions-apiserver/pkg/generated/openapi
 k8s.io/apiextensions-apiserver/pkg/registry/customresource
 k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor
 k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition
+k8s.io/apiextensions-apiserver/pkg/validation
 k8s.io/apiextensions-apiserver/test/integration
 k8s.io/apiextensions-apiserver/test/integration/fixtures
 # k8s.io/apimachinery v0.0.0 => ./staging/src/k8s.io/apimachinery
