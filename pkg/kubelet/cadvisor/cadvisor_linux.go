@@ -39,9 +39,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -92,11 +90,6 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		cadvisormetrics.AppMetrics:          struct{}{},
 		cadvisormetrics.ProcessMetrics:      struct{}{},
 		cadvisormetrics.OOMMetrics:          struct{}{},
-	}
-
-	// Only add the Accelerator metrics if the feature is inactive
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableAcceleratorUsageMetrics) {
-		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
 	}
 
 	if usingLegacyStats || localStorageCapacityIsolation {
