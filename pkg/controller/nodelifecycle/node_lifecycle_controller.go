@@ -593,12 +593,6 @@ func (nc *Controller) doNodeProcessingPassWorker(ctx context.Context) {
 			klog.Errorf("Failed to taint NoSchedule on node <%s>, requeue it: %v", nodeName, err)
 			// TODO(k82cn): Add nodeName back to the queue
 		}
-		// TODO: re-evaluate whether there are any labels that need to be
-		// reconcile in 1.19. Remove this function if it's no longer necessary.
-		if err := nc.reconcileNodeLabels(nodeName); err != nil {
-			klog.Errorf("Failed to reconcile labels for node <%s>, requeue it: %v", nodeName, err)
-			// TODO(yujuhong): Add nodeName back to the queue
-		}
 		nc.nodeUpdateQueue.Done(nodeName)
 	}
 }

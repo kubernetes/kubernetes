@@ -260,14 +260,6 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
 		}
 		cnc.updateNodeAddress(ctx, &nodes.Items[i], instanceMetadata)
 	}
-
-	for _, node := range nodes.Items {
-		err = cnc.reconcileNodeLabels(node.Name)
-		if err != nil {
-			klog.Errorf("Error reconciling node labels for node %q, err: %v", node.Name, err)
-		}
-	}
-
 	return nil
 }
 
