@@ -29,7 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -604,8 +604,8 @@ func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
 			CompletionMode: &mode,
-			Completions:    pointer.Int32(500),
-			Parallelism:    pointer.Int32(500),
+			Completions:    pointer.Int32(100),
+			Parallelism:    pointer.Int32(100),
 			BackoffLimit:   pointer.Int32(0),
 		},
 	})
