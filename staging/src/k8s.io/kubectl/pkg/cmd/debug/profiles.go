@@ -69,9 +69,38 @@ func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runt
 	}
 }
 
-func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+func isPodCopy(pod *corev1.Pod, target runtime.Object) bool {
+	if asserted, ok := target.(*corev1.Pod); !ok {
+		return false
+	} else {
+		return pod != asserted
+	}
+}
+
+type debugStyle int
+
+const (
+	styleEphemeral debugStyle = iota
+	stylePodCopy
+	styleNode
+)
+
+func getDebugStyle(pod *corev1.Pod, target runtime.Object) debugStyle {
 	switch target.(type) {
 	case *corev1.Pod:
+		if isPodCopy(pod, target) {
+			return stylePodCopy
+		}
+		return styleEphemeral
+	case *corev1.Node:
+		return styleNode
+	}
+	return debugStyle(-1) // unknown
+}
+
+func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+	switch getDebugStyle(pod, target) {
+	case stylePodCopy:
 		for i := range pod.Spec.Containers {
 			container := &pod.Spec.Containers[i]
 			if container.Name != containerName {
@@ -87,6 +116,7 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 			}
 		}
 
+	case styleEphemeral:
 		for i := range pod.Spec.EphemeralContainers {
 			container := &pod.Spec.EphemeralContainers[i]
 			if container.Name != containerName {
@@ -100,7 +130,7 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 			}
 		}
 
-	case *corev1.Node:
+	case styleNode:
 		// empty securityContext; uses host namespaces, mounts root partition
 		const volumeName = "host-root"
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
@@ -130,8 +160,8 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 }
 
 func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	switch target.(type) {
-	case *corev1.Pod:
+	switch getDebugStyle(pod, target) {
+	case stylePodCopy:
 		pod.Spec.SecurityContext = nil
 		setHostNamespace(pod, false)
 
@@ -145,6 +175,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
 		}
 
+	case styleEphemeral:
 		for i := range pod.Spec.EphemeralContainers {
 			container := &pod.Spec.EphemeralContainers[i]
 			if container.Name != containerName {
@@ -154,7 +185,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 			container.SecurityContext = nil
 		}
 
-	case *corev1.Node:
+	case styleNode:
 		// empty securityContext; uses isolated namespaces
 		pod.Spec.SecurityContext = nil
 		setHostNamespace(pod, false)
@@ -167,11 +198,8 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 }
 
 func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	switch target.(type) {
-	case *corev1.Pod:
-		pod.Spec.SecurityContext = nil
-		setHostNamespace(pod, false)
-
+	switch getDebugStyle(pod, target) {
+	case stylePodCopy:
 		for i := range pod.Spec.Containers {
 			container := &pod.Spec.Containers[i]
 			if container.Name != containerName {
@@ -187,6 +215,7 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
 		}
 
+	case styleEphemeral:
 		for i := range pod.Spec.EphemeralContainers {
 			container := &pod.Spec.EphemeralContainers[i]
 			if container.Name != containerName {
@@ -201,13 +230,17 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 			}
 		}
 
-	case *corev1.Node:
-		// empty securityContext; uses isolated namespaces
-		pod.Spec.SecurityContext = nil
+	case styleNode:
+		// no additional settings required other than the common
+		// settings applied below
 
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileRestricted, target)
 	}
+
+	// common settings
+	pod.Spec.SecurityContext = nil
+	setHostNamespace(pod, false)
 
 	return nil
 }
