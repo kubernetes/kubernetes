@@ -637,6 +637,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 
 	name, containerByName := o.Container, containerNameToRef(copied)
 
+	appendDebugContainer := func() {}
 	c, ok := containerByName[name]
 	if !ok {
 		// Adding a new debug container
@@ -655,9 +656,9 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 			Name:                     name,
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 		}
-		defer func() {
+		appendDebugContainer = func() {
 			copied.Spec.Containers = append(copied.Spec.Containers, *c)
-		}()
+		}
 	}
 
 	if len(o.Args) > 0 {
@@ -679,6 +680,8 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	}
 	c.Stdin = o.Interactive
 	c.TTY = o.TTY
+
+	appendDebugContainer()
 
 	err := o.applier.Apply(copied, c.Name, pod)
 	if err != nil {
