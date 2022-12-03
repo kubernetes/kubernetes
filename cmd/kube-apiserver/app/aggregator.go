@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/crdregistration"
 )
 
+// createAggregatorConfig creates the aggregator config and all related client/informers for the aggregator
 func createAggregatorConfig(
 	kubeAPIServerConfig genericapiserver.Config,
 	commandOptions *options.ServerRunOptions,
@@ -117,6 +118,7 @@ func createAggregatorConfig(
 	return aggregatorConfig, nil
 }
 
+// createAggregatorServer creates the aggregator server.
 func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget, apiExtensionInformers apiextensionsinformers.SharedInformerFactory) (*aggregatorapiserver.APIAggregator, error) {
 	aggregatorServer, err := aggregatorConfig.Complete().NewWithDelegate(delegateAPIServer)
 	if err != nil {
@@ -172,6 +174,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	return aggregatorServer, nil
 }
 
+// makeAPIServiceAvailableHealthCheck returns a healthz check that waits for the specified APIServices to be available.
 func makeAPIService(gv schema.GroupVersion) *v1.APIService {
 	apiServicePriority, ok := apiVersionPriorities[gv]
 	if !ok {
@@ -289,6 +292,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	// Version can be set to 9 (to have space around) for a new group.
 }
 
+// apiVersionPriorities is a map from group/version to the priority of that group/version.
 func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*v1.APIService {
 	apiServices := []*v1.APIService{}
 

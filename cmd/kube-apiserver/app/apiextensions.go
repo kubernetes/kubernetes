@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
+// createAPIExtensionsConfig creates the APIExtensions server's config.
 func createAPIExtensionsConfig(
 	kubeAPIServerConfig genericapiserver.Config,
 	externalInformers kubeexternalinformers.SharedInformerFactory,
