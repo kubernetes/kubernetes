@@ -78,8 +78,6 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 				continue
 			}
 			// For copy of pod: sets SYS_PTRACE in debugging container, sets shareProcessNamespace
-			// Probes and labels are stripped from Pod copies.
-			clearProbes(container)
 			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
 			if container.SecurityContext == nil {
 				container.SecurityContext = &corev1.SecurityContext{}
@@ -143,7 +141,6 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 				continue
 			}
 			// For copy of pod: empty securityContext; sets shareProcessNamespace
-			clearProbes(container)
 			container.SecurityContext = nil
 			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
 		}
@@ -181,8 +178,6 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 				continue
 			}
 			// For copy of pod: empty securityContext; sets shareProcessNamespace
-			// Probes and labels are stripped from Pod copies.
-			clearProbes(container)
 			container.SecurityContext = &corev1.SecurityContext{
 				RunAsNonRoot: pointer.BoolPtr(true),
 				Capabilities: &corev1.Capabilities{
@@ -215,11 +210,6 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	}
 
 	return nil
-}
-
-func clearProbes(c *corev1.Container) {
-	c.LivenessProbe = nil
-	c.ReadinessProbe = nil
 }
 
 func setHostNamespace(pod *corev1.Pod, enabled bool) {
