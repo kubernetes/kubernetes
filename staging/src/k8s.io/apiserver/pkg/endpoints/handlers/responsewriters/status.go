@@ -58,26 +58,45 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 		//TODO: check for invalid responses
 		return &status
 	default:
-		status := http.StatusInternalServerError
-		switch {
-		//TODO: replace me with NewConflictErr
-		case storage.IsConflict(err):
-			status = http.StatusConflict
-		}
 		// Log errors that were not converted to an error status
 		// by REST storage - these typically indicate programmer
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
 		runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %#+v: %v", err, err))
-		return &metav1.Status{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Status",
-				APIVersion: "v1",
-			},
-			Status:  metav1.StatusFailure,
-			Code:    int32(status),
-			Reason:  metav1.StatusReasonUnknown,
-			Message: err.Error(),
-		}
+		return convertStorageErrorOrNot(err)
 	}
+}
+
+// convertStorageErrorOrNot try to recognize storage error and convert it to an error status.
+// Eventually, unrecognized error becomes internal error with reason unknown.
+func convertStorageErrorOrNot(err error) *metav1.Status {
+	status := &metav1.Status{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Status",
+			APIVersion: "v1",
+		},
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusInternalServerError,
+		Reason:  metav1.StatusReasonUnknown,
+		Message: err.Error(),
+	}
+	//TODO: replace me with errors.NewXxxErr if we can
+	switch {
+	case storage.IsNotFound(err):
+		status.Code = http.StatusNotFound
+		status.Reason = metav1.StatusReasonNotFound
+	case storage.IsExist(err):
+		status.Code = http.StatusConflict
+		status.Reason = metav1.StatusReasonAlreadyExists
+	case storage.IsUnreachable(err):
+		status.Code = http.StatusServiceUnavailable
+		status.Reason = metav1.StatusReasonServiceUnavailable
+	case storage.IsConflict(err):
+		status.Code = http.StatusConflict
+		status.Reason = metav1.StatusReasonConflict
+	case storage.IsInvalidError(err):
+		status.Code = http.StatusUnprocessableEntity
+		status.Reason = metav1.StatusReasonInvalid
+	}
+	return status
 }

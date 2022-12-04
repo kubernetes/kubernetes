@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/storage"
 )
 
 func TestBadStatusErrorToAPIStatus(t *testing.T) {
@@ -82,6 +84,68 @@ func TestAPIStatus(t *testing.T) {
 		v.Kind = "Status"
 		if !reflect.DeepEqual(actual, &v) {
 			t.Errorf("%s: Expected %#v, Got %#v", k, v, actual)
+		}
+	}
+}
+
+func TestConvertStorageErrorOrNot(t *testing.T) {
+	cases := []struct {
+		err            error
+		expectedStatus metav1.Status
+	}{
+		{
+			err: storage.NewKeyNotFoundError("", 0),
+			expectedStatus: metav1.Status{
+				Status:  metav1.StatusFailure,
+				Code:    http.StatusNotFound,
+				Reason:  "NotFound",
+				Message: "StorageError: key not found, Code: 1, Key: , ResourceVersion: 0, AdditionalErrorMsg: ",
+			},
+		},
+		{
+			err: storage.NewKeyExistsError("", 0),
+			expectedStatus: metav1.Status{
+				Status:  metav1.StatusFailure,
+				Code:    http.StatusConflict,
+				Reason:  "AlreadyExists",
+				Message: "StorageError: key exists, Code: 2, Key: , ResourceVersion: 0, AdditionalErrorMsg: ",
+			},
+		},
+		{
+			err: storage.NewUnreachableError("", 0),
+			expectedStatus: metav1.Status{
+				Status:  metav1.StatusFailure,
+				Code:    http.StatusServiceUnavailable,
+				Reason:  "ServiceUnavailable",
+				Message: "StorageError: server unreachable, Code: 5, Key: , ResourceVersion: 0, AdditionalErrorMsg: ",
+			},
+		},
+		{
+			err: storage.NewResourceVersionConflictsError("", 0),
+			expectedStatus: metav1.Status{
+				Status:  metav1.StatusFailure,
+				Code:    http.StatusConflict,
+				Reason:  "Conflict",
+				Message: "StorageError: resource version conflicts, Code: 3, Key: , ResourceVersion: 0, AdditionalErrorMsg: ",
+			},
+		},
+		{
+			err: storage.NewInvalidError([]*field.Error{field.Invalid(field.NewPath("test"), nil, "")}),
+			expectedStatus: metav1.Status{
+				Status:  metav1.StatusFailure,
+				Code:    http.StatusUnprocessableEntity,
+				Reason:  "Invalid",
+				Message: "test: Invalid value: \"null\"",
+			},
+		},
+	}
+	for _, v := range cases {
+		actual := convertStorageErrorOrNot(v.err)
+		status := v.expectedStatus
+		status.APIVersion = "v1"
+		status.Kind = "Status"
+		if !reflect.DeepEqual(actual, &status) {
+			t.Errorf("%s: Expected %#v, Got %#v", v.err, v.expectedStatus, actual)
 		}
 	}
 }
