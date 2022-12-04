@@ -128,6 +128,7 @@ type serviceInfo struct {
 	hns                    HostNetworkService
 	preserveDIP            bool
 	localTrafficDSR        bool
+	internalTrafficLocal   bool
 	winProxyOptimization   bool
 }
 
@@ -146,6 +147,7 @@ type remoteSubnetInfo struct {
 }
 
 const NETWORK_TYPE_OVERLAY = "overlay"
+const maxCountLoadbalancerCleanup = 20
 
 func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
 	var hns HostNetworkService
@@ -322,6 +324,29 @@ func logFormattedEndpoints(logMsg string, logLevel klog.Level, svcPortName proxy
 	}
 }
 
+// This will cleanup stale load balancers which are pending delete
+// in last iteration. This function will act like a self healing of stale
+// loadbalancer entries.
+func (proxier *Proxier) cleanupStaleLoadbalancers() {
+	i := 0
+	countStaleLB := len(proxier.mapStaleLoadbalancers)
+	if countStaleLB == 0 {
+		return
+	}
+	klog.V(3).InfoS("Cleanup of stale loadbalancers triggered", "LB Count", countStaleLB)
+	for lbID := range proxier.mapStaleLoadbalancers {
+		i++
+		if err := proxier.hns.deleteLoadBalancer(lbID); err == nil {
+			delete(proxier.mapStaleLoadbalancers, lbID)
+		}
+		if i == maxCountLoadbalancerCleanup {
+			// The remaining stale loadbalancers will be cleaned up in next iteration
+			break
+		}
+	}
+	klog.V(3).InfoS("Stale loadbalancers still remaining", "LB Count", len(proxier.mapStaleLoadbalancers), "lbinfo", proxier.mapStaleLoadbalancers)
+}
+
 func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap) {
 	// This will optimize remote endpoint and loadbalancer deletion based on the annotation
 	var svcPortMap = make(map[proxy.ServicePortName]bool)
@@ -358,7 +383,7 @@ func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName,
 		}
 
 		klog.V(3).InfoS("Endpoints are modified. Service is stale", "servicePortName", svcPortName)
-		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName], true)
+		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName], proxier.mapStaleLoadbalancers, true)
 	} else {
 		// If no service exists, just cleanup the remote endpoints
 		klog.V(3).InfoS("Endpoints are orphaned, cleaning up")
@@ -405,7 +430,7 @@ func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
 		}
 
 		klog.V(3).InfoS("Updating existing service port", "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP(), "port", svcInfo.Port(), "protocol", svcInfo.Protocol())
-		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName], false)
+		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName], proxier.mapStaleLoadbalancers, false)
 	}
 }
 
@@ -495,6 +520,10 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	// Annotation introduced to enable optimized loadbalancing
 	winProxyOptimization := !(strings.ToUpper(service.Annotations["winProxyOptimization"]) == "DISABLED")
 	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
+	var internalTrafficLocal bool
+	if service.Spec.InternalTrafficPolicy != nil {
+		internalTrafficLocal = *service.Spec.InternalTrafficPolicy == v1.ServiceInternalTrafficPolicyLocal
+	}
 
 	err := hcn.DSRSupported()
 	if err != nil {
@@ -512,6 +541,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	info.targetPort = targetPort
 	info.hns = proxier.hns
 	info.localTrafficDSR = localTrafficDSR
+	info.internalTrafficLocal = internalTrafficLocal
 	info.winProxyOptimization = winProxyOptimization
 
 	klog.V(3).InfoS("Flags enabled for service", "service", service.Name, "localTrafficDSR", localTrafficDSR, "preserveDIP", preserveDIP, "winProxyOptimization", winProxyOptimization)
@@ -598,6 +628,7 @@ type Proxier struct {
 
 	forwardHealthCheckVip bool
 	rootHnsEndpointName   string
+	mapStaleLoadbalancers map[string]bool // This maintains entries of load balancers which are pending delete in last iteration
 }
 
 type localPort struct {
@@ -756,6 +787,7 @@ func NewProxier(
 		healthzPort:           healthzPort,
 		rootHnsEndpointName:   config.RootHnsEndpointName,
 		forwardHealthCheckVip: config.ForwardHealthCheckVip,
+		mapStaleLoadbalancers: make(map[string]bool),
 	}
 
 	ipFamily := v1.IPv4Protocol
@@ -817,7 +849,7 @@ func CleanupLeftovers() (encounteredError bool) {
 	return encounteredError
 }
 
-func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, isEndpointChange bool) {
+func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, mapStaleLoadbalancers map[string]bool, isEndpointChange bool) {
 	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
 	// if it's an endpoint change and winProxyOptimization annotation enable, skip lb deletion and remoteEndpoint deletion
 	winProxyOptimization := isEndpointChange && svcInfo.winProxyOptimization
@@ -825,7 +857,7 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, isEnd
 		klog.V(3).InfoS("Skipped loadbalancer deletion.", "hnsID", svcInfo.hnsID, "nodePorthnsID", svcInfo.nodePorthnsID, "winProxyOptimization", svcInfo.winProxyOptimization, "isEndpointChange", isEndpointChange)
 	} else {
 		// Skip the svcInfo.policyApplied check to remove all the policies
-		svcInfo.deleteLoadBalancerPolicy()
+		svcInfo.deleteLoadBalancerPolicy(mapStaleLoadbalancers)
 	}
 
 	// Cleanup Endpoints references
@@ -846,10 +878,11 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint, isEnd
 	svcInfo.policyApplied = false
 }
 
-func (svcInfo *serviceInfo) deleteLoadBalancerPolicy() {
+func (svcInfo *serviceInfo) deleteLoadBalancerPolicy(mapStaleLoadbalancer map[string]bool) {
 	// Remove the Hns Policy corresponding to this service
 	hns := svcInfo.hns
 	if err := hns.deleteLoadBalancer(svcInfo.hnsID); err != nil {
+		mapStaleLoadbalancer[svcInfo.hnsID] = true
 		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource.", "hnsID", svcInfo.hnsID, "ClusterIP", svcInfo.ClusterIP())
 	} else {
 		// On successful delete, remove hnsId
@@ -857,6 +890,7 @@ func (svcInfo *serviceInfo) deleteLoadBalancerPolicy() {
 	}
 
 	if err := hns.deleteLoadBalancer(svcInfo.nodePorthnsID); err != nil {
+		mapStaleLoadbalancer[svcInfo.nodePorthnsID] = true
 		klog.V(1).ErrorS(err, "Error deleting Hns NodePort policy resource.", "hnsID", svcInfo.nodePorthnsID, "NodePort", svcInfo.NodePort())
 	} else {
 		// On successful delete, remove hnsId
@@ -865,6 +899,7 @@ func (svcInfo *serviceInfo) deleteLoadBalancerPolicy() {
 
 	for _, externalIP := range svcInfo.externalIPs {
 		if err := hns.deleteLoadBalancer(externalIP.hnsID); err != nil {
+			mapStaleLoadbalancer[externalIP.hnsID] = true
 			klog.V(1).ErrorS(err, "Error deleting Hns ExternalIP policy resource.", "hnsID", externalIP.hnsID, "IP", externalIP.ip)
 		} else {
 			// On successful delete, remove hnsId
@@ -876,6 +911,7 @@ func (svcInfo *serviceInfo) deleteLoadBalancerPolicy() {
 
 		klog.V(3).InfoS("Loadbalancer Hns LoadBalancer delete triggered for loadBalancer Ingress resources in cleanup", "lbIngressIP", lbIngressIP)
 		if err := hns.deleteLoadBalancer(lbIngressIP.hnsID); err != nil {
+			mapStaleLoadbalancer[lbIngressIP.hnsID] = true
 			klog.V(1).ErrorS(err, "Error deleting Hns IngressIP policy resource.", "hnsID", lbIngressIP.hnsID, "IP", lbIngressIP.ip)
 		} else {
 			// On successful delete, remove hnsId
@@ -884,6 +920,7 @@ func (svcInfo *serviceInfo) deleteLoadBalancerPolicy() {
 
 		if lbIngressIP.healthCheckHnsID != "" {
 			if err := hns.deleteLoadBalancer(lbIngressIP.healthCheckHnsID); err != nil {
+				mapStaleLoadbalancer[lbIngressIP.healthCheckHnsID] = true
 				klog.V(1).ErrorS(err, "Error deleting Hns IngressIP HealthCheck policy resource.", "hnsID", lbIngressIP.healthCheckHnsID, "IP", lbIngressIP.ip)
 			} else {
 				// On successful delete, remove hnsId
@@ -1043,7 +1080,7 @@ func (proxier *Proxier) cleanupAllPolicies() {
 			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
 			continue
 		}
-		svcInfo.cleanupAllPolicies(proxier.endpointsMap[svcName], false)
+		svcInfo.cleanupAllPolicies(proxier.endpointsMap[svcName], proxier.mapStaleLoadbalancers, false)
 	}
 }
 
@@ -1230,7 +1267,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Create Remote endpoints for every endpoint, corresponding to the service
 		containsPublicIP := false
 		containsNodeIP := false
-		var allEndpointsTerminating, allEndpointsNonServing, someEndpointsServing bool
+		var allEndpointsTerminating, allEndpointsNonServing bool
 		someEndpointsServing := true
 
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ProxyTerminatingEndpoints) && len(svcInfo.loadBalancerIngressIPs) > 0 {
@@ -1248,6 +1285,11 @@ func (proxier *Proxier) syncProxyRules() {
 			ep, ok := epInfo.(*endpointsInfo)
 			if !ok {
 				klog.ErrorS(nil, "Failed to cast endpointsInfo", "serviceName", svcName)
+				continue
+			}
+
+			if svcInfo.internalTrafficLocal && svcInfo.localTrafficDSR && !ep.GetIsLocal() {
+				// No need to use or create remote endpoint when internal and external traffic policy is remote
 				continue
 			}
 
@@ -1388,7 +1430,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if svcInfo.winProxyOptimization {
 				// Deleting loadbalancers when there are no endpoints to serve.
 				klog.V(3).InfoS("Cleanup existing ", "endpointsInfo", hnsEndpoints, "serviceName", svcName)
-				svcInfo.deleteLoadBalancerPolicy()
+				svcInfo.deleteLoadBalancerPolicy(proxier.mapStaleLoadbalancers)
 			}
 			klog.ErrorS(nil, "Endpoint information not available for service, not applying any policy", "serviceName", svcName)
 			continue
@@ -1407,7 +1449,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		endpointsAvailableForLB := !allEndpointsTerminating && !allEndpointsNonServing
-		deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
+		proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
 
 		if endpointsAvailableForLB {
 			// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
@@ -1443,7 +1485,7 @@ func (proxier *Proxier) syncProxyRules() {
 				nodePortEndpoints = hnsLocalEndpoints
 			}
 
-			deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.nodePorthnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), nodePortEndpoints, queriedLoadBalancers)
+			proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.nodePorthnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), nodePortEndpoints, queriedLoadBalancers)
 
 			if len(nodePortEndpoints) > 0 && endpointsAvailableForLB {
 				// If all endpoints are in terminating stage, then no need to create Node Port LoadBalancer
@@ -1477,7 +1519,7 @@ func (proxier *Proxier) syncProxyRules() {
 				externalIPEndpoints = hnsLocalEndpoints
 			}
 
-			deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &externalIP.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), externalIPEndpoints, queriedLoadBalancers)
+			proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &externalIP.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), externalIPEndpoints, queriedLoadBalancers)
 
 			if len(externalIPEndpoints) > 0 && endpointsAvailableForLB {
 				// If all endpoints are in terminating stage, then no need to External IP LoadBalancer
@@ -1510,7 +1552,7 @@ func (proxier *Proxier) syncProxyRules() {
 				lbIngressEndpoints = hnsLocalEndpoints
 			}
 
-			deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &lbIngressIP.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), lbIngressEndpoints, queriedLoadBalancers)
+			proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &lbIngressIP.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), lbIngressEndpoints, queriedLoadBalancers)
 
 			if len(lbIngressEndpoints) > 0 {
 				hnsLoadBalancer, err := hns.getLoadBalancer(
@@ -1540,7 +1582,7 @@ func (proxier *Proxier) syncProxyRules() {
 					nodeport = svcInfo.HealthCheckNodePort()
 				}
 
-				deleteStaleLoadBalancer(hns, svcInfo.winProxyOptimization, &lbIngressIP.healthCheckHnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), []endpointsInfo{*gatewayHnsendpoint}, queriedLoadBalancers)
+				proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &lbIngressIP.healthCheckHnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), []endpointsInfo{*gatewayHnsendpoint}, queriedLoadBalancers)
 
 				hnsHealthCheckLoadBalancer, err := hns.getLoadBalancer(
 					[]endpointsInfo{*gatewayHnsendpoint},
@@ -1597,11 +1639,15 @@ func (proxier *Proxier) syncProxyRules() {
 			delete(proxier.endPointsRefCount, hnsID)
 		}
 	}
+
+	// This will cleanup stale load balancers which are pending delete
+	// in last iteration
+	proxier.cleanupStaleLoadbalancers()
 }
 
-// deleteStaleLoadBalancer checks whether loadbalancer delete is needed or not.
+// deleteExistingLoadBalancer checks whether loadbalancer delete is needed or not.
 // If it is needed, the function will delete the existing loadbalancer and return true, else false.
-func deleteStaleLoadBalancer(hns HostNetworkService, winProxyOptimization bool, lbHnsID *string, sourceVip string, protocol, intPort, extPort uint16, endpoints []endpointsInfo, queriedLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) bool {
+func (proxier *Proxier) deleteExistingLoadBalancer(hns HostNetworkService, winProxyOptimization bool, lbHnsID *string, sourceVip string, protocol, intPort, extPort uint16, endpoints []endpointsInfo, queriedLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) bool {
 
 	if !winProxyOptimization || *lbHnsID == "" {
 		// Loadbalancer delete not needed
@@ -1617,7 +1663,7 @@ func deleteStaleLoadBalancer(hns HostNetworkService, winProxyOptimization bool, 
 	)
 
 	if lbIdErr != nil {
-		return deleteLoadBalancer(hns, lbHnsID)
+		return proxier.deleteLoadBalancer(hns, lbHnsID)
 	}
 
 	if _, ok := queriedLoadBalancers[lbID]; ok {
@@ -1625,12 +1671,15 @@ func deleteStaleLoadBalancer(hns HostNetworkService, winProxyOptimization bool, 
 		return false
 	}
 
-	return deleteLoadBalancer(hns, lbHnsID)
+	return proxier.deleteLoadBalancer(hns, lbHnsID)
 }
 
-func deleteLoadBalancer(hns HostNetworkService, lbHnsID *string) bool {
+func (proxier *Proxier) deleteLoadBalancer(hns HostNetworkService, lbHnsID *string) bool {
 	klog.V(3).InfoS("Hns LoadBalancer delete triggered for loadBalancer resources", "lbHnsID", *lbHnsID)
-	hns.deleteLoadBalancer(*lbHnsID)
+	if err := hns.deleteLoadBalancer(*lbHnsID); err != nil {
+		// This will be cleanup by cleanupStaleLoadbalancer fnction.
+		proxier.mapStaleLoadbalancers[*lbHnsID] = true
+	}
 	*lbHnsID = ""
 	return true
 }
