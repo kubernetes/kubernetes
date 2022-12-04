@@ -3429,6 +3429,17 @@ function log-proto {
   "${LOG_CLUSTER_ID}" "${LOG_INSTANCE_NAME}" "${LOG_BOOT_ID}" "${timestamp}" "${bootstep}" "${status}" "${status_reason}" "${latency}"
 }
 
+function configure_sshd() {
+  # Enable ssh-rsa in ssh_config to enable the backward compatibility
+  # for running the tests that depend on the golang.org/x/crypto/ssh.
+
+  # golang library golang/go#56342 is still in process to handle the ssh2
+  # key alogrithms in client and server. Adding this workaround till the
+  # issue is fixed.
+  echo 'HostkeyAlgorithms +ssh-rsa' >> /etc/ssh/sshd_config
+  echo 'PubkeyAcceptedAlgorithms +ssh-rsa' >> /etc/ssh/sshd_config
+}
+
 ########### Main Function ###########
 function main() {
   echo "Start to configure instance for kubernetes"
@@ -3448,6 +3459,10 @@ function main() {
   KUBE_BIN=${KUBE_HOME}/bin
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
+
+  if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
+    configure_sshd
+  fi
 
   log-start 'SourceKubeEnv'
   if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
