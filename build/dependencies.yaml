@@ -39,7 +39,7 @@ dependencies:
       match: registry.k8s.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.9.3
+    version: 1.10.0
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
