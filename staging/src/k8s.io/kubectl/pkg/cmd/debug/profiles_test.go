@@ -1,0 +1,413 @@
+package debug
+
+import (
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
+)
+
+var node = &corev1.Node{
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "node-XXX",
+	},
+}
+
+func TestGeneralProfile(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+		Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+			{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name: "dbg", Image: "dbgimage",
+				},
+			},
+		}},
+	}
+
+	tests := map[string]struct {
+		pod           *corev1.Pod
+		containerName string
+		target        runtime.Object
+		expectPod     *corev1.Pod
+		expectErr     bool
+	}{
+		"bad inputs results in error": {
+			pod:           nil,
+			containerName: "dbg",
+			target:        runtime.Object(nil),
+			expectErr:     true,
+		},
+		"debug by ephemeral container": {
+			pod:           pod,
+			containerName: "dbg",
+			target:        pod,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+					{
+						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+							Name: "dbg", Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+				}},
+			},
+		},
+		"debug by pod copy": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{Name: "dbg", Image: "dbgimage"},
+					},
+				},
+			},
+			containerName: "dbg",
+			target: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+					},
+				},
+			},
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+					ShareProcessNamespace: pointer.BoolPtr(true),
+				},
+			},
+		},
+		"debug by node": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "dbg", Image: "dbgimage"},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        node,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					HostNetwork: true,
+					HostPID:     true,
+					HostIPC:     true,
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := (&generalProfile{}).Apply(test.pod, test.containerName, test.target)
+			if (err != nil) != test.expectErr {
+				t.Fatalf("expect error: %v, got error: %v", test.expectErr, (err != nil))
+			}
+			if err != nil {
+				return
+			}
+			if diff := cmp.Diff(test.expectPod, test.pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
+		})
+	}
+}
+
+func TestBaselineProfile(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+		Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+			{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name: "dbg", Image: "dbgimage",
+					SecurityContext: &corev1.SecurityContext{
+						Capabilities: &corev1.Capabilities{
+							Add: []corev1.Capability{"SYS_PTRACE"},
+						},
+					},
+				},
+			},
+		}},
+	}
+
+	tests := map[string]struct {
+		pod           *corev1.Pod
+		containerName string
+		target        runtime.Object
+		expectPod     *corev1.Pod
+		expectErr     bool
+	}{
+		"bad inputs results in error": {
+			pod:           nil,
+			containerName: "dbg",
+			target:        runtime.Object(nil),
+			expectErr:     true,
+		},
+		"debug by ephemeral container": {
+			pod:           pod,
+			containerName: "dbg",
+			target:        pod,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+					{
+						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+							Name: "dbg", Image: "dbgimage",
+						},
+					},
+				}},
+			},
+		},
+		"debug by pod copy": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{Name: "dbg", Image: "dbgimage"},
+					},
+				},
+			},
+			containerName: "dbg",
+			target: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+					},
+				},
+			},
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					ShareProcessNamespace: pointer.BoolPtr(true),
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"debug by node": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "dbg", Image: "dbgimage"},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        node,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := (&baselineProfile{}).Apply(test.pod, test.containerName, test.target)
+			if (err != nil) != test.expectErr {
+				t.Fatalf("expect error: %v, got error: %v", test.expectErr, (err != nil))
+			}
+			if err != nil {
+				return
+			}
+			if diff := cmp.Diff(test.expectPod, test.pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
+		})
+	}
+}
+
+func TestRestrictedProfile(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+		Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+			{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name: "dbg", Image: "dbgimage",
+					SecurityContext: &corev1.SecurityContext{
+						Capabilities: &corev1.Capabilities{
+							Add: []corev1.Capability{"SYS_PTRACE"},
+						},
+					},
+				},
+			},
+		}},
+	}
+
+	tests := map[string]struct {
+		pod           *corev1.Pod
+		containerName string
+		target        runtime.Object
+		expectPod     *corev1.Pod
+		expectErr     bool
+	}{
+		"bad inputs results in error": {
+			pod:           nil,
+			containerName: "dbg",
+			target:        runtime.Object(nil),
+			expectErr:     true,
+		},
+		"debug by ephemeral container": {
+			pod:           pod,
+			containerName: "dbg",
+			target:        pod,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+					{
+						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+							Name: "dbg", Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot: pointer.BoolPtr(true),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+						},
+					},
+				}},
+			},
+		},
+		"debug by pod copy": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{Name: "dbg", Image: "dbgimage"},
+					},
+				},
+			},
+			containerName: "dbg",
+			target: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+					},
+				},
+			},
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					ShareProcessNamespace: pointer.BoolPtr(true),
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot: pointer.BoolPtr(true),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"debug by node": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "dbg", Image: "dbgimage"},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        node,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := (&restrictedProfile{}).Apply(test.pod, test.containerName, test.target)
+			if (err != nil) != test.expectErr {
+				t.Fatalf("expect error: %v, got error: %v", test.expectErr, (err != nil))
+			}
+			if err != nil {
+				return
+			}
+			if diff := cmp.Diff(test.expectPod, test.pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
+		})
+	}
+}
