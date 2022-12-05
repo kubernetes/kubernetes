@@ -19,7 +19,6 @@ package discovery
 import (
 	"encoding/json"
 	"fmt"
-	"mime"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -484,8 +483,6 @@ func openapiSchemaDeprecatedFakeServer(status int, t *testing.T) (*httptest.Serv
 			return
 		}
 
-		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
-
 		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
 			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
@@ -525,8 +522,6 @@ func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 			t.Errorf("testing should fail as %s", errMsg)
 			return
 		}
-
-		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
 
 		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
