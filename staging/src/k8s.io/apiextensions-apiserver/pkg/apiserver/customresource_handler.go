@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	gjson "encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -47,7 +46,6 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -81,7 +79,6 @@ import (
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
@@ -644,43 +641,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 	equivalentResourceRegistry := runtime.NewEquivalentResourceRegistry()
 
-	structuralSchemas := map[string]*structuralschema.Structural{}
-	for _, v := range crd.Spec.Versions {
-		val, err := apiextensionshelpers.GetSchemaForVersion(crd, v.Name)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return nil, fmt.Errorf("the server could not properly serve the CR schema")
-		}
-		if val == nil {
-			continue
-		}
-		internalValidation := &apiextensionsinternal.CustomResourceValidation{}
-		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(val, internalValidation, nil); err != nil {
-			return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
-		}
-		s, err := structuralschema.NewStructural(internalValidation.OpenAPIV3Schema)
-		if crd.Spec.PreserveUnknownFields == false && err != nil {
-			// This should never happen. If it does, it is a programming error.
-			utilruntime.HandleError(fmt.Errorf("failed to convert schema to structural: %v", err))
-			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
-		}
-
-		if crd.Spec.PreserveUnknownFields == false {
-			// we don't own s completely, e.g. defaults are not deep-copied. So better make a copy here.
-			s = s.DeepCopy()
-
-			if err := structuraldefaulting.PruneDefaults(s); err != nil {
-				// This should never happen. If it does, it is a programming error.
-				utilruntime.HandleError(fmt.Errorf("failed to prune defaults: %v", err))
-				return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
-			}
-		}
-		structuralSchemas[v.Name] = s
+	structuralSchemas, err := structuralSchemasFromCRD(crd)
+	if err != nil {
+		return nil, err
 	}
 
 	// CRD group-versions each get their own type converter.
 	// Fetch the ObjectMeta and TypeMeta schemas to allow this
-	typeConverter, err := buildOpenAPIModelsForApply(r.staticTypeConverter, crd)
+	typeConverter, err := buildOpenAPIModelsForApply(r.staticTypeConverter, crd, structuralSchemas)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error building openapi models for %s: %v", crd.Name, err))
 
@@ -1364,7 +1332,7 @@ func hasServedCRDVersion(spec *apiextensionsv1.CustomResourceDefinitionSpec, ver
 // buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
 // and merges it with the models defined in the static OpenAPI spec.
 // Returns nil models ifthe static spec is nil, or an error is encountered.
-func buildOpenAPIModelsForApply(staticTypeConverter fieldmanager.TypeConverter, crd *apiextensionsv1.CustomResourceDefinition) (fieldmanager.TypeConverter, error) {
+func buildOpenAPIModelsForApply(staticTypeConverter fieldmanager.TypeConverter, crd *apiextensionsv1.CustomResourceDefinition, structuralSchemas map[string]*structuralschema.Structural) (fieldmanager.TypeConverter, error) {
 	// Cannot construct CRD models if native models are not available.
 	// At a minimum need TypeMeta/ObjectMeta since those are injected by builder,
 	// but there may be other native type dependencies found inside $refs.
@@ -1372,103 +1340,63 @@ func buildOpenAPIModelsForApply(staticTypeConverter fieldmanager.TypeConverter, 
 		return nil, errors.New("cannot construct SMD schemas without static types")
 	}
 
-	// Create openapi spec from each CRD schema and flatten into a single list
-	// Any unresolved references should be found within staticDefs
-	mergedOpenAPI := &spec.Swagger{
-		SwaggerProps: spec.SwaggerProps{
-			Info: &spec.Info{
-				InfoProps: spec.InfoProps{
-					Title:   "Kubernetes CRD Swagger",
-					Version: "v0.1.0",
-				},
-			},
-			Swagger:     "2.0",
-			Definitions: map[string]spec.Schema{},
-		},
-	}
-
-	for _, v := range crd.Spec.Versions {
-		// Defaults are not pruned here, but before being served.
-		// See flag description in builder.go for flag usage
-		s, err := builder.BuildOpenAPIV2(crd, v.Name, builder.Options{V2: true, SkipFilterSchemaForKubectlOpenAPIV2Validation: true, StripValueValidation: true, StripNullable: true, AllowNonStructural: false})
-		if err != nil {
-			// Failed to build open api
-			return nil, err
-		}
-
-		// Build a dependency tree of which static definitions were referred by
-		// the spec
-		for k, def := range s.Definitions {
-			mergedOpenAPI.Definitions[k] = def
-		}
-	}
-
-	//TEMPORARY HACK:
-	// Gnostic ParseDocument errors if there are unresolved refs. We don't want
-	// this behavior since some of the refs are found in the static type converter
-	//
-	// Workaround by inserting an empty schema for every type contained by
-	// static type converter.
-	//
-	// After parsing, we can remove the fake schemas.
-	// This will not be necessary once we remove gnostic ParseDocument by
-	// implementing direct conversion from spec.Schema to SMD Schema
-	toRemove := map[string]struct{}{}
 	gvkStaticTypes, ok := staticTypeConverter.(fieldmanager.LazyTypeConverter).TypeResolver().(*managedfields.GvkParser)
+	if !ok {
+		return nil, errors.New("cannot construct SMD schemas without static types")
+	}
 
-	if ok {
-		for _, name := range gvkStaticTypes.Parser().TypeNames() {
-			if _, exists := mergedOpenAPI.Definitions[name]; !exists {
-				toRemove[name] = struct{}{}
-				mergedOpenAPI.Definitions[name] = spec.Schema{
-					SchemaProps: spec.SchemaProps{
-						Type: spec.StringOrArray{"object"},
-					},
-				}
+	defs := map[string]spec.Schema{}
+	crdDefs := builder.BuildOpenAPIV3Definitions(crd, structuralSchemas)
+	for name, s := range crdDefs {
+		defs[name] = *s
+	}
+
+	gvkParser, err := managedfields.NewGVKParserFromOpenAPI(defs, crd.Spec.PreserveUnknownFields)
+	if err != nil {
+		return nil, err
+	}
+
+	gvkParser.AddModelsFromParser(gvkStaticTypes)
+
+	tc := fieldmanager.NewLazyTypeConverter()
+	tc.InstallTypeResolver(gvkParser)
+	return tc, nil
+}
+
+func structuralSchemasFromCRD(crd *apiextensionsv1.CustomResourceDefinition) (map[string]*structuralschema.Structural, error) {
+	structuralSchemas := map[string]*structuralschema.Structural{}
+	for _, v := range crd.Spec.Versions {
+		val, err := apiextensionshelpers.GetSchemaForVersion(crd, v.Name)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR schema")
+		}
+		if val == nil {
+			continue
+		}
+		internalValidation := &apiextensionsinternal.CustomResourceValidation{}
+		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(val, internalValidation, nil); err != nil {
+			return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
+		}
+		s, err := structuralschema.NewStructural(internalValidation.OpenAPIV3Schema)
+		if crd.Spec.PreserveUnknownFields == false && err != nil {
+			// This should never happen. If it does, it is a programming error.
+			utilruntime.HandleError(fmt.Errorf("failed to convert schema to structural: %v", err))
+			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
+		}
+
+		if crd.Spec.PreserveUnknownFields == false {
+			// we don't own s completely, e.g. defaults are not deep-copied. So better make a copy here.
+			s = s.DeepCopy()
+
+			if err := structuraldefaulting.PruneDefaults(s); err != nil {
+				// This should never happen. If it does, it is a programming error.
+				utilruntime.HandleError(fmt.Errorf("failed to prune defaults: %v", err))
+				return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
 			}
 		}
-	} else {
-		return nil, errors.New("expected static type converter to use gvkParser")
+		structuralSchemas[v.Name] = s
 	}
 
-	// Implementation of ToProtoModels duplicated so we can remove fake schemas
-	//TEMPORARY HACK until direct conversion from spec.Schema -> TypeConverter
-	// is implemented
-	specBytes, err := gjson.MarshalIndent(mergedOpenAPI, " ", " ")
-	if err != nil {
-		return nil, err
-	}
-
-	doc, err := openapi_v2.ParseDocument(specBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	filteredDefs := []*openapi_v2.NamedSchema{}
-
-	for _, def := range doc.Definitions.AdditionalProperties {
-		if _, shouldRemove := toRemove[def.Name]; !shouldRemove {
-			filteredDefs = append(filteredDefs, def)
-		}
-	}
-	doc.Definitions.AdditionalProperties = filteredDefs
-
-	models, err := proto.NewOpenAPIData(doc)
-	if err != nil {
-		return nil, err
-	}
-
-	crdParser, err := managedfields.NewGVKParser(models, crd.Spec.PreserveUnknownFields)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add knowledge of static types not contained CRD schema to the parser
-	//!TODO: would it be better to add delegating functionalty to smdschema?
-	crdParser.AddModelsFromParser(gvkStaticTypes)
-
-	result := fieldmanager.NewLazyTypeConverter()
-	result.InstallTypeResolver(crdParser)
-
-	return result, nil
+	return structuralSchemas, nil
 }

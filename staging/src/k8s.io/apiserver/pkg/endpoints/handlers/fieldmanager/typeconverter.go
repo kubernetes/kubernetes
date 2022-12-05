@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
@@ -45,6 +46,7 @@ type LazyTypeConverter interface {
 	// Convenience method which installs a TypeResolver from
 	// the given
 	InstallModels(proto.Models, bool) error
+	InstallOpenAPIModels(map[string]spec.Schema, bool) error
 }
 
 // DeducedTypeConverter is a TypeConverter for CRDs that don't have a
@@ -109,7 +111,17 @@ func (c *typeConverter) InstallModels(models proto.Models, preserveUnknownFields
 		return err
 	}
 
-	c.parser.Store(parser)
+	c.InstallTypeResolver(parser)
+	return nil
+}
+
+func (c *typeConverter) InstallOpenAPIModels(schemas map[string]spec.Schema, preserveUnknownFields bool) error {
+	parser, err := managedfields.NewGVKParserFromOpenAPI(schemas, preserveUnknownFields)
+	if err != nil {
+		return err
+	}
+
+	c.InstallTypeResolver(parser)
 	return nil
 }
 

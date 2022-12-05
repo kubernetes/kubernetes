@@ -48,7 +48,6 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	builder2 "k8s.io/kube-openapi/pkg/builder"
@@ -397,11 +396,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 
 		// May be nil if installV2 results in (ignored) error
 		if s.StaticOpenAPISpec != nil {
-			models, err := utilopenapi.ToProtoModels(s.StaticOpenAPISpec)
-			if err != nil {
-				utilruntime.HandleError(err)
-			}
-			err = s.StaticTypeConverter.InstallModels(models, false)
+			err := s.StaticTypeConverter.InstallOpenAPIModels(s.StaticOpenAPISpec.Definitions, false)
 			if err != nil {
 				utilruntime.HandleError(err)
 			}
@@ -421,11 +416,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 			s.openAPIConfig)
 
 		if err == nil {
-			models, err := utilopenapi.ToProtoModels(spec)
-			if err != nil {
-				utilruntime.HandleError(err)
-			}
-			err = s.StaticTypeConverter.InstallModels(models, false)
+			err = s.StaticTypeConverter.InstallOpenAPIModels(spec.Definitions, false)
 			if err != nil {
 				utilruntime.HandleError(err)
 			}

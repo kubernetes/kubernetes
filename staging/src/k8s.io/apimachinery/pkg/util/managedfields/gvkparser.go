@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kube-openapi/pkg/schemaconv"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	smdschema "sigs.k8s.io/structured-merge-diff/v4/schema"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
@@ -70,7 +71,32 @@ func NewGVKParser(models proto.Models, preserveUnknownFields bool) (*GvkParser, 
 		if model == nil {
 			panic(fmt.Sprintf("ListModels returns a model that can't be looked-up for: %v", modelName))
 		}
-		gvkList := parseGroupVersionKind(model)
+		gvkList := parseGroupVersionKind(model.GetExtensions())
+		for _, gvk := range gvkList {
+			if len(gvk.Kind) > 0 {
+				_, ok := parser.gvks[gvk]
+				if ok {
+					return nil, fmt.Errorf("duplicate entry for %v", gvk)
+				}
+				parser.gvks[gvk] = modelName
+			}
+		}
+	}
+	return &parser, nil
+}
+
+func NewGVKParserFromOpenAPI(schemas map[string]spec.Schema, preserveUnknownFields bool) (*GvkParser, error) {
+	typeSchema, err := schemaconv.OpenAPIv3ToSchema(schemas, preserveUnknownFields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert models to schema: %v", err)
+	}
+	parser := GvkParser{
+		gvks: map[schema.GroupVersionKind]string{},
+	}
+	parser.parser = typed.Parser{Schema: smdschema.Schema{Types: typeSchema.Types}}
+
+	for modelName, model := range schemas {
+		gvkList := parseGroupVersionKind(model.Extensions)
 		for _, gvk := range gvkList {
 			if len(gvk.Kind) > 0 {
 				_, ok := parser.gvks[gvk]
@@ -123,9 +149,7 @@ func (p *GvkParser) AddModelsFromParser(other *GvkParser) {
 }
 
 // Get and parse GroupVersionKind from the extension. Returns empty if it doesn't have one.
-func parseGroupVersionKind(s proto.Schema) []schema.GroupVersionKind {
-	extensions := s.GetExtensions()
-
+func parseGroupVersionKind(extensions map[string]any) []schema.GroupVersionKind {
 	gvkListResult := []schema.GroupVersionKind{}
 
 	// Get the extensions
@@ -141,22 +165,38 @@ func parseGroupVersionKind(s proto.Schema) []schema.GroupVersionKind {
 	}
 
 	for _, gvk := range gvkList {
+		var group, version, kind string
+
 		// gvk extension list must be a map with group, version, and
 		// kind fields
-		gvkMap, ok := gvk.(map[interface{}]interface{})
-		if !ok {
-			continue
-		}
-		group, ok := gvkMap["group"].(string)
-		if !ok {
-			continue
-		}
-		version, ok := gvkMap["version"].(string)
-		if !ok {
-			continue
-		}
-		kind, ok := gvkMap["kind"].(string)
-		if !ok {
+		if gvkMap, ok := gvk.(map[any]any); ok {
+			group, ok = gvkMap["group"].(string)
+			if !ok {
+				continue
+			}
+			version, ok = gvkMap["version"].(string)
+			if !ok {
+				continue
+			}
+			kind, ok = gvkMap["kind"].(string)
+			if !ok {
+				continue
+			}
+
+		} else if gvkMap, ok := gvk.(map[string]any); ok {
+			group, ok = gvkMap["group"].(string)
+			if !ok {
+				continue
+			}
+			version, ok = gvkMap["version"].(string)
+			if !ok {
+				continue
+			}
+			kind, ok = gvkMap["kind"].(string)
+			if !ok {
+				continue
+			}
+		} else {
 			continue
 		}
 

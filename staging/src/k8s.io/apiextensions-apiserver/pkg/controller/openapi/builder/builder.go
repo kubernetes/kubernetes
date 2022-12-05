@@ -195,6 +195,28 @@ func generateBuilder(crd *apiextensionsv1.CustomResourceDefinition, version stri
 	return b, nil
 }
 
+func BuildOpenAPIV3Definitions(crd *apiextensionsv1.CustomResourceDefinition, structuralSchemas map[string]*structuralschema.Structural) map[string]*spec.Schema {
+	result := map[string]*spec.Schema{}
+	for version, ss := range structuralSchemas {
+		b := newBuilder(crd, version, ss, Options{})
+		sample := &CRDCanonicalTypeNamer{
+			group:   b.group,
+			version: b.version,
+			kind:    b.kind,
+		}
+		sampleList := &CRDCanonicalTypeNamer{
+			group:   b.group,
+			version: b.version,
+			kind:    b.listKind,
+		}
+
+		result[sample.OpenAPICanonicalTypeName()] = b.schema
+		result[sampleList.OpenAPICanonicalTypeName()] = b.listSchema
+	}
+
+	return result
+}
+
 func BuildOpenAPIV3(crd *apiextensionsv1.CustomResourceDefinition, version string, opts Options) (*spec3.OpenAPI, error) {
 	b, err := generateBuilder(crd, version, opts)
 	if err != nil {

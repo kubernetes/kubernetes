@@ -64,8 +64,6 @@ import (
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kube-openapi/pkg/builder"
-	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -1039,7 +1037,12 @@ func TestBuildOpenAPIModelsForApply(t *testing.T) {
 
 	for i, test := range tests {
 		crd.Spec.Versions[0].Schema = &test
-		models, err := buildOpenAPIModelsForApply(typeConverter, &crd)
+		structuralSchemas, err := structuralSchemasFromCRD(&crd)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		models, err := buildOpenAPIModelsForApply(typeConverter, &crd, structuralSchemas)
 		if err != nil {
 			t.Fatalf("failed to convert to apply model: %v", err)
 		}
@@ -1050,68 +1053,29 @@ func TestBuildOpenAPIModelsForApply(t *testing.T) {
 }
 
 func getStaticTypeConverter() (fieldmanager.TypeConverter, error) {
-	names := []string{}
 	namer := openapi.NewDefinitionNamer(Scheme)
 	defs := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
 		friendlyName, _ := namer.GetDefinitionName(name)
 		return spec.MustCreateRef("#/definitions/" + friendlyName)
 	})
 
-	// Build a list of all definitions we want to include in the spec by filtering
-	// all top-level types. The builder will grab any dependencies referred
-	// from there.
-	//!NOTE: This loop will be removed once we can directly convert to smdSchema
-	// without using ParseDocument/ToProtoModels
-	for unFriendlyName := range defs {
-		_, ext := namer.GetDefinitionName(unFriendlyName)
-		if len(ext) == 0 {
-			continue
+	renamedDefs := map[string]spec.Schema{}
+	for k, v := range defs {
+		friendlyName, ext := namer.GetDefinitionName(k)
+		schema := v.Schema
+
+		for extKey, extValue := range ext {
+			schema.AddExtension(extKey, extValue)
 		}
 
-		gvks, ok := ext["x-kubernetes-group-version-kind"].([]any)
-		if !ok || len(gvks) == 0 {
-			continue
-		}
-
-		// Want all items with public GVKs. Internal schemas have been observed
-		// to have strange bugs (like including a $ref to runtime.Object which
-		// is not a real schema)
-		shouldSkip := false
-		for _, gvk := range gvks {
-			if d, ok := gvk.(map[string]any); !ok {
-				shouldSkip = true
-			} else if version, ok := d["version"]; !ok {
-				shouldSkip = true
-			} else if version == "__internal" {
-				shouldSkip = true
-			}
-		}
-
-		if shouldSkip {
-			continue
-		}
-
-		names = append(names, unFriendlyName)
+		renamedDefs[friendlyName] = schema
 	}
 
-	staticSpec, err := builder.BuildOpenAPIDefinitionsForResources(&common.Config{
-		GetDefinitions:    utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions),
-		GetDefinitionName: namer.GetDefinitionName,
-		Info: &spec.Info{
-			InfoProps: spec.InfoProps{
-				Title:   "Kubernetes CRD Swagger",
-				Version: "v0.1.0",
-			},
-		},
-	}, names...)
+	tc := fieldmanager.NewLazyTypeConverter()
+	err := tc.InstallOpenAPIModels(renamedDefs, false)
 	if err != nil {
 		return nil, err
 	}
 
-	specModels, err := utilopenapi.ToProtoModels(staticSpec)
-	if err != nil {
-		return nil, err
-	}
-
-	return fieldmanager.NewTypeConverter(specModels, false)
+	return tc, nil
 }
