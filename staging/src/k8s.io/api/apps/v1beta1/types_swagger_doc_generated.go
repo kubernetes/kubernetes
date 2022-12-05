@@ -198,7 +198,7 @@ func (ScaleStatus) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSet = map[string]string{
-	"":       "DEPRECATED - This group version of StatefulSet is deprecated by apps/v1beta2/StatefulSet. See the release notes for more information. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n  - Network: A single stable DNS and hostname.\n  - Storage: As many VolumeClaims as requested.\n\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+	"":       "DEPRECATED - This group version of StatefulSet is deprecated by apps/v1beta2/StatefulSet. See the release notes for more information. StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n  - Network: A single stable DNS and hostname.\n  - Storage: As many VolumeClaims as requested.\n\n\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
 	"spec":   "Spec defines the desired identities of pods in this set.",
 	"status": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
 }
@@ -230,7 +230,7 @@ func (StatefulSetList) SwaggerDoc() map[string]string {
 
 var map_StatefulSetOrdinals = map[string]string{
 	"":      "StatefulSetOrdinals describes the policy used for replica ordinal assignment in this StatefulSet.",
-	"start": "start is the number representing the first replica's index. It may be used to number replicas from an alternate index (eg: 1-indexed) over the default 0-indexed names, or to orchestrate progressive movement of replicas from one StatefulSet to another. If set, replica indices will be in the range:\n  [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).\nIf unset, defaults to 0. Replica indices will be in the range:\n  [0, .spec.replicas).",
+	"start": "start is the number representing the first replica's index. It may be used to number replicas from an alternate index (eg: 1-indexed) over the default 0-indexed names, or to orchestrate progressive movement of replicas from one StatefulSet to another. If set, replica indices will be in the range:\n  [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).\n\nIf unset, defaults to 0. Replica indices will be in the range:\n  [0, .spec.replicas).",
 }
 
 func (StatefulSetOrdinals) SwaggerDoc() map[string]string {

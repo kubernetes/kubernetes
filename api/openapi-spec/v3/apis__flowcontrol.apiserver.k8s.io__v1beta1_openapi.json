@@ -1,7 +1,7 @@
 {
   "components": {
     "schemas": {
-      "io.k8s.api.flowcontrol.v1beta3.FlowDistinguisherMethod": {
+      "io.k8s.api.flowcontrol.v1beta1.FlowDistinguisherMethod": {
         "description": "FlowDistinguisherMethod specifies the method of a flow distinguisher.",
         "properties": {
           "type": {
@@ -15,7 +15,7 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.FlowSchema": {
+      "io.k8s.api.flowcontrol.v1beta1.FlowSchema": {
         "description": "FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with similar attributes and is identified by a pair of strings: the name of the FlowSchema and a \"flow distinguisher\".",
         "properties": {
           "apiVersion": {
@@ -38,7 +38,7 @@
           "spec": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchemaSpec"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchemaSpec"
               }
             ],
             "default": {},
@@ -47,7 +47,7 @@
           "status": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchemaStatus"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchemaStatus"
               }
             ],
             "default": {},
@@ -59,11 +59,11 @@
           {
             "group": "flowcontrol.apiserver.k8s.io",
             "kind": "FlowSchema",
-            "version": "v1beta3"
+            "version": "v1beta1"
           }
         ]
       },
-      "io.k8s.api.flowcontrol.v1beta3.FlowSchemaCondition": {
+      "io.k8s.api.flowcontrol.v1beta1.FlowSchemaCondition": {
         "description": "FlowSchemaCondition describes conditions for a FlowSchema.",
         "properties": {
           "lastTransitionTime": {
@@ -94,7 +94,7 @@
         },
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.FlowSchemaList": {
+      "io.k8s.api.flowcontrol.v1beta1.FlowSchemaList": {
         "description": "FlowSchemaList is a list of FlowSchema objects.",
         "properties": {
           "apiVersion": {
@@ -106,7 +106,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               ],
               "default": {}
@@ -135,17 +135,17 @@
           {
             "group": "flowcontrol.apiserver.k8s.io",
             "kind": "FlowSchemaList",
-            "version": "v1beta3"
+            "version": "v1beta1"
           }
         ]
       },
-      "io.k8s.api.flowcontrol.v1beta3.FlowSchemaSpec": {
+      "io.k8s.api.flowcontrol.v1beta1.FlowSchemaSpec": {
         "description": "FlowSchemaSpec describes how the FlowSchema's specification looks like.",
         "properties": {
           "distinguisherMethod": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowDistinguisherMethod"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowDistinguisherMethod"
               }
             ],
             "description": "`distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string."
@@ -159,7 +159,7 @@
           "priorityLevelConfiguration": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationReference"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationReference"
               }
             ],
             "default": {},
@@ -170,7 +170,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PolicyRulesWithSubjects"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PolicyRulesWithSubjects"
                 }
               ],
               "default": {}
@@ -184,7 +184,7 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.FlowSchemaStatus": {
+      "io.k8s.api.flowcontrol.v1beta1.FlowSchemaStatus": {
         "description": "FlowSchemaStatus represents the current state of a FlowSchema.",
         "properties": {
           "conditions": {
@@ -192,7 +192,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchemaCondition"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchemaCondition"
                 }
               ],
               "default": {}
@@ -201,14 +201,12 @@
             "x-kubernetes-list-map-keys": [
               "type"
             ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "type",
-            "x-kubernetes-patch-strategy": "merge"
+            "x-kubernetes-list-type": "map"
           }
         },
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.GroupSubject": {
+      "io.k8s.api.flowcontrol.v1beta1.GroupSubject": {
         "description": "GroupSubject holds detailed information for group-kind subject.",
         "properties": {
           "name": {
@@ -222,13 +220,13 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.LimitResponse": {
+      "io.k8s.api.flowcontrol.v1beta1.LimitResponse": {
         "description": "LimitResponse defines how to handle requests that can not be executed right now.",
         "properties": {
           "queuing": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.QueuingConfiguration"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.QueuingConfiguration"
               }
             ],
             "description": "`queuing` holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`."
@@ -252,9 +250,15 @@
           }
         ]
       },
-      "io.k8s.api.flowcontrol.v1beta3.LimitedPriorityLevelConfiguration": {
+      "io.k8s.api.flowcontrol.v1beta1.LimitedPriorityLevelConfiguration": {
         "description": "LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits. It addresses two issues:\n  - How are requests for this priority level limited?\n  - What should be done with requests that exceed the limit?",
         "properties": {
+          "assuredConcurrencyShares": {
+            "default": 0,
+            "description": "`assuredConcurrencyShares` (ACS) configures the execution limit, which is a limit on the number of requests of this priority level that may be exeucting at a given time.  ACS must be a positive number. The server's concurrency limit (SCL) is divided among the concurrency-controlled priority levels in proportion to their assured concurrency shares. This produces the assured concurrency value (ACV) --- the number of requests that may be executing at a time --- for each such priority level:\n\n            ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )\n\nbigger numbers of ACS mean more reserved concurrent requests (at the expense of every other PL). This field has a default value of 30.",
+            "format": "int32",
+            "type": "integer"
+          },
           "borrowingLimitPercent": {
             "description": "`borrowingLimitPercent`, if present, configures a limit on how many seats this priority level can borrow from other priority levels. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
             "format": "int32",
@@ -268,22 +272,16 @@
           "limitResponse": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.LimitResponse"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.LimitResponse"
               }
             ],
             "default": {},
             "description": "`limitResponse` indicates what to do with requests that can not be executed right now"
-          },
-          "nominalConcurrencyShares": {
-            "default": 0,
-            "description": "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats available at this priority level. This is used both for requests dispatched from this priority level as well as requests dispatched from other priority levels borrowing seats from this level. The server's concurrency limit (ServerCL) is divided among the Limited priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[limited priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other Limited priority level. This field has a default value of 30.",
-            "format": "int32",
-            "type": "integer"
           }
         },
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.NonResourcePolicyRule": {
+      "io.k8s.api.flowcontrol.v1beta1.NonResourcePolicyRule": {
         "description": "NonResourcePolicyRule is a predicate that matches non-resource requests according to their verb and the target non-resource URL. A NonResourcePolicyRule matches a request if and only if both (a) at least one member of verbs matches the request and (b) at least one member of nonResourceURLs matches the request.",
         "properties": {
           "nonResourceURLs": {
@@ -311,7 +309,7 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.PolicyRulesWithSubjects": {
+      "io.k8s.api.flowcontrol.v1beta1.PolicyRulesWithSubjects": {
         "description": "PolicyRulesWithSubjects prescribes a test that applies to a request to an apiserver. The test considers the subject making the request, the verb being requested, and the resource to be acted upon. This PolicyRulesWithSubjects matches a request if and only if both (a) at least one member of subjects matches the request and (b) at least one member of resourceRules or nonResourceRules matches the request.",
         "properties": {
           "nonResourceRules": {
@@ -319,7 +317,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.NonResourcePolicyRule"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.NonResourcePolicyRule"
                 }
               ],
               "default": {}
@@ -332,7 +330,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.ResourcePolicyRule"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.ResourcePolicyRule"
                 }
               ],
               "default": {}
@@ -345,7 +343,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.Subject"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.Subject"
                 }
               ],
               "default": {}
@@ -359,7 +357,7 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration": {
+      "io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration": {
         "description": "PriorityLevelConfiguration represents the configuration of a priority level.",
         "properties": {
           "apiVersion": {
@@ -382,7 +380,7 @@
           "spec": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationSpec"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationSpec"
               }
             ],
             "default": {},
@@ -391,7 +389,7 @@
           "status": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationStatus"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationStatus"
               }
             ],
             "default": {},
@@ -403,11 +401,11 @@
           {
             "group": "flowcontrol.apiserver.k8s.io",
             "kind": "PriorityLevelConfiguration",
-            "version": "v1beta3"
+            "version": "v1beta1"
           }
         ]
       },
-      "io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationCondition": {
+      "io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationCondition": {
         "description": "PriorityLevelConfigurationCondition defines the condition of priority level.",
         "properties": {
           "lastTransitionTime": {
@@ -438,7 +436,7 @@
         },
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationList": {
+      "io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationList": {
         "description": "PriorityLevelConfigurationList is a list of PriorityLevelConfiguration objects.",
         "properties": {
           "apiVersion": {
@@ -450,7 +448,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               ],
               "default": {}
@@ -479,11 +477,11 @@
           {
             "group": "flowcontrol.apiserver.k8s.io",
             "kind": "PriorityLevelConfigurationList",
-            "version": "v1beta3"
+            "version": "v1beta1"
           }
         ]
       },
-      "io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationReference": {
+      "io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationReference": {
         "description": "PriorityLevelConfigurationReference contains information that points to the \"request-priority\" being used.",
         "properties": {
           "name": {
@@ -497,13 +495,13 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationSpec": {
+      "io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationSpec": {
         "description": "PriorityLevelConfigurationSpec specifies the configuration of a priority level.",
         "properties": {
           "limited": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.LimitedPriorityLevelConfiguration"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.LimitedPriorityLevelConfiguration"
               }
             ],
             "description": "`limited` specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if `type` is `\"Limited\"`."
@@ -527,7 +525,7 @@
           }
         ]
       },
-      "io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationStatus": {
+      "io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationStatus": {
         "description": "PriorityLevelConfigurationStatus represents the current state of a \"request-priority\".",
         "properties": {
           "conditions": {
@@ -535,7 +533,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationCondition"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationCondition"
                 }
               ],
               "default": {}
@@ -544,14 +542,12 @@
             "x-kubernetes-list-map-keys": [
               "type"
             ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "type",
-            "x-kubernetes-patch-strategy": "merge"
+            "x-kubernetes-list-type": "map"
           }
         },
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.QueuingConfiguration": {
+      "io.k8s.api.flowcontrol.v1beta1.QueuingConfiguration": {
         "description": "QueuingConfiguration holds the configuration parameters for queuing",
         "properties": {
           "handSize": {
@@ -575,7 +571,7 @@
         },
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.ResourcePolicyRule": {
+      "io.k8s.api.flowcontrol.v1beta1.ResourcePolicyRule": {
         "description": "ResourcePolicyRule is a predicate that matches some resource requests, testing the request's verb and the target resource. A ResourcePolicyRule matches a resource request if and only if: (a) at least one member of verbs matches the request, (b) at least one member of apiGroups matches the request, (c) at least one member of resources matches the request, and (d) either (d1) the request does not specify a namespace (i.e., `Namespace==\"\"`) and clusterScope is true or (d2) the request specifies a namespace and least one member of namespaces matches the request's namespace.",
         "properties": {
           "apiGroups": {
@@ -626,7 +622,7 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.ServiceAccountSubject": {
+      "io.k8s.api.flowcontrol.v1beta1.ServiceAccountSubject": {
         "description": "ServiceAccountSubject holds detailed information for service-account-kind subject.",
         "properties": {
           "name": {
@@ -646,13 +642,13 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.flowcontrol.v1beta3.Subject": {
+      "io.k8s.api.flowcontrol.v1beta1.Subject": {
         "description": "Subject matches the originator of a request, as identified by the request authentication system. There are three ways of matching an originator; by user, group, or service account.",
         "properties": {
           "group": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.GroupSubject"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.GroupSubject"
               }
             ],
             "description": "`group` matches based on user group name."
@@ -665,7 +661,7 @@
           "serviceAccount": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.ServiceAccountSubject"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.ServiceAccountSubject"
               }
             ],
             "description": "`serviceAccount` matches ServiceAccounts."
@@ -673,7 +669,7 @@
           "user": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.UserSubject"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.UserSubject"
               }
             ],
             "description": "`user` matches based on username."
@@ -694,7 +690,7 @@
           }
         ]
       },
-      "io.k8s.api.flowcontrol.v1beta3.UserSubject": {
+      "io.k8s.api.flowcontrol.v1beta1.UserSubject": {
         "description": "UserSubject holds detailed information for user-kind subject.",
         "properties": {
           "name": {
@@ -1837,10 +1833,10 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/": {
       "get": {
         "description": "get available resources",
-        "operationId": "getFlowcontrolApiserverV1beta3APIResources",
+        "operationId": "getFlowcontrolApiserverV1beta1APIResources",
         "responses": {
           "200": {
             "content": {
@@ -1867,14 +1863,14 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ]
       }
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas": {
       "delete": {
         "description": "delete collection of FlowSchema",
-        "operationId": "deleteFlowcontrolApiserverV1beta3CollectionFlowSchema",
+        "operationId": "deleteFlowcontrolApiserverV1beta1CollectionFlowSchema",
         "parameters": [
           {
             "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
@@ -2011,18 +2007,18 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "get": {
         "description": "list or watch objects of kind FlowSchema",
-        "operationId": "listFlowcontrolApiserverV1beta3FlowSchema",
+        "operationId": "listFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
           {
             "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
@@ -2111,27 +2107,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchemaList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchemaList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchemaList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchemaList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchemaList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchemaList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchemaList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchemaList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchemaList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchemaList"
                 }
               }
             },
@@ -2142,13 +2138,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -2164,7 +2160,7 @@
       ],
       "post": {
         "description": "create a FlowSchema",
-        "operationId": "createFlowcontrolApiserverV1beta3FlowSchema",
+        "operationId": "createFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -2198,7 +2194,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
               }
             }
           }
@@ -2208,17 +2204,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2228,17 +2224,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2248,17 +2244,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2269,20 +2265,20 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas/{name}": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas/{name}": {
       "delete": {
         "description": "delete a FlowSchema",
-        "operationId": "deleteFlowcontrolApiserverV1beta3FlowSchema",
+        "operationId": "deleteFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -2376,34 +2372,34 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "get": {
         "description": "read the specified FlowSchema",
-        "operationId": "readFlowcontrolApiserverV1beta3FlowSchema",
+        "operationId": "readFlowcontrolApiserverV1beta1FlowSchema",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2414,13 +2410,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -2446,7 +2442,7 @@
       ],
       "patch": {
         "description": "partially update the specified FlowSchema",
-        "operationId": "patchFlowcontrolApiserverV1beta3FlowSchema",
+        "operationId": "patchFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -2514,17 +2510,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2534,17 +2530,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2555,18 +2551,18 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "put": {
         "description": "replace the specified FlowSchema",
-        "operationId": "replaceFlowcontrolApiserverV1beta3FlowSchema",
+        "operationId": "replaceFlowcontrolApiserverV1beta1FlowSchema",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -2600,7 +2596,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
               }
             }
           }
@@ -2610,17 +2606,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2630,17 +2626,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2651,36 +2647,36 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas/{name}/status": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas/{name}/status": {
       "get": {
         "description": "read status of the specified FlowSchema",
-        "operationId": "readFlowcontrolApiserverV1beta3FlowSchemaStatus",
+        "operationId": "readFlowcontrolApiserverV1beta1FlowSchemaStatus",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2691,13 +2687,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -2723,7 +2719,7 @@
       ],
       "patch": {
         "description": "partially update status of the specified FlowSchema",
-        "operationId": "patchFlowcontrolApiserverV1beta3FlowSchemaStatus",
+        "operationId": "patchFlowcontrolApiserverV1beta1FlowSchemaStatus",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -2791,17 +2787,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2811,17 +2807,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2832,18 +2828,18 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "put": {
         "description": "replace status of the specified FlowSchema",
-        "operationId": "replaceFlowcontrolApiserverV1beta3FlowSchemaStatus",
+        "operationId": "replaceFlowcontrolApiserverV1beta1FlowSchemaStatus",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -2877,7 +2873,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
               }
             }
           }
@@ -2887,17 +2883,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2907,17 +2903,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.FlowSchema"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.FlowSchema"
                 }
               }
             },
@@ -2928,20 +2924,20 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/prioritylevelconfigurations": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/prioritylevelconfigurations": {
       "delete": {
         "description": "delete collection of PriorityLevelConfiguration",
-        "operationId": "deleteFlowcontrolApiserverV1beta3CollectionPriorityLevelConfiguration",
+        "operationId": "deleteFlowcontrolApiserverV1beta1CollectionPriorityLevelConfiguration",
         "parameters": [
           {
             "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
@@ -3078,18 +3074,18 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "get": {
         "description": "list or watch objects of kind PriorityLevelConfiguration",
-        "operationId": "listFlowcontrolApiserverV1beta3PriorityLevelConfiguration",
+        "operationId": "listFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
           {
             "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
@@ -3178,27 +3174,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationList"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfigurationList"
                 }
               }
             },
@@ -3209,13 +3205,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -3231,7 +3227,7 @@
       ],
       "post": {
         "description": "create a PriorityLevelConfiguration",
-        "operationId": "createFlowcontrolApiserverV1beta3PriorityLevelConfiguration",
+        "operationId": "createFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -3265,7 +3261,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
               }
             }
           }
@@ -3275,17 +3271,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3295,17 +3291,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3315,17 +3311,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3336,20 +3332,20 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/prioritylevelconfigurations/{name}": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/prioritylevelconfigurations/{name}": {
       "delete": {
         "description": "delete a PriorityLevelConfiguration",
-        "operationId": "deleteFlowcontrolApiserverV1beta3PriorityLevelConfiguration",
+        "operationId": "deleteFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -3443,34 +3439,34 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "get": {
         "description": "read the specified PriorityLevelConfiguration",
-        "operationId": "readFlowcontrolApiserverV1beta3PriorityLevelConfiguration",
+        "operationId": "readFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3481,13 +3477,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -3513,7 +3509,7 @@
       ],
       "patch": {
         "description": "partially update the specified PriorityLevelConfiguration",
-        "operationId": "patchFlowcontrolApiserverV1beta3PriorityLevelConfiguration",
+        "operationId": "patchFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -3581,17 +3577,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3601,17 +3597,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3622,18 +3618,18 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "put": {
         "description": "replace the specified PriorityLevelConfiguration",
-        "operationId": "replaceFlowcontrolApiserverV1beta3PriorityLevelConfiguration",
+        "operationId": "replaceFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -3667,7 +3663,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
               }
             }
           }
@@ -3677,17 +3673,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3697,17 +3693,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3718,36 +3714,36 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/prioritylevelconfigurations/{name}/status": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/prioritylevelconfigurations/{name}/status": {
       "get": {
         "description": "read status of the specified PriorityLevelConfiguration",
-        "operationId": "readFlowcontrolApiserverV1beta3PriorityLevelConfigurationStatus",
+        "operationId": "readFlowcontrolApiserverV1beta1PriorityLevelConfigurationStatus",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3758,13 +3754,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -3790,7 +3786,7 @@
       ],
       "patch": {
         "description": "partially update status of the specified PriorityLevelConfiguration",
-        "operationId": "patchFlowcontrolApiserverV1beta3PriorityLevelConfigurationStatus",
+        "operationId": "patchFlowcontrolApiserverV1beta1PriorityLevelConfigurationStatus",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -3858,17 +3854,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3878,17 +3874,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3899,18 +3895,18 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "put": {
         "description": "replace status of the specified PriorityLevelConfiguration",
-        "operationId": "replaceFlowcontrolApiserverV1beta3PriorityLevelConfigurationStatus",
+        "operationId": "replaceFlowcontrolApiserverV1beta1PriorityLevelConfigurationStatus",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are:\n- All: all dry run stages will be processed",
@@ -3944,7 +3940,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
               }
             }
           }
@@ -3954,17 +3950,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3974,17 +3970,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration"
+                  "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"
                 }
               }
             },
@@ -3995,20 +3991,20 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/watch/flowschemas": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/watch/flowschemas": {
       "get": {
         "description": "watch individual changes to a list of FlowSchema. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchFlowcontrolApiserverV1beta3FlowSchemaList",
+        "operationId": "watchFlowcontrolApiserverV1beta1FlowSchemaList",
         "responses": {
           "200": {
             "content": {
@@ -4045,13 +4041,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -4147,10 +4143,10 @@
         }
       ]
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/watch/flowschemas/{name}": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/watch/flowschemas/{name}": {
       "get": {
         "description": "watch changes to an object of kind FlowSchema. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchFlowcontrolApiserverV1beta3FlowSchema",
+        "operationId": "watchFlowcontrolApiserverV1beta1FlowSchema",
         "responses": {
           "200": {
             "content": {
@@ -4187,13 +4183,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "FlowSchema",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -4299,10 +4295,10 @@
         }
       ]
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/watch/prioritylevelconfigurations": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/watch/prioritylevelconfigurations": {
       "get": {
         "description": "watch individual changes to a list of PriorityLevelConfiguration. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchFlowcontrolApiserverV1beta3PriorityLevelConfigurationList",
+        "operationId": "watchFlowcontrolApiserverV1beta1PriorityLevelConfigurationList",
         "responses": {
           "200": {
             "content": {
@@ -4339,13 +4335,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -4441,10 +4437,10 @@
         }
       ]
     },
-    "/apis/flowcontrol.apiserver.k8s.io/v1beta3/watch/prioritylevelconfigurations/{name}": {
+    "/apis/flowcontrol.apiserver.k8s.io/v1beta1/watch/prioritylevelconfigurations/{name}": {
       "get": {
         "description": "watch changes to an object of kind PriorityLevelConfiguration. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchFlowcontrolApiserverV1beta3PriorityLevelConfiguration",
+        "operationId": "watchFlowcontrolApiserverV1beta1PriorityLevelConfiguration",
         "responses": {
           "200": {
             "content": {
@@ -4481,13 +4477,13 @@
           }
         },
         "tags": [
-          "flowcontrolApiserver_v1beta3"
+          "flowcontrolApiserver_v1beta1"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "flowcontrol.apiserver.k8s.io",
           "kind": "PriorityLevelConfiguration",
-          "version": "v1beta3"
+          "version": "v1beta1"
         }
       },
       "parameters": [

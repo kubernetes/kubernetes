@@ -29,7 +29,7 @@ package v1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_Endpoint = map[string]string{
 	"":                   "Endpoint represents a single logical \"backend\" implementing a service.",
-	"addresses":          "addresses of this endpoint. The contents of this field are interpreted according to the corresponding EndpointSlice addressType field. Consumers must handle different types of addresses in the context of their own capabilities. This must contain at least one address but no more than 100. These are all assumed to be fungible and clients may choose to only use the first element. Refer to: https://issue.k8s.io/106267",
+	"addresses":          "addresses of this endpoint. The contents of this field are interpreted according to the corresponding EndpointSlice addressType field. Consumers must handle different types of addresses in the context of their own capabilities. This must contain at least one address but no more than\n100. These are all assumed to be fungible and clients may choose to only\n\nuse the first element. Refer to: https://issue.k8s.io/106267",
 	"conditions":         "conditions contains information about the current status of the endpoint.",
 	"hostname":           "hostname of this endpoint. This field may be used by consumers of endpoints to distinguish endpoints from each other (e.g. in DNS names). Multiple endpoints which use the same hostname should be considered fungible (e.g. multiple A values in DNS). Must be lowercase and pass DNS Label (RFC 1123) validation.",
 	"targetRef":          "targetRef is a reference to a Kubernetes object that represents this endpoint.",
@@ -65,7 +65,7 @@ func (EndpointHints) SwaggerDoc() map[string]string {
 
 var map_EndpointPort = map[string]string{
 	"":            "EndpointPort represents a Port used by an EndpointSlice",
-	"name":        "The name of this port. All ports in an EndpointSlice must have a unique name. If the EndpointSlice is dervied from a Kubernetes service, this corresponds to the Service.ports[].name. Name must either be an empty string or pass DNS_LABEL validation: * must be no more than 63 characters long. * must consist of lower case alphanumeric characters or '-'. * must start and end with an alphanumeric character. Default is empty string.",
+	"name":        "The name of this port. All ports in an EndpointSlice must have a unique name. If the EndpointSlice is dervied from a Kubernetes service, this corresponds to the Service.ports[].name. Name must either be an empty string or pass DNS_LABEL validation:\n* must be no more than 63 characters long.\n* must consist of lower case alphanumeric characters or '-'.\n* must start and end with an alphanumeric character.\n\nDefault is empty string.",
 	"protocol":    "The IP protocol for this port. Must be UDP, TCP, or SCTP. Default is TCP.",
 	"port":        "The port number of the endpoint. If this is not specified, ports are not restricted and must be interpreted in the context of the specific consumer.",
 	"appProtocol": "The application protocol for this port. This field follows standard Kubernetes label syntax. Un-prefixed names are reserved for IANA standard service names (as per RFC-6335 and https://www.iana.org/assignments/service-names). Non-standard protocols should use prefixed names such as mycompany.com/my-custom-protocol.",
@@ -78,7 +78,7 @@ func (EndpointPort) SwaggerDoc() map[string]string {
 var map_EndpointSlice = map[string]string{
 	"":            "EndpointSlice represents a subset of the endpoints that implement a service. For a given service there may be multiple EndpointSlice objects, selected by labels, which must be joined to produce the full set of endpoints.",
 	"metadata":    "Standard object's metadata.",
-	"addressType": "addressType specifies the type of address carried by this EndpointSlice. All addresses in this slice must be the same type. This field is immutable after creation. The following address types are currently supported: * IPv4: Represents an IPv4 Address. * IPv6: Represents an IPv6 Address. * FQDN: Represents a Fully Qualified Domain Name.",
+	"addressType": "addressType specifies the type of address carried by this EndpointSlice. All addresses in this slice must be the same type. This field is immutable after creation. The following address types are currently supported:\n* IPv4: Represents an IPv4 Address.\n* IPv6: Represents an IPv6 Address.\n* FQDN: Represents a Fully Qualified Domain Name.",
 	"endpoints":   "endpoints is a list of unique endpoints in this slice. Each slice may include a maximum of 1000 endpoints.",
 	"ports":       "ports specifies the list of network ports exposed by each endpoint in this slice. Each port must have a unique name. When ports is empty, it indicates that there are no defined ports. When a port is defined with a nil port value, it indicates \"all ports\". Each slice may include a maximum of 100 ports.",
 }
