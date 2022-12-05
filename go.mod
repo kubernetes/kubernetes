@@ -23,7 +23,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.116
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.7.0
-	github.com/coredns/corefile-migration v1.0.17
+	github.com/coredns/corefile-migration v1.0.18
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.2
