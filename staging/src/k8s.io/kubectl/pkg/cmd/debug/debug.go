@@ -180,7 +180,7 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().BoolVar(&opt.ShareProcesses, "share-processes", opt.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
 	cmd.Flags().StringVar(&opt.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocate a TTY for the debugging container."))
-	cmd.Flags().StringVar(&opt.Profile, "profile", ProfileLegacy, i18n.T("Debugging profile."))
+	cmd.Flags().StringVar(&opt.Profile, "profile", ProfileLegacy, i18n.T(`Debugging profile. Options are "legacy", "general", "baseline", or "restricted". See https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/1441-kubectl-debug`))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
