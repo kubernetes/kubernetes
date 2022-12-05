@@ -199,7 +199,7 @@ github.com/containerd/ttrpc
 # github.com/coredns/caddy v1.1.0
 ## explicit; go 1.13
 github.com/coredns/caddy/caddyfile
-# github.com/coredns/corefile-migration v1.0.17
+# github.com/coredns/corefile-migration v1.0.18
 ## explicit; go 1.14
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile

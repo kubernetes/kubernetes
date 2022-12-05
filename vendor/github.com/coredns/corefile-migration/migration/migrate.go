@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/coredns/corefile-migration/migration/corefile"
 )
@@ -420,7 +422,26 @@ func ValidVersions() []string {
 	for vStr := range Versions {
 		vStrs = append(vStrs, vStr)
 	}
-	sort.Strings(vStrs)
+	sort.Slice(vStrs, func(i, j int) bool {
+		iSegs := strings.Split(vStrs[i], ".")
+		jSegs := strings.Split(vStrs[j], ".")
+		for k, iSeg := range iSegs {
+			if iSeg == jSegs[k] {
+				continue
+			}
+			iInt, err := strconv.Atoi(iSeg)
+			if err != nil {
+				panic(err)
+			}
+			jInt, err := strconv.Atoi(jSegs[k])
+			if err != nil {
+				panic(err)
+			}
+			return iInt < jInt
+		}
+		return false
+	})
+
 	return vStrs
 }
 
