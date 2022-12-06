@@ -56,7 +56,7 @@ func NewCleanupNodePhase() workflow.Phase {
 
 func runCleanupNode(c workflow.RunData) error {
 	dirsToClean := []string{filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)}
-	r, ok := c.(resetData)
+	r, ok := c.(ResetData)
 	if !ok {
 		return errors.New("cleanup-node phase invoked with an invalid data struct")
 	}

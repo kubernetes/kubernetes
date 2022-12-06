@@ -50,7 +50,7 @@ func NewRemoveETCDMemberPhase() workflow.Phase {
 }
 
 func runRemoveETCDMemberPhase(c workflow.RunData) error {
-	r, ok := c.(resetData)
+	r, ok := c.(ResetData)
 	if !ok {
 		return errors.New("remove-etcd-member-phase phase invoked with an invalid data struct")
 	}

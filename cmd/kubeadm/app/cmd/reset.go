@@ -69,6 +69,9 @@ type resetOptions struct {
 	cleanupTmpDir         bool
 }
 
+// compile-time assert that the local data object satisfies the phases data interface.
+var _ phases.ResetData = &resetData{}
+
 // resetData defines all the runtime information used when running the kubeadm reset workflow;
 // this data is shared across all the phases that are included in the workflow.
 type resetData struct {

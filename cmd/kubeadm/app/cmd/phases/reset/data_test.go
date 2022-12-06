@@ -28,8 +28,8 @@ import (
 // a package local type for testing purposes.
 type testData struct{}
 
-// testData must satisfy resetData.
-var _ resetData = &testData{}
+// testData must satisfy ResetData.
+var _ ResetData = &testData{}
 
 func (t *testData) ForceReset() bool                   { return false }
 func (t *testData) InputReader() io.Reader             { return nil }

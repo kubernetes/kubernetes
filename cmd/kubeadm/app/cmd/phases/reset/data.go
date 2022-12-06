@@ -25,9 +25,9 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-// resetData is the interface to use for reset phases.
+// ResetData is the interface to use for reset phases.
 // The "resetData" type from "cmd/reset.go" must satisfy this interface.
-type resetData interface {
+type ResetData interface {
 	ForceReset() bool
 	InputReader() io.Reader
 	IgnorePreflightErrors() sets.String
