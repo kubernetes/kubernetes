@@ -123,7 +123,6 @@ type EnvOptions struct {
 	resources              []string
 	output                 string
 	dryRunStrategy         cmdutil.DryRunStrategy
-	dryRunVerifier         *resource.QueryParamVerifier
 	builder                func() *resource.Builder
 	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
@@ -231,11 +230,6 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -519,13 +513,6 @@ func (o *EnvOptions) RunEnv() error {
 				allErrs = append(allErrs, err)
 			}
 			continue
-		}
-
-		if o.dryRunStrategy == cmdutil.DryRunServer {
-			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				allErrs = append(allErrs, err)
-				continue
-			}
 		}
 
 		actual, err := resource.

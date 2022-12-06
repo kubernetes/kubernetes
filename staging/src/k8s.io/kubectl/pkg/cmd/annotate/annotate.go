@@ -48,11 +48,9 @@ import (
 // the logic itself easy to unit test
 type AnnotateFlags struct {
 	// Common user flags
-	All           bool
-	AllNamespaces bool
-
+	All            bool
+	AllNamespaces  bool
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
 	FieldManager   string
 	FieldSelector  string
 	resource.FilenameOptions
@@ -84,7 +82,6 @@ type AnnotateOptions struct {
 
 	builder        *resource.Builder
 	dryRunStrategy cmdutil.DryRunStrategy
-	dryRunVerifier *resource.QueryParamVerifier
 
 	enforceNamespace bool
 	fieldSelector    string
@@ -219,13 +216,6 @@ func (flags *AnnotateFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, arg
 		return nil, err
 	}
 
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return nil, err
-	}
-
-	options.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
-
 	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, options.dryRunStrategy)
 	printer, err := flags.PrintFlags.ToPrinter()
 	if err != nil {
@@ -340,11 +330,6 @@ func (o AnnotateOptions) RunAnnotate() error {
 			outputObj = obj
 		} else {
 			mapping := info.ResourceMapping()
-			if o.dryRunStrategy == cmdutil.DryRunServer {
-				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-					return err
-				}
-			}
 			name, namespace := info.Name, info.Namespace
 
 			if len(o.resourceVersion) != 0 {
