@@ -16,7 +16,10 @@ limitations under the License.
 
 package container
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // TestRuntimeCache embeds runtimeCache with some additional methods for testing.
 // It must be declared in the container package to have visibility to runtimeCache.
@@ -45,6 +48,16 @@ func NewTestRuntimeCache(getter podsGetter) *TestRuntimeCache {
 	return &TestRuntimeCache{
 		runtimeCache: runtimeCache{
 			getter: getter,
+		},
+	}
+}
+
+// NewTestRuntimeCache creates a new instance of TestRuntimeCache.
+func NewTestRuntimeCacheAndTime(getter podsGetter, cacheTime int32) *TestRuntimeCache {
+	return &TestRuntimeCache{
+		runtimeCache: runtimeCache{
+			getter:      getter,
+			cachePeriod: time.Second * time.Duration(cacheTime),
 		},
 	}
 }

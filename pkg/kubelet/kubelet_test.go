@@ -2806,6 +2806,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 
 	testMainKubelet, err := NewMainKubelet(
 		kubeCfg,
+		2,
 		kubeDep,
 		crOptions,
 		"hostname",

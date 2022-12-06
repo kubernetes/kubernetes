@@ -327,6 +327,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+	cacheTime int32,
 	kubeDeps *Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
 	hostname string,
@@ -685,7 +686,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.streamingRuntime = runtime
 	klet.runner = runtime
 
-	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
+	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, cacheTime)
 	if err != nil {
 		return nil, err
 	}

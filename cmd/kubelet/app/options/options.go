@@ -128,6 +128,10 @@ type KubeletFlags struct {
 	// maxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int32
+	// cacheTime is the number of cache second time for cache pods.
+	// returns the cached pods if they are not outdated; otherwise, it
+	// retrieves the latest pods and return them.
+	CacheTime int32
 	// masterServiceNamespace is The namespace from which the kubernetes
 	// master services should be injected into pods.
 	MasterServiceNamespace string
@@ -200,6 +204,9 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 		return fmt.Errorf("the container runtime endpoint address was not specified or empty, use --container-runtime-endpoint to set")
 	}
 
+	if f.CacheTime < 0 {
+		return fmt.Errorf("the pod cache time second can not less than 0")
+	}
 	return nil
 }
 
@@ -339,6 +346,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.Int32Var(&f.MaxPerPodContainerCount, "maximum-dead-containers-per-container", f.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
 	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxContainerCount, "maximum-dead-containers", f.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space. To disable, set to a negative number.")
+	fs.Int32Var(&f.CacheTime, "cache-pods-time", 2, "Second time for cache pods. Returns the cached pods if they are not outdated; otherwise, it retrieves the latest pods and return them.")
 	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.StringVar(&f.MasterServiceNamespace, "master-service-namespace", f.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.MarkDeprecated("master-service-namespace", "This flag will be removed in a future version.")

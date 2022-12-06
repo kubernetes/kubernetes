@@ -1214,6 +1214,7 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 	// up into "per source" synchronizations
 
 	k, err = kubelet.NewMainKubelet(&kubeServer.KubeletConfiguration,
+		kubeServer.CacheTime,
 		kubeDeps,
 		&kubeServer.ContainerRuntimeOptions,
 		hostname,
