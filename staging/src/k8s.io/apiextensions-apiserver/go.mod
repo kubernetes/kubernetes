@@ -121,7 +121,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d // indirect
 	k8s.io/kms v0.0.0 // indirect
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.15-0.20221205233108-961b8e6add0d // indirect
 )
 
 replace (
@@ -133,4 +133,5 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
 	k8s.io/kms => ../kms
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => github.com/jkh52/apiserver-network-proxy/konnectivity-client v0.0.15-0.20221205233108-961b8e6add0d
 )

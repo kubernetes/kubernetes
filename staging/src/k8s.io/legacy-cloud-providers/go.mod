@@ -106,4 +106,5 @@ replace (
 	k8s.io/csi-translation-lib => ../csi-translation-lib
 	k8s.io/kms => ../kms
 	k8s.io/legacy-cloud-providers => ../legacy-cloud-providers
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => github.com/jkh52/apiserver-network-proxy/konnectivity-client v0.0.15-0.20221205233108-961b8e6add0d
 )

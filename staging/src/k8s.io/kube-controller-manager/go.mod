@@ -39,4 +39,5 @@ replace (
 	k8s.io/controller-manager => ../controller-manager
 	k8s.io/kms => ../kms
 	k8s.io/kube-controller-manager => ../kube-controller-manager
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => github.com/jkh52/apiserver-network-proxy/konnectivity-client v0.0.15-0.20221205233108-961b8e6add0d
 )

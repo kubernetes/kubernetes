@@ -98,7 +98,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/kms v0.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.15-0.20221205233108-961b8e6add0d // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
@@ -111,4 +111,5 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/kms => ../kms
 	k8s.io/pod-security-admission => ../pod-security-admission
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => github.com/jkh52/apiserver-network-proxy/konnectivity-client v0.0.15-0.20221205233108-961b8e6add0d
 )

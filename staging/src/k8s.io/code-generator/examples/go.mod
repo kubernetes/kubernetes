@@ -16,3 +16,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace sigs.k8s.io/apiserver-network-proxy/konnectivity-client => github.com/jkh52/apiserver-network-proxy/konnectivity-client v0.0.15-0.20221205233108-961b8e6add0d
