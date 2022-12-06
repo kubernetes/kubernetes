@@ -54,9 +54,15 @@ var _ CertKeyContentProvider = &DynamicCertKeyPairContent{}
 var _ ControllerRunner = &DynamicCertKeyPairContent{}
 
 // NewDynamicServingContentFromFiles returns a dynamic CertKeyContentProvider based on a cert and key filename
+// Deprecated: use NewDynamicCertKeyPairContentFromFiles instead
 func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
+	return NewDynamicCertKeyPairContentFromFiles(purpose, certFile, keyFile)
+}
+
+// NewDynamicCertKeyPairContentFromFiles returns a dynamic CertKeyContentProvider based on a cert and key filename
+func NewDynamicCertKeyPairContentFromFiles(purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
 	if len(certFile) == 0 || len(keyFile) == 0 {
-		return nil, fmt.Errorf("missing filename for serving cert")
+		return nil, fmt.Errorf("missing filename for %q cert", purpose)
 	}
 	name := fmt.Sprintf("%s::%s::%s", purpose, certFile, keyFile)
 
@@ -73,7 +79,7 @@ func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*Dyna
 	return ret, nil
 }
 
-// AddListener adds a listener to be notified when the serving cert content changes.
+// AddListener adds a listener to be notified when the cert content changes.
 func (c *DynamicCertKeyPairContent) AddListener(listener Listener) {
 	c.listeners = append(c.listeners, listener)
 }
@@ -89,7 +95,7 @@ func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
 		return err
 	}
 	if len(cert) == 0 || len(key) == 0 {
-		return fmt.Errorf("missing content for serving cert %q", c.Name())
+		return fmt.Errorf("missing content for cert %q", c.Name())
 	}
 
 	// Ensure that the key matches the cert and both are valid

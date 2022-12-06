@@ -27,7 +27,7 @@ var _ ControllerRunner = &DynamicFileSNIContent{}
 
 // NewDynamicSNIContentFromFiles returns a dynamic SNICertKeyContentProvider based on a cert and key filename and explicit names
 func NewDynamicSNIContentFromFiles(purpose, certFile, keyFile string, sniNames ...string) (*DynamicFileSNIContent, error) {
-	servingContent, err := NewDynamicServingContentFromFiles(purpose, certFile, keyFile)
+	servingContent, err := NewDynamicCertKeyPairContentFromFiles(purpose, certFile, keyFile)
 	if err != nil {
 		return nil, err
 	}
