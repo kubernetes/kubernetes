@@ -18,6 +18,7 @@ package responsewriters
 
 import (
 	stderrs "errors"
+	"k8s.io/apiserver/pkg/storage"
 	"net/http"
 	"reflect"
 	"testing"
@@ -41,6 +42,8 @@ func TestBadStatusErrorToAPIStatus(t *testing.T) {
 }
 
 func TestAPIStatus(t *testing.T) {
+	unexpectedError := &errors.UnexpectedObjectError{}
+	conflictsError := storage.NewResourceVersionConflictsError("fake_key", 0)
 	cases := map[error]metav1.Status{
 		errors.NewNotFound(schema.GroupResource{Group: "legacy.kubernetes.io", Resource: "foos"}, "bar"): {
 			Status:  metav1.StatusFailure,
@@ -74,6 +77,20 @@ func TestAPIStatus(t *testing.T) {
 				Kind:  "foos",
 				Name:  "bar",
 			},
+		},
+		unexpectedError: {
+			TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"},
+			Status:   metav1.StatusFailure,
+			Code:     http.StatusInternalServerError,
+			Reason:   metav1.StatusReasonUnknown,
+			Message:  unexpectedError.Error(),
+		},
+		conflictsError: {
+			TypeMeta: metav1.TypeMeta{Kind: "Status", APIVersion: "v1"},
+			Status:   metav1.StatusFailure,
+			Code:     http.StatusConflict,
+			Reason:   metav1.StatusReasonConflict,
+			Message:  conflictsError.Error(),
 		},
 	}
 	for k, v := range cases {
