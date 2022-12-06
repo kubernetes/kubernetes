@@ -246,6 +246,7 @@ func validateIPVSSchedulerMethod(scheduler kubeproxyconfig.IPVSSchedulerMethod, 
 		kubeproxyconfig.DestinationHashing,
 		kubeproxyconfig.ShortestExpectedDelay,
 		kubeproxyconfig.NeverQueue,
+		kubeproxyconfig.MaglevHashing,
 		"",
 	}
 	allErrs := field.ErrorList{}

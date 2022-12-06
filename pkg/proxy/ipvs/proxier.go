@@ -206,6 +206,8 @@ const (
 	sysctlConnReuse               = "net/ipv4/vs/conn_reuse_mode"
 	sysctlExpireNoDestConn        = "net/ipv4/vs/expire_nodest_conn"
 	sysctlExpireQuiescentTemplate = "net/ipv4/vs/expire_quiescent_template"
+	sysctlSloppyTCP               = "net/ipv4/vs/sloppy_tcp"
+	sysctlSloppySCTP              = "net/ipv4/vs/sloppy_sctp"
 	sysctlForward                 = "net/ipv4/ip_forward"
 	sysctlArpIgnore               = "net/ipv4/conf/all/arp_ignore"
 	sysctlArpAnnounce             = "net/ipv4/conf/all/arp_announce"
@@ -459,6 +461,19 @@ func NewProxier(ipt utiliptables.Interface,
 	if len(scheduler) == 0 {
 		klog.InfoS("IPVS scheduler not specified, use rr by default")
 		scheduler = defaultScheduler
+	}
+
+	if scheduler == "mh" {
+		// Set the sloppy_tcp sysctl and slopy_sctp sysctl to allow IPVS to create
+		// connection state on any packet, not just a TCP SYN (or SCTP INIT).
+		// This allows connections to fail over from one worker node to another.
+		if err := utilproxy.EnsureSysctl(sysctl, sysctlSloppyTCP, 1); err != nil {
+			return nil, err
+		}
+
+		if err := utilproxy.EnsureSysctl(sysctl, sysctlSloppySCTP, 1); err != nil {
+			return nil, err
+		}
 	}
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
@@ -1191,6 +1206,9 @@ func (proxier *Proxier) syncProxyRules() {
 			serv.Flags |= utilipvs.FlagPersistent
 			serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 		}
+		if proxier.ipvsScheduler == "mh" {
+			serv.Flags |= utilipvs.FlagSourceHash
+		}
 		// We need to bind ClusterIP to dummy interface, so set `bindAddr` parameter to `true` in syncService()
 		if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
 			activeIPVSServices[serv.String()] = true
@@ -1243,6 +1261,9 @@ func (proxier *Proxier) syncProxyRules() {
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				serv.Flags |= utilipvs.FlagPersistent
 				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
+			}
+			if proxier.ipvsScheduler == "mh" {
+				serv.Flags |= utilipvs.FlagSourceHash
 			}
 			if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
 				activeIPVSServices[serv.String()] = true
@@ -1343,6 +1364,9 @@ func (proxier *Proxier) syncProxyRules() {
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				serv.Flags |= utilipvs.FlagPersistent
 				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
+			}
+			if proxier.ipvsScheduler == "mh" {
+				serv.Flags |= utilipvs.FlagSourceHash
 			}
 			if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
 				activeIPVSServices[serv.String()] = true
@@ -1486,6 +1510,9 @@ func (proxier *Proxier) syncProxyRules() {
 				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 					serv.Flags |= utilipvs.FlagPersistent
 					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
+				}
+				if proxier.ipvsScheduler == "mh" {
+					serv.Flags |= utilipvs.FlagSourceHash
 				}
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
 				if err := proxier.syncService(svcPortNameString, serv, false, bindedAddresses); err == nil {

@@ -258,6 +258,11 @@ const (
 	// NeverQueue assigns an incoming job to an idle server if there is, instead of waiting for a fast one;
 	// if all the servers are busy, it adopts the ShortestExpectedDelay policy to assign the job.
 	NeverQueue IPVSSchedulerMethod = "nq"
+	// Google MaglevHashing assigns jobs to servers based on the hash value of jobs' source IP and source port
+	// which maps to an entry of a hash table updated by Maglev hashing algorithm (a consistent-based hashing
+	// algorithm) which offers a consistent load balancing for all worker nodes regardless of which worker node
+	// handle the jobs.
+	MaglevHashing IPVSSchedulerMethod = "mh"
 )
 
 func (m *ProxyMode) Set(s string) error {
