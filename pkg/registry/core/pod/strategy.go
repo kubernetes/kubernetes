@@ -309,16 +309,16 @@ func ToSelectableFields(pod *api.Pod) fields.Set {
 	podSpecificFieldsSet := make(fields.Set, 9)
 	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
 	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
-	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
-	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
+	podSpecificFieldsSet["spec.schedulerName"] = pod.Spec.SchedulerName
+	podSpecificFieldsSet["spec.serviceAccountName"] = pod.Spec.ServiceAccountName
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
 	// TODO: add podIPs as a downward API value(s) with proper format
 	podIP := ""
 	if len(pod.Status.PodIPs) > 0 {
-		podIP = string(pod.Status.PodIPs[0].IP)
+		podIP = pod.Status.PodIPs[0].IP
 	}
 	podSpecificFieldsSet["status.podIP"] = podIP
-	podSpecificFieldsSet["status.nominatedNodeName"] = string(pod.Status.NominatedNodeName)
+	podSpecificFieldsSet["status.nominatedNodeName"] = pod.Status.NominatedNodeName
 	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }
 
