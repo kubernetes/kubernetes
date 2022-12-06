@@ -17,6 +17,8 @@ cgroupsPerQOS: true
 configMapAndSecretChangeDetectionStrategy: Watch
 containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
+containerLogMaxWorkers: 1
+containerLogMonitorInterval: 10s
 containerRuntimeEndpoint: unix:///run/containerd/containerd.sock
 contentType: application/vnd.kubernetes.protobuf
 cpuCFSQuota: true
