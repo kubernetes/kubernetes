@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -48,7 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
-	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
@@ -71,8 +71,8 @@ func init() {
 	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+// GetPodAttrs returns labels and fields of a given object for filtering purposes.
+func GetPodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod, ok := obj.(*example.Pod)
 	if !ok {
 		return nil, nil, fmt.Errorf("not a pod")
@@ -107,7 +107,7 @@ func newPodList() runtime.Object { return &example.PodList{} }
 
 func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), newPod, prefix, schema.GroupResource{Resource: "pods"}, value.IdentityTransformer, true, etcd3.NewDefaultLeaseManagerConfig())
+	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), newPod, prefix, schema.GroupResource{Resource: "pods"}, identity.NewEncryptCheckTransformer(), true, etcd3.NewDefaultLeaseManagerConfig())
 	return server, storage
 }
 
@@ -117,13 +117,14 @@ func newTestCacher(s storage.Interface) (*cacherstorage.Cacher, storage.Versione
 
 func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstorage.Cacher, storage.Versioner, error) {
 	prefix := "pods"
-	v := etcd3.APIObjectVersioner{}
+	v := storage.APIObjectVersioner{}
 	config := cacherstorage.Config{
 		Storage:        s,
 		Versioner:      v,
+		GroupResource:  schema.GroupResource{Resource: "pods"},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
-		GetAttrsFunc:   GetAttrs,
+		GetAttrsFunc:   GetPodAttrs,
 		NewFunc:        newPod,
 		NewListFunc:    newPodList,
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
@@ -163,96 +164,15 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *exampl
 }
 
 func TestGet(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
-	defer server.Terminate(t)
-	cacher, _, err := newTestCacher(etcdStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	podFoo := makeTestPod("foo")
-	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
-
-	// We pass the ResourceVersion from the above Create() operation.
-	result := &example.Pod{}
-	if err := cacher.Get(context.TODO(), "pods/ns/foo", storage.GetOptions{IgnoreNotFound: true, ResourceVersion: fooCreated.ResourceVersion}, result); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if e, a := *fooCreated, *result; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected: %#v, got: %#v", e, a)
-	}
-
-	if err := cacher.Get(context.TODO(), "pods/ns/bar", storage.GetOptions{ResourceVersion: fooCreated.ResourceVersion, IgnoreNotFound: true}, result); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	emptyPod := example.Pod{}
-	if e, a := emptyPod, *result; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected: %#v, got: %#v", e, a)
-	}
-
-	if err := cacher.Get(context.TODO(), "pods/ns/bar", storage.GetOptions{ResourceVersion: fooCreated.ResourceVersion}, result); !storage.IsNotFound(err) {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGet(ctx, t, cacher)
 }
 
-func TestGetToList(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
-	defer server.Terminate(t)
-	cacher, _, err := newTestCacher(etcdStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	storedObj := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
-	key := "pods/" + storedObj.Namespace + "/" + storedObj.Name
-
-	tests := []struct {
-		key         string
-		pred        storage.SelectionPredicate
-		expectedOut []*example.Pod
-	}{{ // test GetToList on existing key
-		key:         key,
-		pred:        storage.Everything,
-		expectedOut: []*example.Pod{storedObj},
-	}, { // test GetToList on non-existing key
-		key:         "/non-existing",
-		pred:        storage.Everything,
-		expectedOut: nil,
-	}, { // test GetToList with matching pod name
-		key: "/non-existing",
-		pred: storage.SelectionPredicate{
-			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
-			},
-		},
-		expectedOut: nil,
-	}}
-
-	for i, tt := range tests {
-		out := &example.PodList{}
-		err := cacher.GetToList(context.TODO(), tt.key, storage.ListOptions{Predicate: tt.pred}, out)
-		if err != nil {
-			t.Fatalf("GetToList failed: %v", err)
-		}
-		if len(out.ResourceVersion) == 0 {
-			t.Errorf("#%d: unset resourceVersion", i)
-		}
-		if len(out.Items) != len(tt.expectedOut) {
-			t.Errorf("#%d: length of list want=%d, get=%d", i, len(tt.expectedOut), len(out.Items))
-			continue
-		}
-		for j, wantPod := range tt.expectedOut {
-			getPod := &out.Items[j]
-			if !reflect.DeepEqual(wantPod, getPod) {
-				t.Errorf("#%d: pod want=%#v, get=%#v", i, wantPod, getPod)
-			}
-		}
-	}
+func TestGetListNonRecursive(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, cacher)
 }
 
 func TestList(t *testing.T) {
@@ -293,8 +213,9 @@ func TestList(t *testing.T) {
 	rvResult := &example.PodList{}
 	options := storage.ListOptions{
 		Predicate: storage.Everything,
+		Recursive: true,
 	}
-	if err := cacher.List(context.TODO(), "pods/ns", options, rvResult); err != nil {
+	if err := cacher.GetList(context.TODO(), "pods/ns", options, rvResult); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	deletedPodRV := rvResult.ListMeta.ResourceVersion
@@ -305,8 +226,9 @@ func TestList(t *testing.T) {
 	options = storage.ListOptions{
 		ResourceVersion: deletedPodRV,
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	}
-	if err := cacher.List(context.TODO(), "pods/ns", options, result); err != nil {
+	if err := cacher.GetList(context.TODO(), "pods/ns", options, result); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if result.ListMeta.ResourceVersion != deletedPodRV {
@@ -371,8 +293,9 @@ func TestTooLargeResourceVersionList(t *testing.T) {
 	options := storage.ListOptions{
 		ResourceVersion: listRV,
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	}
-	err = cacher.List(context.TODO(), "pods/ns", options, result)
+	err = cacher.GetList(context.TODO(), "pods/ns", options, result)
 	if !errors.IsTimeout(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -408,12 +331,12 @@ type injectListError struct {
 	storage.Interface
 }
 
-func (self *injectListError) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+func (self *injectListError) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	if self.errors > 0 {
 		self.errors--
 		return fmt.Errorf("injected error")
 	}
-	return self.Interface.List(ctx, key, opts, listObj)
+	return self.Interface.GetList(ctx, key, opts, listObj)
 }
 
 func TestWatch(t *testing.T) {
@@ -957,4 +880,59 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 			lastObservedResourceVersion = rv
 		}
 	}
+}
+
+// ===================================================
+// Test-setup related function are following.
+// ===================================================
+
+type tearDownFunc func()
+
+type setupOptions struct {
+	resourcePrefix string
+	keyFunc        func(runtime.Object) (string, error)
+	clock          clock.Clock
+}
+
+type setupOption func(*setupOptions)
+
+func withDefaults(options *setupOptions) {
+	prefix := "/pods"
+
+	options.resourcePrefix = prefix
+	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
+	options.clock = clock.RealClock{}
+}
+
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstorage.Cacher, tearDownFunc) {
+	setupOpts := setupOptions{}
+	opts = append([]setupOption{withDefaults}, opts...)
+	for _, opt := range opts {
+		opt(&setupOpts)
+	}
+
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	config := cacherstorage.Config{
+		Storage:        etcdStorage,
+		Versioner:      storage.APIObjectVersioner{},
+		GroupResource:  schema.GroupResource{Resource: "pods"},
+		ResourcePrefix: setupOpts.resourcePrefix,
+		KeyFunc:        setupOpts.keyFunc,
+		GetAttrsFunc:   GetPodAttrs,
+		NewFunc:        newPod,
+		NewListFunc:    newPodList,
+		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:          setupOpts.clock,
+	}
+	cacher, err := cacherstorage.NewCacherFromConfig(config)
+	if err != nil {
+		t.Fatalf("Failed to initialize cacher: %v", err)
+	}
+	ctx := context.Background()
+	terminate := func() {
+		cacher.Stop()
+		server.Terminate(t)
+	}
+
+	return ctx, cacher, terminate
 }

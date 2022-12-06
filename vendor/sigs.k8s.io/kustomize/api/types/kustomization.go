@@ -17,7 +17,13 @@ const (
 	ComponentVersion      = "kustomize.config.k8s.io/v1alpha1"
 	ComponentKind         = "Component"
 	MetadataNamespacePath = "metadata/namespace"
+
+	OriginAnnotations      = "originAnnotations"
+	TransformerAnnotations = "transformerAnnotations"
+	ManagedByLabelOption   = "managedByLabel"
 )
+
+var BuildMetadataOptions = []string{OriginAnnotations, TransformerAnnotations, ManagedByLabelOption}
 
 // Kustomization holds the information needed to generate customized k8s api resources.
 type Kustomization struct {
@@ -55,7 +61,7 @@ type Kustomization struct {
 
 	// PatchesStrategicMerge specifies the relative path to a file
 	// containing a strategic merge patch.  Format documented at
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/strategic-merge-patch.md
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md
 	// URLs and globs are not supported.
 	PatchesStrategicMerge []PatchStrategicMerge `json:"patchesStrategicMerge,omitempty" yaml:"patchesStrategicMerge,omitempty"`
 
@@ -186,14 +192,14 @@ func (k *Kustomization) FixKustomizationPostUnmarshalling() {
 	for i, g := range k.ConfigMapGenerator {
 		if g.EnvSource != "" {
 			k.ConfigMapGenerator[i].EnvSources =
-				append(g.EnvSources, g.EnvSource)
+				append(g.EnvSources, g.EnvSource) //nolint:gocritic
 			k.ConfigMapGenerator[i].EnvSource = ""
 		}
 	}
 	for i, g := range k.SecretGenerator {
 		if g.EnvSource != "" {
 			k.SecretGenerator[i].EnvSources =
-				append(g.EnvSources, g.EnvSource)
+				append(g.EnvSources, g.EnvSource) //nolint:gocritic
 			k.SecretGenerator[i].EnvSource = ""
 		}
 	}

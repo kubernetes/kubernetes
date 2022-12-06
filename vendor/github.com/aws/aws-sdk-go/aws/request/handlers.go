@@ -330,6 +330,9 @@ func MakeAddToUserAgentFreeFormHandler(s string) func(*Request) {
 // WithSetRequestHeaders updates the operation request's HTTP header to contain
 // the header key value pairs provided. If the header key already exists in the
 // request's HTTP header set, the existing value(s) will be replaced.
+//
+// Header keys added will be added as canonical format with title casing
+// applied via http.Header.Set method.
 func WithSetRequestHeaders(h map[string]string) Option {
 	return withRequestHeader(h).SetRequestHeaders
 }
@@ -338,6 +341,6 @@ type withRequestHeader map[string]string
 
 func (h withRequestHeader) SetRequestHeaders(r *Request) {
 	for k, v := range h {
-		r.HTTPRequest.Header[k] = []string{v}
+		r.HTTPRequest.Header.Set(k, v)
 	}
 }

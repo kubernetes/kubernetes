@@ -44,8 +44,9 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize
@@ -59,11 +60,16 @@ type priorityPair struct {
 
 var testExtendedResource = v1.ResourceName("scheduling.k8s.io/foo")
 
+const (
+	testFinalizer = "example.com/test-finalizer"
+)
+
 var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var ns string
 	f := framework.NewDefaultFramework("sched-preemption")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	lowPriority, mediumPriority, highPriority := int32(1), int32(100), int32(1000)
 	lowPriorityClassName := f.BaseName + "-low-priority"
@@ -94,7 +100,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		var err error
 		for _, pair := range priorityPairs {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value}, metav1.CreateOptions{})
-			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				framework.Failf("expected 'alreadyExists' as error, got instead: %v", err)
+			}
 		}
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
@@ -194,13 +202,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(context.TODO(), pods[0].Name, metav1.GetOptions{})
 		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
+		if !podPreempted {
+			framework.Failf("expected pod to be preempted, instead got pod %+v and error %v", preemptedPod, err)
+		}
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(context.TODO(), pods[i].Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
 		}
-
-		framework.ExpectEqual(podPreempted, true)
 	})
 
 	/*
@@ -303,7 +312,78 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
 		}
 
-		framework.ExpectEqual(podPreempted, true)
+		if !podPreempted {
+			framework.Failf("expected pod to be preempted, instead got pod %+v and error %v", preemptedPod, err)
+		}
+	})
+
+	// 1. Run a low priority pod with finalizer which consumes 1/1 of node resources
+	// 2. Schedule a higher priority pod which also consumes 1/1 of node resources
+	// 3. See if the pod with lower priority is preempted and has the pod disruption condition
+	// 4. Remove the finalizer so that the pod can be deleted by GC
+	ginkgo.It("validates pod disruption condition is added to the preempted pod", func() {
+		podRes := v1.ResourceList{testExtendedResource: resource.MustParse("1")}
+
+		ginkgo.By("Select a node to run the lower and higher priority pods")
+		framework.ExpectNotEqual(len(nodeList.Items), 0, "We need at least one node for the test to run")
+		node := nodeList.Items[0]
+		nodeCopy := node.DeepCopy()
+		nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("1")
+		err := patchNode(cs, &node, nodeCopy)
+		framework.ExpectNoError(err)
+
+		// prepare node affinity to make sure both the lower and higher priority pods are scheduled on the same node
+		testNodeAffinity := v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchFields: []v1.NodeSelectorRequirement{
+								{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		ginkgo.By("Create a low priority pod that consumes 1/1 of node resources")
+		victimPod := createPausePod(f, pausePodConfig{
+			Name:              "victim-pod",
+			PriorityClassName: lowPriorityClassName,
+			Resources: &v1.ResourceRequirements{
+				Requests: podRes,
+				Limits:   podRes,
+			},
+			Finalizers: []string{testFinalizer},
+			Affinity:   &testNodeAffinity,
+		})
+		framework.Logf("Created pod: %v", victimPod.Name)
+
+		ginkgo.By("Wait for the victim pod to be scheduled")
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, victimPod))
+
+		// Remove the finalizer so that the victim pod can be GCed
+		defer e2epod.NewPodClient(f).RemoveFinalizer(victimPod.Name, testFinalizer)
+
+		ginkgo.By("Create a high priority pod to trigger preemption of the lower priority pod")
+		preemptorPod := createPausePod(f, pausePodConfig{
+			Name:              "preemptor-pod",
+			PriorityClassName: highPriorityClassName,
+			Resources: &v1.ResourceRequirements{
+				Requests: podRes,
+				Limits:   podRes,
+			},
+			Affinity: &testNodeAffinity,
+		})
+		framework.Logf("Created pod: %v", preemptorPod.Name)
+
+		ginkgo.By("Waiting for the victim pod to be terminating")
+		err = e2epod.WaitForPodTerminatingInNamespaceTimeout(f.ClientSet, victimPod.Name, victimPod.Namespace, framework.PodDeleteTimeout)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying the pod has the pod disruption condition")
+		e2epod.VerifyPodHasConditionWithType(f, victimPod, v1.DisruptionTarget)
 	})
 
 	ginkgo.Context("PodTopologySpread Preemption", func() {
@@ -320,7 +400,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
 			for _, nodeName := range nodeNames {
-				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+				e2enode.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
 
 				node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
@@ -335,7 +415,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		})
 		ginkgo.AfterEach(func() {
 			for _, nodeName := range nodeNames {
-				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+				e2enode.RemoveLabelOffNode(cs, nodeName, topologyKey)
 			}
 			for _, node := range nodes {
 				nodeCopy := node.DeepCopy()
@@ -456,12 +536,13 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		var node *v1.Node
 		var ns, nodeHostNameLabel string
 		f := framework.NewDefaultFramework("sched-preemption-path")
+		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 		priorityPairs := make([]priorityPair, 0)
 
 		ginkgo.AfterEach(func() {
 			// print out additional info if tests failed
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				// List existing PriorityClasses.
 				priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
@@ -521,7 +602,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				if err != nil {
 					framework.Logf("Failed to create priority '%v/%v'. Reason: %v. Msg: %v", priorityName, priorityVal, apierrors.ReasonForError(err), err)
 				}
-				framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					framework.Failf("expected 'alreadyExists' as error, got instead: %v", err)
+				}
 			}
 		})
 
@@ -673,6 +756,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	ginkgo.Context("PriorityClass endpoints", func() {
 		var cs clientset.Interface
 		f := framework.NewDefaultFramework("sched-preemption-path")
+		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 		testUUID := uuid.New().String()
 		var pcs []*schedulingv1.PriorityClass
 
@@ -685,14 +769,16 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				if err != nil {
 					framework.Logf("Failed to create priority '%v/%v'. Reason: %v. Msg: %v", name, val, apierrors.ReasonForError(err), err)
 				}
-				framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					framework.Failf("expected 'alreadyExists' as error, got instead: %v", err)
+				}
 				pcs = append(pcs, pc)
 			}
 		})
 
 		ginkgo.AfterEach(func() {
 			// Print out additional info if tests failed.
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				// List existing PriorityClasses.
 				priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
 				if err != nil {

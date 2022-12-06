@@ -25,7 +25,8 @@ import (
 // Labels represents a collection of label name -> value mappings. This type is
 // commonly used with the With(Labels) and GetMetricWith(Labels) methods of
 // metric vector Collectors, e.g.:
-//     myVec.With(Labels{"code": "404", "method": "GET"}).Add(42)
+//
+//	myVec.With(Labels{"code": "404", "method": "GET"}).Add(42)
 //
 // The other use-case is the specification of constant label pairs in Opts or to
 // create a Desc.
@@ -39,7 +40,7 @@ var errInconsistentCardinality = errors.New("inconsistent label cardinality")
 
 func makeInconsistentCardinalityError(fqName string, labels, labelValues []string) error {
 	return fmt.Errorf(
-		"%s: %q has %d variable labels named %q but %d values %q were provided",
+		"%w: %q has %d variable labels named %q but %d values %q were provided",
 		errInconsistentCardinality, fqName,
 		len(labels), labels,
 		len(labelValues), labelValues,
@@ -49,7 +50,7 @@ func makeInconsistentCardinalityError(fqName string, labels, labelValues []strin
 func validateValuesInLabels(labels Labels, expectedNumberOfValues int) error {
 	if len(labels) != expectedNumberOfValues {
 		return fmt.Errorf(
-			"%s: expected %d label values but got %d in %#v",
+			"%w: expected %d label values but got %d in %#v",
 			errInconsistentCardinality, expectedNumberOfValues,
 			len(labels), labels,
 		)
@@ -67,7 +68,7 @@ func validateValuesInLabels(labels Labels, expectedNumberOfValues int) error {
 func validateLabelValues(vals []string, expectedNumberOfValues int) error {
 	if len(vals) != expectedNumberOfValues {
 		return fmt.Errorf(
-			"%s: expected %d label values but got %d in %#v",
+			"%w: expected %d label values but got %d in %#v",
 			errInconsistentCardinality, expectedNumberOfValues,
 			len(vals), vals,
 		)

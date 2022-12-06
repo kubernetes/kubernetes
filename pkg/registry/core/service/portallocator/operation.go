@@ -23,11 +23,13 @@ package portallocator
 // On rollback we best-effort release any allocations we did.
 //
 // Pattern for use:
-//   op := StartPortAllocationOperation(...)
-//   defer op.Finish
-//   ...
-//   write(updatedOwner)
-///  op.Commit()
+//
+//	op := StartPortAllocationOperation(...)
+//	defer op.Finish
+//	...
+//	write(updatedOwner)
+//
+// /  op.Commit()
 type PortAllocationOperation struct {
 	pa              Interface
 	allocated       []int

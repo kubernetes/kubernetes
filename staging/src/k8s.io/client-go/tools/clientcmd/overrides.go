@@ -74,6 +74,7 @@ type ClusterOverrideFlags struct {
 	InsecureSkipTLSVerify FlagInfo
 	TLSServerName         FlagInfo
 	ProxyURL              FlagInfo
+	DisableCompression    FlagInfo
 }
 
 // FlagInfo contains information about how to register a flag.  This struct is useful if you want to provide a way for an extender to
@@ -143,25 +144,26 @@ func (f FlagInfo) BindBoolFlag(flags *pflag.FlagSet, target *bool) FlagInfo {
 }
 
 const (
-	FlagClusterName      = "cluster"
-	FlagAuthInfoName     = "user"
-	FlagContext          = "context"
-	FlagNamespace        = "namespace"
-	FlagAPIServer        = "server"
-	FlagTLSServerName    = "tls-server-name"
-	FlagInsecure         = "insecure-skip-tls-verify"
-	FlagCertFile         = "client-certificate"
-	FlagKeyFile          = "client-key"
-	FlagCAFile           = "certificate-authority"
-	FlagEmbedCerts       = "embed-certs"
-	FlagBearerToken      = "token"
-	FlagImpersonate      = "as"
-	FlagImpersonateUID   = "as-uid"
-	FlagImpersonateGroup = "as-group"
-	FlagUsername         = "username"
-	FlagPassword         = "password"
-	FlagTimeout          = "request-timeout"
-	FlagProxyURL         = "proxy-url"
+	FlagClusterName        = "cluster"
+	FlagAuthInfoName       = "user"
+	FlagContext            = "context"
+	FlagNamespace          = "namespace"
+	FlagAPIServer          = "server"
+	FlagTLSServerName      = "tls-server-name"
+	FlagInsecure           = "insecure-skip-tls-verify"
+	FlagCertFile           = "client-certificate"
+	FlagKeyFile            = "client-key"
+	FlagCAFile             = "certificate-authority"
+	FlagEmbedCerts         = "embed-certs"
+	FlagBearerToken        = "token"
+	FlagImpersonate        = "as"
+	FlagImpersonateUID     = "as-uid"
+	FlagImpersonateGroup   = "as-group"
+	FlagUsername           = "username"
+	FlagPassword           = "password"
+	FlagTimeout            = "request-timeout"
+	FlagProxyURL           = "proxy-url"
+	FlagDisableCompression = "disable-compression"
 )
 
 // RecommendedConfigOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -198,6 +200,7 @@ func RecommendedClusterOverrideFlags(prefix string) ClusterOverrideFlags {
 		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure"},
 		TLSServerName:         FlagInfo{prefix + FlagTLSServerName, "", "", "If provided, this name will be used to validate server certificate. If this is not provided, hostname used to contact the server is used."},
 		ProxyURL:              FlagInfo{prefix + FlagProxyURL, "", "", "If provided, this URL will be used to connect via proxy"},
+		DisableCompression:    FlagInfo{prefix + FlagDisableCompression, "", "", "If true, opt-out of response compression for all requests to the server"},
 	}
 }
 
@@ -238,6 +241,7 @@ func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, f
 	flagNames.InsecureSkipTLSVerify.BindBoolFlag(flags, &clusterInfo.InsecureSkipTLSVerify)
 	flagNames.TLSServerName.BindStringFlag(flags, &clusterInfo.TLSServerName)
 	flagNames.ProxyURL.BindStringFlag(flags, &clusterInfo.ProxyURL)
+	flagNames.DisableCompression.BindBoolFlag(flags, &clusterInfo.DisableCompression)
 }
 
 // BindFlags is a convenience method to bind the specified flags to their associated variables

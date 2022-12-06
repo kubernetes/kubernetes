@@ -33,12 +33,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coretesting "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitrans "k8s.io/csi-translation-lib"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/controller"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -49,14 +47,13 @@ import (
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
-		name                string
-		csiMigrationEnabled bool
-		pvcKey              string
-		pv                  *v1.PersistentVolume
-		pvc                 *v1.PersistentVolumeClaim
-		expansionCalled     bool
-		hasError            bool
-		expectedAnnotation  map[string]string
+		name               string
+		pvcKey             string
+		pv                 *v1.PersistentVolume
+		pvc                *v1.PersistentVolumeClaim
+		expansionCalled    bool
+		hasError           bool
+		expectedAnnotation map[string]string
 	}{
 		{
 			name:     "when pvc has no PV binding",
@@ -69,8 +66,8 @@ func TestSyncHandler(t *testing.T) {
 			pv:                 getFakePersistentVolume("vol-3", csitranslationplugins.AWSEBSInTreePluginName, "1Gi", "good-pvc-vol-3"),
 			pvc:                getFakePersistentVolumeClaim("good-pvc", "vol-3", "1Gi", "2Gi", "good-pvc-vol-3"),
 			pvcKey:             "default/good-pvc",
-			expansionCalled:    true,
-			expectedAnnotation: map[string]string{volumetypes.VolumeResizerKey: csitranslationplugins.AWSEBSInTreePluginName},
+			expansionCalled:    false,
+			expectedAnnotation: map[string]string{volumetypes.VolumeResizerKey: csitranslationplugins.AWSEBSDriverName},
 		},
 		{
 			name: "if pv has pre-resize capacity annotation, generate expand operation should not be called",
@@ -83,14 +80,6 @@ func TestSyncHandler(t *testing.T) {
 			pvc:             getFakePersistentVolumeClaim("good-pvc", "vol-4", "2Gi", "2Gi", "good-pvc-vol-4"),
 			pvcKey:          "default/good-pvc",
 			expansionCalled: false,
-		},
-		{
-			name:                "when csi migration is enabled for a in-tree plugin",
-			csiMigrationEnabled: true,
-			pv:                  getFakePersistentVolume("vol-4", csitranslationplugins.AWSEBSInTreePluginName, "1Gi", "csi-pvc-vol-5"),
-			pvc:                 getFakePersistentVolumeClaim("csi-pvc", "vol-4", "1Gi", "2Gi", "csi-pvc-vol-5"),
-			pvcKey:              "default/csi-pvc",
-			expectedAnnotation:  map[string]string{volumetypes.VolumeResizerKey: csitranslationplugins.AWSEBSDriverName},
 		},
 		{
 			name:            "for csi plugin without migration path",
@@ -123,14 +112,6 @@ func TestSyncHandler(t *testing.T) {
 		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate), nil)
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
-		}
-
-		if test.csiMigrationEnabled {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
-		} else {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
 		}
 
 		var expController *expandController

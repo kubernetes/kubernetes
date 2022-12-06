@@ -7,13 +7,14 @@
 package devicefilter
 
 import (
+	"errors"
+	"fmt"
 	"math"
 	"strconv"
 
 	"github.com/cilium/ebpf/asm"
 	devicesemulator "github.com/opencontainers/runc/libcontainer/cgroups/devices"
 	"github.com/opencontainers/runc/libcontainer/devices"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -51,21 +52,20 @@ func DeviceFilter(rules []*devices.Rule) (asm.Instructions, string, error) {
 			// only be one (at most) at the very start to instruct cgroupv1 to
 			// go into allow-list mode. However we do double-check this here.
 			if idx != 0 || rule.Allow != emu.IsBlacklist() {
-				return nil, "", errors.Errorf("[internal error] emulated cgroupv2 devices ruleset had bad wildcard at idx %v (%s)", idx, rule.CgroupString())
+				return nil, "", fmt.Errorf("[internal error] emulated cgroupv2 devices ruleset had bad wildcard at idx %v (%s)", idx, rule.CgroupString())
 			}
 			continue
 		}
 		if rule.Allow == p.defaultAllow {
 			// There should be no rules which have an action equal to the
 			// default action, the emulator removes those.
-			return nil, "", errors.Errorf("[internal error] emulated cgroupv2 devices ruleset had no-op rule at idx %v (%s)", idx, rule.CgroupString())
+			return nil, "", fmt.Errorf("[internal error] emulated cgroupv2 devices ruleset had no-op rule at idx %v (%s)", idx, rule.CgroupString())
 		}
 		if err := p.appendRule(rule); err != nil {
 			return nil, "", err
 		}
 	}
-	insts, err := p.finalize()
-	return insts, license, err
+	return p.finalize(), license, nil
 }
 
 type program struct {
@@ -118,13 +118,13 @@ func (p *program) appendRule(rule *devices.Rule) error {
 		bpfType = int32(unix.BPF_DEVCG_DEV_BLOCK)
 	default:
 		// We do not permit 'a', nor any other types we don't know about.
-		return errors.Errorf("invalid type %q", string(rule.Type))
+		return fmt.Errorf("invalid type %q", string(rule.Type))
 	}
 	if rule.Major > math.MaxUint32 {
-		return errors.Errorf("invalid major %d", rule.Major)
+		return fmt.Errorf("invalid major %d", rule.Major)
 	}
 	if rule.Minor > math.MaxUint32 {
-		return errors.Errorf("invalid minor %d", rule.Major)
+		return fmt.Errorf("invalid minor %d", rule.Major)
 	}
 	hasMajor := rule.Major >= 0 // if not specified in OCI json, major is set to -1
 	hasMinor := rule.Minor >= 0
@@ -138,7 +138,7 @@ func (p *program) appendRule(rule *devices.Rule) error {
 		case 'm':
 			bpfAccess |= unix.BPF_DEVCG_ACC_MKNOD
 		default:
-			return errors.Errorf("unknown device access %v", r)
+			return fmt.Errorf("unknown device access %v", r)
 		}
 	}
 	// If the access is rwm, skip the check.
@@ -180,7 +180,7 @@ func (p *program) appendRule(rule *devices.Rule) error {
 	return nil
 }
 
-func (p *program) finalize() (asm.Instructions, error) {
+func (p *program) finalize() asm.Instructions {
 	var v int32
 	if p.defaultAllow {
 		v = 1
@@ -192,7 +192,7 @@ func (p *program) finalize() (asm.Instructions, error) {
 		asm.Return(),
 	)
 	p.blockID = -1
-	return p.insts, nil
+	return p.insts
 }
 
 func acceptBlock(accept bool) asm.Instructions {

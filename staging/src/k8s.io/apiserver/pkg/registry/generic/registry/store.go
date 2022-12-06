@@ -217,7 +217,10 @@ type Store struct {
 	// If the StorageVersioner is nil, apiserver will leave the
 	// storageVersionHash as empty in the discovery document.
 	StorageVersioner runtime.GroupVersioner
-	// Called to cleanup clients used by the underlying Storage; optional.
+
+	// DestroyFunc cleans up clients used by the underlying Storage; optional.
+	// If set, DestroyFunc has to be implemented in thread-safe way and
+	// be prepared for being called more than once.
 	DestroyFunc func()
 }
 
@@ -277,6 +280,13 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 // New implements RESTStorage.New.
 func (e *Store) New() runtime.Object {
 	return e.NewFunc()
+}
+
+// Destroy cleans up its resources on shutdown.
+func (e *Store) Destroy() {
+	if e.DestroyFunc != nil {
+		e.DestroyFunc()
+	}
 }
 
 // NewList implements rest.Lister.
@@ -347,16 +357,18 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 		ResourceVersion:      options.ResourceVersion,
 		ResourceVersionMatch: options.ResourceVersionMatch,
 		Predicate:            p,
+		Recursive:            true,
 	}
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			err := e.Storage.GetToList(ctx, key, storageOpts, list)
+			storageOpts.Recursive = false
+			err := e.Storage.GetList(ctx, key, storageOpts, list)
 			return list, storeerr.InterpretListError(err, qualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), storageOpts, list)
+	err := e.Storage.GetList(ctx, e.KeyRootFunc(ctx), storageOpts, list)
 	return list, storeerr.InterpretListError(err, qualifiedResource)
 }
 
@@ -369,6 +381,16 @@ func finishNothing(context.Context, bool) {}
 // be able to examine the input and output objects for differences.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	var finishCreate FinishFunc = finishNothing
+
+	// Init metadata as early as possible.
+	if objectMeta, err := meta.Accessor(obj); err != nil {
+		return nil, err
+	} else {
+		rest.FillObjectMetaSystemFields(objectMeta)
+		if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
+			objectMeta.SetName(e.CreateStrategy.GenerateName(objectMeta.GetGenerateName()))
+		}
+	}
 
 	if e.BeginCreate != nil {
 		fn, err := e.BeginCreate(ctx, obj, options)
@@ -546,6 +568,13 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
 		if existingResourceVersion == 0 {
+			// Init metadata as early as possible.
+			if objectMeta, err := meta.Accessor(obj); err != nil {
+				return nil, nil, err
+			} else {
+				rest.FillObjectMetaSystemFields(objectMeta)
+			}
+
 			var finishCreate FinishFunc = finishNothing
 
 			if e.BeginCreate != nil {
@@ -898,13 +927,13 @@ func markAsDeleting(obj runtime.Object, now time.Time) (err error) {
 // grace period seconds (graceful deletion) and updating the list of
 // finalizers (finalization); it returns:
 //
-// 1. an error
-// 2. a boolean indicating that the object was not found, but it should be
-//    ignored
-// 3. a boolean indicating that the object's grace period is exhausted and it
-//    should be deleted immediately
-// 4. a new output object with the state that was updated
-// 5. a copy of the last existing state of the object
+//  1. an error
+//  2. a boolean indicating that the object was not found, but it should be
+//     ignored
+//  3. a boolean indicating that the object's grace period is exhausted and it
+//     should be deleted immediately
+//  4. a new output object with the state that was updated
+//  5. a copy of the last existing state of the object
 func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, deleteValidation rest.ValidateObjectFunc, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	var pendingFinalizers bool
@@ -1431,11 +1460,14 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		if opts.CountMetricPollPeriod > 0 {
 			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod, opts.StorageObjectCountTracker)
 			previousDestroy := e.DestroyFunc
+			var once sync.Once
 			e.DestroyFunc = func() {
-				stopFunc()
-				if previousDestroy != nil {
-					previousDestroy()
-				}
+				once.Do(func() {
+					stopFunc()
+					if previousDestroy != nil {
+						previousDestroy()
+					}
+				})
 			}
 		}
 	}

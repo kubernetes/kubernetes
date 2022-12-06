@@ -17,28 +17,18 @@ limitations under the License.
 // Package app implements a server that runs a set of active
 // components.  This includes replication controllers, service endpoints and
 // nodes.
-//
 package app
 
 import (
 	"context"
 
-	"k8s.io/klog/v2"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func startDisruptionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
-		klog.InfoS("Refusing to start disruption because the PodDisruptionBudget feature is disabled")
-		return nil, false, nil
-	}
-
 	client := controllerContext.ClientBuilder.ClientOrDie("disruption-controller")
 	config := controllerContext.ClientBuilder.ConfigOrDie("disruption-controller")
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
@@ -58,6 +48,6 @@ func startDisruptionController(ctx context.Context, controllerContext Controller
 		controllerContext.RESTMapper,
 		scaleClient,
 		client.Discovery(),
-	).Run(ctx.Done())
+	).Run(ctx)
 	return nil, true, nil
 }

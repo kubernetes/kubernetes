@@ -19,7 +19,7 @@ package fake
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -68,7 +68,7 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 			resp := &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(strings.NewReader("fake logs")),
+				Body:       io.NopCloser(strings.NewReader("fake logs")),
 			}
 			return resp, nil
 		}),

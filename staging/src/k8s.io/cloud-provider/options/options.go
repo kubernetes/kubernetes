@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
@@ -51,8 +50,6 @@ import (
 const (
 	// CloudControllerManagerUserAgent is the userAgent name when starting cloud-controller managers.
 	CloudControllerManagerUserAgent = "cloud-controller-manager"
-	// DefaultInsecureCloudControllerManagerPort is the default insecure cloud-controller manager port.
-	DefaultInsecureCloudControllerManagerPort = 0
 )
 
 // CloudControllerManagerOptions is the main context object for the controller manager.
@@ -61,11 +58,9 @@ type CloudControllerManagerOptions struct {
 	KubeCloudShared   *KubeCloudSharedOptions
 	ServiceController *ServiceControllerOptions
 
-	SecureServing *apiserveroptions.SecureServingOptionsWithLoopback
-	// TODO: remove insecure serving mode
-	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
-	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
-	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
+	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
+	Authentication *apiserveroptions.DelegatingAuthenticationOptions
+	Authorization  *apiserveroptions.DelegatingAuthorizationOptions
 
 	Master     string
 	Kubeconfig string
@@ -76,7 +71,7 @@ type CloudControllerManagerOptions struct {
 
 // NewCloudControllerManagerOptions creates a new ExternalCMServer with a default config.
 func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) {
-	componentConfig, err := NewDefaultComponentConfig(DefaultInsecureCloudControllerManagerPort)
+	componentConfig, err := NewDefaultComponentConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -87,12 +82,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 		ServiceController: &ServiceControllerOptions{
 			ServiceControllerConfiguration: &componentConfig.ServiceController,
 		},
-		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
-		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: netutils.ParseIPSloppy(componentConfig.Generic.Address),
-			BindPort:    int(componentConfig.Generic.Port),
-			BindNetwork: "tcp",
-		}).WithLoopback(),
+		SecureServing:             apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication:            apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:             apiserveroptions.NewDelegatingAuthorizationOptions(),
 		NodeStatusUpdateFrequency: componentConfig.NodeStatusUpdateFrequency,
@@ -113,7 +103,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 }
 
 // NewDefaultComponentConfig returns cloud-controller manager configuration object.
-func NewDefaultComponentConfig(insecurePort int32) (*ccmconfig.CloudControllerManagerConfiguration, error) {
+func NewDefaultComponentConfig() (*ccmconfig.CloudControllerManagerConfiguration, error) {
 	versioned := &ccmconfigv1alpha1.CloudControllerManagerConfiguration{}
 	ccmconfigscheme.Scheme.Default(versioned)
 
@@ -121,11 +111,10 @@ func NewDefaultComponentConfig(insecurePort int32) (*ccmconfig.CloudControllerMa
 	if err := ccmconfigscheme.Scheme.Convert(versioned, internal, nil); err != nil {
 		return nil, err
 	}
-	internal.Generic.Port = insecurePort
 	return internal, nil
 }
 
-// Flags returns flags for a specific APIServer by section name
+// Flags returns flags for a specific CloudController by section name
 func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultControllers []string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
 	o.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers)
@@ -133,7 +122,6 @@ func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultC
 	o.ServiceController.AddFlags(fss.FlagSet("service controller"))
 
 	o.SecureServing.AddFlags(fss.FlagSet("secure serving"))
-	o.InsecureServing.AddUnqualifiedFlags(fss.FlagSet("insecure serving"))
 	o.Authentication.AddFlags(fss.FlagSet("authentication"))
 	o.Authorization.AddFlags(fss.FlagSet("authorization"))
 
@@ -150,6 +138,20 @@ func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultC
 // ApplyTo fills up cloud controller manager config with options.
 func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent string) error {
 	var err error
+
+	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
+	// goroutines (started from initializing secure serving - which underneath
+	// creates a queue which in its constructor starts a goroutine).
+	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	c.Kubeconfig.DisableCompression = true
+	c.Kubeconfig.ContentConfig.AcceptContentTypes = o.Generic.ClientConnection.AcceptContentTypes
+	c.Kubeconfig.ContentConfig.ContentType = o.Generic.ClientConnection.ContentType
+	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
+	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)
+
 	if err = o.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
 		return err
 	}
@@ -157,9 +159,6 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 		return err
 	}
 	if err = o.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
-		return err
-	}
-	if err = o.InsecureServing.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
 	if err = o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
@@ -174,22 +173,13 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 		}
 	}
 
-	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)
-	if err != nil {
-		return err
-	}
-	c.Kubeconfig.DisableCompression = true
-	c.Kubeconfig.ContentConfig.AcceptContentTypes = o.Generic.ClientConnection.AcceptContentTypes
-	c.Kubeconfig.ContentConfig.ContentType = o.Generic.ClientConnection.ContentType
-	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
-	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)
-
 	c.Client, err = clientset.NewForConfig(restclient.AddUserAgent(c.Kubeconfig, userAgent))
 	if err != nil {
 		return err
 	}
 
-	c.EventRecorder = createRecorder(c.Client, userAgent)
+	c.EventBroadcaster = record.NewBroadcaster()
+	c.EventRecorder = c.EventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: userAgent})
 
 	rootClientBuilder := clientbuilder.SimpleControllerClientBuilder{
 		ClientConfig: c.Kubeconfig,
@@ -207,9 +197,6 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 
 	// sync back to component config
 	// TODO: find more elegant way than syncing back the values.
-	c.ComponentConfig.Generic.Port = int32(o.InsecureServing.BindPort)
-	c.ComponentConfig.Generic.Address = o.InsecureServing.BindAddress.String()
-
 	c.ComponentConfig.NodeStatusUpdateFrequency = o.NodeStatusUpdateFrequency
 
 	return nil
@@ -223,7 +210,6 @@ func (o *CloudControllerManagerOptions) Validate(allControllers, disabledByDefau
 	errors = append(errors, o.KubeCloudShared.Validate()...)
 	errors = append(errors, o.ServiceController.Validate()...)
 	errors = append(errors, o.SecureServing.Validate()...)
-	errors = append(errors, o.InsecureServing.Validate()...)
 	errors = append(errors, o.Authentication.Validate()...)
 	errors = append(errors, o.Authorization.Validate()...)
 
@@ -258,11 +244,4 @@ func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefault
 	}
 
 	return c, nil
-}
-
-func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	return eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: userAgent})
 }

@@ -18,10 +18,10 @@ const (
 	// ErrCodeCloudHsmClusterInUseException for service response error code
 	// "CloudHsmClusterInUseException".
 	//
-	// The request was rejected because the specified AWS CloudHSM cluster is already
+	// The request was rejected because the specified CloudHSM cluster is already
 	// associated with a custom key store or it shares a backup history with a cluster
 	// that is associated with a custom key store. Each custom key store must be
-	// associated with a different AWS CloudHSM cluster.
+	// associated with a different CloudHSM cluster.
 	//
 	// Clusters that share a backup history have the same cluster certificate. To
 	// view the cluster certificate of a cluster, use the DescribeClusters (https://docs.aws.amazon.com/cloudhsm/latest/APIReference/API_DescribeClusters.html)
@@ -31,8 +31,8 @@ const (
 	// ErrCodeCloudHsmClusterInvalidConfigurationException for service response error code
 	// "CloudHsmClusterInvalidConfigurationException".
 	//
-	// The request was rejected because the associated AWS CloudHSM cluster did
-	// not meet the configuration requirements for a custom key store.
+	// The request was rejected because the associated CloudHSM cluster did not
+	// meet the configuration requirements for a custom key store.
 	//
 	//    * The cluster must be configured with private subnets in at least two
 	//    different Availability Zones in the Region.
@@ -47,46 +47,44 @@ const (
 	//    operation.
 	//
 	//    * The cluster must contain at least as many HSMs as the operation requires.
-	//    To add HSMs, use the AWS CloudHSM CreateHsm (https://docs.aws.amazon.com/cloudhsm/latest/APIReference/API_CreateHsm.html)
+	//    To add HSMs, use the CloudHSM CreateHsm (https://docs.aws.amazon.com/cloudhsm/latest/APIReference/API_CreateHsm.html)
 	//    operation. For the CreateCustomKeyStore, UpdateCustomKeyStore, and CreateKey
-	//    operations, the AWS CloudHSM cluster must have at least two active HSMs,
-	//    each in a different Availability Zone. For the ConnectCustomKeyStore operation,
-	//    the AWS CloudHSM must contain at least one active HSM.
+	//    operations, the CloudHSM cluster must have at least two active HSMs, each
+	//    in a different Availability Zone. For the ConnectCustomKeyStore operation,
+	//    the CloudHSM must contain at least one active HSM.
 	//
-	// For information about the requirements for an AWS CloudHSM cluster that is
-	// associated with a custom key store, see Assemble the Prerequisites (https://docs.aws.amazon.com/kms/latest/developerguide/create-keystore.html#before-keystore)
-	// in the AWS Key Management Service Developer Guide. For information about
-	// creating a private subnet for an AWS CloudHSM cluster, see Create a Private
-	// Subnet (https://docs.aws.amazon.com/cloudhsm/latest/userguide/create-subnets.html)
-	// in the AWS CloudHSM User Guide. For information about cluster security groups,
+	// For information about the requirements for an CloudHSM cluster that is associated
+	// with a custom key store, see Assemble the Prerequisites (https://docs.aws.amazon.com/kms/latest/developerguide/create-keystore.html#before-keystore)
+	// in the Key Management Service Developer Guide. For information about creating
+	// a private subnet for an CloudHSM cluster, see Create a Private Subnet (https://docs.aws.amazon.com/cloudhsm/latest/userguide/create-subnets.html)
+	// in the CloudHSM User Guide. For information about cluster security groups,
 	// see Configure a Default Security Group (https://docs.aws.amazon.com/cloudhsm/latest/userguide/configure-sg.html)
-	// in the AWS CloudHSM User Guide .
+	// in the CloudHSM User Guide .
 	ErrCodeCloudHsmClusterInvalidConfigurationException = "CloudHsmClusterInvalidConfigurationException"
 
 	// ErrCodeCloudHsmClusterNotActiveException for service response error code
 	// "CloudHsmClusterNotActiveException".
 	//
-	// The request was rejected because the AWS CloudHSM cluster that is associated
+	// The request was rejected because the CloudHSM cluster that is associated
 	// with the custom key store is not active. Initialize and activate the cluster
 	// and try the command again. For detailed instructions, see Getting Started
 	// (https://docs.aws.amazon.com/cloudhsm/latest/userguide/getting-started.html)
-	// in the AWS CloudHSM User Guide.
+	// in the CloudHSM User Guide.
 	ErrCodeCloudHsmClusterNotActiveException = "CloudHsmClusterNotActiveException"
 
 	// ErrCodeCloudHsmClusterNotFoundException for service response error code
 	// "CloudHsmClusterNotFoundException".
 	//
-	// The request was rejected because AWS KMS cannot find the AWS CloudHSM cluster
-	// with the specified cluster ID. Retry the request with a different cluster
-	// ID.
+	// The request was rejected because KMS cannot find the CloudHSM cluster with
+	// the specified cluster ID. Retry the request with a different cluster ID.
 	ErrCodeCloudHsmClusterNotFoundException = "CloudHsmClusterNotFoundException"
 
 	// ErrCodeCloudHsmClusterNotRelatedException for service response error code
 	// "CloudHsmClusterNotRelatedException".
 	//
-	// The request was rejected because the specified AWS CloudHSM cluster has a
-	// different cluster certificate than the original cluster. You cannot use the
-	// operation to specify an unrelated cluster.
+	// The request was rejected because the specified CloudHSM cluster has a different
+	// cluster certificate than the original cluster. You cannot use the operation
+	// to specify an unrelated cluster.
 	//
 	// Specify a cluster that shares a backup history with the original cluster.
 	// This includes clusters that were created from a backup of the current cluster,
@@ -101,10 +99,10 @@ const (
 	// ErrCodeCustomKeyStoreHasCMKsException for service response error code
 	// "CustomKeyStoreHasCMKsException".
 	//
-	// The request was rejected because the custom key store contains AWS KMS customer
-	// master keys (CMKs). After verifying that you do not need to use the CMKs,
-	// use the ScheduleKeyDeletion operation to delete the CMKs. After they are
-	// deleted, you can delete the custom key store.
+	// The request was rejected because the custom key store contains KMS keys.
+	// After verifying that you do not need to use the KMS keys, use the ScheduleKeyDeletion
+	// operation to delete the KMS keys. After they are deleted, you can delete
+	// the custom key store.
 	ErrCodeCustomKeyStoreHasCMKsException = "CustomKeyStoreHasCMKsException"
 
 	// ErrCodeCustomKeyStoreInvalidStateException for service response error code
@@ -140,7 +138,7 @@ const (
 	// ErrCodeCustomKeyStoreNotFoundException for service response error code
 	// "CustomKeyStoreNotFoundException".
 	//
-	// The request was rejected because AWS KMS cannot find a custom key store with
+	// The request was rejected because KMS cannot find a custom key store with
 	// the specified key store name or ID.
 	ErrCodeCustomKeyStoreNotFoundException = "CustomKeyStoreNotFoundException"
 
@@ -154,7 +152,7 @@ const (
 	// ErrCodeDisabledException for service response error code
 	// "DisabledException".
 	//
-	// The request was rejected because the specified CMK is not enabled.
+	// The request was rejected because the specified KMS key is not enabled.
 	ErrCodeDisabledException = "DisabledException"
 
 	// ErrCodeExpiredImportTokenException for service response error code
@@ -168,9 +166,9 @@ const (
 	// ErrCodeIncorrectKeyException for service response error code
 	// "IncorrectKeyException".
 	//
-	// The request was rejected because the specified CMK cannot decrypt the data.
-	// The KeyId in a Decrypt request and the SourceKeyId in a ReEncrypt request
-	// must identify the same CMK that was used to encrypt the ciphertext.
+	// The request was rejected because the specified KMS key cannot decrypt the
+	// data. The KeyId in a Decrypt request and the SourceKeyId in a ReEncrypt request
+	// must identify the same KMS key that was used to encrypt the ciphertext.
 	ErrCodeIncorrectKeyException = "IncorrectKeyException"
 
 	// ErrCodeIncorrectKeyMaterialException for service response error code
@@ -178,14 +176,14 @@ const (
 	//
 	// The request was rejected because the key material in the request is, expired,
 	// invalid, or is not the same key material that was previously imported into
-	// this customer master key (CMK).
+	// this KMS key.
 	ErrCodeIncorrectKeyMaterialException = "IncorrectKeyMaterialException"
 
 	// ErrCodeIncorrectTrustAnchorException for service response error code
 	// "IncorrectTrustAnchorException".
 	//
 	// The request was rejected because the trust anchor certificate in the request
-	// is not the trust anchor certificate for the specified AWS CloudHSM cluster.
+	// is not the trust anchor certificate for the specified CloudHSM cluster.
 	//
 	// When you initialize the cluster (https://docs.aws.amazon.com/cloudhsm/latest/userguide/initialize-cluster.html#sign-csr),
 	// you create the trust anchor certificate and save it in the customerCA.crt
@@ -220,8 +218,8 @@ const (
 	// the ciphertext, such as the encryption context, is corrupted, missing, or
 	// otherwise invalid.
 	//
-	// From the ImportKeyMaterial operation, the request was rejected because AWS
-	// KMS could not decrypt the encrypted (wrapped) key material.
+	// From the ImportKeyMaterial operation, the request was rejected because KMS
+	// could not decrypt the encrypted (wrapped) key material.
 	ErrCodeInvalidCiphertextException = "InvalidCiphertextException"
 
 	// ErrCodeInvalidGrantIdException for service response error code
@@ -240,7 +238,7 @@ const (
 	// "InvalidImportTokenException".
 	//
 	// The request was rejected because the provided import token is invalid or
-	// is associated with a different customer master key (CMK).
+	// is associated with a different KMS key.
 	ErrCodeInvalidImportTokenException = "InvalidImportTokenException"
 
 	// ErrCodeInvalidKeyUsageException for service response error code
@@ -248,17 +246,19 @@ const (
 	//
 	// The request was rejected for one of the following reasons:
 	//
-	//    * The KeyUsage value of the CMK is incompatible with the API operation.
+	//    * The KeyUsage value of the KMS key is incompatible with the API operation.
 	//
 	//    * The encryption algorithm or signing algorithm specified for the operation
-	//    is incompatible with the type of key material in the CMK (CustomerMasterKeySpec).
+	//    is incompatible with the type of key material in the KMS key (KeySpec).
 	//
 	// For encrypting, decrypting, re-encrypting, and generating data keys, the
-	// KeyUsage must be ENCRYPT_DECRYPT. For signing and verifying, the KeyUsage
-	// must be SIGN_VERIFY. To find the KeyUsage of a CMK, use the DescribeKey operation.
+	// KeyUsage must be ENCRYPT_DECRYPT. For signing and verifying messages, the
+	// KeyUsage must be SIGN_VERIFY. For generating and verifying message authentication
+	// codes (MACs), the KeyUsage must be GENERATE_VERIFY_MAC. To find the KeyUsage
+	// of a KMS key, use the DescribeKey operation.
 	//
-	// To find the encryption or signing algorithms supported for a particular CMK,
-	// use the DescribeKey operation.
+	// To find the encryption or signing algorithms supported for a particular KMS
+	// key, use the DescribeKey operation.
 	ErrCodeInvalidKeyUsageException = "InvalidKeyUsageException"
 
 	// ErrCodeInvalidMarkerException for service response error code
@@ -274,24 +274,32 @@ const (
 	// The request was rejected because the state of the specified resource is not
 	// valid for this request.
 	//
-	// For more information about how key state affects the use of a CMK, see How
-	// Key State Affects Use of a Customer Master Key (https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html)
-	// in the AWS Key Management Service Developer Guide .
+	// For more information about how key state affects the use of a KMS key, see
+	// Key states of KMS keys (https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html)
+	// in the Key Management Service Developer Guide .
 	ErrCodeInvalidStateException = "KMSInvalidStateException"
+
+	// ErrCodeKMSInvalidMacException for service response error code
+	// "KMSInvalidMacException".
+	//
+	// The request was rejected because the HMAC verification failed. HMAC verification
+	// fails when the HMAC computed by using the specified message, HMAC KMS key,
+	// and MAC algorithm does not match the HMAC specified in the request.
+	ErrCodeKMSInvalidMacException = "KMSInvalidMacException"
 
 	// ErrCodeKMSInvalidSignatureException for service response error code
 	// "KMSInvalidSignatureException".
 	//
 	// The request was rejected because the signature verification failed. Signature
 	// verification fails when it cannot confirm that signature was produced by
-	// signing the specified message with the specified CMK and signing algorithm.
+	// signing the specified message with the specified KMS key and signing algorithm.
 	ErrCodeKMSInvalidSignatureException = "KMSInvalidSignatureException"
 
 	// ErrCodeKeyUnavailableException for service response error code
 	// "KeyUnavailableException".
 	//
-	// The request was rejected because the specified CMK was not available. You
-	// can retry the request.
+	// The request was rejected because the specified KMS key was not available.
+	// You can retry the request.
 	ErrCodeKeyUnavailableException = "KeyUnavailableException"
 
 	// ErrCodeLimitExceededException for service response error code
@@ -299,7 +307,7 @@ const (
 	//
 	// The request was rejected because a quota was exceeded. For more information,
 	// see Quotas (https://docs.aws.amazon.com/kms/latest/developerguide/limits.html)
-	// in the AWS Key Management Service Developer Guide.
+	// in the Key Management Service Developer Guide.
 	ErrCodeLimitExceededException = "LimitExceededException"
 
 	// ErrCodeMalformedPolicyDocumentException for service response error code
@@ -357,6 +365,7 @@ var exceptionFromCode = map[string]func(protocol.ResponseMetadata) error{
 	"InvalidKeyUsageException":                     newErrorInvalidKeyUsageException,
 	"InvalidMarkerException":                       newErrorInvalidMarkerException,
 	"KMSInvalidStateException":                     newErrorInvalidStateException,
+	"KMSInvalidMacException":                       newErrorKMSInvalidMacException,
 	"KMSInvalidSignatureException":                 newErrorKMSInvalidSignatureException,
 	"KeyUnavailableException":                      newErrorKeyUnavailableException,
 	"LimitExceededException":                       newErrorLimitExceededException,

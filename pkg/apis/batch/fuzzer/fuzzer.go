@@ -20,6 +20,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/utils/pointer"
 )
 
@@ -71,6 +72,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(cp *batch.ConcurrencyPolicy, c fuzz.Continue) {
 			policies := []batch.ConcurrencyPolicy{batch.AllowConcurrent, batch.ForbidConcurrent, batch.ReplaceConcurrent}
 			*cp = policies[c.Rand.Intn(len(policies))]
+		},
+		func(p *batch.PodFailurePolicyOnPodConditionsPattern, c fuzz.Continue) {
+			c.FuzzNoCustom(p)
+			if p.Status == "" {
+				p.Status = api.ConditionTrue
+			}
 		},
 	}
 }

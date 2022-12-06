@@ -64,7 +64,7 @@ func DoRetryWithRegistration(client autorest.Client) autorest.SendDecorator {
 				if re.ServiceError != nil && re.ServiceError.Code == "MissingSubscriptionRegistration" {
 					regErr := register(client, r, re)
 					if regErr != nil {
-						return resp, fmt.Errorf("failed auto registering Resource Provider: %s. Original error: %s", regErr, err)
+						return resp, fmt.Errorf("failed auto registering Resource Provider: %s. Original error: %w", regErr, err)
 					}
 				}
 			}

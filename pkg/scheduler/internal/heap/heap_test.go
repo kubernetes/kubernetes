@@ -94,42 +94,6 @@ func TestHeap_Add(t *testing.T) {
 	}
 }
 
-// TestHeap_AddIfNotPresent tests Heap.AddIfNotPresent and ensures that heap
-// invariant is preserved after adding items.
-func TestHeap_AddIfNotPresent(t *testing.T) {
-	h := New(testHeapObjectKeyFunc, compareInts)
-	h.AddIfNotPresent(mkHeapObj("foo", 10))
-	h.AddIfNotPresent(mkHeapObj("bar", 1))
-	h.AddIfNotPresent(mkHeapObj("baz", 11))
-	h.AddIfNotPresent(mkHeapObj("zab", 30))
-	h.AddIfNotPresent(mkHeapObj("foo", 13)) // This is not added.
-
-	if len := len(h.data.items); len != 4 {
-		t.Errorf("unexpected number of items: %d", len)
-	}
-	if val := h.data.items["foo"].obj.(testHeapObject).val; val != 10 {
-		t.Errorf("unexpected value: %d", val)
-	}
-	item, err := h.Pop()
-	if e, a := 1, item.(testHeapObject).val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-	item, err = h.Pop()
-	if e, a := 10, item.(testHeapObject).val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-	// bar is already popped. Let's add another one.
-	h.AddIfNotPresent(mkHeapObj("bar", 14))
-	item, err = h.Pop()
-	if e, a := 11, item.(testHeapObject).val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-	item, err = h.Pop()
-	if e, a := 14, item.(testHeapObject).val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-}
-
 // TestHeap_Delete tests Heap.Delete and ensures that heap invariant is
 // preserved after deleting items.
 func TestHeap_Delete(t *testing.T) {

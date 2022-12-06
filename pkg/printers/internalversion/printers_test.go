@@ -17,8 +17,10 @@ limitations under the License.
 package internalversion
 
 import (
+	"fmt"
 	"math"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -28,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/certificate/csr"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -976,8 +979,8 @@ func TestPrintIngress(t *testing.T) {
 			},
 		},
 		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			LoadBalancer: networking.IngressLoadBalancerStatus{
+				Ingress: []networking.IngressLoadBalancerIngress{
 					{
 						IP:       "2.3.4.5",
 						Hostname: "localhost.localdomain",
@@ -1498,6 +1501,24 @@ func TestPrintPod(t *testing.T) {
 				},
 			},
 			[]metav1.TableRow{{Cells: []interface{}{"test14", "2/2", "Running", "9 (5d ago)", "<unknown>"}}},
+		},
+		{
+			// Test PodScheduled condition with reason WaitingForGates
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test15"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodScheduled,
+							Status: api.ConditionFalse,
+							Reason: api.PodReasonSchedulingGated,
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test15", "0/2", api.PodReasonSchedulingGated, "0", "<unknown>"}}},
 		},
 	}
 
@@ -5534,7 +5555,7 @@ func TestPrintFlowSchema(t *testing.T) {
 				},
 			},
 			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, Age, MissingPL
-			expected: []metav1.TableRow{{Cells: []interface{}{"all-matcher", "allee", int32(math.MaxInt32), "ByUser", "0s", "?"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"all-matcher", "allee", int64(math.MaxInt32), "ByUser", "0s", "?"}}},
 		}, {
 			fs: flowcontrol.FlowSchema{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5580,7 +5601,7 @@ func TestPrintFlowSchema(t *testing.T) {
 				},
 			},
 			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, Age, MissingPL
-			expected: []metav1.TableRow{{Cells: []interface{}{"some-matcher", "allee", int32(0), "ByNamespace", "5m", "True"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-matcher", "allee", int64(0), "ByNamespace", "5m", "True"}}},
 		}, {
 			fs: flowcontrol.FlowSchema{
 				ObjectMeta: metav1.ObjectMeta{
@@ -5607,7 +5628,7 @@ func TestPrintFlowSchema(t *testing.T) {
 				},
 			},
 			// Columns: Name, PriorityLevelName, MatchingPrecedence, DistinguisherMethod, Age, MissingPL
-			expected: []metav1.TableRow{{Cells: []interface{}{"exempt", "allee", int32(0), "<none>", "5m", "?"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"exempt", "allee", int64(0), "<none>", "5m", "?"}}},
 		},
 	}
 
@@ -5640,7 +5661,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 					Type: flowcontrol.PriorityLevelEnablementExempt,
 				},
 			},
-			// Columns: Name, Type, AssuredConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
+			// Columns: Name, Type, NominalConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"unlimited", "Exempt", "<none>", "<none>", "<none>", "<none>", "0s"}}},
 		},
 		{
@@ -5652,14 +5673,14 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 47,
+						NominalConcurrencyShares: 47,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject,
 						},
 					},
 				},
 			},
-			// Columns: Name, Type, AssuredConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
+			// Columns: Name, Type, NominalConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"unqueued", "Limited", int32(47), "<none>", "<none>", "<none>", "0s"}}},
 		},
 		{
@@ -5671,7 +5692,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 42,
+						NominalConcurrencyShares: 42,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 							Queuing: &flowcontrol.QueuingConfiguration{
@@ -5683,7 +5704,7 @@ func TestPrintPriorityLevelConfiguration(t *testing.T) {
 					},
 				},
 			},
-			// Columns: Name, Type, AssuredConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
+			// Columns: Name, Type, NominalConcurrencyShares, Queues, HandSize, QueueLengthLimit, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"queued", "Limited", int32(42), int32(8), int32(3), int32(4), "0s"}}},
 		},
 	}
@@ -5820,6 +5841,650 @@ func TestPrintStorageVersion(t *testing.T) {
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
 			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintScale(t *testing.T) {
+	tests := []struct {
+		scale    autoscaling.Scale
+		options  printers.GenerateOptions
+		expected []metav1.TableRow
+	}{
+		{
+			scale: autoscaling.Scale{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-autoscaling",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec:   autoscaling.ScaleSpec{Replicas: 2},
+				Status: autoscaling.ScaleStatus{Replicas: 1},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"test-autoscaling", int64(2), int64(1), string("0s")},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printScale(&test.scale, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
+	tests := []struct {
+		name    string
+		printer func() ([]metav1.TableRow, error)
+	}{
+		{
+			name: "Pod",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPod(&api.Pod{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PodTemplate",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPodTemplate(&api.PodTemplate{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PodDisruptionBudget",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPodDisruptionBudget(&policy.PodDisruptionBudget{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ReplicationController",
+			printer: func() ([]metav1.TableRow, error) {
+				return printReplicationController(&api.ReplicationController{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ReplicaSet",
+			printer: func() ([]metav1.TableRow, error) {
+				return printReplicaSet(&apps.ReplicaSet{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Job",
+			printer: func() ([]metav1.TableRow, error) {
+				return printJob(&batch.Job{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "CronJob",
+			printer: func() ([]metav1.TableRow, error) {
+				return printCronJob(&batch.CronJob{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Service",
+			printer: func() ([]metav1.TableRow, error) {
+				return printService(&api.Service{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Ingress",
+			printer: func() ([]metav1.TableRow, error) {
+				return printIngress(&networking.Ingress{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "IngressClass",
+			printer: func() ([]metav1.TableRow, error) {
+				return printIngressClass(&networking.IngressClass{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "StatefulSet",
+			printer: func() ([]metav1.TableRow, error) {
+				return printStatefulSet(&apps.StatefulSet{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "DaemonSet",
+			printer: func() ([]metav1.TableRow, error) {
+				return printDaemonSet(&apps.DaemonSet{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Endpoints",
+			printer: func() ([]metav1.TableRow, error) {
+				return printEndpoints(&api.Endpoints{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "EndpointSlice",
+			printer: func() ([]metav1.TableRow, error) {
+				return printEndpointSlice(&discovery.EndpointSlice{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "CSINode",
+			printer: func() ([]metav1.TableRow, error) {
+				return printCSINode(&storage.CSINode{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "CSIDriver",
+			printer: func() ([]metav1.TableRow, error) {
+				return printCSIDriver(&storage.CSIDriver{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "CSIStorageCapacity",
+			printer: func() ([]metav1.TableRow, error) {
+				return printCSIStorageCapacity(&storage.CSIStorageCapacity{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "MutatingWebhookConfiguration",
+			printer: func() ([]metav1.TableRow, error) {
+				return printMutatingWebhook(&admissionregistration.MutatingWebhookConfiguration{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ValidatingWebhookConfiguration",
+			printer: func() ([]metav1.TableRow, error) {
+				return printValidatingWebhook(&admissionregistration.ValidatingWebhookConfiguration{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ValidatingAdmissionPolicy",
+			printer: func() ([]metav1.TableRow, error) {
+				return printValidatingAdmissionPolicy(&admissionregistration.ValidatingAdmissionPolicy{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ValidatingAdmissionPolicyBinding",
+			printer: func() ([]metav1.TableRow, error) {
+				return printValidatingAdmissionPolicyBinding(&admissionregistration.ValidatingAdmissionPolicyBinding{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Namespace",
+			printer: func() ([]metav1.TableRow, error) {
+				return printNamespace(&api.Namespace{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Secret",
+			printer: func() ([]metav1.TableRow, error) {
+				return printSecret(&api.Secret{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ServiceAccount",
+			printer: func() ([]metav1.TableRow, error) {
+				return printServiceAccount(&api.ServiceAccount{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Node",
+			printer: func() ([]metav1.TableRow, error) {
+				return printNode(&api.Node{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PersistentVolume",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPersistentVolume(&api.PersistentVolume{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PersistentVolumeClaim",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPersistentVolumeClaim(&api.PersistentVolumeClaim{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Event",
+			printer: func() ([]metav1.TableRow, error) {
+				return printEvent(&api.Event{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "RoleBinding",
+			printer: func() ([]metav1.TableRow, error) {
+				return printRoleBinding(&rbac.RoleBinding{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ClusterRoleBinding",
+			printer: func() ([]metav1.TableRow, error) {
+				return printClusterRoleBinding(&rbac.ClusterRoleBinding{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "CertificateSigningRequest",
+			printer: func() ([]metav1.TableRow, error) {
+				return printCertificateSigningRequest(&certificates.CertificateSigningRequest{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ComponentStatus",
+			printer: func() ([]metav1.TableRow, error) {
+				return printComponentStatus(&api.ComponentStatus{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Deployment",
+			printer: func() ([]metav1.TableRow, error) {
+				return printDeployment(&apps.Deployment{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "HorizontalPodAutoscaler",
+			printer: func() ([]metav1.TableRow, error) {
+				return printHorizontalPodAutoscaler(&autoscaling.HorizontalPodAutoscaler{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ConfigMap",
+			printer: func() ([]metav1.TableRow, error) {
+				return printConfigMap(&api.ConfigMap{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PodSecurityPolicy",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPodSecurityPolicy(&policy.PodSecurityPolicy{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "NetworkPolicy",
+			printer: func() ([]metav1.TableRow, error) {
+				return printNetworkPolicy(&networking.NetworkPolicy{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "StorageClass",
+			printer: func() ([]metav1.TableRow, error) {
+				return printStorageClass(&storage.StorageClass{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Lease",
+			printer: func() ([]metav1.TableRow, error) {
+				return printLease(&coordination.Lease{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ControllerRevision",
+			printer: func() ([]metav1.TableRow, error) {
+				return printControllerRevision(&apps.ControllerRevision{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ResourceQuota",
+			printer: func() ([]metav1.TableRow, error) {
+				return printResourceQuota(&api.ResourceQuota{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PriorityClass",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPriorityClass(&scheduling.PriorityClass{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "RuntimeClass",
+			printer: func() ([]metav1.TableRow, error) {
+				return printRuntimeClass(&nodeapi.RuntimeClass{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "VolumeAttachment",
+			printer: func() ([]metav1.TableRow, error) {
+				return printVolumeAttachment(&storage.VolumeAttachment{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "FlowSchema",
+			printer: func() ([]metav1.TableRow, error) {
+				return printFlowSchema(&flowcontrol.FlowSchema{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "StorageVersion",
+			printer: func() ([]metav1.TableRow, error) {
+				return printStorageVersion(&apiserverinternal.StorageVersion{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "PriorityLevelConfiguration",
+			printer: func() ([]metav1.TableRow, error) {
+				return printPriorityLevelConfiguration(&flowcontrol.PriorityLevelConfiguration{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Scale",
+			printer: func() ([]metav1.TableRow, error) {
+				return printScale(&autoscaling.Scale{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "Status",
+			printer: func() ([]metav1.TableRow, error) {
+				return printStatus(&metav1.Status{}, printers.GenerateOptions{})
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rows, err := test.printer()
+			if err != nil {
+				t.Fatalf("expected no error, but got: %#v", err)
+			}
+			if len(rows) <= 0 {
+				t.Fatalf("expected to have at least one TableRow, but got: %d", len(rows))
+			}
+
+			func() {
+				defer func() {
+					if err := recover(); err != nil {
+						// Same as stdlib http server code. Manually allocate stack
+						// trace buffer size to prevent excessively large logs
+						const size = 64 << 10
+						buf := make([]byte, size)
+						buf = buf[:runtime.Stack(buf, false)]
+						err = fmt.Errorf("%q stack:\n%s", err, buf)
+
+						t.Errorf("Expected no panic, but got: %v", err)
+					}
+				}()
+
+				// should not panic
+				rows[0].DeepCopy()
+			}()
+
+		})
+	}
+}
+
+func TestPrintClusterCIDR(t *testing.T) {
+	ipv4CIDR := "10.1.0.0/16"
+	perNodeHostBits := int32(8)
+	ipv6CIDR := "fd00:1:1::/64"
+
+	tests := []struct {
+		ccc      networking.ClusterCIDR
+		options  printers.GenerateOptions
+		expected []metav1.TableRow
+	}{
+		{
+			// Test name, IPv4 only with no node selector.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv4:            ipv4CIDR,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "8", ipv4CIDR, "<none>", "<unknown>"}}},
+		},
+		{
+			// Test name, IPv4 only with node selector, Not wide.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test2"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv4:            ipv4CIDR,
+					// Does NOT get printed.
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test2", "8", ipv4CIDR, "<none>", "<unknown>"}}},
+		},
+		{
+			// Test name, IPv4 only with no node selector, wide.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test3"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv4:            ipv4CIDR,
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test3", "8", ipv4CIDR, "<none>", "<unknown>", "<none>"}}},
+		},
+		{
+			// Test name, IPv4 only with node selector, wide.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test4"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv4:            ipv4CIDR,
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test4", "8", ipv4CIDR, "<none>", "<unknown>", "MatchExpressions: [{foo In [bar]}]"}}},
+		},
+		{
+			// Test name, IPv6 only with no node selector.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv6:            ipv6CIDR,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "8", "<none>", ipv6CIDR, "<unknown>"}}},
+		},
+		{
+			// Test name, IPv6 only with node selector, Not wide.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv6:            ipv6CIDR,
+					// Does NOT get printed.
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test6", "8", "<none>", ipv6CIDR, "<unknown>"}}},
+		},
+		{
+			// Test name, IPv6 only with no node selector, wide.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test7"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv6:            ipv6CIDR,
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test7", "8", "<none>", ipv6CIDR, "<unknown>", "<none>"}}},
+		},
+		{
+			// Test name, IPv6 only with node selector, wide.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test8"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv6:            ipv6CIDR,
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test8", "8", "<none>", ipv6CIDR, "<unknown>", "MatchExpressions: [{foo In [bar]}]"}}},
+		},
+		{
+			// Test name, DualStack with no node selector.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test9"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv4:            ipv4CIDR,
+					IPv6:            ipv6CIDR,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test9", "8", ipv4CIDR, ipv6CIDR, "<unknown>"}}},
+		},
+		{
+			// Test name,DualStack with node selector, Not wide.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test10"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv4:            ipv4CIDR,
+					IPv6:            ipv6CIDR,
+					// Does NOT get printed.
+					NodeSelector: makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test10", "8", ipv4CIDR, ipv6CIDR, "<unknown>"}}},
+		},
+		{
+			// Test name, DualStack with no node selector, wide.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test11"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv4:            ipv4CIDR,
+					IPv6:            ipv6CIDR,
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test11", "8", ipv4CIDR, ipv6CIDR, "<unknown>", "<none>"}}},
+		},
+		{
+			// Test name, DualStack with node selector, wide.
+			ccc: networking.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{Name: "test12"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: perNodeHostBits,
+					IPv4:            ipv4CIDR,
+					IPv6:            ipv6CIDR,
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector .
+			expected: []metav1.TableRow{{Cells: []interface{}{"test12", "8", ipv4CIDR, ipv6CIDR, "<unknown>", "MatchExpressions: [{foo In [bar]}]"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printClusterCIDR(&test.ccc, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func makeNodeSelector(key string, op api.NodeSelectorOperator, values []string) *api.NodeSelector {
+	return &api.NodeSelector{
+		NodeSelectorTerms: []api.NodeSelectorTerm{
+			{
+				MatchExpressions: []api.NodeSelectorRequirement{
+					{
+						Key:      key,
+						Operator: op,
+						Values:   values,
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestPrintClusterCIDRList(t *testing.T) {
+
+	cccList := networking.ClusterCIDRList{
+		Items: []networking.ClusterCIDR{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "ccc1"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: int32(8),
+					IPv4:            "10.1.0.0/16",
+					IPv6:            "fd00:1:1::/64",
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "ccc2"},
+				Spec: networking.ClusterCIDRSpec{
+					PerNodeHostBits: int32(8),
+					IPv4:            "10.2.0.0/16",
+					IPv6:            "fd00:2:1::/64",
+					NodeSelector:    makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}),
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		options  printers.GenerateOptions
+		expected []metav1.TableRow
+	}{
+		{
+			// Test name, DualStack with node selector, wide.
+			options: printers.GenerateOptions{Wide: false},
+			expected: []metav1.TableRow{
+				// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age.
+				{Cells: []interface{}{"ccc1", "8", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>"}},
+				{Cells: []interface{}{"ccc2", "8", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>"}},
+			},
+		},
+		{
+			// Test name, DualStack with node selector, wide.
+			options: printers.GenerateOptions{Wide: true},
+			expected: []metav1.TableRow{
+				// Columns: Name, PerNodeHostBits, IPv4, IPv6, Age, NodeSelector.
+				{Cells: []interface{}{"ccc1", "8", "10.1.0.0/16", "fd00:1:1::/64", "<unknown>", "MatchExpressions: [{foo In [bar]}]"}},
+				{Cells: []interface{}{"ccc2", "8", "10.2.0.0/16", "fd00:2:1::/64", "<unknown>", "MatchExpressions: [{foo In [bar]}]"}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		rows, err := printClusterCIDRList(&cccList, test.options)
+		if err != nil {
+			t.Fatalf("Error printing service list: %#v", err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
 }

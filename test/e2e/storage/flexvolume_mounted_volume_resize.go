@@ -22,7 +22,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -38,6 +38,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -54,13 +55,13 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		resizableSc       *storagev1.StorageClass
 		node              *v1.Node
 		nodeName          string
-		isNodeLabeled     bool
 		nodeKeyValueLabel map[string]string
 		nodeLabelValue    string
 		nodeKey           string
 	)
 
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce", "local")
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
@@ -68,21 +69,17 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 
 		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 		framework.ExpectNoError(err)
 		nodeName = node.Name
 
-		nodeKey = "mounted_flexvolume_expand"
-
-		if !isNodeLabeled {
-			nodeLabelValue = ns
-			nodeKeyValueLabel = make(map[string]string)
-			nodeKeyValueLabel[nodeKey] = nodeLabelValue
-			framework.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
-			isNodeLabeled = true
-		}
+		nodeKey = "mounted_flexvolume_expand_" + ns
+		nodeLabelValue = ns
+		nodeKeyValueLabel = map[string]string{nodeKey: nodeLabelValue}
+		e2enode.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
+		ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, c, nodeName, nodeKey)
 
 		test := testsuites.StorageClassTest{
 			Name:                 "flexvolume-resize",
@@ -97,7 +94,9 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 			fmt.Printf("storage class creation error: %v\n", err)
 		}
 		framework.ExpectNoError(err, "Error creating resizable storage class")
-		framework.ExpectEqual(*resizableSc.AllowVolumeExpansion, true)
+		if !*resizableSc.AllowVolumeExpansion {
+			framework.Failf("Class %s does not allow volume expansion", resizableSc.Name)
+		}
 
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			StorageClassName: &(resizableSc.Name),
@@ -105,24 +104,12 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		}, ns)
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating pvc")
-	})
-
-	framework.AddCleanupAction(func() {
-		if len(nodeLabelValue) > 0 {
-			framework.RemoveLabelOffNode(c, nodeName, nodeKey)
-		}
-	})
-
-	ginkgo.AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
-
-		if c != nil {
+		ginkgo.DeferCleanup(func() {
+			framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
 			if errs := e2epv.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
 				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
-			pvc, nodeName, isNodeLabeled, nodeLabelValue = nil, "", false, ""
-			nodeKeyValueLabel = make(map[string]string)
-		}
+		})
 	})
 
 	ginkgo.It("Should verify mounted flex volumes can be resized", func() {

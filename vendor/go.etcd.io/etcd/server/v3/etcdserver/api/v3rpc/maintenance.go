@@ -66,19 +66,20 @@ type ClusterStatusGetter interface {
 }
 
 type maintenanceServer struct {
-	lg  *zap.Logger
-	rg  etcdserver.RaftStatusGetter
-	kg  KVGetter
-	bg  BackendGetter
-	a   Alarmer
-	lt  LeaderTransferrer
-	hdr header
-	cs  ClusterStatusGetter
-	d   Downgrader
+	lg     *zap.Logger
+	rg     etcdserver.RaftStatusGetter
+	hasher mvcc.HashStorage
+	kg     KVGetter
+	bg     BackendGetter
+	a      Alarmer
+	lt     LeaderTransferrer
+	hdr    header
+	cs     ClusterStatusGetter
+	d      Downgrader
 }
 
 func NewMaintenanceServer(s *etcdserver.EtcdServer) pb.MaintenanceServer {
-	srv := &maintenanceServer{lg: s.Cfg.Logger, rg: s, kg: s, bg: s, a: s, lt: s, hdr: newHeader(s), cs: s, d: s}
+	srv := &maintenanceServer{lg: s.Cfg.Logger, rg: s, hasher: s.KV().HashStorage(), kg: s, bg: s, a: s, lt: s, hdr: newHeader(s), cs: s, d: s}
 	if srv.lg == nil {
 		srv.lg = zap.NewNop()
 	}
@@ -180,7 +181,7 @@ func (ms *maintenanceServer) Snapshot(sr *pb.SnapshotRequest, srv pb.Maintenance
 }
 
 func (ms *maintenanceServer) Hash(ctx context.Context, r *pb.HashRequest) (*pb.HashResponse, error) {
-	h, rev, err := ms.kg.KV().Hash()
+	h, rev, err := ms.hasher.Hash()
 	if err != nil {
 		return nil, togRPCError(err)
 	}
@@ -190,12 +191,12 @@ func (ms *maintenanceServer) Hash(ctx context.Context, r *pb.HashRequest) (*pb.H
 }
 
 func (ms *maintenanceServer) HashKV(ctx context.Context, r *pb.HashKVRequest) (*pb.HashKVResponse, error) {
-	h, rev, compactRev, err := ms.kg.KV().HashByRev(r.Revision)
+	h, rev, err := ms.hasher.HashByRev(r.Revision)
 	if err != nil {
 		return nil, togRPCError(err)
 	}
 
-	resp := &pb.HashKVResponse{Header: &pb.ResponseHeader{Revision: rev}, Hash: h, CompactRevision: compactRev}
+	resp := &pb.HashKVResponse{Header: &pb.ResponseHeader{Revision: rev}, Hash: h.Hash, CompactRevision: h.CompactRevision}
 	ms.hdr.fill(resp.Header)
 	return resp, nil
 }

@@ -3,6 +3,6 @@
 approvers:
   - sig-cli-maintainers
 reviewers:
-  - sig-cli
+  - sig-cli-reviewers
 labels:
   - sig/cli

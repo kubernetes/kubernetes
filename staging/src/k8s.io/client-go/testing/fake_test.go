@@ -26,8 +26,8 @@ import (
 )
 
 func TestOriginalObjectCaptured(t *testing.T) {
-	// this ReactionFunc sets the resources ClusterName
-	const testClusterName = "some-value"
+	// this ReactionFunc sets the resources SelfLink
+	const testSelfLink = "some-value"
 	reactors := []ReactionFunc{
 		func(action Action) (bool, runtime.Object, error) {
 			createAction := action.(CreateActionImpl)
@@ -37,7 +37,7 @@ func TestOriginalObjectCaptured(t *testing.T) {
 			}
 
 			// set any field on the resource
-			accessor.SetClusterName(testClusterName)
+			accessor.SetSelfLink(testSelfLink)
 
 			return true, createAction.Object, nil
 		},
@@ -69,7 +69,7 @@ func TestOriginalObjectCaptured(t *testing.T) {
 	}
 
 	// validate that the returned resource was modified by the ReactionFunc
-	if accessor.GetClusterName() != testClusterName {
+	if accessor.GetSelfLink() != testSelfLink {
 		t.Errorf("expected resource returned by Invokes to be modified by the ReactionFunc")
 	}
 	// verify one action was performed
@@ -83,14 +83,14 @@ func TestOriginalObjectCaptured(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if accessor.GetClusterName() != "" {
+	if accessor.GetSelfLink() != "" {
 		t.Errorf("expected Action recorded to not be modified by ReactionFunc but it was")
 	}
 }
 
 func TestReactorChangesPersisted(t *testing.T) {
-	// this ReactionFunc sets the resources ClusterName
-	const testClusterName = "some-value"
+	// this ReactionFunc sets the resources SelfLink
+	const testSelfLink = "some-value"
 	reactors := []ReactionFunc{
 		func(action Action) (bool, runtime.Object, error) {
 			createAction := action.(CreateActionImpl)
@@ -100,7 +100,7 @@ func TestReactorChangesPersisted(t *testing.T) {
 			}
 
 			// set any field on the resource
-			accessor.SetClusterName(testClusterName)
+			accessor.SetSelfLink(testSelfLink)
 
 			return false, createAction.Object, nil
 		},
@@ -111,8 +111,8 @@ func TestReactorChangesPersisted(t *testing.T) {
 				return false, nil, err
 			}
 
-			// ensure the clusterName is set to testClusterName already
-			if accessor.GetClusterName() != testClusterName {
+			// ensure the selfLink is set to testSelfLink already
+			if accessor.GetSelfLink() != testSelfLink {
 				t.Errorf("expected resource passed to second reactor to be modified by first reactor")
 			}
 
@@ -146,7 +146,7 @@ func TestReactorChangesPersisted(t *testing.T) {
 	}
 
 	// validate that the returned resource was modified by the ReactionFunc
-	if accessor.GetClusterName() != testClusterName {
+	if accessor.GetSelfLink() != testSelfLink {
 		t.Errorf("expected resource returned by Invokes to be modified by the ReactionFunc")
 	}
 	// verify one action was performed
@@ -160,7 +160,7 @@ func TestReactorChangesPersisted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if accessor.GetClusterName() != "" {
+	if accessor.GetSelfLink() != "" {
 		t.Errorf("expected Action recorded to not be modified by ReactionFunc but it was")
 	}
 }

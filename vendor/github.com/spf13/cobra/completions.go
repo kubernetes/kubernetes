@@ -1,3 +1,17 @@
+// Copyright 2013-2022 The Cobra Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cobra
 
 import (
@@ -93,12 +107,22 @@ type CompletionOptions struct {
 	// DisableDescriptions turns off all completion descriptions for shells
 	// that support them
 	DisableDescriptions bool
+	// HiddenDefaultCmd makes the default 'completion' command hidden
+	HiddenDefaultCmd bool
 }
 
 // NoFileCompletions can be used to disable file completion for commands that should
 // not trigger file completions.
 func NoFileCompletions(cmd *Command, args []string, toComplete string) ([]string, ShellCompDirective) {
 	return nil, ShellCompDirectiveNoFileComp
+}
+
+// FixedCompletions can be used to create a completion function which always
+// returns the same results.
+func FixedCompletions(choices []string, directive ShellCompDirective) func(cmd *Command, args []string, toComplete string) ([]string, ShellCompDirective) {
+	return func(cmd *Command, args []string, toComplete string) ([]string, ShellCompDirective) {
+		return choices, directive
+	}
 }
 
 // RegisterFlagCompletionFunc should be called to register a function to provide completion for a flag.
@@ -168,6 +192,12 @@ func (c *Command) initCompleteCmd(args []string) {
 
 			noDescriptions := (cmd.CalledAs() == ShellCompNoDescRequestCmd)
 			for _, comp := range completions {
+				if GetActiveHelpConfig(finalCmd) == activeHelpGlobalDisable {
+					// Remove all activeHelp entries in this case
+					if strings.HasPrefix(comp, activeHelpMarker) {
+						continue
+					}
+				}
 				if noDescriptions {
 					// Remove any description that may be included following a tab character.
 					comp = strings.Split(comp, "\t")[0]
@@ -226,13 +256,29 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 	if c.Root().TraverseChildren {
 		finalCmd, finalArgs, err = c.Root().Traverse(trimmedArgs)
 	} else {
-		finalCmd, finalArgs, err = c.Root().Find(trimmedArgs)
+		// For Root commands that don't specify any value for their Args fields, when we call
+		// Find(), if those Root commands don't have any sub-commands, they will accept arguments.
+		// However, because we have added the __complete sub-command in the current code path, the
+		// call to Find() -> legacyArgs() will return an error if there are any arguments.
+		// To avoid this, we first remove the __complete command to get back to having no sub-commands.
+		rootCmd := c.Root()
+		if len(rootCmd.Commands()) == 1 {
+			rootCmd.RemoveCommand(c)
+		}
+
+		finalCmd, finalArgs, err = rootCmd.Find(trimmedArgs)
 	}
 	if err != nil {
 		// Unable to find the real command. E.g., <program> someInvalidCmd <TAB>
 		return c, []string{}, ShellCompDirectiveDefault, fmt.Errorf("Unable to find a command for arguments: %v", trimmedArgs)
 	}
 	finalCmd.ctx = c.ctx
+
+	// These flags are normally added when `execute()` is called on `finalCmd`,
+	// however, when doing completion, we don't call `finalCmd.execute()`.
+	// Let's add the --help and --version flag ourselves.
+	finalCmd.InitDefaultHelpFlag()
+	finalCmd.InitDefaultVersionFlag()
 
 	// Check if we are doing flag value completion before parsing the flags.
 	// This is important because if we are completing a flag value, we need to also
@@ -266,6 +312,18 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 		}
 	}
 
+	// Look for the --help or --version flags.  If they are present,
+	// there should be no further completions.
+	if helpOrVersionFlagPresent(finalCmd) {
+		return finalCmd, []string{}, ShellCompDirectiveNoFileComp, nil
+	}
+
+	// We only remove the flags from the arguments if DisableFlagParsing is not set.
+	// This is important for commands which have requested to do their own flag completion.
+	if !finalCmd.DisableFlagParsing {
+		finalArgs = finalCmd.Flags().Args()
+	}
+
 	if flag != nil && flagCompletion {
 		// Check if we are completing a flag value subject to annotations
 		if validExts, present := flag.Annotations[BashCompFilenameExt]; present {
@@ -290,12 +348,19 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 		}
 	}
 
+	var completions []string
+	var directive ShellCompDirective
+
+	// Enforce flag groups before doing flag completions
+	finalCmd.enforceFlagGroupsForCompletion()
+
+	// Note that we want to perform flagname completion even if finalCmd.DisableFlagParsing==true;
+	// doing this allows for completion of persistent flag names even for commands that disable flag parsing.
+	//
 	// When doing completion of a flag name, as soon as an argument starts with
 	// a '-' we know it is a flag.  We cannot use isFlagArg() here as it requires
 	// the flag name to be complete
 	if flag == nil && len(toComplete) > 0 && toComplete[0] == '-' && !strings.Contains(toComplete, "=") && flagCompletion {
-		var completions []string
-
 		// First check for required flags
 		completions = completeRequireFlags(finalCmd, toComplete)
 
@@ -322,86 +387,86 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 			})
 		}
 
-		directive := ShellCompDirectiveNoFileComp
+		directive = ShellCompDirectiveNoFileComp
 		if len(completions) == 1 && strings.HasSuffix(completions[0], "=") {
 			// If there is a single completion, the shell usually adds a space
 			// after the completion.  We don't want that if the flag ends with an =
 			directive = ShellCompDirectiveNoSpace
 		}
-		return finalCmd, completions, directive, nil
-	}
 
-	// We only remove the flags from the arguments if DisableFlagParsing is not set.
-	// This is important for commands which have requested to do their own flag completion.
-	if !finalCmd.DisableFlagParsing {
-		finalArgs = finalCmd.Flags().Args()
-	}
-
-	var completions []string
-	directive := ShellCompDirectiveDefault
-	if flag == nil {
-		foundLocalNonPersistentFlag := false
-		// If TraverseChildren is true on the root command we don't check for
-		// local flags because we can use a local flag on a parent command
-		if !finalCmd.Root().TraverseChildren {
-			// Check if there are any local, non-persistent flags on the command-line
-			localNonPersistentFlags := finalCmd.LocalNonPersistentFlags()
-			finalCmd.NonInheritedFlags().VisitAll(func(flag *pflag.Flag) {
-				if localNonPersistentFlags.Lookup(flag.Name) != nil && flag.Changed {
-					foundLocalNonPersistentFlag = true
-				}
-			})
+		if !finalCmd.DisableFlagParsing {
+			// If DisableFlagParsing==false, we have completed the flags as known by Cobra;
+			// we can return what we found.
+			// If DisableFlagParsing==true, Cobra may not be aware of all flags, so we
+			// let the logic continue to see if ValidArgsFunction needs to be called.
+			return finalCmd, completions, directive, nil
 		}
-
-		// Complete subcommand names, including the help command
-		if len(finalArgs) == 0 && !foundLocalNonPersistentFlag {
-			// We only complete sub-commands if:
-			// - there are no arguments on the command-line and
-			// - there are no local, non-persistent flags on the command-line or TraverseChildren is true
-			for _, subCmd := range finalCmd.Commands() {
-				if subCmd.IsAvailableCommand() || subCmd == finalCmd.helpCommand {
-					if strings.HasPrefix(subCmd.Name(), toComplete) {
-						completions = append(completions, fmt.Sprintf("%s\t%s", subCmd.Name(), subCmd.Short))
+	} else {
+		directive = ShellCompDirectiveDefault
+		if flag == nil {
+			foundLocalNonPersistentFlag := false
+			// If TraverseChildren is true on the root command we don't check for
+			// local flags because we can use a local flag on a parent command
+			if !finalCmd.Root().TraverseChildren {
+				// Check if there are any local, non-persistent flags on the command-line
+				localNonPersistentFlags := finalCmd.LocalNonPersistentFlags()
+				finalCmd.NonInheritedFlags().VisitAll(func(flag *pflag.Flag) {
+					if localNonPersistentFlags.Lookup(flag.Name) != nil && flag.Changed {
+						foundLocalNonPersistentFlag = true
 					}
-					directive = ShellCompDirectiveNoFileComp
+				})
+			}
+
+			// Complete subcommand names, including the help command
+			if len(finalArgs) == 0 && !foundLocalNonPersistentFlag {
+				// We only complete sub-commands if:
+				// - there are no arguments on the command-line and
+				// - there are no local, non-persistent flags on the command-line or TraverseChildren is true
+				for _, subCmd := range finalCmd.Commands() {
+					if subCmd.IsAvailableCommand() || subCmd == finalCmd.helpCommand {
+						if strings.HasPrefix(subCmd.Name(), toComplete) {
+							completions = append(completions, fmt.Sprintf("%s\t%s", subCmd.Name(), subCmd.Short))
+						}
+						directive = ShellCompDirectiveNoFileComp
+					}
 				}
 			}
-		}
 
-		// Complete required flags even without the '-' prefix
-		completions = append(completions, completeRequireFlags(finalCmd, toComplete)...)
+			// Complete required flags even without the '-' prefix
+			completions = append(completions, completeRequireFlags(finalCmd, toComplete)...)
 
-		// Always complete ValidArgs, even if we are completing a subcommand name.
-		// This is for commands that have both subcommands and ValidArgs.
-		if len(finalCmd.ValidArgs) > 0 {
-			if len(finalArgs) == 0 {
-				// ValidArgs are only for the first argument
-				for _, validArg := range finalCmd.ValidArgs {
-					if strings.HasPrefix(validArg, toComplete) {
-						completions = append(completions, validArg)
+			// Always complete ValidArgs, even if we are completing a subcommand name.
+			// This is for commands that have both subcommands and ValidArgs.
+			if len(finalCmd.ValidArgs) > 0 {
+				if len(finalArgs) == 0 {
+					// ValidArgs are only for the first argument
+					for _, validArg := range finalCmd.ValidArgs {
+						if strings.HasPrefix(validArg, toComplete) {
+							completions = append(completions, validArg)
+						}
 					}
-				}
-				directive = ShellCompDirectiveNoFileComp
+					directive = ShellCompDirectiveNoFileComp
 
-				// If no completions were found within commands or ValidArgs,
-				// see if there are any ArgAliases that should be completed.
-				if len(completions) == 0 {
-					for _, argAlias := range finalCmd.ArgAliases {
-						if strings.HasPrefix(argAlias, toComplete) {
-							completions = append(completions, argAlias)
+					// If no completions were found within commands or ValidArgs,
+					// see if there are any ArgAliases that should be completed.
+					if len(completions) == 0 {
+						for _, argAlias := range finalCmd.ArgAliases {
+							if strings.HasPrefix(argAlias, toComplete) {
+								completions = append(completions, argAlias)
+							}
 						}
 					}
 				}
+
+				// If there are ValidArgs specified (even if they don't match), we stop completion.
+				// Only one of ValidArgs or ValidArgsFunction can be used for a single command.
+				return finalCmd, completions, directive, nil
 			}
 
-			// If there are ValidArgs specified (even if they don't match), we stop completion.
-			// Only one of ValidArgs or ValidArgsFunction can be used for a single command.
-			return finalCmd, completions, directive, nil
+			// Let the logic continue so as to add any ValidArgsFunction completions,
+			// even if we already found sub-commands.
+			// This is for commands that have subcommands but also specify a ValidArgsFunction.
 		}
-
-		// Let the logic continue so as to add any ValidArgsFunction completions,
-		// even if we already found sub-commands.
-		// This is for commands that have subcommands but also specify a ValidArgsFunction.
 	}
 
 	// Find the completion function for the flag or command
@@ -422,6 +487,18 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 	}
 
 	return finalCmd, completions, directive, nil
+}
+
+func helpOrVersionFlagPresent(cmd *Command) bool {
+	if versionFlag := cmd.Flags().Lookup("version"); versionFlag != nil &&
+		len(versionFlag.Annotations[FlagSetByCobraAnnotation]) > 0 && versionFlag.Changed {
+		return true
+	}
+	if helpFlag := cmd.Flags().Lookup("help"); helpFlag != nil &&
+		len(helpFlag.Annotations[FlagSetByCobraAnnotation]) > 0 && helpFlag.Changed {
+		return true
+	}
+	return false
 }
 
 func getFlagNameCompletions(flag *pflag.Flag, toComplete string) []string {
@@ -568,12 +645,12 @@ func checkIfFlagCompletion(finalCmd *Command, args []string, lastArg string) (*p
 	return flag, trimmedArgs, lastArg, nil
 }
 
-// initDefaultCompletionCmd adds a default 'completion' command to c.
+// InitDefaultCompletionCmd adds a default 'completion' command to c.
 // This function will do nothing if any of the following is true:
 // 1- the feature has been explicitly disabled by the program,
 // 2- c has no subcommands (to avoid creating one),
 // 3- c already has a 'completion' command provided by the program.
-func (c *Command) initDefaultCompletionCmd() {
+func (c *Command) InitDefaultCompletionCmd() {
 	if c.CompletionOptions.DisableDefaultCmd || !c.HasSubCommands() {
 		return
 	}
@@ -589,39 +666,44 @@ func (c *Command) initDefaultCompletionCmd() {
 
 	completionCmd := &Command{
 		Use:   compCmdName,
-		Short: "generate the autocompletion script for the specified shell",
-		Long: fmt.Sprintf(`
-Generate the autocompletion script for %[1]s for the specified shell.
+		Short: "Generate the autocompletion script for the specified shell",
+		Long: fmt.Sprintf(`Generate the autocompletion script for %[1]s for the specified shell.
 See each sub-command's help for details on how to use the generated script.
 `, c.Root().Name()),
 		Args:              NoArgs,
 		ValidArgsFunction: NoFileCompletions,
+		Hidden:            c.CompletionOptions.HiddenDefaultCmd,
+		GroupID:           c.completionCommandGroupID,
 	}
 	c.AddCommand(completionCmd)
 
 	out := c.OutOrStdout()
 	noDesc := c.CompletionOptions.DisableDescriptions
-	shortDesc := "generate the autocompletion script for %s"
+	shortDesc := "Generate the autocompletion script for %s"
 	bash := &Command{
 		Use:   "bash",
 		Short: fmt.Sprintf(shortDesc, "bash"),
-		Long: fmt.Sprintf(`
-Generate the autocompletion script for the bash shell.
+		Long: fmt.Sprintf(`Generate the autocompletion script for the bash shell.
 
 This script depends on the 'bash-completion' package.
 If it is not installed already, you can install it via your OS's package manager.
 
 To load completions in your current shell session:
-$ source <(%[1]s completion bash)
+
+	source <(%[1]s completion bash)
 
 To load completions for every new session, execute once:
-Linux:
-  $ %[1]s completion bash > /etc/bash_completion.d/%[1]s
-MacOS:
-  $ %[1]s completion bash > /usr/local/etc/bash_completion.d/%[1]s
+
+#### Linux:
+
+	%[1]s completion bash > /etc/bash_completion.d/%[1]s
+
+#### macOS:
+
+	%[1]s completion bash > $(brew --prefix)/etc/bash_completion.d/%[1]s
 
 You will need to start a new shell for this setup to take effect.
-  `, c.Root().Name()),
+`, c.Root().Name()),
 		Args:                  NoArgs,
 		DisableFlagsInUseLine: true,
 		ValidArgsFunction:     NoFileCompletions,
@@ -636,19 +718,26 @@ You will need to start a new shell for this setup to take effect.
 	zsh := &Command{
 		Use:   "zsh",
 		Short: fmt.Sprintf(shortDesc, "zsh"),
-		Long: fmt.Sprintf(`
-Generate the autocompletion script for the zsh shell.
+		Long: fmt.Sprintf(`Generate the autocompletion script for the zsh shell.
 
 If shell completion is not already enabled in your environment you will need
 to enable it.  You can execute the following once:
 
-$ echo "autoload -U compinit; compinit" >> ~/.zshrc
+	echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+To load completions in your current shell session:
+
+	source <(%[1]s completion zsh); compdef _%[1]s %[1]s
 
 To load completions for every new session, execute once:
-# Linux:
-$ %[1]s completion zsh > "${fpath[1]}/_%[1]s"
-# macOS:
-$ %[1]s completion zsh > /usr/local/share/zsh/site-functions/_%[1]s
+
+#### Linux:
+
+	%[1]s completion zsh > "${fpath[1]}/_%[1]s"
+
+#### macOS:
+
+	%[1]s completion zsh > $(brew --prefix)/share/zsh/site-functions/_%[1]s
 
 You will need to start a new shell for this setup to take effect.
 `, c.Root().Name()),
@@ -668,14 +757,15 @@ You will need to start a new shell for this setup to take effect.
 	fish := &Command{
 		Use:   "fish",
 		Short: fmt.Sprintf(shortDesc, "fish"),
-		Long: fmt.Sprintf(`
-Generate the autocompletion script for the fish shell.
+		Long: fmt.Sprintf(`Generate the autocompletion script for the fish shell.
 
 To load completions in your current shell session:
-$ %[1]s completion fish | source
+
+	%[1]s completion fish | source
 
 To load completions for every new session, execute once:
-$ %[1]s completion fish > ~/.config/fish/completions/%[1]s.fish
+
+	%[1]s completion fish > ~/.config/fish/completions/%[1]s.fish
 
 You will need to start a new shell for this setup to take effect.
 `, c.Root().Name()),
@@ -692,11 +782,11 @@ You will need to start a new shell for this setup to take effect.
 	powershell := &Command{
 		Use:   "powershell",
 		Short: fmt.Sprintf(shortDesc, "powershell"),
-		Long: fmt.Sprintf(`
-Generate the autocompletion script for powershell.
+		Long: fmt.Sprintf(`Generate the autocompletion script for powershell.
 
 To load completions in your current shell session:
-PS C:\> %[1]s completion powershell | Out-String | Invoke-Expression
+
+	%[1]s completion powershell | Out-String | Invoke-Expression
 
 To load completions for every new session, add the output of the above command
 to your powershell profile.

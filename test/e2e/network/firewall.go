@@ -39,8 +39,9 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -53,6 +54,7 @@ const (
 var _ = common.SIGDescribe("Firewall rule", func() {
 	var firewallTestName = "firewall-test"
 	f := framework.NewDefaultFramework(firewallTestName)
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var cloudConfig framework.CloudConfig
@@ -197,7 +199,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 			framework.ExpectNoError(err)
 		}()
 
-		ginkgo.By("Accessing serivce through the external ip and examine got no response from the node without tags")
+		ginkgo.By("Accessing service through the external ip and examine got no response from the node without tags")
 		err = testHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet, 15)
 		framework.ExpectNoError(err)
 	})
@@ -242,12 +244,12 @@ func assertNotReachableHTTPTimeout(ip, path string, port int, timeout time.Durat
 	}
 }
 
-// testHitNodesFromOutside checkes HTTP connectivity from outside.
+// testHitNodesFromOutside checks HTTP connectivity from outside.
 func testHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
 	return testHitNodesFromOutsideWithCount(externalIP, httpPort, timeout, expectedHosts, 1)
 }
 
-// testHitNodesFromOutsideWithCount checkes HTTP connectivity from outside with count.
+// testHitNodesFromOutsideWithCount checks HTTP connectivity from outside with count.
 func testHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
 	countToSucceed int) error {
 	framework.Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)

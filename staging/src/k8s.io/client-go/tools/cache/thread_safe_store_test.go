@@ -18,7 +18,11 @@ package cache
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
@@ -39,7 +43,7 @@ func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
 	store.Add(testKey, testKey)
 
 	// Assumption check, there should be a set for the `testKey` with one element in the added index
-	set := store.indices[testIndexer][testKey]
+	set := store.index.indices[testIndexer][testKey]
 
 	if len(set) != 1 {
 		t.Errorf("Initial assumption of index backing string set having 1 element failed. Actual elements: %d", len(set))
@@ -47,7 +51,7 @@ func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
 	}
 
 	store.Delete(testKey)
-	set, present := store.indices[testIndexer][testKey]
+	set, present := store.index.indices[testIndexer][testKey]
 
 	if present {
 		t.Errorf("Index backing string set not deleted from index. Set length: %d", len(set))
@@ -72,7 +76,7 @@ func TestThreadSafeStoreAddKeepsNonEmptySetPostDeleteFromIndex(t *testing.T) {
 	store.Add("delete", "delete")
 
 	// Assumption check, there should be a set for the `testIndex` with two elements
-	set := store.indices[testIndexer][testIndex]
+	set := store.index.indices[testIndexer][testIndex]
 
 	if len(set) != 2 {
 		t.Errorf("Initial assumption of index backing string set having 2 elements failed. Actual elements: %d", len(set))
@@ -80,7 +84,7 @@ func TestThreadSafeStoreAddKeepsNonEmptySetPostDeleteFromIndex(t *testing.T) {
 	}
 
 	store.Delete("delete")
-	set, present := store.indices[testIndexer][testIndex]
+	set, present := store.index.indices[testIndexer][testIndex]
 
 	if !present {
 		t.Errorf("Index backing string set erroneously deleted from index.")
@@ -90,6 +94,75 @@ func TestThreadSafeStoreAddKeepsNonEmptySetPostDeleteFromIndex(t *testing.T) {
 	if len(set) != 1 {
 		t.Errorf("Index backing string set has incorrect length, expect 1. Set length: %d", len(set))
 	}
+}
+
+func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
+	testIndexer := "testIndexer"
+
+	indexers := Indexers{
+		testIndexer: func(obj interface{}) ([]string, error) {
+			return strings.Split(obj.(string), ","), nil
+		},
+	}
+
+	indices := Indices{}
+	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+
+	store.Add("key1", "foo")
+	store.Add("key2", "bar")
+
+	assert := assert.New(t)
+
+	compare := func(key string, expected []string) error {
+		values := store.index.indices[testIndexer][key].List()
+		if cmp.Equal(values, expected) {
+			return nil
+		}
+		return fmt.Errorf("unexpected index for key %s, diff=%s", key, cmp.Diff(values, expected))
+	}
+
+	assert.NoError(compare("foo", []string{"key1"}))
+	assert.NoError(compare("bar", []string{"key2"}))
+
+	store.Update("key2", "foo,bar")
+
+	assert.NoError(compare("foo", []string{"key1", "key2"}))
+	assert.NoError(compare("bar", []string{"key2"}))
+
+	store.Update("key1", "foo,bar")
+
+	assert.NoError(compare("foo", []string{"key1", "key2"}))
+	assert.NoError(compare("bar", []string{"key1", "key2"}))
+
+	store.Add("key3", "foo,bar,baz")
+
+	assert.NoError(compare("foo", []string{"key1", "key2", "key3"}))
+	assert.NoError(compare("bar", []string{"key1", "key2", "key3"}))
+	assert.NoError(compare("baz", []string{"key3"}))
+
+	store.Update("key1", "foo")
+
+	assert.NoError(compare("foo", []string{"key1", "key2", "key3"}))
+	assert.NoError(compare("bar", []string{"key2", "key3"}))
+	assert.NoError(compare("baz", []string{"key3"}))
+
+	store.Update("key2", "bar")
+
+	assert.NoError(compare("foo", []string{"key1", "key3"}))
+	assert.NoError(compare("bar", []string{"key2", "key3"}))
+	assert.NoError(compare("baz", []string{"key3"}))
+
+	store.Delete("key1")
+
+	assert.NoError(compare("foo", []string{"key3"}))
+	assert.NoError(compare("bar", []string{"key2", "key3"}))
+	assert.NoError(compare("baz", []string{"key3"}))
+
+	store.Delete("key3")
+
+	assert.NoError(compare("foo", []string{}))
+	assert.NoError(compare("bar", []string{"key2"}))
+	assert.NoError(compare("baz", []string{}))
 }
 
 func BenchmarkIndexer(b *testing.B) {

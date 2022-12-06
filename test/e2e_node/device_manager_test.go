@@ -19,7 +19,6 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,13 +33,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -53,6 +53,7 @@ const (
 var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeature:DeviceManager]", func() {
 	checkpointFullPath := filepath.Join(devicePluginDir, checkpointName)
 	f := framework.NewDefaultFramework("devicemanager-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("With SRIOV devices in the system", func() {
 		// this test wants to reproduce what happened in https://github.com/kubernetes/kubernetes/issues/102880
@@ -84,7 +85,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			podName := "gu-pod-rec-pre-1"
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-			pod = f.PodClient().CreateSync(pod)
+			pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 			// now we need to simulate a node drain, so we remove all the pods, including the sriov device plugin.
 
@@ -130,7 +131,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod = makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 
-			pod = f.PodClient().Create(pod)
+			pod = e2epod.NewPodClient(f).Create(pod)
 			err = e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 				if pod.Status.Phase != v1.PodPending {
 					return true, nil
@@ -138,7 +139,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				return false, nil
 			})
 			framework.ExpectNoError(err)
-			pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			pod, err = e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			if pod.Status.Phase != v1.PodFailed {
@@ -204,7 +205,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			podName := "gu-pod-rec-pre-1"
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-			pod = f.PodClient().CreateSync(pod)
+			pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 			// now we need to simulate a node drain, so we remove all the pods, including the sriov device plugin.
 
@@ -306,8 +307,8 @@ func rewriteCheckpointAsV1(dir, name string) error {
 
 	// TODO: why `checkpointManager.CreateCheckpoint(name, cpV1)` doesn't seem to work?
 	ckPath := filepath.Join(dir, name)
-	ioutil.WriteFile(filepath.Join("/tmp", name), blob, 0600)
-	return ioutil.WriteFile(ckPath, blob, 0600)
+	os.WriteFile(filepath.Join("/tmp", name), blob, 0600)
+	return os.WriteFile(ckPath, blob, 0600)
 }
 
 func convertPodDeviceEntriesToV1(entries []checkpoint.PodDevicesEntry) []checkpoint.PodDevicesEntryV1 {

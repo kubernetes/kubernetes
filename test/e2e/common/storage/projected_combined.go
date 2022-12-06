@@ -24,13 +24,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Projected combined", func() {
 	f := framework.NewDefaultFramework("projected")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	// Test multiple projections
 	/*
@@ -86,7 +89,7 @@ var _ = SIGDescribe("Projected combined", func() {
 				},
 			},
 		}
-		f.TestContainerOutput("Check all projections for projected volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "Check all projections for projected volume plugin", pod, 0, []string{
 			podName,
 			"secret-value-1",
 			"configmap-value-1",

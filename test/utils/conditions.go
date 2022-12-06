@@ -19,7 +19,7 @@ package utils
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
@@ -50,6 +50,10 @@ func PodRunningReadyOrSucceeded(p *v1.Pod) (bool, error) {
 		return true, nil
 	}
 	return PodRunningReady(p)
+}
+
+func PodSucceeded(p *v1.Pod) (bool, error) {
+	return p.Status.Phase == v1.PodSucceeded, nil
 }
 
 // FailedContainers inspects all containers in a pod and returns failure

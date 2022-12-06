@@ -19,16 +19,19 @@ package endpointslice
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -120,15 +123,10 @@ func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
 
 // dropDisabledConditionsOnCreate will drop any fields that are disabled.
 func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
-	dropTerminating := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
 	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
 
-	if dropHints || dropTerminating {
+	if dropHints {
 		for i := range endpointSlice.Endpoints {
-			if dropTerminating {
-				endpointSlice.Endpoints[i].Conditions.Serving = nil
-				endpointSlice.Endpoints[i].Conditions.Terminating = nil
-			}
 			if dropHints {
 				endpointSlice.Endpoints[i].Hints = nil
 			}
@@ -139,16 +137,6 @@ func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
 // dropDisabledFieldsOnUpdate will drop any disable fields that have not already
 // been set on the EndpointSlice.
 func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
-	dropTerminating := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
-	if dropTerminating {
-		for _, ep := range oldEPS.Endpoints {
-			if ep.Conditions.Serving != nil || ep.Conditions.Terminating != nil {
-				dropTerminating = false
-				break
-			}
-		}
-	}
-
 	dropHints := !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints)
 	if dropHints {
 		for _, ep := range oldEPS.Endpoints {
@@ -159,12 +147,8 @@ func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
 		}
 	}
 
-	if dropHints || dropTerminating {
+	if dropHints {
 		for i := range newEPS.Endpoints {
-			if dropTerminating {
-				newEPS.Endpoints[i].Conditions.Serving = nil
-				newEPS.Endpoints[i].Conditions.Terminating = nil
-			}
 			if dropHints {
 				newEPS.Endpoints[i].Hints = nil
 			}
@@ -186,11 +170,40 @@ func dropTopologyOnV1(ctx context.Context, oldEPS, newEPS *discovery.EndpointSli
 			return
 		}
 
+		// Only node names that exist in previous version of the EndpointSlice
+		// deprecatedTopology fields may be retained in new version of the
+		// EndpointSlice.
+		prevNodeNames := getDeprecatedTopologyNodeNames(oldEPS)
+
 		for i := range newEPS.Endpoints {
 			ep := &newEPS.Endpoints[i]
 
-			//Silently clear out DeprecatedTopology
+			newTopologyNodeName, ok := ep.DeprecatedTopology[corev1.LabelHostname]
+			if ep.NodeName == nil && ok && prevNodeNames.Has(newTopologyNodeName) && len(apivalidation.ValidateNodeName(newTopologyNodeName, false)) == 0 {
+				// Copy the label previously used to store the node name into the nodeName field,
+				// in order to make partial updates preserve previous node info
+				ep.NodeName = &newTopologyNodeName
+			}
+			// Drop writes to this field via the v1 API as documented
 			ep.DeprecatedTopology = nil
 		}
 	}
+}
+
+// getDeprecatedTopologyNodeNames returns a set of node names present in
+// deprecatedTopology fields within the provided EndpointSlice.
+func getDeprecatedTopologyNodeNames(eps *discovery.EndpointSlice) sets.String {
+	if eps == nil {
+		return nil
+	}
+	var names sets.String
+	for _, ep := range eps.Endpoints {
+		if nodeName, ok := ep.DeprecatedTopology[corev1.LabelHostname]; ok && len(nodeName) > 0 {
+			if names == nil {
+				names = sets.NewString()
+			}
+			names.Insert(nodeName)
+		}
+	}
+	return names
 }

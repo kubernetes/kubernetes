@@ -22,14 +22,9 @@ limitations under the License.
 package main
 
 import (
-	"math/rand"
 	"os"
-	"time"
 
-	"github.com/spf13/cobra"
-
-	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
+	"k8s.io/component-base/cli"
 	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/restclient"
 	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
@@ -38,22 +33,6 @@ import (
 
 func main() {
 	command := app.NewKubeletCommand()
-
-	// kubelet uses a config file and does its own special
-	// parsing of flags and that config file. It initializes
-	// logging after it is done with that. Therefore it does
-	// not use cli.Run like other, simpler commands.
-	code := run(command)
+	code := cli.Run(command)
 	os.Exit(code)
-}
-
-func run(command *cobra.Command) int {
-	defer logs.FlushLogs()
-	rand.Seed(time.Now().UnixNano())
-
-	command.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
-	if err := command.Execute(); err != nil {
-		return 1
-	}
-	return 0
 }

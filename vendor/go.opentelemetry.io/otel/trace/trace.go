@@ -19,9 +19,6 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"regexp"
-	"strings"
-	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -39,18 +36,6 @@ const (
 
 	errInvalidSpanIDLength errorConst = "hex encoded span-id must have length equals to 16"
 	errNilSpanID           errorConst = "span-id can't be all zero"
-
-	// based on the W3C Trace Context specification, see https://www.w3.org/TR/trace-context-1/#tracestate-header
-	traceStateKeyFormat                      = `[a-z][_0-9a-z\-\*\/]{0,255}`
-	traceStateKeyFormatWithMultiTenantVendor = `[a-z0-9][_0-9a-z\-\*\/]{0,240}@[a-z][_0-9a-z\-\*\/]{0,13}`
-	traceStateValueFormat                    = `[\x20-\x2b\x2d-\x3c\x3e-\x7e]{0,255}[\x21-\x2b\x2d-\x3c\x3e-\x7e]`
-
-	traceStateMaxListMembers = 32
-
-	errInvalidTraceStateKeyValue errorConst = "provided key or value is not valid according to the" +
-		" W3C Trace Context specification"
-	errInvalidTraceStateMembersNumber errorConst = "trace state would exceed the maximum limit of members (32)"
-	errInvalidTraceStateDuplicate     errorConst = "trace state key/value pairs with duplicate keys provided"
 )
 
 type errorConst string
@@ -60,7 +45,7 @@ func (e errorConst) Error() string {
 }
 
 // TraceID is a unique identity of a trace.
-// nolint:golint
+// nolint:revive // revive complains about stutter of `trace.TraceID`.
 type TraceID [16]byte
 
 var nilTraceID TraceID
@@ -78,7 +63,7 @@ func (t TraceID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.String())
 }
 
-// String returns the hex string representation form of a TraceID
+// String returns the hex string representation form of a TraceID.
 func (t TraceID) String() string {
 	return hex.EncodeToString(t[:])
 }
@@ -101,7 +86,7 @@ func (s SpanID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.String())
 }
 
-// String returns the hex string representation form of a SpanID
+// String returns the hex string representation form of a SpanID.
 func (s SpanID) String() string {
 	return hex.EncodeToString(s[:])
 }
@@ -109,7 +94,7 @@ func (s SpanID) String() string {
 // TraceIDFromHex returns a TraceID from a hex string if it is compliant with
 // the W3C trace-context specification.  See more at
 // https://www.w3.org/TR/trace-context/#trace-id
-// nolint:golint
+// nolint:revive // revive complains about stutter of `trace.TraceIDFromHex`.
 func TraceIDFromHex(h string) (TraceID, error) {
 	t := TraceID{}
 	if len(h) != 32 {
@@ -166,155 +151,8 @@ func decodeHex(h string, b []byte) error {
 	return nil
 }
 
-// TraceState provides additional vendor-specific trace identification information
-// across different distributed tracing systems. It represents an immutable list consisting
-// of key/value pairs. There can be a maximum of 32 entries in the list.
-//
-// Key and value of each list member must be valid according to the W3C Trace Context specification
-// (see https://www.w3.org/TR/trace-context-1/#key and https://www.w3.org/TR/trace-context-1/#value
-// respectively).
-//
-// Trace state must be valid according to the W3C Trace Context specification at all times. All
-// mutating operations validate their input and, in case of valid parameters, return a new TraceState.
-type TraceState struct { //nolint:golint
-	// TODO @matej-g: Consider implementing this as attribute.Set, see
-	// comment https://github.com/open-telemetry/opentelemetry-go/pull/1340#discussion_r540599226
-	kvs []attribute.KeyValue
-}
-
-var _ json.Marshaler = TraceState{}
-var _ json.Marshaler = SpanContext{}
-
-var keyFormatRegExp = regexp.MustCompile(
-	`^((` + traceStateKeyFormat + `)|(` + traceStateKeyFormatWithMultiTenantVendor + `))$`,
-)
-var valueFormatRegExp = regexp.MustCompile(`^(` + traceStateValueFormat + `)$`)
-
-// MarshalJSON implements a custom marshal function to encode trace state.
-func (ts TraceState) MarshalJSON() ([]byte, error) {
-	return json.Marshal(ts.kvs)
-}
-
-// String returns trace state as a string valid according to the
-// W3C Trace Context specification.
-func (ts TraceState) String() string {
-	var sb strings.Builder
-
-	for i, kv := range ts.kvs {
-		sb.WriteString((string)(kv.Key))
-		sb.WriteByte('=')
-		sb.WriteString(kv.Value.Emit())
-
-		if i != len(ts.kvs)-1 {
-			sb.WriteByte(',')
-		}
-	}
-
-	return sb.String()
-}
-
-// Get returns a value for given key from the trace state.
-// If no key is found or provided key is invalid, returns an empty value.
-func (ts TraceState) Get(key attribute.Key) attribute.Value {
-	if !isTraceStateKeyValid(key) {
-		return attribute.Value{}
-	}
-
-	for _, kv := range ts.kvs {
-		if kv.Key == key {
-			return kv.Value
-		}
-	}
-
-	return attribute.Value{}
-}
-
-// Insert adds a new key/value, if one doesn't exists; otherwise updates the existing entry.
-// The new or updated entry is always inserted at the beginning of the TraceState, i.e.
-// on the left side, as per the W3C Trace Context specification requirement.
-func (ts TraceState) Insert(entry attribute.KeyValue) (TraceState, error) {
-	if !isTraceStateKeyValueValid(entry) {
-		return ts, errInvalidTraceStateKeyValue
-	}
-
-	ckvs := ts.copyKVsAndDeleteEntry(entry.Key)
-	if len(ckvs)+1 > traceStateMaxListMembers {
-		return ts, errInvalidTraceStateMembersNumber
-	}
-
-	ckvs = append(ckvs, attribute.KeyValue{})
-	copy(ckvs[1:], ckvs)
-	ckvs[0] = entry
-
-	return TraceState{ckvs}, nil
-}
-
-// Delete removes specified entry from the trace state.
-func (ts TraceState) Delete(key attribute.Key) (TraceState, error) {
-	if !isTraceStateKeyValid(key) {
-		return ts, errInvalidTraceStateKeyValue
-	}
-
-	return TraceState{ts.copyKVsAndDeleteEntry(key)}, nil
-}
-
-// IsEmpty returns true if the TraceState does not contain any entries
-func (ts TraceState) IsEmpty() bool {
-	return len(ts.kvs) == 0
-}
-
-func (ts TraceState) copyKVsAndDeleteEntry(key attribute.Key) []attribute.KeyValue {
-	ckvs := make([]attribute.KeyValue, len(ts.kvs))
-	copy(ckvs, ts.kvs)
-	for i, kv := range ts.kvs {
-		if kv.Key == key {
-			ckvs = append(ckvs[:i], ckvs[i+1:]...)
-			break
-		}
-	}
-
-	return ckvs
-}
-
-// TraceStateFromKeyValues is a convenience method to create a new TraceState from
-// provided key/value pairs.
-func TraceStateFromKeyValues(kvs ...attribute.KeyValue) (TraceState, error) { //nolint:golint
-	if len(kvs) == 0 {
-		return TraceState{}, nil
-	}
-
-	if len(kvs) > traceStateMaxListMembers {
-		return TraceState{}, errInvalidTraceStateMembersNumber
-	}
-
-	km := make(map[attribute.Key]bool)
-	for _, kv := range kvs {
-		if !isTraceStateKeyValueValid(kv) {
-			return TraceState{}, errInvalidTraceStateKeyValue
-		}
-		_, ok := km[kv.Key]
-		if ok {
-			return TraceState{}, errInvalidTraceStateDuplicate
-		}
-		km[kv.Key] = true
-	}
-
-	ckvs := make([]attribute.KeyValue, len(kvs))
-	copy(ckvs, kvs)
-	return TraceState{ckvs}, nil
-}
-
-func isTraceStateKeyValid(key attribute.Key) bool {
-	return keyFormatRegExp.MatchString(string(key))
-}
-
-func isTraceStateKeyValueValid(kv attribute.KeyValue) bool {
-	return isTraceStateKeyValid(kv.Key) &&
-		valueFormatRegExp.MatchString(kv.Value.Emit())
-}
-
-// TraceFlags contains flags that can be set on a SpanContext
-type TraceFlags byte //nolint:golint
+// TraceFlags contains flags that can be set on a SpanContext.
+type TraceFlags byte //nolint:revive // revive complains about stutter of `trace.TraceFlags`.
 
 // IsSampled returns if the sampling bit is set in the TraceFlags.
 func (tf TraceFlags) IsSampled() bool {
@@ -322,7 +160,7 @@ func (tf TraceFlags) IsSampled() bool {
 }
 
 // WithSampled sets the sampling bit in a new copy of the TraceFlags.
-func (tf TraceFlags) WithSampled(sampled bool) TraceFlags {
+func (tf TraceFlags) WithSampled(sampled bool) TraceFlags { // nolint:revive  // sampled is not a control flag.
 	if sampled {
 		return tf | FlagsSampled
 	}
@@ -336,7 +174,7 @@ func (tf TraceFlags) MarshalJSON() ([]byte, error) {
 	return json.Marshal(tf.String())
 }
 
-// String returns the hex string representation form of TraceFlags
+// String returns the hex string representation form of TraceFlags.
 func (tf TraceFlags) String() string {
 	return hex.EncodeToString([]byte{byte(tf)}[:])
 }
@@ -371,6 +209,8 @@ type SpanContext struct {
 	traceState TraceState
 	remote     bool
 }
+
+var _ json.Marshaler = SpanContext{}
 
 // IsValid returns if the SpanContext is valid. A valid span context has a
 // valid TraceID and SpanID.
@@ -497,16 +337,14 @@ func (sc SpanContext) MarshalJSON() ([]byte, error) {
 // and timed operation of a workflow that is traced. A Tracer is used to
 // create a Span and it is then up to the operation the Span represents to
 // properly end the Span when the operation itself ends.
+//
+// Warning: methods may be added to this interface in minor releases.
 type Span interface {
-	// Tracer returns the Tracer that created the Span. Tracer MUST NOT be
-	// nil.
-	Tracer() Tracer
-
 	// End completes the Span. The Span is considered complete and ready to be
 	// delivered through the rest of the telemetry pipeline after this method
 	// is called. Therefore, updates to the Span are not allowed after this
 	// method has been called.
-	End(options ...SpanOption)
+	End(options ...SpanEndOption)
 
 	// AddEvent adds an event with the provided name and options.
 	AddEvent(name string, options ...EventOption)
@@ -516,19 +354,19 @@ type Span interface {
 	IsRecording() bool
 
 	// RecordError will record err as an exception span event for this span. An
-	// additional call toSetStatus is required if the Status of the Span should
-	// be set to Error, this method does not change the Span status. If this
-	// span is not being recorded or err is nil than this method does nothing.
+	// additional call to SetStatus is required if the Status of the Span should
+	// be set to Error, as this method does not change the Span status. If this
+	// span is not being recorded or err is nil then this method does nothing.
 	RecordError(err error, options ...EventOption)
 
-	// SpanContext returns the SpanContext of the Span. The returned
-	// SpanContext is usable even after the End has been called for the Span.
+	// SpanContext returns the SpanContext of the Span. The returned SpanContext
+	// is usable even after the End method has been called for the Span.
 	SpanContext() SpanContext
 
 	// SetStatus sets the status of the Span in the form of a code and a
-	// message. SetStatus overrides the value of previous calls to SetStatus
-	// on the Span.
-	SetStatus(code codes.Code, msg string)
+	// description, overriding previous values set. The description is only
+	// included in a status when the code is for an error.
+	SetStatus(code codes.Code, description string)
 
 	// SetName sets the Span name.
 	SetName(name string)
@@ -537,22 +375,10 @@ type Span interface {
 	// already exists for an attribute of the Span it will be overwritten with
 	// the value contained in kv.
 	SetAttributes(kv ...attribute.KeyValue)
-}
 
-// Event is a thing that happened during a Span's lifetime.
-type Event struct {
-	// Name is the name of this event
-	Name string
-
-	// Attributes describe the aspects of the event.
-	Attributes []attribute.KeyValue
-
-	// DroppedAttributeCount is the number of attributes that were not
-	// recorded due to configured limits being reached.
-	DroppedAttributeCount int
-
-	// Time at which this event was recorded.
-	Time time.Time
+	// TracerProvider returns a TracerProvider that can be used to generate
+	// additional Spans on the same telemetry pipeline as the current Span.
+	TracerProvider() TracerProvider
 }
 
 // Link is the relationship between two Spans. The relationship can be within
@@ -560,26 +386,30 @@ type Event struct {
 //
 // For example, a Link is used in the following situations:
 //
-//   1. Batch Processing: A batch of operations may contain operations
-//      associated with one or more traces/spans. Since there can only be one
-//      parent SpanContext, a Link is used to keep reference to the
-//      SpanContext of all operations in the batch.
-//   2. Public Endpoint: A SpanContext for an in incoming client request on a
-//      public endpoint should be considered untrusted. In such a case, a new
-//      trace with its own identity and sampling decision needs to be created,
-//      but this new trace needs to be related to the original trace in some
-//      form. A Link is used to keep reference to the original SpanContext and
-//      track the relationship.
+//  1. Batch Processing: A batch of operations may contain operations
+//     associated with one or more traces/spans. Since there can only be one
+//     parent SpanContext, a Link is used to keep reference to the
+//     SpanContext of all operations in the batch.
+//  2. Public Endpoint: A SpanContext for an in incoming client request on a
+//     public endpoint should be considered untrusted. In such a case, a new
+//     trace with its own identity and sampling decision needs to be created,
+//     but this new trace needs to be related to the original trace in some
+//     form. A Link is used to keep reference to the original SpanContext and
+//     track the relationship.
 type Link struct {
 	// SpanContext of the linked Span.
-	SpanContext
+	SpanContext SpanContext
 
 	// Attributes describe the aspects of the link.
 	Attributes []attribute.KeyValue
+}
 
-	// DroppedAttributeCount is the number of attributes that were not
-	// recorded due to configured limits being reached.
-	DroppedAttributeCount int
+// LinkFromContext returns a link encapsulating the SpanContext in the provided ctx.
+func LinkFromContext(ctx context.Context, attrs ...attribute.KeyValue) Link {
+	return Link{
+		SpanContext: SpanContextFromContext(ctx),
+		Attributes:  attrs,
+	}
 }
 
 // SpanKind is the role a Span plays in a Trace.
@@ -654,20 +484,67 @@ func (sk SpanKind) String() string {
 }
 
 // Tracer is the creator of Spans.
+//
+// Warning: methods may be added to this interface in minor releases.
 type Tracer interface {
-	// Start creates a span.
-	Start(ctx context.Context, spanName string, opts ...SpanOption) (context.Context, Span)
+	// Start creates a span and a context.Context containing the newly-created span.
+	//
+	// If the context.Context provided in `ctx` contains a Span then the newly-created
+	// Span will be a child of that span, otherwise it will be a root span. This behavior
+	// can be overridden by providing `WithNewRoot()` as a SpanOption, causing the
+	// newly-created Span to be a root span even if `ctx` contains a Span.
+	//
+	// When creating a Span it is recommended to provide all known span attributes using
+	// the `WithAttributes()` SpanOption as samplers will only have access to the
+	// attributes provided when a Span is created.
+	//
+	// Any Span that is created MUST also be ended. This is the responsibility of the user.
+	// Implementations of this API may leak memory or other resources if Spans are not ended.
+	Start(ctx context.Context, spanName string, opts ...SpanStartOption) (context.Context, Span)
 }
 
-// TracerProvider provides access to instrumentation Tracers.
+// TracerProvider provides Tracers that are used by instrumentation code to
+// trace computational workflows.
+//
+// A TracerProvider is the collection destination of all Spans from Tracers it
+// provides, it represents a unique telemetry collection pipeline. How that
+// pipeline is defined, meaning how those Spans are collected, processed, and
+// where they are exported, depends on its implementation. Instrumentation
+// authors do not need to define this implementation, rather just use the
+// provided Tracers to instrument code.
+//
+// Commonly, instrumentation code will accept a TracerProvider implementation
+// at runtime from its users or it can simply use the globally registered one
+// (see https://pkg.go.dev/go.opentelemetry.io/otel#GetTracerProvider).
+//
+// Warning: methods may be added to this interface in minor releases.
 type TracerProvider interface {
-	// Tracer creates an implementation of the Tracer interface.
-	// The instrumentationName must be the name of the library providing
-	// instrumentation. This name may be the same as the instrumented code
-	// only if that code provides built-in instrumentation. If the
-	// instrumentationName is empty, then a implementation defined default
-	// name will be used instead.
+	// Tracer returns a unique Tracer scoped to be used by instrumentation code
+	// to trace computational workflows. The scope and identity of that
+	// instrumentation code is uniquely defined by the name and options passed.
 	//
-	// This method must be concurrency safe.
-	Tracer(instrumentationName string, opts ...TracerOption) Tracer
+	// The passed name needs to uniquely identify instrumentation code.
+	// Therefore, it is recommended that name is the Go package name of the
+	// library providing instrumentation (note: not the code being
+	// instrumented). Instrumentation libraries can have multiple versions,
+	// therefore, the WithInstrumentationVersion option should be used to
+	// distinguish these different codebases. Additionally, instrumentation
+	// libraries may sometimes use traces to communicate different domains of
+	// workflow data (i.e. using spans to communicate workflow events only). If
+	// this is the case, the WithScopeAttributes option should be used to
+	// uniquely identify Tracers that handle the different domains of workflow
+	// data.
+	//
+	// If the same name and options are passed multiple times, the same Tracer
+	// will be returned (it is up to the implementation if this will be the
+	// same underlying instance of that Tracer or not). It is not necessary to
+	// call this multiple times with the same name and options to get an
+	// up-to-date Tracer. All implementations will ensure any TracerProvider
+	// configuration changes are propagated to all provided Tracers.
+	//
+	// If name is empty, then an implementation defined default name will be
+	// used instead.
+	//
+	// This method is safe to call concurrently.
+	Tracer(name string, options ...TracerOption) Tracer
 }

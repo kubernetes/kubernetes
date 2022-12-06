@@ -22,13 +22,13 @@ limitations under the License.
 // The command line flags all get stored in a private flag set. The
 // developer of the E2E test suite decides how they are exposed. Options
 // include:
-// - exposing as normal flags in the actual command line:
-//   CopyFlags(Flags, flag.CommandLine)
-// - populate via test/e2e/framework/viperconfig:
-//   viperconfig.ViperizeFlags("my-config.yaml", "", Flags)
-// - a combination of both:
-//   CopyFlags(Flags, flag.CommandLine)
-//   viperconfig.ViperizeFlags("my-config.yaml", "", flag.CommandLine)
+//   - exposing as normal flags in the actual command line:
+//     CopyFlags(Flags, flag.CommandLine)
+//   - populate via test/e2e/framework/viperconfig:
+//     viperconfig.ViperizeFlags("my-config.yaml", "", Flags)
+//   - a combination of both:
+//     CopyFlags(Flags, flag.CommandLine)
+//     viperconfig.ViperizeFlags("my-config.yaml", "", flag.CommandLine)
 //
 // Instead of defining flags one-by-one, test developers annotate a
 // structure with tags and then call a single function. This is the
@@ -38,16 +38,16 @@ limitations under the License.
 //
 // For example, a file storage/csi.go might define:
 //
-//     var scaling struct {
-//             NumNodes int  `default:"1" description:"number of nodes to run on"`
-//             Master string
-//     }
-//     _ = config.AddOptions(&scaling, "storage.csi.scaling")
+//	var scaling struct {
+//	        NumNodes int  `default:"1" description:"number of nodes to run on"`
+//	        Master string
+//	}
+//	_ = config.AddOptions(&scaling, "storage.csi.scaling")
 //
 // This defines the following command line flags:
 //
-//     -storage.csi.scaling.numNodes=<int>  - number of nodes to run on (default: 1)
-//     -storage.csi.scaling.master=<string>
+//	-storage.csi.scaling.numNodes=<int>  - number of nodes to run on (default: 1)
+//	-storage.csi.scaling.master=<string>
 //
 // All fields in the structure must be exported and have one of the following
 // types (same as in the `flag` package):
@@ -63,10 +63,10 @@ limitations under the License.
 //
 // Each basic entry may have a tag with these optional keys:
 //
-//     usage:   additional explanation of the option
-//     default: the default value, in the same format as it would
-//              be given on the command line and true/false for
-//              a boolean
+//	usage:   additional explanation of the option
+//	default: the default value, in the same format as it would
+//	         be given on the command line and true/false for
+//	         a boolean
 //
 // The names of the final configuration options are a combination of an
 // optional common prefix for all options in the structure and the
@@ -135,7 +135,7 @@ func AddOptionsToSet(flags *flag.FlagSet, options interface{}, prefix string) bo
 	if optionsType == nil {
 		panic("options parameter without a type - nil?!")
 	}
-	if optionsType.Kind() != reflect.Ptr || optionsType.Elem().Kind() != reflect.Struct {
+	if optionsType.Kind() != reflect.Pointer || optionsType.Elem().Kind() != reflect.Struct {
 		panic(fmt.Sprintf("need a pointer to a struct, got instead: %T", options))
 	}
 	addStructFields(flags, optionsType.Elem(), reflect.Indirect(reflect.ValueOf(options)), prefix)

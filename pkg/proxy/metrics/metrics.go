@@ -61,7 +61,7 @@ var (
 			Subsystem: kubeProxySubsystem,
 			Name:      "network_programming_duration_seconds",
 			Help:      "In Cluster Network Programming Latency in seconds",
-			Buckets: merge(
+			Buckets: metrics.MergeBuckets(
 				metrics.LinearBuckets(0.25, 0.25, 2), // 0.25s, 0.50s
 				metrics.LinearBuckets(1, 1, 59),      // 1s, 2s, 3s, ... 59s
 				metrics.LinearBuckets(60, 5, 12),     // 60s, 65s, 70s, ... 115s
@@ -126,6 +126,17 @@ var (
 		},
 	)
 
+	// IptablesPartialRestoreFailuresTotal is the number of iptables *partial* restore
+	// failures (resulting in a fall back to a full restore) that the proxy has seen.
+	IptablesPartialRestoreFailuresTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_partial_restore_failures_total",
+			Help:           "Cumulative proxy iptables partial restore failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// IptablesRulesTotal is the number of iptables rules that the iptables proxy installs.
 	IptablesRulesTotal = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
@@ -148,6 +159,19 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// SyncProxyRulesNoLocalEndpointsTotal is the total number of rules that do
+	// not have an available endpoint. This can be caused by an internal
+	// traffic policy with no available local workload.
+	SyncProxyRulesNoLocalEndpointsTotal = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_no_local_endpoints_total",
+			Help:           "Number of services with a Local traffic policy and no endpoints",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"traffic_policy"},
+	)
 )
 
 var registerMetricsOnce sync.Once
@@ -164,19 +188,13 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(ServiceChangesTotal)
 		legacyregistry.MustRegister(IptablesRulesTotal)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
+		legacyregistry.MustRegister(IptablesPartialRestoreFailuresTotal)
 		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
+		legacyregistry.MustRegister(SyncProxyRulesNoLocalEndpointsTotal)
 	})
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
-}
-
-func merge(slices ...[]float64) []float64 {
-	result := make([]float64, 1)
-	for _, s := range slices {
-		result = append(result, s...)
-	}
-	return result
 }

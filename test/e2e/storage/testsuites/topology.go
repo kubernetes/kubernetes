@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -36,6 +36,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type topologyTestSuite struct {
@@ -43,8 +44,7 @@ type topologyTestSuite struct {
 }
 
 type topologyTest struct {
-	config        *storageframework.PerTestConfig
-	driverCleanup func()
+	config *storageframework.PerTestConfig
 
 	migrationCheck *migrationOpCheck
 
@@ -104,13 +104,14 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("topology", storageframework.GetDriverTimeouts(driver))
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	init := func() topologyTest {
 		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
 		l := topologyTest{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 
 		l.resource = storageframework.VolumeResource{
 			Config:  l.config,
@@ -154,8 +155,6 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 
 	cleanup := func(l topologyTest) {
 		t.CleanupResources(cs, &l)
-		err := storageutils.TryFunc(l.driverCleanup)
-		l.driverCleanup = nil
 		framework.ExpectNoError(err, "while cleaning up driver")
 
 		l.migrationCheck.validateMigrationVolumeOpCounts()

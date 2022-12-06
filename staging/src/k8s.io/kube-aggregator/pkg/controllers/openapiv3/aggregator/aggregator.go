@@ -17,6 +17,8 @@ limitations under the License.
 package aggregator
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -24,17 +26,18 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler3"
-	"k8s.io/kube-openapi/pkg/spec3"
+	"k8s.io/kube-openapi/pkg/openapiconv"
+
+	v2aggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 )
 
-// SpecAggregator calls out to http handlers of APIServices and caches specs. It keeps state of the last
-// known specs including the http etag.
-// TODO(jefftree): remove the downloading and caching and proxy directly to the APIServices. This is possible because we
-// don't have to merge here, which is cpu intensive in v2
-type SpecAggregator interface {
+// SpecProxier proxies OpenAPI V3 requests to their respective APIService
+type SpecProxier interface {
 	AddUpdateAPIService(handler http.Handler, apiService *v1.APIService)
 	UpdateAPIServiceSpec(apiServiceName string) error
 	RemoveAPIServiceSpec(apiServiceName string)
@@ -46,6 +49,7 @@ const (
 	specDownloadTimeout           = 60 * time.Second
 	localDelegateChainNamePrefix  = "k8s_internal_local_delegation_chain_"
 	localDelegateChainNamePattern = localDelegateChainNamePrefix + "%010d"
+	openAPIV2Converter            = "openapiv2converter"
 )
 
 // IsLocalAPIService returns true for local specs from delegates.
@@ -53,35 +57,25 @@ func IsLocalAPIService(apiServiceName string) bool {
 	return strings.HasPrefix(apiServiceName, localDelegateChainNamePrefix)
 }
 
-// GetAPIServicesName returns the names of APIServices recorded in openAPIV3Specs.
+// GetAPIServiceNames returns the names of APIServices recorded in apiServiceInfo.
 // We use this function to pass the names of local APIServices to the controller in this package,
 // so that the controller can periodically sync the OpenAPI spec from delegation API servers.
-func (s *specAggregator) GetAPIServiceNames() []string {
-	s.rwMutex.Lock()
-	defer s.rwMutex.Unlock()
+func (s *specProxier) GetAPIServiceNames() []string {
+	s.rwMutex.RLock()
+	defer s.rwMutex.RUnlock()
 
-	names := make([]string, len(s.openAPIV3Specs))
-	for key := range s.openAPIV3Specs {
+	names := make([]string, 0, len(s.apiServiceInfo))
+	for key := range s.apiServiceInfo {
 		names = append(names, key)
 	}
 	return names
 }
 
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
-func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.DelegationTarget, pathHandler common.PathHandlerByGroupVersion) (SpecAggregator, error) {
-	var err error
-	s := &specAggregator{
-		openAPIV3Specs: map[string]*openAPIV3APIServiceInfo{},
+func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.DelegationTarget, pathHandler common.PathHandlerByGroupVersion) (SpecProxier, error) {
+	s := &specProxier{
+		apiServiceInfo: map[string]*openAPIV3APIServiceInfo{},
 		downloader:     downloader,
-	}
-
-	s.openAPIV3VersionedService, err = handler3.NewOpenAPIService(nil)
-	if err != nil {
-		return nil, err
-	}
-	err = s.openAPIV3VersionedService.RegisterOpenAPIV3VersionedService("/openapi/v3", pathHandler)
-	if err != nil {
-		return nil, err
 	}
 
 	i := 1
@@ -99,108 +93,184 @@ func BuildAndRegisterAggregator(downloader Downloader, delegationTarget server.D
 		i++
 	}
 
+	handler, err := handler3.NewOpenAPIService(nil)
+	if err != nil {
+		return s, err
+	}
+	s.openAPIV2ConverterHandler = handler
+	openAPIV2ConverterMux := mux.NewPathRecorderMux(openAPIV2Converter)
+	s.openAPIV2ConverterHandler.RegisterOpenAPIV3VersionedService("/openapi/v3", openAPIV2ConverterMux)
+	openAPIV2ConverterAPIService := v1.APIService{}
+	openAPIV2ConverterAPIService.Name = openAPIV2Converter
+	s.AddUpdateAPIService(openAPIV2ConverterMux, &openAPIV2ConverterAPIService)
+	s.register(pathHandler)
+
 	return s, nil
 }
 
 // AddUpdateAPIService adds or updates the api service. It is thread safe.
-func (s *specAggregator) AddUpdateAPIService(handler http.Handler, apiservice *v1.APIService) {
+func (s *specProxier) AddUpdateAPIService(handler http.Handler, apiservice *v1.APIService) {
 	s.rwMutex.Lock()
 	defer s.rwMutex.Unlock()
 	// If the APIService is being updated, use the existing struct.
-	if apiServiceInfo, ok := s.openAPIV3Specs[apiservice.Name]; ok {
+	if apiServiceInfo, ok := s.apiServiceInfo[apiservice.Name]; ok {
 		apiServiceInfo.apiService = *apiservice
 		apiServiceInfo.handler = handler
 	}
-	s.openAPIV3Specs[apiservice.Name] = &openAPIV3APIServiceInfo{
+	s.apiServiceInfo[apiservice.Name] = &openAPIV3APIServiceInfo{
 		apiService: *apiservice,
 		handler:    handler,
-		specs:      make(map[string]*openAPIV3SpecInfo),
 	}
+}
+
+func getGroupVersionStringFromAPIService(apiService v1.APIService) string {
+	if apiService.Spec.Group == "" && apiService.Spec.Version == "" {
+		return ""
+	}
+	return "apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
 }
 
 // UpdateAPIServiceSpec updates all the OpenAPI v3 specs that the APIService serves.
 // It is thread safe.
-func (s *specAggregator) UpdateAPIServiceSpec(apiServiceName string) error {
+func (s *specProxier) UpdateAPIServiceSpec(apiServiceName string) error {
 	s.rwMutex.Lock()
 	defer s.rwMutex.Unlock()
+	return s.updateAPIServiceSpecLocked(apiServiceName)
+}
 
-	apiService, exists := s.openAPIV3Specs[apiServiceName]
+func (s *specProxier) updateAPIServiceSpecLocked(apiServiceName string) error {
+	apiService, exists := s.apiServiceInfo[apiServiceName]
 	if !exists {
 		return fmt.Errorf("APIService %s does not exist for update", apiServiceName)
 	}
 
-	// Pass a list of old etags to the Downloader to prevent transfers if etags match
-	etagList := make(map[string]string)
-	for gv, specInfo := range apiService.specs {
-		etagList[gv] = specInfo.etag
+	if !apiService.isLegacyAPIService {
+		gv, httpStatus, err := s.downloader.OpenAPIV3Root(apiService.handler)
+		if err != nil {
+			return err
+		}
+		if httpStatus == http.StatusNotFound {
+			apiService.isLegacyAPIService = true
+		} else {
+			s.apiServiceInfo[apiServiceName].discovery = gv
+			return nil
+		}
 	}
-	groups, err := s.downloader.Download(apiService.handler, etagList)
+
+	newDownloader := v2aggregator.Downloader{}
+	v2Spec, etag, httpStatus, err := newDownloader.Download(apiService.handler, apiService.etag)
 	if err != nil {
 		return err
 	}
-
-	// Remove any groups that do not exist anymore
-	for group := range s.openAPIV3Specs[apiServiceName].specs {
-		if _, exists := groups[group]; !exists {
-			s.openAPIV3VersionedService.DeleteGroupVersion(group)
-			delete(s.openAPIV3Specs[apiServiceName].specs, group)
-		}
-	}
-
-	for group, info := range groups {
-		if info.spec == nil {
-			continue
-		}
-
-		// If ETag has not changed, no update is necessary
-		oldInfo, exists := s.openAPIV3Specs[apiServiceName].specs[group]
-		if exists && oldInfo.etag == info.etag {
-			continue
-		}
-		s.openAPIV3Specs[apiServiceName].specs[group] = &openAPIV3SpecInfo{
-			spec: info.spec,
-			etag: info.etag,
-		}
-		s.openAPIV3VersionedService.UpdateGroupVersion(group, info.spec)
+	apiService.etag = etag
+	if httpStatus == http.StatusOK {
+		v3Spec := openapiconv.ConvertV2ToV3(v2Spec)
+		s.openAPIV2ConverterHandler.UpdateGroupVersion(getGroupVersionStringFromAPIService(apiService.apiService), v3Spec)
+		s.updateAPIServiceSpecLocked(openAPIV2Converter)
 	}
 	return nil
 }
 
-type specAggregator struct {
+type specProxier struct {
 	// mutex protects all members of this struct.
 	rwMutex sync.RWMutex
 
 	// OpenAPI V3 specs by APIService name
-	openAPIV3Specs map[string]*openAPIV3APIServiceInfo
-	// provided for dynamic OpenAPI spec
-	openAPIV3VersionedService *handler3.OpenAPIService
+	apiServiceInfo map[string]*openAPIV3APIServiceInfo
 
 	// For downloading the OpenAPI v3 specs from apiservices
 	downloader Downloader
+
+	openAPIV2ConverterHandler *handler3.OpenAPIService
 }
 
-var _ SpecAggregator = &specAggregator{}
+var _ SpecProxier = &specProxier{}
 
 type openAPIV3APIServiceInfo struct {
 	apiService v1.APIService
 	handler    http.Handler
-	specs      map[string]*openAPIV3SpecInfo
-}
+	discovery  *handler3.OpenAPIV3Discovery
 
-type openAPIV3SpecInfo struct {
-	spec *spec3.OpenAPI
-	etag string
+	// These fields are only used if the /openapi/v3 endpoint is not served by an APIService
+	// Legacy APIService indicates that an APIService does not support OpenAPI V3, and the OpenAPI V2
+	// will be downloaded, converted to V3 (lossy), and served by the aggregator
+	etag               string
+	isLegacyAPIService bool
 }
 
 // RemoveAPIServiceSpec removes an api service from the OpenAPI map. If it does not exist, no error is returned.
 // It is thread safe.
-func (s *specAggregator) RemoveAPIServiceSpec(apiServiceName string) {
+func (s *specProxier) RemoveAPIServiceSpec(apiServiceName string) {
 	s.rwMutex.Lock()
 	defer s.rwMutex.Unlock()
-	if apiServiceInfo, ok := s.openAPIV3Specs[apiServiceName]; ok {
-		for gv := range apiServiceInfo.specs {
-			s.openAPIV3VersionedService.DeleteGroupVersion(gv)
-		}
-		delete(s.openAPIV3Specs, apiServiceName)
+	if apiServiceInfo, ok := s.apiServiceInfo[apiServiceName]; ok {
+		s.openAPIV2ConverterHandler.DeleteGroupVersion(getGroupVersionStringFromAPIService(apiServiceInfo.apiService))
+		delete(s.apiServiceInfo, apiServiceName)
 	}
+}
+
+func (s *specProxier) getOpenAPIV3Root() handler3.OpenAPIV3Discovery {
+	s.rwMutex.RLock()
+	defer s.rwMutex.RUnlock()
+
+	merged := handler3.OpenAPIV3Discovery{
+		Paths: make(map[string]handler3.OpenAPIV3DiscoveryGroupVersion),
+	}
+
+	for _, apiServiceInfo := range s.apiServiceInfo {
+		if apiServiceInfo.discovery == nil {
+			continue
+		}
+
+		for key, item := range apiServiceInfo.discovery.Paths {
+			merged.Paths[key] = item
+		}
+	}
+	return merged
+}
+
+// handleDiscovery is the handler for OpenAPI V3 Discovery
+func (s *specProxier) handleDiscovery(w http.ResponseWriter, r *http.Request) {
+	merged := s.getOpenAPIV3Root()
+	j, err := json.Marshal(&merged)
+	if err != nil {
+		w.WriteHeader(500)
+		klog.Errorf("failed to created merged OpenAPIv3 discovery response: %s", err.Error())
+		return
+	}
+
+	http.ServeContent(w, r, "/openapi/v3", time.Now(), bytes.NewReader(j))
+}
+
+// handleGroupVersion is the OpenAPI V3 handler for a specified group/version
+func (s *specProxier) handleGroupVersion(w http.ResponseWriter, r *http.Request) {
+	s.rwMutex.RLock()
+	defer s.rwMutex.RUnlock()
+
+	// TODO: Import this logic from kube-openapi instead of duplicating
+	// URLs for OpenAPI V3 have the format /openapi/v3/<groupversionpath>
+	// SplitAfterN with 4 yields ["", "openapi", "v3", <groupversionpath>]
+	url := strings.SplitAfterN(r.URL.Path, "/", 4)
+	targetGV := url[3]
+
+	for _, apiServiceInfo := range s.apiServiceInfo {
+		if apiServiceInfo.discovery == nil {
+			continue
+		}
+
+		for key := range apiServiceInfo.discovery.Paths {
+			if targetGV == key {
+				apiServiceInfo.handler.ServeHTTP(w, r)
+				return
+			}
+		}
+	}
+	// No group-versions match the desired request
+	w.WriteHeader(404)
+}
+
+// Register registers the OpenAPI V3 Discovery and GroupVersion handlers
+func (s *specProxier) register(handler common.PathHandlerByGroupVersion) {
+	handler.Handle("/openapi/v3", http.HandlerFunc(s.handleDiscovery))
+	handler.HandlePrefix("/openapi/v3/", http.HandlerFunc(s.handleGroupVersion))
 }

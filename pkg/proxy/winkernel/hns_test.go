@@ -26,6 +26,8 @@ import (
 
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 const (
@@ -35,6 +37,7 @@ const (
 	gatewayAddress    = "192.168.1.1"
 	epMacAddress      = "00-11-22-33-44-55"
 	epIpAddress       = "192.168.1.3"
+	epIpAddressB      = "192.168.1.4"
 	epIpAddressRemote = "192.168.2.3"
 	epPaAddress       = "10.0.0.3"
 	protocol          = 6
@@ -43,76 +46,7 @@ const (
 )
 
 func TestGetNetworkByName(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetNetworkByName(t, hnsV1)
-	testGetNetworkByName(t, hnsV2)
-}
-func TestGetEndpointByID(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetEndpointByID(t, hnsV1)
-	testGetEndpointByID(t, hnsV2)
-}
-func TestGetEndpointByIpAddress(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetEndpointByIpAddress(t, hnsV1)
-	testGetEndpointByIpAddress(t, hnsV2)
-}
-func TestCreateEndpointLocal(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testCreateEndpointLocal(t, hnsV1)
-	testCreateEndpointLocal(t, hnsV2)
-}
-func TestCreateEndpointRemotePA(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testCreateEndpointRemote(t, hnsV1, epPaAddress)
-	testCreateEndpointRemote(t, hnsV2, epPaAddress)
-}
-func TestCreateEndpointRemoteNoPA(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testCreateEndpointRemote(t, hnsV1, "")
-	testCreateEndpointRemote(t, hnsV2, "")
-}
-func TestDeleteEndpoint(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testDeleteEndpoint(t, hnsV1)
-	testDeleteEndpoint(t, hnsV2)
-}
-func TestGetLoadBalancerExisting(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetLoadBalancerExisting(t, hnsV1)
-	testGetLoadBalancerExisting(t, hnsV2)
-}
-func TestGetLoadBalancerNew(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetLoadBalancerNew(t, hnsV1)
-	testGetLoadBalancerNew(t, hnsV2)
-}
-func TestDeleteLoadBalancer(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testDeleteLoadBalancer(t, hnsV1)
-	testDeleteLoadBalancer(t, hnsV2)
-}
-func testGetNetworkByName(t *testing.T, hns HostNetworkService) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	network, err := hns.getNetworkByName(Network.Name)
@@ -128,7 +62,9 @@ func testGetNetworkByName(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testGetEndpointByID(t *testing.T, hns HostNetworkService) {
+
+func TestGetEndpointByID(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -165,7 +101,9 @@ func testGetEndpointByID(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testGetEndpointByIpAddress(t *testing.T, hns HostNetworkService) {
+
+func TestGetEndpointByIpAddressAndName(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -195,6 +133,15 @@ func testGetEndpointByIpAddress(t *testing.T, hns HostNetworkService) {
 		t.Errorf("%v does not match %v", endpoint.ip, Endpoint.IpConfigurations[0].IpAddress)
 	}
 
+	endpoint2, err := hns.getEndpointByName(Endpoint.Name)
+	if err != nil {
+		t.Error(err)
+	}
+	diff := cmp.Diff(endpoint, endpoint2)
+	if diff != "" {
+		t.Errorf("getEndpointByName(%s) returned a different endpoint. Diff: %s ", Endpoint.Name, diff)
+	}
+
 	err = Endpoint.Delete()
 	if err != nil {
 		t.Error(err)
@@ -204,7 +151,9 @@ func testGetEndpointByIpAddress(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testCreateEndpointLocal(t *testing.T, hns HostNetworkService) {
+
+func TestCreateEndpointLocal(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	endpoint := &endpointsInfo{
@@ -240,8 +189,11 @@ func testCreateEndpointLocal(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testCreateEndpointRemote(t *testing.T, hns HostNetworkService, providerAddress string) {
+
+func TestCreateEndpointRemote(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
+	providerAddress := epPaAddress
 
 	endpoint := &endpointsInfo{
 		ip:              epIpAddressRemote,
@@ -280,7 +232,9 @@ func testCreateEndpointRemote(t *testing.T, hns HostNetworkService, providerAddr
 		t.Error(err)
 	}
 }
-func testDeleteEndpoint(t *testing.T, hns HostNetworkService) {
+
+func TestDeleteEndpoint(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -314,8 +268,10 @@ func testDeleteEndpoint(t *testing.T, hns HostNetworkService) {
 	}
 }
 
-func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
+func TestGetLoadBalancerExisting(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
+	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 
 	ipConfig := &hcn.IpConfig{
 		IpAddress: epIpAddress,
@@ -347,13 +303,22 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 	if err != nil {
 		t.Error(err)
 	}
-
 	endpoint := &endpointsInfo{
 		ip:    Endpoint.IpConfigurations[0].IpAddress,
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
-	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort)
+	hash, err := hashEndpoints(endpoints)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// We populate this to ensure we test for getting existing load balancer
+	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsHash: hash}
+	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
+
+	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
+
 	if err != nil {
 		t.Error(err)
 	}
@@ -375,8 +340,12 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
+
+func TestGetLoadBalancerNew(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
+	// We keep this empty to ensure we test for new load balancer creation.
+	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 
 	ipConfig := &hcn.IpConfig{
 		IpAddress: epIpAddress,
@@ -398,7 +367,7 @@ func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
-	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort)
+	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 	if err != nil {
 		t.Error(err)
 	}
@@ -423,7 +392,9 @@ func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testDeleteLoadBalancer(t *testing.T, hns HostNetworkService) {
+
+func TestDeleteLoadBalancer(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -475,6 +446,7 @@ func testDeleteLoadBalancer(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 	network, err := createTestNetwork()
 	if err != nil {
@@ -485,6 +457,81 @@ func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 	}
 	return network
 }
+
+func TestHashEndpoints(t *testing.T) {
+	Network := mustTestNetwork(t)
+	// Create endpoint A
+	ipConfigA := &hcn.IpConfig{
+		IpAddress: epIpAddress,
+	}
+	endpointASpec := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipConfigA},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	endpointA, err := Network.CreateEndpoint(endpointASpec)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointInfoA := &endpointsInfo{
+		ip:    endpointA.IpConfigurations[0].IpAddress,
+		hnsID: endpointA.Id,
+	}
+	// Create Endpoint B
+	ipConfigB := &hcn.IpConfig{
+		IpAddress: epIpAddressB,
+	}
+	endpointBSpec := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipConfigB},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	endpointB, err := Network.CreateEndpoint(endpointBSpec)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointInfoB := &endpointsInfo{
+		ip:    endpointB.IpConfigurations[0].IpAddress,
+		hnsID: endpointB.Id,
+	}
+	endpoints := []endpointsInfo{*endpointInfoA, *endpointInfoB}
+	endpointsReverse := []endpointsInfo{*endpointInfoB, *endpointInfoA}
+	h1, err := hashEndpoints(endpoints)
+	if err != nil {
+		t.Error(err)
+	} else if len(h1) < 1 {
+		t.Error("HashEndpoints failed for endpoints", endpoints)
+	}
+
+	h2, err := hashEndpoints(endpointsReverse)
+	if err != nil {
+		t.Error(err)
+	}
+	if h1 != h2 {
+		t.Errorf("%x does not match %x", h1, h2)
+	}
+
+	// Clean up
+	err = endpointA.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+	err = endpointB.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+	err = Network.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func createTestNetwork() (*hcn.HostComputeNetwork, error) {
 	network := &hcn.HostComputeNetwork{
 		Type: NETWORK_TYPE_OVERLAY,

@@ -47,9 +47,11 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		},
 	}
 	rootUser := "ContainerAdministrator"
+	rootUserUppercase := "CONTAINERADMINISTRATOR"
 	anyUser := "anyone"
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
+	uid := int64(0)
 	for _, test := range []struct {
 		desc     string
 		sc       *v1.SecurityContext
@@ -102,11 +104,30 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			fail:     true,
 		},
 		{
+			desc: "Fail if container's RunAsUser is root (case-insensitive) and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+				WindowsOptions: &v1.WindowsSecurityContextOptions{
+					RunAsUserName: &rootUserUppercase,
+				},
+			},
+			username: anyUser,
+			fail:     true,
+		},
+		{
 			desc: "Fail if image's user is root and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
 			username: rootUser,
+			fail:     true,
+		},
+		{
+			desc: "Fail if image's user is root (case-insensitive) and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			username: rootUserUppercase,
 			fail:     true,
 		},
 		{
@@ -120,9 +141,35 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		{
 			desc: "Pass if container's user and image's user aren't set and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootTrue,
+				// verifyRunAsNonRoot should ignore the RunAsUser, SELinuxOptions, and RunAsGroup options.
+				RunAsUser:      &uid,
+				SELinuxOptions: &v1.SELinuxOptions{},
+				RunAsGroup:     &uid,
+				RunAsNonRoot:   &runAsNonRootTrue,
 			},
 			fail: false,
+		},
+		{
+			desc: "Pass if image's user is root, container's RunAsUser is not root and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+				WindowsOptions: &v1.WindowsSecurityContextOptions{
+					RunAsUserName: &anyUser,
+				},
+			},
+			username: rootUser,
+			fail:     false,
+		},
+		{
+			desc: "Pass if image's user is root (case-insensitive), container's RunAsUser is not root and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+				WindowsOptions: &v1.WindowsSecurityContextOptions{
+					RunAsUserName: &anyUser,
+				},
+			},
+			username: rootUserUppercase,
+			fail:     false,
 		},
 	} {
 		pod.Spec.Containers[0].SecurityContext = test.sc

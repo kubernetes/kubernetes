@@ -94,7 +94,7 @@ func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
 	if op == admission.Create {
 		return true
 	}
-	if op == admission.Update && utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.ExpandPersistentVolumes) {
+	if op == admission.Update {
 		return true
 	}
 	return false
@@ -178,7 +178,7 @@ func (p *pvcEvaluator) getStorageUsage(pvc *corev1.PersistentVolumeClaim) *resou
 		roundedRequest := i.DeepCopy()
 		if !roundedRequest.RoundUp(0) {
 			// Ensure storage requests are counted as whole byte values, to pass resourcequota validation.
-			// See http://issue.k8s.io/94313
+			// See https://issue.k8s.io/94313
 			return &roundedRequest
 		}
 		return i

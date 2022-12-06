@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -79,6 +80,12 @@ func GetSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *batchv1.Job:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
+	case *autoscalingv1.Scale:
+		selector, err := metav1.ParseToLabelSelector(typed.Status.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("Parsing selector for: %v encountered an error: %v", obj, err)
+		}
+		return metav1.LabelSelectorAsSelector(selector)
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting selector: %v", obj)
 	}
@@ -124,6 +131,8 @@ func GetReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 			return *typed.Spec.Parallelism, nil
 		}
 		return 0, nil
+	case *autoscalingv1.Scale:
+		return typed.Status.Replicas, nil
 	default:
 		return -1, fmt.Errorf("Unsupported kind when getting number of replicas: %v", obj)
 	}

@@ -1,19 +1,22 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+options:
+  # make root approval non-recursive
+  no_parent_owners: true
 approvers:
   - release-engineering-approvers
   - release-managers
+  - AuraSinis # 1.24 Release Notes Lead
   - cici37 # 1.23 Release Notes Lead
-  - pmmalinov01 # 1.22 Release Notes Lead
-  - wilsonehusin # 1.21 Release Notes Lead
+  - csantanapr # 1.25 Release Notes Lead
+  - ramrodo # 1.26 Release Notes Lead
 reviewers:
-  - cici37 # 1.23 Release Notes Leas
-  - AuraSinis # 1.23 Release Notes shadow
-  - Damans227 # 1.23 Release Notes shadow
-  - parul5sahoo # 1.23 Release Notes shadow
-  - sam-cogan # 1.23 Release Notes shadow
-  - pmmalinov01 # 1.22 Release Notes Lead
-  - sladyn98 # 1.22 Release Notes shadow
+  - release-managers
+  - AnaMMedina21 # 1.26 Release Notes Shadow
+  - harshanarayana # 1.26 Release Notes Shadow
+  - laxmikantbpandhare # 1.26 Release Notes Shadow
+  - ramrodo # 1.26 Release Notes Lead
+  - sayantani11 # 1.26 Release Notes Shadow
 labels:
   - sig/release
   - area/release-eng

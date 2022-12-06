@@ -19,7 +19,7 @@ package openapi_test
 import (
 	"path/filepath"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -50,6 +50,9 @@ var _ = Describe("Reading apps/v1/Deployment from openAPIData", func() {
 		schema = resources.LookupResource(gvk)
 		Expect(schema).ToNot(BeNil())
 		Expect(schema.(*proto.Kind)).ToNot(BeNil())
+		consumes := resources.GetConsumes(gvk, "PATCH")
+		Expect(consumes).ToNot(BeNil())
+		Expect(len(consumes)).To(Equal(4))
 	})
 })
 

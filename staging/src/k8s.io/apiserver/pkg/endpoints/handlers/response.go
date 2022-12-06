@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	utiltrace "k8s.io/utils/trace"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // transformObject takes the object as returned by storage and ensures it is in
@@ -59,8 +59,14 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
-	if err := setObjectSelfLink(ctx, obj, req, scope.Namer); err != nil {
-		return nil, err
+
+	// ensure that for empty lists we don't return <nil> items.
+	// This is safe to modify without deep-copying the object, as
+	// List objects themselves are never cached.
+	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
+		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
+			return nil, err
+		}
 	}
 
 	switch target := mediaType.Convert; {
@@ -122,19 +128,25 @@ func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.Media
 
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
-func transformResponseObject(ctx context.Context, scope *RequestScope, trace *utiltrace.Trace, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
+func transformResponseObject(ctx context.Context, scope *RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
 	options, err := optionsForTransform(mediaType, req)
 	if err != nil {
 		scope.err(err, w, req)
 		return
 	}
-	obj, err := transformObject(ctx, result, options, mediaType, scope, req)
+
+	var obj runtime.Object
+	do := func() {
+		obj, err = transformObject(ctx, result, options, mediaType, scope, req)
+	}
+	endpointsrequest.TrackTransformResponseObjectLatency(ctx, do)
+
 	if err != nil {
 		scope.err(err, w, req)
 		return
 	}
 	kind, serializer, _ := targetEncodingForTransform(scope, mediaType, req)
-	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj)
+	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj, false)
 }
 
 // errNotAcceptable indicates Accept negotiation has failed
@@ -244,7 +256,6 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		if err != nil {
 			return nil, err
 		}
-		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
 		list.RemainingItemCount = li.GetRemainingItemCount()
@@ -265,7 +276,6 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		if err != nil {
 			return nil, err
 		}
-		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
 		list.RemainingItemCount = li.GetRemainingItemCount()

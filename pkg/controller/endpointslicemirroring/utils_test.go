@@ -21,8 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,12 +53,12 @@ func TestNewEndpointSlice(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		tweakEndpoint func(ep *corev1.Endpoints)
+		tweakEndpoint func(ep *v1.Endpoints)
 		expectedSlice discovery.EndpointSlice
 	}{
 		{
 			name: "create slice from endpoints",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 			},
 			expectedSlice: discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -79,7 +78,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with annotations",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				annotations := map[string]string{"foo": "bar"}
 				ep.Annotations = annotations
 			},
@@ -101,7 +100,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with labels",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				labels := map[string]string{"foo": "bar"}
 				ep.Labels = labels
 			},
@@ -124,7 +123,7 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with labels and annotations",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				labels := map[string]string{"foo": "bar"}
 				ep.Labels = labels
 				annotations := map[string]string{"foo2": "bar2"}
@@ -149,12 +148,12 @@ func TestNewEndpointSlice(t *testing.T) {
 		},
 		{
 			name: "create slice from endpoints with labels and annotations triggertime",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				labels := map[string]string{"foo": "bar"}
 				ep.Labels = labels
 				annotations := map[string]string{
-					"foo2":                                "bar2",
-					corev1.EndpointsLastChangeTriggerTime: "date",
+					"foo2":                            "bar2",
+					v1.EndpointsLastChangeTriggerTime: "date",
 				}
 				ep.Annotations = annotations
 			},

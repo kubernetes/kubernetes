@@ -28,7 +28,14 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func startLegacyIPAM(
+type fakeController struct {
+}
+
+func (f *fakeController) Run(stopCh <-chan struct{}) {
+	<-stopCh
+}
+
+func createLegacyIPAM(
 	ic *Controller,
 	nodeInformer coreinformers.NodeInformer,
 	cloud cloudprovider.Interface,
@@ -36,6 +43,7 @@ func startLegacyIPAM(
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
-) {
+) *fakeController {
 	klog.Fatal("Error trying to Init(): legacy cloud provider support disabled at build time")
+	return &fakeController{}
 }

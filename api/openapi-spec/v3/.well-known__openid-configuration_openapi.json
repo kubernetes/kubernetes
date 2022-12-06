@@ -1,5 +1,14 @@
 {
-  "components": {},
+  "components": {
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
+    }
+  },
   "info": {
     "title": "Kubernetes",
     "version": "unversioned"
@@ -20,6 +29,9 @@
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         },
         "tags": [

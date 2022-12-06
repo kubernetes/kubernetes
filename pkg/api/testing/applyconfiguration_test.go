@@ -179,6 +179,7 @@ func fuzzObject(t *testing.T, gvk schema.GroupVersionKind) runtime.Object {
 			func(s *v1.ObjectMeta, c fuzz.Continue) {
 				c.FuzzNoCustom(s)
 				s.ManagedFields = nil
+				s.SelfLink = ""
 			},
 		).Fuzz(internalObj)
 

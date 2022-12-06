@@ -36,9 +36,8 @@ type PodDisruptionBudgetSpec struct {
 	// A null selector selects no pods.
 	// An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
 	// In policy/v1, an empty selector will select all pods in the namespace.
-	// +patchStrategy=replace
 	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty" patchStrategy:"replace" protobuf:"bytes,2,opt,name=selector"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// An eviction is allowed if at most "maxUnavailable" pods selected by
 	// "selector" are unavailable after the eviction, i.e. even in absence of
@@ -46,7 +45,55 @@ type PodDisruptionBudgetSpec struct {
 	// by specifying 0. This is a mutually exclusive setting with "minAvailable".
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,3,opt,name=maxUnavailable"`
+
+	// UnhealthyPodEvictionPolicy defines the criteria for when unhealthy pods
+	// should be considered for eviction. Current implementation considers healthy pods,
+	// as pods that have status.conditions item with type="Ready",status="True".
+	//
+	// Valid policies are IfHealthyBudget and AlwaysAllow.
+	// If no policy is specified, the default behavior will be used,
+	// which corresponds to the IfHealthyBudget policy.
+	//
+	// IfHealthyBudget policy means that running pods (status.phase="Running"),
+	// but not yet healthy can be evicted only if the guarded application is not
+	// disrupted (status.currentHealthy is at least equal to status.desiredHealthy).
+	// Healthy pods will be subject to the PDB for eviction.
+	//
+	// AlwaysAllow policy means that all running pods (status.phase="Running"),
+	// but not yet healthy are considered disrupted and can be evicted regardless
+	// of whether the criteria in a PDB is met. This means perspective running
+	// pods of a disrupted application might not get a chance to become healthy.
+	// Healthy pods will be subject to the PDB for eviction.
+	//
+	// Additional policies may be added in the future.
+	// Clients making eviction decisions should disallow eviction of unhealthy pods
+	// if they encounter an unrecognized policy in this field.
+	//
+	// This field is alpha-level. The eviction API uses this field when
+	// the feature gate PDBUnhealthyPodEvictionPolicy is enabled (disabled by default).
+	// +optional
+	UnhealthyPodEvictionPolicy *UnhealthyPodEvictionPolicyType `json:"unhealthyPodEvictionPolicy,omitempty" protobuf:"bytes,4,opt,name=unhealthyPodEvictionPolicy"`
 }
+
+// UnhealthyPodEvictionPolicyType defines the criteria for when unhealthy pods
+// should be considered for eviction.
+// +enum
+type UnhealthyPodEvictionPolicyType string
+
+const (
+	// IfHealthyBudget policy means that running pods (status.phase="Running"),
+	// but not yet healthy can be evicted only if the guarded application is not
+	// disrupted (status.currentHealthy is at least equal to status.desiredHealthy).
+	// Healthy pods will be subject to the PDB for eviction.
+	IfHealthyBudget UnhealthyPodEvictionPolicyType = "IfHealthyBudget"
+
+	// AlwaysAllow policy means that all running pods (status.phase="Running"),
+	// but not yet healthy are considered disrupted and can be evicted regardless
+	// of whether the criteria in a PDB is met. This means perspective running
+	// pods of a disrupted application might not get a chance to become healthy.
+	// Healthy pods will be subject to the PDB for eviction.
+	AlwaysAllow UnhealthyPodEvictionPolicyType = "AlwaysAllow"
+)
 
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
@@ -279,7 +326,6 @@ type PodSecurityPolicySpec struct {
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
 	// AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
 	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
-	// This is a beta field, and is only honored if the API server enables the CSIInlineVolume feature gate.
 	// +optional
 	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
 	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.

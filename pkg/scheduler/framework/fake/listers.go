@@ -254,18 +254,6 @@ func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*framework
 	return nodes, nil
 }
 
-// NewNodeInfoLister create a new fake NodeInfoLister from a slice of v1.Nodes.
-func NewNodeInfoLister(nodes []*v1.Node) framework.NodeInfoLister {
-	nodeInfoList := make([]*framework.NodeInfo, len(nodes))
-	for _, node := range nodes {
-		nodeInfo := framework.NewNodeInfo()
-		nodeInfo.SetNode(node)
-		nodeInfoList = append(nodeInfoList, nodeInfo)
-	}
-
-	return NodeInfoLister(nodeInfoList)
-}
-
 var _ storagelisters.CSINodeLister = CSINodeLister{}
 
 // CSINodeLister declares a storagev1.CSINode type for testing.

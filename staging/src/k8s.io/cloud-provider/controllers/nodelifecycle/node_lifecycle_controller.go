@@ -36,6 +36,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 )
@@ -54,7 +55,9 @@ var ShutdownTaint = &v1.Taint{
 type CloudNodeLifecycleController struct {
 	kubeClient clientset.Interface
 	nodeLister v1lister.NodeLister
-	recorder   record.EventRecorder
+
+	broadcaster record.EventBroadcaster
+	recorder    record.EventRecorder
 
 	cloud cloudprovider.Interface
 
@@ -72,10 +75,6 @@ func NewCloudNodeLifecycleController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"})
-	eventBroadcaster.StartStructuredLogging(0)
-
-	klog.Info("Sending events to api server")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	if kubeClient == nil {
 		return nil, errors.New("kubernetes client is nil")
@@ -94,6 +93,7 @@ func NewCloudNodeLifecycleController(
 	c := &CloudNodeLifecycleController{
 		kubeClient:        kubeClient,
 		nodeLister:        nodeInformer.Lister(),
+		broadcaster:       eventBroadcaster,
 		recorder:          recorder,
 		cloud:             cloud,
 		nodeMonitorPeriod: nodeMonitorPeriod,
@@ -104,8 +104,16 @@ func NewCloudNodeLifecycleController(
 
 // Run starts the main loop for this controller. Run is blocking so should
 // be called via a goroutine
-func (c *CloudNodeLifecycleController) Run(ctx context.Context) {
+func (c *CloudNodeLifecycleController) Run(ctx context.Context, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
+	controllerManagerMetrics.ControllerStarted("cloud-node-lifecycle")
+	defer controllerManagerMetrics.ControllerStopped("cloud-node-lifecycle")
+
+	// Start event processing pipeline.
+	klog.Info("Sending events to api server")
+	c.broadcaster.StartStructuredLogging(0)
+	c.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.kubeClient.CoreV1().Events("")})
+	defer c.broadcaster.Shutdown()
 
 	// The following loops run communicate with the APIServer with a worst case complexity
 	// of O(num_nodes) per cycle. These functions are justified here because these events fire

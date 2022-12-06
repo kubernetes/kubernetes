@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package pv
 
 import (
 	"context"
@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
@@ -44,14 +45,6 @@ const (
 
 	// VolumeSelectorKey is the key for volume selector.
 	VolumeSelectorKey = "e2e-pv-pool"
-
-	// isDefaultStorageClassAnnotation represents a StorageClass annotation that
-	// marks a class as the default StorageClass
-	isDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
-
-	// betaIsDefaultStorageClassAnnotation is the beta version of IsDefaultStorageClassAnnotation.
-	// TODO: remove Beta when no longer used
-	betaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
 
 	// volumeGidAnnotationKey is the of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
@@ -80,13 +73,15 @@ type pvcval struct{}
 // present. We must always Get the pvc object before referencing any of its values, eg.
 // its VolumeName.
 // Note: It's unsafe to add keys to a map in a loop. Their insertion in the map is
-//   unpredictable and can result in the same key being iterated over again.
+//
+//	unpredictable and can result in the same key being iterated over again.
 type PVCMap map[types.NamespacedName]pvcval
 
 // PersistentVolumeConfig is consumed by MakePersistentVolume() to generate a PV object
 // for varying storage options (NFS, ceph, glusterFS, etc.).
 // (+optional) prebind holds a pre-bound PVC
 // Example pvSource:
+//
 //	pvSource: api.PersistentVolumeSource{
 //		NFS: &api.NFSVolumeSource{
 //	 		...
@@ -257,7 +252,8 @@ func DeletePVCandValidatePV(c clientset.Interface, timeouts *framework.TimeoutCo
 // are deleted. Validates that the claim was deleted and the PV is in the expected Phase (Released,
 // Available, Bound).
 // Note: if there are more claims than pvs then some of the remaining claims may bind to just made
-//   available pvs.
+//
+//	available pvs.
 func DeletePVCandValidatePVGroup(c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvols PVMap, claims PVCMap, expectPVPhase v1.PersistentVolumePhase) error {
 	var boundPVs, deletedPVCs int
 
@@ -347,8 +343,9 @@ func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) 
 // namespace. If the "preBind" bool is true then pre-bind the PV to the PVC
 // via the PV's ClaimRef. Return the pv and pvc to reflect the created objects.
 // Note: in the pre-bind case the real PVC name, which is generated, is not
-//   known until after the PVC is instantiated. This is why the pvc is created
-//   before the pv.
+//
+//	known until after the PVC is instantiated. This is why the pvc is created
+//	before the pv.
 func CreatePVCPV(c clientset.Interface, timeouts *framework.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
 	// make the pvc spec
 	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
@@ -382,8 +379,9 @@ func CreatePVCPV(c clientset.Interface, timeouts *framework.TimeoutContext, pvCo
 // via the PVC's VolumeName. Return the pv and pvc to reflect the created
 // objects.
 // Note: in the pre-bind case the real PV name, which is generated, is not
-//   known until after the PV is instantiated. This is why the pv is created
-//   before the pvc.
+//
+//	known until after the PV is instantiated. This is why the pv is created
+//	before the pvc.
 func CreatePVPVC(c clientset.Interface, timeouts *framework.TimeoutContext, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
 	preBindMsg := ""
 	if preBind {
@@ -417,7 +415,8 @@ func CreatePVPVC(c clientset.Interface, timeouts *framework.TimeoutContext, pvCo
 // entries for the resources that were successfully created. In other words, when the caller
 // sees an error returned, it needs to decide what to do about entries in the maps.
 // Note: when the test suite deletes the namespace orphaned pvcs and pods are deleted. However,
-//   orphaned pvs are not deleted and will remain after the suite completes.
+//
+//	orphaned pvs are not deleted and will remain after the suite completes.
 func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig) (PVMap, PVCMap, error) {
 	pvMap := make(PVMap, numpvs)
 	pvcMap := make(PVCMap, numpvcs)
@@ -504,10 +503,11 @@ func WaitOnPVandPVC(c clientset.Interface, timeouts *framework.TimeoutContext, n
 
 // WaitAndVerifyBinds searches for bound PVs and PVCs by examining pvols for non-nil claimRefs.
 // NOTE: Each iteration waits for a maximum of 3 minutes per PV and, if the PV is bound,
-//   up to 3 minutes for the PVC. When the number of PVs != number of PVCs, this can lead
-//   to situations where the maximum wait times are reached several times in succession,
-//   extending test time. Thus, it is recommended to keep the delta between PVs and PVCs
-//   small.
+//
+//	up to 3 minutes for the PVC. When the number of PVs != number of PVCs, this can lead
+//	to situations where the maximum wait times are reached several times in succession,
+//	extending test time. Thus, it is recommended to keep the delta between PVs and PVCs
+//	small.
 func WaitAndVerifyBinds(c clientset.Interface, timeouts *framework.TimeoutContext, ns string, pvols PVMap, claims PVCMap, testExpected bool) error {
 	var actualBinds int
 	expectedBinds := len(pvols)
@@ -563,8 +563,9 @@ func makePvcKey(ns, name string) types.NamespacedName {
 // If the PVC is nil then the PV is not defined with a ClaimRef.  If no reclaimPolicy
 // is assigned, assumes "Retain". Specs are expected to match the test's PVC.
 // Note: the passed-in claim does not have a name until it is created and thus the PV's
-//   ClaimRef cannot be completely filled-in in this func. Therefore, the ClaimRef's name
-//   is added later in CreatePVCPV.
+//
+//	ClaimRef cannot be completely filled-in in this func. Therefore, the ClaimRef's name
+//	is added later in CreatePVCPV.
 func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
 	var claimRef *v1.ObjectReference
 
@@ -671,6 +672,14 @@ func createPDWithRetry(zone string) (string, error) {
 		return newDiskName, nil
 	}
 	return "", err
+}
+
+func CreateShare() (string, string, string, error) {
+	return framework.TestContext.CloudConfig.Provider.CreateShare()
+}
+
+func DeleteShare(accountName, shareName string) error {
+	return framework.TestContext.CloudConfig.Provider.DeleteShare(accountName, shareName)
 }
 
 // CreatePDWithRetry creates PD with retry.
@@ -810,7 +819,7 @@ func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
 	}
 	var scName string
 	for _, sc := range list.Items {
-		if isDefaultAnnotation(sc.ObjectMeta) {
+		if util.IsDefaultAnnotation(sc.ObjectMeta) {
 			if len(scName) != 0 {
 				return "", fmt.Errorf("Multiple default storage classes found: %q and %q", scName, sc.Name)
 			}
@@ -822,20 +831,6 @@ func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
 	}
 	framework.Logf("Default storage class: %q", scName)
 	return scName, nil
-}
-
-// isDefaultAnnotation returns a boolean if the default storage class
-// annotation is set
-// TODO: remove Beta when no longer needed
-func isDefaultAnnotation(obj metav1.ObjectMeta) bool {
-	if obj.Annotations[isDefaultStorageClassAnnotation] == "true" {
-		return true
-	}
-	if obj.Annotations[betaIsDefaultStorageClassAnnotation] == "true" {
-		return true
-	}
-
-	return false
 }
 
 // SkipIfNoDefaultStorageClass skips tests if no default SC can be found.

@@ -54,15 +54,14 @@ var (
 	// so that tests can set a different segment size.
 	SegmentSizeBytes int64 = 64 * 1000 * 1000 // 64MB
 
-	ErrMetadataConflict             = errors.New("wal: conflicting metadata found")
-	ErrFileNotFound                 = errors.New("wal: file not found")
-	ErrCRCMismatch                  = errors.New("wal: crc mismatch")
-	ErrSnapshotMismatch             = errors.New("wal: snapshot mismatch")
-	ErrSnapshotNotFound             = errors.New("wal: snapshot not found")
-	ErrSliceOutOfRange              = errors.New("wal: slice bounds out of range")
-	ErrMaxWALEntrySizeLimitExceeded = errors.New("wal: max entry size limit exceeded")
-	ErrDecoderNotFound              = errors.New("wal: decoder not found")
-	crcTable                        = crc32.MakeTable(crc32.Castagnoli)
+	ErrMetadataConflict = errors.New("wal: conflicting metadata found")
+	ErrFileNotFound     = errors.New("wal: file not found")
+	ErrCRCMismatch      = errors.New("wal: crc mismatch")
+	ErrSnapshotMismatch = errors.New("wal: snapshot mismatch")
+	ErrSnapshotNotFound = errors.New("wal: snapshot not found")
+	ErrSliceOutOfRange  = errors.New("wal: slice bounds out of range")
+	ErrDecoderNotFound  = errors.New("wal: decoder not found")
+	crcTable            = crc32.MakeTable(crc32.Castagnoli)
 )
 
 // WAL is a logical representation of the stable storage.
@@ -378,12 +377,13 @@ func selectWALFiles(lg *zap.Logger, dirpath string, snap walpb.Snapshot) ([]stri
 	return names, nameIndex, nil
 }
 
-func openWALFiles(lg *zap.Logger, dirpath string, names []string, nameIndex int, write bool) ([]io.Reader, []*fileutil.LockedFile, func() error, error) {
+func openWALFiles(lg *zap.Logger, dirpath string, names []string, nameIndex int, write bool) ([]fileutil.FileReader, []*fileutil.LockedFile, func() error, error) {
 	rcs := make([]io.ReadCloser, 0)
-	rs := make([]io.Reader, 0)
+	rs := make([]fileutil.FileReader, 0)
 	ls := make([]*fileutil.LockedFile, 0)
 	for _, name := range names[nameIndex:] {
 		p := filepath.Join(dirpath, name)
+		var f *os.File
 		if write {
 			l, err := fileutil.TryLockFile(p, os.O_RDWR, fileutil.PrivateFileMode)
 			if err != nil {
@@ -392,6 +392,7 @@ func openWALFiles(lg *zap.Logger, dirpath string, names []string, nameIndex int,
 			}
 			ls = append(ls, l)
 			rcs = append(rcs, l)
+			f = l.File
 		} else {
 			rf, err := os.OpenFile(p, os.O_RDONLY, fileutil.PrivateFileMode)
 			if err != nil {
@@ -400,8 +401,10 @@ func openWALFiles(lg *zap.Logger, dirpath string, names []string, nameIndex int,
 			}
 			ls = append(ls, nil)
 			rcs = append(rcs, rf)
+			f = rf
 		}
-		rs = append(rs, rcs[len(rcs)-1])
+		fileReader := fileutil.NewFileReader(f)
+		rs = append(rs, fileReader)
 	}
 
 	closer := func() error { return closeAll(lg, rcs...) }

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,9 +105,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				setIngressEmptyFirstElement(np)
 			}
 			np.Spec.Ingress[0].Ports = make([]networking.NetworkPolicyPort, len(ports))
-			for i, p := range ports {
-				np.Spec.Ingress[0].Ports[i] = p
-			}
+			copy(np.Spec.Ingress[0].Ports, ports)
 		}
 	}
 
@@ -198,9 +197,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				setEgressEmptyFirstElement(np)
 			}
 			np.Spec.Egress[0].Ports = make([]networking.NetworkPolicyPort, len(ports))
-			for i, p := range ports {
-				np.Spec.Egress[0].Ports[i] = p
-			}
+			copy(np.Spec.Egress[0].Ports, ports)
 		}
 	}
 
@@ -254,7 +251,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	// Success cases are expected to pass validation.
 
 	for k, v := range successCases {
-		if errs := ValidateNetworkPolicy(v); len(errs) != 0 {
+		if errs := ValidateNetworkPolicy(v, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) != 0 {
 			t.Errorf("Expected success for the success validation test number %d, got %v", k, errs)
 		}
 	}
@@ -371,7 +368,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	// Error cases are not expected to pass validation.
 	for testName, networkPolicy := range errorCases {
-		if errs := ValidateNetworkPolicy(networkPolicy); len(errs) == 0 {
+		if errs := ValidateNetworkPolicy(networkPolicy, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %s", testName)
 		}
 	}
@@ -426,7 +423,7 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	for testName, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{false}); len(errs) != 0 {
 			t.Errorf("expected success (%s): %v", testName, errs)
 		}
 	}
@@ -453,10 +450,142 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	for testName, errorCase := range errorCases {
 		errorCase.old.ObjectMeta.ResourceVersion = "1"
 		errorCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{false}); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
+}
+
+func TestValidateNetworkPolicyStatusUpdate(t *testing.T) {
+
+	type netpolStatusCases struct {
+		obj          networking.NetworkPolicyStatus
+		expectedErrs field.ErrorList
+	}
+
+	testCases := map[string]netpolStatusCases{
+		"valid conditions": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusAccepted),
+						Status: metav1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: 2,
+					},
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusFailure),
+						Status: metav1.ConditionFalse,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             "RuleApplied",
+						Message:            "no error was found",
+						ObservedGeneration: 2,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{},
+		},
+		"duplicate type": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusAccepted),
+						Status: metav1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: 2,
+					},
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusAccepted),
+						Status: metav1.ConditionFalse,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             string(networking.NetworkPolicyConditionReasonFeatureNotSupported),
+						Message:            "endport is not supported",
+						ObservedGeneration: 2,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{field.Duplicate(field.NewPath("status").Child("conditions").Index(1).Child("type"),
+				string(networking.NetworkPolicyConditionStatusAccepted))},
+		},
+		"invalid generation": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusAccepted),
+						Status: metav1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: -1,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status").Child("conditions").Index(0).Child("observedGeneration"),
+				int64(-1), "must be greater than or equal to zero")},
+		},
+		"invalid null transition time": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               string(networking.NetworkPolicyConditionStatusAccepted),
+						Status:             metav1.ConditionTrue,
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: 3,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status").Child("conditions").Index(0).Child("lastTransitionTime"),
+				"must be set")},
+		},
+		"multiple condition errors": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               string(networking.NetworkPolicyConditionStatusAccepted),
+						Status:             metav1.ConditionTrue,
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: -1,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status").Child("conditions").Index(0).Child("observedGeneration"),
+					int64(-1), "must be greater than or equal to zero"),
+				field.Required(field.NewPath("status").Child("conditions").Index(0).Child("lastTransitionTime"),
+					"must be set"),
+			},
+		},
+	}
+
+	for testName, testCase := range testCases {
+		errs := ValidateNetworkPolicyStatusUpdate(testCase.obj, networking.NetworkPolicyStatus{}, field.NewPath("status"))
+		if len(errs) != len(testCase.expectedErrs) {
+			t.Errorf("Test %s: Expected %d errors, got %d (%+v)", testName, len(testCase.expectedErrs), len(errs), errs)
+		}
+
+		for i, err := range errs {
+			if err.Error() != testCase.expectedErrs[i].Error() {
+				t.Errorf("Test %s: Expected error: %v, got %v", testName, testCase.expectedErrs[i], err)
+			}
+		}
+	}
+
 }
 
 func TestValidateIngress(t *testing.T) {
@@ -499,8 +628,8 @@ func TestValidateIngress(t *testing.T) {
 			},
 		},
 		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			LoadBalancer: networking.IngressLoadBalancerStatus{
+				Ingress: []networking.IngressLoadBalancerIngress{
 					{IP: "127.0.0.1"},
 				},
 			},
@@ -1645,8 +1774,8 @@ func TestValidateIngressTLS(t *testing.T) {
 				},
 			},
 			Status: networking.IngressStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
+				LoadBalancer: networking.IngressLoadBalancerStatus{
+					Ingress: []networking.IngressLoadBalancerIngress{
 						{IP: "127.0.0.1"},
 					},
 				},
@@ -1797,8 +1926,8 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 				},
 			},
 			Status: networking.IngressStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
+				LoadBalancer: networking.IngressLoadBalancerStatus{
+					Ingress: []networking.IngressLoadBalancerIngress{
 						{IP: "127.0.0.1", Hostname: "foo.bar.com"},
 					},
 				},
@@ -1808,24 +1937,24 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 	oldValue := newValid()
 	newValue := newValid()
 	newValue.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.IngressLoadBalancerStatus{
+			Ingress: []networking.IngressLoadBalancerIngress{
 				{IP: "127.0.0.2", Hostname: "foo.com"},
 			},
 		},
 	}
 	invalidIP := newValid()
 	invalidIP.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.IngressLoadBalancerStatus{
+			Ingress: []networking.IngressLoadBalancerIngress{
 				{IP: "abcd", Hostname: "foo.com"},
 			},
 		},
 	}
 	invalidHostname := newValid()
 	invalidHostname.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.IngressLoadBalancerStatus{
+			Ingress: []networking.IngressLoadBalancerIngress{
 				{IP: "127.0.0.1", Hostname: "127.0.0.1"},
 			},
 		},
@@ -1851,5 +1980,218 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
 		}
+	}
+}
+
+func makeNodeSelector(key string, op api.NodeSelectorOperator, values []string) *api.NodeSelector {
+	return &api.NodeSelector{
+		NodeSelectorTerms: []api.NodeSelectorTerm{
+			{
+				MatchExpressions: []api.NodeSelectorRequirement{
+					{
+						Key:      key,
+						Operator: op,
+						Values:   values,
+					},
+				},
+			},
+		},
+	}
+}
+
+func makeClusterCIDR(perNodeHostBits int32, ipv4, ipv6 string, nodeSelector *api.NodeSelector) *networking.ClusterCIDR {
+	return &networking.ClusterCIDR{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "9",
+		},
+		Spec: networking.ClusterCIDRSpec{
+			PerNodeHostBits: perNodeHostBits,
+			IPv4:            ipv4,
+			IPv6:            ipv6,
+			NodeSelector:    nodeSelector,
+		},
+	}
+}
+
+func TestValidateClusterCIDR(t *testing.T) {
+	testCases := []struct {
+		name      string
+		cc        *networking.ClusterCIDR
+		expectErr bool
+	}{
+		{
+			name:      "valid SingleStack IPv4 ClusterCIDR",
+			cc:        makeClusterCIDR(8, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv4 ClusterCIDR, perNodeHostBits = maxPerNodeHostBits",
+			cc:        makeClusterCIDR(16, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv4 ClusterCIDR, perNodeHostBits > minPerNodeHostBits",
+			cc:        makeClusterCIDR(4, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv6 ClusterCIDR",
+			cc:        makeClusterCIDR(8, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv6 ClusterCIDR, perNodeHostBits = maxPerNodeHostBit",
+			cc:        makeClusterCIDR(64, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv6 ClusterCIDR, perNodeHostBits > minPerNodeHostBit",
+			cc:        makeClusterCIDR(4, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv6 ClusterCIDR perNodeHostBits=100",
+			cc:        makeClusterCIDR(100, "", "fd00:1:1::/16", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid DualStack ClusterCIDR",
+			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid DualStack ClusterCIDR, no NodeSelector",
+			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", nil),
+			expectErr: false,
+		},
+		// Failure cases.
+		{
+			name:      "invalid ClusterCIDR, no IPv4 or IPv6 CIDR",
+			cc:        makeClusterCIDR(8, "", "", nil),
+			expectErr: true,
+		},
+		{
+			name:      "invalid ClusterCIDR, invalid nodeSelector",
+			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("NoUppercaseOrSpecialCharsLike=Equals", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		// IPv4 tests.
+		{
+			name:      "invalid SingleStack IPv4 ClusterCIDR, invalid spec.IPv4",
+			cc:        makeClusterCIDR(8, "test", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid Singlestack IPv4 ClusterCIDR, perNodeHostBits > maxPerNodeHostBits",
+			cc:        makeClusterCIDR(100, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid SingleStack IPv4 ClusterCIDR, perNodeHostBits < minPerNodeHostBits",
+			cc:        makeClusterCIDR(2, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		// IPv6 tests.
+		{
+			name:      "invalid SingleStack IPv6 ClusterCIDR, invalid spec.IPv6",
+			cc:        makeClusterCIDR(8, "", "testv6", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid SingleStack IPv6 ClusterCIDR, valid IPv4 CIDR in spec.IPv6",
+			cc:        makeClusterCIDR(8, "", "10.2.0.0/16", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid SingleStack IPv6 ClusterCIDR, invalid perNodeHostBits > maxPerNodeHostBits",
+			cc:        makeClusterCIDR(12, "", "fd00::/120", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid SingleStack IPv6 ClusterCIDR, invalid perNodeHostBits < minPerNodeHostBits",
+			cc:        makeClusterCIDR(3, "", "fd00::/120", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		// DualStack tests
+		{
+			name:      "invalid DualStack ClusterCIDR, valid spec.IPv4, invalid spec.IPv6",
+			cc:        makeClusterCIDR(8, "10.1.0.0/16", "testv6", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid DualStack ClusterCIDR, valid spec.IPv6, invalid spec.IPv4",
+			cc:        makeClusterCIDR(8, "testv4", "fd00::/120", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid DualStack ClusterCIDR, invalid perNodeHostBits > maxPerNodeHostBits",
+			cc:        makeClusterCIDR(24, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid DualStack ClusterCIDR, valid IPv6 CIDR in spec.IPv4",
+			cc:        makeClusterCIDR(8, "fd00::/120", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := ValidateClusterCIDR(testCase.cc)
+			if !testCase.expectErr && err != nil {
+				t.Errorf("ValidateClusterCIDR(%+v) must be successful for test '%s', got %v", testCase.cc, testCase.name, err)
+			}
+			if testCase.expectErr && err == nil {
+				t.Errorf("ValidateClusterCIDR(%+v) must return an error for test: %s, but got nil", testCase.cc, testCase.name)
+			}
+		})
+	}
+}
+
+func TestValidateClusterConfigUpdate(t *testing.T) {
+	oldCCC := makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}))
+
+	testCases := []struct {
+		name      string
+		cc        *networking.ClusterCIDR
+		expectErr bool
+	}{
+		{
+			name:      "Successful update, no changes to ClusterCIDR.Spec",
+			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "Failed update, update spec.PerNodeHostBits",
+			cc:        makeClusterCIDR(12, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "Failed update, update spec.IPv4",
+			cc:        makeClusterCIDR(8, "10.2.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "Failed update, update spec.IPv6",
+			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:2:/112", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "Failed update, update spec.NodeSelector",
+			cc:        makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar2"})),
+			expectErr: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := ValidateClusterCIDRUpdate(testCase.cc, oldCCC)
+			if !testCase.expectErr && err != nil {
+				t.Errorf("ValidateClusterCIDRUpdate(%+v) must be successful for test '%s', got %v", testCase.cc, testCase.name, err)
+			}
+			if testCase.expectErr && err == nil {
+				t.Errorf("ValidateClusterCIDRUpdate(%+v) must return error for test: %s, but got nil", testCase.cc, testCase.name)
+			}
+		})
 	}
 }

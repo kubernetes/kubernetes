@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -32,8 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/server"
@@ -235,8 +234,6 @@ func validateBackendBatchOptions(pluginName string, options AuditBatchOptions) e
 }
 
 var knownGroupVersions = []schema.GroupVersion{
-	auditv1alpha1.SchemeGroupVersion,
-	auditv1beta1.SchemeGroupVersion,
 	auditv1.SchemeGroupVersion,
 }
 
@@ -529,6 +526,9 @@ func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 }
 
 func (o *AuditLogOptions) ensureLogFile() error {
+	if err := os.MkdirAll(filepath.Dir(o.Path), 0700); err != nil {
+		return err
+	}
 	mode := os.FileMode(0600)
 	f, err := os.OpenFile(o.Path, os.O_CREATE|os.O_APPEND|os.O_RDWR, mode)
 	if err != nil {

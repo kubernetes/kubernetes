@@ -134,7 +134,7 @@ function kube::release::package_client_tarballs() {
   for platform_long in "${long_platforms[@]}"; do
     local platform
     local platform_tag
-    platform=${platform_long##${LOCAL_OUTPUT_BINPATH}/} # Strip LOCAL_OUTPUT_BINPATH
+    platform=${platform_long##"${LOCAL_OUTPUT_BINPATH}"/} # Strip LOCAL_OUTPUT_BINPATH
     platform_tag=${platform/\//-} # Replace a "/" for a "-"
     kube::log::status "Starting tarball: client $platform_tag"
 
@@ -340,10 +340,10 @@ function kube::release::create_docker_images_for_server() {
     images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
-    # k8s.gcr.io is the constant tag in the docker archives, this is also the default for config scripts in GKE.
+    # registry.k8s.io is the constant tag in the docker archives, this is also the default for config scripts in GKE.
     # We can use KUBE_DOCKER_REGISTRY to include and extra registry in the docker archive.
-    # If we use KUBE_DOCKER_REGISTRY="k8s.gcr.io", then the extra tag (same) is ignored, see release_docker_image_tag below.
-    local -r docker_registry="k8s.gcr.io"
+    # If we use KUBE_DOCKER_REGISTRY="registry.k8s.io", then the extra tag (same) is ignored, see release_docker_image_tag below.
+    local -r docker_registry="registry.k8s.io"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
@@ -442,6 +442,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
   cp "${src_dir}/konnectivity-server.yaml" "${dst_dir}"
   cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
+  cp "${src_dir}/cloud-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
   cp "${src_dir}/glbc.manifest" "${dst_dir}"

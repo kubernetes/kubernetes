@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,12 +29,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
-	return &api.PersistentVolumeClaim{
+func testVolumeClaim(name string, namespace string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
+	return &core.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec:       spec,
 	}
@@ -41,7 +41,7 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 
 func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 	classGold := "gold"
-	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+	validClaim := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 		Selector: &metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
@@ -50,17 +50,17 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				},
 			},
 		},
-		AccessModes: []api.PersistentVolumeAccessMode{
-			api.ReadWriteOnce,
-			api.ReadOnlyMany,
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
 		},
-		Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10Gi"),
 			},
 		},
 	})
-	validClaimByStorageClass := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+	validClaimByStorageClass := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 		Selector: &metav1.LabelSelector{
 			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
@@ -69,27 +69,27 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				},
 			},
 		},
-		AccessModes: []api.PersistentVolumeAccessMode{
-			api.ReadWriteOnce,
-			api.ReadOnlyMany,
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
 		},
-		Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("10Gi"),
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10Gi"),
 			},
 		},
 		StorageClassName: &classGold,
 	})
 
 	validClaimWithNonIntegerStorage := validClaim.DeepCopy()
-	validClaimWithNonIntegerStorage.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)] = resource.MustParse("1001m")
+	validClaimWithNonIntegerStorage.Spec.Resources.Requests[core.ResourceName(core.ResourceStorage)] = resource.MustParse("1001m")
 
 	validClaimByStorageClassWithNonIntegerStorage := validClaimByStorageClass.DeepCopy()
-	validClaimByStorageClassWithNonIntegerStorage.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)] = resource.MustParse("1001m")
+	validClaimByStorageClassWithNonIntegerStorage.Spec.Resources.Requests[core.ResourceName(core.ResourceStorage)] = resource.MustParse("1001m")
 
 	evaluator := NewPersistentVolumeClaimEvaluator(nil)
 	testCases := map[string]struct {
-		pvc                        *api.PersistentVolumeClaim
+		pvc                        *core.PersistentVolumeClaim
 		usage                      corev1.ResourceList
 		enableRecoverFromExpansion bool
 	}{
@@ -168,16 +168,58 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 	}
 }
 
-func getPVCWithAllocatedResource(pvcSize, allocatedSize string) *api.PersistentVolumeClaim {
-	validPVCWithAllocatedResources := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
-		Resources: api.ResourceRequirements{
-			Requests: api.ResourceList{
+func getPVCWithAllocatedResource(pvcSize, allocatedSize string) *core.PersistentVolumeClaim {
+	validPVCWithAllocatedResources := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
 				core.ResourceStorage: resource.MustParse(pvcSize),
 			},
 		},
 	})
-	validPVCWithAllocatedResources.Status.AllocatedResources = api.ResourceList{
-		api.ResourceName(api.ResourceStorage): resource.MustParse(allocatedSize),
+	validPVCWithAllocatedResources.Status.AllocatedResources = core.ResourceList{
+		core.ResourceName(core.ResourceStorage): resource.MustParse(allocatedSize),
 	}
 	return validPVCWithAllocatedResources
+}
+
+func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
+	evaluator := NewPersistentVolumeClaimEvaluator(nil)
+	testCases := map[string]struct {
+		items []corev1.ResourceName
+		want  []corev1.ResourceName
+	}{
+		"supported-resources": {
+			items: []corev1.ResourceName{
+				"count/persistentvolumeclaims",
+				"requests.storage",
+				"persistentvolumeclaims",
+				"gold.storageclass.storage.k8s.io/requests.storage",
+				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+			},
+
+			want: []corev1.ResourceName{
+				"count/persistentvolumeclaims",
+				"requests.storage",
+				"persistentvolumeclaims",
+				"gold.storageclass.storage.k8s.io/requests.storage",
+				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+			},
+		},
+		"unsupported-resources": {
+			items: []corev1.ResourceName{
+				"storage",
+				"ephemeral-storage",
+				"bronze.storageclass.storage.k8s.io/storage",
+				"gold.storage.k8s.io/requests.storage",
+			},
+			want: []corev1.ResourceName{},
+		},
+	}
+	for testName, testCase := range testCases {
+		actual := evaluator.MatchingResources(testCase.items)
+
+		if !reflect.DeepEqual(testCase.want, actual) {
+			t.Errorf("%s expected:\n%v\n, actual:\n%v", testName, testCase.want, actual)
+		}
+	}
 }

@@ -17,11 +17,22 @@ limitations under the License.
 package pleg
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/types"
 )
 
 // PodLifeCycleEventType define the event type of pod life cycle events.
 type PodLifeCycleEventType string
+
+type RelistDuration struct {
+	// The period for relisting.
+	RelistPeriod time.Duration
+	// The relisting threshold needs to be greater than the relisting period +
+	// the relisting time, which can vary significantly. Set a conservative
+	// threshold to avoid flipping between healthy and unhealthy.
+	RelistThreshold time.Duration
+}
 
 const (
 	// ContainerStarted - event type when the new state of container is running.
@@ -52,6 +63,9 @@ type PodLifecycleEvent struct {
 // PodLifecycleEventGenerator contains functions for generating pod life cycle events.
 type PodLifecycleEventGenerator interface {
 	Start()
+	Stop()
+	Update(relistDuration *RelistDuration)
 	Watch() chan *PodLifecycleEvent
 	Healthy() (bool, error)
+	Relist()
 }

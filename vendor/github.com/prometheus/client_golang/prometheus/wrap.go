@@ -21,6 +21,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	dto "github.com/prometheus/client_model/go"
+
+	"github.com/prometheus/client_golang/prometheus/internal"
 )
 
 // WrapRegistererWith returns a Registerer wrapping the provided
@@ -182,7 +184,7 @@ func (m *wrappingMetric) Write(out *dto.Metric) error {
 			Value: proto.String(lv),
 		})
 	}
-	sort.Sort(labelPairSorter(out.Label))
+	sort.Sort(internal.LabelPairSorter(out.Label))
 	return nil
 }
 

@@ -238,15 +238,19 @@ var (
 // (to setup server->client keys) or clientKeys (for client->server keys).
 func newPacketCipher(d direction, algs directionAlgorithms, kex *kexResult) (packetCipher, error) {
 	cipherMode := cipherModes[algs.Cipher]
-	macMode := macModes[algs.MAC]
 
 	iv := make([]byte, cipherMode.ivSize)
 	key := make([]byte, cipherMode.keySize)
-	macKey := make([]byte, macMode.keySize)
 
 	generateKeyMaterial(iv, d.ivTag, kex)
 	generateKeyMaterial(key, d.keyTag, kex)
-	generateKeyMaterial(macKey, d.macKeyTag, kex)
+
+	var macKey []byte
+	if !aeadCiphers[algs.Cipher] {
+		macMode := macModes[algs.MAC]
+		macKey = make([]byte, macMode.keySize)
+		generateKeyMaterial(macKey, d.macKeyTag, kex)
+	}
 
 	return cipherModes[algs.Cipher].create(key, iv, macKey, algs)
 }

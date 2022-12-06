@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -39,8 +41,9 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -107,7 +110,7 @@ func waitTillNPodsRunningOnNodes(c clientset.Interface, nodeNames sets.String, p
 func restartNfsServer(serverPod *v1.Pod) {
 	const startcmd = "/usr/sbin/rpc.nfsd 1"
 	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
-	framework.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", startcmd)
+	e2ekubectl.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", startcmd)
 }
 
 // Stop the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 0` command in the
@@ -116,7 +119,7 @@ func restartNfsServer(serverPod *v1.Pod) {
 func stopNfsServer(serverPod *v1.Pod) {
 	const stopcmd = "/usr/sbin/rpc.nfsd 0"
 	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
-	framework.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", stopcmd)
+	e2ekubectl.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", stopcmd)
 }
 
 // Creates a pod that mounts an nfs volume that is served by the nfs-server pod. The container
@@ -270,6 +273,7 @@ var _ = SIGDescribe("kubelet", func() {
 		ns string
 	)
 	f := framework.NewDefaultFramework("kubelet")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -306,7 +310,7 @@ var _ = SIGDescribe("kubelet", func() {
 			}
 			for nodeName := range nodeNames {
 				for k, v := range nodeLabels {
-					framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+					e2enode.AddOrUpdateLabelOnNode(c, nodeName, k, v)
 				}
 			}
 
@@ -330,7 +334,7 @@ var _ = SIGDescribe("kubelet", func() {
 			// If we added labels to nodes in this test, remove them now.
 			for nodeName := range nodeNames {
 				for k := range nodeLabels {
-					framework.RemoveLabelOffNode(c, nodeName, k)
+					e2enode.RemoveLabelOffNode(c, nodeName, k)
 				}
 			}
 		})
@@ -338,6 +342,7 @@ var _ = SIGDescribe("kubelet", func() {
 		for _, itArg := range deleteTests {
 			name := fmt.Sprintf(
 				"kubelet should be able to delete %d pods per node in %v.", itArg.podsPerNode, itArg.timeout)
+			itArg := itArg
 			ginkgo.It(name, func() {
 				totalPods := itArg.podsPerNode * numNodes
 				ginkgo.By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
@@ -430,6 +435,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			// execute It blocks from above table of tests
 			for _, t := range testTbl {
+				t := t
 				ginkgo.It(t.itDescr, func() {
 					pod = createPodUsingNfs(f, c, ns, nfsIP, t.podCmd)
 
@@ -453,4 +459,82 @@ var _ = SIGDescribe("kubelet", func() {
 			}
 		})
 	})
+
+	//Test kubectl alpha node-logs <node-name> commands
+	ginkgo.Describe("kubectl node-logs <node-name> [Feature:add node log viewer]", func() {
+		var (
+			numNodes  int
+			nodeNames sets.String
+		)
+
+		ginkgo.BeforeEach(func() {
+			nodes, err := e2enode.GetBoundedReadySchedulableNodes(c, maxNodesToCheck)
+			numNodes = len(nodes.Items)
+			framework.ExpectNoError(err)
+			nodeNames = sets.NewString()
+			for i := 0; i < numNodes; i++ {
+				nodeNames.Insert(nodes.Items[i].Name)
+			}
+		})
+
+		/*
+			Test if kubectl node-logs <node-name>
+			returns something or not!
+		*/
+
+		ginkgo.It("should return the logs ", func() {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+			for nodeName := range nodeNames {
+				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName)
+				runKubectlCommand(cmd, "")
+			}
+		})
+
+		/*
+			Test if kubectl node-logs <node-name> --service kubelet
+			returns something or not!
+		*/
+
+		ginkgo.It("should return the logs for the requested service", func() {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+			for nodeName := range nodeNames {
+				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName, "--service", "kubelet")
+				runKubectlCommand(cmd, "--service")
+			}
+		})
+
+		/*
+			Test if kubectl node-logs <node-name> --path pods
+			returns something or not!
+		*/
+
+		ginkgo.It("should return the logs for the provided path", func() {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+			for nodeName := range nodeNames {
+				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName, "--path", "pods")
+				runKubectlCommand(cmd, "--path")
+			}
+		})
+	})
 })
+
+func runKubectlCommand(cmd *exec.Cmd, arg string) {
+	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
+	if err != nil {
+		framework.Failf("Failed to start kubectl command: %v", err)
+	}
+	defer stdout.Close()
+	defer stderr.Close()
+	defer framework.TryKill(cmd)
+	buf := make([]byte, 128)
+	if _, err = stdout.Read(buf); err != nil {
+		framework.Failf("Expected output from kubectl alpha node-logs %s: %v", arg, err)
+	}
+	framework.Logf("output: %s", buf)
+}

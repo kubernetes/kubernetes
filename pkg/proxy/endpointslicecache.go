@@ -158,7 +158,7 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 }
 
 // standardEndpointInfo is the default makeEndpointFunc.
-func standardEndpointInfo(ep *BaseEndpointInfo) Endpoint {
+func standardEndpointInfo(ep *BaseEndpointInfo, _ *ServicePortName) Endpoint {
 	return ep
 }
 
@@ -186,6 +186,21 @@ func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.Endpoint
 	}
 
 	return changed
+}
+
+// pendingChanges returns a set whose keys are the names of the services whose endpoints
+// have changed since the last time checkoutChanges was called
+func (cache *EndpointSliceCache) pendingChanges() sets.String {
+	cache.lock.Lock()
+	defer cache.lock.Unlock()
+
+	changes := sets.NewString()
+	for serviceNN, esTracker := range cache.trackerByServiceMap {
+		if len(esTracker.pending) > 0 {
+			changes.Insert(serviceNN.String())
+		}
+	}
+	return changes
 }
 
 // checkoutChanges returns a list of all endpointsChanges that are
@@ -250,7 +265,7 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 				Protocol:       *port.Protocol,
 			}
 
-			endpointInfoBySP[svcPortName] = cache.addEndpoints(serviceNN, int(*port.Port), endpointInfoBySP[svcPortName], sliceInfo.Endpoints)
+			endpointInfoBySP[svcPortName] = cache.addEndpoints(&svcPortName, int(*port.Port), endpointInfoBySP[svcPortName], sliceInfo.Endpoints)
 		}
 	}
 
@@ -258,7 +273,7 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 }
 
 // addEndpoints adds endpointInfo for each unique endpoint.
-func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, portNum int, endpointSet map[string]Endpoint, endpoints []*endpointInfo) map[string]Endpoint {
+func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, portNum int, endpointSet map[string]Endpoint, endpoints []*endpointInfo) map[string]Endpoint {
 	if endpointSet == nil {
 		endpointSet = map[string]Endpoint{}
 	}
@@ -275,7 +290,7 @@ func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, po
 		if (cache.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(endpoint.Addresses[0]) {
 			// Emit event on the corresponding service which had a different IP
 			// version than the endpoint.
-			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], serviceNN.Namespace, serviceNN.Name, "")
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], svcPortName.NamespacedName.Namespace, svcPortName.NamespacedName.Name, "")
 			continue
 		}
 
@@ -298,7 +313,7 @@ func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, po
 		// isLocal should not vary between matching endpoints, but if it does, we
 		// favor a true value here if it exists.
 		if _, exists := endpointSet[endpointInfo.String()]; !exists || isLocal {
-			endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo)
+			endpointSet[endpointInfo.String()] = cache.makeEndpointInfo(endpointInfo, svcPortName)
 		}
 	}
 

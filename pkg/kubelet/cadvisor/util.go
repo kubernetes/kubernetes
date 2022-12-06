@@ -64,12 +64,10 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 }
 
 // UsingLegacyCadvisorStats returns true if container stats are provided by cadvisor instead of through the CRI.
-// CRI integrations should get container metrics via CRI. Docker
-// uses the built-in cadvisor to gather such metrics on Linux for
-// historical reasons.
+// CRI integrations should get container metrics via CRI.
 // TODO: cri-o relies on cadvisor as a temporary workaround. The code should
 // be removed. Related issue:
 // https://github.com/kubernetes/kubernetes/issues/51798
-func UsingLegacyCadvisorStats(runtime, runtimeEndpoint string) bool {
+func UsingLegacyCadvisorStats(runtimeEndpoint string) bool {
 	return runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
 }

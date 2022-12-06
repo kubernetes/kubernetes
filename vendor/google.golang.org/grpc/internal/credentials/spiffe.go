@@ -1,5 +1,3 @@
-// +build !appengine
-
 /*
  *
  * Copyright 2020 gRPC authors.

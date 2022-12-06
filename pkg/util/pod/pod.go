@@ -27,10 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // PatchPodStatus patches pod status. It returns true and avoids an update if the patch contains no changes.
-func PatchPodStatus(c clientset.Interface, namespace, name string, uid types.UID, oldPodStatus, newPodStatus v1.PodStatus) (*v1.Pod, []byte, bool, error) {
+func PatchPodStatus(ctx context.Context, c clientset.Interface, namespace, name string, uid types.UID, oldPodStatus, newPodStatus v1.PodStatus) (*v1.Pod, []byte, bool, error) {
 	patchBytes, unchanged, err := preparePatchBytesForPodStatus(namespace, name, uid, oldPodStatus, newPodStatus)
 	if err != nil {
 		return nil, nil, false, err
@@ -39,7 +40,7 @@ func PatchPodStatus(c clientset.Interface, namespace, name string, uid types.UID
 		return nil, patchBytes, true, nil
 	}
 
-	updatedPod, err := c.CoreV1().Pods(namespace).Patch(context.TODO(), name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	updatedPod, err := c.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	if err != nil {
 		return nil, nil, false, fmt.Errorf("failed to patch status %q for pod %q/%q: %v", patchBytes, namespace, name, err)
 	}
@@ -67,4 +68,14 @@ func preparePatchBytesForPodStatus(namespace, name string, uid types.UID, oldPod
 		return nil, false, fmt.Errorf("failed to CreateTwoWayMergePatch for pod %q/%q: %v", namespace, name, err)
 	}
 	return patchBytes, bytes.Equal(patchBytes, []byte(fmt.Sprintf(`{"metadata":{"uid":%q}}`, uid))), nil
+}
+
+// ReplaceOrAppendPodCondition replaces the first pod condition with equal type or appends if there is none
+func ReplaceOrAppendPodCondition(conditions []v1.PodCondition, condition *v1.PodCondition) []v1.PodCondition {
+	if i, _ := podutil.GetPodConditionFromList(conditions, condition.Type); i >= 0 {
+		conditions[i] = *condition
+	} else {
+		conditions = append(conditions, *condition)
+	}
+	return conditions
 }

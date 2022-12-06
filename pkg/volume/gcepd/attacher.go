@@ -242,8 +242,9 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 		id, err := getDiskID(pdName, exec)
 		if err != nil {
 			klog.Errorf("WaitForAttach (windows) failed with error %s", err)
+			return "", err
 		}
-		return id, err
+		return id, nil
 	}
 
 	partition := ""

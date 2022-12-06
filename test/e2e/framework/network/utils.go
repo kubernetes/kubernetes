@@ -21,14 +21,14 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,8 +41,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -155,7 +157,7 @@ func getServiceSelector() map[string]string {
 // NetworkingTestConfig is a convenience class around some utility methods
 // for testing kubeproxy/networking/services/endpoints.
 type NetworkingTestConfig struct {
-	// TestContaienrPod is a test pod running the netexec image. It is capable
+	// TestContainerPod is a test pod running the netexec image. It is capable
 	// of executing tcp/udp requests against ip:port.
 	TestContainerPod *v1.Pod
 	// HostTestContainerPod is a pod running using the hostexec image.
@@ -174,7 +176,7 @@ type NetworkingTestConfig struct {
 	// 1 pod per node running the netexecImage.
 	EndpointPods []*v1.Pod
 	f            *framework.Framework
-	podClient    *framework.PodClient
+	podClient    *e2epod.PodClient
 	// NodePortService is a Service with Type=NodePort spanning over all
 	// endpointPods.
 	NodePortService *v1.Service
@@ -248,7 +250,7 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 			continue
 		}
 		framework.Logf("\nOutput of kubectl describe pod %v/%v:\n", e.Namespace, e.Name)
-		desc, _ := framework.RunKubectl(
+		desc, _ := e2ekubectl.RunKubectl(
 			e.Namespace, "describe", "pod", e.Name, fmt.Sprintf("--namespace=%v", e.Namespace))
 		framework.Logf(desc)
 	}
@@ -282,18 +284,19 @@ func makeCURLDialCommand(ipPort, dialCmd, protocol, targetIP string, targetPort 
 // DialFromContainer executes a curl via kubectl exec in a test container,
 // which might then translate to a tcp or udp request based on the protocol
 // argument in the url.
-// - minTries is the minimum number of curl attempts required before declaring
-//   success. Set to 0 if you'd like to return as soon as all endpoints respond
-//   at least once.
-// - maxTries is the maximum number of curl attempts. If this many attempts pass
-//   and we don't see all expected endpoints, the test fails.
-// - targetIP is the source Pod IP that will dial the given dialCommand using the given protocol.
-// - dialCommand is the command that the targetIP will send to the targetIP using the given protocol.
-//   the dialCommand should be formatted properly for the protocol (http: URL path+parameters,
-//   udp: command%20parameters, where parameters are optional)
-// - expectedResponses is the unordered set of responses to wait for. The responses are based on
-//   the dialCommand; for example, for the dialCommand "hostname", the expectedResponses
-//   should contain the hostnames reported by each pod in the service through /hostName.
+//   - minTries is the minimum number of curl attempts required before declaring
+//     success. Set to 0 if you'd like to return as soon as all endpoints respond
+//     at least once.
+//   - maxTries is the maximum number of curl attempts. If this many attempts pass
+//     and we don't see all expected endpoints, the test fails.
+//   - targetIP is the source Pod IP that will dial the given dialCommand using the given protocol.
+//   - dialCommand is the command that the targetIP will send to the targetIP using the given protocol.
+//     the dialCommand should be formatted properly for the protocol (http: URL path+parameters,
+//     udp: command%20parameters, where parameters are optional)
+//   - expectedResponses is the unordered set of responses to wait for. The responses are based on
+//     the dialCommand; for example, for the dialCommand "hostname", the expectedResponses
+//     should contain the hostnames reported by each pod in the service through /hostName.
+//
 // maxTries == minTries will confirm that we see the expected endpoints and no
 // more for maxTries. Use this if you want to eg: fail a readiness check on a
 // pod and confirm it doesn't show up as an endpoint.
@@ -346,8 +349,8 @@ func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targ
 // GetEndpointsFromContainer executes a curl via kubectl exec in a test container,
 // which might then translate to a tcp or udp request based on the protocol argument
 // in the url. It returns all different endpoints from multiple retries.
-// - tries is the number of curl attempts. If this many attempts pass and
-//   we don't see any endpoints, the test fails.
+//   - tries is the number of curl attempts. If this many attempts pass and
+//     we don't see any endpoints, the test fails.
 func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHTTPPort, targetPort, tries int) (sets.String, error) {
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	cmd := makeCURLDialCommand(ipPort, "hostName", protocol, targetIP, targetPort)
@@ -355,7 +358,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 	eps := sets.NewString()
 
 	for i := 0; i < tries; i++ {
-		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
+		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
@@ -390,7 +393,7 @@ func (config *NetworkingTestConfig) GetResponseFromContainer(protocol, dialComma
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	cmd := makeCURLDialCommand(ipPort, dialCommand, protocol, targetIP, targetPort)
 
-	stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
+	stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
 	if err != nil {
 		return NetexecDialResponse{}, fmt.Errorf("failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 	}
@@ -414,7 +417,7 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 		targetIP,
 		targetPort,
 		path)
-	stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
+	stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
 	// We only care about the status code reported by curl,
 	// and want to return any other errors, such as cannot execute command in the Pod.
 	// If curl failed to connect to host, it would exit with code 7, which makes `ExecShellInPodWithFullOutput`
@@ -431,17 +434,17 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 
 // DialFromNode executes a tcp/udp curl/nc request based on protocol via kubectl exec
 // in a test container running with host networking.
-// - minTries is the minimum number of curl/nc attempts required before declaring
-//   success. If 0, then we return as soon as all endpoints succeed.
-// - There is no logical change to test results if faillures happen AFTER endpoints have succeeded,
-//   hence over-padding minTries will NOT reverse a successful result and is thus not very useful yet
-//   (See the TODO about checking probability, which isnt implemented yet).
-// - maxTries is the maximum number of curl/echo attempts before an error is returned.  The
-//   smaller this number is, the less 'slack' there is for declaring success.
-// - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints won't be hit.
-// - maxTries == minTries will return as soon as all endpoints succeed (or fail once maxTries is reached without
-//   success on all endpoints).
-//   In general its prudent to have a high enough level of minTries to guarantee that all pods get a fair chance at receiving traffic.
+//   - minTries is the minimum number of curl/nc attempts required before declaring
+//     success. If 0, then we return as soon as all endpoints succeed.
+//   - There is no logical change to test results if faillures happen AFTER endpoints have succeeded,
+//     hence over-padding minTries will NOT reverse a successful result and is thus not very useful yet
+//     (See the TODO about checking probability, which isn't implemented yet).
+//   - maxTries is the maximum number of curl/echo attempts before an error is returned.  The
+//     smaller this number is, the less 'slack' there is for declaring success.
+//   - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints won't be hit.
+//   - maxTries == minTries will return as soon as all endpoints succeed (or fail once maxTries is reached without
+//     success on all endpoints).
+//     In general its prudent to have a high enough level of minTries to guarantee that all pods get a fair chance at receiving traffic.
 func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
 	var cmd string
 	if protocol == "udp" {
@@ -462,7 +465,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
 	framework.Logf("Going to poll %v on port %v at least %v times, with a maximum of %v tries before failing", targetIP, targetPort, minTries, maxTries)
 	for i := 0; i < maxTries; i++ {
-		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, filterCmd)
+		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(config.f, config.HostTestContainerPod.Name, filterCmd)
 		if err != nil || len(stderr) > 0 {
 			// A failure to exec command counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
@@ -518,7 +521,7 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 	podName := config.HostTestContainerPod.Name
 	var msg string
 	if pollErr := wait.PollImmediate(retryInterval, retryTimeout, func() (bool, error) {
-		stdout, err := framework.RunHostCmd(config.Namespace, podName, cmd)
+		stdout, err := e2epodoutput.RunHostCmd(config.Namespace, podName, cmd)
 		if err != nil {
 			msg = fmt.Sprintf("failed executing cmd %v in %v/%v: %v", cmd, config.Namespace, podName, err)
 			framework.Logf(msg)
@@ -532,7 +535,7 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 		return true, nil
 	}); pollErr != nil {
 		framework.Logf("\nOutput of kubectl describe pod %v/%v:\n", config.Namespace, podName)
-		desc, _ := framework.RunKubectl(
+		desc, _ := e2ekubectl.RunKubectl(
 			config.Namespace, "describe", "pod", podName, fmt.Sprintf("--namespace=%v", config.Namespace))
 		framework.Logf("%s", desc)
 		framework.Failf("Timed out in %v: %v", retryTimeout, msg)
@@ -775,7 +778,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	config.setupCore(selector)
 
 	ginkgo.By("Getting node addresses")
-	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList, err := e2enode.GetReadySchedulableNodes(config.f.ClientSet)
 	framework.ExpectNoError(err)
 
@@ -835,7 +838,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 }
 
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*v1.Pod {
-	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList, err := e2enode.GetBoundedReadySchedulableNodes(config.f.ClientSet, maxNetProxyPodsCount)
 	framework.ExpectNoError(err)
 	nodes := nodeList.Items
@@ -848,6 +851,11 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
 		pod.Spec.HostNetwork = config.EndpointsHostNetwork
+
+		// NOTE(claudiub): In order to use HostNetwork on Windows, we need to use Privileged Containers.
+		if pod.Spec.HostNetwork && framework.NodeOSDistroIs("windows") {
+			e2epod.WithWindowsHostProcess(pod, "")
+		}
 		createdPod := config.createPod(pod)
 		createdPods = append(createdPods, createdPod)
 	}
@@ -887,9 +895,9 @@ func (config *NetworkingTestConfig) createPod(pod *v1.Pod) *v1.Pod {
 	return config.getPodClient().Create(pod)
 }
 
-func (config *NetworkingTestConfig) getPodClient() *framework.PodClient {
+func (config *NetworkingTestConfig) getPodClient() *e2epod.PodClient {
 	if config.podClient == nil {
-		config.podClient = config.f.PodClient()
+		config.podClient = e2epod.NewPodClient(config.f)
 	}
 	return config.podClient
 }
@@ -1005,7 +1013,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 	ret.Code = resp.StatusCode
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		ret.Status = HTTPError
 		ret.Error = fmt.Errorf("error reading HTTP body: %v", err)
@@ -1107,13 +1115,13 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 // slow down the test and cause it to fail if DNS is absent or broken.
 //
 // Suggested usage pattern:
-// func foo() {
-//	...
-//	defer UnblockNetwork(from, to)
-//	BlockNetwork(from, to)
-//	...
-// }
 //
+//	func foo() {
+//		...
+//		defer UnblockNetwork(from, to)
+//		BlockNetwork(from, to)
+//		...
+//	}
 func BlockNetwork(from string, to string) {
 	framework.Logf("block network traffic from %s to %s", from, to)
 	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)

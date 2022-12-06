@@ -267,9 +267,19 @@ func TestValidateNamespace(t *testing.T) {
 		},
 		{
 			name:           "create restricted",
-			newLabels:      map[string]string{api.EnforceLevelLabel: string(api.LevelBaseline)},
+			newLabels:      map[string]string{api.EnforceLevelLabel: string(api.LevelRestricted)},
 			expectAllowed:  true,
 			expectListPods: false,
+		},
+		{
+			name:             "create restricted exempt",
+			newLabels:        map[string]string{api.EnforceLevelLabel: string(api.LevelRestricted)},
+			exemptNamespaces: []string{"test"},
+			expectAllowed:    true,
+			expectListPods:   false,
+			expectWarnings: []string{
+				`namespace "test" is exempt from Pod Security, and the policy (enforce=restricted:latest) will be ignored`,
+			},
 		},
 		{
 			name:           "create malformed level",
@@ -346,10 +356,18 @@ func TestValidateNamespace(t *testing.T) {
 		{
 			name:             "update exempt to restricted",
 			exemptNamespaces: []string{"test"},
-			newLabels:        map[string]string{api.EnforceLevelLabel: string(api.LevelRestricted), api.EnforceVersionLabel: "v1.0"},
-			oldLabels:        map[string]string{},
-			expectAllowed:    true,
-			expectListPods:   false,
+			newLabels: map[string]string{
+				api.EnforceLevelLabel:   string(api.LevelRestricted),
+				api.EnforceVersionLabel: "v1.0",
+				api.AuditLevelLabel:     string(api.LevelRestricted),
+				api.WarnLevelLabel:      string(api.LevelBaseline),
+			},
+			oldLabels:      map[string]string{},
+			expectAllowed:  true,
+			expectListPods: false,
+			expectWarnings: []string{
+				`namespace "test" is exempt from Pod Security, and the policy (enforce=restricted:v1.0, audit=restricted:latest, warn=baseline:latest) will be ignored`,
+			},
 		},
 
 		// update tests that introduce labels errors
@@ -517,6 +535,14 @@ func TestValidateNamespace(t *testing.T) {
 
 			defaultPolicy := api.Policy{
 				Enforce: api.LevelVersion{
+					Level:   api.LevelPrivileged,
+					Version: api.LatestVersion(),
+				},
+				Audit: api.LevelVersion{
+					Level:   api.LevelPrivileged,
+					Version: api.LatestVersion(),
+				},
+				Warn: api.LevelVersion{
 					Level:   api.LevelPrivileged,
 					Version: api.LatestVersion(),
 				},
@@ -1109,6 +1135,111 @@ func TestPrioritizePods(t *testing.T) {
 	}
 	if len(prioritizedPods) != len(pods) {
 		assert.Fail(t, "Pod count is not the same after prioritization")
+	}
+}
+
+func TestExemptNamespaceWarning(t *testing.T) {
+	privileged := api.LevelVersion{
+		Level:   api.LevelPrivileged,
+		Version: api.LatestVersion(),
+	}
+	privilegedPolicy := api.Policy{
+		Enforce: privileged,
+		Audit:   privileged,
+		Warn:    privileged,
+	}
+	baseline := api.LevelVersion{
+		Level:   api.LevelBaseline,
+		Version: api.MajorMinorVersion(1, 23),
+	}
+	baselinePolicy := api.Policy{
+		Enforce: baseline,
+		Audit:   baseline,
+		Warn:    baseline,
+	}
+	tests := []struct {
+		name                  string
+		labels                map[string]string
+		defaultPolicy         api.Policy // Defaults to privilegedPolicy if empty.
+		expectWarning         bool
+		expectWarningContains string
+	}{{
+		name:          "empty-case",
+		expectWarning: false,
+	}, {
+		name: "ignore-privileged",
+		labels: map[string]string{
+			api.EnforceLevelLabel:   string(api.LevelPrivileged),
+			api.EnforceVersionLabel: "v1.24",
+			api.WarnVersionLabel:    "v1.25",
+		},
+		expectWarning: false,
+	}, {
+		name: "warn-on-enforce",
+		labels: map[string]string{
+			api.EnforceLevelLabel: string(api.LevelBaseline),
+		},
+		expectWarning:         true,
+		expectWarningContains: "(enforce=baseline:latest)",
+	}, {
+		name: "warn-on-warn",
+		labels: map[string]string{
+			api.WarnLevelLabel: string(api.LevelBaseline),
+		},
+		expectWarning:         true,
+		expectWarningContains: "(warn=baseline:latest)",
+	}, {
+		name: "warn-on-audit",
+		labels: map[string]string{
+			api.AuditLevelLabel: string(api.LevelRestricted),
+		},
+		expectWarning:         true,
+		expectWarningContains: "(audit=restricted:latest)",
+	}, {
+		name:          "ignore-default-policy",
+		defaultPolicy: baselinePolicy,
+		expectWarning: false,
+	}, {
+		name: "warn-versions-default-policy",
+		labels: map[string]string{
+			api.WarnVersionLabel: "latest",
+		},
+		defaultPolicy:         baselinePolicy,
+		expectWarning:         true,
+		expectWarningContains: "(warn=baseline:latest)",
+	}}
+
+	const (
+		sentinelLabelKey   = "qqincegidneocgu"
+		sentinelLabelValue = "vpmxkpcjphxrcpx"
+	)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defaultPolicy := test.defaultPolicy
+			if defaultPolicy == (api.Policy{}) {
+				defaultPolicy = privilegedPolicy
+			}
+			a := &Admission{defaultPolicy: defaultPolicy}
+			labels := test.labels
+			if labels == nil {
+				labels = map[string]string{}
+			}
+			labels[sentinelLabelKey] = sentinelLabelValue
+			policy, err := api.PolicyToEvaluate(labels, defaultPolicy)
+			require.NoError(t, err.ToAggregate())
+
+			warning := a.exemptNamespaceWarning(test.name, policy, labels)
+			if !test.expectWarning {
+				assert.Empty(t, warning)
+				return
+			}
+			require.NotEmpty(t, warning)
+
+			assert.NotContains(t, warning, sentinelLabelKey, "non-podsecurity label key included")
+			assert.NotContains(t, warning, sentinelLabelValue, "non-podsecurity label value included")
+
+			assert.Contains(t, warning, test.expectWarningContains)
+		})
 	}
 }
 

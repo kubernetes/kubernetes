@@ -20,14 +20,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/opencontainers/runc/libcontainer/apparmor"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,10 +39,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/opencontainers/runc/libcontainer/apparmor"
 )
 
 var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
@@ -55,6 +55,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 		})
 		ginkgo.Context("when running with AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
+			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject an unloaded profile", func() {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
@@ -85,6 +86,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 	} else {
 		ginkgo.Context("when running without AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
+			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject a pod with an AppArmor profile", func() {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileRuntimeDefault)
@@ -118,7 +120,7 @@ profile e2e-node-apparmor-test-audit-write flags=(attach_disconnected) {
 `
 
 func loadTestProfiles() error {
-	f, err := ioutil.TempFile("/tmp", "apparmor")
+	f, err := os.CreateTemp("/tmp", "apparmor")
 	if err != nil {
 		return fmt.Errorf("failed to open temp file: %v", err)
 	}
@@ -159,11 +161,11 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 		w := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
-				return f.PodClient().List(context.TODO(), options)
+				return e2epod.NewPodClient(f).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = fieldSelector
-				return f.PodClient().Watch(context.TODO(), options)
+				return e2epod.NewPodClient(f).Watch(context.TODO(), options)
 			},
 		}
 		preconditionFunc := func(store cache.Store) (bool, error) {
@@ -200,7 +202,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 		})
 		framework.ExpectNoError(err)
 	}
-	p, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	p, err := e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return p.Status
 }
@@ -222,7 +224,7 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
-	return f.PodClient().Create(pod)
+	return e2epod.NewPodClient(f).Create(pod)
 }
 
 func expectSoftRejection(status v1.PodStatus) {

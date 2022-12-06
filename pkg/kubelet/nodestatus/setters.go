@@ -17,6 +17,7 @@ limitations under the License.
 package nodestatus
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net"
@@ -31,12 +32,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
+	cloudprovidernodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -55,7 +55,7 @@ const (
 
 // Setter modifies the node in-place, and returns an error if the modification failed.
 // Setters may partially mutate the node before returning an error.
-type Setter func(node *v1.Node) error
+type Setter func(ctx context.Context, node *v1.Node) error
 
 // NodeAddress returns a Setter that updates address-related information on the node.
 func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
@@ -79,7 +79,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 	}
 	secondaryNodeIPSpecified := secondaryNodeIP != nil && !secondaryNodeIP.IsUnspecified()
 
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		if nodeIPSpecified {
 			if err := validateNodeIPFunc(nodeIP); err != nil {
 				return fmt.Errorf("failed to validate nodeIP: %v", err)
@@ -93,14 +93,30 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			klog.V(4).InfoS("Using secondary node IP", "IP", secondaryNodeIP.String())
 		}
 
-		if externalCloudProvider {
-			if nodeIPSpecified {
-				if node.ObjectMeta.Annotations == nil {
-					node.ObjectMeta.Annotations = make(map[string]string)
-				}
-				node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr] = nodeIP.String()
+		if (externalCloudProvider || cloud != nil) && nodeIPSpecified {
+			// Annotate the Node object with nodeIP for external cloud provider.
+			//
+			// We do this even when external CCM is not configured to cover a situation
+			// during migration from legacy to external CCM: when CCM is running the
+			// node controller in the cluster but kubelet is still running the in-tree
+			// provider. Adding this annotation in all cases ensures that while
+			// Addresses flap between the competing controllers, they at least flap
+			// consistently.
+			//
+			// We do not add the annotation in the case where there is no cloud
+			// controller at all, as we don't expect to migrate these clusters to use an
+			// external CCM.
+			if node.ObjectMeta.Annotations == nil {
+				node.ObjectMeta.Annotations = make(map[string]string)
 			}
+			node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr] = nodeIP.String()
+		} else if node.ObjectMeta.Annotations != nil {
+			// Clean up stale annotations if no longer using a cloud provider or
+			// no longer overriding node IP.
+			delete(node.ObjectMeta.Annotations, cloudproviderapi.AnnotationAlphaProvidedIPAddr)
+		}
 
+		if externalCloudProvider {
 			// If --cloud-provider=external and node address is already set,
 			// then we return early because provider set addresses should take precedence.
 			// Otherwise, we try to look up the node IP and let the cloud provider override it later
@@ -115,56 +131,9 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 				return err
 			}
 
-			var nodeAddresses []v1.NodeAddress
-
-			// For every address supplied by the cloud provider that matches nodeIP, nodeIP is the enforced node address for
-			// that address Type (like InternalIP and ExternalIP), meaning other addresses of the same Type are discarded.
-			// See #61921 for more information: some cloud providers may supply secondary IPs, so nodeIP serves as a way to
-			// ensure that the correct IPs show up on a Node object.
-			if nodeIPSpecified {
-				enforcedNodeAddresses := []v1.NodeAddress{}
-
-				nodeIPTypes := make(map[v1.NodeAddressType]bool)
-				for _, nodeAddress := range cloudNodeAddresses {
-					if nodeAddress.Address == nodeIP.String() {
-						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-						nodeIPTypes[nodeAddress.Type] = true
-					}
-				}
-
-				// nodeIP must be among the addresses supplied by the cloud provider
-				if len(enforcedNodeAddresses) == 0 {
-					return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", nodeIP)
-				}
-
-				// nodeIP was found, now use all other addresses supplied by the cloud provider NOT of the same Type as nodeIP.
-				for _, nodeAddress := range cloudNodeAddresses {
-					if !nodeIPTypes[nodeAddress.Type] {
-						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-					}
-				}
-
-				nodeAddresses = enforcedNodeAddresses
-			} else if nodeIP != nil {
-				// nodeIP is "0.0.0.0" or "::"; sort cloudNodeAddresses to
-				// prefer addresses of the matching family
-				sortedAddresses := make([]v1.NodeAddress, 0, len(cloudNodeAddresses))
-				for _, nodeAddress := range cloudNodeAddresses {
-					ip := netutils.ParseIPSloppy(nodeAddress.Address)
-					if ip == nil || isPreferredIPFamily(ip) {
-						sortedAddresses = append(sortedAddresses, nodeAddress)
-					}
-				}
-				for _, nodeAddress := range cloudNodeAddresses {
-					ip := netutils.ParseIPSloppy(nodeAddress.Address)
-					if ip != nil && !isPreferredIPFamily(ip) {
-						sortedAddresses = append(sortedAddresses, nodeAddress)
-					}
-				}
-				nodeAddresses = sortedAddresses
-			} else {
-				// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
-				nodeAddresses = cloudNodeAddresses
+			nodeAddresses, err := cloudprovidernodeutil.PreferNodeIP(nodeIP, cloudNodeAddresses)
+			if err != nil {
+				return err
 			}
 
 			switch {
@@ -276,12 +245,13 @@ func MachineInfo(nodeName string,
 	maxPods int,
 	podsPerCore int,
 	machineInfoFunc func() (*cadvisorapiv1.MachineInfo, error), // typically Kubelet.GetCachedMachineInfo
-	capacityFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
+	capacityFunc func(localStorageCapacityIsolation bool) v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
 	devicePluginResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
 	nodeAllocatableReservationFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetNodeAllocatableReservation
 	recordEventFunc func(eventType, event, message string), // typically Kubelet.recordEvent
+	localStorageCapacityIsolation bool,
 ) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		// Note: avoid blindly overwriting the capacity in case opaque
 		//       resources are being advertised.
 		if node.Status.Capacity == nil {
@@ -327,16 +297,15 @@ func MachineInfo(nodeName string,
 			}
 			node.Status.NodeInfo.BootID = info.BootID
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-				// TODO: all the node resources should use ContainerManager.GetCapacity instead of deriving the
-				// capacity for every node status request
-				initialCapacity := capacityFunc()
-				if initialCapacity != nil {
-					if v, exists := initialCapacity[v1.ResourceEphemeralStorage]; exists {
-						node.Status.Capacity[v1.ResourceEphemeralStorage] = v
-					}
+			// TODO: all the node resources should use ContainerManager.GetCapacity instead of deriving the
+			// capacity for every node status request
+			initialCapacity := capacityFunc(localStorageCapacityIsolation)
+			if initialCapacity != nil {
+				if v, exists := initialCapacity[v1.ResourceEphemeralStorage]; exists {
+					node.Status.Capacity[v1.ResourceEphemeralStorage] = v
 				}
 			}
+			//}
 
 			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc()
 			for k, v := range devicePluginCapacity {
@@ -411,9 +380,9 @@ func MachineInfo(nodeName string,
 // VersionInfo returns a Setter that updates version-related information on the node.
 func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // typically Kubelet.cadvisor.VersionInfo
 	runtimeTypeFunc func() string, // typically Kubelet.containerRuntime.Type
-	runtimeVersionFunc func() (kubecontainer.Version, error), // typically Kubelet.containerRuntime.Version
+	runtimeVersionFunc func(ctx context.Context) (kubecontainer.Version, error), // typically Kubelet.containerRuntime.Version
 ) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		verinfo, err := versionInfoFunc()
 		if err != nil {
 			return fmt.Errorf("error getting version info: %v", err)
@@ -423,7 +392,7 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 		node.Status.NodeInfo.OSImage = verinfo.ContainerOsVersion
 
 		runtimeVersion := "Unknown"
-		if runtimeVer, err := runtimeVersionFunc(); err == nil {
+		if runtimeVer, err := runtimeVersionFunc(ctx); err == nil {
 			runtimeVersion = runtimeVer.String()
 		}
 		node.Status.NodeInfo.ContainerRuntimeVersion = fmt.Sprintf("%s://%s", runtimeTypeFunc(), runtimeVersion)
@@ -437,7 +406,7 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 
 // DaemonEndpoints returns a Setter that updates the daemon endpoints on the node.
 func DaemonEndpoints(daemonEndpoints *v1.NodeDaemonEndpoints) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		node.Status.DaemonEndpoints = *daemonEndpoints
 		return nil
 	}
@@ -449,7 +418,7 @@ func DaemonEndpoints(daemonEndpoints *v1.NodeDaemonEndpoints) Setter {
 func Images(nodeStatusMaxImages int32,
 	imageListFunc func() ([]kubecontainer.Image, error), // typically Kubelet.imageManager.GetImageList
 ) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		// Update image list of this node
 		var imagesOnNode []v1.ContainerImage
 		containerImages, err := imageListFunc()
@@ -484,7 +453,7 @@ func Images(nodeStatusMaxImages int32,
 
 // GoRuntime returns a Setter that sets GOOS and GOARCH on the node.
 func GoRuntime() Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		node.Status.NodeInfo.OperatingSystem = goruntime.GOOS
 		node.Status.NodeInfo.Architecture = goruntime.GOARCH
 		return nil
@@ -501,8 +470,9 @@ func ReadyCondition(
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
 	nodeShutdownManagerErrorsFunc func() error, // typically kubelet.shutdownManager.errors.
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
+	localStorageCapacityIsolation bool,
 ) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
 		// This is due to an issue with version skewed kubelet and master components.
 		// ref: https://github.com/kubernetes/kubernetes/issues/16961
@@ -516,7 +486,7 @@ func ReadyCondition(
 		}
 		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc(), nodeShutdownManagerErrorsFunc()}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
-		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		if localStorageCapacityIsolation {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
 		}
 		missingCapacities := []string{}
@@ -587,7 +557,7 @@ func MemoryPressureCondition(nowFunc func() time.Time, // typically Kubelet.cloc
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderMemoryPressure
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		currentTime := metav1.NewTime(nowFunc())
 		var condition *v1.NodeCondition
 
@@ -648,7 +618,7 @@ func PIDPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.N
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderPIDPressure
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		currentTime := metav1.NewTime(nowFunc())
 		var condition *v1.NodeCondition
 
@@ -709,7 +679,7 @@ func DiskPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.
 	pressureFunc func() bool, // typically Kubelet.evictionManager.IsUnderDiskPressure
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
 ) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		currentTime := metav1.NewTime(nowFunc())
 		var condition *v1.NodeCondition
 
@@ -769,7 +739,7 @@ func DiskPressureCondition(nowFunc func() time.Time, // typically Kubelet.clock.
 func VolumesInUse(syncedFunc func() bool, // typically Kubelet.volumeManager.ReconcilerStatesHasBeenSynced
 	volumesInUseFunc func() []v1.UniqueVolumeName, // typically Kubelet.volumeManager.GetVolumesInUse
 ) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		// Make sure to only update node status after reconciler starts syncing up states
 		if syncedFunc() {
 			node.Status.VolumesInUse = volumesInUseFunc()
@@ -781,7 +751,7 @@ func VolumesInUse(syncedFunc func() bool, // typically Kubelet.volumeManager.Rec
 // VolumeLimits returns a Setter that updates the volume limits on the node.
 func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLimits, // typically Kubelet.volumePluginMgr.ListVolumePluginWithLimits
 ) Setter {
-	return func(node *v1.Node) error {
+	return func(ctx context.Context, node *v1.Node) error {
 		if node.Status.Capacity == nil {
 			node.Status.Capacity = v1.ResourceList{}
 		}

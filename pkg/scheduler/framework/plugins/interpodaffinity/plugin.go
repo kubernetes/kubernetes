@@ -27,14 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
-const (
-	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = names.InterPodAffinity
-)
+// Name is the name of the plugin used in the plugin registry and configurations.
+const Name = names.InterPodAffinity
 
 var _ framework.PreFilterPlugin = &InterPodAffinity{}
 var _ framework.FilterPlugin = &InterPodAffinity{}
@@ -44,11 +41,10 @@ var _ framework.EnqueueExtensions = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	parallelizer            parallelize.Parallelizer
-	args                    config.InterPodAffinityArgs
-	sharedLister            framework.SharedLister
-	nsLister                listersv1.NamespaceLister
-	enableNamespaceSelector bool
+	parallelizer parallelize.Parallelizer
+	args         config.InterPodAffinityArgs
+	sharedLister framework.SharedLister
+	nsLister     listersv1.NamespaceLister
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -73,7 +69,7 @@ func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEvent {
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
@@ -85,15 +81,12 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 		return nil, err
 	}
 	pl := &InterPodAffinity{
-		parallelizer:            h.Parallelizer(),
-		args:                    args,
-		sharedLister:            h.SnapshotSharedLister(),
-		enableNamespaceSelector: fts.EnablePodAffinityNamespaceSelector,
+		parallelizer: h.Parallelizer(),
+		args:         args,
+		sharedLister: h.SnapshotSharedLister(),
+		nsLister:     h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
 	}
 
-	if pl.enableNamespaceSelector {
-		pl.nsLister = h.SharedInformerFactory().Core().V1().Namespaces().Lister()
-	}
 	return pl, nil
 }
 
@@ -135,6 +128,6 @@ func GetNamespaceLabelsSnapshot(ns string, nsLister listersv1.NamespaceLister) (
 		// Create and return snapshot of the labels.
 		return labels.Merge(podNS.Labels, nil)
 	}
-	klog.ErrorS(err, "getting namespace, assuming empty set of namespace labels", "namespace", ns)
+	klog.V(3).InfoS("getting namespace, assuming empty set of namespace labels", "namespace", ns, "err", err)
 	return
 }

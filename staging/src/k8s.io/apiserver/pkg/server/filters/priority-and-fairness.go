@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -46,9 +47,7 @@ type PriorityAndFairnessClassification struct {
 
 // waitingMark tracks requests waiting rather than being executed
 var waitingMark = &requestWatermark{
-	phase:            epmetrics.WaitingPhase,
-	readOnlyObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.ReadOnlyKind}).RequestsWaiting,
-	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.MutatingKind}).RequestsWaiting,
+	phase: epmetrics.WaitingPhase,
 }
 
 var atomicMutatingExecuting, atomicReadOnlyExecuting int32
@@ -66,6 +65,8 @@ func truncateLogField(s string) string {
 	return s
 }
 
+var initAPFOnce sync.Once
+
 // WithPriorityAndFairness limits the number of in-flight
 // requests in a fine-grained way.
 func WithPriorityAndFairness(
@@ -78,6 +79,13 @@ func WithPriorityAndFairness(
 		klog.Warningf("priority and fairness support not found, skipping")
 		return handler
 	}
+	initAPFOnce.Do(func() {
+		initMaxInFlight(0, 0)
+		// Fetching these gauges is delayed until after their underlying metric has been registered
+		// so that this latches onto the efficient implementation.
+		waitingMark.readOnlyObserver = fcmetrics.GetWaitingReadonlyConcurrency()
+		waitingMark.mutatingObserver = fcmetrics.GetWaitingMutatingConcurrency()
+	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
@@ -110,7 +118,6 @@ func WithPriorityAndFairness(
 
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
-			httplog.AddKeyValue(ctx, "apf_fd", truncateLogField(flowDistinguisher))
 		}
 		// estimateWork is called, if at all, after noteFn
 		estimateWork := func() flowcontrolrequest.WorkEstimate {
@@ -126,10 +133,10 @@ func WithPriorityAndFairness(
 			workEstimate := workEstimator(r, classification.FlowSchemaName, classification.PriorityLevelName)
 
 			fcmetrics.ObserveWorkEstimatedSeats(classification.PriorityLevelName, classification.FlowSchemaName, workEstimate.MaxSeats())
-			if klog.V(4).Enabled() {
-				httplog.AddKeyValue(ctx, "apf_iseats", workEstimate.InitialSeats)
-				httplog.AddKeyValue(ctx, "apf_fseats", workEstimate.FinalSeats)
-			}
+			httplog.AddKeyValue(ctx, "apf_iseats", workEstimate.InitialSeats)
+			httplog.AddKeyValue(ctx, "apf_fseats", workEstimate.FinalSeats)
+			httplog.AddKeyValue(ctx, "apf_additionalLatency", workEstimate.AdditionalLatency)
+
 			return workEstimate
 		}
 
@@ -291,11 +298,7 @@ func WithPriorityAndFairness(
 		if !served {
 			setResponseHeaders(classification, w)
 
-			if isMutatingRequest {
-				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.MutatingKind).Inc()
-			} else {
-				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.ReadOnlyKind).Inc()
-			}
+			epmetrics.RecordDroppedRequest(r, requestInfo, epmetrics.APIServerComponent, isMutatingRequest)
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
 			tooManyRequests(r, w)
 		}

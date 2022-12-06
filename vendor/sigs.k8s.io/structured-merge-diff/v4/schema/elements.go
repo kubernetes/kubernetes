@@ -16,7 +16,9 @@ limitations under the License.
 
 package schema
 
-import "sync"
+import (
+	"sync"
+)
 
 // Schema is a list of named types.
 //
@@ -27,6 +29,11 @@ type Schema struct {
 
 	once sync.Once
 	m    map[string]TypeDef
+
+	lock sync.Mutex
+	// Cached results of resolving type references to atoms. Only stores
+	// type references which require fields of Atom to be overriden.
+	resolvedTypes map[TypeRef]Atom
 }
 
 // A TypeSpecifier references a particular type in a schema.
@@ -48,6 +55,12 @@ type TypeRef struct {
 	// Either the name or one member of Atom should be set.
 	NamedType *string `yaml:"namedType,omitempty"`
 	Inlined   Atom    `yaml:",inline,omitempty"`
+
+	// If this reference refers to a map-type or list-type, this field overrides
+	// the `ElementRelationship` of the referred type when resolved.
+	// If this field is nil, then it has no effect.
+	// See `Map` and `List` for more information about `ElementRelationship`
+	ElementRelationship *ElementRelationship `yaml:"elementRelationship,omitempty"`
 }
 
 // Atom represents the smallest possible pieces of the type system.
@@ -88,11 +101,11 @@ const (
 
 // Map is a key-value pair. Its default semantics are the same as an
 // associative list, but:
-// * It is serialized differently:
+//   - It is serialized differently:
 //     map:  {"k": {"value": "v"}}
 //     list: [{"key": "k", "value": "v"}]
-// * Keys must be string typed.
-// * Keys can't have multiple components.
+//   - Keys must be string typed.
+//   - Keys can't have multiple components.
 //
 // Optionally, maps may be atomic (for example, imagine representing an RGB
 // color value--it doesn't make sense to have different actors own the R and G
@@ -144,6 +157,31 @@ func (m *Map) FindField(name string) (StructField, bool) {
 	})
 	sf, ok := m.m[name]
 	return sf, ok
+}
+
+// CopyInto this instance of Map into the other
+// If other is nil this method does nothing.
+// If other is already initialized, overwrites it with this instance
+// Warning: Not thread safe
+func (m *Map) CopyInto(dst *Map) {
+	if dst == nil {
+		return
+	}
+
+	// Map type is considered immutable so sharing references
+	dst.Fields = m.Fields
+	dst.ElementType = m.ElementType
+	dst.Unions = m.Unions
+	dst.ElementRelationship = m.ElementRelationship
+
+	if m.m != nil {
+		// If cache is non-nil then the once token had been consumed.
+		// Must reset token and use it again to ensure same semantics.
+		dst.once = sync.Once{}
+		dst.once.Do(func() {
+			dst.m = m.m
+		})
+	}
 }
 
 // UnionFields are mapping between the fields that are part of the union and
@@ -244,18 +282,93 @@ func (s *Schema) FindNamedType(name string) (TypeDef, bool) {
 	return t, ok
 }
 
+func (s *Schema) resolveNoOverrides(tr TypeRef) (Atom, bool) {
+	result := Atom{}
+
+	if tr.NamedType != nil {
+		t, ok := s.FindNamedType(*tr.NamedType)
+		if !ok {
+			return Atom{}, false
+		}
+
+		result = t.Atom
+	} else {
+		result = tr.Inlined
+	}
+
+	return result, true
+}
+
 // Resolve is a convenience function which returns the atom referenced, whether
 // it is inline or named. Returns (Atom{}, false) if the type can't be resolved.
 //
 // This allows callers to not care about the difference between a (possibly
 // inlined) reference and a definition.
 func (s *Schema) Resolve(tr TypeRef) (Atom, bool) {
-	if tr.NamedType != nil {
-		t, ok := s.FindNamedType(*tr.NamedType)
-		if !ok {
+	// If this is a plain reference with no overrides, just return the type
+	if tr.ElementRelationship == nil {
+		return s.resolveNoOverrides(tr)
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.resolvedTypes == nil {
+		s.resolvedTypes = make(map[TypeRef]Atom)
+	}
+
+	var result Atom
+	var exists bool
+
+	// Return cached result if available
+	// If not, calculate result and cache it
+	if result, exists = s.resolvedTypes[tr]; !exists {
+		if result, exists = s.resolveNoOverrides(tr); exists {
+			// Allow field-level electives to override the referred type's modifiers
+			switch {
+			case result.Map != nil:
+				mapCopy := Map{}
+				result.Map.CopyInto(&mapCopy)
+				mapCopy.ElementRelationship = *tr.ElementRelationship
+				result.Map = &mapCopy
+			case result.List != nil:
+				listCopy := *result.List
+				listCopy.ElementRelationship = *tr.ElementRelationship
+				result.List = &listCopy
+			case result.Scalar != nil:
+				return Atom{}, false
+			default:
+				return Atom{}, false
+			}
+		} else {
 			return Atom{}, false
 		}
-		return t.Atom, true
+
+		// Save result. If it is nil, that is also recorded as not existing.
+		s.resolvedTypes[tr] = result
 	}
-	return tr.Inlined, true
+
+	return result, true
+}
+
+// Clones this instance of Schema into the other
+// If other is nil this method does nothing.
+// If other is already initialized, overwrites it with this instance
+// Warning: Not thread safe
+func (s *Schema) CopyInto(dst *Schema) {
+	if dst == nil {
+		return
+	}
+
+	// Schema type is considered immutable so sharing references
+	dst.Types = s.Types
+
+	if s.m != nil {
+		// If cache is non-nil then the once token had been consumed.
+		// Must reset token and use it again to ensure same semantics.
+		dst.once = sync.Once{}
+		dst.once.Do(func() {
+			dst.m = s.m
+		})
+	}
 }

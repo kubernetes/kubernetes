@@ -25,11 +25,14 @@ import (
 
 	"github.com/pkg/errors"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -162,7 +165,19 @@ func NewDryRunClientWithOpts(opts DryRunClientOptions) clientset.Interface {
 		&core.SimpleReactor{
 			Verb:     "create",
 			Resource: "*",
-			Reaction: successfulModificationReactorFunc,
+			Reaction: func(action core.Action) (bool, runtime.Object, error) {
+				objAction, ok := action.(actionWithObject)
+				if obj := objAction.GetObject(); ok && obj != nil {
+					if secret, ok := obj.(*v1.Secret); ok {
+						if secret.Namespace == metav1.NamespaceSystem && strings.HasPrefix(secret.Name, bootstrapapi.BootstrapTokenSecretPrefix) {
+							// bypass bootstrap token secret create event so that it can be persisted to the backing data store
+							// this secret should be readable during the uploadcerts init phase if it has already been created
+							return false, nil, nil
+						}
+					}
+				}
+				return successfulModificationReactorFunc(action)
+			},
 		},
 		&core.SimpleReactor{
 			Verb:     "update",

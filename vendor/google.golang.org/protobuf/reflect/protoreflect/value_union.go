@@ -41,6 +41,32 @@ import (
 // Converting to/from a Value and a concrete Go value panics on type mismatch.
 // For example, ValueOf("hello").Int() panics because this attempts to
 // retrieve an int64 from a string.
+//
+// List, Map, and Message Values are called "composite" values.
+//
+// A composite Value may alias (reference) memory at some location,
+// such that changes to the Value updates the that location.
+// A composite value acquired with a Mutable method, such as Message.Mutable,
+// always references the source object.
+//
+// For example:
+//
+//	// Append a 0 to a "repeated int32" field.
+//	// Since the Value returned by Mutable is guaranteed to alias
+//	// the source message, modifying the Value modifies the message.
+//	message.Mutable(fieldDesc).(List).Append(protoreflect.ValueOfInt32(0))
+//
+//	// Assign [0] to a "repeated int32" field by creating a new Value,
+//	// modifying it, and assigning it.
+//	list := message.NewField(fieldDesc).(List)
+//	list.Append(protoreflect.ValueOfInt32(0))
+//	message.Set(fieldDesc, list)
+//	// ERROR: Since it is not defined whether Set aliases the source,
+//	// appending to the List here may or may not modify the message.
+//	list.Append(protoreflect.ValueOfInt32(0))
+//
+// Some operations, such as Message.Get, may return an "empty, read-only"
+// composite Value. Modifying an empty, read-only value panics.
 type Value value
 
 // The protoreflect API uses a custom Value union type instead of interface{}
@@ -367,6 +393,7 @@ func (v Value) MapKey() MapKey {
 //	╚═════════╧═════════════════════════════════════╝
 //
 // A MapKey is constructed and accessed through a Value:
+//
 //	k := ValueOf("hash").MapKey() // convert string to MapKey
 //	s := k.String()               // convert MapKey to string
 //

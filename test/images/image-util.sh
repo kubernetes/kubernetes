@@ -39,7 +39,7 @@ declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["pp
 # NOTE(claudiub): In the test image build jobs, this script is not being run in a git repository,
 # which would cause git log to fail. Instead, we can use the GIT_COMMIT_ID set in cloudbuild.yaml.
 GIT_COMMIT_ID=$(git log -1 --format=%h || echo "${GIT_COMMIT_ID}")
-windows_os_versions=(1809 2004 20H2 ltsc2022)
+windows_os_versions=(1809 ltsc2022)
 declare -A WINDOWS_OS_VERSIONS_MAP
 
 initWindowsOsVersions() {
@@ -282,10 +282,10 @@ if [[ "${WHAT}" == "all-conformance" ]]; then
   # Discussed during Conformance Office Hours Meeting (2019.12.17):
   # https://docs.google.com/document/d/1W31nXh9RYAb_VaYkwuPLd1hFxuRX3iU0DmaQ4lkCsX8/edit#heading=h.l87lu17xm9bh
   shift
-  conformance_images=("busybox" "agnhost" "echoserver" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
+  conformance_images=("busybox" "agnhost" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
   for image in "${conformance_images[@]}"; do
-    eval "${TASK}" "${image}" "$@"
+    "${TASK}" "${image}" "$@"
   done
 else
-  eval "${TASK}" "$@"
+  "${TASK}" "$@"
 fi

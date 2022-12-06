@@ -55,7 +55,7 @@ func jsonTag(field reflect.StructField) (string, bool) {
 }
 
 func isPointerKind(kind reflect.Kind) bool {
-	return kind == reflect.Ptr
+	return kind == reflect.Pointer
 }
 
 func isStructKind(kind reflect.Kind) bool {
@@ -139,7 +139,7 @@ func Convert(obj interface{}) (url.Values, error) {
 	}
 	var sv reflect.Value
 	switch reflect.TypeOf(obj).Kind() {
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		sv = reflect.ValueOf(obj).Elem()
 	default:
 		return nil, fmt.Errorf("expecting a pointer or interface")

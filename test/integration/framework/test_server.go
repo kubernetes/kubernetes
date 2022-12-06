@@ -18,11 +18,11 @@ package framework
 
 import (
 	"context"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,13 +56,34 @@ type TestServerSetup struct {
 	ModifyServerConfig     func(*controlplane.Config)
 }
 
+type TearDownFunc func()
+
 // StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
-func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup) (client.Interface, *rest.Config) {
-	certDir, _ := ioutil.TempDir("", "test-integration-"+t.Name())
-	go func() {
-		<-stopCh
-		os.RemoveAll(certDir)
-	}()
+func StartTestServer(t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
+	certDir, err := os.MkdirTemp("", "test-integration-"+strings.ReplaceAll(t.Name(), "/", "_"))
+	if err != nil {
+		t.Fatalf("Couldn't create temp dir: %v", err)
+	}
+
+	stopCh := make(chan struct{})
+	var errCh chan error
+	tearDownFn := func() {
+		// Closing stopCh is stopping apiserver and cleaning up
+		// after itself, including shutting down its storage layer.
+		close(stopCh)
+
+		// If the apiserver was started, let's wait for it to
+		// shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				t.Error(err)
+			}
+		}
+		if err := os.RemoveAll(certDir); err != nil {
+			t.Log(err)
+		}
+	}
 
 	_, defaultServiceClusterIPRange, _ := netutils.ParseCIDRSloppy("10.0.0.0/24")
 	proxySigningKey, err := utils.NewPrivateKey()
@@ -73,8 +94,8 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	if err != nil {
 		t.Fatal(err)
 	}
-	proxyCACertFile, _ := ioutil.TempFile(certDir, "proxy-ca.crt")
-	if err := ioutil.WriteFile(proxyCACertFile.Name(), utils.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+	proxyCACertFile, _ := os.CreateTemp(certDir, "proxy-ca.crt")
+	if err := os.WriteFile(proxyCACertFile.Name(), utils.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
 	clientSigningKey, err := utils.NewPrivateKey()
@@ -85,8 +106,8 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientCACertFile, _ := ioutil.TempFile(certDir, "client-ca.crt")
-	if err := ioutil.WriteFile(clientCACertFile.Name(), utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+	clientCACertFile, _ := os.CreateTemp(certDir, "client-ca.crt")
+	if err := os.WriteFile(clientCACertFile.Name(), utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -95,12 +116,12 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatal(err)
 	}
 
-	saSigningKeyFile, err := ioutil.TempFile("/tmp", "insecure_test_key")
+	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(saSigningKeyFile.Name())
-	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 
@@ -148,9 +169,12 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	errCh = make(chan error)
 	go func() {
+		defer close(errCh)
 		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
-			t.Error(err)
+			errCh <- err
 		}
 	}()
 
@@ -162,6 +186,12 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 
 	// wait for health
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+		select {
+		case err := <-errCh:
+			return false, err
+		default:
+		}
+
 		healthzConfig := rest.CopyConfig(kubeAPIServerClientConfig)
 		healthzConfig.ContentType = ""
 		healthzConfig.AcceptContentTypes = ""
@@ -196,5 +226,5 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatal(err)
 	}
 
-	return kubeAPIServerClient, kubeAPIServerClientConfig
+	return kubeAPIServerClient, kubeAPIServerClientConfig, tearDownFn
 }

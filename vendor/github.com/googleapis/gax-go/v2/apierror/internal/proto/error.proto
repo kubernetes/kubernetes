@@ -1,0 +1,46 @@
+// Copyright 2021 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package error;
+
+import "google/protobuf/any.proto";
+import "google/rpc/code.proto";
+
+option go_package = "github.com/googleapis/gax-go/v2/apierror/internal/proto;jsonerror";
+
+// The error format v2 for Google JSON REST APIs.
+// Copied from https://cloud.google.com/apis/design/errors#http_mapping.
+//
+// NOTE: This schema is not used for other wire protocols.
+message Error {
+  // This message has the same semantics as `google.rpc.Status`. It uses HTTP
+  // status code instead of gRPC status code. It has an extra field `status`
+  // for backward compatibility with Google API Client Libraries.
+  message Status {
+    // The HTTP status code that corresponds to `google.rpc.Status.code`.
+    int32 code = 1;
+    // This corresponds to `google.rpc.Status.message`.
+    string message = 2;
+    // This is the enum version for `google.rpc.Status.code`.
+    google.rpc.Code status = 4;
+    // This corresponds to `google.rpc.Status.details`.
+    repeated google.protobuf.Any details = 5;
+  }
+  // The actual error payload. The nested message structure is for backward
+  // compatibility with Google API client libraries. It also makes the error
+  // more readable to developers.
+  Status error = 1;
+}

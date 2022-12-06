@@ -37,7 +37,10 @@ import (
 // PluginName is a string with the name of the plugin
 const PluginName = "ResourceQuota"
 
-var namespaceGVK = v1.SchemeGroupVersion.WithKind("Namespace").GroupKind()
+var (
+	namespaceGVK          = v1.SchemeGroupVersion.WithKind("Namespace").GroupKind()
+	stopChUnconfiguredErr = fmt.Errorf("quota configuration configured between stop channel")
+)
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
@@ -54,7 +57,7 @@ func Register(plugins *admission.Plugins) {
 					return nil, errs.ToAggregate()
 				}
 			}
-			return NewResourceQuota(configuration, 5, make(chan struct{}))
+			return NewResourceQuota(configuration, 5)
 		})
 }
 
@@ -67,12 +70,14 @@ type QuotaAdmission struct {
 	numEvaluators      int
 	quotaAccessor      *quotaAccessor
 	evaluator          Evaluator
+	initializationErr  error
 }
 
 var _ admission.ValidationInterface = &QuotaAdmission{}
 var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&QuotaAdmission{})
 var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&QuotaAdmission{})
 var _ = genericadmissioninitializer.WantsQuotaConfiguration(&QuotaAdmission{})
+var _ = genericadmissioninitializer.WantsDrainedNotification(&QuotaAdmission{})
 
 type liveLookupEntry struct {
 	expiry time.Time
@@ -82,7 +87,7 @@ type liveLookupEntry struct {
 // NewResourceQuota configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int, stopCh <-chan struct{}) (*QuotaAdmission, error) {
+func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int) (*QuotaAdmission, error) {
 	quotaAccessor, err := newQuotaAccessor()
 	if err != nil {
 		return nil, err
@@ -90,11 +95,16 @@ func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int,
 
 	return &QuotaAdmission{
 		Handler:       admission.NewHandler(admission.Create, admission.Update),
-		stopCh:        stopCh,
+		stopCh:        nil,
 		numEvaluators: numEvaluators,
 		config:        config,
 		quotaAccessor: quotaAccessor,
 	}, nil
+}
+
+// SetDrainedNotification sets the stop channel into QuotaAdmission.
+func (a *QuotaAdmission) SetDrainedNotification(stopCh <-chan struct{}) {
+	a.stopCh = stopCh
 }
 
 // SetExternalKubeClientSet registers the client into QuotaAdmission
@@ -110,11 +120,21 @@ func (a *QuotaAdmission) SetExternalKubeInformerFactory(f informers.SharedInform
 // SetQuotaConfiguration assigns and initializes configuration and evaluator for QuotaAdmission
 func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {
 	a.quotaConfiguration = c
+	if a.stopCh == nil {
+		a.initializationErr = stopChUnconfiguredErr
+		return
+	}
 	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration.IgnoredResources(), generic.NewRegistry(a.quotaConfiguration.Evaluators()), nil, a.config, a.numEvaluators, a.stopCh)
 }
 
 // ValidateInitialization ensures an authorizer is set.
 func (a *QuotaAdmission) ValidateInitialization() error {
+	if a.initializationErr != nil {
+		return a.initializationErr
+	}
+	if a.stopCh == nil {
+		return fmt.Errorf("missing stopCh")
+	}
 	if a.quotaAccessor == nil {
 		return fmt.Errorf("missing quotaAccessor")
 	}

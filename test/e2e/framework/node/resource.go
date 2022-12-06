@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 	netutil "k8s.io/utils/net"
 )
 
@@ -128,7 +128,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					}
 					if !silent {
-						e2elog.Logf(msg)
+						framework.Logf(msg)
 					}
 					return false
 				}
@@ -137,7 +137,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 					return true
 				}
 				if !silent {
-					e2elog.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					framework.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 				}
 				return false
@@ -146,7 +146,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 				return true
 			}
 			if !silent {
-				e2elog.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+				framework.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 			}
 			return false
@@ -154,7 +154,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 
 	}
 	if !silent {
-		e2elog.Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
+		framework.Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
 	}
 	return false
 }
@@ -196,7 +196,7 @@ func Filter(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
 func TotalRegistered(c clientset.Interface) (int, error) {
 	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
-		e2elog.Logf("Failed to list nodes: %v", err)
+		framework.Logf("Failed to list nodes: %v", err)
 		return 0, err
 	}
 	return len(nodes.Items), nil
@@ -206,7 +206,7 @@ func TotalRegistered(c clientset.Interface) (int, error) {
 func TotalReady(c clientset.Interface) (int, error) {
 	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
-		e2elog.Logf("Failed to list nodes: %v", err)
+		framework.Logf("Failed to list nodes: %v", err)
 		return 0, err
 	}
 
@@ -220,7 +220,7 @@ func TotalReady(c clientset.Interface) (int, error) {
 // GetExternalIP returns node external IP concatenated with port 22 for ssh
 // e.g. 1.2.3.4:22
 func GetExternalIP(node *v1.Node) (string, error) {
-	e2elog.Logf("Getting external IP address for %s", node.Name)
+	framework.Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
@@ -375,6 +375,42 @@ func GetRandomReadySchedulableNode(c clientset.Interface) (*v1.Node, error) {
 		return nil, err
 	}
 	return &nodes.Items[rand.Intn(len(nodes.Items))], nil
+}
+
+// GetSubnetPrefix gets first 2 number of an IP in the node subnet. [IPv4]
+// It assumes that the subnet mask is /16.
+func GetSubnetPrefix(c clientset.Interface) ([]string, error) {
+	node, err := GetReadySchedulableWorkerNode(c)
+	if err != nil {
+		return nil, fmt.Errorf("error getting a ready schedulable worker Node, err: %v", err)
+	}
+	internalIP, err := GetInternalIP(node)
+	if err != nil {
+		return nil, fmt.Errorf("error getting Node internal IP, err: %v", err)
+	}
+	splitted := strings.Split(internalIP, ".")
+	if len(splitted) == 4 {
+		return splitted[:2], nil
+	}
+	return nil, fmt.Errorf("invalid IP address format: %s", internalIP)
+}
+
+// GetReadySchedulableWorkerNode gets a single worker node which is available for
+// running pods on. If there are no such available nodes it will return an error.
+func GetReadySchedulableWorkerNode(c clientset.Interface) (*v1.Node, error) {
+	nodes, err := GetReadySchedulableNodes(c)
+	if err != nil {
+		return nil, err
+	}
+	for i := range nodes.Items {
+		node := nodes.Items[i]
+		_, isMaster := node.Labels["node-role.kubernetes.io/master"]
+		_, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]
+		if !isMaster && !isControlPlane {
+			return &node, nil
+		}
+	}
+	return nil, fmt.Errorf("there are currently no ready, schedulable worker nodes in the cluster")
 }
 
 // GetReadyNodesIncludingTainted returns all ready nodes, even those which are tainted.
@@ -592,7 +628,7 @@ func CreatePodsPerNodeForSimpleApp(c clientset.Interface, namespace, appName str
 		"app": appName + "-pod",
 	}
 	for i, node := range nodes.Items {
-		e2elog.Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
+		framework.Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
 		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   fmt.Sprintf(appName+"-pod-%v", i),
@@ -848,16 +884,6 @@ func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
 	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
 	if taintExists(nodeUpdated.Spec.Taints, taint) {
-		e2elog.Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
+		framework.Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
-}
-
-// taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
-func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
-	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
-			return true
-		}
-	}
-	return false
 }

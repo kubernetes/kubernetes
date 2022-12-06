@@ -26,14 +26,37 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-// minimalValidPods holds minimal valid pods per-level per-version.
+// minimalValidPods holds minimal valid OS neutral pods per-level per-version.
 // To get a valid pod for a particular level/version, use getMinimalValidPod().
 var minimalValidPods = map[api.Level]map[api.Version]*corev1.Pod{}
 
+// minimalValidLinuxPods holds minimal valid linux pods per-level per-version.
+// To get a valid pod for a particular level/version, use getMinimalValidPod().
+var minimalValidLinuxPods = map[api.Level]map[api.Version]*corev1.Pod{}
+
+// minimalValidWindowsPods holds minimal valid Windows pods per-level per-version.
+// To get a valid pod for a particular level/version, use getMinimalValidPod().
+var minimalValidWindowsPods = map[api.Level]map[api.Version]*corev1.Pod{}
+
+func addLinux(pod *corev1.Pod) *corev1.Pod {
+	copyPod := pod.DeepCopy()
+	copyPod.Spec.OS = &corev1.PodOS{Name: corev1.Linux}
+	return copyPod
+}
+
+func addWindows(pod *corev1.Pod) *corev1.Pod {
+	copyPod := pod.DeepCopy()
+	copyPod.Spec.OS = &corev1.PodOS{Name: corev1.Windows}
+	return copyPod
+}
+
 func init() {
+	// These are the OS neutral pods
 	minimalValidPods[api.LevelBaseline] = map[api.Version]*corev1.Pod{}
 	minimalValidPods[api.LevelRestricted] = map[api.Version]*corev1.Pod{}
 
+	minimalValidLinuxPods[api.LevelRestricted] = map[api.Version]*corev1.Pod{}
+	minimalValidWindowsPods[api.LevelRestricted] = map[api.Version]*corev1.Pod{}
 	// Define minimal valid baseline pod.
 	// This must remain valid for all versions.
 	baseline_1_0 := &corev1.Pod{Spec: corev1.PodSpec{
@@ -50,6 +73,8 @@ func init() {
 		p.Spec.SecurityContext = &corev1.PodSecurityContext{RunAsNonRoot: pointer.BoolPtr(true)}
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 0)] = restricted_1_0
+	minimalValidLinuxPods[api.LevelRestricted][api.MajorMinorVersion(1, 0)] = addLinux(restricted_1_0)
+	minimalValidWindowsPods[api.LevelRestricted][api.MajorMinorVersion(1, 0)] = addWindows(restricted_1_0)
 
 	// 1.8+: allowPrivilegeEscalation=false
 	restricted_1_8 := tweak(restricted_1_0, func(p *corev1.Pod) {
@@ -57,6 +82,8 @@ func init() {
 		p.Spec.InitContainers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: pointer.BoolPtr(false)}
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 8)] = restricted_1_8
+	minimalValidLinuxPods[api.LevelRestricted][api.MajorMinorVersion(1, 8)] = addLinux(restricted_1_8)
+	minimalValidWindowsPods[api.LevelRestricted][api.MajorMinorVersion(1, 8)] = addWindows(restricted_1_8)
 
 	// 1.19+: seccompProfile.type=RuntimeDefault
 	restricted_1_19 := tweak(restricted_1_8, func(p *corev1.Pod) {
@@ -66,6 +93,8 @@ func init() {
 		}
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 19)] = restricted_1_19
+	minimalValidLinuxPods[api.LevelRestricted][api.MajorMinorVersion(1, 19)] = addLinux(restricted_1_19)
+	minimalValidWindowsPods[api.LevelRestricted][api.MajorMinorVersion(1, 19)] = addWindows(restricted_1_19)
 
 	// 1.22+: capabilities.drop=["ALL"]
 	restricted_1_22 := tweak(restricted_1_19, func(p *corev1.Pod) {
@@ -73,13 +102,53 @@ func init() {
 		p.Spec.InitContainers[0].SecurityContext.Capabilities = &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 22)] = restricted_1_22
+	minimalValidLinuxPods[api.LevelRestricted][api.MajorMinorVersion(1, 22)] = addLinux(restricted_1_22)
+	minimalValidWindowsPods[api.LevelRestricted][api.MajorMinorVersion(1, 22)] = addWindows(restricted_1_22)
+
+	// 1.25+: OS specific changes
+	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 25)] = restricted_1_22
+	minimalValidLinuxPods[api.LevelRestricted][api.MajorMinorVersion(1, 25)] = addLinux(restricted_1_22)
+	// none of the restricted requirements added between 1.0 and 1.25 apply to the pods that are explicitly Windows
+	restricted_1_25_windows := addWindows(restricted_1_0)
+	minimalValidWindowsPods[api.LevelRestricted][api.MajorMinorVersion(1, 25)] = restricted_1_25_windows
+
 }
 
-// GetMinimalValidPod returns a minimal valid pod for the specified level and version.
+// GetMinimalValidPod returns a minimal valid OS neutral pod for the specified level and version.
 func GetMinimalValidPod(level api.Level, version api.Version) (*corev1.Pod, error) {
 	originalVersion := version
 	for {
 		pod, exists := minimalValidPods[level][version]
+		if exists {
+			return pod.DeepCopy(), nil
+		}
+		if version.Minor() <= 0 {
+			return nil, fmt.Errorf("no valid pod fixture found in specified or older versions for %s/%s", level, originalVersion.String())
+		}
+		version = api.MajorMinorVersion(version.Major(), version.Minor()-1)
+	}
+}
+
+// GetMinimalValidLinuxPod returns a minimal valid linux pod for the specified level and version.
+func GetMinimalValidLinuxPod(level api.Level, version api.Version) (*corev1.Pod, error) {
+	originalVersion := version
+	for {
+		pod, exists := minimalValidLinuxPods[level][version]
+		if exists {
+			return pod.DeepCopy(), nil
+		}
+		if version.Minor() <= 0 {
+			return nil, fmt.Errorf("no valid pod fixture found in specified or older versions for %s/%s", level, originalVersion.String())
+		}
+		version = api.MajorMinorVersion(version.Major(), version.Minor()-1)
+	}
+}
+
+// GetMinimalValidWindowsPod returns a minimal valid windows pod for the specified level and version.
+func GetMinimalValidWindowsPod(level api.Level, version api.Version) (*corev1.Pod, error) {
+	originalVersion := version
+	for {
+		pod, exists := minimalValidWindowsPods[level][version]
 		if exists {
 			return pod.DeepCopy(), nil
 		}
@@ -99,7 +168,7 @@ var fixtureGenerators = map[fixtureKey]fixtureGenerator{}
 type fixtureKey struct {
 	version api.Version
 	level   api.Level
-	check   string
+	check   policy.CheckID
 }
 
 // fixtureGenerator holds generators for valid and invalid fixtures.
@@ -184,7 +253,7 @@ func getFixtures(key fixtureKey) (fixtureData, error) {
 				fail: generator.generateFail(validPodForLevel.DeepCopy()),
 			}
 			if len(data.expectErrorSubstring) == 0 {
-				data.expectErrorSubstring = key.check
+				data.expectErrorSubstring = string(key.check)
 			}
 			if len(data.fail) == 0 {
 				return fixtureData{}, fmt.Errorf("generateFail for %#v must return at least one pod", key)

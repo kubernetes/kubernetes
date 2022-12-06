@@ -418,3 +418,33 @@
 - endpoint: replaceAutoscalingV2NamespacedHorizontalPodAutoscalerStatus
   reason: optional feature
   link: https://github.com/kubernetes/kubernetes/pull/106595#issuecomment-1006015756
+- endpoint: logFileHandler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/issues/108675
+- endpoint: logFileListHandler
+  reason: optional feature
+  link: https://github.com/kubernetes/kubernetes/issues/108675
+- endpoint: readNetworkingV1NamespacedNetworkPolicyStatus
+  reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
+  link: https://github.com/kubernetes/kubernetes/pull/107963
+- endpoint: patchNetworkingV1NamespacedNetworkPolicyStatus
+  reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
+  link: https://github.com/kubernetes/kubernetes/pull/107963
+- endpoint: replaceNetworkingV1NamespacedNetworkPolicyStatus
+  reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
+  link: https://github.com/kubernetes/kubernetes/pull/107963
+- endpoint: readCoreV1NodeStatus
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/kubernetes/issues/109379
+- endpoint: replaceCoreV1NodeStatus
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/kubernetes/issues/109379
+- endpoint: deleteCoreV1CollectionNode
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/kubernetes/issues/109379 
+- endpoint: createCoreV1NamespacedBinding
+  reason: Endpoint was deprecated in 1.7
+  link: https://github.com/kubernetes/kubernetes/pull/47041  
+- endpoint: createAuthorizationV1SelfSubjectRulesReview
+  reason: Endpoint likely to be deprecated
+  link: https://github.com/kubernetes/kubernetes/issues/112657#issuecomment-1265441626  

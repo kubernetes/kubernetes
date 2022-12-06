@@ -37,6 +37,8 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
@@ -50,10 +52,14 @@ type Leases interface {
 
 	// RemoveLease removes a master's lease
 	RemoveLease(ip string) error
+
+	// Destroy cleans up everything on shutdown.
+	Destroy()
 }
 
 type storageLeases struct {
 	storage   storage.Interface
+	destroyFn func()
 	baseKey   string
 	leaseTime time.Duration
 }
@@ -67,8 +73,9 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 		ResourceVersion:      "0",
 		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
 		Predicate:            storage.Everything,
+		Recursive:            true,
 	}
-	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, storageOpts, ipInfoList); err != nil {
+	if err := s.storage.GetList(apirequest.NewDefaultContext(), s.baseKey, storageOpts, ipInfoList); err != nil {
 		return nil, err
 	}
 
@@ -113,16 +120,27 @@ func (s *storageLeases) UpdateLease(ip string) error {
 
 // RemoveLease removes the lease on a master IP in storage
 func (s *storageLeases) RemoveLease(ip string) error {
-	return s.storage.Delete(apirequest.NewDefaultContext(), s.baseKey+"/"+ip, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc, nil)
+	key := path.Join(s.baseKey, ip)
+	return s.storage.Delete(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc, nil)
+}
+
+func (s *storageLeases) Destroy() {
+	s.destroyFn()
 }
 
 // NewLeases creates a new etcd-based Leases implementation.
-func NewLeases(storage storage.Interface, baseKey string, leaseTime time.Duration) Leases {
+func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTime time.Duration) (Leases, error) {
+	leaseStorage, destroyFn, err := storagefactory.Create(*config, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating storage factory: %v", err)
+	}
+	var once sync.Once
 	return &storageLeases{
-		storage:   storage,
+		storage:   leaseStorage,
+		destroyFn: func() { once.Do(destroyFn) },
 		baseKey:   baseKey,
 		leaseTime: leaseTime,
-	}
+	}, nil
 }
 
 type leaseEndpointReconciler struct {
@@ -245,9 +263,9 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 // format ReconcileEndpoints expects when the controller is using leases.
 //
 // Return values:
-// * formatCorrect is true if exactly one subset is found.
-// * ipsCorrect when the addresses in the endpoints match the expected addresses list
-// * portsCorrect is true when endpoint ports exactly match provided ports.
+//   - formatCorrect is true if exactly one subset is found.
+//   - ipsCorrect when the addresses in the endpoints match the expected addresses list
+//   - portsCorrect is true when endpoint ports exactly match provided ports.
 //     portsCorrect is only evaluated when reconcilePorts is set to true.
 func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []string, ports []corev1.EndpointPort, reconcilePorts bool) (formatCorrect bool, ipsCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
@@ -306,4 +324,8 @@ func (r *leaseEndpointReconciler) StopReconciling() {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 	r.stopReconcilingCalled = true
+}
+
+func (r *leaseEndpointReconciler) Destroy() {
+	r.masterLeases.Destroy()
 }

@@ -19,20 +19,24 @@ package windows
 import (
 	"context"
 
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"time"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 	f := framework.NewDefaultFramework("cpu-resources-test-windows")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// The Windows 'BusyBox' image is PowerShell plus a collection of scripts and utilities to mimic common busybox commands
 	powershellImage := imageutils.GetConfig(imageutils.BusyBox)
@@ -41,10 +45,10 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 		ginkgo.It("should not be exceeded after waiting 2 minutes", func() {
 			ginkgo.By("Creating one pod with limit set to '0.5'")
 			podsDecimal := newCPUBurnPods(1, powershellImage, "0.5", "1Gi")
-			f.PodClient().CreateBatch(podsDecimal)
+			e2epod.NewPodClient(f).CreateBatch(podsDecimal)
 			ginkgo.By("Creating one pod with limit set to '500m'")
 			podsMilli := newCPUBurnPods(1, powershellImage, "500m", "1Gi")
-			f.PodClient().CreateBatch(podsMilli)
+			e2epod.NewPodClient(f).CreateBatch(podsMilli)
 			ginkgo.By("Waiting 2 minutes")
 			time.Sleep(2 * time.Minute)
 			ginkgo.By("Ensuring pods are still running")

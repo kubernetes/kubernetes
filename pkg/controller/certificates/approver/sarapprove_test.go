@@ -17,6 +17,7 @@ limitations under the License.
 package approver
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/x509"
@@ -130,7 +131,8 @@ func TestHandle(t *testing.T) {
 				},
 			}
 			csr := makeTestCsr()
-			if err := approver.handle(csr); err != nil && !c.err {
+			ctx := context.TODO()
+			if err := approver.handle(ctx, csr); err != nil && !c.err {
 				t.Errorf("unexpected err: %v", err)
 			}
 			c.verify(t, client.Actions())
@@ -201,6 +203,28 @@ func testRecognizer(t *testing.T, cases []func(b *csrBuilder), recognizeFunc fun
 		c(&b)
 		t.Run(fmt.Sprintf("csr:%#v", b), func(t *testing.T) {
 			csr := makeFancyTestCsr(b)
+			x509cr, err := k8s_certificates_v1.ParseCSR(csr.Spec.Request)
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+			if recognizeFunc(csr, x509cr) != shouldRecognize {
+				t.Errorf("expected recognized to be %v", shouldRecognize)
+			}
+		})
+		// reset the builder to run testcase without usage key encipherment
+		d := csrBuilder{
+			signerName: capi.KubeAPIServerClientKubeletSignerName,
+			cn:         "system:node:foo",
+			orgs:       []string{"system:nodes"},
+			requestor:  "system:node:foo",
+			usages: []capi.KeyUsage{
+				capi.UsageDigitalSignature,
+				capi.UsageClientAuth,
+			},
+		}
+		c(&d)
+		t.Run(fmt.Sprintf("csr:%#v", d), func(t *testing.T) {
+			csr := makeFancyTestCsr(d)
 			x509cr, err := k8s_certificates_v1.ParseCSR(csr.Spec.Request)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)

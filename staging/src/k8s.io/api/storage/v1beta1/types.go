@@ -364,11 +364,7 @@ type CSIDriverSpec struct {
 	//
 	// This field was immutable in Kubernetes <= 1.22 and now is mutable.
 	//
-	// This is a beta field and only available when the CSIStorageCapacity
-	// feature is enabled. The default is false.
-	//
 	// +optional
-	// +featureGate=CSIStorageCapacity
 	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
 
 	// Defines if the underlying volume supports changing ownership and
@@ -414,6 +410,27 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	RequiresRepublish *bool `json:"requiresRepublish,omitempty" protobuf:"varint,7,opt,name=requiresRepublish"`
+
+	// SELinuxMount specifies if the CSI driver supports "-o context"
+	// mount option.
+	//
+	// When "true", the CSI driver must ensure that all volumes provided by this CSI
+	// driver can be mounted separately with different `-o context` options. This is
+	// typical for storage backends that provide volumes as filesystems on block
+	// devices or as independent shared volumes.
+	// Kubernetes will call NodeStage / NodePublish with "-o context=xyz" mount
+	// option when mounting a ReadWriteOncePod volume used in Pod that has
+	// explicitly set SELinux context. In the future, it may be expanded to other
+	// volume AccessModes. In any case, Kubernetes will ensure that the volume is
+	// mounted only with a single SELinux context.
+	//
+	// When "false", Kubernetes won't pass any special SELinux mount options to the driver.
+	// This is typical for volumes that represent subdirectories of a bigger shared filesystem.
+	//
+	// Default is "false".
+	//
+	// +optional
+	SELinuxMount *bool `json:"seLinuxMount,omitempty" protobuf:"varint,8,opt,name=seLinuxMount"`
 }
 
 // FSGroupPolicy specifies if a CSI Driver supports modifying
@@ -588,6 +605,8 @@ type CSINodeList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.21
+// +k8s:prerelease-lifecycle-gen:deprecated=1.24
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSIStorageCapacity
 
 // CSIStorageCapacity stores the result of one CSI GetCapacity call.
 // For a given StorageClass, this describes the available capacity in a
@@ -606,9 +625,13 @@ type CSINodeList struct {
 //
 // The producer of these objects can decide which approach is more suitable.
 //
-// They are consumed by the kube-scheduler if the CSIStorageCapacity beta feature gate
-// is enabled there and a CSI driver opts into capacity-aware scheduling with
-// CSIDriver.StorageCapacity.
+// They are consumed by the kube-scheduler when a CSI driver opts into
+// capacity-aware scheduling with CSIDriverSpec.StorageCapacity. The scheduler
+// compares the MaximumVolumeSize against the requested size of pending volumes
+// to filter out unsuitable nodes. If MaximumVolumeSize is unset, it falls back
+// to a comparison against the less precise Capacity. If that is also unset,
+// the scheduler assumes that capacity is insufficient and tries some other
+// node.
 type CSIStorageCapacity struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata. The name has no particular meaning. It must be
@@ -647,7 +670,7 @@ type CSIStorageCapacity struct {
 	// The semantic is currently (CSI spec 1.2) defined as:
 	// The available capacity, in bytes, of the storage that can be used
 	// to provision volumes. If not set, that information is currently
-	// unavailable and treated like zero capacity.
+	// unavailable.
 	//
 	// +optional
 	Capacity *resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,4,opt,name=capacity"`
@@ -669,6 +692,8 @@ type CSIStorageCapacity struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.21
+// +k8s:prerelease-lifecycle-gen:deprecated=1.24
+// +k8s:prerelease-lifecycle-gen:replacement=storage.k8s.io,v1,CSIStorageCapacityList
 
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
 type CSIStorageCapacityList struct {

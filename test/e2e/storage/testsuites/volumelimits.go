@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -41,6 +41,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type volumeLimitsTestSuite struct {
@@ -54,7 +55,7 @@ const (
 	testSlowMultiplier = 10
 
 	// How long to wait until CSINode gets attach limit from installed CSI driver.
-	csiNodeInfoTimeout = 1 * time.Minute
+	csiNodeInfoTimeout = 2 * time.Minute
 )
 
 var _ storageframework.TestSuite = &volumeLimitsTestSuite{}
@@ -89,8 +90,7 @@ func (t *volumeLimitsTestSuite) SkipUnsupportedTests(driver storageframework.Tes
 
 func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config      *storageframework.PerTestConfig
-		testCleanup func()
+		config *storageframework.PerTestConfig
 
 		cs clientset.Interface
 		ns *v1.Namespace
@@ -113,6 +113,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volumelimits", storageframework.GetDriverTimeouts(driver))
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// This checks that CSIMaxVolumeLimitChecker works as expected.
 	// A randomly chosen node should be able to handle as many CSI volumes as
@@ -122,7 +123,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 	// And one extra pod with a CSI volume should get Pending with a condition
 	// that says it's unschedulable because of volume limit.
 	// BEWARE: the test may create lot of volumes and it's really slow.
-	ginkgo.It("should support volume limits [Serial]", func() {
+	ginkgo.It("should support volume limits [Serial]", func(ctx context.Context) {
 		driverInfo := driver.GetDriverInfo()
 		if !driverInfo.Capabilities[storageframework.CapVolumeLimits] {
 			ginkgo.Skip(fmt.Sprintf("driver %s does not support volume limits", driverInfo.Name))
@@ -135,8 +136,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.ns = f.Namespace
 		l.cs = f.ClientSet
 
-		l.config, l.testCleanup = driver.PrepareTest(f)
-		defer l.testCleanup()
+		l.config = driver.PrepareTest(f)
 
 		ginkgo.By("Picking a node")
 		// Some CSI drivers are deployed to a single node (e.g csi-hostpath),
@@ -175,7 +175,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 			// Create <limit> Pods.
 			ginkgo.By(fmt.Sprintf("Creating %d Pod(s) with one volume each", limit))
 			for i := 0; i < limit; i++ {
-				pod := StartInPodWithVolumeSource(l.cs, *l.resource.VolSource, l.ns.Name, "volume-limits", "sleep 1000000", selection)
+				pod := StartInPodWithVolumeSource(ctx, l.cs, *l.resource.VolSource, l.ns.Name, "volume-limits", "sleep 1000000", selection)
 				l.podNames = append(l.podNames, pod.Name)
 				l.pvcNames = append(l.pvcNames, ephemeral.VolumeClaimName(pod, &pod.Spec.Volumes[0]))
 			}
@@ -219,7 +219,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 
 		ginkgo.By("Creating an extra pod with one volume to exceed the limit")
-		pod := StartInPodWithVolumeSource(l.cs, *l.resource.VolSource, l.ns.Name, "volume-limits-exceeded", "sleep 10000", selection)
+		pod := StartInPodWithVolumeSource(ctx, l.cs, *l.resource.VolSource, l.ns.Name, "volume-limits-exceeded", "sleep 10000", selection)
 		l.podNames = append(l.podNames, pod.Name)
 
 		ginkgo.By("Waiting for the pod to get unschedulable with the right message")
@@ -253,8 +253,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.ns = f.Namespace
 		l.cs = f.ClientSet
 
-		l.config, l.testCleanup = driver.PrepareTest(f)
-		defer l.testCleanup()
+		l.config = driver.PrepareTest(f)
 
 		nodeNames := []string{}
 		if l.config.ClientNodeSelection.Name != "" {

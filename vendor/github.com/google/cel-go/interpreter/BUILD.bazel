@@ -17,8 +17,10 @@ go_library(
         "evalstate.go",
         "interpretable.go",
         "interpreter.go",
+        "optimizations.go",
         "planner.go",
         "prune.go",
+        "runtimecost.go",
     ],
     importpath = "github.com/google/cel-go/interpreter",
     deps = [

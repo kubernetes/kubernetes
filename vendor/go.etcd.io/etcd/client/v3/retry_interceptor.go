@@ -73,7 +73,7 @@ func (c *Client) unaryClientInterceptor(optFuncs ...retryOption) grpc.UnaryClien
 				// its the callCtx deadline or cancellation, in which case try again.
 				continue
 			}
-			if callOpts.retryAuth && rpctypes.Error(lastErr) == rpctypes.ErrInvalidAuthToken {
+			if c.shouldRefreshToken(lastErr, callOpts) {
 				// clear auth token before refreshing it.
 				// call c.Auth.Authenticate with an invalid token will always fail the auth check on the server-side,
 				// if the server has not apply the patch of pr #12165 (https://github.com/etcd-io/etcd/pull/12165)
@@ -146,6 +146,19 @@ func (c *Client) streamClientInterceptor(optFuncs ...retryOption) grpc.StreamCli
 		}
 		return retryingStreamer, nil
 	}
+}
+
+// shouldRefreshToken checks whether there's a need to refresh the token based on the error and callOptions,
+// and returns a boolean value.
+func (c *Client) shouldRefreshToken(err error, callOpts *options) bool {
+	if rpctypes.Error(err) == rpctypes.ErrUserEmpty {
+		// refresh the token when username, password is present but the server returns ErrUserEmpty
+		// which is possible when the client token is cleared somehow
+		return c.authTokenBundle != nil // equal to c.Username != "" && c.Password != ""
+	}
+
+	return callOpts.retryAuth &&
+		(rpctypes.Error(err) == rpctypes.ErrInvalidAuthToken || rpctypes.Error(err) == rpctypes.ErrAuthOldRevision)
 }
 
 // type serverStreamingRetryingStream is the implementation of grpc.ClientStream that acts as a
@@ -245,7 +258,7 @@ func (s *serverStreamingRetryingStream) receiveMsgAndIndicateRetry(m interface{}
 		// its the callCtx deadline or cancellation, in which case try again.
 		return true, err
 	}
-	if s.callOpts.retryAuth && rpctypes.Error(err) == rpctypes.ErrInvalidAuthToken {
+	if s.client.shouldRefreshToken(err, s.callOpts) {
 		// clear auth token to avoid failure when call getToken
 		s.client.authTokenBundle.UpdateAuthToken("")
 

@@ -30,8 +30,9 @@ func TestPolicyRestrictedName(t *testing.T) {
 			expected: "restricted",
 		},
 	}
+	numaInfo := commonNUMAInfoTwoNodes()
 	for _, tc := range tcases {
-		policy := NewRestrictedPolicy([]int{0, 1})
+		policy := &restrictedPolicy{bestEffortPolicy{numaInfo: numaInfo, opts: PolicyOptions{}}}
 		if policy.Name() != tc.expected {
 			t.Errorf("Expected Policy Name to be %s, got %s", tc.expected, policy.Name())
 		}
@@ -57,9 +58,9 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		numaNodes := []int{0, 1}
-		policy := NewRestrictedPolicy(numaNodes)
-		result := policy.(*restrictedPolicy).canAdmitPodResult(&tc.hint)
+		numaInfo := commonNUMAInfoTwoNodes()
+		policy := &restrictedPolicy{bestEffortPolicy{numaInfo: numaInfo}}
+		result := policy.canAdmitPodResult(&tc.hint)
 
 		if result != tc.expected {
 			t.Errorf("Expected result to be %t, got %t", tc.expected, result)
@@ -68,11 +69,23 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 }
 
 func TestPolicyRestrictedMerge(t *testing.T) {
-	numaNodes := []int{0, 1}
-	policy := NewRestrictedPolicy(numaNodes)
+	numaInfo := commonNUMAInfoFourNodes()
+	policy := &restrictedPolicy{bestEffortPolicy{numaInfo: numaInfo}}
 
-	tcases := commonPolicyMergeTestCases(numaNodes)
-	tcases = append(tcases, policy.(*restrictedPolicy).mergeTestCases(numaNodes)...)
+	tcases := commonPolicyMergeTestCases(numaInfo.Nodes)
+	tcases = append(tcases, policy.mergeTestCases(numaInfo.Nodes)...)
+	tcases = append(tcases, policy.mergeTestCasesNoPolicies(numaInfo.Nodes)...)
+
+	testPolicyMerge(policy, tcases, t)
+}
+
+func TestPolicyRestrictedMergeClosestNUMA(t *testing.T) {
+	numaInfo := commonNUMAInfoEightNodes()
+	policy := &restrictedPolicy{bestEffortPolicy{numaInfo: numaInfo, opts: PolicyOptions{PreferClosestNUMA: true}}}
+
+	tcases := commonPolicyMergeTestCases(numaInfo.Nodes)
+	tcases = append(tcases, policy.mergeTestCases(numaInfo.Nodes)...)
+	tcases = append(tcases, policy.mergeTestCasesClosestNUMA(numaInfo.Nodes)...)
 
 	testPolicyMerge(policy, tcases, t)
 }

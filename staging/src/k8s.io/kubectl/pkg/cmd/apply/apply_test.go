@@ -29,8 +29,9 @@ import (
 	"strings"
 	"testing"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +40,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -46,11 +49,14 @@ import (
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	testing2 "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/csaupgrade"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/openapi"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/strings/slices"
 )
 
 var (
@@ -103,6 +109,80 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func TestApplyFlagValidation(t *testing.T) {
+	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
+	tests := []struct {
+		args        [][]string
+		expectedErr string
+	}{
+		{
+			args: [][]string{
+				{"force-conflicts", "true"},
+			},
+			expectedErr: "--force-conflicts only works with --server-side",
+		},
+		{
+			args: [][]string{
+				{"server-side", "true"},
+				{"dry-run", "client"},
+			},
+			expectedErr: "--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)",
+		},
+		{
+			args: [][]string{
+				{"force", "true"},
+				{"server-side", "true"},
+			},
+			expectedErr: "--force cannot be used with --server-side",
+		},
+		{
+			args: [][]string{
+				{"force", "true"},
+				{"dry-run", "server"},
+			},
+			expectedErr: "--dry-run=server cannot be used with --force",
+		},
+		{
+			args: [][]string{
+				{"all", "true"},
+				{"selector", "unused"},
+			},
+			expectedErr: "cannot set --all and --selector at the same time",
+		},
+		{
+			args: [][]string{
+				{"force", "true"},
+				{"prune", "true"},
+				{"all", "true"},
+			},
+			expectedErr: "--force cannot be used with --prune",
+		},
+	}
+
+	for _, test := range tests {
+		cmd := &cobra.Command{}
+		flags := NewApplyFlags(f, genericclioptions.NewTestIOStreamsDiscard())
+		flags.AddFlags(cmd)
+		cmd.Flags().Set("filename", "unused")
+		for _, arg := range test.args {
+			cmd.Flags().Set(arg[0], arg[1])
+		}
+		o, err := flags.ToOptions(cmd, "kubectl", []string{})
+		if err != nil {
+			t.Fatalf("unexpected error creating apply options: %s", err)
+		}
+		err = o.Validate()
+		if err == nil {
+			t.Fatalf("missing expected error")
+		}
+		if test.expectedErr != err.Error() {
+			t.Errorf("expected error %s, got %s", test.expectedErr, err)
+		}
+	}
+}
+
 const (
 	filenameCM                = "../../../testdata/apply/cm.yaml"
 	filenameRC                = "../../../testdata/apply/rc.yaml"
@@ -110,6 +190,7 @@ const (
 	filenameRCLastAppliedArgs = "../../../testdata/apply/rc-lastapplied-args.yaml"
 	filenameRCNoAnnotation    = "../../../testdata/apply/rc-no-annotation.yaml"
 	filenameRCLASTAPPLIED     = "../../../testdata/apply/rc-lastapplied.yaml"
+	filenameRCManagedFieldsLA = "../../../testdata/apply/rc-managedfields-lastapplied.yaml"
 	filenameSVC               = "../../../testdata/apply/service.yaml"
 	filenameRCSVC             = "../../../testdata/apply/rc-service.yaml"
 	filenameNoExistRC         = "../../../testdata/apply/rc-noexist.yaml"
@@ -259,7 +340,11 @@ func readAndAnnotateUnstructured(t *testing.T, filename string) (string, []byte)
 	return annotateRuntimeObject(t, obj1, obj2, "Widget")
 }
 
-func validatePatchApplication(t *testing.T, req *http.Request) {
+func validatePatchApplication(t *testing.T, req *http.Request, patchType types.PatchType) {
+	if got, wanted := req.Header.Get("Content-Type"), string(patchType); got != wanted {
+		t.Fatalf("unexpected content-type expected: %s but actual %s\n", wanted, got)
+	}
+
 	patch, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		t.Fatal(err)
@@ -550,7 +635,7 @@ func TestApplyObject(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					default:
@@ -599,7 +684,7 @@ func TestApplyPruneObjects(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					default:
@@ -629,6 +714,445 @@ func TestApplyPruneObjects(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	// Read ReplicationController from the file we will use to apply. This one will not be pruned because it exists in the file.
+	rc := readUnstructuredFromFile(t, filenameRC)
+	err := setLastAppliedConfigAnnotation(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create another ReplicationController that can be pruned
+	rc2 := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "ReplicationController",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "test-rc2",
+				"namespace": "test",
+				"uid":       "uid-rc2",
+			},
+		},
+	}
+	err = setLastAppliedConfigAnnotation(rc2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ConfigMap that can be pruned
+	cm := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "ConfigMap",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "test-cm",
+				"namespace": "test",
+				"uid":       "uid-cm",
+			},
+		},
+	}
+	err = setLastAppliedConfigAnnotation(cm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create Namespace that can be pruned
+	ns := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "Namespace",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name": "test-apply",
+				"uid":  "uid-ns",
+			},
+		},
+	}
+	err = setLastAppliedConfigAnnotation(ns)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ConfigMap without a UID. Resources without a UID will not be pruned.
+	cmNoUID := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "ConfigMap",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "test-cm-nouid",
+				"namespace": "test",
+			},
+		},
+	}
+	err = setLastAppliedConfigAnnotation(cmNoUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ConfigMap without a last applied annotation. Resources without a last applied annotation will not be pruned.
+	cmNoLastApplied := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "ConfigMap",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "test-cm-nolastapplied",
+				"namespace": "test",
+				"uid":       "uid-cm-nolastapplied",
+			},
+		},
+	}
+
+	testCases := map[string]struct {
+		currentResources        []runtime.Object
+		pruneAllowlist          []string
+		namespace               string
+		expectedPrunedResources []string
+		expectedOutputs         []string
+	}{
+		"prune without namespace and allowlist should delete resources that are not in the specified file": {
+			currentResources:        []runtime.Object{rc, rc2, cm, ns},
+			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2", "/test-apply"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+				"replicationcontroller/test-rc2 pruned",
+				"namespace/test-apply pruned",
+			},
+		},
+		// Deprecated: kubectl apply will no longer prune non-namespaced resources by default when used with the --namespace flag in a future release
+		// namespace is a non-namespaced resource and will not be pruned in the future
+		"prune with namespace and without allowlist should delete resources that are not in the specified file": {
+			currentResources:        []runtime.Object{rc, rc2, cm, ns},
+			namespace:               "test",
+			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2", "/test-apply"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+				"replicationcontroller/test-rc2 pruned",
+				"namespace/test-apply pruned",
+			},
+		},
+		// Even namespace is a non-namespaced resource, it will be pruned if specified in pruneAllowList in the future
+		"prune with namespace and allowlist should delete all matching resources": {
+			currentResources:        []runtime.Object{rc, cm, ns},
+			pruneAllowlist:          []string{"core/v1/ConfigMap", "core/v1/Namespace"},
+			namespace:               "test",
+			expectedPrunedResources: []string{"test/test-cm", "/test-apply"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+				"namespace/test-apply pruned",
+			},
+		},
+		"prune with allowlist should delete only matching resources": {
+			currentResources:        []runtime.Object{rc, rc2, cm},
+			pruneAllowlist:          []string{"core/v1/ConfigMap"},
+			namespace:               "test",
+			expectedPrunedResources: []string{"test/test-cm"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+			},
+		},
+		"prune with allowlist specifying the same resource type multiple times should not fail": {
+			currentResources:        []runtime.Object{rc, rc2, cm},
+			pruneAllowlist:          []string{"core/v1/ConfigMap", "core/v1/ConfigMap"},
+			namespace:               "test",
+			expectedPrunedResources: []string{"test/test-cm"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+			},
+		},
+		"prune with allowlist should not delete resources that exist in the specified file": {
+			currentResources:        []runtime.Object{rc, rc2, cm},
+			pruneAllowlist:          []string{"core/v1/ReplicationController"},
+			namespace:               "test",
+			expectedPrunedResources: []string{"test/test-rc2"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"replicationcontroller/test-rc2 pruned",
+			},
+		},
+		"prune with allowlist specifying multiple resource types should delete matching resources": {
+			currentResources:        []runtime.Object{rc, rc2, cm},
+			pruneAllowlist:          []string{"core/v1/ConfigMap", "core/v1/ReplicationController"},
+			namespace:               "test",
+			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+				"replicationcontroller/test-rc2 pruned",
+			},
+		},
+		"prune should not delete resources that are missing a UID": {
+			currentResources:        []runtime.Object{rc, cm, cmNoUID},
+			expectedPrunedResources: []string{"test/test-cm"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+			},
+		},
+		"prune should not delete resources that are missing the last applied config annotation": {
+			currentResources:        []runtime.Object{rc, cm, cmNoLastApplied},
+			expectedPrunedResources: []string{"test/test-cm"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+			},
+		},
+	}
+
+	for testCaseName, tc := range testCases {
+		for _, testingOpenAPISchema := range testingOpenAPISchemas {
+			t.Run(testCaseName, func(t *testing.T) {
+				tf := cmdtesting.NewTestFactory().WithNamespace("test")
+				defer tf.Cleanup()
+
+				tf.UnstructuredClient = &fake.RESTClient{
+					NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+					Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+						switch p, m := req.URL.Path, req.Method; {
+						case p == "/namespaces/test/replicationcontrollers/test-rc" && m == "GET":
+							encoded := runtime.EncodeOrDie(unstructured.UnstructuredJSONScheme, rc)
+							bodyRC := io.NopCloser(strings.NewReader(encoded))
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+						case p == "/namespaces/test/replicationcontrollers/test-rc" && m == "PATCH":
+							encoded := runtime.EncodeOrDie(unstructured.UnstructuredJSONScheme, rc)
+							bodyRC := io.NopCloser(strings.NewReader(encoded))
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+						default:
+							t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+							return nil, nil
+						}
+					}),
+				}
+				tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+				tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
+				tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+				for _, resource := range tc.currentResources {
+					if err := tf.FakeDynamicClient.Tracker().Add(resource); err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+				cmd := NewCmdApply("kubectl", tf, ioStreams)
+				cmd.Flags().Set("filename", filenameRC)
+				cmd.Flags().Set("prune", "true")
+				cmd.Flags().Set("namespace", tc.namespace)
+				cmd.Flags().Set("all", "true")
+				for _, allow := range tc.pruneAllowlist {
+					cmd.Flags().Set("prune-allowlist", allow)
+				}
+				cmd.Run(cmd, []string{})
+
+				if errBuf.String() != "" {
+					t.Fatalf("unexpected error output: %s", errBuf.String())
+				}
+
+				actualOutput := buf.String()
+				for _, expectedOutput := range tc.expectedOutputs {
+					if !strings.Contains(actualOutput, expectedOutput) {
+						t.Fatalf("expected output to contain %q, but it did not. Actual Output:\n%s", expectedOutput, actualOutput)
+					}
+				}
+
+				var prunedResources []string
+				for _, action := range tf.FakeDynamicClient.Actions() {
+					if action.GetVerb() == "delete" {
+						deleteAction := action.(testing2.DeleteAction)
+						prunedResources = append(prunedResources, deleteAction.GetNamespace()+"/"+deleteAction.GetName())
+					}
+				}
+
+				// Make sure nothing unexpected was pruned
+				for _, resource := range prunedResources {
+					if !slices.Contains(tc.expectedPrunedResources, resource) {
+						t.Fatalf("expected %s not to be pruned, but it was", resource)
+					}
+				}
+
+				// Make sure everything that was expected to be pruned was pruned
+				for _, resource := range tc.expectedPrunedResources {
+					if !slices.Contains(prunedResources, resource) {
+						t.Fatalf("expected %s to be pruned, but it was not", resource)
+					}
+				}
+
+			})
+		}
+	}
+}
+
+func setLastAppliedConfigAnnotation(obj runtime.Object) error {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+		accessor.SetAnnotations(annotations)
+	}
+	annotations[corev1.LastAppliedConfigAnnotation] = runtime.EncodeOrDie(unstructured.NewJSONFallbackEncoder(codec), obj)
+	accessor.SetAnnotations(annotations)
+	return nil
+}
+
+// Tests that apply of object in need of CSA migration results in a call
+// to patch it.
+func TestApplyCSAMigration(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	nameRC, rcWithManagedFields := readAndAnnotateReplicationController(t, filenameRCManagedFieldsLA)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	// The object after patch should be equivalent to the output of
+	// csaupgrade.UpgradeManagedFields
+	//
+	// Parse object into unstructured, apply patch
+	postPatchObj := &unstructured.Unstructured{}
+	err := json.Unmarshal(rcWithManagedFields, &postPatchObj.Object)
+	require.NoError(t, err)
+
+	expectedPatch, err := csaupgrade.UpgradeManagedFieldsPatch(postPatchObj, sets.New(FieldManagerClientSideApply), "kubectl")
+	require.NoError(t, err)
+
+	err = csaupgrade.UpgradeManagedFields(postPatchObj, sets.New("kubectl-client-side-apply"), "kubectl")
+	require.NoError(t, err)
+
+	postPatchData, err := json.Marshal(postPatchObj)
+	require.NoError(t, err)
+
+	patches := 0
+	targetPatches := 2
+	applies := 0
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == pathRC && m == "GET":
+				// During retry loop for patch fetch is performed.
+				// keep returning the unchanged data
+				if patches < targetPatches {
+					bodyRC := ioutil.NopCloser(bytes.NewReader(rcWithManagedFields))
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+				}
+
+				t.Fatalf("should not do a fetch in serverside-apply")
+				return nil, nil
+			case p == pathRC && m == "PATCH":
+				if got := req.Header.Get("Content-Type"); got == string(types.ApplyPatchType) {
+					defer func() {
+						applies += 1
+					}()
+
+					switch applies {
+					case 0:
+						// initial apply.
+						// Just return the same object but with managed fields
+						bodyRC := ioutil.NopCloser(bytes.NewReader(rcWithManagedFields))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					case 1:
+						// Second apply should include only last apply annotation unmodified
+						// Return new object
+						// NOTE: on a real server this would also modify the managed fields
+						// just return the same object unmodified. It is not so important
+						// for this test for the last-applied to appear in new field
+						// manager response, only that the client asks the server to do it
+						bodyRC := ioutil.NopCloser(bytes.NewReader(rcWithManagedFields))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					case 2, 3:
+						// Before the last apply we have formed our JSONPAtch so it
+						// should reply now with the upgraded object
+						bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					default:
+						require.Fail(t, "sent more apply requests than expected")
+						return &http.Response{StatusCode: http.StatusBadRequest, Header: cmdtesting.DefaultHeader()}, nil
+					}
+				} else if got == string(types.JSONPatchType) {
+					defer func() {
+						patches += 1
+					}()
+
+					// Require that the patch is equal to what is expected
+					body, err := ioutil.ReadAll(req.Body)
+					require.NoError(t, err)
+					require.Equal(t, expectedPatch, body)
+
+					switch patches {
+					case targetPatches - 1:
+						bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					default:
+						// Return conflict until the client has retried enough times
+						return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader()}, nil
+
+					}
+				} else {
+					t.Fatalf("unexpected content-type: %s\n", got)
+					return nil, nil
+				}
+
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
+	tf.FakeOpenAPIGetter = FakeOpenAPISchema.OpenAPIGetter
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("server-side", "true")
+	cmd.Flags().Set("show-managed-fields", "true")
+	cmd.Run(cmd, []string{})
+
+	// JSONPatch should have been attempted exactly the given number of times
+	require.Equal(t, targetPatches, patches, "should retry as many times as a conflict was returned")
+	require.Equal(t, 3, applies, "should perform specified # of apply calls upon migration")
+	require.Empty(t, errBuf.String())
+
+	// ensure that in the future there will be no migrations necessary
+	// (by showing migration is a no-op)
+
+	rc := &corev1.ReplicationController{}
+	if err := runtime.DecodeInto(codec, buf.Bytes(), rc); err != nil {
+		t.Fatal(err)
+	}
+
+	upgradedRC := rc.DeepCopyObject()
+	err = csaupgrade.UpgradeManagedFields(upgradedRC, sets.New("kubectl-client-side-apply"), "kubectl")
+	require.NoError(t, err)
+	require.NotEmpty(t, rc.ManagedFields)
+	require.Equal(t, rc, upgradedRC, "upgrading should be no-op in future")
+
+	// Apply the upgraded object.
+	// Expect only a single PATCH call to apiserver
+	ioStreams, _, _, errBuf = genericclioptions.NewTestIOStreams()
+	cmd = NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("server-side", "true")
+	cmd.Flags().Set("show-managed-fields", "true")
+	cmd.Run(cmd, []string{})
+
+	require.Empty(t, errBuf)
+	require.Equal(t, 4, applies, "only a single call to server-side apply should have been performed")
+	require.Equal(t, targetPatches, patches, "no more json patches should have been needed")
 }
 
 func TestApplyObjectOutput(t *testing.T) {
@@ -665,7 +1189,7 @@ func TestApplyObjectOutput(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					default:
@@ -727,7 +1251,7 @@ func TestApplyRetry(t *testing.T) {
 							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: bodyErr}, nil
 						}
 						retry = true
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					default:
@@ -896,14 +1420,14 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathSVC && m == "GET":
 						bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodySVC}, nil
 					case p == pathSVC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodySVC}, nil
 					default:
@@ -1057,11 +1581,7 @@ func TestUnstructuredApply(t *testing.T) {
 							Header:     cmdtesting.DefaultHeader(),
 							Body:       body}, nil
 					case p == path && m == "PATCH":
-						contentType := req.Header.Get("Content-Type")
-						if contentType != "application/merge-patch+json" {
-							t.Fatalf("Unexpected Content-Type: %s", contentType)
-						}
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.MergePatchType)
 						verifiedPatch = true
 
 						body := ioutil.NopCloser(bytes.NewReader(curr))
@@ -1128,7 +1648,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 					case p == path && m == "PATCH":
 						// In idempotent updates, kubectl will resolve to an empty patch and not send anything to the server
 						// Thus, if we reach this branch, kubectl is unnecessarily sending a patch.
-
 						patch, err := ioutil.ReadAll(req.Body)
 						if err != nil {
 							t.Fatal(err)

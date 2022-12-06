@@ -92,6 +92,18 @@ func MustFromJSON(jsonString string) Map {
 	return o
 }
 
+// MustFromJSONSlice creates a new slice of Map containing the data specified in the
+// jsonString. Works with jsons with a top level array
+//
+// Panics if the JSON is invalid.
+func MustFromJSONSlice(jsonString string) []Map {
+	slice, err := FromJSONSlice(jsonString)
+	if err != nil {
+		panic("objx: MustFromJSONSlice failed with error: " + err.Error())
+	}
+	return slice
+}
+
 // FromJSON creates a new Map containing the data specified in the
 // jsonString.
 //
@@ -102,45 +114,20 @@ func FromJSON(jsonString string) (Map, error) {
 	if err != nil {
 		return Nil, err
 	}
-	m.tryConvertFloat64()
 	return m, nil
 }
 
-func (m Map) tryConvertFloat64() {
-	for k, v := range m {
-		switch v.(type) {
-		case float64:
-			f := v.(float64)
-			if float64(int(f)) == f {
-				m[k] = int(f)
-			}
-		case map[string]interface{}:
-			t := New(v)
-			t.tryConvertFloat64()
-			m[k] = t
-		case []interface{}:
-			m[k] = tryConvertFloat64InSlice(v.([]interface{}))
-		}
+// FromJSONSlice creates a new slice of Map containing the data specified in the
+// jsonString. Works with jsons with a top level array
+//
+// Returns an error if the JSON is invalid.
+func FromJSONSlice(jsonString string) ([]Map, error) {
+	var slice []Map
+	err := json.Unmarshal([]byte(jsonString), &slice)
+	if err != nil {
+		return nil, err
 	}
-}
-
-func tryConvertFloat64InSlice(s []interface{}) []interface{} {
-	for k, v := range s {
-		switch v.(type) {
-		case float64:
-			f := v.(float64)
-			if float64(int(f)) == f {
-				s[k] = int(f)
-			}
-		case map[string]interface{}:
-			t := New(v)
-			t.tryConvertFloat64()
-			s[k] = t
-		case []interface{}:
-			s[k] = tryConvertFloat64InSlice(v.([]interface{}))
-		}
-	}
-	return s
+	return slice, nil
 }
 
 // FromBase64 creates a new Obj containing the data specified

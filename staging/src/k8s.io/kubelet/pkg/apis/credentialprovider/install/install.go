@@ -20,7 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubelet/pkg/apis/credentialprovider"
+	v1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1"
 	"k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
+	"k8s.io/kubelet/pkg/apis/credentialprovider/v1beta1"
 )
 
 // Install registers the credentialprovider.kubelet.k8s.io APIs into the given scheme.
@@ -28,4 +30,8 @@ func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(credentialprovider.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(v1alpha1.SchemeGroupVersion))
+	utilruntime.Must(v1beta1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(v1beta1.SchemeGroupVersion))
+	utilruntime.Must(v1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion))
 }

@@ -37,7 +37,13 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 # See: https://github.com/kubernetes/kubernetes/issues/89267
 allowed_prometheus_importers=(
   ./cluster/images/etcd-version-monitor/etcd-version-monitor.go
-  ./pkg/volume/util/operationexecutor/operation_generator_test.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/timing_histogram.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/timing_histogram_test.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/timing_histogram_vec.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/weighted_histogram.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/weighted_histogram_test.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/weighted_histogram_vec.go
+  ./staging/src/k8s.io/component-base/metrics/buckets.go
   ./staging/src/k8s.io/component-base/metrics/collector.go
   ./staging/src/k8s.io/component-base/metrics/collector_test.go
   ./staging/src/k8s.io/component-base/metrics/counter.go
@@ -60,14 +66,15 @@ allowed_prometheus_importers=(
   ./staging/src/k8s.io/component-base/metrics/testutil/metrics_test.go
   ./staging/src/k8s.io/component-base/metrics/testutil/promlint.go
   ./staging/src/k8s.io/component-base/metrics/testutil/testutil.go
+  ./staging/src/k8s.io/component-base/metrics/timing_histogram_test.go
   ./staging/src/k8s.io/component-base/metrics/value.go
   ./staging/src/k8s.io/component-base/metrics/wrappers.go
   ./test/e2e/apimachinery/flowcontrol.go
   ./test/e2e/node/pods.go
-  ./test/e2e_node/dynamic_kubelet_config_test.go
   ./test/e2e_node/resource_metrics_test.go
   ./test/instrumentation/main_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_test.go
+  ./test/integration/apiserver/flowcontrol/concurrency_util_test.go
   ./test/integration/metrics/metrics_test.go
 )
 
@@ -75,7 +82,7 @@ allowed_prometheus_importers=(
 # https://golang.org/ref/spec#Import_declarations
 #
 # If you *really* need a string literal that looks like "github.com/prometheus/.*"
-# somewhere else that actually isn't an import, you can use backticks / a raw 
+# somewhere else that actually isn't an import, you can use backticks / a raw
 # string literal instead (which cannot be used in imports, only double quotes).
 #
 # NOTE: we previously had an implementation that checked for an actual import

@@ -18,22 +18,10 @@ package metrics
 
 import (
 	"context"
-	"github.com/blang/semver"
+
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-// DefBuckets is a wrapper for prometheus.DefBuckets
-var DefBuckets = prometheus.DefBuckets
-
-// LinearBuckets is a wrapper for prometheus.LinearBuckets.
-func LinearBuckets(start, width float64, count int) []float64 {
-	return prometheus.LinearBuckets(start, width, count)
-}
-
-// ExponentialBuckets is a wrapper for prometheus.ExponentialBuckets.
-func ExponentialBuckets(start, factor float64, count int) []float64 {
-	return prometheus.ExponentialBuckets(start, factor, count)
-}
 
 // Histogram is our internal representation for our wrapping struct around prometheus
 // histograms. Summary implements both kubeCollector and ObserverMetric
@@ -51,7 +39,7 @@ func NewHistogram(opts *HistogramOpts) *Histogram {
 
 	h := &Histogram{
 		HistogramOpts: opts,
-		lazyMetric:    lazyMetric{},
+		lazyMetric:    lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	h.setPrometheusHistogram(noopMetric{})
 	h.lazyInit(h, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
@@ -100,7 +88,10 @@ type HistogramVec struct {
 
 // NewHistogramVec returns an object which satisfies kubeCollector and wraps the
 // prometheus.HistogramVec object. However, the object returned will not measure
-// anything unless the collector is first registered, since the metric is lazily instantiated.
+// anything unless the collector is first registered, since the metric is lazily instantiated,
+// and only members extracted after
+// registration will actually measure anything.
+
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 	opts.StabilityLevel.setDefaults()
 
@@ -115,7 +106,7 @@ func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,
 		originalLabels: labels,
-		lazyMetric:     lazyMetric{},
+		lazyMetric:     lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	v.lazyInit(v, fqName)
 	return v
@@ -136,13 +127,16 @@ func (v *HistogramVec) initializeDeprecatedMetric() {
 	v.initializeMetric()
 }
 
-// Default Prometheus behavior actually results in the creation of a new metric
-// if a metric with the unique label values is not found in the underlying stored metricMap.
+// Default Prometheus Vec behavior is that member extraction results in creation of a new element
+// if one with the unique label values is not found in the underlying stored metricMap.
 // This means  that if this function is called but the underlying metric is not registered
 // (which means it will never be exposed externally nor consumed), the metric will exist in memory
 // for perpetuity (i.e. throughout application lifecycle).
 //
 // For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/histogram.go#L460-L470
+//
+// In contrast, the Vec behavior in this package is that member extraction before registration
+// returns a permanent noop object.
 
 // WithLabelValues returns the ObserverMetric for the given slice of label
 // values (same order as the VariableLabels in Desc). If that combination of
@@ -199,13 +193,13 @@ func (v *HistogramVec) Reset() {
 func (v *HistogramVec) WithContext(ctx context.Context) *HistogramVecWithContext {
 	return &HistogramVecWithContext{
 		ctx:          ctx,
-		HistogramVec: *v,
+		HistogramVec: v,
 	}
 }
 
 // HistogramVecWithContext is the wrapper of HistogramVec with context.
 type HistogramVecWithContext struct {
-	HistogramVec
+	*HistogramVec
 	ctx context.Context
 }
 

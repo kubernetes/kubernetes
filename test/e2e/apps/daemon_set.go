@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -53,8 +53,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -102,7 +104,7 @@ func updateDaemonSetWithRetries(c clientset.Interface, namespace, name string, a
 // always get scheduled.  If we run other tests in parallel, this may not
 // happen.  In the future, running in parallel may work if we have an eviction
 // model which lets the DS controller kick out other pods to make room.
-// See http://issues.k8s.io/21767 for more details
+// See https://issues.k8s.io/21767 for more details
 var _ = SIGDescribe("Daemon set [Serial]", func() {
 	var f *framework.Framework
 
@@ -133,6 +135,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	f = framework.NewDefaultFramework("daemonsets")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	image := WebserverImage
 	dsName := "daemon-set"
@@ -768,7 +771,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 							return pod.DeletionTimestamp == nil && oldVersion == pod.Spec.Containers[0].Env[0].Value
 						}); pod != nil {
 							// make the /tmp/ready file read only, which will cause readiness to fail
-							if _, err := framework.RunKubectl(pod.Namespace, "exec", "-c", pod.Spec.Containers[0].Name, pod.Name, "--", "/bin/sh", "-ec", "echo 0 > /var/tmp/ready"); err != nil {
+							if _, err := e2ekubectl.RunKubectl(pod.Namespace, "exec", "-c", pod.Spec.Containers[0].Name, pod.Name, "--", "/bin/sh", "-ec", "echo 0 > /var/tmp/ready"); err != nil {
 								framework.Logf("Failed to mark pod %s as unready via exec: %v", pod.Name, err)
 							} else {
 								framework.Logf("Marked old pod %s as unready", pod.Name)

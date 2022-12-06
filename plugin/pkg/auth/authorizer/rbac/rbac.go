@@ -82,7 +82,7 @@ func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes author
 
 	// Build a detailed log of the denial.
 	// Make the whole block conditional so we don't do a lot of string-building we won't use.
-	if klog.V(5).Enabled() {
+	if klogV := klog.V(5); klogV.Enabled() {
 		var operation string
 		if requestAttributes.IsResourceRequest() {
 			b := &bytes.Buffer{}
@@ -116,7 +116,7 @@ func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes author
 			scope = "cluster-wide"
 		}
 
-		klog.Infof("RBAC: no rules authorize user %q with groups %q to %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
+		klogV.Infof("RBAC: no rules authorize user %q with groups %q to %s %s", requestAttributes.GetUser().GetName(), requestAttributes.GetUser().GetGroups(), operation, scope)
 	}
 
 	reason := ""

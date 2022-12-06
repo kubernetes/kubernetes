@@ -17,6 +17,8 @@
 package pb
 
 import (
+	"fmt"
+
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -47,6 +49,31 @@ var (
 		files:                []*FileDescription{},
 	}
 )
+
+// Merge will copy the source proto message into the destination, or error if the merge cannot be completed.
+//
+// Unlike the proto.Merge, this method will fallback to proto.Marshal/Unmarshal of the two proto messages do not
+// share the same instance of their type descriptor.
+func Merge(dstPB, srcPB proto.Message) error {
+	src, dst := srcPB.ProtoReflect(), dstPB.ProtoReflect()
+	if src.Descriptor() == dst.Descriptor() {
+		proto.Merge(dstPB, srcPB)
+		return nil
+	}
+	if src.Descriptor().FullName() != dst.Descriptor().FullName() {
+		return fmt.Errorf("pb.Merge() arguments must be the same type. got: %v, %v",
+			dst.Descriptor().FullName(), src.Descriptor().FullName())
+	}
+	bytes, err := proto.Marshal(srcPB)
+	if err != nil {
+		return fmt.Errorf("pb.Merge(dstPB, srcPB) failed to marshal source proto: %v", err)
+	}
+	err = proto.Unmarshal(bytes, dstPB)
+	if err != nil {
+		return fmt.Errorf("pb.Merge(dstPB, srcPB) failed to unmarshal to dest proto: %v", err)
+	}
+	return nil
+}
 
 // NewDb creates a new `pb.Db` with an empty type name to file description map.
 func NewDb() *Db {

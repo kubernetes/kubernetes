@@ -49,6 +49,12 @@ func RunNodeDrain(drainer *Helper, nodeName string) error {
 
 // RunCordonOrUncordon demonstrates the canonical way to cordon or uncordon a Node
 func RunCordonOrUncordon(drainer *Helper, node *corev1.Node, desired bool) error {
+	if drainer.Ctx == nil {
+		return fmt.Errorf("RunCordonOrUncordon error: drainer.Ctx can't be nil")
+	}
+	if drainer.Client == nil {
+		return fmt.Errorf("RunCordonOrUncordon error: drainer.Client can't be nil")
+	}
 	// TODO(justinsb): Ensure we have adequate e2e coverage of this function in library consumers
 	c := NewCordonHelper(node)
 
@@ -60,9 +66,9 @@ func RunCordonOrUncordon(drainer *Helper, node *corev1.Node, desired bool) error
 	err, patchErr := c.PatchOrReplaceWithContext(drainer.Ctx, drainer.Client, false)
 	if err != nil {
 		if patchErr != nil {
-			return fmt.Errorf("cordon error: %s; merge patch error: %s", err.Error(), patchErr.Error())
+			return fmt.Errorf("cordon error: %s; merge patch error: %w", err.Error(), patchErr)
 		}
-		return fmt.Errorf("cordon error: %s", err.Error())
+		return fmt.Errorf("cordon error: %w", err)
 	}
 
 	return nil

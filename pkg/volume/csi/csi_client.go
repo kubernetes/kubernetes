@@ -28,6 +28,7 @@ import (
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -113,17 +114,14 @@ type csiDriverClient struct {
 }
 
 type csiResizeOptions struct {
-	volumeID string
-	// volumePath is path where volume is available. It could be:
-	//   - path where node is staged if NodeExpandVolume is called after NodeStageVolume
-	//   - path where volume is published if NodeExpandVolume is called after NodePublishVolume
-	// DEPRECATION NOTICE: in future NodeExpandVolume will be always called after NodePublish
+	volumeID          string
 	volumePath        string
 	stagingTargetPath string
 	fsType            string
 	accessMode        api.PersistentVolumeAccessMode
 	newSize           resource.Quantity
 	mountOptions      []string
+	secrets           map[string]string
 }
 
 var _ csiClient = &csiDriverClient{}
@@ -137,7 +135,7 @@ type nodeV1ClientCreator func(addr csiAddr, metricsManager *MetricsManager) (
 type nodeV1AccessModeMapper func(am api.PersistentVolumeAccessMode) csipbv1.VolumeCapability_AccessMode_Mode
 
 // newV1NodeClient creates a new NodeClient with the internally used gRPC
-// connection set up. It also returns a closer which must to be called to close
+// connection set up. It also returns a closer which must be called to close
 // the gRPC connection when the NodeClient is not used anymore.
 // This is the default implementation for the nodeV1ClientCreator, used in
 // newCsiDriverClient.
@@ -324,6 +322,7 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 				Mode: accessModeMapper(opts.accessMode),
 			},
 		},
+		Secrets: opts.secrets,
 	}
 
 	// not all CSI drivers support NodeStageUnstage and hence the StagingTargetPath
@@ -536,7 +535,8 @@ func newGrpcConn(addr csiAddr, metricsManager *MetricsManager) (*grpc.ClientConn
 
 	return grpc.Dial(
 		string(addr),
-		grpc.WithInsecure(),
+		grpc.WithAuthority("localhost"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),

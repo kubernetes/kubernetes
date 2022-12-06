@@ -796,7 +796,7 @@ func GetPackageExports(ctx context.Context, wrapped func(PackageExport), searchP
 	return getCandidatePkgs(ctx, callback, filename, filePkg, env)
 }
 
-var RequiredGoEnvVars = []string{"GO111MODULE", "GOFLAGS", "GOINSECURE", "GOMOD", "GOMODCACHE", "GONOPROXY", "GONOSUMDB", "GOPATH", "GOPROXY", "GOROOT", "GOSUMDB"}
+var RequiredGoEnvVars = []string{"GO111MODULE", "GOFLAGS", "GOINSECURE", "GOMOD", "GOMODCACHE", "GONOPROXY", "GONOSUMDB", "GOPATH", "GOPROXY", "GOROOT", "GOSUMDB", "GOWORK"}
 
 // ProcessEnv contains environment variables and settings that affect the use of
 // the go command, the go/build package, etc.
@@ -806,6 +806,11 @@ type ProcessEnv struct {
 	BuildFlags []string
 	ModFlag    string
 	ModFile    string
+
+	// SkipPathInScan returns true if the path should be skipped from scans of
+	// the RootCurrentModule root type. The function argument is a clean,
+	// absolute path.
+	SkipPathInScan func(string) bool
 
 	// Env overrides the OS environment, and can be used to specify
 	// GOPROXY, GO111MODULE, etc. PATH cannot be set here, because
@@ -906,7 +911,7 @@ func (e *ProcessEnv) GetResolver() (Resolver, error) {
 	if err := e.init(); err != nil {
 		return nil, err
 	}
-	if len(e.Env["GOMOD"]) == 0 {
+	if len(e.Env["GOMOD"]) == 0 && len(e.Env["GOWORK"]) == 0 {
 		e.resolver = newGopathResolver(e)
 		return e.resolver, nil
 	}
@@ -1367,9 +1372,9 @@ func (r *gopathResolver) scan(ctx context.Context, callback *scanCallback) error
 		return err
 	}
 	var roots []gopathwalk.Root
-	roots = append(roots, gopathwalk.Root{filepath.Join(goenv["GOROOT"], "src"), gopathwalk.RootGOROOT})
+	roots = append(roots, gopathwalk.Root{Path: filepath.Join(goenv["GOROOT"], "src"), Type: gopathwalk.RootGOROOT})
 	for _, p := range filepath.SplitList(goenv["GOPATH"]) {
-		roots = append(roots, gopathwalk.Root{filepath.Join(p, "src"), gopathwalk.RootGOPATH})
+		roots = append(roots, gopathwalk.Root{Path: filepath.Join(p, "src"), Type: gopathwalk.RootGOPATH})
 	}
 	// The callback is not necessarily safe to use in the goroutine below. Process roots eagerly.
 	roots = filterRoots(roots, callback.rootFound)

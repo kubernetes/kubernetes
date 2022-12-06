@@ -24,6 +24,7 @@ package v1beta1
 import (
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	v1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -54,7 +55,7 @@ func SetObjectDefaults_MutatingWebhookConfiguration(in *v1beta1.MutatingWebhookC
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
-			SetDefaults_Rule(&b.Rule)
+			v1.SetDefaults_Rule(&b.Rule)
 		}
 	}
 }
@@ -75,7 +76,7 @@ func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1beta1.ValidatingWebh
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
-			SetDefaults_Rule(&b.Rule)
+			v1.SetDefaults_Rule(&b.Rule)
 		}
 	}
 }

@@ -30,7 +30,7 @@ import (
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // JobUpgradeTest is a test harness for batch Jobs.
@@ -53,7 +53,7 @@ func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Ensuring active pods == parallelism")
-	err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, t.namespace, job.Name, 2)
+	err = e2ejob.WaitForJobPodsRunning(f.ClientSet, t.namespace, job.Name, 2)
 	framework.ExpectNoError(err)
 }
 

@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
-	clientset "k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes" // import known versions
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
@@ -46,9 +46,7 @@ import (
 	"k8s.io/klog/v2"
 	c "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
-
-	// import known versions
-	_ "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 )
 
 // ResourceResyncTime defines the resync period of the garbage collector's informers.
@@ -76,6 +74,9 @@ type GarbageCollector struct {
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *ReferenceCache
 
+	kubeClient       clientset.Interface
+	eventBroadcaster record.EventBroadcaster
+
 	workerLock sync.RWMutex
 }
 
@@ -93,8 +94,6 @@ func NewGarbageCollector(
 ) (*GarbageCollector, error) {
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
 
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
@@ -106,6 +105,8 @@ func NewGarbageCollector(
 		attemptToDelete:  attemptToDelete,
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
+		kubeClient:       kubeClient,
+		eventBroadcaster: eventBroadcaster,
 	}
 	gc.dependencyGraphBuilder = &GraphBuilder{
 		eventRecorder:    eventRecorder,
@@ -122,6 +123,8 @@ func NewGarbageCollector(
 		sharedInformers:  sharedInformers,
 		ignoredResources: ignoredResources,
 	}
+
+	metrics.Register()
 
 	return gc, nil
 }
@@ -142,6 +145,11 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 	defer gc.attemptToDelete.ShutDown()
 	defer gc.attemptToOrphan.ShutDown()
 	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
+
+	// Start events processing pipeline.
+	gc.eventBroadcaster.StartStructuredLogging(0)
+	gc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: gc.kubeClient.CoreV1().Events("")})
+	defer gc.eventBroadcaster.Shutdown()
 
 	klog.Infof("Starting garbage collector controller")
 	defer klog.Infof("Shutting down garbage collector controller")
@@ -179,6 +187,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		// This can occur if there is an internal error in GetDeletableResources.
 		if len(newResources) == 0 {
 			klog.V(2).Infof("no resources reported by discovery, skipping garbage collector sync")
+			metrics.GarbageCollectorResourcesSyncError.Inc()
 			return
 		}
 
@@ -203,6 +212,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 				newResources = GetDeletableResources(discoveryClient)
 				if len(newResources) == 0 {
 					klog.V(2).Infof("no resources reported by discovery (attempt %d)", attempt)
+					metrics.GarbageCollectorResourcesSyncError.Inc()
 					return false, nil
 				}
 			}
@@ -226,6 +236,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			// attempt.
 			if err := gc.resyncMonitors(newResources); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors (attempt %d): %v", attempt, err))
+				metrics.GarbageCollectorResourcesSyncError.Inc()
 				return false, nil
 			}
 			klog.V(4).Infof("resynced monitors")
@@ -237,6 +248,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			// note that workers stay paused until we successfully resync.
 			if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
 				utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync (attempt %d)", attempt))
+				metrics.GarbageCollectorResourcesSyncError.Inc()
 				return false, nil
 			}
 

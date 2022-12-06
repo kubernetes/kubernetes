@@ -17,23 +17,32 @@ package common
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // Errors type which contains a list of errors observed during parsing.
 type Errors struct {
-	errors []Error
-	source Source
+	errors            []Error
+	source            Source
+	numErrors         int
+	maxErrorsToReport int
 }
 
 // NewErrors creates a new instance of the Errors type.
 func NewErrors(source Source) *Errors {
 	return &Errors{
-		errors: []Error{},
-		source: source}
+		errors:            []Error{},
+		source:            source,
+		maxErrorsToReport: 100,
+	}
 }
 
 // ReportError records an error at a source location.
 func (e *Errors) ReportError(l Location, format string, args ...interface{}) {
+	e.numErrors++
+	if e.numErrors > e.maxErrorsToReport {
+		return
+	}
 	err := Error{
 		Location: l,
 		Message:  fmt.Sprintf(format, args...),
@@ -46,18 +55,28 @@ func (e *Errors) GetErrors() []Error {
 	return e.errors[:]
 }
 
-// Append takes an Errors object as input creates a new Errors object with the current and input
-// errors.
+// Append creates a new Errors object with the current and input errors.
 func (e *Errors) Append(errs []Error) *Errors {
 	return &Errors{
-		errors: append(e.errors, errs...),
-		source: e.source,
+		errors:            append(e.errors, errs...),
+		source:            e.source,
+		numErrors:         e.numErrors + len(errs),
+		maxErrorsToReport: e.maxErrorsToReport,
 	}
 }
 
 // ToDisplayString returns the error set to a newline delimited string.
 func (e *Errors) ToDisplayString() string {
-	var result = ""
+	errorsInString := e.maxErrorsToReport
+	if e.numErrors > e.maxErrorsToReport {
+		// add one more error to indicate the number of errors truncated.
+		errorsInString++
+	} else {
+		// otherwise the error set will just contain the number of errors.
+		errorsInString = e.numErrors
+	}
+
+	result := make([]string, errorsInString)
 	sort.SliceStable(e.errors, func(i, j int) bool {
 		ei := e.errors[i].Location
 		ej := e.errors[j].Location
@@ -65,10 +84,14 @@ func (e *Errors) ToDisplayString() string {
 			(ei.Line() == ej.Line() && ei.Column() < ej.Column())
 	})
 	for i, err := range e.errors {
-		if i >= 1 {
-			result += "\n"
+		// This can happen during the append of two errors objects
+		if i >= e.maxErrorsToReport {
+			break
 		}
-		result += err.ToDisplayString(e.source)
+		result[i] = err.ToDisplayString(e.source)
 	}
-	return result
+	if e.numErrors > e.maxErrorsToReport {
+		result[e.maxErrorsToReport] = fmt.Sprintf("%d more errors were truncated", e.numErrors-e.maxErrorsToReport)
+	}
+	return strings.Join(result, "\n")
 }

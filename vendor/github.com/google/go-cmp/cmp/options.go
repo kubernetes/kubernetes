@@ -33,6 +33,7 @@ type Option interface {
 }
 
 // applicableOption represents the following types:
+//
 //	Fundamental: ignore | validator | *comparer | *transformer
 //	Grouping:    Options
 type applicableOption interface {
@@ -43,6 +44,7 @@ type applicableOption interface {
 }
 
 // coreOption represents the following types:
+//
 //	Fundamental: ignore | validator | *comparer | *transformer
 //	Filters:     *pathFilter | *valuesFilter
 type coreOption interface {
@@ -336,9 +338,9 @@ func (tr transformer) String() string {
 // both implement T.
 //
 // The equality function must be:
-//	• Symmetric: equal(x, y) == equal(y, x)
-//	• Deterministic: equal(x, y) == equal(x, y)
-//	• Pure: equal(x, y) does not modify x or y
+//   - Symmetric: equal(x, y) == equal(y, x)
+//   - Deterministic: equal(x, y) == equal(x, y)
+//   - Pure: equal(x, y) does not modify x or y
 func Comparer(f interface{}) Option {
 	v := reflect.ValueOf(f)
 	if !function.IsType(v.Type(), function.Equal) || v.IsNil() {
@@ -430,7 +432,7 @@ func AllowUnexported(types ...interface{}) Option {
 }
 
 // Result represents the comparison result for a single node and
-// is provided by cmp when calling Result (see Reporter).
+// is provided by cmp when calling Report (see Reporter).
 type Result struct {
 	_     [0]func() // Make Result incomparable
 	flags resultFlags

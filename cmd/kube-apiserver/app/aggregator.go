@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +37,6 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
-	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
@@ -77,24 +77,17 @@ func createAggregatorConfig(
 		genericConfig.BuildHandlerChainFunc = genericapiserver.BuildHandlerChainWithStorageVersionPrecondition
 	}
 
-	// override genericConfig.AdmissionControl with kube-aggregator's scheme,
-	// because aggregator apiserver should use its own scheme to convert its own resources.
-	err := commandOptions.Admission.ApplyTo(
-		&genericConfig,
-		externalInformers,
-		genericConfig.LoopbackClientConfig,
-		utilfeature.DefaultFeatureGate,
-		pluginInitializers...)
-	if err != nil {
-		return nil, err
-	}
-
 	// copy the etcd options so we don't mutate originals.
+	// we assume that the etcd options have been completed already.  avoid messing with anything outside
+	// of changes to StorageConfig as that may lead to unexpected behavior when the options are applied.
 	etcdOptions := *commandOptions.Etcd
 	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIListChunking)
 	etcdOptions.StorageConfig.Codec = aggregatorscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion)
 	etcdOptions.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(v1.SchemeGroupVersion, schema.GroupKind{Group: v1beta1.GroupName})
-	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
+	etcdOptions.SkipHealthEndpoints = true // avoid double wiring of health checks
+	if err := etcdOptions.ApplyTo(&genericConfig); err != nil {
+		return nil, err
+	}
 
 	// override MergedResourceConfig with aggregator defaults and registry
 	if err := commandOptions.APIEnablement.ApplyTo(
@@ -110,10 +103,11 @@ func createAggregatorConfig(
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
-			ProxyClientCertFile: commandOptions.ProxyClientCertFile,
-			ProxyClientKeyFile:  commandOptions.ProxyClientKeyFile,
-			ServiceResolver:     serviceResolver,
-			ProxyTransport:      proxyTransport,
+			ProxyClientCertFile:       commandOptions.ProxyClientCertFile,
+			ProxyClientKeyFile:        commandOptions.ProxyClientKeyFile,
+			ServiceResolver:           serviceResolver,
+			ProxyTransport:            proxyTransport,
+			RejectForwardingRedirects: commandOptions.AggregatorRejectForwardingRedirects,
 		},
 	}
 
@@ -140,13 +134,20 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		apiExtensionInformers.Apiextensions().V1().CustomResourceDefinitions(),
 		autoRegistrationController)
 
+	// Imbue all builtin group-priorities onto the aggregated discovery
+	if aggregatorConfig.GenericConfig.AggregatedDiscoveryGroupManager != nil {
+		for gv, entry := range apiVersionPriorities {
+			aggregatorConfig.GenericConfig.AggregatedDiscoveryGroupManager.SetGroupVersionPriority(metav1.GroupVersion(gv), int(entry.group), int(entry.version))
+		}
+	}
+
 	err = aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
 		go crdRegistrationController.Run(5, context.StopCh)
 		go func() {
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
 			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.
 			// we only need to do this if CRDs are enabled on this server.  We can't use discovery because we are the source for discovery.
-			if aggregatorConfig.GenericConfig.MergedResourceConfig.AnyVersionForGroupEnabled("apiextensions.k8s.io") {
+			if aggregatorConfig.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions")) {
 				crdRegistrationController.WaitForInitialSync()
 			}
 			autoRegistrationController.Run(5, context.StopCh)
@@ -249,6 +250,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "events.k8s.io", Version: "v1"}:                      {group: 17750, version: 15},
 	{Group: "events.k8s.io", Version: "v1beta1"}:                 {group: 17750, version: 5},
 	{Group: "authentication.k8s.io", Version: "v1"}:              {group: 17700, version: 15},
+	{Group: "authentication.k8s.io", Version: "v1alpha1"}:        {group: 17700, version: 1},
 	{Group: "authorization.k8s.io", Version: "v1"}:               {group: 17600, version: 15},
 	{Group: "autoscaling", Version: "v1"}:                        {group: 17500, version: 15},
 	{Group: "autoscaling", Version: "v2"}:                        {group: 17500, version: 30},
@@ -259,6 +261,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "batch", Version: "v2alpha1"}:                        {group: 17400, version: 9},
 	{Group: "certificates.k8s.io", Version: "v1"}:                {group: 17300, version: 15},
 	{Group: "networking.k8s.io", Version: "v1"}:                  {group: 17200, version: 15},
+	{Group: "networking.k8s.io", Version: "v1alpha1"}:            {group: 17200, version: 1},
 	{Group: "policy", Version: "v1"}:                             {group: 17100, version: 15},
 	{Group: "policy", Version: "v1beta1"}:                        {group: 17100, version: 9},
 	{Group: "rbac.authorization.k8s.io", Version: "v1"}:          {group: 17000, version: 15},
@@ -267,6 +270,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "storage.k8s.io", Version: "v1alpha1"}:               {group: 16800, version: 1},
 	{Group: "apiextensions.k8s.io", Version: "v1"}:               {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1"}:       {group: 16700, version: 15},
+	{Group: "admissionregistration.k8s.io", Version: "v1alpha1"}: {group: 16700, version: 9},
 	{Group: "scheduling.k8s.io", Version: "v1"}:                  {group: 16600, version: 15},
 	{Group: "coordination.k8s.io", Version: "v1"}:                {group: 16500, version: 15},
 	{Group: "node.k8s.io", Version: "v1"}:                        {group: 16300, version: 15},
@@ -274,10 +278,12 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "node.k8s.io", Version: "v1beta1"}:                   {group: 16300, version: 9},
 	{Group: "discovery.k8s.io", Version: "v1"}:                   {group: 16200, version: 15},
 	{Group: "discovery.k8s.io", Version: "v1beta1"}:              {group: 16200, version: 12},
+	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"}:  {group: 16100, version: 18},
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"}:  {group: 16100, version: 15},
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"}:  {group: 16100, version: 12},
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"}: {group: 16100, version: 9},
 	{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"}:    {group: 16000, version: 9},
+	{Group: "resource.k8s.io", Version: "v1alpha1"}:              {group: 15900, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

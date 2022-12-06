@@ -20,19 +20,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"reflect"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"golang.org/x/oauth2/google"
 )
 
@@ -50,6 +51,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var kubeClient clientset.Interface
 
 	ginkgo.It("should run Stackdriver Metadata Agent [Feature:StackdriverMetadataAgent]", func() {
@@ -89,7 +91,7 @@ func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
 	if resp.StatusCode != 200 {
 		framework.Failf("Stackdriver Metadata API returned error status: %s", resp.Status)
 	}
-	metadataAPIResponse, err := ioutil.ReadAll(resp.Body)
+	metadataAPIResponse, err := io.ReadAll(resp.Body)
 	if err != nil {
 		framework.Failf("Failed to read response from Stackdriver Metadata API: %s", err)
 	}

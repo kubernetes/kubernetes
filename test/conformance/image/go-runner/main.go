@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -59,6 +58,13 @@ func configureAndRunWithEnv(env Getenver) error {
 	// Print the output to stdout and a logfile which will be returned
 	// as part of the results tarball.
 	logFilePath := filepath.Join(resultsDir, logFileName)
+	// ensure the resultsDir actually exists
+	if _, err := os.Stat(resultsDir); os.IsNotExist(err) {
+		log.Printf("The resultsDir %v does not exist, will create it", resultsDir)
+		if mkdirErr := os.Mkdir(resultsDir, 0755); mkdirErr != nil {
+			return fmt.Errorf("failed to create log directory %v: %w", resultsDir, mkdirErr)
+		}
+	}
 	logFile, err := os.Create(logFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to create log file %v: %w", logFilePath, err)
@@ -123,7 +129,7 @@ func saveResults(resultsDir string) error {
 		return fmt.Errorf("failed to find absolute path for %v: %w", resultsTarball, err)
 	}
 
-	err = ioutil.WriteFile(doneFile, []byte(resultsTarball), os.FileMode(0777))
+	err = os.WriteFile(doneFile, []byte(resultsTarball), os.FileMode(0777))
 	if err != nil {
 		return fmt.Errorf("writing donefile: %w", err)
 	}

@@ -29,8 +29,9 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
@@ -45,6 +46,7 @@ func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 
 var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	f := framework.NewDefaultFramework("resize-nodes")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var systemPodsNo int32
 	var c clientset.Interface
 	var ns string

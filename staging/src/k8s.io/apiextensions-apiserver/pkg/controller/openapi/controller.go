@@ -201,8 +201,10 @@ func buildVersionSpecs(crd *apiextensionsv1.CustomResourceDefinition, oldSpecs m
 		if !v.Served {
 			continue
 		}
-		// Defaults are not pruned here, but before being served.
 		spec, err := builder.BuildOpenAPIV2(crd, v.Name, builder.Options{V2: true})
+		// Defaults must be pruned here for CRDs to cleanly merge with the static
+		// spec that already has defaults pruned
+		spec.Definitions = handler.PruneDefaults(spec.Definitions)
 		if err != nil {
 			return nil, false, err
 		}

@@ -257,6 +257,7 @@ func TestPodSecurityContextMutator(t *testing.T) {
 func TestContainerSecurityContextAccessor(t *testing.T) {
 	privileged := true
 	runAsUser := int64(1)
+	runAsGroup := int64(1)
 	runAsNonRoot := true
 	readOnlyRootFilesystem := true
 	allowPrivilegeEscalation := true
@@ -268,6 +269,7 @@ func TestContainerSecurityContextAccessor(t *testing.T) {
 		{Privileged: &privileged},
 		{SELinuxOptions: &api.SELinuxOptions{User: "bob"}},
 		{RunAsUser: &runAsUser},
+		{RunAsGroup: &runAsGroup},
 		{RunAsNonRoot: &runAsNonRoot},
 		{ReadOnlyRootFilesystem: &readOnlyRootFilesystem},
 		{AllowPrivilegeEscalation: &allowPrivilegeEscalation},
@@ -292,6 +294,9 @@ func TestContainerSecurityContextAccessor(t *testing.T) {
 		}
 		if v := a.RunAsUser(); !reflect.DeepEqual(expected.RunAsUser, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsUser, v)
+		}
+		if v := a.RunAsGroup(); !reflect.DeepEqual(expected.RunAsGroup, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsGroup, v)
 		}
 		if v := a.SELinuxOptions(); !reflect.DeepEqual(expected.SELinuxOptions, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.SELinuxOptions, v)
@@ -345,6 +350,7 @@ func TestContainerSecurityContextMutator(t *testing.T) {
 			m.SetReadOnlyRootFilesystem(m.ReadOnlyRootFilesystem())
 			m.SetRunAsNonRoot(m.RunAsNonRoot())
 			m.SetRunAsUser(m.RunAsUser())
+			m.SetRunAsGroup(m.RunAsGroup())
 			m.SetSELinuxOptions(m.SELinuxOptions())
 			if !reflect.DeepEqual(sc, originalSC) {
 				t.Errorf("%s: unexpected mutation: %#v, %#v", k, sc, originalSC)
@@ -425,6 +431,19 @@ func TestContainerSecurityContextMutator(t *testing.T) {
 			i := int64(1123)
 			modifiedSC.RunAsUser = &i
 			m.SetRunAsUser(&i)
+			if !reflect.DeepEqual(m.ContainerSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.ContainerSecurityContext()))
+				continue
+			}
+		}
+
+		// RunAsGroup
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewContainerSecurityContextMutator(tc.newSC())
+			i := int64(1123)
+			modifiedSC.RunAsGroup = &i
+			m.SetRunAsGroup(&i)
 			if !reflect.DeepEqual(m.ContainerSecurityContext(), modifiedSC) {
 				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.ContainerSecurityContext()))
 				continue
@@ -567,6 +586,9 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 		if v := a.RunAsUser(); !reflect.DeepEqual(expected.RunAsUser, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsUser, v)
 		}
+		if v := a.RunAsGroup(); !reflect.DeepEqual(expected.RunAsGroup, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.RunAsGroup, v)
+		}
 		if v := a.SELinuxOptions(); !reflect.DeepEqual(expected.SELinuxOptions, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.SELinuxOptions, v)
 		}
@@ -643,6 +665,7 @@ func TestEffectiveContainerSecurityContextMutator(t *testing.T) {
 			m.SetReadOnlyRootFilesystem(m.ReadOnlyRootFilesystem())
 			m.SetRunAsNonRoot(m.RunAsNonRoot())
 			m.SetRunAsUser(m.RunAsUser())
+			m.SetRunAsGroup(m.RunAsGroup())
 			m.SetSELinuxOptions(m.SELinuxOptions())
 			if !reflect.DeepEqual(podSC, originalPodSC) {
 				t.Errorf("%s: unexpected mutation: %#v, %#v", k, podSC, originalPodSC)
@@ -744,6 +767,22 @@ func TestEffectiveContainerSecurityContextMutator(t *testing.T) {
 			i := int64(1123)
 			modifiedSC.RunAsUser = &i
 			m.SetRunAsUser(&i)
+			if !reflect.DeepEqual(m.ContainerSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.ContainerSecurityContext()))
+				continue
+			}
+		}
+
+		// RunAsGroup
+		{
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewEffectiveContainerSecurityContextMutator(
+				NewPodSecurityContextAccessor(tc.newPodSC()),
+				NewContainerSecurityContextMutator(tc.newSC()),
+			)
+			i := int64(1123)
+			modifiedSC.RunAsGroup = &i
+			m.SetRunAsGroup(&i)
 			if !reflect.DeepEqual(m.ContainerSecurityContext(), modifiedSC) {
 				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.ContainerSecurityContext()))
 				continue

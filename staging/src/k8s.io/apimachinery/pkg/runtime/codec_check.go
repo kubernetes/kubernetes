@@ -30,7 +30,7 @@ import (
 // TODO: verify that the correct external version is chosen on encode...
 func CheckCodec(c Codec, internalType Object, externalTypes ...schema.GroupVersionKind) error {
 	if _, err := Encode(c, internalType); err != nil {
-		return fmt.Errorf("Internal type not encodable: %v", err)
+		return fmt.Errorf("internal type not encodable: %v", err)
 	}
 	for _, et := range externalTypes {
 		typeMeta := TypeMeta{

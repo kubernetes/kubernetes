@@ -54,7 +54,7 @@ const (
 	testNodeMonitorGracePeriod = 40 * time.Second
 	testNodeStartupGracePeriod = 60 * time.Second
 	testNodeMonitorPeriod      = 5 * time.Second
-	testRateLimiterQPS         = float32(10000)
+	testRateLimiterQPS         = float32(100000)
 	testLargeClusterThreshold  = 20
 	testUnhealthyThreshold     = float32(0.55)
 )

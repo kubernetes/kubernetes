@@ -40,7 +40,7 @@ type noRestraint struct{}
 
 type noRestraintRequest struct{}
 
-func (noRestraintFactory) BeginConstruction(fq.QueuingConfig, metrics.RatioedChangeObserverPair, metrics.RatioedChangeObserver) (fq.QueueSetCompleter, error) {
+func (noRestraintFactory) BeginConstruction(fq.QueuingConfig, metrics.RatioedGaugePair, metrics.RatioedGauge, metrics.Gauge) (fq.QueueSetCompleter, error) {
 	return noRestraintCompleter{}, nil
 }
 
@@ -58,9 +58,6 @@ func (noRestraint) IsIdle() bool {
 
 func (noRestraint) StartRequest(ctx context.Context, workEstimate *fcrequest.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) (fq.Request, bool) {
 	return noRestraintRequest{}, false
-}
-
-func (noRestraint) UpdateObservations() {
 }
 
 func (noRestraint) Dump(bool) debug.QueueSetDump {

@@ -53,7 +53,7 @@ Sources:
   FieldRE: "KeyData"
 
 # The following fields are tagged in #95600
-- PackageRE: "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+- PackageRE: "k8s.io/cri-api/pkg/apis/runtime/v1"
   TypeRE: "AuthConfig"
   FieldRE: "Password|IdentityToken|RegistryToken"
 
@@ -128,6 +128,11 @@ Sources:
 - PackageRE: "k8s.io/kubernetes/pkg/controller/certificates/authority"
   TypeRE: "CertificateAuthority"
   FieldRE: "RawKey"
+
+# The following fields are not yet tagged
+- PackageRE: "k8s.io/api/core/v1"
+  TypeRE: "Secret"
+  FieldRE: "Data|StringData"
 
 # Sinks are functions that should not be called with source or source-tainted arguments.
 # This configuration should capture all log unfiltered log calls.

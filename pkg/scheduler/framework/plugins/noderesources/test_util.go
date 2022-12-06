@@ -22,10 +22,21 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 var (
 	ignoreBadValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+	defaultResources     = []config.ResourceSpec{
+		{Name: string(v1.ResourceCPU), Weight: 1},
+		{Name: string(v1.ResourceMemory), Weight: 1},
+	}
+	extendedRes         = "abc.com/xyz"
+	extendedResourceSet = []config.ResourceSpec{
+		{Name: string(v1.ResourceCPU), Weight: 1},
+		{Name: string(v1.ResourceMemory), Weight: 1},
+		{Name: extendedRes, Weight: 1},
+	}
 )
 
 func makeNode(node string, milliCPU, memory int64, extendedResource map[string]int64) *v1.Node {

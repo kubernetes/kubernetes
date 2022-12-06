@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -30,7 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
-	utiltrace "k8s.io/utils/trace"
+	"k8s.io/component-base/tracing"
 )
 
 const (
@@ -63,8 +65,12 @@ func retryOnError(err error) bool {
 }
 
 func loadWebhook(configFile string, groupVersion schema.GroupVersion, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*webhook.GenericWebhook, error) {
-	w, err := webhook.NewGenericWebhook(audit.Scheme, audit.Codecs, configFile,
-		[]schema.GroupVersion{groupVersion}, retryBackoff, customDial)
+	clientConfig, err := webhook.LoadKubeconfig(configFile, customDial)
+	if err != nil {
+		return nil, err
+	}
+	w, err := webhook.NewGenericWebhook(audit.Scheme, audit.Codecs, clientConfig,
+		[]schema.GroupVersion{groupVersion}, retryBackoff)
 	if err != nil {
 		return nil, err
 	}
@@ -122,15 +128,16 @@ func (b *backend) processEvents(ev ...*auditinternal.Event) error {
 		list.Items = append(list.Items, *e)
 	}
 	return b.w.WithExponentialBackoff(context.Background(), func() rest.Result {
-		trace := utiltrace.New("Call Audit Events webhook",
-			utiltrace.Field{"name", b.name},
-			utiltrace.Field{"event-count", len(list.Items)})
+		ctx, span := tracing.Start(context.Background(), "Call Audit Events webhook",
+			attribute.String("name", b.name),
+			attribute.Int("event-count", len(list.Items)),
+		)
 		// Only log audit webhook traces that exceed a 25ms per object limit plus a 50ms
 		// request overhead allowance. The high per object limit used here is primarily to
 		// allow enough time for the serialization/deserialization of audit events, which
 		// contain nested request and response objects plus additional event fields.
-		defer trace.LogIfLong(time.Duration(50+25*len(list.Items)) * time.Millisecond)
-		return b.w.RestClient.Post().Body(&list).Do(context.TODO())
+		defer span.End(time.Duration(50+25*len(list.Items)) * time.Millisecond)
+		return b.w.RestClient.Post().Body(&list).Do(ctx)
 	}).Error()
 }
 

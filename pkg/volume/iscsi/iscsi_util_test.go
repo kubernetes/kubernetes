@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -66,6 +69,11 @@ func TestExtractPortalAndIqn(t *testing.T) {
 	devicePath = "127.0.0.1:3260-eui.02004567A425678D-lun-0"
 	portal, iqn, err = extractPortalAndIqn(devicePath)
 	if err != nil || portal != "127.0.0.1:3260" || iqn != "eui.02004567A425678D" {
+		t.Errorf("extractPortalAndIqn: got %v %s %s", err, portal, iqn)
+	}
+	devicePath = "[2001:db8:0:f101::1]:3260-iqn.2014-12.com.example:test.tgt00-lun-0"
+	portal, iqn, err = extractPortalAndIqn(devicePath)
+	if err != nil || portal != "[2001:db8:0:f101::1]:3260" || iqn != "iqn.2014-12.com.example:test.tgt00" {
 		t.Errorf("extractPortalAndIqn: got %v %s %s", err, portal, iqn)
 	}
 }

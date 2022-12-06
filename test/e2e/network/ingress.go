@@ -42,8 +42,9 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -58,6 +59,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		conformanceTests []e2eingress.ConformanceTests
 	)
 	f := framework.NewDefaultFramework("ingress")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		jig = e2eingress.NewIngressTestJig(f.ClientSet)
@@ -100,7 +102,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific cleanup
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				e2eingress.DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
@@ -145,7 +147,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific cleanup
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				e2eingress.DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
@@ -473,63 +475,6 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			detectNegAnnotation(f, jig, gceController, ns, name, 0)
 		})
 	})
-
-	// Time: borderline 5m, slow by design
-	ginkgo.Describe("[Slow] Nginx", func() {
-		var nginxController *e2eingress.NginxIngressController
-
-		ginkgo.BeforeEach(func() {
-			// Skip until nginx-ingress controller works against kubernetes 1.22+
-			// Those versions no longer server ingress v1beta1
-			// xref: https://github.com/kubernetes/ingress-nginx/issues/7145
-			e2eskipper.Skipf("Skipping because nginx-controller requires ingress/v1beta1 API")
-
-			e2eskipper.SkipUnlessProviderIs("gce", "gke")
-			ginkgo.By("Initializing nginx controller")
-			jig.Class = "nginx"
-			nginxController = &e2eingress.NginxIngressController{Ns: ns, Client: jig.Client}
-
-			// TODO: This test may fail on other platforms. We can simply skip it
-			// but we want to allow easy testing where a user might've hand
-			// configured firewalls.
-			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(gce.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
-			} else {
-				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
-			}
-
-			nginxController.Init()
-		})
-
-		ginkgo.AfterEach(func() {
-			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(gce.GcloudComputeResourceDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
-			}
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				e2eingress.DescribeIng(ns)
-			}
-			defer nginxController.TearDown()
-			if jig.Ingress == nil {
-				ginkgo.By("No ingress created, no cleanup necessary")
-				return
-			}
-			ginkgo.By("Deleting ingress")
-			jig.TryDeleteIngress()
-		})
-
-		ginkgo.It("should conform to Ingress spec", func() {
-			// Poll more frequently to reduce e2e completion time.
-			// This test runs in presubmit.
-			jig.PollInterval = 5 * time.Second
-			conformanceTests = e2eingress.CreateIngressComformanceTests(jig, ns, map[string]string{})
-			for _, t := range conformanceTests {
-				ginkgo.By(t.EntryLog)
-				t.Execute()
-				ginkgo.By(t.ExitLog)
-				jig.WaitForIngress(false)
-			}
-		})
-	})
 })
 
 func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
@@ -592,6 +537,7 @@ func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceCon
 
 var _ = common.SIGDescribe("Ingress API", func() {
 	f := framework.NewDefaultFramework("ingress")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.19
 		Testname: Ingress API
@@ -650,8 +596,16 @@ var _ = common.SIGDescribe("Ingress API", func() {
 					},
 				},
 			},
-			Status: networkingv1.IngressStatus{LoadBalancer: v1.LoadBalancerStatus{}},
+			Status: networkingv1.IngressStatus{LoadBalancer: networkingv1.IngressLoadBalancerStatus{}},
 		}
+
+		ingress1 := ingTemplate.DeepCopy()
+		ingress1.Spec.Rules[0].Host = "host1.bar.com"
+		ingress2 := ingTemplate.DeepCopy()
+		ingress2.Spec.Rules[0].Host = "host2.bar.com"
+		ingress3 := ingTemplate.DeepCopy()
+		ingress3.Spec.Rules[0].Host = "host3.bar.com"
+
 		// Discovery
 		ginkgo.By("getting /apis")
 		{
@@ -708,11 +662,11 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		// Ingress resource create/read/update/watch verbs
 		ginkgo.By("creating")
-		_, err := ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
+		_, err := ingClient.Create(context.TODO(), ingress1, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		_, err = ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
+		_, err = ingClient.Create(context.TODO(), ingress2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		createdIngress, err := ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
+		createdIngress, err := ingClient.Create(context.TODO(), ingress3, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("getting")
@@ -787,8 +741,8 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		// /status subresource operations
 		ginkgo.By("patching /status")
-		lbStatus := v1.LoadBalancerStatus{
-			Ingress: []v1.LoadBalancerIngress{{IP: "169.1.1.1"}},
+		lbStatus := networkingv1.IngressLoadBalancerStatus{
+			Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "169.1.1.1"}},
 		}
 		lbStatusJSON, err := json.Marshal(lbStatus)
 		framework.ExpectNoError(err)
@@ -806,8 +760,8 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			if err != nil {
 				return err
 			}
-			statusToUpdate.Status.LoadBalancer = v1.LoadBalancerStatus{
-				Ingress: []v1.LoadBalancerIngress{{IP: "169.1.1.2"}},
+			statusToUpdate.Status.LoadBalancer = networkingv1.IngressLoadBalancerStatus{
+				Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "169.1.1.2"}},
 			}
 			updatedStatus, err = ingClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
 			return err

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,7 +35,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
-	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -101,8 +101,7 @@ func (v *volumeExpandTestSuite) SkipUnsupportedTests(driver storageframework.Tes
 
 func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
+		config *storageframework.PerTestConfig
 
 		resource *storageframework.VolumeResource
 		pod      *v1.Pod
@@ -115,12 +114,13 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volume-expand", storageframework.GetDriverTimeouts(driver))
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	init := func() {
 		l = local{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := v.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
@@ -147,8 +147,6 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			l.resource = nil
 		}
 
-		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
-		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
@@ -174,6 +172,10 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 		ginkgo.It("Verify if offline PVC expansion works", func() {
 			init()
 			defer cleanup()
+
+			if !driver.GetDriverInfo().Capabilities[storageframework.CapOfflineExpansion] {
+				e2eskipper.Skipf("Driver %q does not support offline volume expansion - skipping", driver.GetDriverInfo().Name)
+			}
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")

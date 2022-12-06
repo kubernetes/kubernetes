@@ -19,7 +19,7 @@ package openapi
 import (
 	"sync"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"k8s.io/client-go/discovery"
 )
 

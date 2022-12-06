@@ -32,28 +32,21 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestGCEDiskConflicts(t *testing.T) {
-	volState := v1.PodSpec{
-		Volumes: []v1.Volume{
-			{
-				VolumeSource: v1.VolumeSource{
-					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-						PDName: "foo",
-					},
-				},
+	volState := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName: "foo",
 			},
 		},
 	}
-	volState2 := v1.PodSpec{
-		Volumes: []v1.Volume{
-			{
-				VolumeSource: v1.VolumeSource{
-					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-						PDName: "bar",
-					},
-				},
+	volState2 := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName: "bar",
 			},
 		},
 	}
@@ -66,14 +59,16 @@ func TestGCEDiskConflicts(t *testing.T) {
 		wantStatus *framework.Status
 	}{
 		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state", nil},
-		{&v1.Pod{Spec: volState}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state", errStatus},
-		{&v1.Pod{Spec: volState2}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state", nil},
+		{&v1.Pod{}, framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "one state", nil},
+		{st.MakePod().Volume(volState).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), false, "same state", errStatus},
+		{st.MakePod().Volume(volState2).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "different state", nil},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPlugin(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPlugin(ctx, t)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -83,25 +78,17 @@ func TestGCEDiskConflicts(t *testing.T) {
 }
 
 func TestAWSDiskConflicts(t *testing.T) {
-	volState := v1.PodSpec{
-		Volumes: []v1.Volume{
-			{
-				VolumeSource: v1.VolumeSource{
-					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-						VolumeID: "foo",
-					},
-				},
+	volState := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+				VolumeID: "foo",
 			},
 		},
 	}
-	volState2 := v1.PodSpec{
-		Volumes: []v1.Volume{
-			{
-				VolumeSource: v1.VolumeSource{
-					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-						VolumeID: "bar",
-					},
-				},
+	volState2 := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+				VolumeID: "bar",
 			},
 		},
 	}
@@ -114,14 +101,16 @@ func TestAWSDiskConflicts(t *testing.T) {
 		wantStatus *framework.Status
 	}{
 		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state", nil},
-		{&v1.Pod{Spec: volState}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state", errStatus},
-		{&v1.Pod{Spec: volState2}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state", nil},
+		{&v1.Pod{}, framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "one state", nil},
+		{st.MakePod().Volume(volState).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), false, "same state", errStatus},
+		{st.MakePod().Volume(volState2).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "different state", nil},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPlugin(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPlugin(ctx, t)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -131,31 +120,23 @@ func TestAWSDiskConflicts(t *testing.T) {
 }
 
 func TestRBDDiskConflicts(t *testing.T) {
-	volState := v1.PodSpec{
-		Volumes: []v1.Volume{
-			{
-				VolumeSource: v1.VolumeSource{
-					RBD: &v1.RBDVolumeSource{
-						CephMonitors: []string{"a", "b"},
-						RBDPool:      "foo",
-						RBDImage:     "bar",
-						FSType:       "ext4",
-					},
-				},
+	volState := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			RBD: &v1.RBDVolumeSource{
+				CephMonitors: []string{"a", "b"},
+				RBDPool:      "foo",
+				RBDImage:     "bar",
+				FSType:       "ext4",
 			},
 		},
 	}
-	volState2 := v1.PodSpec{
-		Volumes: []v1.Volume{
-			{
-				VolumeSource: v1.VolumeSource{
-					RBD: &v1.RBDVolumeSource{
-						CephMonitors: []string{"c", "d"},
-						RBDPool:      "foo",
-						RBDImage:     "bar",
-						FSType:       "ext4",
-					},
-				},
+	volState2 := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			RBD: &v1.RBDVolumeSource{
+				CephMonitors: []string{"c", "d"},
+				RBDPool:      "foo",
+				RBDImage:     "bar",
+				FSType:       "ext4",
 			},
 		},
 	}
@@ -168,14 +149,16 @@ func TestRBDDiskConflicts(t *testing.T) {
 		wantStatus *framework.Status
 	}{
 		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state", nil},
-		{&v1.Pod{Spec: volState}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state", errStatus},
-		{&v1.Pod{Spec: volState2}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state", nil},
+		{&v1.Pod{}, framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "one state", nil},
+		{st.MakePod().Volume(volState).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), false, "same state", errStatus},
+		{st.MakePod().Volume(volState2).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "different state", nil},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPlugin(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPlugin(ctx, t)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -185,31 +168,23 @@ func TestRBDDiskConflicts(t *testing.T) {
 }
 
 func TestISCSIDiskConflicts(t *testing.T) {
-	volState := v1.PodSpec{
-		Volumes: []v1.Volume{
-			{
-				VolumeSource: v1.VolumeSource{
-					ISCSI: &v1.ISCSIVolumeSource{
-						TargetPortal: "127.0.0.1:3260",
-						IQN:          "iqn.2016-12.server:storage.target01",
-						FSType:       "ext4",
-						Lun:          0,
-					},
-				},
+	volState := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			ISCSI: &v1.ISCSIVolumeSource{
+				TargetPortal: "127.0.0.1:3260",
+				IQN:          "iqn.2016-12.server:storage.target01",
+				FSType:       "ext4",
+				Lun:          0,
 			},
 		},
 	}
-	volState2 := v1.PodSpec{
-		Volumes: []v1.Volume{
-			{
-				VolumeSource: v1.VolumeSource{
-					ISCSI: &v1.ISCSIVolumeSource{
-						TargetPortal: "127.0.0.1:3260",
-						IQN:          "iqn.2017-12.server:storage.target01",
-						FSType:       "ext4",
-						Lun:          0,
-					},
-				},
+	volState2 := v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			ISCSI: &v1.ISCSIVolumeSource{
+				TargetPortal: "127.0.0.1:3260",
+				IQN:          "iqn.2017-12.server:storage.target01",
+				FSType:       "ext4",
+				Lun:          0,
 			},
 		},
 	}
@@ -222,14 +197,16 @@ func TestISCSIDiskConflicts(t *testing.T) {
 		wantStatus *framework.Status
 	}{
 		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state", nil},
-		{&v1.Pod{Spec: volState}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state", errStatus},
-		{&v1.Pod{Spec: volState2}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state", nil},
+		{&v1.Pod{}, framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "one state", nil},
+		{st.MakePod().Volume(volState).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), false, "same state", errStatus},
+		{st.MakePod().Volume(volState2).Obj(), framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()), true, "different state", nil},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPlugin(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPlugin(ctx, t)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -241,44 +218,10 @@ func TestISCSIDiskConflicts(t *testing.T) {
 func TestAccessModeConflicts(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
 
-	podWithReadWriteOncePodPVC := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			// Required for querying lister for PVCs in the same namespace.
-			Namespace: "default",
-			Name:      "pod-with-rwop",
-		},
-		Spec: v1.PodSpec{
-			NodeName: "node-1",
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "claim-with-rwop",
-						},
-					},
-				},
-			},
-		},
-	}
-	podWithReadWriteManyPVC := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			// Required for querying lister for PVCs in the same namespace.
-			Namespace: "default",
-			Name:      "pod-with-rwx",
-		},
-		Spec: v1.PodSpec{
-			NodeName: "node-1",
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "claim-with-rwx",
-						},
-					},
-				},
-			},
-		},
-	}
+	// Required for querying lister for PVCs in the same namespace.
+	podWithReadWriteOncePodPVC := st.MakePod().Name("pod-with-rwop").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwop").Node("node-1").Obj()
+	// Required for querying lister for PVCs in the same namespace.
+	podWithReadWriteManyPVC := st.MakePod().Name("pod-with-rwx").Namespace(metav1.NamespaceDefault).PVC("claim-with-rwx").Node("node-1").Obj()
 
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -355,8 +298,10 @@ func TestAccessModeConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p := newPluginWithListers(t, test.existingPods, test.existingNodes, test.existingPVCs, test.enableReadWriteOncePod)
-			gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), nil, test.pod)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			p := newPluginWithListers(ctx, t, test.existingPods, test.existingNodes, test.existingPVCs, test.enableReadWriteOncePod)
+			_, gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), nil, test.pod)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %+v, want: %+v", gotStatus, test.wantStatus)
 			}
@@ -364,12 +309,11 @@ func TestAccessModeConflicts(t *testing.T) {
 	}
 }
 
-func newPlugin(t *testing.T) framework.Plugin {
-	return newPluginWithListers(t, nil, nil, nil, true)
+func newPlugin(ctx context.Context, t *testing.T) framework.Plugin {
+	return newPluginWithListers(ctx, t, nil, nil, nil, true)
 }
 
-func newPluginWithListers(t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim, enableReadWriteOncePod bool) framework.Plugin {
-	ctx := context.Background()
+func newPluginWithListers(ctx context.Context, t *testing.T, pods []*v1.Pod, nodes []*v1.Node, pvcs []*v1.PersistentVolumeClaim, enableReadWriteOncePod bool) framework.Plugin {
 	pluginFactory := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		return New(plArgs, fh, feature.Features{
 			EnableReadWriteOncePod: enableReadWriteOncePod,

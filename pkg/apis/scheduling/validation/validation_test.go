@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 )
@@ -81,29 +82,37 @@ func TestValidatePriorityClass(t *testing.T) {
 }
 
 func TestValidatePriorityClassUpdate(t *testing.T) {
+	preemptLowerPriority := core.PreemptLowerPriority
+	preemptNever := core.PreemptNever
+
 	old := scheduling.PriorityClass{
-		ObjectMeta: metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "1"},
-		Value:      100,
+		ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "1"},
+		Value:            100,
+		PreemptionPolicy: &preemptLowerPriority,
 	}
 	successCases := map[string]scheduling.PriorityClass{
 		"no change": {
-			ObjectMeta:  metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
-			Value:       100,
-			Description: "Used for the highest priority pods.",
+			ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
+			Value:            100,
+			PreemptionPolicy: &preemptLowerPriority,
+			Description:      "Used for the highest priority pods.",
 		},
 		"change description": {
-			ObjectMeta:  metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
-			Value:       100,
-			Description: "A different description.",
+			ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
+			Value:            100,
+			PreemptionPolicy: &preemptLowerPriority,
+			Description:      "A different description.",
 		},
 		"remove description": {
-			ObjectMeta: metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
-			Value:      100,
+			ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
+			Value:            100,
+			PreemptionPolicy: &preemptLowerPriority,
 		},
 		"change globalDefault": {
-			ObjectMeta:    metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
-			Value:         100,
-			GlobalDefault: true,
+			ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
+			Value:            100,
+			PreemptionPolicy: &preemptLowerPriority,
+			GlobalDefault:    true,
 		},
 	}
 
@@ -119,30 +128,42 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 	}{
 		"add namespace": {
 			P: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "tier1", Namespace: "foo", ResourceVersion: "2"},
-				Value:      100,
+				ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "foo", ResourceVersion: "2"},
+				Value:            100,
+				PreemptionPolicy: &preemptLowerPriority,
 			},
 			T: field.ErrorTypeInvalid,
 		},
 		"change name": {
 			P: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "tier2", Namespace: "", ResourceVersion: "2"},
-				Value:      100,
+				ObjectMeta:       metav1.ObjectMeta{Name: "tier2", Namespace: "", ResourceVersion: "2"},
+				Value:            100,
+				PreemptionPolicy: &preemptLowerPriority,
 			},
 			T: field.ErrorTypeInvalid,
 		},
 		"remove value": {
 			P: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
+				ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
+				PreemptionPolicy: &preemptLowerPriority,
 			},
 			T: field.ErrorTypeForbidden,
 		},
 		"change value": {
 			P: scheduling.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
-				Value:      101,
+				ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
+				Value:            101,
+				PreemptionPolicy: &preemptLowerPriority,
 			},
 			T: field.ErrorTypeForbidden,
+		},
+		"change preemptionPolicy": {
+			P: scheduling.PriorityClass{
+				ObjectMeta:       metav1.ObjectMeta{Name: "tier1", Namespace: "", ResourceVersion: "2"},
+				Value:            100,
+				PreemptionPolicy: &preemptNever,
+			},
+			T: field.ErrorTypeInvalid,
 		},
 	}
 

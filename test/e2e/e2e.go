@@ -20,10 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,9 +29,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,6 +41,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -75,9 +72,12 @@ const (
 	namespaceCleanupTimeout = 15 * time.Minute
 )
 
+var progressReporter = &e2ereporters.ProgressReporter{}
+
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
+	progressReporter.SetStartMsg()
 	setupSuite()
 	return nil
 }, func(data []byte) {
@@ -86,7 +86,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.SynchronizedAfterSuite(func() {
-	CleanupSuite()
+	progressReporter.SetEndMsg()
 }, func() {
 	AfterSuiteActions()
 })
@@ -97,38 +97,34 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 // generated in this directory, and cluster logs will also be saved.
 // This function is called on each Ginkgo node in parallel mode.
 func RunE2ETests(t *testing.T) {
+	// InitLogs disables contextual logging, without a way to enable it again
+	// in the E2E test suite because it has no feature gates. It used to have a
+	// misleading --feature-gates parameter but that didn't do what users
+	// and developers expected (define which features the cluster supports)
+	// and therefore got removed.
+	//
+	// Because contextual logging is useful and should get tested, it gets
+	// re-enabled here unconditionally.
 	logs.InitLogs()
 	defer logs.FlushLogs()
+	klog.EnableContextualLogging(true)
 
+	progressReporter = e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL)
 	gomega.RegisterFailHandler(framework.Fail)
-	// Disable skipped tests unless they are explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
-	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
-	var r []ginkgo.Reporter
 	if framework.TestContext.ReportDir != "" {
 		// TODO: we should probably only be trying to create this directory once
 		// rather than once-per-Ginkgo-node.
+		// NOTE: junit report can be simply created by executing your tests with the new --junit-report flags instead.
 		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
-		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
 		}
 	}
 
-	// Stream the progress to stdout and optionally a URL accepting progress updates.
-	r = append(r, e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL))
-
-	// The DetailsRepoerter will output details about every test (name, files, lines, etc) which helps
-	// when documenting our tests.
-	if len(framework.TestContext.SpecSummaryOutput) > 0 {
-		r = append(r, e2ereporters.NewDetailsReporterFile(framework.TestContext.SpecSummaryOutput))
-	}
-
-	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, suiteConfig.ParallelProcess)
+	ginkgo.RunSpecs(t, "Kubernetes e2e suite", suiteConfig, reporterConfig)
 }
 
 // getDefaultClusterIPFamily obtains the default IP family of the cluster
@@ -229,7 +225,7 @@ func setupSuite() {
 	// In large clusters we may get to this point but still have a bunch
 	// of nodes without Routes created. Since this would make a node
 	// unschedulable, we need to wait until all of them are schedulable.
-	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 
 	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
 	if framework.TestContext.CloudConfig.NumNodes == framework.DefaultNumNodes {
@@ -248,7 +244,7 @@ func setupSuite() {
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
 	if err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
-		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
+		e2edebug.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		e2ekubectl.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
@@ -276,7 +272,7 @@ func setupSuite() {
 	}
 
 	if framework.TestContext.NodeKiller.Enabled {
-		nodeKiller := framework.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
+		nodeKiller := e2enode.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
 		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCh)
 	}
 }
@@ -298,7 +294,7 @@ func logClusterImageSources() {
 
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
 	filePath := filepath.Join(framework.TestContext.ReportDir, "images.json")
-	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
+	if err := os.WriteFile(filePath, outputBytes, 0644); err != nil {
 		framework.Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
 }

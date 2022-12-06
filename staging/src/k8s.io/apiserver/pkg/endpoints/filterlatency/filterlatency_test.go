@@ -23,6 +23,10 @@ import (
 	"testing"
 	"time"
 
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
+
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -41,7 +45,7 @@ func TestTrackStartedWithContextAlreadyHasFilterRecord(t *testing.T) {
 	})
 
 	requestFilterStarted := time.Now()
-	wrapped := trackStarted(handler, filterName, testingclock.NewFakeClock(requestFilterStarted))
+	wrapped := trackStarted(handler, trace.NewNoopTracerProvider(), filterName, testingclock.NewFakeClock(requestFilterStarted))
 
 	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
@@ -84,7 +88,7 @@ func TestTrackStartedWithContextDoesNotHaveFilterRecord(t *testing.T) {
 	})
 
 	requestFilterStarted := time.Now()
-	wrapped := trackStarted(handler, filterName, testingclock.NewFakeClock(requestFilterStarted))
+	wrapped := trackStarted(handler, trace.NewNoopTracerProvider(), filterName, testingclock.NewFakeClock(requestFilterStarted))
 
 	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
@@ -174,5 +178,41 @@ func TestTrackCompletedContextDoesNotHaveFilterRecord(t *testing.T) {
 	}
 	if actionCallCount != 0 {
 		t.Errorf("expected the callback to not be invoked, but was actually invoked %d times", actionCallCount)
+	}
+}
+
+func TestStartedAndCompletedOpenTelemetryTracing(t *testing.T) {
+	filterName := "my-filter"
+	// Seup OTel for testing
+	fakeRecorder := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(fakeRecorder))
+
+	// base handler func
+	var callCount int
+	handler := http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		// we expect the handler to be invoked just once.
+		callCount++
+	})
+	// wrap with start and completed handler
+	wrapped := TrackCompleted(handler)
+	wrapped = TrackStarted(wrapped, tp, filterName)
+
+	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
+	if err != nil {
+		t.Fatalf("failed to create new http request - %v", err)
+	}
+
+	wrapped.ServeHTTP(httptest.NewRecorder(), testRequest)
+
+	if callCount != 1 {
+		t.Errorf("expected the given handler to be invoked once, but was actually invoked %d times", callCount)
+	}
+	output := fakeRecorder.Ended()
+	if len(output) != 1 {
+		t.Fatalf("got %d; expected len(output) == 1", len(output))
+	}
+	span := output[0]
+	if span.Name() != filterName {
+		t.Fatalf("got %s; expected span.Name == my-filter", span.Name())
 	}
 }

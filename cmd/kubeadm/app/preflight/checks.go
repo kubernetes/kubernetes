@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -40,7 +39,6 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/version"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
@@ -49,7 +47,6 @@ import (
 	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
@@ -599,7 +596,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
 // KubeletVersionCheck validates installed kubelet version
 type KubeletVersionCheck struct {
 	KubernetesVersion string
-	minKubeletVersion *version.Version
+	minKubeletVersion *versionutil.Version
 	exec              utilsexec.Interface
 }
 
@@ -616,7 +613,7 @@ func (kubever KubeletVersionCheck) Check() (warnings, errorList []error) {
 		return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
 	}
 	if kubever.minKubeletVersion == nil {
-		kubever.minKubeletVersion = constants.MinimumKubeletVersion
+		kubever.minKubeletVersion = kubeadmconstants.MinimumKubeletVersion
 	}
 	if kubeletVersion.LessThan(kubever.minKubeletVersion) {
 		return nil, []error{errors.Errorf("Kubelet version %q is lower than kubeadm can support. Please upgrade kubelet", kubeletVersion)}
@@ -741,7 +738,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 func (evc ExternalEtcdVersionCheck) configRootCAs(config *tls.Config) (*tls.Config, error) {
 	var CACertPool *x509.CertPool
 	if evc.Etcd.External.CAFile != "" {
-		CACert, err := ioutil.ReadFile(evc.Etcd.External.CAFile)
+		CACert, err := os.ReadFile(evc.Etcd.External.CAFile)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't load external etcd's server certificate %s", evc.Etcd.External.CAFile)
 		}
@@ -934,7 +931,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
 		if ip := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if netutils.IsIPv6(ip) {
+			if netutils.IsIPv6(ip) && runtime.GOOS == "linux" {
 				checks = append(checks,
 					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
@@ -1004,7 +1001,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			}
 		}
 	}
-	if addIPv6Checks {
+	if addIPv6Checks && runtime.GOOS == "linux" {
 		checks = append(checks,
 			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
@@ -1064,7 +1061,7 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
 	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.NodeRegistration.CRISocket)
 	if err != nil {
-		return err
+		return &Error{Msg: err.Error()}
 	}
 
 	checks := []Checker{

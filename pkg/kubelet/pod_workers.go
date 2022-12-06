@@ -218,7 +218,7 @@ type PodWorkers interface {
 }
 
 // the function to invoke to perform a sync (reconcile the kubelet state to the desired shape of the pod)
-type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error
+type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error)
 
 // the function to invoke to terminate a pod (ensure no running processes are present)
 type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
@@ -313,10 +313,10 @@ func (s *podSyncStatus) IsDeleted() bool              { return s.deleted }
 // Once a pod is set to be "torn down" it cannot be started again for that
 // UID (corresponding to a delete or eviction) until:
 //
-// 1. The pod worker is finalized (syncTerminatingPod and
-//    syncTerminatedPod exit without error sequentially)
-// 2. The SyncKnownPods method is invoked by kubelet housekeeping and the pod
-//    is not part of the known config.
+//  1. The pod worker is finalized (syncTerminatingPod and
+//     syncTerminatedPod exit without error sequentially)
+//  2. The SyncKnownPods method is invoked by kubelet housekeeping and the pod
+//     is not part of the known config.
 //
 // Pod workers provide a consistent source of information to other kubelet
 // loops about the status of the pod and whether containers can be
@@ -332,36 +332,50 @@ func (s *podSyncStatus) IsDeleted() bool              { return s.deleted }
 // ---|                                         = kubelet config has synced at least once
 // -------|                                  |- = pod exists in apiserver config
 // --------|                  |---------------- = CouldHaveRunningContainers() is true
-//         ^- pod is observed by pod worker  .
-//         .                                 .
+//
+//	^- pod is observed by pod worker  .
+//	.                                 .
+//
 // ----------|       |------------------------- = syncPod is running
-//         . ^- pod worker loop sees change and invokes syncPod
-//         . .                               .
+//
+//	. ^- pod worker loop sees change and invokes syncPod
+//	. .                               .
+//
 // --------------|                     |------- = ShouldPodContainersBeTerminating() returns true
 // --------------|                     |------- = IsPodTerminationRequested() returns true (pod is known)
-//         . .   ^- Kubelet evicts pod       .
-//         . .                               .
+//
+//	. .   ^- Kubelet evicts pod       .
+//	. .                               .
+//
 // -------------------|       |---------------- = syncTerminatingPod runs then exits without error
-//         . .        ^ pod worker loop exits syncPod, sees pod is terminating,
-// 				 . .          invokes syncTerminatingPod
-//         . .                               .
+//
+//	        . .        ^ pod worker loop exits syncPod, sees pod is terminating,
+//					 . .          invokes syncTerminatingPod
+//	        . .                               .
+//
 // ---|    |------------------|              .  = ShouldPodRuntimeBeRemoved() returns true (post-sync)
-//           .                ^ syncTerminatingPod has exited successfully
-//           .                               .
+//
+//	.                ^ syncTerminatingPod has exited successfully
+//	.                               .
+//
 // ----------------------------|       |------- = syncTerminatedPod runs then exits without error
-//           .                         ^ other loops can tear down
-//           .                               .
+//
+//	.                         ^ other loops can tear down
+//	.                               .
+//
 // ------------------------------------|  |---- = status manager is waiting for PodResourcesAreReclaimed()
-//           .                         ^     .
+//
+//	.                         ^     .
+//
 // ----------|                               |- = status manager can be writing pod status
-//                                           ^ status manager deletes pod because no longer exists in config
+//
+//	^ status manager deletes pod because no longer exists in config
 //
 // Other components in the Kubelet can request a termination of the pod
 // via the UpdatePod method or the killPodNow wrapper - this will ensure
 // the components of the pod are stopped until the kubelet is restarted
 // or permanently (if the phase of the pod is set to a terminal phase
 // in the pod status change).
-//
 type podWorkers struct {
 	// Protects all per worker fields.
 	podLock sync.Mutex
@@ -391,6 +405,11 @@ type podWorkers struct {
 	syncPodFn            syncPodFnType
 	syncTerminatingPodFn syncTerminatingPodFnType
 	syncTerminatedPodFn  syncTerminatedPodFnType
+
+	// workerChannelFn is exposed for testing to allow unit tests to impose delays
+	// in channel communication. The function is invoked once each time a new worker
+	// goroutine starts.
+	workerChannelFn func(uid types.UID, in chan podWork) (out <-chan podWork)
 
 	// The EventRecorder to use
 	recorder record.EventRecorder
@@ -580,6 +599,7 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 						syncedAt:           now,
 						startedTerminating: true,
 						finished:           true,
+						fullname:           kubecontainer.GetPodFullName(pod),
 					}
 				}
 			}
@@ -698,9 +718,8 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 	}
 
 	// start the pod worker goroutine if it doesn't exist
-	var podUpdates chan podWork
-	var exists bool
-	if podUpdates, exists = p.podUpdates[uid]; !exists {
+	podUpdates, exists := p.podUpdates[uid]
+	if !exists {
 		// We need to have a buffer here, because checkForUpdates() method that
 		// puts an update into channel is called from the same goroutine where
 		// the channel is consumed. However, it is guaranteed that in such case
@@ -714,13 +733,21 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 				append(p.waitingToStartStaticPodsByFullname[status.fullname], uid)
 		}
 
+		// allow testing of delays in the pod update channel
+		var outCh <-chan podWork
+		if p.workerChannelFn != nil {
+			outCh = p.workerChannelFn(uid, podUpdates)
+		} else {
+			outCh = podUpdates
+		}
+
 		// Creating a new pod worker either means this is a new pod, or that the
 		// kubelet just restarted. In either case the kubelet is willing to believe
 		// the status of the pod for the first pod worker sync. See corresponding
 		// comment in syncPod.
 		go func() {
 			defer runtime.HandleCrash()
-			p.managePodLoop(podUpdates)
+			p.managePodLoop(outCh)
 		}()
 	}
 
@@ -784,28 +811,31 @@ func calculateEffectiveGracePeriod(status *podSyncStatus, pod *v1.Pod, options *
 }
 
 // allowPodStart tries to start the pod and returns true if allowed, otherwise
-// it requeues the pod and returns false.
-func (p *podWorkers) allowPodStart(pod *v1.Pod) bool {
+// it requeues the pod and returns false. If the pod will never be able to start
+// because data is missing, or the pod was terminated before start, canEverStart
+// is false.
+func (p *podWorkers) allowPodStart(pod *v1.Pod) (canStart bool, canEverStart bool) {
 	if !kubetypes.IsStaticPod(pod) {
-		// TBD: Do we want to allow non-static pods with the same full name?
+		// TODO: Do we want to allow non-static pods with the same full name?
 		// Note that it may disable the force deletion of pods.
-		return true
+		return true, true
 	}
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	status, ok := p.podSyncStatuses[pod.UID]
 	if !ok {
-		klog.ErrorS(nil, "Failed to get a valid podSyncStatuses", "pod", klog.KObj(pod), "podUID", pod.UID)
-		p.workQueue.Enqueue(pod.UID, wait.Jitter(p.backOffPeriod, workerBackOffPeriodJitterFactor))
-		status.working = false
-		return false
+		klog.ErrorS(nil, "Pod sync status does not exist, the worker should not be running", "pod", klog.KObj(pod), "podUID", pod.UID)
+		return false, false
+	}
+	if status.IsTerminationRequested() {
+		return false, false
 	}
 	if !p.allowStaticPodStart(status.fullname, pod.UID) {
 		p.workQueue.Enqueue(pod.UID, wait.Jitter(p.backOffPeriod, workerBackOffPeriodJitterFactor))
 		status.working = false
-		return false
+		return false, true
 	}
-	return true
+	return true, true
 }
 
 // allowStaticPodStart tries to start the static pod and returns true if
@@ -818,9 +848,12 @@ func (p *podWorkers) allowStaticPodStart(fullname string, uid types.UID) bool {
 	}
 
 	waitingPods := p.waitingToStartStaticPodsByFullname[fullname]
+	// TODO: This is O(N) with respect to the number of updates to static pods
+	// with overlapping full names, and ideally would be O(1).
 	for i, waitingUID := range waitingPods {
 		// has pod already terminated or been deleted?
-		if _, ok := p.podSyncStatuses[waitingUID]; !ok {
+		status, ok := p.podSyncStatuses[waitingUID]
+		if !ok || status.IsTerminationRequested() || status.IsTerminated() {
 			continue
 		}
 		// another pod is next in line
@@ -846,8 +879,20 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 	var podStarted bool
 	for update := range podUpdates {
 		pod := update.Options.Pod
+
+		// Decide whether to start the pod. If the pod was terminated prior to the pod being allowed
+		// to start, we have to clean it up and then exit the pod worker loop.
 		if !podStarted {
-			if !p.allowPodStart(pod) {
+			canStart, canEverStart := p.allowPodStart(pod)
+			if !canEverStart {
+				p.completeUnstartedTerminated(pod)
+				if start := update.Options.StartTime; !start.IsZero() {
+					metrics.PodWorkerDuration.WithLabelValues("terminated").Observe(metrics.SinceInSeconds(start))
+				}
+				klog.V(4).InfoS("Processing pod event done", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", update.WorkType)
+				return
+			}
+			if !canStart {
 				klog.V(4).InfoS("Pod cannot start yet", "pod", klog.KObj(pod), "podUID", pod.UID)
 				continue
 			}
@@ -855,6 +900,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 		}
 
 		klog.V(4).InfoS("Processing pod event", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", update.WorkType)
+		var isTerminal bool
 		err := func() error {
 			// The worker is responsible for ensuring the sync method sees the appropriate
 			// status updates on resyncs (the result of the last sync), transitions to
@@ -870,7 +916,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 				// wait until we see the next refresh from the PLEG via the cache (max 2s)
 				// TODO: this adds ~1s of latency on all transitions from sync to terminating
 				//  to terminated, and on all termination retries (including evictions). We should
-				//  improve latency by making the the pleg continuous and by allowing pod status
+				//  improve latency by making the pleg continuous and by allowing pod status
 				//  changes to be refreshed when key events happen (killPod, sync->terminating).
 				//  Improving this latency also reduces the possibility that a terminated
 				//  container's status is garbage collected before we have a chance to update the
@@ -901,13 +947,14 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 				err = p.syncTerminatingPodFn(ctx, pod, status, update.Options.RunningPod, gracePeriod, podStatusFn)
 
 			default:
-				err = p.syncPodFn(ctx, update.Options.UpdateType, pod, update.Options.MirrorPod, status)
+				isTerminal, err = p.syncPodFn(ctx, update.Options.UpdateType, pod, update.Options.MirrorPod, status)
 			}
 
 			lastSyncTime = time.Now()
 			return err
 		}()
 
+		var phaseTransition bool
 		switch {
 		case err == context.Canceled:
 			// when the context is cancelled we expect an update to already be queued
@@ -938,10 +985,17 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 			}
 			// otherwise we move to the terminating phase
 			p.completeTerminating(pod)
+			phaseTransition = true
+
+		case isTerminal:
+			// if syncPod indicated we are now terminal, set the appropriate pod status to move to terminating
+			klog.V(4).InfoS("Pod is terminal", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", update.WorkType)
+			p.completeSync(pod)
+			phaseTransition = true
 		}
 
-		// queue a retry for errors if necessary, then put the next event in the channel if any
-		p.completeWork(pod, err)
+		// queue a retry if necessary, then put the next event in the channel if any
+		p.completeWork(pod, phaseTransition, err)
 		if start := update.Options.StartTime; !start.IsZero() {
 			metrics.PodWorkerDuration.WithLabelValues(update.Options.UpdateType.String()).Observe(metrics.SinceInSeconds(start))
 		}
@@ -970,6 +1024,33 @@ func (p *podWorkers) acknowledgeTerminating(pod *v1.Pod) PodStatusFunc {
 		return status.statusPostTerminating[l-1]
 	}
 	return nil
+}
+
+// completeSync is invoked when syncPod completes successfully and indicates the pod is now terminal and should
+// be terminated. This happens when the natural pod lifecycle completes - any pod which is not RestartAlways
+// exits. Unnatural completions, such as evictions, API driven deletion or phase transition, are handled by
+// UpdatePod.
+func (p *podWorkers) completeSync(pod *v1.Pod) {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+
+	klog.V(4).InfoS("Pod indicated lifecycle completed naturally and should now terminate", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	if status, ok := p.podSyncStatuses[pod.UID]; ok {
+		if status.terminatingAt.IsZero() {
+			status.terminatingAt = time.Now()
+		} else {
+			klog.V(4).InfoS("Pod worker attempted to set terminatingAt twice, likely programmer error", "pod", klog.KObj(pod), "podUID", pod.UID)
+		}
+		status.startedTerminating = true
+	}
+
+	p.lastUndeliveredWorkUpdate[pod.UID] = podWork{
+		WorkType: TerminatingPodWork,
+		Options: UpdatePodOptions{
+			Pod: pod,
+		},
+	}
 }
 
 // completeTerminating is invoked when syncTerminatingPod completes successfully, which means
@@ -1026,12 +1107,7 @@ func (p *podWorkers) completeTerminatingRuntimePod(pod *v1.Pod) {
 		}
 	}
 
-	ch, ok := p.podUpdates[pod.UID]
-	if ok {
-		close(ch)
-	}
-	delete(p.podUpdates, pod.UID)
-	delete(p.lastUndeliveredWorkUpdate, pod.UID)
+	p.cleanupPodUpdates(pod.UID)
 }
 
 // completeTerminated is invoked after syncTerminatedPod completes successfully and means we
@@ -1042,12 +1118,7 @@ func (p *podWorkers) completeTerminated(pod *v1.Pod) {
 
 	klog.V(4).InfoS("Pod is complete and the worker can now stop", "pod", klog.KObj(pod), "podUID", pod.UID)
 
-	ch, ok := p.podUpdates[pod.UID]
-	if ok {
-		close(ch)
-	}
-	delete(p.podUpdates, pod.UID)
-	delete(p.lastUndeliveredWorkUpdate, pod.UID)
+	p.cleanupPodUpdates(pod.UID)
 
 	if status, ok := p.podSyncStatuses[pod.UID]; ok {
 		if status.terminatingAt.IsZero() {
@@ -1065,11 +1136,40 @@ func (p *podWorkers) completeTerminated(pod *v1.Pod) {
 	}
 }
 
+// completeUnstartedTerminated is invoked if a pod that has never been started receives a termination
+// signal before it can be started.
+func (p *podWorkers) completeUnstartedTerminated(pod *v1.Pod) {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+
+	klog.V(4).InfoS("Pod never started and the worker can now stop", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	p.cleanupPodUpdates(pod.UID)
+
+	if status, ok := p.podSyncStatuses[pod.UID]; ok {
+		if status.terminatingAt.IsZero() {
+			klog.V(4).InfoS("Pod worker is complete but did not have terminatingAt set, likely programmer error", "pod", klog.KObj(pod), "podUID", pod.UID)
+		}
+		if !status.terminatedAt.IsZero() {
+			klog.V(4).InfoS("Pod worker is complete and had terminatedAt set, likely programmer error", "pod", klog.KObj(pod), "podUID", pod.UID)
+		}
+		status.finished = true
+		status.working = false
+		status.terminatedAt = time.Now()
+
+		if p.startedStaticPodsByFullname[status.fullname] == pod.UID {
+			delete(p.startedStaticPodsByFullname, status.fullname)
+		}
+	}
+}
+
 // completeWork requeues on error or the next sync interval and then immediately executes any pending
 // work.
-func (p *podWorkers) completeWork(pod *v1.Pod, syncErr error) {
+func (p *podWorkers) completeWork(pod *v1.Pod, phaseTransition bool, syncErr error) {
 	// Requeue the last update if the last sync returned error.
 	switch {
+	case phaseTransition:
+		p.workQueue.Enqueue(pod.UID, 0)
 	case syncErr == nil:
 		// No error; requeue at the regular resync interval.
 		p.workQueue.Enqueue(pod.UID, wait.Jitter(p.resyncInterval, workerResyncIntervalJitterFactor))
@@ -1149,21 +1249,16 @@ func (p *podWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorke
 	return workers
 }
 
-// removeTerminatedWorker cleans up and removes the worker status for a worker that
-// has reached a terminal state of "finished" - has successfully exited
-// syncTerminatedPod. This "forgets" a pod by UID and allows another pod to be recreated
-// with the same UID.
+// removeTerminatedWorker cleans up and removes the worker status for a worker
+// that has reached a terminal state of "finished" - has successfully exited
+// syncTerminatedPod. This "forgets" a pod by UID and allows another pod to be
+// recreated with the same UID.
 func (p *podWorkers) removeTerminatedWorker(uid types.UID) {
 	status, ok := p.podSyncStatuses[uid]
 	if !ok {
 		// already forgotten, or forgotten too early
 		klog.V(4).InfoS("Pod worker has been requested for removal but is not a known pod", "podUID", uid)
 		return
-	}
-
-	if startedUID, started := p.startedStaticPodsByFullname[status.fullname]; started && startedUID != uid {
-		klog.V(4).InfoS("Pod cannot start yet but is no longer known to the kubelet, finish it", "podUID", uid)
-		status.finished = true
 	}
 
 	if !status.finished {
@@ -1177,8 +1272,7 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID) {
 		klog.V(4).InfoS("Pod has been terminated and is no longer known to the kubelet, remove all history", "podUID", uid)
 	}
 	delete(p.podSyncStatuses, uid)
-	delete(p.podUpdates, uid)
-	delete(p.lastUndeliveredWorkUpdate, uid)
+	p.cleanupPodUpdates(uid)
 
 	if p.startedStaticPodsByFullname[status.fullname] == uid {
 		delete(p.startedStaticPodsByFullname, status.fullname)
@@ -1228,4 +1322,16 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 			return fmt.Errorf("timeout waiting to kill pod")
 		}
 	}
+}
+
+// cleanupPodUpdates closes the podUpdates channel and removes it from
+// podUpdates map so that the corresponding pod worker can stop. It also
+// removes any undelivered work. This method must be called holding the
+// pod lock.
+func (p *podWorkers) cleanupPodUpdates(uid types.UID) {
+	if ch, ok := p.podUpdates[uid]; ok {
+		close(ch)
+	}
+	delete(p.podUpdates, uid)
+	delete(p.lastUndeliveredWorkUpdate, uid)
 }

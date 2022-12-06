@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	netutils "k8s.io/utils/net"
@@ -148,17 +150,6 @@ func TestGetNodeHostIPs(t *testing.T) {
 			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
 		},
 		{
-			name: "dual-stack node",
-			addresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-			},
-			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
-		},
-		{
 			name: "dual-stack node, different order",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
@@ -168,27 +159,6 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 			},
 			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
-		},
-		{
-			name: "dual-stack node, different order",
-			addresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-			},
-			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
-		},
-		{
-			name: "dual-stack node, IPv6-first, no internal IPv4",
-			addresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-			},
-			expectIPs: []net.IP{netutils.ParseIPSloppy("a:b::c:d"), netutils.ParseIPSloppy("4.3.2.1")},
 		},
 		{
 			name: "dual-stack node, IPv6-first, no internal IPv4, dual-stack cluster",
@@ -257,5 +227,62 @@ func TestGetHostname(t *testing.T) {
 			t.Errorf("[%d]: expected output %q, got %q", idx, test.expectedHostName, hostName)
 		}
 
+	}
+}
+
+func TestIsNodeReady(t *testing.T) {
+	testCases := []struct {
+		name   string
+		Node   *v1.Node
+		expect bool
+	}{
+		{
+			name: "case that returns true",
+			Node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expect: true,
+		},
+		{
+			name: "case that returns false",
+			Node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			expect: false,
+		},
+		{
+			name: "case that returns false",
+			Node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeMemoryPressure,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			expect: false,
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result := IsNodeReady(test.Node)
+			assert.Equal(t, test.expect, result)
+		})
 	}
 }

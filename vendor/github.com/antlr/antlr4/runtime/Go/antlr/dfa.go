@@ -6,7 +6,6 @@ package antlr
 
 import (
 	"sort"
-	"sync"
 )
 
 type DFA struct {
@@ -18,23 +17,27 @@ type DFA struct {
 	// states is all the DFA states. Use Map to get the old state back; Set can only
 	// indicate whether it is there.
 	states map[int]*DFAState
-	statesMu sync.RWMutex
 
 	s0 *DFAState
-	s0Mu sync.RWMutex
 
 	// precedenceDfa is the backing field for isPrecedenceDfa and setPrecedenceDfa.
 	// True if the DFA is for a precedence decision and false otherwise.
 	precedenceDfa bool
-	precedenceDfaMu sync.RWMutex
 }
 
 func NewDFA(atnStartState DecisionState, decision int) *DFA {
-	return &DFA{
+	dfa := &DFA{
 		atnStartState: atnStartState,
 		decision:      decision,
 		states:        make(map[int]*DFAState),
 	}
+	if s, ok := atnStartState.(*StarLoopEntryState); ok && s.precedenceRuleDecision {
+		dfa.precedenceDfa = true
+		dfa.s0 = NewDFAState(-1, NewBaseATNConfigSet(false))
+		dfa.s0.isAcceptState = false
+		dfa.s0.requiresFullContext = false
+	}
+	return dfa
 }
 
 // getPrecedenceStartState gets the start state for the current precedence and
@@ -79,8 +82,6 @@ func (d *DFA) setPrecedenceStartState(precedence int, startState *DFAState) {
 }
 
 func (d *DFA) getPrecedenceDfa() bool {
-	d.precedenceDfaMu.RLock()
-	defer d.precedenceDfaMu.RUnlock()
 	return d.precedenceDfa
 }
 
@@ -104,46 +105,32 @@ func (d *DFA) setPrecedenceDfa(precedenceDfa bool) {
 			d.setS0(nil)
 		}
 
-		d.precedenceDfaMu.Lock()
-		defer d.precedenceDfaMu.Unlock()
 		d.precedenceDfa = precedenceDfa
 	}
 }
 
 func (d *DFA) getS0() *DFAState {
-	d.s0Mu.RLock()
-	defer d.s0Mu.RUnlock()
 	return d.s0
 }
 
 func (d *DFA) setS0(s *DFAState) {
-	d.s0Mu.Lock()
-	defer d.s0Mu.Unlock()
 	d.s0 = s
 }
 
 func (d *DFA) getState(hash int) (*DFAState, bool) {
-	d.statesMu.RLock()
-	defer d.statesMu.RUnlock()
 	s, ok := d.states[hash]
 	return s, ok
 }
 
 func (d *DFA) setStates(states map[int]*DFAState) {
-	d.statesMu.Lock()
-	defer d.statesMu.Unlock()
 	d.states = states
 }
 
 func (d *DFA) setState(hash int, state *DFAState) {
-	d.statesMu.Lock()
-	defer d.statesMu.Unlock()
 	d.states[hash] = state
 }
 
 func (d *DFA) numStates() int {
-	d.statesMu.RLock()
-	defer d.statesMu.RUnlock()
 	return len(d.states)
 }
 

@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	benchparse "golang.org/x/tools/benchmark/parse"
@@ -87,7 +86,7 @@ func run() error {
 	if err := json.Indent(formatted, output.Bytes(), "", "  "); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(os.Args[1], formatted.Bytes(), 0664)
+	return os.WriteFile(os.Args[1], formatted.Bytes(), 0664)
 }
 
 func appendIfMeasured(items []DataItem, benchmark *benchparse.Benchmark, metricType int, metricName string, unit string, value float64) []DataItem {

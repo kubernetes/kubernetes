@@ -6,6 +6,8 @@ rules:
     allowedPrefixes:
       - k8s.io/kube-openapi/pkg/util/proto
       - k8s.io/kube-openapi/pkg/schemaconv
+      - k8s.io/kube-openapi/pkg/handler3
+      - k8s.io/kube-openapi/pkg/spec3
   - selectorRegexp: k8s[.]io/kube-proxy/
     allowedPrefixes:
       - k8s.io/kube-proxy/config/v1alpha1

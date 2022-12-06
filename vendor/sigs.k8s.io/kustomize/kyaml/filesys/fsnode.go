@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 )
 
 var _ File = &fsNode{}
@@ -163,7 +163,6 @@ func (n *fsNode) AddFile(
 }
 
 func (n *fsNode) addDir(path string) (result *fsNode, err error) {
-
 	parent := n
 	dName, subDirName := mySplit(path)
 	if dName != "" {
@@ -233,7 +232,7 @@ func (n *fsNode) AddDir(path string) (result *fsNode, err error) {
 func (n *fsNode) CleanedAbs(path string) (ConfirmedDir, string, error) {
 	node, err := n.Find(path)
 	if err != nil {
-		return "", "", errors.Wrap(err, "unable to clean")
+		return "", "", errors.WrapPrefixf(err, "unable to clean")
 	}
 	if node == nil {
 		return "", "", notExistError(path)
@@ -570,7 +569,7 @@ func (n *fsNode) DebugPrint() {
 	})
 }
 
-var legalFileNamePattern = regexp.MustCompile("^[a-zA-Z0-9-_.]+$")
+var legalFileNamePattern = regexp.MustCompile("^[a-zA-Z0-9-_.:]+$")
 
 // This rules enforced here should be simpler and tighter
 // than what's allowed on a real OS.

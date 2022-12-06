@@ -17,9 +17,11 @@ limitations under the License.
 package attach
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -35,7 +37,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -105,7 +107,7 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Short:                 i18n.T("Attach to a running container"),
 		Long:                  i18n.T("Attach to a process that is already running inside an existing container."),
 		Example:               attachExample,
-		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
+		ValidArgsFunction:     completion.PodResourceNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -158,7 +160,7 @@ func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclie
 	if err != nil {
 		return err
 	}
-	return exec.Stream(remotecommand.StreamOptions{
+	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdin:             stdin,
 		Stdout:            stdout,
 		Stderr:            stderr,
@@ -286,8 +288,8 @@ func (o *AttachOptions) Run() error {
 		return err
 	}
 
-	if !o.Quiet && o.Stdin && t.Raw && o.Pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
-		fmt.Fprintf(o.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", o.CommandName, o.Pod.Name, containerToAttach.Name)
+	if msg := o.reattachMessage(containerToAttach.Name, t.Raw); msg != "" {
+		fmt.Fprintln(o.Out, msg)
 	}
 	return nil
 }
@@ -316,4 +318,16 @@ func (o *AttachOptions) GetContainerName(pod *corev1.Pod) (string, error) {
 		return "", err
 	}
 	return c.Name, nil
+}
+
+// reattachMessage returns a message to print after attach has completed, or
+// the empty string if no message should be printed.
+func (o *AttachOptions) reattachMessage(containerName string, rawTTY bool) string {
+	if o.Quiet || !o.Stdin || !rawTTY || o.Pod.Spec.RestartPolicy != corev1.RestartPolicyAlways {
+		return ""
+	}
+	if _, path := podcmd.FindContainerByName(o.Pod, containerName); strings.HasPrefix(path, "spec.ephemeralContainers") {
+		return fmt.Sprintf("Session ended, the ephemeral container will not be restarted but may be reattached using '%s %s -c %s -i -t' if it is still running", o.CommandName, o.Pod.Name, containerName)
+	}
+	return fmt.Sprintf("Session ended, resume using '%s %s -c %s -i -t' command when the pod is running", o.CommandName, o.Pod.Name, containerName)
 }

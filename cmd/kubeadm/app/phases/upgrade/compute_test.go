@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -27,11 +26,11 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 type fakeVersionGetter struct {
@@ -83,7 +82,7 @@ metadata:
 spec:
   containers:
   - name: etcd
-    image: k8s.gcr.io/etcd:` + fakeCurrentEtcdVersion
+    image: registry.k8s.io/etcd:` + fakeCurrentEtcdVersion
 
 func getEtcdVersion(v *versionutil.Version) string {
 	etcdVer, _, _ := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, v.String())
@@ -98,11 +97,11 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	// variables are in the form v{MAJOR}{MINOR}{PATCH}, where MINOR is a variable so test are automatically uptodate to the latest MinimumControlPlaneVersion/
 
 	// v1.X series, e.g. v1.14
-	v1X0 := version.MustParseSemantic("v1.14.0")
+	v1X0 := versionutil.MustParseSemantic("v1.14.0")
 	v1X5 := v1X0.WithPatch(5)
 
 	// v1.Y series, where Y = X+1, e.g. v1.15
-	v1Y0 := version.MustParseSemantic("v1.15.0")
+	v1Y0 := versionutil.MustParseSemantic("v1.15.0")
 	v1Y0alpha0 := v1Y0.WithPreRelease("alpha.0")
 	v1Y0alpha1 := v1Y0.WithPreRelease("alpha.1")
 	v1Y1 := v1Y0.WithPatch(1)
@@ -111,7 +110,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	v1Y5 := v1Y0.WithPatch(5)
 
 	// v1.Z series, where Z = Y+1, e.g. v1.16
-	v1Z0 := version.MustParseSemantic("v1.16.0")
+	v1Z0 := versionutil.MustParseSemantic("v1.16.0")
 	v1Z0alpha1 := v1Z0.WithPreRelease("alpha.1")
 	v1Z0alpha2 := v1Z0.WithPreRelease("alpha.2")
 	v1Z0beta1 := v1Z0.WithPreRelease("beta.1")
@@ -138,7 +137,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				stableVersion:      v1Y0.String(),
 			},
 			beforeDNSVersion:  fakeCurrentCoreDNSVersion,
-			expectedUpgrades:  []Upgrade{},
+			expectedUpgrades:  nil,
 			allowExperimental: false,
 			errExpected:       false,
 		},
@@ -343,7 +342,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				latestVersion:      v1Z0alpha2.String(),
 			},
 			beforeDNSVersion:  fakeCurrentCoreDNSVersion,
-			expectedUpgrades:  []Upgrade{},
+			expectedUpgrades:  nil,
 			allowExperimental: true,
 			errExpected:       false,
 		},
@@ -643,17 +642,17 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				},
 			})
 
-			manifestsDir, err := ioutil.TempDir("", "GetAvailableUpgrades-test-manifests")
+			manifestsDir, err := os.MkdirTemp("", "GetAvailableUpgrades-test-manifests")
 			if err != nil {
 				t.Fatalf("Unable to create temporary directory: %v", err)
 			}
 			defer os.RemoveAll(manifestsDir)
 
-			if err = ioutil.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
+			if err = os.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
 				t.Fatalf("Unable to create test static pod manifest: %v", err)
 			}
 
-			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.externalEtcd, client, manifestsDir)
+			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.externalEtcd, client, manifestsDir, &output.TextPrinter{})
 			if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)
 			}

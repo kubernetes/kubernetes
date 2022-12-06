@@ -36,11 +36,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	nodev1client "k8s.io/client-go/kubernetes/typed/node/v1"
 	nodev1listers "k8s.io/client-go/listers/node/v1"
-	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
 	apinodev1 "k8s.io/kubernetes/pkg/apis/node/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 )
 
@@ -62,9 +60,6 @@ type RuntimeClass struct {
 	*admission.Handler
 	runtimeClassLister nodev1listers.RuntimeClassLister
 	runtimeClassClient nodev1client.RuntimeClassInterface
-
-	inspectedFeatures  bool
-	podOverheadEnabled bool
 }
 
 var _ admission.MutationInterface = &RuntimeClass{}
@@ -78,12 +73,6 @@ func (r *RuntimeClass) SetExternalKubeClientSet(client kubernetes.Interface) {
 	r.runtimeClassClient = client.NodeV1().RuntimeClasses()
 }
 
-// InspectFeatureGates allows setting bools without taking a dep on a global variable
-func (r *RuntimeClass) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	r.podOverheadEnabled = featureGates.Enabled(features.PodOverhead)
-	r.inspectedFeatures = true
-}
-
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (r *RuntimeClass) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	runtimeClassInformer := f.Node().V1().RuntimeClasses()
@@ -93,9 +82,6 @@ func (r *RuntimeClass) SetExternalKubeInformerFactory(f informers.SharedInformer
 
 // ValidateInitialization implements the WantsExternalKubeInformerFactory interface.
 func (r *RuntimeClass) ValidateInitialization() error {
-	if !r.inspectedFeatures {
-		return fmt.Errorf("InspectFeatureGates was not called")
-	}
 	if r.runtimeClassLister == nil {
 		return fmt.Errorf("missing RuntimeClass lister")
 	}
@@ -116,10 +102,8 @@ func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attribute
 	if err != nil {
 		return err
 	}
-	if r.podOverheadEnabled {
-		if err := setOverhead(attributes, pod, runtimeClass); err != nil {
-			return err
-		}
+	if err := setOverhead(attributes, pod, runtimeClass); err != nil {
+		return err
 	}
 
 	if err := setScheduling(attributes, pod, runtimeClass); err != nil {
@@ -140,10 +124,8 @@ func (r *RuntimeClass) Validate(ctx context.Context, attributes admission.Attrib
 	if err != nil {
 		return err
 	}
-	if r.podOverheadEnabled {
-		if err := validateOverhead(attributes, pod, runtimeClass); err != nil {
-			return err
-		}
+	if err := validateOverhead(attributes, pod, runtimeClass); err != nil {
+		return err
 	}
 
 	return nil

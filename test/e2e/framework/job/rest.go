@@ -18,6 +18,7 @@ package job
 
 import (
 	"context"
+
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +29,21 @@ import (
 // GetJob uses c to get the Job in namespace ns named name. If the returned error is nil, the returned Job is valid.
 func GetJob(c clientset.Interface, ns, name string) (*batchv1.Job, error) {
 	return c.BatchV1().Jobs(ns).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+// GetAllRunningJobPods returns a list of all running Pods belonging to a Job.
+func GetAllRunningJobPods(c clientset.Interface, ns, jobName string) ([]v1.Pod, error) {
+	if podList, err := GetJobPods(c, ns, jobName); err != nil {
+		return nil, err
+	} else {
+		pods := []v1.Pod{}
+		for _, pod := range podList.Items {
+			if pod.Status.Phase == v1.PodRunning {
+				pods = append(pods, pod)
+			}
+		}
+		return pods, nil
+	}
 }
 
 // GetJobPods returns a list of Pods belonging to a Job.

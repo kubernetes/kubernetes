@@ -541,6 +541,9 @@ func (l PathGetter) getFilter(part, nextPart string, fieldPath *[]string) (Filte
 	case part == "-":
 		// part is a hyphen
 		return GetElementByIndex(-1), nil
+	case part == "*":
+		// PathGetter is not support for wildcard matching
+		return nil, errors.Errorf("wildcard is not supported in PathGetter")
 	case IsListIndex(part):
 		// part is surrounded by brackets
 		return l.elemFilter(part)
@@ -552,7 +555,6 @@ func (l PathGetter) getFilter(part, nextPart string, fieldPath *[]string) (Filte
 }
 
 func (l PathGetter) elemFilter(part string) (Filter, error) {
-	var match *RNode
 	name, value, err := SplitIndexNameValue(part)
 	if err != nil {
 		return nil, errors.Wrap(err)
@@ -567,10 +569,9 @@ func (l PathGetter) elemFilter(part string) (Filter, error) {
 		// append a ScalarNode
 		elem = NewScalarRNode(value)
 		elem.YNode().Style = l.Style
-		match = elem
 	} else {
 		// append a MappingNode
-		match = NewRNode(&yaml.Node{Kind: yaml.ScalarNode, Value: value, Style: l.Style})
+		match := NewRNode(&yaml.Node{Kind: yaml.ScalarNode, Value: value, Style: l.Style})
 		elem = NewRNode(&yaml.Node{
 			Kind:    yaml.MappingNode,
 			Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: name}, match.YNode()},
@@ -612,6 +613,50 @@ func Set(value *RNode) FieldSetter {
 	return FieldSetter{Value: value}
 }
 
+// MapEntrySetter sets a map entry to a value. If it finds a key with the same
+// value, it will override both Key and Value RNodes, including style and any
+// other metadata. If it doesn't find the key, it will insert a new map entry.
+// It will set the field, even if it's empty or nil, unlike the FieldSetter.
+// This is useful for rebuilding some pre-existing RNode structure.
+type MapEntrySetter struct {
+	// Name is the name of the field or key to lookup in a MappingNode.
+	// If Name is unspecified, it will use the Key's Value
+	Name string `yaml:"name,omitempty"`
+
+	// Value is the value to set.
+	Value *RNode `yaml:"value,omitempty"`
+
+	// Key is the map key to set.
+	Key *RNode `yaml:"key,omitempty"`
+}
+
+func (s MapEntrySetter) Filter(rn *RNode) (*RNode, error) {
+	if rn == nil {
+		return nil, errors.Errorf("Can't set map entry on a nil RNode")
+	}
+	if err := ErrorIfInvalid(rn, yaml.MappingNode); err != nil {
+		return nil, err
+	}
+	if s.Name == "" {
+		s.Name = GetValue(s.Key)
+	}
+	for i := 0; i < len(rn.Content()); i = IncrementFieldIndex(i) {
+		isMatchingField := rn.Content()[i].Value == s.Name
+		if isMatchingField {
+			rn.Content()[i] = s.Key.YNode()
+			rn.Content()[i+1] = s.Value.YNode()
+			return rn, nil
+		}
+	}
+
+	// create the field
+	rn.YNode().Content = append(
+		rn.YNode().Content,
+		s.Key.YNode(),
+		s.Value.YNode())
+	return rn, nil
+}
+
 // FieldSetter sets a field or map entry to a value.
 type FieldSetter struct {
 	Kind string `yaml:"kind,omitempty"`
@@ -639,6 +684,12 @@ type FieldSetter struct {
 func (s FieldSetter) Filter(rn *RNode) (*RNode, error) {
 	if s.StringValue != "" && s.Value == nil {
 		s.Value = NewScalarRNode(s.StringValue)
+	}
+
+	// need to set style for strings not recognized by yaml 1.1 to quoted if not previously set
+	// TODO: fix in upstream yaml library so this can be handled with yaml SetString
+	if s.Value.IsStringValue() && !s.OverrideStyle && s.Value.YNode().Style == 0 && IsYaml1_1NonString(s.Value.YNode()) {
+		s.Value.YNode().Style = yaml.DoubleQuotedStyle
 	}
 
 	if s.Name == "" {
@@ -780,6 +831,19 @@ func ErrorIfInvalid(rn *RNode, kind yaml.Kind) error {
 // e.g. [=primitiveValue]
 func IsListIndex(p string) bool {
 	return strings.HasPrefix(p, "[") && strings.HasSuffix(p, "]")
+}
+
+// IsIdxNumber returns true if p is an index number.
+// e.g. 1
+func IsIdxNumber(p string) bool {
+	idx, err := strconv.Atoi(p)
+	return err == nil && idx >= 0
+}
+
+// IsWildcard returns true if p is matching every elements.
+// e.g. "*"
+func IsWildcard(p string) bool {
+	return p == "*"
 }
 
 // SplitIndexNameValue splits a lookup part Val index into the field name

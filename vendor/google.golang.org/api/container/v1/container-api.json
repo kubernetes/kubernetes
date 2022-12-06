@@ -3,7 +3,7 @@
     "oauth2": {
       "scopes": {
         "https://www.googleapis.com/auth/cloud-platform": {
-          "description": "See, edit, configure, and delete your Google Cloud Platform data"
+          "description": "See, edit, configure, and delete your Google Cloud data and see the email address for your Google Account."
         }
       }
     }
@@ -2459,7 +2459,7 @@
       }
     }
   },
-  "revision": "20210419",
+  "revision": "20211008",
   "rootUrl": "https://container.googleapis.com/",
   "schemas": {
     "AcceleratorConfig": {
@@ -2473,6 +2473,10 @@
         },
         "acceleratorType": {
           "description": "The accelerator type resource name. List of supported accelerators [here](https://cloud.google.com/compute/docs/gpus)",
+          "type": "string"
+        },
+        "gpuPartitionSize": {
+          "description": "Size of partitions to create on the GPU. Valid values are described in the NVIDIA [mig user guide](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#partitioning).",
           "type": "string"
         }
       },
@@ -2497,6 +2501,10 @@
         "gcePersistentDiskCsiDriverConfig": {
           "$ref": "GcePersistentDiskCsiDriverConfig",
           "description": "Configuration for the Compute Engine Persistent Disk CSI driver."
+        },
+        "gcpFilestoreCsiDriverConfig": {
+          "$ref": "GcpFilestoreCsiDriverConfig",
+          "description": "Configuration for the GCP Filestore CSI driver."
         },
         "horizontalPodAutoscaling": {
           "$ref": "HorizontalPodAutoscaling",
@@ -2573,6 +2581,10 @@
         },
         "diskType": {
           "description": "Type of the disk attached to each node (e.g. 'pd-standard', 'pd-ssd' or 'pd-balanced') If unspecified, the default disk type is 'pd-standard'",
+          "type": "string"
+        },
+        "imageType": {
+          "description": "The image type to use for NAP created node.",
           "type": "string"
         },
         "management": {
@@ -2829,6 +2841,10 @@
           },
           "type": "array"
         },
+        "loggingConfig": {
+          "$ref": "LoggingConfig",
+          "description": "Logging configuration for the cluster."
+        },
         "loggingService": {
           "description": "The logging service the cluster should use to write logs. Currently available options: * `logging.googleapis.com/kubernetes` - The Cloud Logging service with a Kubernetes-native resource model * `logging.googleapis.com` - The legacy Cloud Logging service (no longer available as of GKE 1.15). * `none` - no logs will be exported from the cluster. If left as an empty string,`logging.googleapis.com/kubernetes` will be used for GKE 1.14+ or `logging.googleapis.com` for earlier versions.",
           "type": "string"
@@ -2844,6 +2860,14 @@
         "masterAuthorizedNetworksConfig": {
           "$ref": "MasterAuthorizedNetworksConfig",
           "description": "The configuration options for master authorized networks feature."
+        },
+        "meshCertificates": {
+          "$ref": "MeshCertificates",
+          "description": "Configuration for issuance of mTLS keys and certificates to Kubernetes pods."
+        },
+        "monitoringConfig": {
+          "$ref": "MonitoringConfig",
+          "description": "Monitoring configuration for the cluster."
         },
         "monitoringService": {
           "description": "The monitoring service the cluster should use to write metrics. Currently available options: * \"monitoring.googleapis.com/kubernetes\" - The Cloud Monitoring service with a Kubernetes-native resource model * `monitoring.googleapis.com` - The legacy Cloud Monitoring service (no longer available as of GKE 1.15). * `none` - No metrics will be exported from the cluster. If left as an empty string,`monitoring.googleapis.com/kubernetes` will be used for GKE 1.14+ or `monitoring.googleapis.com` for earlier versions.",
@@ -2873,6 +2897,10 @@
           "description": "[Output only] The size of the address space on each node for hosting containers. This is provisioned from within the `container_ipv4_cidr` range. This field will only be set when cluster is in route-based network mode.",
           "format": "int32",
           "type": "integer"
+        },
+        "nodePoolDefaults": {
+          "$ref": "NodePoolDefaults",
+          "description": "Default NodePool settings for the entire cluster. These settings are overridden if specified on the specific NodePool object."
         },
         "nodePools": {
           "description": "The node pools associated with this cluster. This field should not be set if \"node_config\" or \"initial_node_count\" are specified.",
@@ -2980,6 +3008,20 @@
           "$ref": "AutoprovisioningNodePoolDefaults",
           "description": "AutoprovisioningNodePoolDefaults contains defaults for a node pool created by NAP."
         },
+        "autoscalingProfile": {
+          "description": "Defines autoscaling behaviour.",
+          "enum": [
+            "PROFILE_UNSPECIFIED",
+            "OPTIMIZE_UTILIZATION",
+            "BALANCED"
+          ],
+          "enumDescriptions": [
+            "No change to autoscaling configuration.",
+            "Prioritize optimizing utilization of resources.",
+            "Use default (balanced) autoscaling configuration."
+          ],
+          "type": "string"
+        },
         "enableNodeAutoprovisioning": {
           "description": "Enables automatic node pool creation and deletion.",
           "type": "boolean"
@@ -3002,9 +3044,9 @@
           "$ref": "AddonsConfig",
           "description": "Configurations for the various addons available to run in the cluster."
         },
-        "desiredAutopilot": {
-          "$ref": "Autopilot",
-          "description": "The desired Autopilot configuration for the cluster."
+        "desiredAuthenticatorGroupsConfig": {
+          "$ref": "AuthenticatorGroupsConfig",
+          "description": "The desired authenticator groups config for the cluster."
         },
         "desiredBinaryAuthorization": {
           "$ref": "BinaryAuthorization",
@@ -3018,9 +3060,31 @@
           "$ref": "DatabaseEncryption",
           "description": "Configuration of etcd encryption."
         },
+        "desiredDatapathProvider": {
+          "description": "The desired datapath provider for the cluster.",
+          "enum": [
+            "DATAPATH_PROVIDER_UNSPECIFIED",
+            "LEGACY_DATAPATH",
+            "ADVANCED_DATAPATH"
+          ],
+          "enumDescriptions": [
+            "Default value.",
+            "Use the IPTables implementation based on kube-proxy.",
+            "Use the eBPF based GKE Dataplane V2 with additional features. See the [GKE Dataplane V2 documentation](https://cloud.google.com/kubernetes-engine/docs/how-to/dataplane-v2) for more."
+          ],
+          "type": "string"
+        },
         "desiredDefaultSnatStatus": {
           "$ref": "DefaultSnatStatus",
           "description": "The desired status of whether to disable default sNAT for this cluster."
+        },
+        "desiredDnsConfig": {
+          "$ref": "DNSConfig",
+          "description": "DNSConfig contains clusterDNS config for this cluster."
+        },
+        "desiredGcfsConfig": {
+          "$ref": "GcfsConfig",
+          "description": "The desired GCFS config for the cluster"
         },
         "desiredImageType": {
           "description": "The desired image type for the node pool. NOTE: Set the \"desired_node_pool\" field as well.",
@@ -3030,12 +3094,20 @@
           "$ref": "IntraNodeVisibilityConfig",
           "description": "The desired config of Intra-node visibility."
         },
+        "desiredL4ilbSubsettingConfig": {
+          "$ref": "ILBSubsettingConfig",
+          "description": "The desired L4 Internal Load Balancer Subsetting configuration."
+        },
         "desiredLocations": {
           "description": "The desired list of Google Compute Engine [zones](https://cloud.google.com/compute/docs/zones#available) in which the cluster's nodes should be located. This list must always include the cluster's primary zone. Warning: changing cluster locations will update the locations of all node pools and will result in nodes being added and/or removed.",
           "items": {
             "type": "string"
           },
           "type": "array"
+        },
+        "desiredLoggingConfig": {
+          "$ref": "LoggingConfig",
+          "description": "The desired logging configuration."
         },
         "desiredLoggingService": {
           "description": "The logging service the cluster should use to write logs. Currently available options: * `logging.googleapis.com/kubernetes` - The Cloud Logging service with a Kubernetes-native resource model * `logging.googleapis.com` - The legacy Cloud Logging service (no longer available as of GKE 1.15). * `none` - no logs will be exported from the cluster. If left as an empty string,`logging.googleapis.com/kubernetes` will be used for GKE 1.14+ or `logging.googleapis.com` for earlier versions.",
@@ -3048,6 +3120,14 @@
         "desiredMasterVersion": {
           "description": "The Kubernetes version to change the master to. Users may specify either explicit versions offered by Kubernetes Engine or version aliases, which have the following behavior: - \"latest\": picks the highest valid Kubernetes version - \"1.X\": picks the highest valid patch+gke.N patch in the 1.X version - \"1.X.Y\": picks the highest valid gke.N patch in the 1.X.Y version - \"1.X.Y-gke.N\": picks an explicit Kubernetes version - \"-\": picks the default Kubernetes version",
           "type": "string"
+        },
+        "desiredMeshCertificates": {
+          "$ref": "MeshCertificates",
+          "description": "Configuration for issuance of mTLS keys and certificates to Kubernetes pods."
+        },
+        "desiredMonitoringConfig": {
+          "$ref": "MonitoringConfig",
+          "description": "The desired monitoring configuration."
         },
         "desiredMonitoringService": {
           "description": "The monitoring service the cluster should use to write metrics. Currently available options: * \"monitoring.googleapis.com/kubernetes\" - The Cloud Monitoring service with a Kubernetes-native resource model * `monitoring.googleapis.com` - The legacy Cloud Monitoring service (no longer available as of GKE 1.15). * `none` - No metrics will be exported from the cluster. If left as an empty string,`monitoring.googleapis.com/kubernetes` will be used for GKE 1.14+ or `monitoring.googleapis.com` for earlier versions.",
@@ -3218,6 +3298,43 @@
       },
       "type": "object"
     },
+    "DNSConfig": {
+      "description": "DNSConfig contains the desired set of options for configuring clusterDNS.",
+      "id": "DNSConfig",
+      "properties": {
+        "clusterDns": {
+          "description": "cluster_dns indicates which in-cluster DNS provider should be used.",
+          "enum": [
+            "PROVIDER_UNSPECIFIED",
+            "PLATFORM_DEFAULT",
+            "CLOUD_DNS"
+          ],
+          "enumDescriptions": [
+            "Default value",
+            "Use GKE default DNS provider(kube-dns) for DNS resolution.",
+            "Use CloudDNS for DNS resolution."
+          ],
+          "type": "string"
+        },
+        "clusterDnsDomain": {
+          "description": "cluster_dns_domain is the suffix used for all cluster service records.",
+          "type": "string"
+        },
+        "clusterDnsScope": {
+          "description": "cluster_dns_scope indicates the scope of access to cluster DNS records.",
+          "enum": [
+            "DNS_SCOPE_UNSPECIFIED",
+            "VPC_SCOPE"
+          ],
+          "enumDescriptions": [
+            "Default value, will be inferred as cluster scope.",
+            "DNS records are accessible from within the VPC."
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "DailyMaintenanceWindow": {
       "description": "Time window specified for daily maintenance operations.",
       "id": "DailyMaintenanceWindow",
@@ -3292,6 +3409,28 @@
       "properties": {
         "enabled": {
           "description": "Whether the Compute Engine PD CSI driver is enabled for this cluster.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "GcfsConfig": {
+      "description": "GcfsConfig contains configurations of Google Container File System (image streaming).",
+      "id": "GcfsConfig",
+      "properties": {
+        "enabled": {
+          "description": "Whether to use GCFS.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "GcpFilestoreCsiDriverConfig": {
+      "description": "Configuration for the GCP Filestore CSI driver.",
+      "id": "GcpFilestoreCsiDriverConfig",
+      "properties": {
+        "enabled": {
+          "description": "Whether the GCP Filestore CSI driver is enabled for this cluster.",
           "type": "boolean"
         }
       },
@@ -3406,6 +3545,17 @@
       "properties": {
         "disabled": {
           "description": "Whether the HTTP Load Balancing controller is enabled in the cluster. When enabled, it runs a small pod in the cluster that manages the load balancers.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ILBSubsettingConfig": {
+      "description": "ILBSubsettingConfig contains the desired config of L4 Internal LoadBalancer subsetting on this cluster.",
+      "id": "ILBSubsettingConfig",
+      "properties": {
+        "enabled": {
+          "description": "Enables l4 ILB subsetting for this cluster.",
           "type": "boolean"
         }
       },
@@ -3634,6 +3784,41 @@
       },
       "type": "object"
     },
+    "LoggingComponentConfig": {
+      "description": "LoggingComponentConfig is cluster logging component configuration.",
+      "id": "LoggingComponentConfig",
+      "properties": {
+        "enableComponents": {
+          "description": "Select components to collect logs. An empty set would disable all logging.",
+          "items": {
+            "enum": [
+              "COMPONENT_UNSPECIFIED",
+              "SYSTEM_COMPONENTS",
+              "WORKLOADS"
+            ],
+            "enumDescriptions": [
+              "Default value. This shouldn't be used.",
+              "system components",
+              "workloads"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "LoggingConfig": {
+      "description": "LoggingConfig is cluster logging configuration.",
+      "id": "LoggingConfig",
+      "properties": {
+        "componentConfig": {
+          "$ref": "LoggingComponentConfig",
+          "description": "Logging components configuration"
+        }
+      },
+      "type": "object"
+    },
     "MaintenancePolicy": {
       "description": "MaintenancePolicy defines the maintenance policy to be used for the cluster.",
       "id": "MaintenancePolicy",
@@ -3732,6 +3917,12 @@
       },
       "type": "object"
     },
+    "MeshCertificates": {
+      "description": "Configuration for issuance of mTLS keys and certificates to Kubernetes pods.",
+      "id": "MeshCertificates",
+      "properties": {},
+      "type": "object"
+    },
     "Metric": {
       "description": "Progress metric is (string, int|float|string) pair.",
       "id": "Metric",
@@ -3757,16 +3948,71 @@
       },
       "type": "object"
     },
+    "MonitoringComponentConfig": {
+      "description": "MonitoringComponentConfig is cluster monitoring component configuration.",
+      "id": "MonitoringComponentConfig",
+      "properties": {
+        "enableComponents": {
+          "description": "Select components to collect metrics. An empty set would disable all monitoring.",
+          "items": {
+            "enum": [
+              "COMPONENT_UNSPECIFIED",
+              "SYSTEM_COMPONENTS"
+            ],
+            "enumDescriptions": [
+              "Default value. This shouldn't be used.",
+              "system components"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "MonitoringConfig": {
+      "description": "MonitoringConfig is cluster monitoring configuration.",
+      "id": "MonitoringConfig",
+      "properties": {
+        "componentConfig": {
+          "$ref": "MonitoringComponentConfig",
+          "description": "Monitoring components configuration"
+        }
+      },
+      "type": "object"
+    },
     "NetworkConfig": {
       "description": "NetworkConfig reports the relative names of network \u0026 subnetwork.",
       "id": "NetworkConfig",
       "properties": {
+        "datapathProvider": {
+          "description": "The desired datapath provider for this cluster. By default, uses the IPTables-based kube-proxy implementation.",
+          "enum": [
+            "DATAPATH_PROVIDER_UNSPECIFIED",
+            "LEGACY_DATAPATH",
+            "ADVANCED_DATAPATH"
+          ],
+          "enumDescriptions": [
+            "Default value.",
+            "Use the IPTables implementation based on kube-proxy.",
+            "Use the eBPF based GKE Dataplane V2 with additional features. See the [GKE Dataplane V2 documentation](https://cloud.google.com/kubernetes-engine/docs/how-to/dataplane-v2) for more."
+          ],
+          "type": "string"
+        },
         "defaultSnatStatus": {
           "$ref": "DefaultSnatStatus",
           "description": "Whether the cluster disables default in-node sNAT rules. In-node sNAT rules will be disabled when default_snat_status is disabled. When disabled is set to false, default IP masquerade rules will be applied to the nodes to prevent sNAT on cluster internal traffic."
         },
+        "dnsConfig": {
+          "$ref": "DNSConfig",
+          "description": "DNSConfig contains clusterDNS config for this cluster."
+        },
         "enableIntraNodeVisibility": {
           "description": "Whether Intra-node visibility is enabled for this cluster. This makes same node pod to pod traffic visible for VPC network.",
+          "type": "boolean"
+        },
+        "enableL4ilbSubsetting": {
+          "description": "Whether L4ILB Subsetting is enabled for this cluster.",
           "type": "boolean"
         },
         "network": {
@@ -3854,6 +4100,14 @@
           "description": "Type of the disk attached to each node (e.g. 'pd-standard', 'pd-ssd' or 'pd-balanced') If unspecified, the default disk type is 'pd-standard'",
           "type": "string"
         },
+        "gcfsConfig": {
+          "$ref": "GcfsConfig",
+          "description": "Google Container File System (image streaming) configs."
+        },
+        "gvnic": {
+          "$ref": "VirtualNIC",
+          "description": "Enable or disable gvnic in the node pool."
+        },
         "imageType": {
           "description": "The image type to use for this node. Note that for a given image type, the latest version of it will be used.",
           "type": "string"
@@ -3886,7 +4140,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "The metadata key/value pairs assigned to instances in the cluster. Keys must conform to the regexp `[a-zA-Z0-9-_]+` and be less than 128 bytes in length. These are reflected as part of a URL in the metadata server. Additionally, to avoid ambiguity, keys must not conflict with any other metadata keys for the project or be one of the reserved keys: - \"cluster-location\" - \"cluster-name\" - \"cluster-uid\" - \"configure-sh\" - \"containerd-configure-sh\" - \"enable-os-login\" - \"gci-ensure-gke-docker\" - \"gci-metrics-enabled\" - \"gci-update-strategy\" - \"instance-template\" - \"kube-env\" - \"startup-script\" - \"user-data\" - \"disable-address-manager\" - \"windows-startup-script-ps1\" - \"common-psm1\" - \"k8s-node-setup-psm1\" - \"install-ssh-psm1\" - \"user-profile-psm1\" The following keys are reserved for Windows nodes: - \"serial-port-logging-enable\" Values are free-form strings, and only have meaning as interpreted by the image running in the instance. The only restriction placed on them is that each value's size must be less than or equal to 32 KB. The total size of all keys and values must be less than 512 KB.",
+          "description": "The metadata key/value pairs assigned to instances in the cluster. Keys must conform to the regexp `[a-zA-Z0-9-_]+` and be less than 128 bytes in length. These are reflected as part of a URL in the metadata server. Additionally, to avoid ambiguity, keys must not conflict with any other metadata keys for the project or be one of the reserved keys: - \"cluster-location\" - \"cluster-name\" - \"cluster-uid\" - \"configure-sh\" - \"containerd-configure-sh\" - \"enable-os-login\" - \"gci-ensure-gke-docker\" - \"gci-metrics-enabled\" - \"gci-update-strategy\" - \"instance-template\" - \"kube-env\" - \"startup-script\" - \"user-data\" - \"disable-address-manager\" - \"windows-startup-script-ps1\" - \"common-psm1\" - \"k8s-node-setup-psm1\" - \"install-ssh-psm1\" - \"user-profile-psm1\" Values are free-form strings, and only have meaning as interpreted by the image running in the instance. The only restriction placed on them is that each value's size must be less than or equal to 32 KB. The total size of all keys and values must be less than 512 KB.",
           "type": "object"
         },
         "minCpuPlatform": {
@@ -3945,6 +4199,17 @@
       },
       "type": "object"
     },
+    "NodeConfigDefaults": {
+      "description": "Subset of NodeConfig message that has defaults.",
+      "id": "NodeConfigDefaults",
+      "properties": {
+        "gcfsConfig": {
+          "$ref": "GcfsConfig",
+          "description": "GCFS (Google Container File System, a.k.a Riptide) options."
+        }
+      },
+      "type": "object"
+    },
     "NodeKubeletConfig": {
       "description": "Node kubelet configs.",
       "id": "NodeKubeletConfig",
@@ -3979,6 +4244,25 @@
         "upgradeOptions": {
           "$ref": "AutoUpgradeOptions",
           "description": "Specifies the Auto Upgrade knobs for the node pool."
+        }
+      },
+      "type": "object"
+    },
+    "NodeNetworkConfig": {
+      "description": "Parameters for node pool-level network config.",
+      "id": "NodeNetworkConfig",
+      "properties": {
+        "createPodRange": {
+          "description": "Input only. Whether to create a new range for pod IPs in this node pool. Defaults are provided for `pod_range` and `pod_ipv4_cidr_block` if they are not specified. If neither `create_pod_range` or `pod_range` are specified, the cluster-level default (`ip_allocation_policy.cluster_ipv4_cidr_block`) is used. Only applicable if `ip_allocation_policy.use_ip_aliases` is true. This field cannot be changed after the node pool has been created.",
+          "type": "boolean"
+        },
+        "podIpv4CidrBlock": {
+          "description": "The IP address range for pod IPs in this node pool. Only applicable if `create_pod_range` is true. Set to blank to have a range chosen with the default size. Set to /netmask (e.g. `/14`) to have a range chosen with a specific netmask. Set to a [CIDR](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) notation (e.g. `10.96.0.0/14`) to pick a specific range to use. Only applicable if `ip_allocation_policy.use_ip_aliases` is true. This field cannot be changed after the node pool has been created.",
+          "type": "string"
+        },
+        "podRange": {
+          "description": "The ID of the secondary range for pod IPs. If `create_pod_range` is true, this ID is used for the new range. If `create_pod_range` is false, uses an existing secondary range with this ID. Only applicable if `ip_allocation_policy.use_ip_aliases` is true. This field cannot be changed after the node pool has been created.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -4032,6 +4316,10 @@
         "name": {
           "description": "The name of the node pool.",
           "type": "string"
+        },
+        "networkConfig": {
+          "$ref": "NodeNetworkConfig",
+          "description": "Networking configuration for this NodePool. If specified, it overrides the cluster-level defaults."
         },
         "podIpv4CidrSize": {
           "description": "[Output only] The pod CIDR block size per node in this node pool.",
@@ -4092,14 +4380,25 @@
           "type": "boolean"
         },
         "maxNodeCount": {
-          "description": "Maximum number of nodes in the NodePool. Must be \u003e= min_node_count. There has to enough quota to scale up the cluster.",
+          "description": "Maximum number of nodes for one location in the NodePool. Must be \u003e= min_node_count. There has to be enough quota to scale up the cluster.",
           "format": "int32",
           "type": "integer"
         },
         "minNodeCount": {
-          "description": "Minimum number of nodes in the NodePool. Must be \u003e= 1 and \u003c= max_node_count.",
+          "description": "Minimum number of nodes for one location in the NodePool. Must be \u003e= 1 and \u003c= max_node_count.",
           "format": "int32",
           "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "NodePoolDefaults": {
+      "description": "Subset of Nodepool message that has defaults.",
+      "id": "NodePoolDefaults",
+      "properties": {
+        "nodeConfigDefaults": {
+          "$ref": "NodeConfigDefaults",
+          "description": "Subset of NodeConfig message that has defaults."
         }
       },
       "type": "object"
@@ -5109,7 +5408,8 @@
             "GKE_SERVICE_ACCOUNT_DELETED",
             "GCE_QUOTA_EXCEEDED",
             "SET_BY_OPERATOR",
-            "CLOUD_KMS_KEY_ERROR"
+            "CLOUD_KMS_KEY_ERROR",
+            "CA_EXPIRING"
           ],
           "enumDescriptions": [
             "UNKNOWN indicates a generic condition.",
@@ -5117,7 +5417,8 @@
             "GKE_SERVICE_ACCOUNT_DELETED indicates that the user deleted their robot service account.",
             "Google Compute Engine quota was exceeded.",
             "Cluster state was manually changed by an SRE due to a system logic error.",
-            "Unable to perform an encrypt operation against the CloudKMS key used for etcd level encryption. More codes TBA"
+            "Unable to perform an encrypt operation against the CloudKMS key used for etcd level encryption.",
+            "Cluster CA is expiring soon."
           ],
           "type": "string"
         },
@@ -5207,6 +5508,14 @@
           "description": "Deprecated. The name of the cluster to upgrade. This field has been deprecated and replaced by the name field.",
           "type": "string"
         },
+        "gcfsConfig": {
+          "$ref": "GcfsConfig",
+          "description": "GCFS config."
+        },
+        "gvnic": {
+          "$ref": "VirtualNIC",
+          "description": "Enable or disable gvnic on the node pool."
+        },
         "imageType": {
           "description": "Required. The desired image type for the node pool.",
           "type": "string"
@@ -5252,6 +5561,39 @@
         },
         "zone": {
           "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) in which the cluster resides. This field has been deprecated and replaced by the name field.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UpgradeAvailableEvent": {
+      "description": "UpgradeAvailableEvent is a notification sent to customers when a new available version is released.",
+      "id": "UpgradeAvailableEvent",
+      "properties": {
+        "releaseChannel": {
+          "$ref": "ReleaseChannel",
+          "description": "The release channel of the version. If empty, it means a non-channel release."
+        },
+        "resource": {
+          "description": "Optional relative path to the resource. For example, the relative path of the node pool.",
+          "type": "string"
+        },
+        "resourceType": {
+          "description": "The resource type of the release version.",
+          "enum": [
+            "UPGRADE_RESOURCE_TYPE_UNSPECIFIED",
+            "MASTER",
+            "NODE_POOL"
+          ],
+          "enumDescriptions": [
+            "Default value. This shouldn't be used.",
+            "Master / control plane",
+            "Node pool"
+          ],
+          "type": "string"
+        },
+        "version": {
+          "description": "The release version available for upgrade.",
           "type": "string"
         }
       },
@@ -5385,6 +5727,17 @@
       "properties": {
         "enabled": {
           "description": "Enables vertical pod autoscaling.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "VirtualNIC": {
+      "description": "Configuration of gVNIC feature.",
+      "id": "VirtualNIC",
+      "properties": {
+        "enabled": {
+          "description": "Whether gVNIC features are enabled in the node pool.",
           "type": "boolean"
         }
       },

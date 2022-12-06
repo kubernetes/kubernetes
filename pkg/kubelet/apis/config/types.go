@@ -19,7 +19,8 @@ package config
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfig "k8s.io/component-base/config"
+	logsapi "k8s.io/component-base/logs/api/v1"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -98,7 +99,7 @@ type KubeletConfiguration struct {
 	// staticPodURL is the URL for accessing static pods to run
 	StaticPodURL string
 	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL
-	StaticPodURLHeader map[string][]string
+	StaticPodURLHeader map[string][]string `datapolicy:"token"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces)
 	Address string
@@ -240,6 +241,10 @@ type KubeletConfiguration struct {
 	// Default: "container"
 	// +optional
 	TopologyManagerScope string
+	// TopologyManagerPolicyOptions is a set of key=value which allows to set extra options
+	// to fine tune the behaviour of the topology manager policies.
+	// Requires  both the "TopologyManager" and "TopologyManagerPolicyOptions" feature gates to be enabled.
+	TopologyManagerPolicyOptions map[string]string
 	// Map of QoS resource reservation percentages (memory only for now).
 	// Requires the QOSReserved feature gate to be enabled.
 	QOSReserved map[string]string
@@ -288,6 +293,7 @@ type KubeletConfiguration struct {
 	// serializeImagePulls when enabled, tells the Kubelet to pull images one at a time.
 	SerializeImagePulls bool
 	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
+	// Some default signals are Linux only: nodefs.inodesFree
 	EvictionHard map[string]string
 	// Map of signal names to quantities that defines soft eviction thresholds.  For example: {"memory.available": "300Mi"}.
 	EvictionSoft map[string]string
@@ -340,9 +346,10 @@ type KubeletConfiguration struct {
 	ContainerLogMaxFiles int32
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
-	// A comma separated allowlist of unsafe sysctls or sysctl patterns (ending in *).
-	// Unsafe sysctl groups are kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*, and net.*.
-	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
+	// A comma separated allowlist of unsafe sysctls or sysctl patterns (ending in `*`).
+	// Unsafe sysctl groups are `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, and `net.*`.
+	// These sysctls are namespaced but not allowed by default.
+	// For example: "`kernel.msg*,net.ipv4.route.min_pmtu`"
 	// +optional
 	AllowedUnsafeSysctls []string
 	// kernelMemcgNotification if enabled, the kubelet will integrate with the kernel memcg
@@ -351,14 +358,14 @@ type KubeletConfiguration struct {
 
 	/* the following fields are meant for Node Allocatable */
 
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pid=100) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for non-kubernetes components.
-	// Currently only cpu and memory are supported.
+	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	SystemReserved map[string]string
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pid=100) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for kubernetes system components.
-	// Currently cpu, memory and local ephemeral storage for root file system are supported.
+	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	KubeReserved map[string]string
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
@@ -369,7 +376,7 @@ type KubeletConfiguration struct {
 	KubeReservedCgroup string
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
 	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/design-proposals-archive/blob/main/node/node-allocatable.md) doc for more information.
 	EnforceNodeAllocatable []string
 	// This option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
@@ -383,7 +390,7 @@ type KubeletConfiguration struct {
 	ShowHiddenMetricsForVersion string
 	// Logging specifies the options of logging.
 	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
-	Logging componentbaseconfig.LoggingConfiguration
+	Logging logsapi.LoggingConfiguration
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool
 	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
@@ -430,7 +437,7 @@ type KubeletConfiguration struct {
 	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
 	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
 	// while increasing will put less reclaim pressure.
-	// See http://kep.k8s.io/2570 for more details.
+	// See https://kep.k8s.io/2570 for more details.
 	// Default: 0.8
 	// +featureGate=MemoryQoS
 	// +optional
@@ -440,10 +447,24 @@ type KubeletConfiguration struct {
 	// is true and upon the initial registration of the node.
 	// +optional
 	RegisterWithTaints []v1.Taint
-
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
+	// See https://kep.k8s.io/2832 for more details.
+	// +featureGate=KubeletTracing
+	// +optional
+	Tracing *tracingapi.TracingConfiguration
+
+	// LocalStorageCapacityIsolation enables local ephemeral storage isolation feature. The default setting is true.
+	// This feature allows users to set request/limit for container's ephemeral storage and manage it in a similar way
+	// as cpu and memory. It also allows setting sizeLimit for emptyDir volume, which will trigger pod eviction if disk
+	// usage from the volume exceeds the limit.
+	// This feature depends on the capability of detecting correct root file system disk usage. For certain systems,
+	// such as kind rootless, if this capability cannot be supported, the feature LocalStorageCapacityIsolation should be
+	// disabled. Once disabled, user should not set request/limit for container's ephemeral storage, or sizeLimit for emptyDir.
+	// +optional
+	LocalStorageCapacityIsolation bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -554,9 +575,9 @@ type CredentialProvider struct {
 	//
 	// Each entry in matchImages is a pattern which can optionally contain a port and a path.
 	// Globs can be used in the domain, but not in the port or the path. Globs are supported
-	// as subdomains like '*.k8s.io' or 'k8s.*.io', and top-level-domains such as 'k8s.*'.
-	// Matching partial subdomains like 'app*.k8s.io' is also supported. Each glob can only match
-	// a single subdomain segment, so *.io does not match *.k8s.io.
+	// as subdomains like `*.k8s.io` or `k8s.*.io`, and top-level-domains such as `k8s.*`.
+	// Matching partial subdomains like `app*.k8s.io` is also supported. Each glob can only match
+	// a single subdomain segment, so `*.io` does not match *.k8s.io.
 	//
 	// A match exists between an image and a matchImage when all of the below are true:
 	// - Both contain the same number of domain parts and each part matches.
@@ -564,11 +585,11 @@ type CredentialProvider struct {
 	// - If the imageMatch contains a port, then the port must match in the image as well.
 	//
 	// Example values of matchImages:
-	//   - 123456789.dkr.ecr.us-east-1.amazonaws.com
-	//   - *.azurecr.io
-	//   - gcr.io
-	//   - *.*.registry.io
-	//   - registry.io:8080/path
+	//   - `123456789.dkr.ecr.us-east-1.amazonaws.com`
+	//   - `*.azurecr.io`
+	//   - `gcr.io`
+	//   - `*.*.registry.io`
+	//   - `registry.io:8080/path`
 	MatchImages []string
 
 	// defaultCacheDuration is the default duration the plugin will cache credentials in-memory
@@ -578,6 +599,8 @@ type CredentialProvider struct {
 	// Required input version of the exec CredentialProviderRequest. The returned CredentialProviderResponse
 	// MUST use the same encoding version as the input. Current supported values are:
 	// - credentialprovider.kubelet.k8s.io/v1alpha1
+	// - credentialprovider.kubelet.k8s.io/v1beta1
+	// - credentialprovider.kubelet.k8s.io/v1
 	APIVersion string
 
 	// Arguments to pass to the command when executing it.

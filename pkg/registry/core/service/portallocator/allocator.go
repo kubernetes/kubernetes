@@ -35,6 +35,7 @@ type Interface interface {
 	Release(int) error
 	ForEach(func(int))
 	Has(int) bool
+	Destroy()
 }
 
 var (
@@ -206,4 +207,9 @@ func (r *PortAllocator) contains(port int) (bool, int) {
 
 	offset := port - r.portRange.Base
 	return true, offset
+}
+
+// Destroy shuts down internal allocator.
+func (r *PortAllocator) Destroy() {
+	r.alloc.Destroy()
 }

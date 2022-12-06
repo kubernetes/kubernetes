@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // DeleteFlags composes common printer flag structs
@@ -111,7 +112,7 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	f.FileNameFlags.AddFlags(cmd.Flags())
 	if f.LabelSelector != nil {
-		cmd.Flags().StringVarP(f.LabelSelector, "selector", "l", *f.LabelSelector, "Selector (label query) to filter on.")
+		cmdutil.AddLabelSelectorFlagVar(cmd, f.LabelSelector)
 	}
 	if f.FieldSelector != nil {
 		cmd.Flags().StringVarP(f.FieldSelector, "field-selector", "", *f.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")

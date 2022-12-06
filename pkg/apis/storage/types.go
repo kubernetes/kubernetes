@@ -357,9 +357,6 @@ type CSIDriverSpec struct {
 	//
 	// This field was immutable in Kubernetes <= 1.22 and now is mutable.
 	//
-	// This is a beta field and only available when the CSIStorageCapacity
-	// feature is enabled. The default is false.
-	//
 	// +optional
 	StorageCapacity *bool
 
@@ -393,6 +390,27 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	RequiresRepublish *bool
+
+	// SELinuxMount specifies if the CSI driver supports "-o context"
+	// mount option.
+	//
+	// When "true", the CSI driver must ensure that all volumes provided by this CSI
+	// driver can be mounted separately with different `-o context` options. This is
+	// typical for storage backends that provide volumes as filesystems on block
+	// devices or as independent shared volumes.
+	// Kubernetes will call NodeStage / NodePublish with "-o context=xyz" mount
+	// option when mounting a ReadWriteOncePod volume used in Pod that has
+	// explicitly set SELinux context. In the future, it may be expanded to other
+	// volume AccessModes. In any case, Kubernetes will ensure that the volume is
+	// mounted only with a single SELinux context.
+	//
+	// When "false", Kubernetes won't pass any special SELinux mount options to the driver.
+	// This is typical for volumes that represent subdirectories of a bigger shared filesystem.
+	//
+	// Default is "false".
+	//
+	// +optional
+	SELinuxMount *bool
 }
 
 // FSGroupPolicy specifies if a CSI Driver supports modifying
@@ -575,9 +593,13 @@ type CSINodeList struct {
 //
 // The producer of these objects can decide which approach is more suitable.
 //
-// They are consumed by the kube-scheduler if the CSIStorageCapacity beta feature gate
-// is enabled there and a CSI driver opts into capacity-aware scheduling with
-// CSIDriver.StorageCapacity.
+// They are consumed by the kube-scheduler when a CSI driver opts into
+// capacity-aware scheduling with CSIDriverSpec.StorageCapacity. The scheduler
+// compares the MaximumVolumeSize against the requested size of pending volumes
+// to filter out unsuitable nodes. If MaximumVolumeSize is unset, it falls back
+// to a comparison against the less precise Capacity. If that is also unset,
+// the scheduler assumes that capacity is insufficient and tries some other
+// node.
 type CSIStorageCapacity struct {
 	metav1.TypeMeta
 	// Standard object's metadata. The name has no particular meaning. It must be
@@ -595,7 +617,7 @@ type CSIStorageCapacity struct {
 	// NodeTopology defines which nodes have access to the storage
 	// for which capacity was reported. If not set, the storage is
 	// not accessible from any node in the cluster. If empty, the
-	// storage is accessible from all nodes.  This field is
+	// storage is accessible from all nodes. This field is
 	// immutable.
 	//
 	// +optional
@@ -616,7 +638,7 @@ type CSIStorageCapacity struct {
 	// The semantic is currently (CSI spec 1.2) defined as:
 	// The available capacity, in bytes, of the storage that can be used
 	// to provision volumes. If not set, that information is currently
-	// unavailable and treated like zero capacity.
+	// unavailable.
 	//
 	// +optional
 	Capacity *resource.Quantity

@@ -250,33 +250,54 @@ func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFie
 		}
 		managedAtVersion[managerSet.APIVersion()] = managedAtVersion[managerSet.APIVersion()].Union(managerSet.Set())
 	}
+	// Add back owned items at pruned version first to avoid conversion failure
+	// caused by pruned fields which are required for conversion.
+	prunedVersion := fieldpath.APIVersion(*pruned.TypeRef().NamedType)
+	if managed, ok := managedAtVersion[prunedVersion]; ok {
+		merged, pruned, err = s.addBackOwnedItemsForVersion(merged, pruned, prunedVersion, managed)
+		if err != nil {
+			return nil, err
+		}
+		delete(managedAtVersion, prunedVersion)
+	}
 	for version, managed := range managedAtVersion {
-		merged, err = s.Converter.Convert(merged, version)
+		merged, pruned, err = s.addBackOwnedItemsForVersion(merged, pruned, version, managed)
 		if err != nil {
-			if s.Converter.IsMissingVersionError(err) {
-				continue
-			}
-			return nil, fmt.Errorf("failed to convert merged object at version %v: %v", version, err)
+			return nil, err
 		}
-		pruned, err = s.Converter.Convert(pruned, version)
-		if err != nil {
-			if s.Converter.IsMissingVersionError(err) {
-				continue
-			}
-			return nil, fmt.Errorf("failed to convert pruned object at version %v: %v", version, err)
-		}
-		mergedSet, err := merged.ToFieldSet()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create field set from merged object at version %v: %v", version, err)
-		}
-		prunedSet, err := pruned.ToFieldSet()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create field set from pruned object at version %v: %v", version, err)
-		}
-		sc, tr := merged.Schema(), merged.TypeRef()
-		pruned = merged.RemoveItems(mergedSet.EnsureNamedFieldsAreMembers(sc, tr).Difference(prunedSet.EnsureNamedFieldsAreMembers(sc, tr).Union(managed.EnsureNamedFieldsAreMembers(sc, tr))))
 	}
 	return pruned, nil
+}
+
+// addBackOwnedItemsForVersion adds back any fields, list and map items that were removed by prune with specific managed field path at a version.
+// It is an extracted sub-function from addBackOwnedItems for code reuse.
+func (s *Updater) addBackOwnedItemsForVersion(merged, pruned *typed.TypedValue, version fieldpath.APIVersion, managed *fieldpath.Set) (*typed.TypedValue, *typed.TypedValue, error) {
+	var err error
+	merged, err = s.Converter.Convert(merged, version)
+	if err != nil {
+		if s.Converter.IsMissingVersionError(err) {
+			return merged, pruned, nil
+		}
+		return nil, nil, fmt.Errorf("failed to convert merged object at version %v: %v", version, err)
+	}
+	pruned, err = s.Converter.Convert(pruned, version)
+	if err != nil {
+		if s.Converter.IsMissingVersionError(err) {
+			return merged, pruned, nil
+		}
+		return nil, nil, fmt.Errorf("failed to convert pruned object at version %v: %v", version, err)
+	}
+	mergedSet, err := merged.ToFieldSet()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create field set from merged object at version %v: %v", version, err)
+	}
+	prunedSet, err := pruned.ToFieldSet()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create field set from pruned object at version %v: %v", version, err)
+	}
+	sc, tr := merged.Schema(), merged.TypeRef()
+	pruned = merged.RemoveItems(mergedSet.EnsureNamedFieldsAreMembers(sc, tr).Difference(prunedSet.EnsureNamedFieldsAreMembers(sc, tr).Union(managed.EnsureNamedFieldsAreMembers(sc, tr))))
+	return merged, pruned, nil
 }
 
 // addBackDanglingItems makes sure that the fields list and map items removed by prune were

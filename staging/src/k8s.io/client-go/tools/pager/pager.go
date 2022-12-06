@@ -203,6 +203,11 @@ func (p *ListPager) eachListChunkBuffered(ctx context.Context, options metav1.Li
 	}()
 
 	for o := range chunkC {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		err := fn(o)
 		if err != nil {
 			return err // any fn error should be returned immediately

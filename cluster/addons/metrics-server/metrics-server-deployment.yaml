@@ -50,7 +50,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: metrics-server
-        image: k8s.gcr.io/metrics-server/metrics-server:v0.5.2
+        image: registry.k8s.io/metrics-server/metrics-server:v0.5.2
         command:
         - /metrics-server
         - --metric-resolution=30s
@@ -81,7 +81,7 @@ spec:
         - mountPath: /tmp
           name: tmp-dir
       - name: metrics-server-nanny
-        image: k8s.gcr.io/autoscaling/addon-resizer:1.8.14
+        image: registry.k8s.io/autoscaling/addon-resizer:1.8.14
         resources:
           limits:
             cpu: 100m

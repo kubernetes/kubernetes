@@ -427,6 +427,98 @@ func TestValidateConditions(t *testing.T) {
 	}
 }
 
+func TestLabelSelectorMatchExpression(t *testing.T) {
+	testCases := []struct {
+		name            string
+		labelSelector   *metav1.LabelSelector
+		wantErrorNumber int
+		validateErrs    func(t *testing.T, errs field.ErrorList)
+	}{
+		{
+			name: "Valid LabelSelector",
+			labelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "key",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"value"},
+					},
+				},
+			},
+			wantErrorNumber: 0,
+			validateErrs:    nil,
+		},
+		{
+			name: "MatchExpression's key name isn't valid",
+			labelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "-key",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"value"},
+					},
+				},
+			},
+			wantErrorNumber: 1,
+			validateErrs: func(t *testing.T, errs field.ErrorList) {
+				errMessage := "name part must consist of alphanumeric characters"
+				if !partStringInErrorMessage(errs, errMessage) {
+					t.Errorf("missing %q in\n%v", errMessage, errorsAsString(errs))
+				}
+			},
+		},
+		{
+			name: "MatchExpression's operator isn't valid",
+			labelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "key",
+						Operator: "abc",
+						Values:   []string{"value"},
+					},
+				},
+			},
+			wantErrorNumber: 1,
+			validateErrs: func(t *testing.T, errs field.ErrorList) {
+				errMessage := "not a valid selector operator"
+				if !partStringInErrorMessage(errs, errMessage) {
+					t.Errorf("missing %q in\n%v", errMessage, errorsAsString(errs))
+				}
+			},
+		},
+		{
+			name: "MatchExpression's value name isn't valid",
+			labelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "key",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"-value"},
+					},
+				},
+			},
+			wantErrorNumber: 1,
+			validateErrs: func(t *testing.T, errs field.ErrorList) {
+				errMessage := "a valid label must be an empty string or consist of"
+				if !partStringInErrorMessage(errs, errMessage) {
+					t.Errorf("missing %q in\n%v", errMessage, errorsAsString(errs))
+				}
+			},
+		},
+	}
+	for index, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			allErrs := ValidateLabelSelector(testCase.labelSelector, LabelSelectorValidationOptions{false}, field.NewPath("labelSelector"))
+			if len(allErrs) != testCase.wantErrorNumber {
+				t.Errorf("case[%d]: expected failure", index)
+			}
+			if len(allErrs) >= 1 && testCase.validateErrs != nil {
+				testCase.validateErrs(t, allErrs)
+			}
+		})
+	}
+}
+
 func hasError(errs field.ErrorList, needle string) bool {
 	for _, curr := range errs {
 		if curr.Error() == needle {
@@ -439,6 +531,15 @@ func hasError(errs field.ErrorList, needle string) bool {
 func hasPrefixError(errs field.ErrorList, prefix string) bool {
 	for _, curr := range errs {
 		if strings.HasPrefix(curr.Error(), prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func partStringInErrorMessage(errs field.ErrorList, prefix string) bool {
+	for _, curr := range errs {
+		if strings.Contains(curr.Error(), prefix) {
 			return true
 		}
 	}

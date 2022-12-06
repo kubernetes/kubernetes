@@ -16,10 +16,6 @@
 Package trace provides an implementation of the tracing part of the
 OpenTelemetry API.
 
-This package is currently in a pre-GA phase. Backwards incompatible changes
-may be introduced in subsequent minor version releases as we work to track the
-evolving OpenTelemetry specification and user feedback.
-
 To participate in distributed traces a Span needs to be created for the
 operation being performed as part of a traced workflow. It its simplest form:
 

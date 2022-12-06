@@ -88,7 +88,7 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("cannot specify --authorization-webhook-config-file without mode Webhook"))
 	}
 
-	if len(o.Modes) != len(modes.List()) {
+	if len(o.Modes) != modes.Len() {
 		allErrors = append(allErrors, fmt.Errorf("authorization-mode %q has mode specified more than once", o.Modes))
 	}
 

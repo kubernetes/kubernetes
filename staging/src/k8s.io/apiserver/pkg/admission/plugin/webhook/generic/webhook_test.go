@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/object"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 )
 
 func TestShouldCallHook(t *testing.T) {

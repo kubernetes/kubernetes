@@ -42,19 +42,31 @@ func (v *Error) Error() string {
 	return fmt.Sprintf("%s: %s", v.Field, v.ErrorBody())
 }
 
+type OmitValueType struct{}
+
+var omitValue = OmitValueType{}
+
 // ErrorBody returns the error message without the field name.  This is useful
 // for building nice-looking higher-level error reporting.
 func (v *Error) ErrorBody() string {
 	var s string
-	switch v.Type {
-	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeInternal:
+	switch {
+	case v.Type == ErrorTypeRequired:
+		s = v.Type.String()
+	case v.Type == ErrorTypeForbidden:
+		s = v.Type.String()
+	case v.Type == ErrorTypeTooLong:
+		s = v.Type.String()
+	case v.Type == ErrorTypeInternal:
+		s = v.Type.String()
+	case v.BadValue == omitValue:
 		s = v.Type.String()
 	default:
 		value := v.BadValue
 		valueType := reflect.TypeOf(value)
 		if value == nil || valueType == nil {
 			value = "null"
-		} else if valueType.Kind() == reflect.Ptr {
+		} else if valueType.Kind() == reflect.Pointer {
 			if reflectValue := reflect.ValueOf(value); reflectValue.IsNil() {
 				value = "null"
 			} else {
@@ -123,6 +135,8 @@ const (
 	// ErrorTypeInternal is used to report other errors that are not related
 	// to user input.  See InternalError().
 	ErrorTypeInternal ErrorType = "InternalError"
+	// ErrorTypeTypeInvalid is for the value did not match the schema type for that field
+	ErrorTypeTypeInvalid ErrorType = "FieldValueTypeInvalid"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
@@ -146,9 +160,16 @@ func (t ErrorType) String() string {
 		return "Too many"
 	case ErrorTypeInternal:
 		return "Internal error"
+	case ErrorTypeTypeInvalid:
+		return "Invalid value"
 	default:
 		panic(fmt.Sprintf("unrecognized validation error: %q", string(t)))
 	}
+}
+
+// TypeInvalid returns a *Error indicating "type is invalid"
+func TypeInvalid(field *Path, value interface{}, detail string) *Error {
+	return &Error{ErrorTypeTypeInvalid, field.String(), value, detail}
 }
 
 // NotFound returns a *Error indicating "value not found".  This is
@@ -207,11 +228,40 @@ func TooLong(field *Path, value interface{}, maxLength int) *Error {
 	return &Error{ErrorTypeTooLong, field.String(), value, fmt.Sprintf("must have at most %d bytes", maxLength)}
 }
 
+// TooLongMaxLength returns a *Error indicating "too long".  This is used to
+// report that the given value is too long.  This is similar to
+// Invalid, but the returned error will not include the too-long
+// value. If maxLength is negative, no max length will be included in the message.
+func TooLongMaxLength(field *Path, value interface{}, maxLength int) *Error {
+	var msg string
+	if maxLength >= 0 {
+		msg = fmt.Sprintf("may not be longer than %d", maxLength)
+	} else {
+		msg = "value is too long"
+	}
+	return &Error{ErrorTypeTooLong, field.String(), value, msg}
+}
+
 // TooMany returns a *Error indicating "too many". This is used to
 // report that a given list has too many items. This is similar to TooLong,
 // but the returned error indicates quantity instead of length.
 func TooMany(field *Path, actualQuantity, maxQuantity int) *Error {
-	return &Error{ErrorTypeTooMany, field.String(), actualQuantity, fmt.Sprintf("must have at most %d items", maxQuantity)}
+	var msg string
+
+	if maxQuantity >= 0 {
+		msg = fmt.Sprintf("must have at most %d items", maxQuantity)
+	} else {
+		msg = "has too many items"
+	}
+
+	var actual interface{}
+	if actualQuantity >= 0 {
+		actual = actualQuantity
+	} else {
+		actual = omitValue
+	}
+
+	return &Error{ErrorTypeTooMany, field.String(), actual, msg}
 }
 
 // InternalError returns a *Error indicating "internal error".  This is used

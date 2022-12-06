@@ -246,7 +246,9 @@ func TestNewMap(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := NewMap(tc.cfgs, fakeRegistry, nilRecorderFactory)
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			m, err := NewMap(tc.cfgs, fakeRegistry, nilRecorderFactory, stopCh)
 			if err := checkErr(err, tc.wantErr); err != nil {
 				t.Fatal(err)
 			}

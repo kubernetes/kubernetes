@@ -26,8 +26,9 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -37,7 +38,8 @@ const (
 
 var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
-	var podClient *framework.PodClient
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	var podClient *e2epod.PodClient
 
 	ginkgo.Describe("Pod with a container", func() {
 		ginkgo.Context("printed log to stdout", func() {
@@ -115,7 +117,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 
 			var logPodName string
 			ginkgo.BeforeEach(func() {
-				podClient = f.PodClient()
+				podClient = e2epod.NewPodClient(f)
 				logPodName = "log-pod-" + string(uuid.NewUUID())
 				err := createAndWaitPod(makeLogPod(logPodName, logString))
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)

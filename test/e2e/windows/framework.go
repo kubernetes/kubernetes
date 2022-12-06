@@ -19,7 +19,7 @@ package windows
 import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // SIGDescribe annotates the test with the SIG label.

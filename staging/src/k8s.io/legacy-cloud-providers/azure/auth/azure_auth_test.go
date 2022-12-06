@@ -154,7 +154,7 @@ func TestParseAzureEnvironment(t *testing.T) {
 	for _, c := range cases {
 		env, err := ParseAzureEnvironment(c.cloudName, c.resourceManagerEndpoint, c.identitySystem)
 		assert.NoError(t, err)
-		assert.Equal(t, env, c.expected)
+		assert.Equal(t, c.expected, env)
 	}
 }
 

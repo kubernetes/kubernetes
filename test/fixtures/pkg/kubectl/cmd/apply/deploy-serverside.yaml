@@ -11,7 +11,6 @@ metadata:
   name: nginx-deployment
   namespace: test
   resourceVersion: "355959"
-  selfLink: /apis/extensions/v1beta1/namespaces/test/deployments/nginx-deployment
   uid: 51ac266e-9a37-11e6-8738-0800270c4edc
 spec:
   replicas: 1

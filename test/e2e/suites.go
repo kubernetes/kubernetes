@@ -18,7 +18,7 @@ package e2e
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"time"
 
@@ -26,16 +26,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
-
-// CleanupSuite is the boilerplate that can be used after tests on ginkgo were run, on the SynchronizedAfterSuite step.
-// Similar to SynchronizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
-// Here, the order of functions is reversed; first, the function which runs everywhere,
-// and then the function that only runs on the first Ginkgo node.
-func CleanupSuite() {
-	// Run on all Ginkgo nodes
-	framework.Logf("Running AfterSuite actions on all nodes")
-	framework.RunCleanupActions()
-}
 
 // AfterSuiteActions are actions that are run on ginkgo's SynchronizedAfterSuite
 func AfterSuiteActions() {
@@ -80,7 +70,7 @@ func gatherTestSuiteMetrics() error {
 	metricsJSON := metricsForE2E.PrintJSON()
 	if framework.TestContext.ReportDir != "" {
 		filePath := path.Join(framework.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
-		if err := ioutil.WriteFile(filePath, []byte(metricsJSON), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte(metricsJSON), 0644); err != nil {
 			return fmt.Errorf("error writing to %q: %v", filePath, err)
 		}
 	} else {

@@ -31,22 +31,19 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	testutil "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -704,13 +701,6 @@ func TestPVAffinityConflict(t *testing.T) {
 }
 
 func TestVolumeProvision(t *testing.T) {
-	t.Run("with CSIStorageCapacity", func(t *testing.T) { testVolumeProvision(t, true) })
-	t.Run("without CSIStorageCapacity", func(t *testing.T) { testVolumeProvision(t, false) })
-}
-
-func testVolumeProvision(t *testing.T, storageCapacity bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, storageCapacity)()
-
 	config := setupCluster(t, "volume-scheduling", 1, 0, 0)
 	defer config.teardown()
 
@@ -859,8 +849,6 @@ func testVolumeProvision(t *testing.T, storageCapacity bool) {
 
 // TestCapacity covers different scenarios involving CSIStorageCapacity objects.
 func TestCapacity(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
-
 	config := setupCluster(t, "volume-scheduling", 1, 0, 0)
 	defer config.teardown()
 
@@ -941,8 +929,8 @@ func TestCapacity(t *testing.T) {
 
 		// Create CSIStorageCapacity
 		if test.haveCapacity {
-			if _, err := config.client.StorageV1beta1().CSIStorageCapacities("default").Create(context.TODO(),
-				&storagev1beta1.CSIStorageCapacity{
+			if _, err := config.client.StorageV1().CSIStorageCapacities("default").Create(context.TODO(),
+				&storagev1.CSIStorageCapacity{
 					ObjectMeta: metav1.ObjectMeta{
 						GenerateName: "foo-",
 					},
@@ -1003,19 +991,16 @@ func TestCapacity(t *testing.T) {
 // selectedNode annotation from a claim to reschedule volume provision
 // on provision failure.
 func TestRescheduleProvisioning(t *testing.T) {
-	// Set feature gates
-	ctx, cancel := context.WithCancel(context.Background())
+	testCtx := testutil.InitTestAPIServer(t, "reschedule-volume-provision", nil)
 
-	testCtx := initTestAPIServer(t, "reschedule-volume-provision", nil)
-
-	clientset := testCtx.clientSet
-	ns := testCtx.ns.Name
+	clientset := testCtx.ClientSet
+	ns := testCtx.NS.Name
 
 	defer func() {
-		cancel()
+		testCtx.CancelFn()
 		deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
-		testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-		testCtx.closeFn()
+		testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+		testCtx.CloseFn()
 	}()
 
 	ctrl, informerFactory, err := initPVController(t, testCtx, 0)
@@ -1051,9 +1036,9 @@ func TestRescheduleProvisioning(t *testing.T) {
 	}
 
 	// Start controller.
-	go ctrl.Run(ctx)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	go ctrl.Run(testCtx.Ctx)
+	informerFactory.Start(testCtx.Ctx.Done())
+	informerFactory.WaitForCacheSync(testCtx.Ctx.Done())
 
 	// Validate that the annotation is removed by controller for provision reschedule.
 	if err := waitForProvisionAnn(clientset, pvc, false); err != nil {
@@ -1062,18 +1047,21 @@ func TestRescheduleProvisioning(t *testing.T) {
 }
 
 func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
-	testCtx := initTestSchedulerWithOptions(t, initTestAPIServer(t, nsName, nil), resyncPeriod)
-	clientset := testCtx.clientSet
-	ns := testCtx.ns.Name
+	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
+	testutil.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
+
+	clientset := testCtx.ClientSet
+	ns := testCtx.NS.Name
 
 	ctrl, informerFactory, err := initPVController(t, testCtx, provisionDelaySeconds)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(testCtx.ctx)
+	go ctrl.Run(testCtx.Ctx)
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(testCtx.ctx.Done())
-	informerFactory.WaitForCacheSync(testCtx.ctx.Done())
+	informerFactory.Start(testCtx.Ctx.Done())
+	informerFactory.WaitForCacheSync(testCtx.Ctx.Done())
 
 	// Create shared objects
 	// Create nodes
@@ -1094,17 +1082,17 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   testCtx.ctx.Done(),
+		stop:   testCtx.Ctx.Done(),
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
-			cleanupTest(t, testCtx)
+			testutil.CleanupTest(t, testCtx)
 		},
 	}
 }
 
-func initPVController(t *testing.T, testCtx *testContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
-	clientset := testCtx.clientSet
+func initPVController(t *testing.T, testCtx *testutil.TestContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
+	clientset := testCtx.ClientSet
 	// Informers factory for controllers
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 
@@ -1155,7 +1143,7 @@ func deleteTestObjects(client clientset.Interface, ns string, option metav1.Dele
 	client.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.StorageV1().StorageClasses().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.StorageV1().CSIDrivers().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
-	client.StorageV1beta1().CSIStorageCapacities("default").DeleteCollection(context.TODO(), option, metav1.ListOptions{})
+	client.StorageV1().CSIStorageCapacities("default").DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 }
 
 func makeStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {

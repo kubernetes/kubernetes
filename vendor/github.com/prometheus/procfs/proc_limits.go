@@ -79,7 +79,7 @@ var (
 
 // NewLimits returns the current soft limits of the process.
 //
-// Deprecated: use p.Limits() instead
+// Deprecated: Use p.Limits() instead.
 func (p Proc) NewLimits() (ProcLimits, error) {
 	return p.Limits()
 }

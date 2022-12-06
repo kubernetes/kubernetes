@@ -39,12 +39,14 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -57,8 +59,6 @@ const (
 
 	// We have seen one of these calls take just over 15 seconds, so putting this at 30.
 	proxyHTTPCallTimeout = 30 * time.Second
-	podRetryPeriod       = 1 * time.Second
-	podRetryTimeout      = 1 * time.Minute
 
 	requestRetryPeriod  = 10 * time.Millisecond
 	requestRetryTimeout = 1 * time.Minute
@@ -76,6 +76,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			ClientQPS: -1.0,
 		}
 		f := framework.NewFramework("proxy", options, nil)
+		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 		prefix := "/api/" + version
 
 		/*
@@ -290,9 +291,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 			testSvcLabels := map[string]string{"test": "response"}
 
 			framework.Logf("Creating pod...")
-			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
+			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "agnhost",
+					Name:      "agnhost",
+					Namespace: ns,
 					Labels: map[string]string{
 						"test": "response"},
 				},
@@ -307,11 +309,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 						}},
 					}},
 					RestartPolicy: v1.RestartPolicyNever,
-				}}, metav1.CreateOptions{})
+				}}
+			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
-
-			err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodStatus(f, "test=response"))
-			framework.ExpectNoError(err, "Pod didn't start within time out period")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Pod didn't start within time out period")
 
 			framework.Logf("Creating service...")
 			_, err = f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
@@ -349,7 +350,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			httpVerbs := []string{"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"}
 			for _, httpVerb := range httpVerbs {
 
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy/some/path/with/" + httpVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy/some/path/with/" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
@@ -360,7 +361,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			// For all methods other than HEAD the response body returns 'foo' with the received http method
 			for _, httpVerb := range httpVerbs {
 
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
@@ -384,9 +385,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 			testSvcLabels := map[string]string{"e2e-test": "proxy-endpoints"}
 
 			framework.Logf("Creating pod...")
-			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
+			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "agnhost",
+					Name:      "agnhost",
+					Namespace: ns,
 					Labels: map[string]string{
 						"e2e-test": "proxy-endpoints"},
 				},
@@ -401,11 +403,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 						}},
 					}},
 					RestartPolicy: v1.RestartPolicyNever,
-				}}, metav1.CreateOptions{})
+				}}
+			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
-
-			err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodStatus(f, "e2e-test=proxy-endpoints"))
-			framework.ExpectNoError(err, "Pod didn't start within time out period")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Pod didn't start within time out period")
 
 			framework.Logf("Creating service...")
 			_, err = f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
@@ -443,7 +444,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			httpVerbs := []string{"DELETE", "OPTIONS", "PATCH", "POST", "PUT"}
 			for _, httpVerb := range httpVerbs {
 
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + httpVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
@@ -454,7 +455,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			// The response body returns 'foo' with the received http method
 			for _, httpVerb := range httpVerbs {
 
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + httpVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
 				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
@@ -464,10 +465,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 			// Test that each method returns 301 for both pod and service endpoints
 			redirectVerbs := []string{"GET", "HEAD"}
 			for _, redirectVerb := range redirectVerbs {
-				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + redirectVerb
+				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + redirectVerb
 				validateRedirectRequest(client, redirectVerb, urlString)
 
-				urlString = f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + redirectVerb
+				urlString = strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + redirectVerb
 				validateRedirectRequest(client, redirectVerb, urlString)
 			}
 		})
@@ -485,26 +486,6 @@ func validateRedirectRequest(client *http.Client, redirectVerb string, urlString
 
 	framework.Logf("http.Client request:%s StatusCode:%d", redirectVerb, resp.StatusCode)
 	framework.ExpectEqual(resp.StatusCode, 301, "The resp.StatusCode returned: %d", resp.StatusCode)
-}
-
-func checkPodStatus(f *framework.Framework, label string) func() (bool, error) {
-	return func() (bool, error) {
-		var err error
-
-		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: label})
-
-		if err != nil {
-			return false, err
-		}
-
-		if list.Items[0].Status.Phase != "Running" {
-			framework.Logf("Pod Quantity: %d Status: %s", len(list.Items), list.Items[0].Status.Phase)
-			return false, err
-		}
-		framework.Logf("Pod Status: %v", list.Items[0].Status.Phase)
-		return true, nil
-	}
 }
 
 // validateProxyVerbRequest checks that a http request to a pod

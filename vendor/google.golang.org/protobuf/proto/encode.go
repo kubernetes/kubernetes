@@ -16,7 +16,8 @@ import (
 // MarshalOptions configures the marshaler.
 //
 // Example usage:
-//   b, err := MarshalOptions{Deterministic: true}.Marshal(m)
+//
+//	b, err := MarshalOptions{Deterministic: true}.Marshal(m)
 type MarshalOptions struct {
 	pragma.NoUnkeyedLiterals
 
@@ -101,7 +102,9 @@ func (o MarshalOptions) Marshal(m Message) ([]byte, error) {
 // otherwise it returns a non-nil empty buffer.
 //
 // This is to assist the edge-case where user-code does the following:
+//
 //	m1.OptionalBytes, _ = proto.Marshal(m2)
+//
 // where they expect the proto2 "optional_bytes" field to be populated
 // if any only if m2 is a valid message.
 func emptyBytesForMessage(m Message) []byte {

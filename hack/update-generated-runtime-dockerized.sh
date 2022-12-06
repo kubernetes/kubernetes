@@ -25,11 +25,11 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/staging/src/k8s.io/cri-api/pkg/apis/runtime/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-runtime_versions=("v1alpha2" "v1")
+runtime_versions=("v1")
 
 kube::golang::setup_env
 
-go install k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
+GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 
 if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
   echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
@@ -59,7 +59,7 @@ function generate_code() {
 	protoc \
 	--proto_path="${KUBE_REMOTE_RUNTIME_PATH}" \
 	--proto_path="${KUBE_ROOT}/vendor" \
-	--gogo_out=plugins=grpc:"${KUBE_REMOTE_RUNTIME_PATH}" "${KUBE_REMOTE_RUNTIME_PATH}/api.proto"
+	--gogo_out=plugins=grpc:"${KUBE_ROOT}/staging/src" "${KUBE_REMOTE_RUNTIME_PATH}/api.proto"
 
 	# Update boilerplate for the generated file.
 	cat hack/boilerplate/boilerplate.generatego.txt "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go" > "${KUBE_REMOTE_RUNTIME_PATH}/api.pb.go.tmp"

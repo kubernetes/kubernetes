@@ -385,6 +385,11 @@ func (v *Value) Int(optionalDefault ...int) int {
 	if s, ok := v.data.(int); ok {
 		return s
 	}
+	if s, ok := v.data.(float64); ok {
+		if float64(int(s)) == s {
+			return int(s)
+		}
+	}
 	if len(optionalDefault) == 1 {
 		return optionalDefault[0]
 	}
@@ -395,6 +400,11 @@ func (v *Value) Int(optionalDefault ...int) int {
 //
 // Panics if the object is not a int.
 func (v *Value) MustInt() int {
+	if s, ok := v.data.(float64); ok {
+		if float64(int(s)) == s {
+			return int(s)
+		}
+	}
 	return v.data.(int)
 }
 

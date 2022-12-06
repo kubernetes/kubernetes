@@ -36,7 +36,7 @@ func TestEnabledPluginNames(t *testing.T) {
 	}{
 		// scenario 0: check if a call to enabledPluginNames sets expected values.
 		{
-			expectedPluginNames: []string{"NamespaceLifecycle", "MutatingAdmissionWebhook", "ValidatingAdmissionWebhook"},
+			expectedPluginNames: []string{"NamespaceLifecycle", "MutatingAdmissionWebhook", "ValidatingAdmissionPolicy", "ValidatingAdmissionWebhook"},
 		},
 
 		// scenario 1: use default off plugins if no specified

@@ -28,8 +28,15 @@ import (
 	"strings"
 	"testing"
 
+	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
-	apiv1 "k8s.io/api/core/v1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
+	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -44,15 +51,13 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	kubeversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/networking"
-	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
+	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/storageversionhashdata"
+	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
@@ -77,21 +82,16 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 		},
 	}
 
-	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
-	// This configures the testing apiserver the same way the real apiserver is
-	// configured. The storage versions of these resources are different
-	// from the storage versions of other resources in their group.
-	resourceEncodingOverrides := []schema.GroupVersionResource{
-		batch.Resource("cronjobs").WithVersion("v1beta1"),
-		apisstorage.Resource("volumeattachments").WithVersion("v1beta1"),
-		networking.Resource("ingresses").WithVersion("v1beta1"),
-	}
-	resourceEncoding = resourceconfig.MergeResourceEncodingConfigs(resourceEncoding, resourceEncodingOverrides)
-	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", legacyscheme.Codecs, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
+	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
+	resourceEncoding := resourceconfig.MergeResourceEncodingConfigs(storageFactoryConfig.DefaultResourceEncoding, storageFactoryConfig.ResourceEncodingOverrides)
+	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
 
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
 	etcdOptions.EnableWatchCache = false
+	if err := etcdOptions.Complete(config.GenericConfig.StorageObjectCountTracker, config.GenericConfig.DrainedNotify(), config.GenericConfig.AddPostStartHook); err != nil {
+		t.Fatal(err)
+	}
 	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +156,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 		LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
 	}
 
-	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(apiserverCfg.GenericConfig.RESTOptionsGetter)
+	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
-	apiGroupInfo, _, err := certStorageProvider.NewRESTStorage(apiserverCfg.ExtraConfig.APIResourceConfigSource, apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ExtraConfig.APIResourceConfigSource, apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -216,58 +216,6 @@ func TestVersion(t *testing.T) {
 	if !reflect.DeepEqual(kubeversion.Get(), info) {
 		t.Errorf("Expected %#v, Got %#v", kubeversion.Get(), info)
 	}
-}
-
-func makeNodeList(nodes []string, nodeResources apiv1.NodeResources) *apiv1.NodeList {
-	list := apiv1.NodeList{
-		Items: make([]apiv1.Node, len(nodes)),
-	}
-	for i := range nodes {
-		list.Items[i].Name = nodes[i]
-		list.Items[i].Status.Capacity = nodeResources.Capacity
-	}
-	return &list
-}
-
-// TestGetNodeAddresses verifies that proper results are returned
-// when requesting node addresses.
-func TestGetNodeAddresses(t *testing.T) {
-	assert := assert.New(t)
-
-	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2"}, apiv1.NodeResources{})).CoreV1().Nodes()
-	addressProvider := nodeAddressProvider{fakeNodeClient}
-
-	// Fail case (no addresses associated with nodes)
-	addrs, err := addressProvider.externalAddresses()
-
-	assert.Error(err, "addresses should have caused an error as there are no addresses.")
-	assert.Equal([]string(nil), addrs)
-
-	// Pass case with External type IP
-	nodes, _ := fakeNodeClient.List(context.TODO(), metav1.ListOptions{})
-	for index := range nodes.Items {
-		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
-		fakeNodeClient.Update(context.TODO(), &nodes.Items[index], metav1.UpdateOptions{})
-	}
-	addrs, err = addressProvider.externalAddresses()
-	assert.NoError(err, "addresses should not have returned an error.")
-	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
-}
-
-func TestGetNodeAddressesWithOnlySomeExternalIP(t *testing.T) {
-	assert := assert.New(t)
-
-	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2", "node3"}, apiv1.NodeResources{})).CoreV1().Nodes()
-	addressProvider := nodeAddressProvider{fakeNodeClient}
-
-	// Pass case with 1 External type IP (index == 1) and nodes (indexes 0 & 2) have no External IP.
-	nodes, _ := fakeNodeClient.List(context.TODO(), metav1.ListOptions{})
-	nodes.Items[1].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
-	fakeNodeClient.Update(context.TODO(), &nodes.Items[1], metav1.UpdateOptions{})
-
-	addrs, err := addressProvider.externalAddresses()
-	assert.NoError(err, "addresses should not have returned an error.")
-	assert.Equal([]string{"127.0.0.1"}, addrs)
 }
 
 func decodeResponse(resp *http.Response, obj interface{}) error {
@@ -354,7 +302,7 @@ func TestStorageVersionHashes(t *testing.T) {
 		ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs},
 	}
 	discover := discovery.NewDiscoveryClientForConfigOrDie(c)
-	all, err := discover.ServerResources()
+	_, all, err := discover.ServerGroupsAndResources()
 	if err != nil {
 		t.Error(err)
 	}
@@ -389,73 +337,126 @@ func TestStorageVersionHashes(t *testing.T) {
 	}
 }
 
-func TestStorageVersionHashEqualities(t *testing.T) {
-	apiserver, etcdserver, _, assert := newInstance(t)
-	defer etcdserver.Terminate(t)
-
-	server := httptest.NewServer(apiserver.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
-
-	// Test 1: extensions/v1beta1/ingresses and apps/v1/ingresses have
-	// the same storage version hash.
-	resp, err := http.Get(server.URL + "/apis/extensions/v1beta1")
-	assert.Empty(err)
-	extList := metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &extList))
-	var extIngressHash, appsIngressHash string
-	for _, r := range extList.APIResources {
-		if r.Name == "ingresses" {
-			extIngressHash = r.StorageVersionHash
-			assert.NotEmpty(extIngressHash)
-		}
-	}
-
-	resp, err = http.Get(server.URL + "/apis/networking.k8s.io/v1beta1")
-	assert.Empty(err)
-	appsList := metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &appsList))
-	for _, r := range appsList.APIResources {
-		if r.Name == "ingresses" {
-			appsIngressHash = r.StorageVersionHash
-			assert.NotEmpty(appsIngressHash)
-		}
-	}
-	if len(extIngressHash) > 0 && len(appsIngressHash) > 0 {
-		assert.Equal(extIngressHash, appsIngressHash)
-	}
-
-	// Test 2: batch/v1/jobs and batch/v1beta1/cronjobs have different
-	// storage version hashes.
-	resp, err = http.Get(server.URL + "/apis/batch/v1")
-	assert.Empty(err)
-	batchv1 := metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &batchv1))
-	var jobsHash string
-	for _, r := range batchv1.APIResources {
-		if r.Name == "jobs" {
-			jobsHash = r.StorageVersionHash
-		}
-	}
-	assert.NotEmpty(jobsHash)
-
-	resp, err = http.Get(server.URL + "/apis/batch/v1beta1")
-	assert.Empty(err)
-	batchv1beta1 := metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &batchv1beta1))
-	var cronjobsHash string
-	for _, r := range batchv1beta1.APIResources {
-		if r.Name == "cronjobs" {
-			cronjobsHash = r.StorageVersionHash
-		}
-	}
-	assert.NotEmpty(cronjobsHash)
-	assert.NotEqual(jobsHash, cronjobsHash)
-}
-
 func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
 	config := DefaultAPIResourceConfigSource()
 	for gv, enable := range config.GroupVersionConfigs {
 		if enable && strings.Contains(gv.Version, "alpha") {
 			t.Errorf("Alpha API version %s enabled by default", gv.String())
 		}
+	}
+
+	for gvr, enabled := range config.ResourceConfigs {
+		if !strings.Contains(gvr.Version, "alpha") || !enabled {
+			continue
+		}
+
+		// we have enabled an alpha api by resource {g,v,r}, we also expect the
+		// alpha api by version {g,v} to be disabled. This is so a programmer
+		// remembers to add the new alpha version to alphaAPIGroupVersionsDisabledByDefault.
+		gr := gvr.GroupVersion()
+		if enabled, found := config.GroupVersionConfigs[gr]; !found || enabled {
+			t.Errorf("Alpha API version %q should be disabled by default", gr.String())
+		}
+	}
+}
+
+func TestNoBetaVersionsEnabledByDefault(t *testing.T) {
+	config := DefaultAPIResourceConfigSource()
+	for gv, enable := range config.GroupVersionConfigs {
+		if enable && strings.Contains(gv.Version, "beta") {
+			t.Errorf("Beta API version %s enabled by default", gv.String())
+		}
+	}
+
+	for gvr, enabled := range config.ResourceConfigs {
+		if !strings.Contains(gvr.Version, "beta") || !enabled {
+			continue
+		}
+
+		// we have enabled a beta api by resource {g,v,r}, we also expect the
+		// beta api by version {g,v} to be disabled. This is so a programmer
+		// remembers to add the new beta version to betaAPIGroupVersionsDisabledByDefault.
+		gr := gvr.GroupVersion()
+		if enabled, found := config.GroupVersionConfigs[gr]; !found || enabled {
+			t.Errorf("Beta API version %q should be disabled by default", gr.String())
+		}
+	}
+}
+
+func TestDefaultVars(t *testing.T) {
+	// stableAPIGroupVersionsEnabledByDefault should not contain beta or alpha
+	for i := range stableAPIGroupVersionsEnabledByDefault {
+		gv := stableAPIGroupVersionsEnabledByDefault[i]
+		if strings.Contains(gv.Version, "beta") || strings.Contains(gv.Version, "alpha") {
+			t.Errorf("stableAPIGroupVersionsEnabledByDefault should contain stable version, but found: %q", gv.String())
+		}
+	}
+
+	// legacyBetaEnabledByDefaultResources should contain only beta version
+	for i := range legacyBetaEnabledByDefaultResources {
+		gv := legacyBetaEnabledByDefaultResources[i]
+		if !strings.Contains(gv.Version, "beta") {
+			t.Errorf("legacyBetaEnabledByDefaultResources should contain beta version, but found: %q", gv.String())
+		}
+	}
+
+	// betaAPIGroupVersionsDisabledByDefault should contain only beta version
+	for i := range betaAPIGroupVersionsDisabledByDefault {
+		gv := betaAPIGroupVersionsDisabledByDefault[i]
+		if !strings.Contains(gv.Version, "beta") {
+			t.Errorf("betaAPIGroupVersionsDisabledByDefault should contain beta version, but found: %q", gv.String())
+		}
+	}
+
+	// alphaAPIGroupVersionsDisabledByDefault should contain only alpha version
+	for i := range alphaAPIGroupVersionsDisabledByDefault {
+		gv := alphaAPIGroupVersionsDisabledByDefault[i]
+		if !strings.Contains(gv.Version, "alpha") {
+			t.Errorf("alphaAPIGroupVersionsDisabledByDefault should contain alpha version, but found: %q", gv.String())
+		}
+	}
+}
+
+func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
+	// legacyEnabledBetaResources is nearly a duplication from elsewhere.  This is intentional.  These types already have
+	// GA equivalents available and should therefore never have a beta enabled by default again.
+	legacyEnabledBetaResources := map[schema.GroupVersionResource]bool{
+		autoscalingapiv2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
+		autoscalingapiv2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"): true,
+		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"):                       true,
+		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"):                true,
+		eventsv1beta1.SchemeGroupVersion.WithResource("events"):                           true,
+		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"):                     true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"):          true,
+		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"):           true,
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"):                     true,
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"):         true,
+	}
+
+	// legacyBetaResourcesWithoutStableEquivalents contains those groupresources that were enabled by default as beta
+	// before we changed that policy and do not have stable versions. These resources are allowed to have additional
+	// beta versions enabled by default.  Nothing new should be added here.  There are no future exceptions because there
+	// are no more beta resources enabled by default.
+	legacyBetaResourcesWithoutStableEquivalents := map[schema.GroupResource]bool{
+		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities").GroupResource():         true,
+		flowcontrolv1beta2.SchemeGroupVersion.WithResource("flowschemas").GroupResource():                 true,
+		flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations").GroupResource(): true,
+	}
+
+	config := DefaultAPIResourceConfigSource()
+	for gvr, enable := range config.ResourceConfigs {
+		if !strings.Contains(gvr.Version, "beta") {
+			continue // only check beta things
+		}
+		if !enable {
+			continue // only check things that are enabled
+		}
+		if legacyEnabledBetaResources[gvr] {
+			continue // this is a legacy beta resource
+		}
+		if legacyBetaResourcesWithoutStableEquivalents[gvr.GroupResource()] {
+			continue // this is another beta of a legacy beta resource with no stable equivalent
+		}
+		t.Errorf("no new beta resources can be enabled by default, see https://github.com/kubernetes/enhancements/blob/0ad0fc8269165ca300d05ca51c7ce190a79976a5/keps/sig-architecture/3136-beta-apis-off-by-default/README.md: %v", gvr)
 	}
 }

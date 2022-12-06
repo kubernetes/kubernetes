@@ -27,7 +27,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/big"
 	"net"
@@ -217,7 +216,7 @@ func WriteCSR(csrDir, name string, csr *x509.CertificateRequest) error {
 		return errors.Wrapf(err, "failed to make directory %s", filepath.Dir(csrPath))
 	}
 
-	if err := ioutil.WriteFile(csrPath, EncodeCSRPEM(csr), os.FileMode(0600)); err != nil {
+	if err := os.WriteFile(csrPath, EncodeCSRPEM(csr), os.FileMode(0600)); err != nil {
 		return errors.Wrapf(err, "unable to write CSR to file %s", csrPath)
 	}
 
@@ -248,13 +247,8 @@ func CertOrKeyExist(pkiPath, name string) bool {
 
 	_, certErr := os.Stat(certificatePath)
 	_, keyErr := os.Stat(privateKeyPath)
-	if os.IsNotExist(certErr) && os.IsNotExist(keyErr) {
-		// The cert and the key do not exist
-		return false
-	}
 
-	// Both files exist or one of them
-	return true
+	return !(os.IsNotExist(certErr) && os.IsNotExist(keyErr))
 }
 
 // CSROrKeyExist returns true if one of the CSR or key exists
@@ -354,7 +348,7 @@ func TryLoadCSRAndKeyFromDisk(pkiPath, name string) (*x509.CertificateRequest, c
 }
 
 // TryLoadPrivatePublicKeyFromDisk tries to load the key from the disk and validates that it is valid
-func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, crypto.PublicKey, error) {
 	privateKeyPath := pathForKey(pkiPath, name)
 
 	// Parse the private key from a file
@@ -371,15 +365,15 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 		return nil, nil, errors.Wrapf(err, "couldn't load the public key file %s", publicKeyPath)
 	}
 
-	// Allow RSA format only
-	k, ok := privKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, nil, errors.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
+	// Allow RSA and ECDSA formats only
+	switch k := privKey.(type) {
+	case *rsa.PrivateKey:
+		return k, pubKeys[0].(*rsa.PublicKey), nil
+	case *ecdsa.PrivateKey:
+		return k, pubKeys[0].(*ecdsa.PublicKey), nil
+	default:
+		return nil, nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
 	}
-
-	p := pubKeys[0].(*rsa.PublicKey)
-
-	return k, p, nil
 }
 
 // TryLoadCSRFromDisk tries to load the CSR from the disk
@@ -550,7 +544,7 @@ func parseCSRPEM(pemCSR []byte) (*x509.CertificateRequest, error) {
 // CertificateRequestFromFile returns the CertificateRequest from a given PEM-encoded file.
 // Returns an error if the file could not be read or if the CSR could not be parsed.
 func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
-	pemBlock, err := ioutil.ReadFile(file)
+	pemBlock, err := os.ReadFile(file)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read file")
 	}
@@ -564,6 +558,8 @@ func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
 
 // NewCSR creates a new CSR
 func NewCSR(cfg CertConfig, key crypto.Signer) (*x509.CertificateRequest, error) {
+	RemoveDuplicateAltNames(&cfg.AltNames)
+
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,

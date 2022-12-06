@@ -46,9 +46,14 @@ func NewStorageCodec(opts StorageCodecConfig) (runtime.Codec, runtime.GroupVersi
 		return nil, nil, fmt.Errorf("%q is not a valid mime-type", opts.StorageMediaType)
 	}
 
-	serializer, ok := runtime.SerializerInfoForMediaType(opts.StorageSerializer.SupportedMediaTypes(), mediaType)
+	supportedMediaTypes := opts.StorageSerializer.SupportedMediaTypes()
+	serializer, ok := runtime.SerializerInfoForMediaType(supportedMediaTypes, mediaType)
 	if !ok {
-		return nil, nil, fmt.Errorf("unable to find serializer for %q", mediaType)
+		supportedMediaTypeList := make([]string, len(supportedMediaTypes))
+		for i, mediaType := range supportedMediaTypes {
+			supportedMediaTypeList[i] = mediaType.MediaType
+		}
+		return nil, nil, fmt.Errorf("unable to find serializer for %q, supported media types: %v", mediaType, supportedMediaTypeList)
 	}
 
 	s := serializer.Serializer

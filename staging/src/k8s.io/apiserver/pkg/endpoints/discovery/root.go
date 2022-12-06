@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"sync"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,7 +35,7 @@ import (
 type GroupManager interface {
 	AddGroup(apiGroup metav1.APIGroup)
 	RemoveGroup(groupName string)
-
+	ServeHTTP(resp http.ResponseWriter, req *http.Request)
 	WebService() *restful.WebService
 }
 
@@ -111,7 +111,7 @@ func (s *rootAPIsHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request)
 		groups[i].ServerAddressByClientCIDRs = serverCIDR
 	}
 
-	responsewriters.WriteObjectNegotiated(s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, resp, req, http.StatusOK, &metav1.APIGroupList{Groups: groups})
+	responsewriters.WriteObjectNegotiated(s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, resp, req, http.StatusOK, &metav1.APIGroupList{Groups: groups}, false)
 }
 
 func (s *rootAPIsHandler) restfulHandle(req *restful.Request, resp *restful.Response) {

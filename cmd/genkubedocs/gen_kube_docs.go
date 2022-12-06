@@ -19,7 +19,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra/doc"
@@ -79,7 +79,7 @@ func main() {
 		pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 
 		// generate docs for kubeadm
-		kubeadm := kubeadmapp.NewKubeadmCommand(bytes.NewReader(nil), ioutil.Discard, ioutil.Discard)
+		kubeadm := kubeadmapp.NewKubeadmCommand(bytes.NewReader(nil), io.Discard, io.Discard)
 		doc.GenMarkdownTree(kubeadm, outDir)
 
 		// cleanup generated code for usage as include in the website

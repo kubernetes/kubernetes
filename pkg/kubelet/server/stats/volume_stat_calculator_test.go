@@ -128,8 +128,9 @@ func TestPVCRef(t *testing.T) {
 	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 4)
 	// Verify 'vol0' doesn't have a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
-		Name:    vol0,
-		FsStats: expectedFSStats(),
+		Name:              vol0,
+		FsStats:           expectedFSStats(),
+		VolumeHealthStats: expectedVolumeHealthStats(),
 	})
 	// Verify 'vol1' has a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
@@ -138,16 +139,18 @@ func TestPVCRef(t *testing.T) {
 			Name:      pvcClaimName0,
 			Namespace: namespace0,
 		},
-		FsStats: expectedFSStats(),
+		FsStats:           expectedFSStats(),
+		VolumeHealthStats: expectedVolumeHealthStats(),
 	})
-	// Verify 'vol2' has a PVC reference
+	// // Verify 'vol2' has a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
 		Name: vol2,
 		PVCRef: &kubestats.PVCReference{
 			Name:      pvcClaimName1,
 			Namespace: namespace0,
 		},
-		FsStats: expectedBlockStats(),
+		FsStats:           expectedBlockStats(),
+		VolumeHealthStats: expectedVolumeHealthStats(),
 	})
 	// Verify 'vol3' has a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
@@ -156,7 +159,8 @@ func TestPVCRef(t *testing.T) {
 			Name:      pName0 + "-" + vol3,
 			Namespace: namespace0,
 		},
-		FsStats: expectedFSStats(),
+		FsStats:           expectedFSStats(),
+		VolumeHealthStats: expectedVolumeHealthStats(),
 	})
 }
 
@@ -202,8 +206,10 @@ func TestAbnormalVolumeEvent(t *testing.T) {
 	}
 
 	// Calculate stats for pod
-	volumeCondition.Message = "The target path of the volume doesn't exist"
-	volumeCondition.Abnormal = true
+	if volumeCondition != nil {
+		volumeCondition.Message = "The target path of the volume doesn't exist"
+		volumeCondition.Abnormal = true
+	}
 	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
 	statsCalculator.calcAndStoreStats()
 
@@ -233,16 +239,21 @@ func (v *fakeVolume) GetMetrics() (*volume.Metrics, error) {
 }
 
 func expectedMetrics() *volume.Metrics {
-	return &volume.Metrics{
+	vMetrics := &volume.Metrics{
 		Available:  resource.NewQuantity(available, resource.BinarySI),
 		Capacity:   resource.NewQuantity(capacity, resource.BinarySI),
 		Used:       resource.NewQuantity(available-capacity, resource.BinarySI),
 		Inodes:     resource.NewQuantity(inodesTotal, resource.BinarySI),
 		InodesFree: resource.NewQuantity(inodesFree, resource.BinarySI),
 		InodesUsed: resource.NewQuantity(inodesTotal-inodesFree, resource.BinarySI),
-		Message:    &volumeCondition.Message,
-		Abnormal:   &volumeCondition.Abnormal,
 	}
+
+	if volumeCondition != nil {
+		vMetrics.Message = &volumeCondition.Message
+		vMetrics.Abnormal = &volumeCondition.Abnormal
+	}
+
+	return vMetrics
 }
 
 func expectedFSStats() kubestats.FsStats {
@@ -263,6 +274,17 @@ func expectedFSStats() kubestats.FsStats {
 	}
 }
 
+func expectedVolumeHealthStats() *kubestats.VolumeHealthStats {
+	metric := expectedMetrics()
+	hs := &kubestats.VolumeHealthStats{}
+
+	if metric != nil && metric.Abnormal != nil {
+		hs.Abnormal = *metric.Abnormal
+	}
+
+	return hs
+}
+
 // Fake block-volume/metrics provider, block-devices have no inodes
 var _ volume.BlockVolume = &fakeBlockVolume{}
 
@@ -279,11 +301,17 @@ func (v *fakeBlockVolume) GetMetrics() (*volume.Metrics, error) {
 }
 
 func expectedBlockMetrics() *volume.Metrics {
-	return &volume.Metrics{
+	vMetrics := &volume.Metrics{
 		Available: resource.NewQuantity(available, resource.BinarySI),
 		Capacity:  resource.NewQuantity(capacity, resource.BinarySI),
 		Used:      resource.NewQuantity(available-capacity, resource.BinarySI),
 	}
+
+	if volumeCondition != nil {
+		vMetrics.Abnormal = &volumeCondition.Abnormal
+	}
+
+	return vMetrics
 }
 
 func expectedBlockStats() kubestats.FsStats {

@@ -18,7 +18,7 @@ package kubeconfig
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/pkg/errors"
 
@@ -124,7 +124,7 @@ func HasAuthenticationCredentials(config *clientcmdapi.Config) bool {
 	}
 
 	// token authentication
-	if len(authInfo.Token) != 0 {
+	if len(authInfo.Token) != 0 || len(authInfo.TokenFile) != 0 {
 		return true
 	}
 
@@ -136,6 +136,16 @@ func HasAuthenticationCredentials(config *clientcmdapi.Config) bool {
 	// X509 authentication
 	if (len(authInfo.ClientCertificate) != 0 || len(authInfo.ClientCertificateData) != 0) &&
 		(len(authInfo.ClientKey) != 0 || len(authInfo.ClientKeyData) != 0) {
+		return true
+	}
+
+	// exec authentication
+	if authInfo.Exec != nil && len(authInfo.Exec.Command) != 0 {
+		return true
+	}
+
+	// authprovider authentication
+	if authInfo.AuthProvider != nil && len(authInfo.AuthProvider.Name) != 0 {
 		return true
 	}
 
@@ -151,7 +161,7 @@ func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
 	}
 
 	if len(authInfo.ClientCertificateData) == 0 && len(authInfo.ClientCertificate) != 0 {
-		clientCert, err := ioutil.ReadFile(authInfo.ClientCertificate)
+		clientCert, err := os.ReadFile(authInfo.ClientCertificate)
 		if err != nil {
 			return errors.Wrap(err, "error while reading client cert file defined in kubeconfig")
 		}
@@ -159,12 +169,20 @@ func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
 		authInfo.ClientCertificate = ""
 	}
 	if len(authInfo.ClientKeyData) == 0 && len(authInfo.ClientKey) != 0 {
-		clientKey, err := ioutil.ReadFile(authInfo.ClientKey)
+		clientKey, err := os.ReadFile(authInfo.ClientKey)
 		if err != nil {
 			return errors.Wrap(err, "error while reading client key file defined in kubeconfig")
 		}
 		authInfo.ClientKeyData = clientKey
 		authInfo.ClientKey = ""
+	}
+	if len(authInfo.Token) == 0 && len(authInfo.TokenFile) != 0 {
+		tokenBytes, err := os.ReadFile(authInfo.TokenFile)
+		if err != nil {
+			return errors.Wrap(err, "error while reading token file defined in kubeconfig")
+		}
+		authInfo.Token = string(tokenBytes)
+		authInfo.TokenFile = ""
 	}
 
 	return nil
@@ -178,7 +196,7 @@ func EnsureCertificateAuthorityIsEmbedded(cluster *clientcmdapi.Cluster) error {
 	}
 
 	if len(cluster.CertificateAuthorityData) == 0 && len(cluster.CertificateAuthority) != 0 {
-		ca, err := ioutil.ReadFile(cluster.CertificateAuthority)
+		ca, err := os.ReadFile(cluster.CertificateAuthority)
 		if err != nil {
 			return errors.Wrap(err, "error while reading certificate authority file defined in kubeconfig")
 		}

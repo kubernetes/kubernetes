@@ -27,9 +27,11 @@ const (
 	ScheduleAttemptFailure = "ScheduleAttemptFailure"
 	// BackoffComplete is the event when a pod finishes backoff.
 	BackoffComplete = "BackoffComplete"
-	// ForceActivate is the event when a pod is moved from unschedulableQ/backoffQ
+	// ForceActivate is the event when a pod is moved from unschedulablePods/backoffQ
 	// to activeQ. Usually it's triggered by plugin implementations.
 	ForceActivate = "ForceActivate"
+	// PodUpdate is the event when a pod is updated
+	PodUpdate = "PodUpdate"
 )
 
 var (
@@ -70,20 +72,14 @@ var (
 	CSINodeAdd = framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add, Label: "CSINodeAdd"}
 	// CSINodeUpdate is the event when a CSI node is updated in the cluster.
 	CSINodeUpdate = framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Update, Label: "CSINodeUpdate"}
-	// CSIDriverAdd is the event when a CSI node is added in the cluster.
+	// CSIDriverAdd is the event when a CSI driver is added in the cluster.
 	CSIDriverAdd = framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Add, Label: "CSIDriverAdd"}
-	// CSIDriverUpdate is the event when a CSI node is updated in the cluster.
+	// CSIDriverUpdate is the event when a CSI driver is updated in the cluster.
 	CSIDriverUpdate = framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Update, Label: "CSIDriverUpdate"}
-	// CSIStorageCapacityAdd is the event when a CSI node is added in the cluster.
+	// CSIStorageCapacityAdd is the event when a CSI storage capacity is added in the cluster.
 	CSIStorageCapacityAdd = framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add, Label: "CSIStorageCapacityAdd"}
-	// CSIStorageCapacityUpdate is the event when a CSI node is updated in the cluster.
+	// CSIStorageCapacityUpdate is the event when a CSI storage capacity is updated in the cluster.
 	CSIStorageCapacityUpdate = framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Update, Label: "CSIStorageCapacityUpdate"}
-	// ServiceAdd is the event when a service is added in the cluster.
-	ServiceAdd = framework.ClusterEvent{Resource: framework.Service, ActionType: framework.Add, Label: "ServiceAdd"}
-	// ServiceUpdate is the event when a service is updated in the cluster.
-	ServiceUpdate = framework.ClusterEvent{Resource: framework.Service, ActionType: framework.Update, Label: "ServiceUpdate"}
-	// ServiceDelete is the event when a service is deleted in the cluster.
-	ServiceDelete = framework.ClusterEvent{Resource: framework.Service, ActionType: framework.Delete, Label: "ServiceDelete"}
 	// WildCardEvent semantically matches all resources on all actions.
 	WildCardEvent = framework.ClusterEvent{Resource: framework.WildCard, ActionType: framework.All, Label: "WildCardEvent"}
 	// UnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.

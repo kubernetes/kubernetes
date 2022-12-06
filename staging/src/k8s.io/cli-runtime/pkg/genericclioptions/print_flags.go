@@ -73,7 +73,7 @@ type PrintFlags struct {
 	OutputFlagSpecified func() bool
 }
 
-// Complete sets NamePrintFlags operation flag from sucessTemplate
+// Complete sets NamePrintFlags operation flag from successTemplate
 func (f *PrintFlags) Complete(successTemplate string) error {
 	return f.NamePrintFlags.Complete(successTemplate)
 }
@@ -136,7 +136,7 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	f.TemplatePrinterFlags.AddFlags(cmd)
 
 	if f.OutputFormat != nil {
-		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(f.AllowedFormats(), "|")))
+		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf(`Output format. One of: (%s).`, strings.Join(f.AllowedFormats(), ", ")))
 		if f.OutputFlagSpecified == nil {
 			f.OutputFlagSpecified = func() bool {
 				return cmd.Flag("output").Changed

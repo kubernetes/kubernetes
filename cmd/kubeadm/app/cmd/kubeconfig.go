@@ -111,7 +111,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 	// Add command specific flags
 	cmd.Flags().StringVar(&token, options.TokenStr, token, "The token that should be used as the authentication mechanism for this kubeconfig, instead of client certificates")
 	cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
-	cmd.Flags().StringSliceVar(&organizations, "org", organizations, "The orgnizations of the client certificate. It will be used as the O if client certificates are created")
+	cmd.Flags().StringSliceVar(&organizations, "org", organizations, "The organizations of the client certificate. It will be used as the O if client certificates are created")
 	cmd.Flags().DurationVar(&validityPeriod, "validity-period", kubeadmconstants.CertificateValidity, "The validity period of the client certificate. It is an offset from the current time.")
 
 	cmd.MarkFlagRequired(options.CfgPath)

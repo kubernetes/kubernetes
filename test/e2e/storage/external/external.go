@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"time"
 
 	storagev1 "k8s.io/api/storage/v1"
@@ -34,7 +34,6 @@ import (
 	klog "k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -42,7 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // DriverDefinition needs to be filled in via a .yaml or .json
@@ -162,7 +161,7 @@ func (t testDriverParameter) Set(filename string) error {
 // to define the tests.
 func AddDriverDefinition(filename string) error {
 	driver, err := loadDriverDefinition(filename)
-	e2elog.Logf("Driver loaded from path [%s]: %+v", filename, driver)
+	framework.Logf("Driver loaded from path [%s]: %+v", filename, driver)
 	if err != nil {
 		return err
 	}
@@ -182,7 +181,7 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if filename == "" {
 		return nil, fmt.Errorf("missing file name")
 	}
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -203,11 +202,18 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 		return nil, fmt.Errorf("%s: %w", filename, err)
 	}
 
-	// to ensure backward compatibility if controller expansion is enabled then set online expansion to true
+	// To ensure backward compatibility: if controller expansion is enabled,
+	// then set both online and offline expansion to true
 	if _, ok := driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion]; !ok &&
 		driver.GetDriverInfo().Capabilities[storageframework.CapControllerExpansion] {
 		caps := driver.DriverInfo.Capabilities
 		caps[storageframework.CapOnlineExpansion] = true
+		driver.DriverInfo.Capabilities = caps
+	}
+	if _, ok := driver.GetDriverInfo().Capabilities[storageframework.CapOfflineExpansion]; !ok &&
+		driver.GetDriverInfo().Capabilities[storageframework.CapControllerExpansion] {
+		caps := driver.DriverInfo.Capabilities
+		caps[storageframework.CapOfflineExpansion] = true
 		driver.DriverInfo.Capabilities = caps
 	}
 	return driver, nil
@@ -286,7 +292,9 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storagefra
 		framework.ExpectNoError(err, "patch items")
 
 		sc, ok = items[0].(*storagev1.StorageClass)
-		framework.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
+		if !ok {
+			framework.Failf("storage class from %s", d.StorageClass.FromFile)
+		}
 	}
 
 	framework.ExpectNotEqual(sc, nil, "storage class is unexpectantly nil")
@@ -339,7 +347,7 @@ func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
 }
 
 func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -407,12 +415,12 @@ func (d *driverDefinition) GetCSIDriverName(e2econfig *storageframework.PerTestC
 	return d.DriverInfo.Name
 }
 
-func (d *driverDefinition) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (d *driverDefinition) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	e2econfig := &storageframework.PerTestConfig{
 		Driver:              d,
 		Prefix:              "external",
 		Framework:           f,
 		ClientNodeSelection: e2epod.NodeSelection{Name: d.ClientNodeName},
 	}
-	return e2econfig, func() {}
+	return e2econfig
 }

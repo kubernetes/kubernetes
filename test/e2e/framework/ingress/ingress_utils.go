@@ -26,10 +26,11 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -58,12 +59,13 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -178,7 +180,7 @@ func SimpleGET(c *http.Client, url, host string) (string, error) {
 		return "", err
 	}
 	defer res.Body.Close()
-	rawBody, err := ioutil.ReadAll(res.Body)
+	rawBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		return "", err
 	}
@@ -464,10 +466,10 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 	}
 
 	j.Logger.Infof("creating replication controller")
-	framework.RunKubectlOrDieInput(ns, read("rc.yaml"), "create", "-f", "-")
+	e2ekubectl.RunKubectlOrDieInput(ns, read("rc.yaml"), "create", "-f", "-")
 
 	j.Logger.Infof("creating service")
-	framework.RunKubectlOrDieInput(ns, read("svc.yaml"), "create", "-f", "-")
+	e2ekubectl.RunKubectlOrDieInput(ns, read("svc.yaml"), "create", "-f", "-")
 	if len(svcAnnotations) > 0 {
 		svcList, err := j.Client.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
@@ -480,7 +482,7 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 
 	if exists("secret.yaml") {
 		j.Logger.Infof("creating secret")
-		framework.RunKubectlOrDieInput(ns, read("secret.yaml"), "create", "-f", "-")
+		e2ekubectl.RunKubectlOrDieInput(ns, read("secret.yaml"), "create", "-f", "-")
 	}
 	j.Logger.Infof("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
 
@@ -533,7 +535,7 @@ func ingressToManifest(ing *networkingv1.Ingress, path string) error {
 		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
 	}
 
-	if err := ioutil.WriteFile(path, serialized, 0600); err != nil {
+	if err := os.WriteFile(path, serialized, 0600); err != nil {
 		return fmt.Errorf("error in writing ingress to file: %s", err)
 	}
 	return nil
@@ -549,7 +551,7 @@ func (j *TestJig) runCreate(ing *networkingv1.Ingress) (*networkingv1.Ingress, e
 	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
-	_, err := framework.RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	_, err := e2ekubectl.RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
 	return ing, err
 }
 
@@ -564,14 +566,14 @@ func (j *TestJig) runUpdate(ing *networkingv1.Ingress) (*networkingv1.Ingress, e
 	if err := ingressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
-	_, err := framework.RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
+	_, err := e2ekubectl.RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
 	return ing, err
 }
 
 // DescribeIng describes information of ingress by running kubectl describe ing.
 func DescribeIng(ns string) {
 	framework.Logf("\nOutput of kubectl describe ing:\n")
-	desc, _ := framework.RunKubectl(
+	desc, _ := e2ekubectl.RunKubectl(
 		ns, "describe", "ing")
 	framework.Logf(desc)
 }
@@ -679,7 +681,7 @@ func (j *TestJig) runDelete(ing *networkingv1.Ingress) error {
 	if err := ingressToManifest(ing, filePath); err != nil {
 		return err
 	}
-	_, err := framework.RunKubemciWithKubeconfig("delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	_, err := e2ekubectl.RunKubemciWithKubeconfig("delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
 	return err
 }
 
@@ -687,7 +689,7 @@ func (j *TestJig) runDelete(ing *networkingv1.Ingress) error {
 // TODO(nikhiljindal): Update this to be able to return hostname as well.
 func getIngressAddressFromKubemci(name string) ([]string, error) {
 	var addresses []string
-	out, err := framework.RunKubemciCmd("get-status", name)
+	out, err := e2ekubectl.RunKubemciCmd("get-status", name)
 	if err != nil {
 		return addresses, err
 	}
@@ -795,7 +797,7 @@ func (j *TestJig) WaitForIngressToStable() {
 		}
 		return true, nil
 	}); err != nil {
-		framework.Failf("error in waiting for ingress to stablize: %v", err)
+		framework.Failf("error in waiting for ingress to stabilize: %v", err)
 	}
 }
 
@@ -1031,7 +1033,7 @@ func (cont *NginxIngressController) Init() {
 	}
 
 	framework.Logf("initializing nginx ingress controller")
-	framework.RunKubectlOrDieInput(cont.Ns, read("rc.yaml"), "create", "-f", "-")
+	e2ekubectl.RunKubectlOrDieInput(cont.Ns, read("rc.yaml"), "create", "-f", "-")
 
 	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get(context.TODO(), "nginx-ingress-controller", metav1.GetOptions{})
 	framework.ExpectNoError(err)
@@ -1103,8 +1105,15 @@ func generateBacksideHTTPSServiceSpec() *v1.Service {
 
 func generateBacksideHTTPSDeploymentSpec() *appsv1.Deployment {
 	labels := map[string]string{"app": "echoheaders-https"}
-	d := e2edeployment.NewDeployment("echoheaders-https", 0, labels, "echoheaders-https", imageutils.GetE2EImage(imageutils.EchoServer), appsv1.RollingUpdateDeploymentStrategyType)
+	d := e2edeployment.NewDeployment("echoheaders-https", 0, labels, "echoheaders-https", imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RollingUpdateDeploymentStrategyType)
 	d.Spec.Replicas = nil
+	d.Spec.Template.Spec.Containers[0].Command = []string{
+		"/agnhost",
+		"netexec",
+		"--http-port=8443",
+		"--tls-cert-file=/localhost.crt",
+		"--tls-private-key-file=/localhost.key",
+	}
 	d.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{
 		ContainerPort: 8443,
 		Name:          "echo-443",

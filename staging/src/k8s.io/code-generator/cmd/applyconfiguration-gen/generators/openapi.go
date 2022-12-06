@@ -19,10 +19,10 @@ package generators
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
-	openapiv2 "github.com/googleapis/gnostic/openapiv2"
+	openapiv2 "github.com/google/gnostic/openapiv2"
 	"k8s.io/gengo/types"
 	utilproto "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -42,7 +42,7 @@ func newTypeModels(openAPISchemaFilePath string, pkgTypes map[string]*types.Pack
 		return emptyModels, nil // No Extract<type>() functions will be generated.
 	}
 
-	rawOpenAPISchema, err := ioutil.ReadFile(openAPISchemaFilePath)
+	rawOpenAPISchema, err := os.ReadFile(openAPISchemaFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read openapi-schema file: %w", err)
 	}

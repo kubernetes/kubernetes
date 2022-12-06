@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
 	"time"
 
 	authnv1 "k8s.io/api/authentication/v1"
@@ -34,7 +33,6 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 
 	"github.com/google/uuid"
@@ -54,7 +52,7 @@ func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, 
 		Level:                    level,
 	}
 
-	auditID, found := request.AuditIDFrom(req.Context())
+	auditID, found := AuditIDFrom(req.Context())
 	if !found {
 		auditID = types.UID(uuid.New().String())
 	}
@@ -87,9 +85,7 @@ func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, 
 		}
 	}
 
-	for _, kv := range auditAnnotationsFrom(req.Context()) {
-		LogAnnotation(ev, kv.key, kv.value)
-	}
+	addAuditAnnotationsFrom(req.Context(), ev)
 
 	return ev, nil
 }
@@ -156,7 +152,7 @@ func LogRequestObject(ctx context.Context, obj runtime.Object, objGV schema.Grou
 	if shouldOmitManagedFields(ctx) {
 		copy, ok, err := copyWithoutManagedFields(obj)
 		if err != nil {
-			klog.Warningf("error while dropping managed fields from the request for %q error: %v", reflect.TypeOf(obj).Name(), err)
+			klog.ErrorS(err, "Error while dropping managed fields from the request", "auditID", ae.AuditID)
 		}
 		if ok {
 			obj = copy
@@ -168,7 +164,7 @@ func LogRequestObject(ctx context.Context, obj runtime.Object, objGV schema.Grou
 	ae.RequestObject, err = encodeObject(obj, objGV, s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
-		klog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
+		klog.ErrorS(err, "Encoding failed of request object", "auditID", ae.AuditID, "gvr", gvr.String(), "obj", obj)
 		return
 	}
 }
@@ -196,9 +192,11 @@ func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupV
 	if status, ok := obj.(*metav1.Status); ok {
 		// selectively copy the bounded fields.
 		ae.ResponseStatus = &metav1.Status{
-			Status: status.Status,
-			Reason: status.Reason,
-			Code:   status.Code,
+			Status:  status.Status,
+			Message: status.Message,
+			Reason:  status.Reason,
+			Details: status.Details,
+			Code:    status.Code,
 		}
 	}
 
@@ -209,7 +207,7 @@ func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupV
 	if shouldOmitManagedFields(ctx) {
 		copy, ok, err := copyWithoutManagedFields(obj)
 		if err != nil {
-			klog.Warningf("error while dropping managed fields from the response for %q error: %v", reflect.TypeOf(obj).Name(), err)
+			klog.ErrorS(err, "Error while dropping managed fields from the response", "auditID", ae.AuditID)
 		}
 		if ok {
 			obj = copy
@@ -220,7 +218,7 @@ func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupV
 	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)
 	if err != nil {
-		klog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
+		klog.ErrorS(err, "Encoding failed of response object", "auditID", ae.AuditID, "obj", obj)
 	}
 }
 
@@ -239,23 +237,8 @@ func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime
 
 	return &runtime.Unknown{
 		Raw:         buf.Bytes(),
-		ContentType: runtime.ContentTypeJSON,
+		ContentType: mediaType,
 	}, nil
-}
-
-// LogAnnotation fills in the Annotations according to the key value pair.
-func LogAnnotation(ae *auditinternal.Event, key, value string) {
-	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
-		return
-	}
-	if ae.Annotations == nil {
-		ae.Annotations = make(map[string]string)
-	}
-	if v, ok := ae.Annotations[key]; ok && v != value {
-		klog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
-		return
-	}
-	ae.Annotations[key] = value
 }
 
 // truncate User-Agent if too long, otherwise return it directly.

@@ -7,6 +7,7 @@ package cmp
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -79,7 +80,7 @@ func (opts formatOptions) CanFormatDiffSlice(v *valueNode) bool {
 	}
 
 	// Use specialized string diffing for longer slices or strings.
-	const minLength = 64
+	const minLength = 32
 	return vx.Len() >= minLength && vy.Len() >= minLength
 }
 
@@ -96,15 +97,16 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 	}
 
 	// Auto-detect the type of the data.
-	var isLinedText, isText, isBinary bool
 	var sx, sy string
+	var ssx, ssy []string
+	var isString, isMostlyText, isPureLinedText, isBinary bool
 	switch {
 	case t.Kind() == reflect.String:
 		sx, sy = vx.String(), vy.String()
-		isText = true // Initial estimate, verify later
-	case t.Kind() == reflect.Slice && t.Elem() == reflect.TypeOf(byte(0)):
+		isString = true
+	case t.Kind() == reflect.Slice && t.Elem() == byteType:
 		sx, sy = string(vx.Bytes()), string(vy.Bytes())
-		isBinary = true // Initial estimate, verify later
+		isString = true
 	case t.Kind() == reflect.Array:
 		// Arrays need to be addressable for slice operations to work.
 		vx2, vy2 := reflect.New(t).Elem(), reflect.New(t).Elem()
@@ -112,13 +114,12 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 		vy2.Set(vy)
 		vx, vy = vx2, vy2
 	}
-	if isText || isBinary {
-		var numLines, lastLineIdx, maxLineLen int
-		isBinary = !utf8.ValidString(sx) || !utf8.ValidString(sy)
+	if isString {
+		var numTotalRunes, numValidRunes, numLines, lastLineIdx, maxLineLen int
 		for i, r := range sx + sy {
-			if !(unicode.IsPrint(r) || unicode.IsSpace(r)) || r == utf8.RuneError {
-				isBinary = true
-				break
+			numTotalRunes++
+			if (unicode.IsPrint(r) || unicode.IsSpace(r)) && r != utf8.RuneError {
+				numValidRunes++
 			}
 			if r == '\n' {
 				if maxLineLen < i-lastLineIdx {
@@ -128,8 +129,29 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 				numLines++
 			}
 		}
-		isText = !isBinary
-		isLinedText = isText && numLines >= 4 && maxLineLen <= 1024
+		isPureText := numValidRunes == numTotalRunes
+		isMostlyText = float64(numValidRunes) > math.Floor(0.90*float64(numTotalRunes))
+		isPureLinedText = isPureText && numLines >= 4 && maxLineLen <= 1024
+		isBinary = !isMostlyText
+
+		// Avoid diffing by lines if it produces a significantly more complex
+		// edit script than diffing by bytes.
+		if isPureLinedText {
+			ssx = strings.Split(sx, "\n")
+			ssy = strings.Split(sy, "\n")
+			esLines := diff.Difference(len(ssx), len(ssy), func(ix, iy int) diff.Result {
+				return diff.BoolResult(ssx[ix] == ssy[iy])
+			})
+			esBytes := diff.Difference(len(sx), len(sy), func(ix, iy int) diff.Result {
+				return diff.BoolResult(sx[ix] == sy[iy])
+			})
+			efficiencyLines := float64(esLines.Dist()) / float64(len(esLines))
+			efficiencyBytes := float64(esBytes.Dist()) / float64(len(esBytes))
+			quotedLength := len(strconv.Quote(sx + sy))
+			unquotedLength := len(sx) + len(sy)
+			escapeExpansionRatio := float64(quotedLength) / float64(unquotedLength)
+			isPureLinedText = efficiencyLines < 4*efficiencyBytes || escapeExpansionRatio > 1.1
+		}
 	}
 
 	// Format the string into printable records.
@@ -138,9 +160,7 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 	switch {
 	// If the text appears to be multi-lined text,
 	// then perform differencing across individual lines.
-	case isLinedText:
-		ssx := strings.Split(sx, "\n")
-		ssy := strings.Split(sy, "\n")
+	case isPureLinedText:
 		list = opts.formatDiffSlice(
 			reflect.ValueOf(ssx), reflect.ValueOf(ssy), 1, "line",
 			func(v reflect.Value, d diffMode) textRecord {
@@ -154,12 +174,13 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 		// differences in a string literal. This format is more readable,
 		// but has edge-cases where differences are visually indistinguishable.
 		// This format is avoided under the following conditions:
-		//	• A line starts with `"""`
-		//	• A line starts with "..."
-		//	• A line contains non-printable characters
-		//	• Adjacent different lines differ only by whitespace
+		//   - A line starts with `"""`
+		//   - A line starts with "..."
+		//   - A line contains non-printable characters
+		//   - Adjacent different lines differ only by whitespace
 		//
 		// For example:
+		//
 		//		"""
 		//		... // 3 identical lines
 		//		foo
@@ -214,7 +235,7 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 			var out textNode = &textWrap{Prefix: "(", Value: list2, Suffix: ")"}
 			switch t.Kind() {
 			case reflect.String:
-				if t != reflect.TypeOf(string("")) {
+				if t != stringType {
 					out = opts.FormatType(t, out)
 				}
 			case reflect.Slice:
@@ -229,7 +250,7 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 	// If the text appears to be single-lined text,
 	// then perform differencing in approximately fixed-sized chunks.
 	// The output is printed as quoted strings.
-	case isText:
+	case isMostlyText:
 		list = opts.formatDiffSlice(
 			reflect.ValueOf(sx), reflect.ValueOf(sy), 64, "byte",
 			func(v reflect.Value, d diffMode) textRecord {
@@ -237,7 +258,6 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 				return textRecord{Diff: d, Value: textLine(s)}
 			},
 		)
-		delim = ""
 
 	// If the text appears to be binary data,
 	// then perform differencing in approximately fixed-sized chunks.
@@ -299,7 +319,7 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 
 	// Wrap the output with appropriate type information.
 	var out textNode = &textWrap{Prefix: "{", Value: list, Suffix: "}"}
-	if !isText {
+	if !isMostlyText {
 		// The "{...}" byte-sequence literal is not valid Go syntax for strings.
 		// Emit the type for extra clarity (e.g. "string{...}").
 		if t.Kind() == reflect.String {
@@ -310,12 +330,12 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 	switch t.Kind() {
 	case reflect.String:
 		out = &textWrap{Prefix: "strings.Join(", Value: out, Suffix: fmt.Sprintf(", %q)", delim)}
-		if t != reflect.TypeOf(string("")) {
+		if t != stringType {
 			out = opts.FormatType(t, out)
 		}
 	case reflect.Slice:
 		out = &textWrap{Prefix: "bytes.Join(", Value: out, Suffix: fmt.Sprintf(", %q)", delim)}
-		if t != reflect.TypeOf([]byte(nil)) {
+		if t != bytesType {
 			out = opts.FormatType(t, out)
 		}
 	}
@@ -338,8 +358,11 @@ func (opts formatOptions) formatDiffSlice(
 	vx, vy reflect.Value, chunkSize int, name string,
 	makeRec func(reflect.Value, diffMode) textRecord,
 ) (list textList) {
-	es := diff.Difference(vx.Len(), vy.Len(), func(ix int, iy int) diff.Result {
-		return diff.BoolResult(vx.Index(ix).Interface() == vy.Index(iy).Interface())
+	eq := func(ix, iy int) bool {
+		return vx.Index(ix).Interface() == vy.Index(iy).Interface()
+	}
+	es := diff.Difference(vx.Len(), vy.Len(), func(ix, iy int) diff.Result {
+		return diff.BoolResult(eq(ix, iy))
 	})
 
 	appendChunks := func(v reflect.Value, d diffMode) int {
@@ -364,6 +387,7 @@ func (opts formatOptions) formatDiffSlice(
 
 	groups := coalesceAdjacentEdits(name, es)
 	groups = coalesceInterveningIdentical(groups, chunkSize/4)
+	groups = cleanupSurroundingIdentical(groups, eq)
 	maxGroup := diffStats{Name: name}
 	for i, ds := range groups {
 		if maxLen >= 0 && numDiffs >= maxLen {
@@ -416,25 +440,35 @@ func (opts formatOptions) formatDiffSlice(
 
 // coalesceAdjacentEdits coalesces the list of edits into groups of adjacent
 // equal or unequal counts.
+//
+// Example:
+//
+//	Input:  "..XXY...Y"
+//	Output: [
+//		{NumIdentical: 2},
+//		{NumRemoved: 2, NumInserted 1},
+//		{NumIdentical: 3},
+//		{NumInserted: 1},
+//	]
 func coalesceAdjacentEdits(name string, es diff.EditScript) (groups []diffStats) {
-	var prevCase int // Arbitrary index into which case last occurred
-	lastStats := func(i int) *diffStats {
-		if prevCase != i {
+	var prevMode byte
+	lastStats := func(mode byte) *diffStats {
+		if prevMode != mode {
 			groups = append(groups, diffStats{Name: name})
-			prevCase = i
+			prevMode = mode
 		}
 		return &groups[len(groups)-1]
 	}
 	for _, e := range es {
 		switch e {
 		case diff.Identity:
-			lastStats(1).NumIdentical++
+			lastStats('=').NumIdentical++
 		case diff.UniqueX:
-			lastStats(2).NumRemoved++
+			lastStats('!').NumRemoved++
 		case diff.UniqueY:
-			lastStats(2).NumInserted++
+			lastStats('!').NumInserted++
 		case diff.Modified:
-			lastStats(2).NumModified++
+			lastStats('!').NumModified++
 		}
 	}
 	return groups
@@ -444,6 +478,34 @@ func coalesceAdjacentEdits(name string, es diff.EditScript) (groups []diffStats)
 // equal groups into adjacent unequal groups that currently result in a
 // dual inserted/removed printout. This acts as a high-pass filter to smooth
 // out high-frequency changes within the windowSize.
+//
+// Example:
+//
+//	WindowSize: 16,
+//	Input: [
+//		{NumIdentical: 61},              // group 0
+//		{NumRemoved: 3, NumInserted: 1}, // group 1
+//		{NumIdentical: 6},               // ├── coalesce
+//		{NumInserted: 2},                // ├── coalesce
+//		{NumIdentical: 1},               // ├── coalesce
+//		{NumRemoved: 9},                 // └── coalesce
+//		{NumIdentical: 64},              // group 2
+//		{NumRemoved: 3, NumInserted: 1}, // group 3
+//		{NumIdentical: 6},               // ├── coalesce
+//		{NumInserted: 2},                // ├── coalesce
+//		{NumIdentical: 1},               // ├── coalesce
+//		{NumRemoved: 7},                 // ├── coalesce
+//		{NumIdentical: 1},               // ├── coalesce
+//		{NumRemoved: 2},                 // └── coalesce
+//		{NumIdentical: 63},              // group 4
+//	]
+//	Output: [
+//		{NumIdentical: 61},
+//		{NumIdentical: 7, NumRemoved: 12, NumInserted: 3},
+//		{NumIdentical: 64},
+//		{NumIdentical: 8, NumRemoved: 12, NumInserted: 3},
+//		{NumIdentical: 63},
+//	]
 func coalesceInterveningIdentical(groups []diffStats, windowSize int) []diffStats {
 	groups, groupsOrig := groups[:0], groups
 	for i, ds := range groupsOrig {
@@ -460,6 +522,93 @@ func coalesceInterveningIdentical(groups []diffStats, windowSize int) []diffStat
 			}
 		}
 		groups = append(groups, ds)
+	}
+	return groups
+}
+
+// cleanupSurroundingIdentical scans through all unequal groups, and
+// moves any leading sequence of equal elements to the preceding equal group and
+// moves and trailing sequence of equal elements to the succeeding equal group.
+//
+// This is necessary since coalesceInterveningIdentical may coalesce edit groups
+// together such that leading/trailing spans of equal elements becomes possible.
+// Note that this can occur even with an optimal diffing algorithm.
+//
+// Example:
+//
+//	Input: [
+//		{NumIdentical: 61},
+//		{NumIdentical: 1 , NumRemoved: 11, NumInserted: 2}, // assume 3 leading identical elements
+//		{NumIdentical: 67},
+//		{NumIdentical: 7, NumRemoved: 12, NumInserted: 3},  // assume 10 trailing identical elements
+//		{NumIdentical: 54},
+//	]
+//	Output: [
+//		{NumIdentical: 64}, // incremented by 3
+//		{NumRemoved: 9},
+//		{NumIdentical: 67},
+//		{NumRemoved: 9},
+//		{NumIdentical: 64}, // incremented by 10
+//	]
+func cleanupSurroundingIdentical(groups []diffStats, eq func(i, j int) bool) []diffStats {
+	var ix, iy int // indexes into sequence x and y
+	for i, ds := range groups {
+		// Handle equal group.
+		if ds.NumDiff() == 0 {
+			ix += ds.NumIdentical
+			iy += ds.NumIdentical
+			continue
+		}
+
+		// Handle unequal group.
+		nx := ds.NumIdentical + ds.NumRemoved + ds.NumModified
+		ny := ds.NumIdentical + ds.NumInserted + ds.NumModified
+		var numLeadingIdentical, numTrailingIdentical int
+		for j := 0; j < nx && j < ny && eq(ix+j, iy+j); j++ {
+			numLeadingIdentical++
+		}
+		for j := 0; j < nx && j < ny && eq(ix+nx-1-j, iy+ny-1-j); j++ {
+			numTrailingIdentical++
+		}
+		if numIdentical := numLeadingIdentical + numTrailingIdentical; numIdentical > 0 {
+			if numLeadingIdentical > 0 {
+				// Remove leading identical span from this group and
+				// insert it into the preceding group.
+				if i-1 >= 0 {
+					groups[i-1].NumIdentical += numLeadingIdentical
+				} else {
+					// No preceding group exists, so prepend a new group,
+					// but do so after we finish iterating over all groups.
+					defer func() {
+						groups = append([]diffStats{{Name: groups[0].Name, NumIdentical: numLeadingIdentical}}, groups...)
+					}()
+				}
+				// Increment indexes since the preceding group would have handled this.
+				ix += numLeadingIdentical
+				iy += numLeadingIdentical
+			}
+			if numTrailingIdentical > 0 {
+				// Remove trailing identical span from this group and
+				// insert it into the succeeding group.
+				if i+1 < len(groups) {
+					groups[i+1].NumIdentical += numTrailingIdentical
+				} else {
+					// No succeeding group exists, so append a new group,
+					// but do so after we finish iterating over all groups.
+					defer func() {
+						groups = append(groups, diffStats{Name: groups[len(groups)-1].Name, NumIdentical: numTrailingIdentical})
+					}()
+				}
+				// Do not increment indexes since the succeeding group will handle this.
+			}
+
+			// Update this group since some identical elements were removed.
+			nx -= numIdentical
+			ny -= numIdentical
+			groups[i] = diffStats{Name: ds.Name, NumRemoved: nx, NumInserted: ny}
+		}
+		ix += nx
+		iy += ny
 	}
 	return groups
 }

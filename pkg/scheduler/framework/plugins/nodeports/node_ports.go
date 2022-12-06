@@ -74,10 +74,10 @@ func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *NodePorts) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (pl *NodePorts) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	s := getContainerPorts(pod)
 	cycleState.Write(preFilterStateKey, preFilterState(s))
-	return nil
+	return nil, nil
 }
 
 // PreFilterExtensions do not exist for this plugin.
@@ -105,7 +105,7 @@ func (pl *NodePorts) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
 		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
 		{Resource: framework.Pod, ActionType: framework.Delete},
-		{Resource: framework.Node, ActionType: framework.Add},
+		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }
 

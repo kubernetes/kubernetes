@@ -58,13 +58,17 @@ func TestEventCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	stopCh := make(chan struct{})
+	defer close(stopCh)
 	oldBroadcaster := record.NewBroadcaster()
+	defer oldBroadcaster.Shutdown()
 	oldRecorder := oldBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "integration"})
 	oldBroadcaster.StartRecordingToSink(&typedv1.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	oldRecorder.Eventf(regarding, v1.EventTypeNormal, "started", "note")
 
 	newBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	defer newBroadcaster.Shutdown()
 	newRecorder := newBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-scheduler")
 	newBroadcaster.StartRecordingToSink(stopCh)
 	newRecorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")

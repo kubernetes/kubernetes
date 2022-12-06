@@ -17,8 +17,8 @@ limitations under the License.
 package fc
 
 import (
-	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -172,7 +172,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 
 	path := mounter.GetPath()
-	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~fc/vol1", tmpDir)
+	expectedPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~fc/vol1")
 	if path != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}

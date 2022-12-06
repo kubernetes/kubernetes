@@ -149,6 +149,13 @@ func TestPVSecrets(t *testing.T) {
 					ControllerExpandSecretRef: &corev1.SecretReference{
 						Name:      "Spec.PersistentVolumeSource.CSI.ControllerExpandSecretRef",
 						Namespace: "csi"}}}}},
+		{Spec: corev1.PersistentVolumeSpec{
+			ClaimRef: &corev1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				CSI: &corev1.CSIPersistentVolumeSource{
+					NodeExpandSecretRef: &corev1.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.CSI.NodeExpandSecretRef",
+						Namespace: "csi"}}}}},
 	}
 	extractedNames := sets.NewString()
 	extractedNamesWithNamespace := sets.NewString()
@@ -181,6 +188,7 @@ func TestPVSecrets(t *testing.T) {
 		"Spec.PersistentVolumeSource.CSI.NodePublishSecretRef",
 		"Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
 		"Spec.PersistentVolumeSource.CSI.ControllerExpandSecretRef",
+		"Spec.PersistentVolumeSource.CSI.NodeExpandSecretRef",
 	)
 	secretPaths := collectSecretPaths(t, nil, "", reflect.TypeOf(&api.PersistentVolume{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
@@ -229,6 +237,7 @@ func TestPVSecrets(t *testing.T) {
 		"csi/Spec.PersistentVolumeSource.CSI.NodePublishSecretRef",
 		"csi/Spec.PersistentVolumeSource.CSI.NodeStageSecretRef",
 		"csi/Spec.PersistentVolumeSource.CSI.ControllerExpandSecretRef",
+		"csi/Spec.PersistentVolumeSource.CSI.NodeExpandSecretRef",
 	)
 	if missingNames := expectedNamespacedNames.Difference(extractedNamesWithNamespace); len(missingNames) > 0 {
 		t.Logf("Missing expected namespaced names:\n%s", strings.Join(missingNames.List(), "\n"))
@@ -257,7 +266,7 @@ func TestPVSecrets(t *testing.T) {
 func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.Type) sets.String {
 	secretPaths := sets.NewString()
 
-	if tp.Kind() == reflect.Ptr {
+	if tp.Kind() == reflect.Pointer {
 		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
 		return secretPaths
 	}
@@ -267,7 +276,7 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 	}
 
 	switch tp.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
 		// ObjectMeta should not have any field with the word "secret" in it;

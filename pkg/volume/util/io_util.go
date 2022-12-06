@@ -32,7 +32,7 @@ type IoUtil interface {
 
 type osIOHandler struct{}
 
-//NewIOHandler Create a new IoHandler implementation
+// NewIOHandler Create a new IoHandler implementation
 func NewIOHandler() IoUtil {
 	return &osIOHandler{}
 }

@@ -54,7 +54,9 @@ type ResourceExpirationEvaluator interface {
 }
 
 func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (ResourceExpirationEvaluator, error) {
-	ret := &resourceExpirationEvaluator{}
+	ret := &resourceExpirationEvaluator{
+		strictRemovedHandlingInAlpha: false,
+	}
 	if len(currentVersion.Major) > 0 {
 		currentMajor64, err := strconv.ParseInt(currentVersion.Major, 10, 32)
 		if err != nil {

@@ -139,7 +139,6 @@ func (p *clientConnPool) getStartDialLocked(ctx context.Context, addr string) *d
 func (c *dialCall) dial(ctx context.Context, addr string) {
 	const singleUse = false // shared conn
 	c.res, c.err = c.p.t.dialClientConn(ctx, addr, singleUse)
-	close(c.done)
 
 	c.p.mu.Lock()
 	delete(c.p.dialing, addr)
@@ -147,6 +146,8 @@ func (c *dialCall) dial(ctx context.Context, addr string) {
 		c.p.addConnLocked(addr, c.res)
 	}
 	c.p.mu.Unlock()
+
+	close(c.done)
 }
 
 // addConnIfNeeded makes a NewClientConn out of c if a connection for key doesn't

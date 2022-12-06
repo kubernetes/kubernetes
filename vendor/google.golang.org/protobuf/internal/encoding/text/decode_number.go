@@ -50,8 +50,10 @@ type number struct {
 
 // parseNumber constructs a number object from given input. It allows for the
 // following patterns:
-//   integer: ^-?([1-9][0-9]*|0[xX][0-9a-fA-F]+|0[0-7]*)
-//   float: ^-?((0|[1-9][0-9]*)?([.][0-9]*)?([eE][+-]?[0-9]+)?[fF]?)
+//
+//	integer: ^-?([1-9][0-9]*|0[xX][0-9a-fA-F]+|0[0-7]*)
+//	float: ^-?((0|[1-9][0-9]*)?([.][0-9]*)?([eE][+-]?[0-9]+)?[fF]?)
+//
 // It also returns the number of parsed bytes for the given number, 0 if it is
 // not a number.
 func parseNumber(input []byte) number {

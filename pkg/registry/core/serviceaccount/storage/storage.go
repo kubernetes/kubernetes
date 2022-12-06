@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -64,6 +65,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, 
 			secrets:              secretStorage,
 			issuer:               issuer,
 			auds:                 auds,
+			audsSet:              sets.NewString(auds...),
 			maxExpirationSeconds: int64(max.Seconds()),
 			extendExpiration:     extendExpiration,
 		}

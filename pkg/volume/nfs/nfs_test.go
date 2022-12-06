@@ -17,8 +17,8 @@ limitations under the License.
 package nfs
 
 import (
-	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/mount-utils"
@@ -119,7 +119,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec, expectedDevice string) {
 		t.Errorf("Got a nil Mounter")
 	}
 	volumePath := mounter.GetPath()
-	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~nfs/vol1", tmpDir)
+	expectedPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~nfs/vol1")
 	if volumePath != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, volumePath)
 	}

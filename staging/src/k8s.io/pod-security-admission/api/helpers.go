@@ -144,10 +144,34 @@ func (lv LevelVersion) String() string {
 	return fmt.Sprintf("%s:%s", lv.Level, lv.Version)
 }
 
+// Equivalent determines whether two LevelVersions are functionally equivalent. LevelVersions are
+// considered equivalent if both are privileged, or both levels & versions are equal.
+func (lv *LevelVersion) Equivalent(other *LevelVersion) bool {
+	return (lv.Level == LevelPrivileged && other.Level == LevelPrivileged) ||
+		(lv.Level == other.Level && lv.Version == other.Version)
+}
+
 type Policy struct {
 	Enforce LevelVersion
 	Audit   LevelVersion
 	Warn    LevelVersion
+}
+
+func (p *Policy) String() string {
+	return fmt.Sprintf("enforce=%#v, audit=%#v, warn=%#v", p.Enforce, p.Audit, p.Warn)
+}
+
+// Equivalent determines whether two policies are functionally equivalent. Policies are considered
+// equivalent if all 3 modes are considered equivalent.
+func (p *Policy) Equivalent(other *Policy) bool {
+	return p.Enforce.Equivalent(&other.Enforce) && p.Audit.Equivalent(&other.Audit) && p.Warn.Equivalent(&other.Warn)
+}
+
+// FullyPrivileged returns true if all 3 policy modes are privileged.
+func (p *Policy) FullyPrivileged() bool {
+	return p.Enforce.Level == LevelPrivileged &&
+		p.Audit.Level == LevelPrivileged &&
+		p.Warn.Level == LevelPrivileged
 }
 
 // PolicyToEvaluate resolves the PodSecurity namespace labels to the policy for that namespace,
@@ -160,12 +184,16 @@ func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, field.
 		errs field.ErrorList
 
 		p = defaults
+
+		hasEnforceLevel              bool
+		hasWarnLevel, hasWarnVersion bool
 	)
 	if len(labels) == 0 {
 		return p, nil
 	}
 	if level, ok := labels[EnforceLevelLabel]; ok {
 		p.Enforce.Level, err = ParseLevel(level)
+		hasEnforceLevel = (err == nil) // Don't default warn in case of error
 		errs = appendErr(errs, err, EnforceLevelLabel, level)
 	}
 	if version, ok := labels[EnforceVersionLabel]; ok {
@@ -184,6 +212,7 @@ func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, field.
 		errs = appendErr(errs, err, AuditVersionLabel, version)
 	}
 	if level, ok := labels[WarnLevelLabel]; ok {
+		hasWarnLevel = true
 		p.Warn.Level, err = ParseLevel(level)
 		errs = appendErr(errs, err, WarnLevelLabel, level)
 		if err != nil {
@@ -191,9 +220,19 @@ func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, field.
 		}
 	}
 	if version, ok := labels[WarnVersionLabel]; ok {
+		hasWarnVersion = true
 		p.Warn.Version, err = ParseVersion(version)
 		errs = appendErr(errs, err, WarnVersionLabel, version)
 	}
+
+	// Default warn to the enforce level when explicitly set to a more restrictive level.
+	if !hasWarnLevel && hasEnforceLevel && CompareLevels(p.Enforce.Level, p.Warn.Level) > 0 {
+		p.Warn.Level = p.Enforce.Level
+		if !hasWarnVersion {
+			p.Warn.Version = p.Enforce.Version
+		}
+	}
+
 	return p, errs
 }
 

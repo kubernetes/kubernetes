@@ -27,12 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
-	"k8s.io/kubernetes/pkg/features"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -78,7 +75,6 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 }
 
 func TestDaemonSetUpdatesPodsWithMaxSurge(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, true)()
 	ds := newDaemonSet("foo")
 	manager, podControl, _, err := newTestController(ds)
 	if err != nil {
@@ -191,7 +187,6 @@ func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 }
 
 func TestDaemonSetUpdatesAllOldPodsNotReadyMaxSurge(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, true)()
 	ds := newDaemonSet("foo")
 	manager, podControl, _, err := newTestController(ds)
 	if err != nil {
@@ -381,7 +376,6 @@ func TestGetUnavailableNumbers(t *testing.T) {
 		Manager        *daemonSetsController
 		ds             *apps.DaemonSet
 		nodeToPods     map[string][]*v1.Pod
-		enableSurge    bool
 		maxSurge       int
 		maxUnavailable int
 		emptyNodes     int
@@ -536,7 +530,6 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				mapping["node-1"] = []*v1.Pod{pod1}
 				return mapping
 			}(),
-			enableSurge:    true,
 			maxSurge:       1,
 			maxUnavailable: 0,
 			emptyNodes:     0,
@@ -566,7 +559,6 @@ func TestGetUnavailableNumbers(t *testing.T) {
 				mapping["node-1"] = []*v1.Pod{pod1}
 				return mapping
 			}(),
-			enableSurge:    true,
 			maxSurge:       2,
 			maxUnavailable: 0,
 			emptyNodes:     0,
@@ -605,8 +597,6 @@ func TestGetUnavailableNumbers(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, c.enableSurge)()
-
 			c.Manager.dsStore.Add(c.ds)
 			nodeList, err := c.Manager.nodeLister.List(labels.Everything())
 			if err != nil {

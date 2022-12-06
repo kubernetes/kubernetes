@@ -54,8 +54,8 @@ func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequir
 }
 
 func TestResourceConfigForPod(t *testing.T) {
-	defaultQuotaPeriod := uint64(100 * time.Millisecond / time.Microsecond)
-	tunedQuotaPeriod := uint64(5 * time.Millisecond / time.Microsecond)
+	defaultQuotaPeriod := uint64(100 * time.Millisecond / time.Microsecond) // in microseconds
+	tunedQuotaPeriod := uint64(5 * time.Millisecond / time.Microsecond)     // in microseconds
 
 	minShares := uint64(MinShares)
 	burstableShares := MilliCPUToShares(100)
@@ -73,7 +73,7 @@ func TestResourceConfigForPod(t *testing.T) {
 		pod              *v1.Pod
 		expected         *ResourceConfig
 		enforceCPULimits bool
-		quotaPeriod      uint64
+		quotaPeriod      uint64 // in microseconds
 	}{
 		"besteffort": {
 			pod: &v1.Pod{
@@ -296,8 +296,8 @@ func TestResourceConfigForPod(t *testing.T) {
 }
 
 func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
-	defaultQuotaPeriod := uint64(100 * time.Millisecond / time.Microsecond)
-	tunedQuotaPeriod := uint64(5 * time.Millisecond / time.Microsecond)
+	defaultQuotaPeriod := uint64(100 * time.Millisecond / time.Microsecond) // in microseconds
+	tunedQuotaPeriod := uint64(5 * time.Millisecond / time.Microsecond)     // in microseconds
 	tunedQuota := int64(1 * time.Millisecond / time.Microsecond)
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUCFSQuotaPeriod, true)()
@@ -318,7 +318,7 @@ func TestResourceConfigForPodWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 		pod              *v1.Pod
 		expected         *ResourceConfig
 		enforceCPULimits bool
-		quotaPeriod      uint64
+		quotaPeriod      uint64 // in microseconds
 	}{
 		"besteffort": {
 			pod: &v1.Pod{
@@ -650,8 +650,8 @@ func TestHugePageLimits(t *testing.T) {
 }
 
 func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
-	defaultQuotaPeriod := uint64(100 * time.Millisecond / time.Microsecond)
-	tunedQuotaPeriod := uint64(5 * time.Millisecond / time.Microsecond)
+	defaultQuotaPeriod := uint64(100 * time.Millisecond / time.Microsecond) // in microseconds
+	tunedQuotaPeriod := uint64(5 * time.Millisecond / time.Microsecond)     // in microseconds
 
 	minShares := uint64(MinShares)
 	burstableShares := MilliCPUToShares(100)
@@ -669,7 +669,7 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 		pod              *v1.Pod
 		expected         *ResourceConfig
 		enforceCPULimits bool
-		quotaPeriod      uint64
+		quotaPeriod      uint64 // in microseconds
 	}{
 		"besteffort": {
 			pod: &v1.Pod{

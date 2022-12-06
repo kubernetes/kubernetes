@@ -78,11 +78,20 @@ spec:
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: coredns
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: k8s-app
+                  operator: In
+                  values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-      - key: {{ .OldControlPlaneTaintKey }}
-        effect: NoSchedule
       - key: {{ .ControlPlaneTaintKey }}
         effect: NoSchedule
       nodeSelector:

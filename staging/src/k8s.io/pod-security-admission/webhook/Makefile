@@ -48,13 +48,13 @@ certs:
 	rm -fr pki
 	mkdir -p pki
 	openssl genrsa -out pki/ca.key 2048
-	openssl req -new -x509 -days 3650 -key pki/ca.key -subj "/CN=pod-security-webhook-ca-$(date +%s)" -out pki/ca.crt
+	openssl req -sha256 -new -x509 -days 3650 -key pki/ca.key -subj "/CN=pod-security-webhook-ca-$(shell date +%s)" -out pki/ca.crt
 
-	openssl req -newkey rsa:2048 -nodes -keyout pki/tls.key -subj "/CN=webhook.pod-security-webhook.svc" -out pki/tls.csr
+	openssl req -sha256 -newkey rsa:2048 -nodes -keyout pki/tls.key -subj "/CN=webhook.pod-security-webhook.svc" -out pki/tls.csr
 
 	echo "subjectAltName=DNS:webhook.pod-security-webhook.svc" > pki/extensions.txt
 	echo "extendedKeyUsage=serverAuth" >> pki/extensions.txt
-	openssl x509 -req -extfile pki/extensions.txt -days 730 -in pki/tls.csr -CA pki/ca.crt -CAkey pki/ca.key -CAcreateserial -out pki/tls.crt
+	openssl x509 -sha256 -req -extfile pki/extensions.txt -days 730 -in pki/tls.csr -CA pki/ca.crt -CAkey pki/ca.key -CAcreateserial -out pki/tls.crt
 
 # Publishes the PodSecurity webhook Docker image to the configured registry.
 push:

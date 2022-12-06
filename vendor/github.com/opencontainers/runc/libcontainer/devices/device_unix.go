@@ -1,10 +1,10 @@
+//go:build !windows
 // +build !windows
 
 package devices
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -16,8 +16,8 @@ var ErrNotADevice = errors.New("not a device node")
 
 // Testing dependencies
 var (
-	unixLstat     = unix.Lstat
-	ioutilReadDir = ioutil.ReadDir
+	unixLstat = unix.Lstat
+	osReadDir = os.ReadDir
 )
 
 func mkDev(d *Rule) (uint64, error) {
@@ -40,7 +40,7 @@ func DeviceFromPath(path, permissions string) (*Device, error) {
 	var (
 		devType   Type
 		mode      = stat.Mode
-		devNumber = uint64(stat.Rdev)
+		devNumber = uint64(stat.Rdev) //nolint:unconvert // Rdev is uint32 on e.g. MIPS.
 		major     = unix.Major(devNumber)
 		minor     = unix.Minor(devNumber)
 	)
@@ -76,7 +76,7 @@ func HostDevices() ([]*Device, error) {
 // GetDevices recursively traverses a directory specified by path
 // and returns all devices found there.
 func GetDevices(path string) ([]*Device, error) {
-	files, err := ioutilReadDir(path)
+	files, err := osReadDir(path)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func GetDevices(path string) ([]*Device, error) {
 		}
 		device, err := DeviceFromPath(filepath.Join(path, f.Name()), "rwm")
 		if err != nil {
-			if err == ErrNotADevice {
+			if errors.Is(err, ErrNotADevice) {
 				continue
 			}
 			if os.IsNotExist(err) {

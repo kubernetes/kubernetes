@@ -39,8 +39,7 @@ parallelism=${PARALLELISM:-8}
 artifacts="${ARTIFACTS:-"/tmp/_artifacts/$(date +%y%m%dT%H%M%S)"}"
 remote=${REMOTE:-"false"}
 remote_mode=${REMOTE_MODE:-"gce"}
-runtime=${RUNTIME:-"docker"}
-container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-""}
+container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 image_service_endpoint=${IMAGE_SERVICE_ENDPOINT:-""}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 test_args=${TEST_ARGS:-""}
@@ -54,7 +53,7 @@ ssh_options=${SSH_OPTIONS:-}
 kubelet_config_file=${KUBELET_CONFIG_FILE:-"test/e2e_node/jenkins/default-kubelet-config.yaml"}
 
 # Parse the flags to pass to ginkgo
-ginkgoflags=""
+ginkgoflags="-timeout=24h"
 if [[ ${parallelism} -gt 1 ]]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
@@ -78,13 +77,11 @@ if [ ! -d "${artifacts}" ]; then
 fi
 echo "Test artifacts will be written to ${artifacts}"
 
-if [[ ${runtime} == "remote" ]] ; then
-  if [[ -n ${container_runtime_endpoint} ]] ; then
-    test_args="--container-runtime-endpoint=${container_runtime_endpoint} ${test_args}"
-  fi
-  if [[ -n ${image_service_endpoint} ]] ; then
-    test_args="--image-service-endpoint=${image_service_endpoint} ${test_args}"
-  fi
+if [[ -n ${container_runtime_endpoint} ]] ; then
+  test_args="--container-runtime-endpoint=${container_runtime_endpoint} ${test_args}"
+fi
+if [[ -n ${image_service_endpoint} ]] ; then
+  test_args="--image-service-endpoint=${image_service_endpoint} ${test_args}"
 fi
 
 
@@ -92,19 +89,13 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   # The following options are only valid in remote GCE run.
   images=${IMAGES:-""}
   hosts=${HOSTS:-""}
-  image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
+  image_project=${IMAGE_PROJECT:-"cos-cloud"}
   metadata=${INSTANCE_METADATA:-""}
-  list_images=${LIST_IMAGES:-false}
-  if  [[ ${list_images} == "true" ]]; then
-    gcloud compute images list --project="${image_project}" | grep "e2e-node"
-    exit 0
-  fi
   gubernator=${GUBERNATOR:-"false"}
   image_config_file=${IMAGE_CONFIG_FILE:-""}
   image_config_dir=${IMAGE_CONFIG_DIR:-""}
   runtime_config=${RUNTIME_CONFIG:-""}
   if [[ ${hosts} == "" && ${images} == "" && ${image_config_file} == "" ]]; then
-    image_project="${IMAGE_PROJECT:-"cos-cloud"}"
     gci_image=$(gcloud compute images list --project "${image_project}" \
     --no-standard-images --filter="name ~ 'cos-beta.*'" --format="table[no-heading](name)")
     images=${gci_image}
@@ -120,9 +111,9 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   fi
 
   # Get the compute zone
-  zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone)')"}
+  zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone.value)')"}
   if [[ ${zone} == "" ]]; then
-    echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone)'\`"
+    echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone.value)'\`"
     exit 1
   fi
 
@@ -171,7 +162,7 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   echo "Kubelet Config File: ${kubelet_config_file}"
 
   # Invoke the runner
-  go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
+  go run test/e2e_node/runner/remote/run_remote.go  --vmodule=*=4 --ssh-env="gce" \
     --zone="${zone}" --project="${project}" --gubernator="${gubernator}" \
     --hosts="${hosts}" --images="${images}" --cleanup="${cleanup}" \
     --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" --runtime-config="${runtime_config}" \
@@ -198,7 +189,7 @@ elif [ "${remote}" = true ] && [ "${remote_mode}" = ssh ] ; then
   test_args='--kubelet-flags="--cluster-domain='${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
 
   # Invoke the runner
-  go run test/e2e_node/runner/remote/run_remote.go  --mode="ssh" --logtostderr --vmodule=*=4 \
+  go run test/e2e_node/runner/remote/run_remote.go  --mode="ssh" --vmodule=*=4 \
     --hosts="${hosts}" --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" \
     --test_args="${test_args}" --system-spec-name="${system_spec_name}" \
     --runtime-config="${runtime_config}" \
@@ -223,9 +214,6 @@ else
   fi
 
 
-  # Runtime flags
-  test_args='--kubelet-flags="--container-runtime='${runtime}'" '${test_args}
-
   # Use cluster.local as default dns-domain
   test_args='--dns-domain="'${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
   test_args='--kubelet-flags="--cluster-domain='${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
@@ -233,9 +221,9 @@ else
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go \
     --system-spec-name="${system_spec_name}" --extra-envs="${extra_envs}" \
-    --ginkgo-flags="${ginkgoflags}" --test-flags="--container-runtime=${runtime} \
-    --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
-    ${test_args}" --runtime-config="${runtime_config}" \
+    --ginkgo-flags="${ginkgoflags}" \
+    --test-flags="--v 4 --report-dir=${artifacts} --node-name $(hostname) ${test_args}" \
+    --runtime-config="${runtime_config}" \
     --kubelet-config-file="${kubelet_config_file}" \
     --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?

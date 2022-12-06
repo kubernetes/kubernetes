@@ -14,11 +14,15 @@ conntrack:
   min: 131072
   tcpCloseWaitTimeout: 1h0m0s
   tcpEstablishedTimeout: 24h0m0s
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: 0.0.0.0:10256
 hostnameOverride: ""
 iptables:
+  localhostNodePorts: true
   masqueradeAll: false
   masqueradeBit: 14
   minSyncPeriod: 1s
@@ -39,8 +43,9 @@ nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
 showHiddenMetricsForVersion: ""
-udpIdleTimeout: 250ms
 winkernel:
   enableDSR: false
+  forwardHealthCheckVip: false
   networkName: ""
+  rootHnsEndpointName: ""
   sourceVip: ""

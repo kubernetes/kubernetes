@@ -260,7 +260,12 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 
 		// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/*
 		fullContainerDirPath := filepath.Join(subPathDir, containerDir.Name())
-		err = filepath.Walk(fullContainerDirPath, func(path string, info os.FileInfo, _ error) error {
+		// The original traversal method here was ReadDir, which was not so robust to handle some error such as "stale NFS file handle",
+		// so it was replaced with filepath.Walk in a later patch, which can pass through error and handled by the callback WalkFunc.
+		// After go 1.16, WalkDir was introduced, it's more effective than Walk because the callback WalkDirFunc is called before
+		// reading a directory, making it save some time when a container's subPath contains lots of dirs.
+		// See https://github.com/kubernetes/kubernetes/pull/71804 and https://github.com/kubernetes/kubernetes/issues/107667 for more details.
+		err = filepath.WalkDir(fullContainerDirPath, func(path string, info os.DirEntry, _ error) error {
 			if path == fullContainerDirPath {
 				// Skip top level directory
 				return nil
@@ -561,10 +566,16 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	// Follow the segments one by one using openat() to make
 	// sure the user cannot change already existing directories into symlinks.
 	for _, seg := range segments {
+		var deviceStat unix.Stat_t
+
 		currentPath = filepath.Join(currentPath, seg)
 		if !mount.PathWithinBase(currentPath, base) {
 			return -1, fmt.Errorf("path %s is outside of allowed base %s", currentPath, base)
 		}
+
+		// Trigger auto mount if it's an auto-mounted directory, ignore error if not a directory.
+		// Notice the trailing slash is mandatory, see "automount" in openat(2) and open_by_handle_at(2).
+		unix.Fstatat(parentFD, seg+"/", &deviceStat, unix.AT_SYMLINK_NOFOLLOW)
 
 		klog.V(5).Infof("Opening path %s", currentPath)
 		childFD, err = syscall.Openat(parentFD, seg, openFDFlags|unix.O_CLOEXEC, 0)
@@ -572,7 +583,6 @@ func doSafeOpen(pathname string, base string) (int, error) {
 			return -1, fmt.Errorf("cannot open %s: %s", currentPath, err)
 		}
 
-		var deviceStat unix.Stat_t
 		err := unix.Fstat(childFD, &deviceStat)
 		if err != nil {
 			return -1, fmt.Errorf("error running fstat on %s with %v", currentPath, err)

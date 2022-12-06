@@ -26,6 +26,7 @@ import (
 // with apply.
 type CronJobSpecApplyConfiguration struct {
 	Schedule                   *string                            `json:"schedule,omitempty"`
+	TimeZone                   *string                            `json:"timeZone,omitempty"`
 	StartingDeadlineSeconds    *int64                             `json:"startingDeadlineSeconds,omitempty"`
 	ConcurrencyPolicy          *v1beta1.ConcurrencyPolicy         `json:"concurrencyPolicy,omitempty"`
 	Suspend                    *bool                              `json:"suspend,omitempty"`
@@ -45,6 +46,14 @@ func CronJobSpec() *CronJobSpecApplyConfiguration {
 // If called multiple times, the Schedule field is set to the value of the last call.
 func (b *CronJobSpecApplyConfiguration) WithSchedule(value string) *CronJobSpecApplyConfiguration {
 	b.Schedule = &value
+	return b
+}
+
+// WithTimeZone sets the TimeZone field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TimeZone field is set to the value of the last call.
+func (b *CronJobSpecApplyConfiguration) WithTimeZone(value string) *CronJobSpecApplyConfiguration {
+	b.TimeZone = &value
 	return b
 }
 

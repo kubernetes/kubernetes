@@ -19,16 +19,10 @@ package resourcequota
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestResourceQuotaStrategy(t *testing.T) {
@@ -62,67 +56,5 @@ func TestResourceQuotaStrategy(t *testing.T) {
 	Strategy.PrepareForCreate(genericapirequest.NewContext(), resourceQuota)
 	if resourceQuota.Status.Used != nil {
 		t.Errorf("ResourceQuota does not allow setting status on create")
-	}
-}
-
-func TestGetValidationOptionsFromResourceQuota(t *testing.T) {
-	crossNamespaceAffinity := api.ResourceQuota{Spec: api.ResourceQuotaSpec{
-		Scopes: []api.ResourceQuotaScope{api.ResourceQuotaScopeCrossNamespacePodAffinity},
-	},
-	}
-
-	for name, tc := range map[string]struct {
-		old                             *api.ResourceQuota
-		namespaceSelectorFeatureEnabled bool
-		wantOpts                        validation.ResourceQuotaValidationOptions
-	}{
-		"create-feature-enabled": {
-			namespaceSelectorFeatureEnabled: true,
-			wantOpts: validation.ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: true,
-			},
-		},
-		"create-feature-disabled": {
-			namespaceSelectorFeatureEnabled: false,
-			wantOpts: validation.ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: false,
-			},
-		},
-		"update-old-doesn't-include-scope-feature-enabled": {
-			old:                             &api.ResourceQuota{},
-			namespaceSelectorFeatureEnabled: true,
-			wantOpts: validation.ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: true,
-			},
-		},
-		"update-old-doesn't-include-scope-feature-disabled": {
-			old:                             &api.ResourceQuota{},
-			namespaceSelectorFeatureEnabled: false,
-			wantOpts: validation.ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: false,
-			},
-		},
-		"update-old-includes-scope-feature-disabled": {
-			old:                             &crossNamespaceAffinity,
-			namespaceSelectorFeatureEnabled: false,
-			wantOpts: validation.ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: true,
-			},
-		},
-		"update-old-includes-scope-feature-enabled": {
-			old:                             &crossNamespaceAffinity,
-			namespaceSelectorFeatureEnabled: true,
-			wantOpts: validation.ResourceQuotaValidationOptions{
-				AllowPodAffinityNamespaceSelector: true,
-			},
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodAffinityNamespaceSelector, tc.namespaceSelectorFeatureEnabled)()
-			gotOpts := getValidationOptionsFromResourceQuota(nil, tc.old)
-			if diff := cmp.Diff(tc.wantOpts, gotOpts); diff != "" {
-				t.Errorf("unexpected opts (-want, +got):\n%s", diff)
-			}
-		})
 	}
 }

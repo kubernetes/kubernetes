@@ -43,7 +43,7 @@ metadata:
 		f.IAMPolicyGenerator.KubernetesService.Name)
 
 	if f.IAMPolicyGenerator.Namespace != "" {
-		input = input + fmt.Sprintf("\n  namespace: %s", f.IAMPolicyGenerator.Namespace)
+		input += fmt.Sprintf("\n  namespace: %s", f.IAMPolicyGenerator.Namespace)
 	}
 
 	sa, err := yaml.Parse(input)

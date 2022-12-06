@@ -395,7 +395,7 @@ func New(family, title string) Trace {
 }
 
 func (tr *trace) Finish() {
-	elapsed := time.Now().Sub(tr.Start)
+	elapsed := time.Since(tr.Start)
 	tr.mu.Lock()
 	tr.Elapsed = elapsed
 	tr.mu.Unlock()

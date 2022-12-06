@@ -18,7 +18,6 @@ package e2enode
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -29,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 type numaPodResources struct {
@@ -78,7 +78,7 @@ func (R *numaPodResources) String() string {
 }
 
 func getCPUsPerNUMANode(nodeNum int) ([]int, error) {
-	nodeCPUList, err := ioutil.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", nodeNum))
+	nodeCPUList, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", nodeNum))
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Con
 
 	cpusPerNUMA := make(map[int][]int)
 	for numaNode := 0; numaNode < numaNodes; numaNode++ {
-		nodeCPUList := f.ExecCommandInContainer(pod.Name, cnt.Name,
+		nodeCPUList := e2epod.ExecCommandInContainer(f, pod.Name, cnt.Name,
 			"/bin/cat", fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", numaNode))
 
 		cpus, err := cpuset.Parse(nodeCPUList)
@@ -153,7 +153,7 @@ func getPCIDeviceToNumaNodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *
 		// a single plugin can allocate more than a single device
 		pciDevs := strings.Split(value, ",")
 		for _, pciDev := range pciDevs {
-			pciDevNUMANode := f.ExecCommandInContainer(pod.Name, cnt.Name,
+			pciDevNUMANode := e2epod.ExecCommandInContainer(f, pod.Name, cnt.Name,
 				"/bin/cat", fmt.Sprintf("/sys/bus/pci/devices/%s/numa_node", pciDev))
 			NUMAPerDev[pciDev] = numaNodeFromSysFsEntry(pciDevNUMANode)
 		}
@@ -230,7 +230,7 @@ type pciDeviceInfo struct {
 func getPCIDeviceInfo(sysPCIDir string) ([]pciDeviceInfo, error) {
 	var pciDevs []pciDeviceInfo
 
-	entries, err := ioutil.ReadDir(sysPCIDir)
+	entries, err := os.ReadDir(sysPCIDir)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func getPCIDeviceInfo(sysPCIDir string) ([]pciDeviceInfo, error) {
 			return nil, err
 		}
 
-		content, err := ioutil.ReadFile(filepath.Join(sysPCIDir, entry.Name(), "numa_node"))
+		content, err := os.ReadFile(filepath.Join(sysPCIDir, entry.Name(), "numa_node"))
 		if err != nil {
 			return nil, err
 		}

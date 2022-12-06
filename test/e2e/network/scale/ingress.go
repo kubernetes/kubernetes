@@ -19,7 +19,7 @@ package scale
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
@@ -29,12 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -152,7 +152,7 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 	if f.ScaleTestDeploy != nil {
 		f.Logger.Infof("Cleaning up deployment %s...", f.ScaleTestDeploy.Name)
 		if err := f.Clientset.AppsV1().Deployments(f.ScaleTestDeploy.Namespace).Delete(context.TODO(), f.ScaleTestDeploy.Name, metav1.DeleteOptions{}); err != nil {
-			errs = append(errs, fmt.Errorf("error while delting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
+			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
 		}
 	}
 
@@ -316,7 +316,7 @@ func (f *IngressScaleFramework) dumpLatencies() {
 	formattedData := f.GetFormattedLatencies()
 	if f.OutputFile != "" {
 		f.Logger.Infof("Dumping scale test latencies to file %s...", f.OutputFile)
-		ioutil.WriteFile(f.OutputFile, []byte(formattedData), 0644)
+		os.WriteFile(f.OutputFile, []byte(formattedData), 0644)
 		return
 	}
 	f.Logger.Infof("\n%v", formattedData)
@@ -448,7 +448,12 @@ func generateScaleTestServiceSpec(suffix string) *v1.Service {
 func generateScaleTestBackendDeploymentSpec(numReplicas int32) *appsv1.Deployment {
 	d := e2edeployment.NewDeployment(
 		scaleTestBackendName, numReplicas, scaleTestLabels, scaleTestBackendName,
-		imageutils.GetE2EImage(imageutils.EchoServer), appsv1.RollingUpdateDeploymentStrategyType)
+		imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RollingUpdateDeploymentStrategyType)
+	d.Spec.Template.Spec.Containers[0].Command = []string{
+		"/agnhost",
+		"netexec",
+		"--http-port=8080",
+	}
 	d.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 8080}}
 	d.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
 		ProbeHandler: v1.ProbeHandler{

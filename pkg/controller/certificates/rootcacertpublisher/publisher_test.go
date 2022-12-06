@@ -17,6 +17,7 @@ limitations under the License.
 package rootcacertpublisher
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -154,9 +155,9 @@ func TestConfigMapCreation(t *testing.T) {
 				cmStore.Add(tc.UpdatedConfigMap)
 				controller.configMapUpdated(nil, tc.UpdatedConfigMap)
 			}
-
+			ctx := context.TODO()
 			for controller.queue.Len() != 0 {
-				controller.processNextWorkItem()
+				controller.processNextWorkItem(ctx)
 			}
 
 			actions := client.Actions()
@@ -263,8 +264,8 @@ func TestConfigMapUpdateNoHotLoop(t *testing.T) {
 				cmListerSynced: func() bool { return true },
 				nsListerSynced: func() bool { return true },
 			}
-
-			err := controller.syncNamespace("default")
+			ctx := context.TODO()
+			err := controller.syncNamespace(ctx, "default")
 			if err != nil {
 				t.Fatal(err)
 			}

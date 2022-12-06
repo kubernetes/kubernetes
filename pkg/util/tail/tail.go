@@ -19,7 +19,6 @@ package tail
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 )
 
@@ -57,7 +56,7 @@ func ReadAtMost(path string, max int64) ([]byte, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	return data, offset > 0, err
 }
 

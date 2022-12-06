@@ -32,6 +32,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/utils/pointer"
 )
@@ -45,8 +46,8 @@ var pluginConfigs = []v1beta3.PluginConfig{
 					Kind:       "DefaultPreemptionArgs",
 					APIVersion: "kubescheduler.config.k8s.io/v1beta3",
 				},
-				MinCandidateNodesPercentage: pointer.Int32Ptr(10),
-				MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
+				MinCandidateNodesPercentage: pointer.Int32(10),
+				MinCandidateNodesAbsolute:   pointer.Int32(100),
 			}},
 	},
 	{
@@ -57,7 +58,7 @@ var pluginConfigs = []v1beta3.PluginConfig{
 					Kind:       "InterPodAffinityArgs",
 					APIVersion: "kubescheduler.config.k8s.io/v1beta3",
 				},
-				HardPodAffinityWeight: pointer.Int32Ptr(1),
+				HardPodAffinityWeight: pointer.Int32(1),
 			}},
 	},
 	{
@@ -109,7 +110,7 @@ var pluginConfigs = []v1beta3.PluginConfig{
 				Kind:       "VolumeBindingArgs",
 				APIVersion: "kubescheduler.config.k8s.io/v1beta3",
 			},
-			BindTimeoutSeconds: pointer.Int64Ptr(600),
+			BindTimeoutSeconds: pointer.Int64(600),
 		}},
 	},
 }
@@ -125,13 +126,13 @@ func TestSchedulerDefaults(t *testing.T) {
 			name:   "empty config",
 			config: &v1beta3.KubeSchedulerConfiguration{},
 			expected: &v1beta3.KubeSchedulerConfiguration{
-				Parallelism: pointer.Int32Ptr(16),
+				Parallelism: pointer.Int32(16),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       pointer.BoolPtr(true),
+					LeaderElect:       pointer.Bool(true),
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
@@ -144,14 +145,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
-				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds: pointer.Int64(1),
+				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
 						Plugins:       getDefaultPlugins(),
 						PluginConfig:  pluginConfigs,
-						SchedulerName: pointer.StringPtr("default-scheduler"),
+						SchedulerName: pointer.String("default-scheduler"),
 					},
 				},
 			},
@@ -162,13 +163,13 @@ func TestSchedulerDefaults(t *testing.T) {
 				Profiles: []v1beta3.KubeSchedulerProfile{{}},
 			},
 			expected: &v1beta3.KubeSchedulerConfiguration{
-				Parallelism: pointer.Int32Ptr(16),
+				Parallelism: pointer.Int32(16),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       pointer.BoolPtr(true),
+					LeaderElect:       pointer.Bool(true),
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
@@ -181,12 +182,12 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
-				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds: pointer.Int64(1),
+				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
-						SchedulerName: pointer.StringPtr("default-scheduler"),
+						SchedulerName: pointer.String("default-scheduler"),
 						Plugins:       getDefaultPlugins(),
 						PluginConfig:  pluginConfigs},
 				},
@@ -195,7 +196,7 @@ func TestSchedulerDefaults(t *testing.T) {
 		{
 			name: "two profiles",
 			config: &v1beta3.KubeSchedulerConfiguration{
-				Parallelism: pointer.Int32Ptr(16),
+				Parallelism: pointer.Int32(16),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
 						PluginConfig: []v1beta3.PluginConfig{
@@ -203,7 +204,7 @@ func TestSchedulerDefaults(t *testing.T) {
 						},
 					},
 					{
-						SchedulerName: pointer.StringPtr("custom-scheduler"),
+						SchedulerName: pointer.String("custom-scheduler"),
 						Plugins: &v1beta3.Plugins{
 							Bind: v1beta3.PluginSet{
 								Enabled: []v1beta3.Plugin{
@@ -218,13 +219,13 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 			expected: &v1beta3.KubeSchedulerConfiguration{
-				Parallelism: pointer.Int32Ptr(16),
+				Parallelism: pointer.Int32(16),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       pointer.BoolPtr(true),
+					LeaderElect:       pointer.Bool(true),
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
@@ -237,9 +238,9 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
-				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds: pointer.Int64(1),
+				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
 						Plugins: getDefaultPlugins(),
@@ -253,8 +254,8 @@ func TestSchedulerDefaults(t *testing.T) {
 											Kind:       "DefaultPreemptionArgs",
 											APIVersion: "kubescheduler.config.k8s.io/v1beta3",
 										},
-										MinCandidateNodesPercentage: pointer.Int32Ptr(10),
-										MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
+										MinCandidateNodesPercentage: pointer.Int32(10),
+										MinCandidateNodesAbsolute:   pointer.Int32(100),
 									}},
 							},
 							{
@@ -265,7 +266,7 @@ func TestSchedulerDefaults(t *testing.T) {
 											Kind:       "InterPodAffinityArgs",
 											APIVersion: "kubescheduler.config.k8s.io/v1beta3",
 										},
-										HardPodAffinityWeight: pointer.Int32Ptr(1),
+										HardPodAffinityWeight: pointer.Int32(1),
 									}},
 							},
 							{
@@ -317,13 +318,13 @@ func TestSchedulerDefaults(t *testing.T) {
 										Kind:       "VolumeBindingArgs",
 										APIVersion: "kubescheduler.config.k8s.io/v1beta3",
 									},
-									BindTimeoutSeconds: pointer.Int64Ptr(600),
+									BindTimeoutSeconds: pointer.Int64(600),
 								}},
 							},
 						},
 					},
 					{
-						SchedulerName: pointer.StringPtr("custom-scheduler"),
+						SchedulerName: pointer.String("custom-scheduler"),
 						Plugins: &v1beta3.Plugins{
 							MultiPoint: v1beta3.PluginSet{
 								Enabled: []v1beta3.Plugin{
@@ -366,16 +367,16 @@ func TestSchedulerDefaults(t *testing.T) {
 		{
 			name: "Prallelism with no port",
 			config: &v1beta3.KubeSchedulerConfiguration{
-				Parallelism: pointer.Int32Ptr(16),
+				Parallelism: pointer.Int32(16),
 			},
 			expected: &v1beta3.KubeSchedulerConfiguration{
-				Parallelism: pointer.Int32Ptr(16),
+				Parallelism: pointer.Int32(16),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       pointer.BoolPtr(true),
+					LeaderElect:       pointer.Bool(true),
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
@@ -388,14 +389,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
-				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds: pointer.Int64(1),
+				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
 						Plugins:       getDefaultPlugins(),
 						PluginConfig:  pluginConfigs,
-						SchedulerName: pointer.StringPtr("default-scheduler"),
+						SchedulerName: pointer.String("default-scheduler"),
 					},
 				},
 			},
@@ -403,16 +404,16 @@ func TestSchedulerDefaults(t *testing.T) {
 		{
 			name: "set non default parallelism",
 			config: &v1beta3.KubeSchedulerConfiguration{
-				Parallelism: pointer.Int32Ptr(8),
+				Parallelism: pointer.Int32(8),
 			},
 			expected: &v1beta3.KubeSchedulerConfiguration{
-				Parallelism: pointer.Int32Ptr(8),
+				Parallelism: pointer.Int32(8),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
 				},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       pointer.BoolPtr(true),
+					LeaderElect:       pointer.Bool(true),
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
@@ -425,14 +426,14 @@ func TestSchedulerDefaults(t *testing.T) {
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
-				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
+				PercentageOfNodesToScore: pointer.Int32(config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds: pointer.Int64(1),
+				PodMaxBackoffSeconds:     pointer.Int64(10),
 				Profiles: []v1beta3.KubeSchedulerProfile{
 					{
 						Plugins:       getDefaultPlugins(),
 						PluginConfig:  pluginConfigs,
-						SchedulerName: pointer.StringPtr("default-scheduler"),
+						SchedulerName: pointer.String("default-scheduler"),
 					},
 				},
 			},
@@ -459,43 +460,43 @@ func TestPluginArgsDefaults(t *testing.T) {
 			name: "DefaultPreemptionArgs empty",
 			in:   &v1beta3.DefaultPreemptionArgs{},
 			want: &v1beta3.DefaultPreemptionArgs{
-				MinCandidateNodesPercentage: pointer.Int32Ptr(10),
-				MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
+				MinCandidateNodesPercentage: pointer.Int32(10),
+				MinCandidateNodesAbsolute:   pointer.Int32(100),
 			},
 		},
 		{
 			name: "DefaultPreemptionArgs with value",
 			in: &v1beta3.DefaultPreemptionArgs{
-				MinCandidateNodesPercentage: pointer.Int32Ptr(50),
+				MinCandidateNodesPercentage: pointer.Int32(50),
 			},
 			want: &v1beta3.DefaultPreemptionArgs{
-				MinCandidateNodesPercentage: pointer.Int32Ptr(50),
-				MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
+				MinCandidateNodesPercentage: pointer.Int32(50),
+				MinCandidateNodesAbsolute:   pointer.Int32(100),
 			},
 		},
 		{
 			name: "InterPodAffinityArgs empty",
 			in:   &v1beta3.InterPodAffinityArgs{},
 			want: &v1beta3.InterPodAffinityArgs{
-				HardPodAffinityWeight: pointer.Int32Ptr(1),
+				HardPodAffinityWeight: pointer.Int32(1),
 			},
 		},
 		{
 			name: "InterPodAffinityArgs explicit 0",
 			in: &v1beta3.InterPodAffinityArgs{
-				HardPodAffinityWeight: pointer.Int32Ptr(0),
+				HardPodAffinityWeight: pointer.Int32(0),
 			},
 			want: &v1beta3.InterPodAffinityArgs{
-				HardPodAffinityWeight: pointer.Int32Ptr(0),
+				HardPodAffinityWeight: pointer.Int32(0),
 			},
 		},
 		{
 			name: "InterPodAffinityArgs with value",
 			in: &v1beta3.InterPodAffinityArgs{
-				HardPodAffinityWeight: pointer.Int32Ptr(5),
+				HardPodAffinityWeight: pointer.Int32(5),
 			},
 			want: &v1beta3.InterPodAffinityArgs{
-				HardPodAffinityWeight: pointer.Int32Ptr(5),
+				HardPodAffinityWeight: pointer.Int32(5),
 			},
 		},
 		{
@@ -582,16 +583,6 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "PodTopologySpreadArgs empty, DefaultPodTopologySpread feature disabled",
-			features: map[featuregate.Feature]bool{
-				features.DefaultPodTopologySpread: false,
-			},
-			in: &v1beta3.PodTopologySpreadArgs{},
-			want: &v1beta3.PodTopologySpreadArgs{
-				DefaultingType: v1beta3.ListDefaulting,
-			},
-		},
-		{
 			name: "NodeResourcesFitArgs not set",
 			in:   &v1beta3.NodeResourcesFitArgs{},
 			want: &v1beta3.NodeResourcesFitArgs{
@@ -622,7 +613,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 			in: &v1beta3.VolumeBindingArgs{},
 			want: &v1beta3.VolumeBindingArgs{
-				BindTimeoutSeconds: pointer.Int64Ptr(600),
+				BindTimeoutSeconds: pointer.Int64(600),
 			},
 		},
 		{
@@ -632,7 +623,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 			in: &v1beta3.VolumeBindingArgs{},
 			want: &v1beta3.VolumeBindingArgs{
-				BindTimeoutSeconds: pointer.Int64Ptr(600),
+				BindTimeoutSeconds: pointer.Int64(600),
 				Shape: []v1beta3.UtilizationShapePoint{
 					{Utilization: 0, Score: 0},
 					{Utilization: 100, Score: 10},

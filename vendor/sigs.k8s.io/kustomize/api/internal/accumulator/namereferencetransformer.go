@@ -52,7 +52,10 @@ func (t *nameReferenceTransformer) Transform(m resmap.ResMap) error {
 	fMap := t.determineFilters(m.Resources())
 	debug(fMap)
 	for r, fList := range fMap {
-		c := m.SubsetThatCouldBeReferencedByResource(r)
+		c, err := m.SubsetThatCouldBeReferencedByResource(r)
+		if err != nil {
+			return err
+		}
 		for _, f := range fList {
 			f.Referrer = r
 			f.ReferralCandidates = c
@@ -110,7 +113,6 @@ func debug(fMap filterMap) {
 // 'spec/scaleTargetRef/name' field. Return a filter that can do that.
 func (t *nameReferenceTransformer) determineFilters(
 	resources []*resource.Resource) (fMap filterMap) {
-
 	// We cache the resource OrgId values because they don't change and otherwise are very visible in a memory pprof
 	resourceOrgIds := make([]resid.ResId, len(resources))
 	for i, resource := range resources {

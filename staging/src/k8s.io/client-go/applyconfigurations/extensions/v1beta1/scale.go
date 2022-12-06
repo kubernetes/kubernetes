@@ -37,7 +37,10 @@ type ScaleApplyConfiguration struct {
 // ScaleApplyConfiguration constructs an declarative configuration of the Scale type for use with
 // apply.
 func Scale() *ScaleApplyConfiguration {
-	return &ScaleApplyConfiguration{}
+	b := &ScaleApplyConfiguration{}
+	b.WithKind("Scale")
+	b.WithAPIVersion("extensions/v1beta1")
+	return b
 }
 
 // WithKind sets the Kind field in the declarative configuration to the given value
@@ -80,15 +83,6 @@ func (b *ScaleApplyConfiguration) WithGenerateName(value string) *ScaleApplyConf
 func (b *ScaleApplyConfiguration) WithNamespace(value string) *ScaleApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.Namespace = &value
-	return b
-}
-
-// WithSelfLink sets the SelfLink field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SelfLink field is set to the value of the last call.
-func (b *ScaleApplyConfiguration) WithSelfLink(value string) *ScaleApplyConfiguration {
-	b.ensureObjectMetaApplyConfigurationExists()
-	b.SelfLink = &value
 	return b
 }
 
@@ -198,15 +192,6 @@ func (b *ScaleApplyConfiguration) WithFinalizers(values ...string) *ScaleApplyCo
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
-	return b
-}
-
-// WithClusterName sets the ClusterName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ClusterName field is set to the value of the last call.
-func (b *ScaleApplyConfiguration) WithClusterName(value string) *ScaleApplyConfiguration {
-	b.ensureObjectMetaApplyConfigurationExists()
-	b.ClusterName = &value
 	return b
 }
 

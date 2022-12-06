@@ -44,6 +44,10 @@ func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1alpha1.LimitedPriorit
 	if lplc.AssuredConcurrencyShares == 0 {
 		lplc.AssuredConcurrencyShares = PriorityLevelConfigurationDefaultAssuredConcurrencyShares
 	}
+	if lplc.LendablePercent == nil {
+		lplc.LendablePercent = new(int32)
+		*lplc.LendablePercent = 0
+	}
 }
 
 // SetDefaults_FlowSchema sets default values for flow schema

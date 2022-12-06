@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -201,6 +202,7 @@ func getHugepagesTestPod(f *framework.Framework, limits v1.ResourceList, mounts 
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:HugePages]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should remove resources for huge page sizes no longer supported", func() {
 		ginkgo.By("mimicking support for 9Mi of 3Mi huge page memory by patching the node status")
@@ -321,7 +323,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			ginkgo.It("should set correct hugetlb mount and limit under the container cgroup", func() {
 				ginkgo.By("getting mounts for the test pod")
 				command := []string{"mount"}
-				out := f.ExecCommandInContainer(testpod.Name, testpod.Spec.Containers[0].Name, command...)
+				out := e2epod.ExecCommandInContainer(f, testpod.Name, testpod.Spec.Containers[0].Name, command...)
 
 				for _, mount := range mounts {
 					ginkgo.By(fmt.Sprintf("checking that the hugetlb mount %s exists under the container", mount.MountPath))
@@ -335,7 +337,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 						resourceToCgroup[resourceName],
 					)
 					ginkgo.By("checking if the expected hugetlb settings were applied")
-					f.PodClient().Create(verifyPod)
+					e2epod.NewPodClient(f).Create(verifyPod)
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				}
@@ -354,13 +356,13 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			pod := getHugepagesTestPod(f, limits, mounts, volumes)
 
 			ginkgo.By("by running a test pod that requests hugepages")
-			testpod = f.PodClient().CreateSync(pod)
+			testpod = e2epod.NewPodClient(f).CreateSync(pod)
 		})
 
 		// we should use JustAfterEach because framework will teardown the client under the AfterEach method
 		ginkgo.JustAfterEach(func() {
 			ginkgo.By(fmt.Sprintf("deleting test pod %s", testpod.Name))
-			f.PodClient().DeleteSync(testpod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(testpod.Name, metav1.DeleteOptions{}, 2*time.Minute)
 
 			releaseHugepages()
 

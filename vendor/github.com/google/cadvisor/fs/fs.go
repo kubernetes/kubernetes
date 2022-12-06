@@ -20,7 +20,6 @@ package fs
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -58,9 +57,6 @@ const (
 
 // A pool for restricting the number of consecutive `du` and `find` tasks running.
 var pool = make(chan struct{}, maxConcurrentOps)
-
-// ErrDeviceNotInPartitionsMap is the error resulting if a device could not be found in the partitions map.
-var ErrDeviceNotInPartitionsMap = errors.New("could not find device in cached partitions map")
 
 func init() {
 	for i := 0; i < maxConcurrentOps; i++ {

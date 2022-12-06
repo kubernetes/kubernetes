@@ -25,8 +25,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("[Feature:Windows] DNS", func() {
@@ -36,6 +37,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 	})
 
 	f := framework.NewDefaultFramework("dns")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.It("should support configurable pod DNS servers", func() {
 
 		ginkgo.By("Getting the IP address of the internal Kubernetes service")
@@ -75,7 +77,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		// This isn't the best 'test' but it is a great diagnostic, see later test for the 'real' test.
 		ginkgo.By("Calling ipconfig to get debugging info for this pod's DNS and confirm that a dns server 1.1.1.1 can be injected, along with ")
 		cmd := []string{"ipconfig", "/all"}
-		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testPod.Name,
@@ -100,7 +102,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		// TODO @jayunit100 add ResolveHost to agn images
 
 		cmd = []string{"curl.exe", "-k", "https://kubernetezzzzzzzz:443"}
-		stdout, _, err = f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err = e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testPod.Name,
@@ -115,7 +117,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 
 		ginkgo.By("Verifying that injected dns records for 'kubernetes' resolve to the valid ip address")
 		cmd = []string{"curl.exe", "-k", "https://kubernetes:443"}
-		stdout, _, err = f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err = e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testPod.Name,
@@ -125,7 +127,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		})
 		framework.Logf("Result of curling the kubernetes service... (Failure ok, only testing for the sake of DNS resolution) %v ... error = %v", stdout, err)
 
-		// curl returns an error if the host isnt resolved, otherwise, it will return a passing result.
+		// curl returns an error if the host isn't resolved, otherwise, it will return a passing result.
 		if err != nil {
 			framework.ExpectNoError(err)
 		}

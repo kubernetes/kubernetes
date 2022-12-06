@@ -28,17 +28,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -102,15 +101,18 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 	}
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 
-	handler, err := resourcequota.NewResourceQuota(config, 5, stopCh)
+	handler, err := resourcequota.NewResourceQuota(config, 5)
 	if err != nil {
 		return nil, err
 	}
-	handler.SetExternalKubeClientSet(kubeClient)
-	handler.SetExternalKubeInformerFactory(informerFactory)
-	handler.SetQuotaConfiguration(quotaConfiguration)
 
-	return handler, nil
+	initializers := admission.PluginInitializers{
+		genericadmissioninitializer.New(kubeClient, nil, informerFactory, nil, nil, stopCh),
+		kubeapiserveradmission.NewPluginInitializer(nil, nil, quotaConfiguration),
+	}
+	initializers.Initialize(handler)
+
+	return handler, admission.ValidateInitialization(handler)
 }
 
 // TestAdmissionIgnoresDelete verifies that the admission controller ignores delete operations
@@ -408,8 +410,6 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
-
 	kubeClient := fake.NewSimpleClientset(resourceQuota)
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
@@ -457,8 +457,6 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 			},
 		},
 	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
 
 	// start up quota system
 	stopCh := make(chan struct{})

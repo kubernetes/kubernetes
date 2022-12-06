@@ -18,6 +18,7 @@ package rest
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,9 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 )
 
@@ -91,7 +90,7 @@ type RESTCreateStrategy interface {
 }
 
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns
-// errors that can be converted to api.Status. It invokes PrepareForCreate, then GenerateName, then Validate.
+// errors that can be converted to api.Status. It invokes PrepareForCreate, then Validate.
 // It returns nil if the object should be created.
 func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.Object) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
@@ -99,31 +98,26 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		return kerr
 	}
 
-	if strategy.NamespaceScoped() {
-		if !ValidNamespace(ctx, objectMeta) {
-			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
-		}
-	} else if len(objectMeta.GetNamespace()) > 0 {
-		objectMeta.SetNamespace(metav1.NamespaceNone)
+	// ensure that system-critical metadata has been populated
+	if !metav1.HasObjectMetaSystemFieldValues(objectMeta) {
+		return errors.NewInternalError(fmt.Errorf("system metadata was not initialized"))
 	}
-	objectMeta.SetDeletionTimestamp(nil)
-	objectMeta.SetDeletionGracePeriodSeconds(nil)
-	strategy.PrepareForCreate(ctx, obj)
-	FillObjectMetaSystemFields(objectMeta)
 
+	// ensure the name has been generated
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
-		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
+		return errors.NewInternalError(fmt.Errorf("metadata.name was not generated"))
 	}
 
-	// Ensure managedFields is not set unless the feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		objectMeta.SetManagedFields(nil)
+	// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
+	requestNamespace, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return errors.NewInternalError(fmt.Errorf("no namespace information found in request context"))
+	}
+	if err := EnsureObjectNamespaceMatchesRequestNamespace(ExpectedNamespaceForScope(requestNamespace, strategy.NamespaceScoped()), objectMeta); err != nil {
+		return err
 	}
 
-	// ClusterName is ignored and should not be saved
-	if len(objectMeta.GetClusterName()) > 0 {
-		objectMeta.SetClusterName("")
-	}
+	strategy.PrepareForCreate(ctx, obj)
 
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)

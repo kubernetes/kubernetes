@@ -18,7 +18,7 @@ package patches
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -26,7 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -35,6 +35,7 @@ var testKnownTargets = []string{
 	"kube-apiserver",
 	"kube-controller-manager",
 	"kube-scheduler",
+	"kubeletconfiguration",
 }
 
 const testDirPattern = "patch-files"
@@ -173,7 +174,7 @@ func TestGetPatchSetsForPathMustBeDirectory(t *testing.T) {
 	}
 	defer os.Remove(tempFile.Name())
 
-	_, _, _, err = getPatchSetsFromPath(tempFile.Name(), testKnownTargets, ioutil.Discard)
+	_, _, _, err = getPatchSetsFromPath(tempFile.Name(), testKnownTargets, io.Discard)
 	var pathErr *os.PathError
 	if !errors.As(err, &pathErr) {
 		t.Fatalf("expected os.PathError for non-directory path %q, but got %v", tempFile.Name(), err)
@@ -233,7 +234,7 @@ func TestGetPatchSetsForPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tempDir, err := ioutil.TempDir("", testDirPattern)
+			tempDir, err := os.MkdirTemp("", testDirPattern)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -241,13 +242,13 @@ func TestGetPatchSetsForPath(t *testing.T) {
 
 			for _, file := range tc.filesToWrite {
 				filePath := filepath.Join(tempDir, file)
-				err := ioutil.WriteFile(filePath, []byte(tc.patchData), 0644)
+				err := os.WriteFile(filePath, []byte(tc.patchData), 0644)
 				if err != nil {
 					t.Fatalf("could not write temporary file %q", filePath)
 				}
 			}
 
-			patchSets, patchFiles, ignoredFiles, err := getPatchSetsFromPath(tempDir, testKnownTargets, ioutil.Discard)
+			patchSets, patchFiles, ignoredFiles, err := getPatchSetsFromPath(tempDir, testKnownTargets, io.Discard)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)
 			}
@@ -313,6 +314,21 @@ func TestGetPatchManagerForPath(t *testing.T) {
 			},
 		},
 		{
+			name: "valid: kubeletconfiguration target is patched with json patch",
+			patchTarget: &PatchTarget{
+				Name:                      "kubeletconfiguration",
+				StrategicMergePatchObject: nil,
+				Data:                      []byte("foo: bar\n"),
+			},
+			expectedData: []byte(`{"foo":"zzz"}`),
+			files: []*file{
+				{
+					name: "kubeletconfiguration+json.json",
+					data: `[{"op": "replace", "path": "/foo", "value": "zzz"}]`,
+				},
+			},
+		},
+		{
 			name: "valid: kube-apiserver target is patched with strategic merge patch",
 			patchTarget: &PatchTarget{
 				Name:                      "kube-apiserver",
@@ -361,7 +377,7 @@ func TestGetPatchManagerForPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tempDir, err := ioutil.TempDir("", testDirPattern)
+			tempDir, err := os.MkdirTemp("", testDirPattern)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -369,7 +385,7 @@ func TestGetPatchManagerForPath(t *testing.T) {
 
 			for _, file := range tc.files {
 				filePath := filepath.Join(tempDir, file.name)
-				err := ioutil.WriteFile(filePath, []byte(file.data), 0644)
+				err := os.WriteFile(filePath, []byte(file.data), 0644)
 				if err != nil {
 					t.Fatalf("could not write temporary file %q", filePath)
 				}
@@ -396,7 +412,7 @@ func TestGetPatchManagerForPath(t *testing.T) {
 }
 
 func TestGetPatchManagerForPathCache(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", testDirPattern)
+	tempDir, err := os.MkdirTemp("", testDirPattern)
 	if err != nil {
 		t.Fatal(err)
 	}

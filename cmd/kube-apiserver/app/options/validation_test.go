@@ -18,8 +18,11 @@ package options
 
 import (
 	"net"
+	"strings"
 	"testing"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	netutils "k8s.io/utils/net"
 )
 
@@ -94,6 +97,11 @@ func TestClusterServiceIPRange(t *testing.T) {
 			options:      makeOptionsWithCIDRs("10.0.0.0/16", ""),
 		},
 		{
+			name:         "valid primary, class E range",
+			expectErrors: false,
+			options:      makeOptionsWithCIDRs("244.0.0.0/16", ""),
+		},
+		{
 			name:         "valid v4-v6 dual stack",
 			expectErrors: false,
 			options:      makeOptionsWithCIDRs("10.0.0.0/16", "3000::/108"),
@@ -122,6 +130,65 @@ func TestClusterServiceIPRange(t *testing.T) {
 func getIPnetFromCIDR(cidr string) *net.IPNet {
 	_, ipnet, _ := netutils.ParseCIDRSloppy(cidr)
 	return ipnet
+}
+
+func TestValidateServiceNodePort(t *testing.T) {
+	testCases := []struct {
+		name         string
+		options      *ServerRunOptions
+		expectErrors bool
+	}{
+		{
+			name:         "validate port less than 0",
+			options:      makeOptionsWithPort(-1, 30065, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate port more than 65535",
+			options:      makeOptionsWithPort(65536, 30065, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate port equal 0",
+			options:      makeOptionsWithPort(0, 0, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate port less than base",
+			options:      makeOptionsWithPort(30064, 30065, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate port minus base more than size",
+			options:      makeOptionsWithPort(30067, 30065, 1),
+			expectErrors: true,
+		},
+		{
+			name:         "validate success",
+			options:      makeOptionsWithPort(30067, 30065, 5),
+			expectErrors: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateServiceNodePort(tc.options)
+			if err != nil && !tc.expectErrors {
+				t.Errorf("expected no errors, error found %+v", err)
+			}
+		})
+	}
+}
+
+func makeOptionsWithPort(kubernetesServiceNodePort int, base int, size int) *ServerRunOptions {
+	var portRange = utilnet.PortRange{
+		Base: base,
+		Size: size,
+	}
+	return &ServerRunOptions{
+		ServiceNodePortRange:      portRange,
+		KubernetesServiceNodePort: kubernetesServiceNodePort,
+	}
 }
 
 func TestValidateMaxCIDRRange(t *testing.T) {
@@ -181,6 +248,55 @@ func TestValidateMaxCIDRRange(t *testing.T) {
 
 			if err != nil && tc.expectErrors && err.Error() != tc.expectedErrorMessage {
 				t.Errorf("Expected error message: \"%s\"\nGot: \"%s\"", tc.expectedErrorMessage, err.Error())
+			}
+		})
+	}
+}
+
+func TestValidateAPIPriorityAndFairness(t *testing.T) {
+	const conflict = "conflicts with --enable-priority-and-fairness=true and --feature-gates=APIPriorityAndFairness=true"
+	tests := []struct {
+		runtimeConfig    string
+		errShouldContain string
+	}{
+		{
+			runtimeConfig:    "api/all=false",
+			errShouldContain: conflict,
+		},
+		{
+			runtimeConfig:    "api/beta=false",
+			errShouldContain: conflict,
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta1=false",
+			errShouldContain: "",
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta2=false",
+			errShouldContain: "",
+		},
+		{
+			runtimeConfig:    "flowcontrol.apiserver.k8s.io/v1beta3=false",
+			errShouldContain: conflict,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.runtimeConfig, func(t *testing.T) {
+			options := &ServerRunOptions{
+				GenericServerRunOptions: &genericoptions.ServerRunOptions{
+					EnablePriorityAndFairness: true,
+				},
+				APIEnablement: genericoptions.NewAPIEnablementOptions(),
+			}
+			options.APIEnablement.RuntimeConfig.Set(test.runtimeConfig)
+
+			var errMessageGot string
+			if errs := validateAPIPriorityAndFairness(options); len(errs) > 0 {
+				errMessageGot = errs[0].Error()
+			}
+			if !strings.Contains(errMessageGot, test.errShouldContain) {
+				t.Errorf("Expected error message to contain: %q, but got: %q", test.errShouldContain, errMessageGot)
 			}
 		})
 	}

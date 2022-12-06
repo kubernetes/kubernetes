@@ -30,11 +30,6 @@ type WantsCloudConfig interface {
 	SetCloudConfig([]byte)
 }
 
-// WantsRESTMapper defines a function which sets RESTMapper for admission plugins that need it.
-type WantsRESTMapper interface {
-	SetRESTMapper(meta.RESTMapper)
-}
-
 // PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
 type PluginInitializer struct {
 	cloudConfig        []byte
@@ -66,7 +61,7 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetCloudConfig(i.cloudConfig)
 	}
 
-	if wants, ok := plugin.(WantsRESTMapper); ok {
+	if wants, ok := plugin.(initializer.WantsRESTMapper); ok {
 		wants.SetRESTMapper(i.restMapper)
 	}
 

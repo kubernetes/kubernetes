@@ -17,13 +17,11 @@ limitations under the License.
 // Package app implements a server that runs a set of active
 // components.  This includes replication controllers, service endpoints and
 // nodes.
-//
 package app
 
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -42,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
@@ -55,6 +54,10 @@ import (
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/metrics/features"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -65,6 +68,7 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -72,6 +76,11 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
+
+func init() {
+	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
 
 const (
 	// ControllerStartJitter is the Jitter used when starting controller managers
@@ -107,33 +116,30 @@ state of the cluster through the apiserver and makes changes attempting to move 
 current state towards the desired state. Examples of controllers that ship with
 Kubernetes today are the replication controller, endpoints controller, namespace
 controller, and serviceaccounts controller.`,
-		PersistentPreRun: func(*cobra.Command, []string) {
+		PersistentPreRunE: func(*cobra.Command, []string) error {
 			// silence client-go warnings.
 			// kube-controller-manager generically watches APIs (including deprecated ones),
 			// and CI ensures it works properly against matching kube-apiserver versions.
 			restclient.SetDefaultWarningHandler(restclient.NoWarnings{})
+			return nil
 		},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := s.Logs.ValidateAndApply(); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+			if err := logsapi.ValidateAndApply(s.Logs, utilfeature.DefaultFeatureGate); err != nil {
+				return err
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
 			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				return err
 			}
-
-			if err := Run(c.Complete(), wait.NeverStop); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
-			}
+			// add feature enablement metrics
+			utilfeature.DefaultMutableFeatureGate.AddMetrics()
+			return Run(c.Complete(), wait.NeverStop)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -170,10 +176,17 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 	}
 }
 
-// Run runs the KubeControllerManagerOptions.  This should never exit.
+// Run runs the KubeControllerManagerOptions.
 func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
+
+	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+
+	// Start events processing pipeline.
+	c.EventBroadcaster.StartStructuredLogging(0)
+	c.EventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.Client.CoreV1().Events("")})
+	defer c.EventBroadcaster.Shutdown()
 
 	if cfgz, err := configz.New(ConfigzName); err == nil {
 		cfgz.Set(c.ComponentConfig)
@@ -195,6 +208,9 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
+		if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
+			slis.SLIMetricsWithReset{}.Install(unsecuredMux)
+		}
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
 		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
@@ -207,7 +223,6 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
 	run := func(ctx context.Context, startSATokenController InitFunc, initializersFunc ControllerInitializersFunc) {
-
 		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
@@ -221,13 +236,14 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
 
-		select {}
+		<-ctx.Done()
 	}
 
 	// No leader election, run directly
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO(), saTokenControllerInitFunc, NewControllerInitializers)
-		panic("unreachable")
+		ctx, _ := wait.ContextForChannel(stopCh)
+		run(ctx, saTokenControllerInitFunc, NewControllerInitializers)
+		return nil
 	}
 
 	id, err := os.Hostname()
@@ -275,7 +291,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 				run(ctx, startSATokenController, initializersFunc)
 			},
 			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
+				klog.ErrorS(nil, "leaderelection lost")
+				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 			},
 		})
 
@@ -298,12 +315,14 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 					run(ctx, nil, createInitializersFunc(leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
 				},
 				OnStoppedLeading: func() {
-					klog.Fatalf("migration leaderelection lost")
+					klog.ErrorS(nil, "migration leaderelection lost")
+					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 				},
 			})
 	}
 
-	select {}
+	<-stopCh
+	return nil
 }
 
 // ControllerContext defines the context object for controller
@@ -348,6 +367,9 @@ type ControllerContext struct {
 	// multiple controllers don't get into lock-step and all hammer the apiserver
 	// with list requests simultaneously.
 	ResyncPeriod func() time.Duration
+
+	// ControllerManagerMetrics provides a proxy to set controller manager specific metrics.
+	ControllerManagerMetrics *controllersmetrics.ControllerManagerMetrics
 }
 
 // IsControllerEnabled checks if the context's controllers enabled or not
@@ -365,7 +387,8 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 type InitFunc func(ctx context.Context, controllerCtx ControllerContext) (controller controller.Interface, enabled bool, err error)
 
 // ControllerInitializersFunc is used to create a collection of initializers
-//  given the loopMode.
+//
+//	given the loopMode.
 type ControllerInitializersFunc func(loopMode ControllerLoopMode) (initializers map[string]InitFunc)
 
 var _ ControllerInitializersFunc = NewControllerInitializers
@@ -399,49 +422,61 @@ const (
 // paired to their InitFunc.  This allows for structured downstream composition and subdivision.
 func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc {
 	controllers := map[string]InitFunc{}
-	controllers["endpoint"] = startEndpointController
-	controllers["endpointslice"] = startEndpointSliceController
-	controllers["endpointslicemirroring"] = startEndpointSliceMirroringController
-	controllers["replicationcontroller"] = startReplicationController
-	controllers["podgc"] = startPodGCController
-	controllers["resourcequota"] = startResourceQuotaController
-	controllers["namespace"] = startNamespaceController
-	controllers["serviceaccount"] = startServiceAccountController
-	controllers["garbagecollector"] = startGarbageCollectorController
-	controllers["daemonset"] = startDaemonSetController
-	controllers["job"] = startJobController
-	controllers["deployment"] = startDeploymentController
-	controllers["replicaset"] = startReplicaSetController
-	controllers["horizontalpodautoscaling"] = startHPAController
-	controllers["disruption"] = startDisruptionController
-	controllers["statefulset"] = startStatefulSetController
-	controllers["cronjob"] = startCronJobController
-	controllers["csrsigning"] = startCSRSigningController
-	controllers["csrapproving"] = startCSRApprovingController
-	controllers["csrcleaner"] = startCSRCleanerController
-	controllers["ttl"] = startTTLController
-	controllers["bootstrapsigner"] = startBootstrapSignerController
-	controllers["tokencleaner"] = startTokenCleanerController
-	controllers["nodeipam"] = startNodeIpamController
-	controllers["nodelifecycle"] = startNodeLifecycleController
+
+	// All of the controllers must have unique names, or else we will explode.
+	register := func(name string, fn InitFunc) {
+		if _, found := controllers[name]; found {
+			panic(fmt.Sprintf("controller name %q was registered twice", name))
+		}
+		controllers[name] = fn
+	}
+
+	register("endpoint", startEndpointController)
+	register("endpointslice", startEndpointSliceController)
+	register("endpointslicemirroring", startEndpointSliceMirroringController)
+	register("replicationcontroller", startReplicationController)
+	register("podgc", startPodGCController)
+	register("resourcequota", startResourceQuotaController)
+	register("namespace", startNamespaceController)
+	register("serviceaccount", startServiceAccountController)
+	register("garbagecollector", startGarbageCollectorController)
+	register("daemonset", startDaemonSetController)
+	register("job", startJobController)
+	register("deployment", startDeploymentController)
+	register("replicaset", startReplicaSetController)
+	register("horizontalpodautoscaling", startHPAController)
+	register("disruption", startDisruptionController)
+	register("statefulset", startStatefulSetController)
+	register("cronjob", startCronJobController)
+	register("csrsigning", startCSRSigningController)
+	register("csrapproving", startCSRApprovingController)
+	register("csrcleaner", startCSRCleanerController)
+	register("ttl", startTTLController)
+	register("bootstrapsigner", startBootstrapSignerController)
+	register("tokencleaner", startTokenCleanerController)
+	register("nodeipam", startNodeIpamController)
+	register("nodelifecycle", startNodeLifecycleController)
 	if loopMode == IncludeCloudLoops {
-		controllers["service"] = startServiceController
-		controllers["route"] = startRouteController
-		controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
+		register("service", startServiceController)
+		register("route", startRouteController)
+		register("cloud-node-lifecycle", startCloudNodeLifecycleController)
 		// TODO: volume controller into the IncludeCloudLoops only set.
 	}
-	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController
-	controllers["attachdetach"] = startAttachDetachController
-	controllers["persistentvolume-expander"] = startVolumeExpandController
-	controllers["clusterrole-aggregation"] = startClusterRoleAggregrationController
-	controllers["pvc-protection"] = startPVCProtectionController
-	controllers["pv-protection"] = startPVProtectionController
-	controllers["ttl-after-finished"] = startTTLAfterFinishedController
-	controllers["root-ca-cert-publisher"] = startRootCACertPublisher
-	controllers["ephemeral-volume"] = startEphemeralVolumeController
+	register("persistentvolume-binder", startPersistentVolumeBinderController)
+	register("attachdetach", startAttachDetachController)
+	register("persistentvolume-expander", startVolumeExpandController)
+	register("clusterrole-aggregation", startClusterRoleAggregrationController)
+	register("pvc-protection", startPVCProtectionController)
+	register("pv-protection", startPVProtectionController)
+	register("ttl-after-finished", startTTLAfterFinishedController)
+	register("root-ca-cert-publisher", startRootCACertPublisher)
+	register("ephemeral-volume", startEphemeralVolumeController)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) &&
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
-		controllers["storage-version-gc"] = startStorageVersionGCController
+		register("storage-version-gc", startStorageVersionGCController)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		controllers["resource-claim-controller"] = startResourceClaimController
 	}
 
 	return controllers
@@ -522,7 +557,9 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		LoopMode:                        loopMode,
 		InformersStarted:                make(chan struct{}),
 		ResyncPeriod:                    ResyncPeriod(s),
+		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("kube-controller-manager"),
 	}
+	controllersmetrics.Register()
 	return ctx, nil
 }
 
@@ -632,6 +669,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		serviceaccountcontroller.TokensControllerOptions{
 			TokenGenerator: tokenGenerator,
 			RootCA:         rootCA,
+			AutoGenerate:   !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenNoAutoGeneration),
 		},
 	)
 	if err != nil {
@@ -646,7 +684,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 }
 
 func readCA(file string) ([]byte, error) {
-	rootCA, err := ioutil.ReadFile(file)
+	rootCA, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -709,7 +747,8 @@ func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionC
 }
 
 // createInitializersFunc creates a initializersFunc that returns all initializer
-//  with expected as the result after filtering through filterFunc.
+//
+//	with expected as the result after filtering through filterFunc.
 func createInitializersFunc(filterFunc leadermigration.FilterFunc, expected leadermigration.FilterResult) ControllerInitializersFunc {
 	return func(loopMode ControllerLoopMode) map[string]InitFunc {
 		initializers := make(map[string]InitFunc)

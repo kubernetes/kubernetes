@@ -8,8 +8,8 @@
 // This package currently lacks some features found in alternative
 // and more actively maintained WebSocket packages:
 //
-//     https://godoc.org/github.com/gorilla/websocket
-//     https://godoc.org/nhooyr.io/websocket
+//	https://godoc.org/github.com/gorilla/websocket
+//	https://godoc.org/nhooyr.io/websocket
 package websocket // import "golang.org/x/net/websocket"
 
 import (
@@ -416,7 +416,6 @@ Trivial usage:
 	// send binary frame
 	data = []byte{0, 1, 2}
 	websocket.Message.Send(ws, data)
-
 */
 var Message = Codec{marshal, unmarshal}
 

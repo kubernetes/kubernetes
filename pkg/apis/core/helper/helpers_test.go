@@ -17,11 +17,9 @@ limitations under the License.
 package helper
 
 import (
-	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -132,70 +130,6 @@ func TestRemoveDuplicateAccessModes(t *testing.T) {
 	modes = removeDuplicateAccessModes(modes)
 	if len(modes) != 2 {
 		t.Errorf("Expected 2 distinct modes in set but found %v", len(modes))
-	}
-}
-
-func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
-	matchExpressions := []core.NodeSelectorRequirement{{
-		Key:      "foo",
-		Operator: core.NodeSelectorOpIn,
-		Values:   []string{"bar", "baz"},
-	}}
-	mustParse := func(s string) labels.Selector {
-		out, e := labels.Parse(s)
-		if e != nil {
-			panic(e)
-		}
-		return out
-	}
-	tc := []struct {
-		in        []core.NodeSelectorRequirement
-		out       labels.Selector
-		expectErr bool
-	}{
-		{in: nil, out: labels.Nothing()},
-		{in: []core.NodeSelectorRequirement{}, out: labels.Nothing()},
-		{
-			in:  matchExpressions,
-			out: mustParse("foo in (baz,bar)"),
-		},
-		{
-			in: []core.NodeSelectorRequirement{{
-				Key:      "foo",
-				Operator: core.NodeSelectorOpExists,
-				Values:   []string{"bar", "baz"},
-			}},
-			expectErr: true,
-		},
-		{
-			in: []core.NodeSelectorRequirement{{
-				Key:      "foo",
-				Operator: core.NodeSelectorOpGt,
-				Values:   []string{"1"},
-			}},
-			out: mustParse("foo>1"),
-		},
-		{
-			in: []core.NodeSelectorRequirement{{
-				Key:      "bar",
-				Operator: core.NodeSelectorOpLt,
-				Values:   []string{"7"},
-			}},
-			out: mustParse("bar<7"),
-		},
-	}
-
-	for i, tc := range tc {
-		out, err := NodeSelectorRequirementsAsSelector(tc.in)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-		if !reflect.DeepEqual(out, tc.out) {
-			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
-		}
 	}
 }
 

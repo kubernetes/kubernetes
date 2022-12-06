@@ -89,10 +89,6 @@ not git grep "\(import \|^\s*\)\"github.com/golang/protobuf/ptypes/" -- "*.go"
 # - Ensure all xds proto imports are renamed to *pb or *grpc.
 git grep '"github.com/envoyproxy/go-control-plane/envoy' -- '*.go' ':(exclude)*.pb.go' | not grep -v 'pb "\|grpc "'
 
-# - Check imports that are illegal in appengine (until Go 1.11).
-# TODO: Remove when we drop Go 1.10 support
-go list -f {{.Dir}} ./... | xargs go run test/go_vet/vet.go
-
 misspell -error .
 
 # - Check that generated proto files are up to date.
@@ -111,7 +107,7 @@ for MOD_FILE in $(find . -name 'go.mod'); do
   go vet -all ./... | fail_on_output
   gofmt -s -d -l . 2>&1 | fail_on_output
   goimports -l . 2>&1 | not grep -vE "\.pb\.go"
-  golint ./... 2>&1 | not grep -vE "/testv3\.pb\.go:"
+  golint ./... 2>&1 | not grep -vE "/grpc_testing_not_regenerate/.*\.pb\.go:"
 
   go mod tidy
   git status --porcelain 2>&1 | fail_on_output || \
@@ -151,7 +147,6 @@ grpc.NewGZIPDecompressor
 grpc.RPCCompressor
 grpc.RPCDecompressor
 grpc.ServiceConfig
-grpc.WithBalancerName
 grpc.WithCompressor
 grpc.WithDecompressor
 grpc.WithDialer

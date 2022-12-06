@@ -19,22 +19,28 @@ package factory
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -42,10 +48,10 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/component-base/traces"
+	tracing "k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
 
@@ -63,6 +69,14 @@ const (
 	dbMetricsMonitorJitter = 0.5
 )
 
+// TODO(negz): Stop using a package scoped logger. At the time of writing we're
+// creating an etcd client for each CRD. We need to pass each etcd client a
+// logger or each client will create its own, which comes with a significant
+// memory cost (around 20% of the API server's memory when hundreds of CRDs are
+// present). The correct fix here is to not create a client per CRD. See
+// https://github.com/kubernetes/kubernetes/issues/111476 for more.
+var etcd3ClientLogger *zap.Logger
+
 func init() {
 	// grpcprom auto-registers (via an init function) their client metrics, since we are opting out of
 	// using the global prometheus registry and using our own wrapped global registry,
@@ -70,49 +84,148 @@ func init() {
 	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
 	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
 	dbMetricsMonitors = make(map[string]struct{})
+
+	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
+	if err != nil {
+		l = zap.NewNop()
+	}
+	etcd3ClientLogger = l.Named("etcd-client")
 }
 
-func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
+// etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.
+// NOTE(negz): This is a copy of a private etcd client function:
+// https://github.com/etcd-io/etcd/blob/v3.5.4/client/v3/logger.go#L47
+func etcdClientDebugLevel() zapcore.Level {
+	envLevel := os.Getenv("ETCD_CLIENT_DEBUG")
+	if envLevel == "" || envLevel == "true" {
+		return zapcore.InfoLevel
+	}
+	var l zapcore.Level
+	if err := l.Set(envLevel); err == nil {
+		log.Printf("Deprecated env ETCD_CLIENT_DEBUG value. Using default level: 'info'")
+		return zapcore.InfoLevel
+	}
+	return l
+}
+
+func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
+	timeout := storagebackend.DefaultHealthcheckTimeout
+	if c.HealthcheckTimeout != time.Duration(0) {
+		timeout = c.HealthcheckTimeout
+	}
+	return newETCD3Check(c, timeout, stopCh)
+}
+
+func newETCD3ReadyCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
+	timeout := storagebackend.DefaultReadinessTimeout
+	if c.ReadycheckTimeout != time.Duration(0) {
+		timeout = c.ReadycheckTimeout
+	}
+	return newETCD3Check(c, timeout, stopCh)
+}
+
+// atomic error acts as a cache for atomically store an error
+// the error is only updated if the timestamp is more recent than
+// current stored error.
+type atomicLastError struct {
+	mu        sync.RWMutex
+	err       error
+	timestamp time.Time
+}
+
+func (a *atomicLastError) Store(err error, t time.Time) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.timestamp.IsZero() || a.timestamp.Before(t) {
+		a.err = err
+		a.timestamp = t
+	}
+}
+
+func (a *atomicLastError) Load() error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.err
+}
+
+func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan struct{}) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
 	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
 
-	clientValue := &atomic.Value{}
-
-	clientErrMsg := &atomic.Value{}
-	clientErrMsg.Store("etcd client connection not yet established")
+	lock := sync.RWMutex{}
+	var client *clientv3.Client
+	clientErr := fmt.Errorf("etcd client connection not yet established")
 
 	go wait.PollUntil(time.Second, func() (bool, error) {
-		client, err := newETCD3Client(c.Transport)
+		newClient, err := newETCD3Client(c.Transport)
+		lock.Lock()
+		defer lock.Unlock()
+		// Ensure that server is already not shutting down.
+		select {
+		case <-stopCh:
+			if err == nil {
+				newClient.Close()
+			}
+			return true, nil
+		default:
+		}
 		if err != nil {
-			clientErrMsg.Store(err.Error())
+			clientErr = err
 			return false, nil
 		}
-		clientValue.Store(client)
-		clientErrMsg.Store("")
+		client = newClient
+		clientErr = nil
 		return true, nil
-	}, wait.NeverStop)
+	}, stopCh)
+
+	// Close the client on shutdown.
+	go func() {
+		defer utilruntime.HandleCrash()
+		<-stopCh
+
+		lock.Lock()
+		defer lock.Unlock()
+		if client != nil {
+			client.Close()
+			clientErr = fmt.Errorf("server is shutting down")
+		}
+	}()
+
+	// limit to a request every half of the configured timeout with a maximum burst of one
+	// rate limited requests will receive the last request sent error (note: not the last received response)
+	limiter := rate.NewLimiter(rate.Every(timeout/2), 1)
+	// initial state is the clientErr
+	lastError := &atomicLastError{err: fmt.Errorf("etcd client connection not yet established")}
 
 	return func() error {
-		if errMsg := clientErrMsg.Load().(string); len(errMsg) > 0 {
-			return fmt.Errorf(errMsg)
+		// Given that client is closed on shutdown we hold the lock for
+		// the entire period of healthcheck call to ensure that client will
+		// not be closed during healthcheck.
+		// Given that healthchecks has a 2s timeout, worst case of blocking
+		// shutdown for additional 2s seems acceptable.
+		lock.RLock()
+		defer lock.RUnlock()
+
+		if clientErr != nil {
+			return clientErr
 		}
-		client := clientValue.Load().(*clientv3.Client)
-		healthcheckTimeout := storagebackend.DefaultHealthcheckTimeout
-		if c.HealthcheckTimeout != time.Duration(0) {
-			healthcheckTimeout = c.HealthcheckTimeout
+		if limiter.Allow() == false {
+			return lastError.Load()
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), healthcheckTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
+		now := time.Now()
 		_, err := client.Get(ctx, path.Join("/", c.Prefix, "health"))
-		if err == nil {
-			return nil
+		if err != nil {
+			err = fmt.Errorf("error getting data from etcd: %w", err)
 		}
-		return fmt.Errorf("error getting data from etcd: %v", err)
+		lastError.Store(err, now)
+		return err
 	}, nil
 }
 
-func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
 		KeyFile:       c.KeyFile,
@@ -147,12 +260,10 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		tracingOpts := []otelgrpc.Option{
-			otelgrpc.WithPropagators(traces.Propagators()),
+			otelgrpc.WithPropagators(tracing.Propagators()),
+			otelgrpc.WithTracerProvider(c.TracerProvider),
 		}
-		if c.TracerProvider != nil {
-			tracingOpts = append(tracingOpts, otelgrpc.WithTracerProvider(*c.TracerProvider))
-		}
-		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
+		// Even with Noop  TracerProvider, the otelgrpc still handles context propagation.
 		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 		dialOptions = append(dialOptions,
 			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
@@ -172,6 +283,7 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		}
 		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
 	}
+
 	cfg := clientv3.Config{
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
@@ -179,6 +291,7 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		DialOptions:          dialOptions,
 		Endpoints:            c.ServerList,
 		TLS:                  tlsConfig,
+		Logger:               etcd3ClientLogger,
 	}
 
 	return clientv3.New(cfg)
@@ -261,6 +374,9 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 		return nil, nil, err
 	}
 
+	// decorate the KV instance so we can track etcd latency per request.
+	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
+
 	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client, c.DBMetricPollInterval)
 	if err != nil {
 		return nil, nil, err
@@ -279,7 +395,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 	}
 	transformer := c.Transformer
 	if transformer == nil {
-		transformer = value.IdentityTransformer
+		transformer = identity.NewEncryptCheckTransformer()
 	}
 	return etcd3.New(client, c.Codec, newFunc, c.Prefix, c.GroupResource, transformer, c.Paging, c.LeaseManagerConfig), destroyFunc, nil
 }

@@ -68,7 +68,7 @@ func newListener(addr, scheme string, opts ...ListenerOption) (net.Listener, err
 		fallthrough
 	case lnOpts.IsTimeout(), lnOpts.IsSocketOpts():
 		// timeout listener with socket options.
-		ln, err := lnOpts.ListenConfig.Listen(context.TODO(), "tcp", addr)
+		ln, err := newKeepAliveListener(&lnOpts.ListenConfig, addr)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +78,7 @@ func newListener(addr, scheme string, opts ...ListenerOption) (net.Listener, err
 			writeTimeout: lnOpts.writeTimeout,
 		}
 	case lnOpts.IsTimeout():
-		ln, err := net.Listen("tcp", addr)
+		ln, err := newKeepAliveListener(nil, addr)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +88,7 @@ func newListener(addr, scheme string, opts ...ListenerOption) (net.Listener, err
 			writeTimeout: lnOpts.writeTimeout,
 		}
 	default:
-		ln, err := net.Listen("tcp", addr)
+		ln, err := newKeepAliveListener(nil, addr)
 		if err != nil {
 			return nil, err
 		}
@@ -100,6 +100,19 @@ func newListener(addr, scheme string, opts ...ListenerOption) (net.Listener, err
 		return lnOpts.Listener, nil
 	}
 	return wrapTLS(scheme, lnOpts.tlsInfo, lnOpts.Listener)
+}
+
+func newKeepAliveListener(cfg *net.ListenConfig, addr string) (ln net.Listener, err error) {
+	if cfg != nil {
+		ln, err = cfg.Listen(context.TODO(), "tcp", addr)
+	} else {
+		ln, err = net.Listen("tcp", addr)
+	}
+	if err != nil {
+		return
+	}
+
+	return NewKeepAliveListener(ln, "tcp", nil)
 }
 
 func wrapTLS(scheme string, tlsinfo *TLSInfo, l net.Listener) (net.Listener, error) {

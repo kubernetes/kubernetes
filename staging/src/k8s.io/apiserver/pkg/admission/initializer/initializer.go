@@ -19,6 +19,7 @@ package initializer
 import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
@@ -26,9 +27,11 @@ import (
 
 type pluginInitializer struct {
 	externalClient    kubernetes.Interface
+	dynamicClient     dynamic.Interface
 	externalInformers informers.SharedInformerFactory
 	authorizer        authorizer.Authorizer
 	featureGates      featuregate.FeatureGate
+	stopCh            <-chan struct{}
 }
 
 // New creates an instance of admission plugins initializer.
@@ -36,28 +39,41 @@ type pluginInitializer struct {
 // during compilation when they update a level.
 func New(
 	extClientset kubernetes.Interface,
+	dynamicClient dynamic.Interface,
 	extInformers informers.SharedInformerFactory,
 	authz authorizer.Authorizer,
 	featureGates featuregate.FeatureGate,
+	stopCh <-chan struct{},
 ) pluginInitializer {
 	return pluginInitializer{
 		externalClient:    extClientset,
+		dynamicClient:     dynamicClient,
 		externalInformers: extInformers,
 		authorizer:        authz,
 		featureGates:      featureGates,
+		stopCh:            stopCh,
 	}
 }
 
 // Initialize checks the initialization interfaces implemented by a plugin
 // and provide the appropriate initialization data
 func (i pluginInitializer) Initialize(plugin admission.Interface) {
-	// First tell the plugin about enabled features, so it can decide whether to start informers or not
+	// First tell the plugin about drained notification, so it can pass it to further initializations.
+	if wants, ok := plugin.(WantsDrainedNotification); ok {
+		wants.SetDrainedNotification(i.stopCh)
+	}
+
+	// Second tell the plugin about enabled features, so it can decide whether to start informers or not
 	if wants, ok := plugin.(WantsFeatures); ok {
 		wants.InspectFeatureGates(i.featureGates)
 	}
 
 	if wants, ok := plugin.(WantsExternalKubeClientSet); ok {
 		wants.SetExternalKubeClientSet(i.externalClient)
+	}
+
+	if wants, ok := plugin.(WantsDynamicClient); ok {
+		wants.SetDynamicClient(i.dynamicClient)
 	}
 
 	if wants, ok := plugin.(WantsExternalKubeInformerFactory); ok {

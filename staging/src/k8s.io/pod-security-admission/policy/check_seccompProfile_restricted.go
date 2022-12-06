@@ -51,8 +51,15 @@ func CheckSeccompProfileRestricted() Check {
 		Level: api.LevelRestricted,
 		Versions: []VersionedCheck{
 			{
-				MinimumVersion: api.MajorMinorVersion(1, 19),
-				CheckPod:       seccompProfileRestricted_1_19,
+				MinimumVersion:   api.MajorMinorVersion(1, 19),
+				CheckPod:         seccompProfileRestricted_1_19,
+				OverrideCheckIDs: []CheckID{checkSeccompBaselineID},
+			},
+			// Starting 1.25, windows pods would be exempted from this check using pod.spec.os field when set to windows.
+			{
+				MinimumVersion:   api.MajorMinorVersion(1, 25),
+				CheckPod:         seccompProfileRestricted_1_25,
+				OverrideCheckIDs: []CheckID{checkSeccompBaselineID},
 			},
 		},
 	}
@@ -134,4 +141,15 @@ func seccompProfileRestricted_1_19(podMetadata *metav1.ObjectMeta, podSpec *core
 	}
 
 	return CheckResult{Allowed: true}
+}
+
+// seccompProfileRestricted_1_25 checks restricted policy on securityContext.seccompProfile field for kubernetes
+// version 1.25 and above
+func seccompProfileRestricted_1_25(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	// Pod API validation would have failed if podOS == Windows and if secCompProfile has been set.
+	// We can admit the Windows pod even if seccompProfile has not been set.
+	if podSpec.OS != nil && podSpec.OS.Name == corev1.Windows {
+		return CheckResult{Allowed: true}
+	}
+	return seccompProfileRestricted_1_19(podMetadata, podSpec)
 }

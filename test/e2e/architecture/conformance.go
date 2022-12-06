@@ -19,14 +19,16 @@ package architecture
 import (
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("Conformance Tests", func() {
 	f := framework.NewDefaultFramework("conformance-tests")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.23
@@ -35,7 +37,7 @@ var _ = SIGDescribe("Conformance Tests", func() {
 	*/
 	framework.ConformanceIt("should have at least two untainted nodes", func() {
 		ginkgo.By("Getting node addresses")
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, 10*time.Minute))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(f.ClientSet, 10*time.Minute))
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		if len(nodeList.Items) < 2 {

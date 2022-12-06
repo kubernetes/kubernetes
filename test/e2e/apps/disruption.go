@@ -19,12 +19,13 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/onsi/gomega"
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // schedulingTimeout is longer specifically because sometimes we need to wait
@@ -62,6 +64,7 @@ var defaultLabels = map[string]string{"foo": "bar"}
 
 var _ = SIGDescribe("DisruptionController", func() {
 	f := framework.NewDefaultFramework("disruption")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var ns string
 	var cs kubernetes.Interface
 	var dc dynamic.Interface
@@ -74,6 +77,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 	ginkgo.Context("Listing PodDisruptionBudgets for all namespaces", func() {
 		anotherFramework := framework.NewDefaultFramework("disruption-2")
+		anotherFramework.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 		/*
 		   Release : v1.21

@@ -21,9 +21,11 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -41,7 +43,7 @@ type containerManagerStub struct {
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
+func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
 	klog.V(2).InfoS("Starting stub container manager")
 	return nil
 }
@@ -74,7 +76,10 @@ func (cm *containerManagerStub) GetNodeAllocatableReservation() v1.ResourceList 
 	return nil
 }
 
-func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
+func (cm *containerManagerStub) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+	if !localStorageCapacityIsolation {
+		return v1.ResourceList{}
+	}
 	c := v1.ResourceList{
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(
 			int64(0),
@@ -149,6 +154,18 @@ func (cm *containerManagerStub) GetAllocatableMemory() []*podresourcesapi.Contai
 
 func (cm *containerManagerStub) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
+}
+
+func (cm *containerManagerStub) PrepareResources(pod *v1.Pod, container *v1.Container) (*dra.ContainerInfo, error) {
+	return nil, nil
+}
+
+func (cm *containerManagerStub) UnprepareResources(*v1.Pod) error {
+	return nil
+}
+
+func (cm *containerManagerStub) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return false
 }
 
 func NewStubContainerManager() ContainerManager {

@@ -603,7 +603,8 @@ func (v *SummaryVec) GetMetricWith(labels Labels) (Observer, error) {
 // WithLabelValues works as GetMetricWithLabelValues, but panics where
 // GetMetricWithLabelValues would have returned an error. Not returning an
 // error allows shortcuts like
-//     myVec.WithLabelValues("404", "GET").Observe(42.21)
+//
+//	myVec.WithLabelValues("404", "GET").Observe(42.21)
 func (v *SummaryVec) WithLabelValues(lvs ...string) Observer {
 	s, err := v.GetMetricWithLabelValues(lvs...)
 	if err != nil {
@@ -614,7 +615,8 @@ func (v *SummaryVec) WithLabelValues(lvs ...string) Observer {
 
 // With works as GetMetricWith, but panics where GetMetricWithLabels would have
 // returned an error. Not returning an error allows shortcuts like
-//     myVec.With(prometheus.Labels{"code": "404", "method": "GET"}).Observe(42.21)
+//
+//	myVec.With(prometheus.Labels{"code": "404", "method": "GET"}).Observe(42.21)
 func (v *SummaryVec) With(labels Labels) Observer {
 	s, err := v.GetMetricWith(labels)
 	if err != nil {
@@ -701,7 +703,8 @@ func (s *constSummary) Write(out *dto.Metric) error {
 //
 // quantiles maps ranks to quantile values. For example, a median latency of
 // 0.23s and a 99th percentile latency of 0.56s would be expressed as:
-//     map[float64]float64{0.5: 0.23, 0.99: 0.56}
+//
+//	map[float64]float64{0.5: 0.23, 0.99: 0.56}
 //
 // NewConstSummary returns an error if the length of labelValues is not
 // consistent with the variable labels in Desc or if Desc is invalid.

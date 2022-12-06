@@ -1,6 +1,6 @@
 # libcontainer
 
-[![GoDoc](https://godoc.org/github.com/opencontainers/runc/libcontainer?status.svg)](https://godoc.org/github.com/opencontainers/runc/libcontainer)
+[![Go Reference](https://pkg.go.dev/badge/github.com/opencontainers/runc/libcontainer.svg)](https://pkg.go.dev/github.com/opencontainers/runc/libcontainer)
 
 Libcontainer provides a native Go implementation for creating containers
 with namespaces, cgroups, capabilities, and filesystem access controls.
@@ -81,22 +81,6 @@ config := &configs.Config{
 			"CAP_AUDIT_WRITE",
 		},
 		Effective: []string{
-			"CAP_CHOWN",
-			"CAP_DAC_OVERRIDE",
-			"CAP_FSETID",
-			"CAP_FOWNER",
-			"CAP_MKNOD",
-			"CAP_NET_RAW",
-			"CAP_SETGID",
-			"CAP_SETUID",
-			"CAP_SETFCAP",
-			"CAP_SETPCAP",
-			"CAP_NET_BIND_SERVICE",
-			"CAP_SYS_CHROOT",
-			"CAP_KILL",
-			"CAP_AUDIT_WRITE",
-		},
-		Inheritable: []string{
 			"CAP_CHOWN",
 			"CAP_DAC_OVERRIDE",
 			"CAP_FSETID",

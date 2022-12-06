@@ -235,10 +235,10 @@ type aggregateRecord struct {
 // EventAggregate checks if a similar event has been seen according to the
 // aggregation configuration (max events, max interval, etc) and returns:
 //
-// - The (potentially modified) event that should be created
-// - The cache key for the event, for correlation purposes. This will be set to
-//   the full key for normal events, and to the result of
-//   EventAggregatorMessageFunc for aggregate events.
+//   - The (potentially modified) event that should be created
+//   - The cache key for the event, for correlation purposes. This will be set to
+//     the full key for normal events, and to the result of
+//     EventAggregatorMessageFunc for aggregate events.
 func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, string) {
 	now := metav1.NewTime(e.clock.Now())
 	var record aggregateRecord
@@ -427,14 +427,14 @@ type EventCorrelateResult struct {
 // prior to interacting with the API server to record the event.
 //
 // The default behavior is as follows:
-//   * Aggregation is performed if a similar event is recorded 10 times
+//   - Aggregation is performed if a similar event is recorded 10 times
 //     in a 10 minute rolling interval.  A similar event is an event that varies only by
 //     the Event.Message field.  Rather than recording the precise event, aggregation
 //     will create a new event whose message reports that it has combined events with
 //     the same reason.
-//   * Events are incrementally counted if the exact same event is encountered multiple
+//   - Events are incrementally counted if the exact same event is encountered multiple
 //     times.
-//   * A source may burst 25 events about an object, but has a refill rate budget
+//   - A source may burst 25 events about an object, but has a refill rate budget
 //     per object of 1 event every 5 minutes to control long-tail of spam.
 func NewEventCorrelator(clock clock.PassiveClock) *EventCorrelator {
 	cacheSize := maxLruCacheEntries

@@ -37,18 +37,15 @@ import (
 )
 
 func TestWebhookLoopback(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	webhookPath := "/webhook-test"
 
 	called := int32(0)
 
-	client, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			// Avoid resolveable kubernetes service
+			// Avoid resolvable kubernetes service
 			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
 
 			// Hook into audit to watch requests
@@ -66,6 +63,7 @@ func TestWebhookLoopback(t *testing.T) {
 			})
 		},
 	})
+	defer tearDownFn()
 
 	fail := admissionregistrationv1.Fail
 	noSideEffects := admissionregistrationv1.SideEffectClassNone

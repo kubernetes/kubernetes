@@ -142,7 +142,7 @@ func GetCaller() string {
 	runtime.Callers(3, pc[:])
 	f := runtime.FuncForPC(pc[0])
 	if f == nil {
-		return fmt.Sprintf("Unable to find caller")
+		return "Unable to find caller"
 	}
 	return f.Name()
 }

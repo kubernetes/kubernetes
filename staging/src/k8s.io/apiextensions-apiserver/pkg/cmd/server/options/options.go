@@ -21,8 +21,10 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"reflect"
 
 	"github.com/spf13/pflag"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -31,7 +33,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/server/options"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -43,7 +44,7 @@ const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
 
 // CustomResourceDefinitionsServerOptions describes the runtime options of an apiextensions-apiserver.
 type CustomResourceDefinitionsServerOptions struct {
-	ServerRunOptions   *options.ServerRunOptions
+	ServerRunOptions   *genericoptions.ServerRunOptions
 	RecommendedOptions *genericoptions.RecommendedOptions
 	APIEnablement      *genericoptions.APIEnablementOptions
 
@@ -54,7 +55,7 @@ type CustomResourceDefinitionsServerOptions struct {
 // NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
-		ServerRunOptions: options.NewServerRunOptions(),
+		ServerRunOptions: genericoptions.NewServerRunOptions(),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),
@@ -106,33 +107,46 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Scheme); err != nil {
 		return nil, err
 	}
-
+	crdRESTOptionsGetter, err := NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd)
+	if err != nil {
+		return nil, err
+	}
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
-			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+			CRDRESTOptionsGetter: crdRESTOptionsGetter,
 			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
-			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, nil),
+			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, oteltrace.NewNoopTracerProvider()),
 		},
 	}
 	return config, nil
 }
 
 // NewCRDRESTOptionsGetter create a RESTOptionsGetter for CustomResources.
-func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
-	ret := apiserver.CRDRESTOptionsGetter{
-		StorageConfig:             etcdOptions.StorageConfig,
-		StoragePrefix:             etcdOptions.StorageConfig.Prefix,
-		EnableWatchCache:          etcdOptions.EnableWatchCache,
-		DefaultWatchCacheSize:     etcdOptions.DefaultWatchCacheSize,
-		EnableGarbageCollection:   etcdOptions.EnableGarbageCollection,
-		DeleteCollectionWorkers:   etcdOptions.DeleteCollectionWorkers,
-		CountMetricPollPeriod:     etcdOptions.StorageConfig.CountMetricPollPeriod,
-		StorageObjectCountTracker: etcdOptions.StorageConfig.StorageObjectCountTracker,
-	}
-	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+// This works on a copy of the etcd options so we don't mutate originals.
+// We assume that the input etcd options have been completed already.
+// Avoid messing with anything outside of changes to StorageConfig as that
+// may lead to unexpected behavior when the options are applied.
+func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) (genericregistry.RESTOptionsGetter, error) {
+	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	etcdOptions.WatchCacheSizes = nil      // this control is not provided for custom resources
+	etcdOptions.SkipHealthEndpoints = true // avoid double wiring of health checks
 
-	return ret
+	// creates a generic apiserver config for etcdOptions to mutate
+	c := genericapiserver.Config{}
+	if err := etcdOptions.ApplyTo(&c); err != nil {
+		return nil, err
+	}
+	restOptionsGetter := c.RESTOptionsGetter
+	if restOptionsGetter == nil {
+		return nil, fmt.Errorf("server.Config RESTOptionsGetter should not be nil")
+	}
+	// sanity check that no other fields are set
+	c.RESTOptionsGetter = nil
+	if !reflect.DeepEqual(c, genericapiserver.Config{}) {
+		return nil, fmt.Errorf("only RESTOptionsGetter should have been mutated in server.Config")
+	}
+	return restOptionsGetter, nil
 }
 
 type serviceResolver struct {

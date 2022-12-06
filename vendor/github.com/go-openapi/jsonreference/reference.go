@@ -30,8 +30,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/PuerkitoBio/purell"
 	"github.com/go-openapi/jsonpointer"
+	"github.com/go-openapi/jsonreference/internal"
 )
 
 const (
@@ -114,7 +114,9 @@ func (r *Ref) parse(jsonReferenceString string) error {
 		return err
 	}
 
-	r.referenceURL, _ = url.Parse(purell.NormalizeURL(parsed, purell.FlagsSafe|purell.FlagRemoveDuplicateSlashes))
+	internal.NormalizeURL(parsed)
+
+	r.referenceURL = parsed
 	refURL := r.referenceURL
 
 	if refURL.Scheme != "" && refURL.Host != "" {

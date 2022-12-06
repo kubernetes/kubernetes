@@ -29,9 +29,8 @@ import (
 	"github.com/vmware/govmomi/sts"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
-	"k8s.io/klog/v2"
-
 	"k8s.io/client-go/pkg/version"
+	"k8s.io/klog/v2"
 )
 
 // VSphereConnection contains information for connecting to vCenter
@@ -218,12 +217,12 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 		connection.RoundTripperCount = RoundTripperDefaultCount
 	}
 	client.RoundTripper = vim25.Retry(client.RoundTripper, vim25.TemporaryNetworkError(int(connection.RoundTripperCount)))
-	vcdeprecated, err := isvCenterDeprecated(client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
+	vcNotSupported, err := isvCenterNotSupported(client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
 	if err != nil {
-		klog.Errorf("failed to check if vCenter version:%v and api version: %s is deprecated. Error: %v", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion, err)
+		klog.Errorf("failed to check if vCenter version:%v and api version: %s is supported or not. Error: %v", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion, err)
 	}
-	if vcdeprecated {
-		klog.Warningf("vCenter is deprecated. version: %s, api verson: %s Please consider upgrading vCenter and ESXi servers to 6.7u3 or higher", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
+	if vcNotSupported {
+		klog.Warningf("vCenter version (version: %q, api verson: %q) is not supported for CSI Migration. Please consider upgrading vCenter and ESXi servers to 7.0u2 or higher for migrating vSphere volumes to CSI.", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
 	}
 	return client, nil
 }

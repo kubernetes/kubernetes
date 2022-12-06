@@ -18,13 +18,13 @@
 // Load Balancers, Network Load Balancers, Gateway Load Balancers, and Classic
 // Load Balancers. This reference covers the following load balancer types:
 //
-//    * Application Load Balancer - Operates at the application layer (layer
-//    7) and supports HTTP and HTTPS.
+//   - Application Load Balancer - Operates at the application layer (layer
+//     7) and supports HTTP and HTTPS.
 //
-//    * Network Load Balancer - Operates at the transport layer (layer 4) and
-//    supports TCP, TLS, and UDP.
+//   - Network Load Balancer - Operates at the transport layer (layer 4) and
+//     supports TCP, TLS, and UDP.
 //
-//    * Gateway Load Balancer - Operates at the network layer (layer 3).
+//   - Gateway Load Balancer - Operates at the network layer (layer 3).
 //
 // For more information, see the Elastic Load Balancing User Guide (https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/).
 //
@@ -36,7 +36,7 @@
 // See elbv2 package documentation for more information.
 // https://docs.aws.amazon.com/sdk-for-go/api/service/elbv2/
 //
-// Using the Client
+// # Using the Client
 //
 // To contact Elastic Load Balancing with the SDK use the New function to create
 // a new service client. With that client you can make API requests to the service.

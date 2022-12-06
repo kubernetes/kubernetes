@@ -23,10 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
-	utilpointer "k8s.io/utils/pointer"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -64,7 +61,7 @@ func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 	}
 }
 func SetDefaults_Volume(obj *v1.Volume) {
-	if utilpointer.AllPtrFieldsNil(&obj.VolumeSource) {
+	if pointer.AllPtrFieldsNil(&obj.VolumeSource) {
 		obj.VolumeSource = v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}
@@ -131,19 +128,16 @@ func SetDefaults_Service(obj *v1.Service) {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-		if obj.Spec.InternalTrafficPolicy == nil {
-			if obj.Spec.Type == v1.ServiceTypeNodePort || obj.Spec.Type == v1.ServiceTypeLoadBalancer || obj.Spec.Type == v1.ServiceTypeClusterIP {
-				serviceInternalTrafficPolicyCluster := v1.ServiceInternalTrafficPolicyCluster
-				obj.Spec.InternalTrafficPolicy = &serviceInternalTrafficPolicyCluster
-			}
+	if obj.Spec.InternalTrafficPolicy == nil {
+		if obj.Spec.Type == v1.ServiceTypeNodePort || obj.Spec.Type == v1.ServiceTypeLoadBalancer || obj.Spec.Type == v1.ServiceTypeClusterIP {
+			serviceInternalTrafficPolicyCluster := v1.ServiceInternalTrafficPolicyCluster
+			obj.Spec.InternalTrafficPolicy = &serviceInternalTrafficPolicyCluster
 		}
-
 	}
 
 	if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
 		if obj.Spec.AllocateLoadBalancerNodePorts == nil {
-			obj.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			obj.Spec.AllocateLoadBalancerNodePorts = pointer.BoolPtr(true)
 		}
 	}
 }

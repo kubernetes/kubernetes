@@ -187,7 +187,7 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEvent {
 		// A new pvc may make a pod schedulable.
 		// Due to fields are immutable except `spec.resources`, pvc update events are ignored.
 		{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
-		// A new pv or updating a pv's volume zone labels may make a pod shedulable.
+		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
 		{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update},
 	}
 }

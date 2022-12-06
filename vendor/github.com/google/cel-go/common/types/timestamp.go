@@ -134,13 +134,11 @@ func (t Timestamp) ConvertToType(typeVal ref.Type) ref.Val {
 
 // Equal implements ref.Val.Equal.
 func (t Timestamp) Equal(other ref.Val) ref.Val {
-	if TimestampType != other.Type() {
-		return MaybeNoSuchOverloadErr(other)
-	}
-	return Bool(t.Time.Equal(other.(Timestamp).Time))
+	otherTime, ok := other.(Timestamp)
+	return Bool(ok && t.Time.Equal(otherTime.Time))
 }
 
-// Receive implements traits.Reciever.Receive.
+// Receive implements traits.Receiver.Receive.
 func (t Timestamp) Receive(function string, overload string, args []ref.Val) ref.Val {
 	switch len(args) {
 	case 0:
@@ -301,7 +299,7 @@ func timeZone(tz ref.Val, visitor timestampVisitor) timestampVisitor {
 		if err != nil {
 			return wrapErr(err)
 		}
-		min, err := strconv.Atoi(string(val[ind+1]))
+		min, err := strconv.Atoi(string(val[ind+1:]))
 		if err != nil {
 			return wrapErr(err)
 		}

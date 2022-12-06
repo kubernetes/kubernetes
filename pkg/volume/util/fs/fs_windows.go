@@ -20,7 +20,6 @@ limitations under the License.
 package fs
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -105,7 +104,7 @@ func diskUsage(currPath string, info os.FileInfo) (int64, error) {
 
 	for _, file := range files {
 		if file.IsDir() {
-			s, err := diskUsage(fmt.Sprintf("%s/%s", currPath, file.Name()), file)
+			s, err := diskUsage(filepath.Join(currPath, file.Name()), file)
 			if err != nil {
 				return size, err
 			}

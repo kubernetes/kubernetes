@@ -97,8 +97,8 @@ func IsNotFound(err error) bool {
 	return isErrCode(err, ErrCodeKeyNotFound)
 }
 
-// IsNodeExist returns true if and only if err is an node already exist error.
-func IsNodeExist(err error) bool {
+// IsExist returns true if and only if err is "key" already exists error.
+func IsExist(err error) bool {
 	return isErrCode(err, ErrCodeKeyExists)
 }
 

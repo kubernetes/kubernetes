@@ -271,9 +271,9 @@ func (IDRange) SwaggerDoc() map[string]string {
 }
 
 var map_IPBlock = map[string]string{
-	"":       "DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock. IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\",\"2001:db9::/64\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
-	"cidr":   "CIDR is a string representing the IP Block Valid examples are \"192.168.1.1/24\" or \"2001:db9::/64\"",
-	"except": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" or \"2001:db9::/64\" Except values will be rejected if they are outside the CIDR range",
+	"":       "DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock. IPBlock describes a particular CIDR (Ex. \"192.168.1.0/24\",\"2001:db8::/64\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
+	"cidr":   "CIDR is a string representing the IP Block Valid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"",
+	"except": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.0/24\" or \"2001:db8::/64\" Except values will be rejected if they are outside the CIDR range",
 }
 
 func (IPBlock) SwaggerDoc() map[string]string {
@@ -310,6 +310,37 @@ var map_IngressList = map[string]string{
 
 func (IngressList) SwaggerDoc() map[string]string {
 	return map_IngressList
+}
+
+var map_IngressLoadBalancerIngress = map[string]string{
+	"":         "IngressLoadBalancerIngress represents the status of a load-balancer ingress point.",
+	"ip":       "IP is set for load-balancer ingress points that are IP based.",
+	"hostname": "Hostname is set for load-balancer ingress points that are DNS based.",
+	"ports":    "Ports provides information about the ports exposed by this LoadBalancer.",
+}
+
+func (IngressLoadBalancerIngress) SwaggerDoc() map[string]string {
+	return map_IngressLoadBalancerIngress
+}
+
+var map_IngressLoadBalancerStatus = map[string]string{
+	"":        "LoadBalancerStatus represents the status of a load-balancer.",
+	"ingress": "Ingress is a list containing ingress points for the load-balancer.",
+}
+
+func (IngressLoadBalancerStatus) SwaggerDoc() map[string]string {
+	return map_IngressLoadBalancerStatus
+}
+
+var map_IngressPortStatus = map[string]string{
+	"":         "IngressPortStatus represents the error condition of a service port",
+	"port":     "Port is the port number of the ingress port.",
+	"protocol": "Protocol is the protocol of the ingress port. The supported values are: \"TCP\", \"UDP\", \"SCTP\"",
+	"error":    "Error is to record the problem with the service port The format of the error shall comply with the following rules: - built-in error values shall be specified in this file and those shall use\n  CamelCase names\n- cloud provider specific error values must have names that comply with the\n  format foo.example.com/CamelCase.",
+}
+
+func (IngressPortStatus) SwaggerDoc() map[string]string {
+	return map_IngressPortStatus
 }
 
 var map_IngressRule = map[string]string{
@@ -365,6 +396,7 @@ var map_NetworkPolicy = map[string]string{
 	"":         "DEPRECATED 1.9 - This group version of NetworkPolicy is deprecated by networking/v1/NetworkPolicy. NetworkPolicy describes what network traffic is allowed for a set of Pods",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "Specification of the desired behavior for this NetworkPolicy.",
+	"status":   "Status is the current state of the NetworkPolicy. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (NetworkPolicy) SwaggerDoc() map[string]string {
@@ -416,7 +448,7 @@ var map_NetworkPolicyPort = map[string]string{
 	"":         "DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.",
 	"protocol": "Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.",
 	"port":     "The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.",
-	"endPort":  "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate \"NetworkPolicyEndPort\".",
+	"endPort":  "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.",
 }
 
 func (NetworkPolicyPort) SwaggerDoc() map[string]string {
@@ -433,6 +465,15 @@ var map_NetworkPolicySpec = map[string]string{
 
 func (NetworkPolicySpec) SwaggerDoc() map[string]string {
 	return map_NetworkPolicySpec
+}
+
+var map_NetworkPolicyStatus = map[string]string{
+	"":           "NetworkPolicyStatus describe the current state of the NetworkPolicy.",
+	"conditions": "Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy. Current service state",
+}
+
+func (NetworkPolicyStatus) SwaggerDoc() map[string]string {
+	return map_NetworkPolicyStatus
 }
 
 var map_PodSecurityPolicy = map[string]string{
@@ -535,7 +576,7 @@ func (ReplicaSetSpec) SwaggerDoc() map[string]string {
 
 var map_ReplicaSetStatus = map[string]string{
 	"":                     "ReplicaSetStatus represents the current status of a ReplicaSet.",
-	"replicas":             "Replicas is the most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+	"replicas":             "Replicas is the most recently observed number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
 	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
 	"readyReplicas":        "The number of ready replicas for this replica set.",
 	"availableReplicas":    "The number of available replicas (ready for at least minReadySeconds) for this replica set.",

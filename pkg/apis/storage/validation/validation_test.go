@@ -23,11 +23,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -158,7 +155,6 @@ func TestValidateStorageClass(t *testing.T) {
 }
 
 func TestVolumeAttachmentValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 	volumeName := "pv-name"
 	empty := ""
 	migrationEnabledSuccessCases := []storage.VolumeAttachment{
@@ -384,43 +380,9 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 			t.Errorf("expected failure for test: %v", volumeAttachment)
 		}
 	}
-
-	// validate with CSIMigration disabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
-
-	migrationDisabledSuccessCases := []storage.VolumeAttachment{
-		{
-			// PVName specified with migration disabled
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: storage.VolumeAttachmentSpec{
-				Attacher: "myattacher",
-				NodeName: "node",
-				Source: storage.VolumeAttachmentSource{
-					PersistentVolumeName: &volumeName,
-				},
-			},
-		},
-		{
-			// InlineSpec specified with migration disabled
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: storage.VolumeAttachmentSpec{
-				Attacher: "myattacher",
-				NodeName: "node",
-				Source: storage.VolumeAttachmentSource{
-					InlineVolumeSpec: &inlineSpec,
-				},
-			},
-		},
-	}
-	for _, volumeAttachment := range migrationDisabledSuccessCases {
-		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
-			t.Errorf("expected success: %v %v", volumeAttachment, errs)
-		}
-	}
 }
 
 func TestVolumeAttachmentUpdateValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 	volumeName := "foo"
 	newVolumeName := "bar"
 
@@ -2093,9 +2055,7 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 }
 
 func TestCSIDriverStorageCapacityEnablement(t *testing.T) {
-	run := func(t *testing.T, enabled, withField bool) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, enabled)()
-
+	run := func(t *testing.T, withField bool) {
 		driverName := "test-driver"
 		attachRequired := true
 		podInfoOnMount := true
@@ -2113,7 +2073,7 @@ func TestCSIDriverStorageCapacityEnablement(t *testing.T) {
 			csiDriver.Spec.StorageCapacity = &storageCapacity
 		}
 		errs := ValidateCSIDriver(&csiDriver)
-		success := !enabled || withField
+		success := withField
 		if success && len(errs) != 0 {
 			t.Errorf("expected success, got: %v", errs)
 		}
@@ -2123,13 +2083,9 @@ func TestCSIDriverStorageCapacityEnablement(t *testing.T) {
 	}
 
 	yesNo := []bool{true, false}
-	for _, enabled := range yesNo {
-		t.Run(fmt.Sprintf("CSIStorageCapacity=%v", enabled), func(t *testing.T) {
-			for _, withField := range yesNo {
-				t.Run(fmt.Sprintf("with-field=%v", withField), func(t *testing.T) {
-					run(t, enabled, withField)
-				})
-			}
+	for _, withField := range yesNo {
+		t.Run(fmt.Sprintf("with-field=%v", withField), func(t *testing.T) {
+			run(t, withField)
 		})
 	}
 }
@@ -2223,7 +2179,7 @@ func TestValidateCSIStorageCapacity(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateCSIStorageCapacity(scenario.capacity)
+			errs := ValidateCSIStorageCapacity(scenario.capacity, CSIStorageCapacityValidateOptions{false})
 			if len(errs) == 0 && scenario.isExpectedFailure {
 				t.Errorf("Unexpected success")
 			}

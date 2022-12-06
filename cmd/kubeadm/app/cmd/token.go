@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -49,9 +48,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -86,7 +83,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		// cobra will print usage information, but still exit cleanly.
 		// We want to return an error code in these cases so that the
 		// user knows that their command was invalid.
-		RunE: cmdutil.SubCmdRunE("token"),
+		Run: cmdutil.SubCmdRun(),
 	}
 
 	options.AddKubeConfigFlag(tokenCmd.PersistentFlags(), &kubeConfigFile)
@@ -130,7 +127,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := getClientset(kubeConfigFile, dryRun)
+			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -162,14 +159,14 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := getClientset(kubeConfigFile, dryRun)
+			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
 
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
-				return err
+				return errors.Wrap(err, "could not construct output printer")
 			}
 
 			return RunListTokens(out, errW, client, printer)
@@ -193,10 +190,10 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				return errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern)
+				return errors.Errorf("missing argument; 'token delete' is missing token of form %q or %q", bootstrapapi.BootstrapTokenPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := getClientset(kubeConfigFile, dryRun)
+			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -354,7 +351,7 @@ func (ttp *tokenTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) erro
 // tokenTextPrintFlags provides flags necessary for printing bootstrap token in a text form.
 type tokenTextPrintFlags struct{}
 
-// ToPrinter returns kubeadm printer for the text output format
+// ToPrinter returns a kubeadm printer for the text output format
 func (tpf *tokenTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, error) {
 	if outputFormat == output.TextOutput {
 		return &tokenTextPrinter{columns: []string{"TOKEN", "TTL", "EXPIRES", "USAGES", "DESCRIPTION", "EXTRA GROUPS"}}, nil
@@ -419,7 +416,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 			bts, err := bootstraptokenv1.NewBootstrapTokenString(tokenIDOrToken)
 			if err != nil {
 				return errors.Errorf("given token didn't match pattern %q or %q",
-					bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
+					bootstrapapi.BootstrapTokenPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
 			tokenID = bts.ID
 		}
@@ -432,15 +429,4 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)
 	}
 	return nil
-}
-
-func getClientset(file string, dryRun bool) (clientset.Interface, error) {
-	if dryRun {
-		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
-		if err != nil {
-			return nil, err
-		}
-		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
-	}
-	return kubeconfigutil.ClientSetFromFile(file)
 }

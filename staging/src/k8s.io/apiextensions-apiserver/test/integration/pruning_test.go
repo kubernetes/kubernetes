@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"go.etcd.io/etcd/client/pkg/v3/transport"
@@ -37,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
@@ -298,7 +299,7 @@ func TestPruningStatus(t *testing.T) {
 }
 
 func TestPruningFromStorage(t *testing.T) {
-	tearDown, config, options, err := fixtures.StartDefaultServer(t)
+	tearDown, config, completedConfig, err := fixtures.StartDefaultServerWithConfigAccess(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,11 +315,6 @@ func TestPruningFromStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	serverConfig, err := options.Config()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	crd := pruningFixture.DeepCopy()
 	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
 	if err := yaml.Unmarshal([]byte(fooSchema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
@@ -330,7 +326,7 @@ func TestPruningFromStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	restOptions, err := serverConfig.GenericConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural})
+	restOptions, err := completedConfig.GenericConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -603,6 +599,6 @@ embeddedNested:
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(expected, x) {
-		t.Errorf("unexpected diff: %s", diff.ObjectDiff(expected, x))
+		t.Errorf("unexpected diff: %s", cmp.Diff(expected, x))
 	}
 }

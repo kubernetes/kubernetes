@@ -16,7 +16,7 @@ limitations under the License.
 
 package util
 
-//DeviceUtil is a util for common device methods
+// DeviceUtil is a util for common device methods
 type DeviceUtil interface {
 	FindMultipathDeviceForDevice(disk string) string
 	FindSlaveDevicesOnMultipath(disk string) []string
@@ -28,7 +28,7 @@ type deviceHandler struct {
 	getIo IoUtil
 }
 
-//NewDeviceHandler Create a new IoHandler implementation
+// NewDeviceHandler Create a new IoHandler implementation
 func NewDeviceHandler(io IoUtil) DeviceUtil {
 	return &deviceHandler{getIo: io}
 }

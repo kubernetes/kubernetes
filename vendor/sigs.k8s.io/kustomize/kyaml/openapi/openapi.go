@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"strings"
 
+	openapi_v2 "github.com/google/gnostic/openapiv2"
+	"google.golang.org/protobuf/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/openapi/kubernetesapi"
@@ -49,6 +51,13 @@ type openapiData struct {
 	// so that we only reparse the when necessary (to speed up performance)
 	schemaInit bool
 }
+
+type format string
+
+const (
+	JsonOrYaml format = "jsonOrYaml"
+	Proto      format = "proto"
+)
 
 // precomputedIsNamespaceScoped precomputes IsNamespaceScoped for known types. This avoids Schema creation,
 // which is expensive
@@ -264,12 +273,14 @@ func schemaUsingField(object *yaml.RNode, field string) (*spec.Schema, error) {
 
 // AddSchema parses s, and adds definitions from s to the global schema.
 func AddSchema(s []byte) error {
-	return parse(s)
+	return parse(s, JsonOrYaml)
 }
 
 // ResetOpenAPI resets the openapi data to empty
 func ResetOpenAPI() {
 	globalSchema = openapiData{}
+	kubernetesOpenAPIVersion = ""
+	customSchema = nil
 }
 
 // AddDefinitions adds the definitions to the global schema.
@@ -316,9 +327,8 @@ func toTypeMeta(ext interface{}) (yaml.TypeMeta, bool) {
 		return yaml.TypeMeta{}, false
 	}
 
-	g := m[groupKey].(string)
 	apiVersion := m[versionKey].(string)
-	if g != "" {
+	if g, ok := m[groupKey].(string); ok && g != "" {
 		apiVersion = g + "/" + apiVersion
 	}
 	return yaml.TypeMeta{Kind: m[kindKey].(string), APIVersion: apiVersion}, true
@@ -593,26 +603,27 @@ func initSchema() {
 	}
 	globalSchema.schemaInit = true
 
+	// TODO(natasha41575): Accept proto-formatted schema files
 	if customSchema != nil {
-		err := parse(customSchema)
+		err := parse(customSchema, JsonOrYaml)
 		if err != nil {
 			panic("invalid schema file")
 		}
-		if err = parse(kustomizationapi.MustAsset(kustomizationAPIAssetName)); err != nil {
-			// this should never happen
-			panic(err)
+	} else {
+		if kubernetesOpenAPIVersion == "" {
+			parseBuiltinSchema(kubernetesOpenAPIDefaultVersion)
+		} else {
+			parseBuiltinSchema(kubernetesOpenAPIVersion)
 		}
-		return
 	}
 
-	if kubernetesOpenAPIVersion == "" {
-		parseBuiltinSchema(kubernetesOpenAPIDefaultVersion)
-	} else {
-		parseBuiltinSchema(kubernetesOpenAPIVersion)
+	if err := parse(kustomizationapi.MustAsset(kustomizationAPIAssetName), JsonOrYaml); err != nil {
+		// this should never happen
+		panic(err)
 	}
 }
 
-// parseBuiltinSchema calls parse to parse the json schemas
+// parseBuiltinSchema calls parse to parse the json or proto schemas
 func parseBuiltinSchema(version string) {
 	if globalSchema.noUseBuiltInSchema {
 		// don't parse the built in schema
@@ -623,36 +634,45 @@ func parseBuiltinSchema(version string) {
 	assetName := filepath.Join(
 		"kubernetesapi",
 		version,
-		"swagger.json")
+		"swagger.pb")
 
-	if err := parse(kubernetesapi.OpenAPIMustAsset[version](assetName)); err != nil {
-		// this should never happen
-		panic(err)
-	}
-
-	if err := parse(kustomizationapi.MustAsset(kustomizationAPIAssetName)); err != nil {
+	if err := parse(kubernetesapi.OpenAPIMustAsset[version](assetName), Proto); err != nil {
 		// this should never happen
 		panic(err)
 	}
 }
 
-// parse parses and indexes a single json schema
-func parse(b []byte) error {
+// parse parses and indexes a single json or proto schema
+func parse(b []byte, format format) error {
 	var swagger spec.Swagger
-	s := string(b)
-	if len(s) > 0 && s[0] != '{' {
-		var err error
-		b, err = k8syaml.YAMLToJSON(b)
+	switch {
+	case format == Proto:
+		doc := &openapi_v2.Document{}
+		// We parse protobuf and get an openapi_v2.Document here.
+		if err := proto.Unmarshal(b, doc); err != nil {
+			return fmt.Errorf("openapi proto unmarshalling failed: %w", err)
+		}
+		// convert the openapi_v2.Document back to Swagger
+		_, err := swagger.FromGnostic(doc)
 		if err != nil {
 			return errors.Wrap(err)
 		}
+
+	case format == JsonOrYaml:
+		if len(b) > 0 && b[0] != byte('{') {
+			var err error
+			b, err = k8syaml.YAMLToJSON(b)
+			if err != nil {
+				return errors.Wrap(err)
+			}
+		}
+		if err := swagger.UnmarshalJSON(b); err != nil {
+			return errors.Wrap(err)
+		}
 	}
-	if err := swagger.UnmarshalJSON(b); err != nil {
-		return errors.Wrap(err)
-	}
+
 	AddDefinitions(swagger.Definitions)
 	findNamespaceability(swagger.Paths)
-
 	return nil
 }
 
@@ -696,6 +716,9 @@ func findNamespaceability(paths *spec.Paths) {
 }
 
 func resolve(root interface{}, ref *spec.Ref) (*spec.Schema, error) {
+	if s, ok := root.(*spec.Schema); ok && s == nil {
+		return nil, nil
+	}
 	res, _, err := ref.GetPointer().Get(root)
 	if err != nil {
 		return nil, errors.Wrap(err)

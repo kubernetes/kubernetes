@@ -1,13 +1,14 @@
 package ebpf
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"unsafe"
 
+	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/internal"
-	"github.com/cilium/ebpf/internal/btf"
 	"github.com/cilium/ebpf/internal/unix"
 )
 
@@ -73,30 +74,6 @@ type bpfMapInfo struct {
 	btf_value_type_id         uint32
 }
 
-type bpfProgLoadAttr struct {
-	progType           ProgramType
-	insCount           uint32
-	instructions       internal.Pointer
-	license            internal.Pointer
-	logLevel           uint32
-	logSize            uint32
-	logBuf             internal.Pointer
-	kernelVersion      uint32              // since 4.1  2541517c32be
-	progFlags          uint32              // since 4.11 e07b98d9bffe
-	progName           internal.BPFObjName // since 4.15 067cae47771c
-	progIfIndex        uint32              // since 4.15 1f6f4cb7ba21
-	expectedAttachType AttachType          // since 4.17 5e43f899b03a
-	progBTFFd          uint32
-	funcInfoRecSize    uint32
-	funcInfo           internal.Pointer
-	funcInfoCnt        uint32
-	lineInfoRecSize    uint32
-	lineInfo           internal.Pointer
-	lineInfoCnt        uint32
-	attachBTFID        btf.TypeID
-	attachProgFd       uint32
-}
-
 type bpfProgInfo struct {
 	prog_type                uint32
 	id                       uint32
@@ -107,7 +84,7 @@ type bpfProgInfo struct {
 	xlated_prog_insns        internal.Pointer
 	load_time                uint64 // since 4.15 cb4d2b3f03d8
 	created_by_uid           uint32
-	nr_map_ids               uint32
+	nr_map_ids               uint32 // since 4.15 cb4d2b3f03d8
 	map_ids                  internal.Pointer
 	name                     internal.BPFObjName // since 4.15 067cae47771c
 	ifindex                  uint32
@@ -145,11 +122,6 @@ type bpfProgTestRunAttr struct {
 	duration    uint32
 }
 
-type bpfGetFDByIDAttr struct {
-	id   uint32
-	next uint32
-}
-
 type bpfMapFreezeAttr struct {
 	mapFd uint32
 }
@@ -158,23 +130,6 @@ type bpfObjGetNextIDAttr struct {
 	startID   uint32
 	nextID    uint32
 	openFlags uint32
-}
-
-func bpfProgLoad(attr *bpfProgLoadAttr) (*internal.FD, error) {
-	for {
-		fd, err := internal.BPF(internal.BPF_PROG_LOAD, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
-		// As of ~4.20 the verifier can be interrupted by a signal,
-		// and returns EAGAIN in that case.
-		if errors.Is(err, unix.EAGAIN) {
-			continue
-		}
-
-		if err != nil {
-			return nil, err
-		}
-
-		return internal.NewFD(uint32(fd)), nil
-	}
 }
 
 func bpfProgTestRun(attr *bpfProgTestRunAttr) error {
@@ -372,6 +327,10 @@ func wrapMapError(err error) error {
 		return internal.SyscallError(ErrNotSupported, unix.ENOTSUPP)
 	}
 
+	if errors.Is(err, unix.E2BIG) {
+		return fmt.Errorf("key too big for map: %w", err)
+	}
+
 	return err
 }
 
@@ -388,8 +347,13 @@ func bpfMapFreeze(m *internal.FD) error {
 	return err
 }
 
-func bpfGetProgInfoByFD(fd *internal.FD) (*bpfProgInfo, error) {
+func bpfGetProgInfoByFD(fd *internal.FD, ids []MapID) (*bpfProgInfo, error) {
 	var info bpfProgInfo
+	if len(ids) > 0 {
+		info.nr_map_ids = uint32(len(ids))
+		info.map_ids = internal.NewPointer(unsafe.Pointer(&ids[0]))
+	}
+
 	if err := internal.BPFObjGetInfoByFD(fd, unsafe.Pointer(&info), unsafe.Sizeof(info)); err != nil {
 		return nil, fmt.Errorf("can't get program info: %w", err)
 	}
@@ -471,10 +435,30 @@ var haveBatchAPI = internal.FeatureTest("map batch api", "5.6", func() error {
 	return nil
 })
 
-func bpfObjGetFDByID(cmd internal.BPFCmd, id uint32) (*internal.FD, error) {
-	attr := bpfGetFDByIDAttr{
-		id: id,
+var haveProbeReadKernel = internal.FeatureTest("bpf_probe_read_kernel", "5.5", func() error {
+	insns := asm.Instructions{
+		asm.Mov.Reg(asm.R1, asm.R10),
+		asm.Add.Imm(asm.R1, -8),
+		asm.Mov.Imm(asm.R2, 8),
+		asm.Mov.Imm(asm.R3, 0),
+		asm.FnProbeReadKernel.Call(),
+		asm.Return(),
 	}
-	ptr, err := internal.BPF(cmd, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
-	return internal.NewFD(uint32(ptr)), err
-}
+	buf := bytes.NewBuffer(make([]byte, 0, len(insns)*asm.InstructionSize))
+	if err := insns.Marshal(buf, internal.NativeEndian); err != nil {
+		return err
+	}
+	bytecode := buf.Bytes()
+
+	fd, err := internal.BPFProgLoad(&internal.BPFProgLoadAttr{
+		ProgType:     uint32(Kprobe),
+		License:      internal.NewStringPointer("GPL"),
+		Instructions: internal.NewSlicePointer(bytecode),
+		InsCount:     uint32(len(bytecode) / asm.InstructionSize),
+	})
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+	_ = fd.Close()
+	return nil
+})

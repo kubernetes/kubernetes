@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	. "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -100,7 +102,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *apps.ReplicaSet
 			ResourceVersion: "18",
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			Selector: &metav1.LabelSelector{MatchLabels: selectorMap},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -434,6 +436,36 @@ func TestGetReplicaSetsWithSameController(t *testing.T) {
 		sort.Strings(expectedRSNames)
 		if !reflect.DeepEqual(actualRSNames, expectedRSNames) {
 			t.Errorf("Got [%s]; expected [%s]", strings.Join(actualRSNames, ", "), strings.Join(expectedRSNames, ", "))
+		}
+	}
+}
+
+func BenchmarkGetReplicaSetsWithSameController(b *testing.B) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	controller, informers := testNewReplicaSetControllerFromClient(clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}), stopCh, BurstReplicas)
+
+	targetRS := newReplicaSet(1, map[string]string{"foo": "bar"})
+	targetRS.Name = "rs1"
+	targetRS.ObjectMeta.OwnerReferences[0].UID = "123456"
+	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(targetRS)
+	relatedRS := newReplicaSet(1, map[string]string{"foo": "bar"})
+	relatedRS.Name = "rs2"
+	relatedRS.ObjectMeta.OwnerReferences[0].UID = "123456"
+	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(relatedRS)
+	for i := 0; i < 100; i++ {
+		unrelatedRS := newReplicaSet(1, map[string]string{"foo": fmt.Sprintf("baz-%d", i)})
+		unrelatedRS.Name = fmt.Sprintf("rs-%d", i)
+		unrelatedRS.ObjectMeta.OwnerReferences[0].UID = types.UID(fmt.Sprintf("%d", i))
+		informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(unrelatedRS)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		gotRSs := controller.getReplicaSetsWithSameController(targetRS)
+		if len(gotRSs) != 2 {
+			b.Errorf("Incorrect ReplicaSets number, expected 2, got: %d", len(gotRSs))
 		}
 	}
 }
@@ -1271,10 +1303,10 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !exists {
-		t.Errorf("No expectations found for ReplicaSet %q", oldRSKey)
+		t.Errorf("No expectations found for ReplicaSet %q", newRSKey)
 	}
 	if rsExp.Fulfilled() {
-		t.Errorf("There should be unfulfilled expectations for creating new pods for ReplicaSet %q", oldRSKey)
+		t.Errorf("There should be unfulfilled expectations for creating new pods for ReplicaSet %q", newRSKey)
 	}
 
 	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)

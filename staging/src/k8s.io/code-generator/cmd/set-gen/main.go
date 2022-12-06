@@ -27,7 +27,6 @@ package main
 import (
 	"os"
 
-	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/examples/set-gen/generators"
 
@@ -39,7 +38,6 @@ func main() {
 	arguments := args.Default()
 
 	// Override defaults.
-	arguments.GoHeaderFilePath = util.BoilerplatePath()
 	arguments.InputDirs = []string{"k8s.io/kubernetes/pkg/util/sets/types"}
 	arguments.OutputPackagePath = "k8s.io/apimachinery/pkg/util/sets"
 

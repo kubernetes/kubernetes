@@ -40,7 +40,8 @@ type waitGroupCounter struct {
 }
 
 // compile time assertion that waitGroupCounter meets requirements
-//  of GoRoutineCounter
+//
+//	of GoRoutineCounter
 var _ counter.GoRoutineCounter = (*waitGroupCounter)(nil)
 
 func (wgc *waitGroupCounter) Add(delta int) {

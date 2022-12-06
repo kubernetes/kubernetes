@@ -47,7 +47,7 @@ func CreateInitStaticPodManifestFiles(manifestDir, patchesDir string, cfg *kubea
 }
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current configuration
-// NB. this methods holds the information about how kubeadm creates static pod manifests.
+// NB. this method holds the information about how kubeadm creates static pod manifests.
 func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) map[string]v1.Pod {
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)

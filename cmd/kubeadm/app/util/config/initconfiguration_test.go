@@ -18,7 +18,6 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,7 +32,7 @@ import (
 
 func TestLoadInitConfigurationFromFile(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir: %v", err)
 	}
@@ -84,7 +83,7 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 			cfgPath := filepath.Join(tmpdir, rt.name)
-			err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
+			err := os.WriteFile(cfgPath, rt.fileContents, 0644)
 			if err != nil {
 				t.Errorf("Couldn't create file: %v", err)
 				return
@@ -116,7 +115,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 		expectedTaintCnt int
 	}{
 		{
-			desc: "Uninitialized nodeRegistration field produces a single taint (the master one)",
+			desc: "Uninitialized nodeRegistration field produces expected taints",
 			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -126,7 +125,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 			expectedTaintCnt: 1,
 		},
 		{
-			desc: "Uninitialized taints field produces a single taint (the master one)",
+			desc: "Uninitialized taints field produces expected taints",
 			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),

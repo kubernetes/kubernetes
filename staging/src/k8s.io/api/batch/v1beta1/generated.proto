@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/batch/v1beta1";
 
 // CronJob represents the configuration of a single cron job.
 message CronJob {
@@ -63,6 +63,19 @@ message CronJobList {
 message CronJobSpec {
   // The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
   optional string schedule = 1;
+
+  // The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
+  // If not specified, this will default to the time zone of the kube-controller-manager process.
+  // The set of valid time zone names and the time zone offset is loaded from the system-wide time zone
+  // database by the API server during CronJob validation and the controller manager during execution.
+  // If no system-wide time zone database can be found a bundled version of the database is used instead.
+  // If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host
+  // configuration, the controller will stop creating new new Jobs and will create a system event with the
+  // reason UnknownTimeZone.
+  // More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
+  // This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
+  // +optional
+  optional string timeZone = 8;
 
   // Optional deadline in seconds for starting the job if it misses scheduled
   // time for any reason.  Missed jobs executions will be counted as failed ones.

@@ -43,12 +43,12 @@ func NewSchemaValidation(resources openapi.Resources) *SchemaValidation {
 // ValidateBytes will validates the object against using the Resources
 // object.
 func (v *SchemaValidation) ValidateBytes(data []byte) error {
-	obj, err := parse(data)
+	obj, err := Parse(data)
 	if err != nil {
 		return err
 	}
 
-	gvk, errs := getObjectKind(obj)
+	gvk, errs := GetObjectKind(obj)
 	if errs != nil {
 		return utilerrors.NewAggregate(errs)
 	}
@@ -71,7 +71,7 @@ func (v *SchemaValidation) validateList(object interface{}) []error {
 		return []error{errors.New("invalid object to validate")}
 	}
 	for _, item := range fields["items"].([]interface{}) {
-		if gvk, errs := getObjectKind(item); errs != nil {
+		if gvk, errs := GetObjectKind(item); errs != nil {
 			allErrors = append(allErrors, errs...)
 		} else {
 			allErrors = append(allErrors, v.validateResource(item, gvk)...)
@@ -90,7 +90,7 @@ func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVer
 	return validation.ValidateModel(obj, resource, gvk.Kind)
 }
 
-func parse(data []byte) (interface{}, error) {
+func Parse(data []byte) (interface{}, error) {
 	var obj interface{}
 	out, err := yaml.ToJSON(data)
 	if err != nil {
@@ -102,7 +102,7 @@ func parse(data []byte) (interface{}, error) {
 	return obj, nil
 }
 
-func getObjectKind(object interface{}) (schema.GroupVersionKind, []error) {
+func GetObjectKind(object interface{}) (schema.GroupVersionKind, []error) {
 	var listErrors []error
 	fields, ok := object.(map[string]interface{})
 	if !ok || fields == nil {

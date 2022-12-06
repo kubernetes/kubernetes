@@ -46,11 +46,8 @@ func NewNotFoundError(sub string) error {
 }
 
 func IsNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	_, ok := err.(*NotFoundError)
-	return ok
+	var nfErr *NotFoundError
+	return errors.As(err, &nfErr)
 }
 
 func tryDefaultPath(cgroupPath, subsystem string) string {
@@ -116,6 +113,11 @@ func FindCgroupMountpoint(cgroupPath, subsystem string) (string, error) {
 		return "", errUnified
 	}
 
+	// If subsystem is empty, we look for the cgroupv2 hybrid path.
+	if len(subsystem) == 0 {
+		return hybridMountpoint, nil
+	}
+
 	// Avoid parsing mountinfo by trying the default path first, if possible.
 	if path := tryDefaultPath(cgroupPath, subsystem); path != "" {
 		return path, nil
@@ -154,7 +156,7 @@ func findCgroupMountpointAndRootFromMI(mounts []*mountinfo.Info, cgroupPath, sub
 
 func (m Mount) GetOwnCgroup(cgroups map[string]string) (string, error) {
 	if len(m.Subsystems) == 0 {
-		return "", fmt.Errorf("no subsystem for mount")
+		return "", errors.New("no subsystem for mount")
 	}
 
 	return getControllerPath(m.Subsystems[0], cgroups)
@@ -224,6 +226,11 @@ func GetOwnCgroupPath(subsystem string) (string, error) {
 	cgroup, err := GetOwnCgroup(subsystem)
 	if err != nil {
 		return "", err
+	}
+
+	// If subsystem is empty, we look for the cgroupv2 hybrid path.
+	if len(subsystem) == 0 {
+		return hybridMountpoint, nil
 	}
 
 	return getCgroupPathHelper(subsystem, cgroup)

@@ -53,6 +53,7 @@ type EditTestCase struct {
 	Output           string   `yaml:"outputFormat"`
 	OutputPatch      string   `yaml:"outputPatch"`
 	SaveConfig       string   `yaml:"saveConfig"`
+	Subresource      string   `yaml:"subresource"`
 	Namespace        string   `yaml:"namespace"`
 	ExpectedStdout   []string `yaml:"expectedStdout"`
 	ExpectedStderr   []string `yaml:"expectedStderr"`
@@ -252,6 +253,9 @@ func TestEdit(t *testing.T) {
 			}
 			if len(testcase.SaveConfig) > 0 {
 				cmd.Flags().Set("save-config", testcase.SaveConfig)
+			}
+			if len(testcase.Subresource) > 0 {
+				cmd.Flags().Set("subresource", testcase.Subresource)
 			}
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {

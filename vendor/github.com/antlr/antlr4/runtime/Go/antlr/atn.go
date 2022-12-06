@@ -4,6 +4,8 @@
 
 package antlr
 
+import "sync"
+
 var ATNInvalidAltNumber int
 
 type ATN struct {
@@ -37,6 +39,10 @@ type ATN struct {
 	ruleToTokenType []int
 
 	states []ATNState
+
+	mu      sync.Mutex
+	stateMu sync.RWMutex
+	edgeMu  sync.RWMutex
 }
 
 func NewATN(grammarType int, maxTokenType int) *ATN {
@@ -59,14 +65,15 @@ func (a *ATN) NextTokensInContext(s ATNState, ctx RuleContext) *IntervalSet {
 // in s and staying in same rule. Token.EPSILON is in set if we reach end of
 // rule.
 func (a *ATN) NextTokensNoContext(s ATNState) *IntervalSet {
-	if s.GetNextTokenWithinRule() != nil {
-		return s.GetNextTokenWithinRule()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	iset := s.GetNextTokenWithinRule()
+	if iset == nil {
+		iset = a.NextTokensInContext(s, nil)
+		iset.readOnly = true
+		s.SetNextTokenWithinRule(iset)
 	}
-
-	s.SetNextTokenWithinRule(a.NextTokensInContext(s, nil))
-	s.GetNextTokenWithinRule().readOnly = true
-
-	return s.GetNextTokenWithinRule()
+	return iset
 }
 
 func (a *ATN) NextTokens(s ATNState, ctx RuleContext) *IntervalSet {

@@ -23,14 +23,16 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var loggingSoak struct {
@@ -42,6 +44,7 @@ var _ = e2econfig.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("logging-soak")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// Not a global constant (irrelevant outside this test), also not a parameter (if you want more logs, use --scale=).
 	kbRateInSeconds := 1 * time.Second
@@ -116,7 +119,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 			// we don't validate total log data, since there is no guarantee all logs will be stored forever.
 			// instead, we just validate that some logs are being created in std out.
 			Verify: func(p v1.Pod) (bool, error) {
-				s, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "logging-soak", "logs-123", 1*time.Second)
+				s, err := e2eoutput.LookForStringInLog(f.Namespace.Name, p.Name, "logging-soak", "logs-123", 1*time.Second)
 				return s != "", err
 			},
 		},

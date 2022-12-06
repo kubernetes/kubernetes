@@ -54,9 +54,11 @@ const (
 	extensionsGroup        = "extensions"
 	policyGroup            = "policy"
 	rbacGroup              = "rbac.authorization.k8s.io"
+	resourceGroup          = "resource.k8s.io"
 	storageGroup           = "storage.k8s.io"
 	resMetricsGroup        = "metrics.k8s.io"
 	customMetricsGroup     = "custom.metrics.k8s.io"
+	externalMetricsGroup   = "external.metrics.k8s.io"
 	networkingGroup        = "networking.k8s.io"
 	eventsGroup            = "events.k8s.io"
 	internalAPIServerGroup = "internal.apiserver.k8s.io"
@@ -160,12 +162,10 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		// Use the Node authorization mode to limit a node to update status of pvc objects referenced by pods bound to itself.
-		// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
-		pvcStatusPolicyRule := rbacv1helpers.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
-		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
-	}
+	// Use the Node authorization mode to limit a node to update status of pvc objects referenced by pods bound to itself.
+	// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
+	pvcStatusPolicyRule := rbacv1helpers.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
+	nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
 
 	// CSI
 	csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
@@ -175,6 +175,12 @@ func NodeRules() []rbacv1.PolicyRule {
 
 	// RuntimeClass
 	nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
+
+	// DRA Resource Claims
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie())
+	}
+
 	return nodePolicyRules
 }
 
@@ -211,19 +217,27 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:monitoring"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
-					"/metrics",
+					"/metrics", "/metrics/slis",
 					"/livez", "/readyz", "/healthz",
 					"/livez/*", "/readyz/*", "/healthz/*",
 				).RuleOrDie(),
 			},
 		},
+	}
+
+	basicUserRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.APISelfSubjectReview) {
+		basicUserRules = append(basicUserRules, rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("selfsubjectreviews").RuleOrDie())
+	}
+
+	roles = append(roles, []rbacv1.ClusterRole{
 		{
 			// a role which provides minimal resource access to allow a "normal" user to learn information about themselves
 			ObjectMeta: metav1.ObjectMeta{Name: "system:basic-user"},
-			Rules: []rbacv1.PolicyRule{
-				// TODO add future selfsubjectrulesreview, project request APIs, project listing APIs
-				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
-			},
+			Rules:      basicUserRules,
 		},
 		{
 			// a role which provides just enough power read insensitive cluster information
@@ -284,8 +298,10 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
+				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("pods/eviction").RuleOrDie(),
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 					"services", "services/proxy", "persistentvolumeclaims", "configmaps", "secrets", "events").RuleOrDie(),
+				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 					"statefulsets", "statefulsets/scale",
@@ -305,6 +321,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule(Write...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
+
+				rbacv1helpers.NewRule(ReadWrite...).Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 			},
 		},
 		{
@@ -494,7 +512,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientKubeletSignerName).RuleOrDie(),
 			},
 		},
-	}
+	}...)
 
 	// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
 	roles = append(roles, rbacv1.ClusterRole{
@@ -549,11 +567,16 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie(),
 		// Needed for namespaceSelector feature in pod affinity
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
+		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csidrivers").RuleOrDie(),
+		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csistoragecapacities").RuleOrDie(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	// Needed for dynamic resource allocation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		kubeSchedulerRules = append(kubeSchedulerRules,
-			rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csidrivers").RuleOrDie(),
-			rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csistoragecapacities").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclasses").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulings").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulings/status").RuleOrDie(),
 		)
 	}
 	roles = append(roles, rbacv1.ClusterRole{

@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -47,11 +48,25 @@ type NodeScore struct {
 	Score int64
 }
 
-// PluginToNodeScores declares a map from plugin name to its NodeScoreList.
-type PluginToNodeScores map[string]NodeScoreList
-
 // NodeToStatusMap declares map from node name to its status.
 type NodeToStatusMap map[string]*Status
+
+// NodePluginScores is a struct with node name and scores for that node.
+type NodePluginScores struct {
+	// Name is node name.
+	Name string
+	// Scores is scores from plugins and extenders.
+	Scores []PluginScore
+	// TotalScore is the total score in Scores.
+	TotalScore int64
+}
+
+// PluginScore is a struct with plugin/extender name and score.
+type PluginScore struct {
+	// Name is the name of plugin or extender.
+	Name  string
+	Score int64
+}
 
 // Code is the Status code/type which is returned from plugins.
 type Code int
@@ -107,7 +122,7 @@ const (
 )
 
 // PodsToActivateKey is a reserved state key for stashing pods.
-// If the stashed pods are present in unschedulableQ or backoffQ，they will be
+// If the stashed pods are present in unschedulablePods or backoffQ，they will be
 // activated (i.e., moved to activeQ) in two phases:
 // - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
 // - end of a binding cycle if it succeeds
@@ -192,16 +207,26 @@ func (s *Status) IsSuccess() bool {
 	return s.Code() == Success
 }
 
+// IsWait returns true if and only if "Status" is non-nil and its Code is "Wait".
+func (s *Status) IsWait() bool {
+	return s.Code() == Wait
+}
+
+// IsSkip returns true if and only if "Status" is non-nil and its Code is "Skip".
+func (s *Status) IsSkip() bool {
+	return s.Code() == Skip
+}
+
 // IsUnschedulable returns true if "Status" is Unschedulable (Unschedulable or UnschedulableAndUnresolvable).
 func (s *Status) IsUnschedulable() bool {
 	code := s.Code()
 	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
 
-// AsError returns nil if the status is a success; otherwise returns an "error" object
+// AsError returns nil if the status is a success, a wait or a skip; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
-	if s.IsSuccess() {
+	if s.IsSuccess() || s.IsWait() || s.IsSkip() {
 		return nil
 	}
 	if s.err != nil {
@@ -239,6 +264,9 @@ func NewStatus(code Code, reasons ...string) *Status {
 
 // AsStatus wraps an error in a Status.
 func AsStatus(err error) *Status {
+	if err == nil {
+		return nil
+	}
 	return &Status{
 		code:    Error,
 		reasons: []string{err.Error()},
@@ -295,6 +323,17 @@ type Plugin interface {
 	Name() string
 }
 
+// PreEnqueuePlugin is an interface that must be implemented by "PreEnqueue" plugins.
+// These plugins are called prior to adding Pods to activeQ.
+// Note: an preEnqueue plugin is expected to be lightweight and efficient, so it's not expected to
+// involve expensive calls like accessing external endpoints; otherwise it'd block other
+// Pods' enqueuing in event handlers.
+type PreEnqueuePlugin interface {
+	Plugin
+	// PreEnqueue is called prior to adding Pods to activeQ.
+	PreEnqueue(ctx context.Context, p *v1.Pod) *Status
+}
+
 // LessFunc is the function to sort pod info
 type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
 
@@ -337,8 +376,10 @@ type PreFilterExtensions interface {
 type PreFilterPlugin interface {
 	Plugin
 	// PreFilter is called at the beginning of the scheduling cycle. All PreFilter
-	// plugins must return success or the pod will be rejected.
-	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status
+	// plugins must return success or the pod will be rejected. PreFilter could optionally
+	// return a PreFilterResult to influence which nodes to evaluate downstream. This is useful
+	// for cases where it is possible to determine the subset of nodes to process in O(1) time.
+	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
 	// modify its pre-processed info. The framework guarantees that the extensions
@@ -491,6 +532,10 @@ type BindPlugin interface {
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	Handle
+
+	// PreEnqueuePlugins returns the registered preEnqueue plugins.
+	PreEnqueuePlugins() []PreEnqueuePlugin
+
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
 
@@ -498,7 +543,9 @@ type Framework interface {
 	// *Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If a non-success status is returned, then the scheduling
 	// cycle is aborted.
-	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) *Status
+	// It also returns a PreFilterResult, which may influence what or how many nodes to
+	// evaluate downstream.
+	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (*PreFilterResult, *Status)
 
 	// RunPostFilterPlugins runs the set of configured PostFilter plugins.
 	// PostFilter plugins can either be informational, in which case should be configured
@@ -556,8 +603,11 @@ type Framework interface {
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() *config.Plugins
 
-	// ProfileName returns the profile name associated to this framework.
+	// ProfileName returns the profile name associated to a profile.
 	ProfileName() string
+
+	// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
+	PercentageOfNodesToScore() *int32
 }
 
 // Handle provides data and some tools that plugins can use. It is
@@ -606,6 +656,36 @@ type Handle interface {
 
 	// Parallelizer returns a parallelizer holding parallelism for scheduler.
 	Parallelizer() parallelize.Parallelizer
+}
+
+// PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
+type PreFilterResult struct {
+	// The set of nodes that should be considered downstream; if nil then
+	// all nodes are eligible.
+	NodeNames sets.String
+}
+
+func (p *PreFilterResult) AllNodes() bool {
+	return p == nil || p.NodeNames == nil
+}
+
+func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
+	if p.AllNodes() && in.AllNodes() {
+		return nil
+	}
+
+	r := PreFilterResult{}
+	if p.AllNodes() {
+		r.NodeNames = in.NodeNames.Clone()
+		return &r
+	}
+	if in.AllNodes() {
+		r.NodeNames = p.NodeNames.Clone()
+		return &r
+	}
+
+	r.NodeNames = p.NodeNames.Intersection(in.NodeNames)
+	return &r
 }
 
 type NominatingMode int
@@ -661,11 +741,11 @@ type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
 	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) *Status
-	// RunScorePlugins runs the set of configured Score plugins. It returns a map that
-	// stores for each Score plugin name the corresponding NodeScoreList(s).
+	// RunScorePlugins runs the set of configured scoring plugins.
+	// It returns a list that stores scores from each plugin and total score for each Node.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) (PluginToNodeScores, *Status)
+	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) ([]NodePluginScores, *Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods

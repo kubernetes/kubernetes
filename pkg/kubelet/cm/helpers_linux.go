@@ -25,7 +25,7 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -44,12 +44,16 @@ const (
 	SharesPerCPU  = 1024
 	MilliCPUToCPU = 1000
 
-	// 100000 is equivalent to 100ms
-	QuotaPeriod    = 100000
+	// 100000 microseconds is equivalent to 100ms
+	QuotaPeriod = 100000
+	// 1000 microseconds is equivalent to 1ms
+	// defined here:
+	// https://github.com/torvalds/linux/blob/cac03ac368fabff0122853de2422d4e17a32de08/kernel/sched/core.c#L10546
 	MinQuotaPeriod = 1000
 )
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
+// Input parameters and resulting value is number of microseconds.
 func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	// CFS quota is measured in two values:
 	//  - cfs_period_us=100ms (the amount of time to measure usage across given by period)
@@ -320,7 +324,7 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 	if cgroupsPerQOS {
 		nodeAllocatableRoot = NewCgroupName(nodeAllocatableRoot, defaultNodeAllocatableCgroupName)
 	}
-	if libcontainerCgroupManagerType(cgroupDriver) == libcontainerSystemd {
+	if cgroupDriver == "systemd" {
 		return nodeAllocatableRoot.ToSystemd()
 	}
 	return nodeAllocatableRoot.ToCgroupfs()
@@ -336,16 +340,4 @@ func GetKubeletContainer(kubeletCgroups string) (string, error) {
 		return cont, nil
 	}
 	return kubeletCgroups, nil
-}
-
-// GetRuntimeContainer returns the cgroup used by the container runtime
-func GetRuntimeContainer(containerRuntime, runtimeCgroups string) (string, error) {
-	if containerRuntime == "docker" {
-		cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to get container name for docker process: %v", err)
-		}
-		return cont, nil
-	}
-	return runtimeCgroups, nil
 }

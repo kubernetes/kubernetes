@@ -51,10 +51,6 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 }
 
 func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeControllerManagerConfiguration) {
-	if obj.DeprecatedController.RegisterRetryCount == 0 {
-		obj.DeprecatedController.RegisterRetryCount = 10
-	}
-
 	// These defaults override the recommended defaults from the componentbaseconfigv1alpha1 package that are applied automatically
 	// These client-connection defaults are specific to the kube-controller-manager
 	if obj.Generic.ClientConnection.QPS == 0.0 {

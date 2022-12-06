@@ -46,7 +46,7 @@ func NewParser(opts ...Option) (*Parser, error) {
 		}
 	}
 	if p.maxRecursionDepth == 0 {
-		p.maxRecursionDepth = 200
+		p.maxRecursionDepth = 250
 	}
 	if p.maxRecursionDepth == -1 {
 		p.maxRecursionDepth = int((^uint(0)) >> 1)
@@ -142,14 +142,7 @@ var reservedIds = map[string]struct{}{
 //
 // Deprecated: Use NewParser().Parse() instead.
 func Parse(source common.Source) (*exprpb.ParsedExpr, *common.Errors) {
-	return ParseWithMacros(source, AllMacros)
-}
-
-// ParseWithMacros converts a source input and macros set to a parsed expression.
-//
-// Deprecated: Use NewParser().Parse() instead.
-func ParseWithMacros(source common.Source, macros []Macro) (*exprpb.ParsedExpr, *common.Errors) {
-	return mustNewParser(Macros(macros...)).Parse(source)
+	return mustNewParser(Macros(AllMacros...)).Parse(source)
 }
 
 type recursionError struct {
@@ -277,6 +270,7 @@ type parser struct {
 	errors                           *parseErrors
 	helper                           *parserHelper
 	macros                           map[string]Macro
+	recursionDepth                   int
 	maxRecursionDepth                int
 	errorRecoveryLimit               int
 	errorRecoveryLookaheadTokenLimit int
@@ -304,6 +298,7 @@ var (
 )
 
 func (p *parser) parse(expr runes.Buffer, desc string) *exprpb.Expr {
+	// TODO: get rid of these pools once https://github.com/antlr/antlr4/pull/3571 is in a release
 	lexer := lexerPool.Get().(*gen.CELLexer)
 	prsr := parserPool.Get().(*gen.CELParser)
 
@@ -358,6 +353,13 @@ func (p *parser) parse(expr runes.Buffer, desc string) *exprpb.Expr {
 
 // Visitor implementations.
 func (p *parser) Visit(tree antlr.ParseTree) interface{} {
+	p.recursionDepth++
+	if p.recursionDepth > p.maxRecursionDepth {
+		panic(&recursionError{message: "max recursion depth exceeded"})
+	}
+	defer func() {
+		p.recursionDepth--
+	}()
 	switch tree.(type) {
 	case *gen.StartContext:
 		return p.VisitStart(tree.(*gen.StartContext))
@@ -805,13 +807,13 @@ func (p *parser) extractQualifiedName(e *exprpb.Expr) (string, bool) {
 	if e == nil {
 		return "", false
 	}
-	switch e.ExprKind.(type) {
+	switch e.GetExprKind().(type) {
 	case *exprpb.Expr_IdentExpr:
 		return e.GetIdentExpr().GetName(), true
 	case *exprpb.Expr_SelectExpr:
 		s := e.GetSelectExpr()
-		if prefix, found := p.extractQualifiedName(s.Operand); found {
-			return prefix + "." + s.Field, true
+		if prefix, found := p.extractQualifiedName(s.GetOperand()); found {
+			return prefix + "." + s.GetField(), true
 		}
 	}
 	// TODO: Add a method to Source to get location from character offset.

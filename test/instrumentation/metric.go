@@ -21,21 +21,29 @@ import (
 )
 
 const (
-	counterMetricType   = "Counter"
-	gaugeMetricType     = "Gauge"
-	histogramMetricType = "Histogram"
+	counterMetricType    = "Counter"
+	gaugeMetricType      = "Gauge"
+	histogramMetricType  = "Histogram"
+	summaryMetricType    = "Summary"
+	timingRatioHistogram = "TimingRatioHistogram"
+	customType           = "Custom"
 )
 
 type metric struct {
-	Name              string    `yaml:"name"`
-	Subsystem         string    `yaml:"subsystem,omitempty"`
-	Namespace         string    `yaml:"namespace,omitempty"`
-	Help              string    `yaml:"help,omitempty"`
-	Type              string    `yaml:"type,omitempty"`
-	DeprecatedVersion string    `yaml:"deprecatedVersion,omitempty"`
-	StabilityLevel    string    `yaml:"stabilityLevel,omitempty"`
-	Labels            []string  `yaml:"labels,omitempty"`
-	Buckets           []float64 `yaml:"buckets,omitempty"`
+	Name              string              `yaml:"name" json:"name"`
+	Subsystem         string              `yaml:"subsystem,omitempty" json:"subsystem,omitempty"`
+	Namespace         string              `yaml:"namespace,omitempty" json:"namespace,omitempty"`
+	Help              string              `yaml:"help,omitempty" json:"help,omitempty"`
+	Type              string              `yaml:"type,omitempty" json:"type,omitempty"`
+	DeprecatedVersion string              `yaml:"deprecatedVersion,omitempty" json:"deprecatedVersion,omitempty"`
+	StabilityLevel    string              `yaml:"stabilityLevel,omitempty" json:"stabilityLevel,omitempty"`
+	Labels            []string            `yaml:"labels,omitempty" json:"labels,omitempty"`
+	Buckets           []float64           `yaml:"buckets,omitempty" json:"buckets,omitempty"`
+	Objectives        map[float64]float64 `yaml:"objectives,omitempty" json:"objectives,omitempty"`
+	AgeBuckets        uint32              `yaml:"ageBuckets,omitempty" json:"ageBuckets,omitempty"`
+	BufCap            uint32              `yaml:"bufCap,omitempty" json:"bufCap,omitempty"`
+	MaxAge            int64               `yaml:"maxAge,omitempty" json:"maxAge,omitempty"`
+	ConstLabels       map[string]string   `yaml:"constLabels,omitempty" json:"constLabels,omitempty"`
 }
 
 func (m metric) buildFQName() string {
@@ -46,6 +54,11 @@ type byFQName []metric
 
 func (ms byFQName) Len() int { return len(ms) }
 func (ms byFQName) Less(i, j int) bool {
+	if ms[i].StabilityLevel < ms[j].StabilityLevel {
+		return true
+	} else if ms[i].StabilityLevel > ms[j].StabilityLevel {
+		return false
+	}
 	return ms[i].buildFQName() < ms[j].buildFQName()
 }
 func (ms byFQName) Swap(i, j int) {

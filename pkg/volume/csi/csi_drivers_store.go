@@ -22,7 +22,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 )
 
-// Driver is a description of a CSI Driver, defined by an enpoint and the
+// Driver is a description of a CSI Driver, defined by an endpoint and the
 // highest CSI version supported
 type Driver struct {
 	endpoint                string

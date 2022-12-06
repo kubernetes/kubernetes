@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 )
 
 // EtcdVersion specifies an etcd server binaries SemVer.

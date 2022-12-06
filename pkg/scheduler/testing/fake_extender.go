@@ -143,6 +143,9 @@ func (pl *node2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
 
 // FakeExtender is a data struct which implements the Extender interface.
 type FakeExtender struct {
+	// ExtenderName indicates this fake extender's name.
+	// Note that extender name should be unique.
+	ExtenderName     string
 	Predicates       []FitPredicate
 	Prioritizers     []PriorityConfig
 	Weight           int64
@@ -155,9 +158,15 @@ type FakeExtender struct {
 	CachedNodeNameToInfo map[string]*framework.NodeInfo
 }
 
+const defaultFakeExtenderName = "defaultFakeExtender"
+
 // Name returns name of the extender.
 func (f *FakeExtender) Name() string {
-	return "FakeExtender"
+	if f.ExtenderName == "" {
+		// If ExtenderName is unset, use default name.
+		return defaultFakeExtenderName
+	}
+	return f.ExtenderName
 }
 
 // IsIgnorable returns a bool value indicating whether internal errors can be ignored.

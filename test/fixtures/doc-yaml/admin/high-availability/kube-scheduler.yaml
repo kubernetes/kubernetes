@@ -6,7 +6,7 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-scheduler
-    image: k8s.gcr.io/kube-scheduler:34d0b8f8b31e27937327961528739bc9
+    image: registry.k8s.io/kube-scheduler:34d0b8f8b31e27937327961528739bc9
     command:
     - /bin/sh
     - -c

@@ -31,7 +31,7 @@ const key = keyType("grpc.internal.transport.networktype")
 
 // Set returns a copy of the provided address with attributes containing networkType.
 func Set(address resolver.Address, networkType string) resolver.Address {
-	address.Attributes = address.Attributes.WithValues(key, networkType)
+	address.Attributes = address.Attributes.WithValue(key, networkType)
 	return address
 }
 

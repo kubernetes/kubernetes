@@ -107,8 +107,8 @@ type lifecycleSignal interface {
 // for us to write unit tests that can verify expected graceful termination behavior.
 //
 // GenericAPIServer can use these to either:
-//  - signal that a particular termination event has transpired
-//  - wait for a designated termination event to transpire and do some action.
+//   - signal that a particular termination event has transpired
+//   - wait for a designated termination event to transpire and do some action.
 type lifecycleSignals struct {
 	// ShutdownInitiated event is signaled when an apiserver shutdown has been initiated.
 	// It is signaled when the `stopCh` provided by the main goroutine
@@ -119,6 +119,15 @@ type lifecycleSignals struct {
 	// has elapsed since the ShutdownInitiated event.
 	// ShutdownDelayDuration allows the apiserver to delay shutdown for some time.
 	AfterShutdownDelayDuration lifecycleSignal
+
+	// PreShutdownHooksStopped event is signaled when all registered
+	// preshutdown hook(s) have finished running.
+	PreShutdownHooksStopped lifecycleSignal
+
+	// NotAcceptingNewRequest event is signaled when the server is no
+	// longer accepting any new request, from this point on any new
+	// request will receive an error.
+	NotAcceptingNewRequest lifecycleSignal
 
 	// InFlightRequestsDrained event is signaled when the existing requests
 	// in flight have completed. This is used as signal to shut down the audit backends
@@ -143,6 +152,8 @@ func newLifecycleSignals() lifecycleSignals {
 	return lifecycleSignals{
 		ShutdownInitiated:          newNamedChannelWrapper("ShutdownInitiated"),
 		AfterShutdownDelayDuration: newNamedChannelWrapper("AfterShutdownDelayDuration"),
+		PreShutdownHooksStopped:    newNamedChannelWrapper("PreShutdownHooksStopped"),
+		NotAcceptingNewRequest:     newNamedChannelWrapper("NotAcceptingNewRequest"),
 		InFlightRequestsDrained:    newNamedChannelWrapper("InFlightRequestsDrained"),
 		HTTPServerStoppedListening: newNamedChannelWrapper("HTTPServerStoppedListening"),
 		HasBeenReady:               newNamedChannelWrapper("HasBeenReady"),

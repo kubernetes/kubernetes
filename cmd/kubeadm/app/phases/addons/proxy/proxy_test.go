@@ -17,13 +17,13 @@ limitations under the License.
 package proxy
 
 import (
+	"os"
 	"strings"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
@@ -32,63 +32,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
-
-func TestCreateServiceAccount(t *testing.T) {
-	tests := []struct {
-		name      string
-		createErr error
-		expectErr bool
-	}{
-		{
-			"error-free case",
-			nil,
-			false,
-		},
-		{
-			"duplication errors should be ignored",
-			apierrors.NewAlreadyExists(schema.GroupResource{}, ""),
-			false,
-		},
-		{
-			"unexpected errors should be returned",
-			apierrors.NewUnauthorized(""),
-			true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-			if tc.createErr != nil {
-				client.PrependReactor("create", "serviceaccounts", func(action core.Action) (bool, runtime.Object, error) {
-					return true, nil, tc.createErr
-				})
-			}
-
-			err := CreateServiceAccount(client)
-			if tc.expectErr {
-				if err == nil {
-					t.Errorf("CreateServiceAccounts(%s) wanted err, got nil", tc.name)
-				}
-				return
-			} else if !tc.expectErr && err != nil {
-				t.Errorf("CreateServiceAccounts(%s) returned unexpected err: %v", tc.name, err)
-			}
-
-			wantResourcesCreated := 1
-			if len(client.Actions()) != wantResourcesCreated {
-				t.Errorf("CreateServiceAccounts(%s) should have made %d actions, but made %d", tc.name, wantResourcesCreated, len(client.Actions()))
-			}
-
-			for _, action := range client.Actions() {
-				if action.GetVerb() != "create" || action.GetResource().Resource != "serviceaccounts" {
-					t.Errorf("CreateServiceAccounts(%s) called [%v %v], but wanted [create serviceaccounts]",
-						tc.name, action.GetVerb(), action.GetResource().Resource)
-				}
-			}
-		})
-	}
-}
 
 func TestCompileManifests(t *testing.T) {
 	var tests = []struct {
@@ -198,7 +141,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 				initConfiguration.ClusterConfiguration.Networking.PodSubnet = "2001:101::/48"
 			}
 
-			err = EnsureProxyAddon(&initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint, client)
+			err = EnsureProxyAddon(&initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint, client, os.Stdout, false)
 
 			// Compare actual to expected errors
 			actErr := "No error"

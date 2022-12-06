@@ -23,11 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -61,11 +59,6 @@ func (volumeAttachmentStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	volumeAttachment := obj.(*storage.VolumeAttachment)
 	volumeAttachment.Status = storage.VolumeAttachmentStatus{}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-		volumeAttachment.Spec.Source.InlineVolumeSpec = nil
-	}
-
 }
 
 func (volumeAttachmentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -99,9 +92,6 @@ func (volumeAttachmentStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	newVolumeAttachment.Status = oldVolumeAttachment.Status
 	// No need to increment Generation because we don't allow updates to spec
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && oldVolumeAttachment.Spec.Source.InlineVolumeSpec == nil {
-		newVolumeAttachment.Spec.Source.InlineVolumeSpec = nil
-	}
 }
 
 func (volumeAttachmentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

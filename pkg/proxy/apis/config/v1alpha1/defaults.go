@@ -64,19 +64,18 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.IPTables.MinSyncPeriod.Duration == 0 {
 		obj.IPTables.MinSyncPeriod = metav1.Duration{Duration: 1 * time.Second}
 	}
+	if obj.IPTables.LocalhostNodePorts == nil {
+		obj.IPTables.LocalhostNodePorts = pointer.Bool(true)
+	}
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
-	zero := metav1.Duration{}
-	if obj.UDPIdleTimeout == zero {
-		obj.UDPIdleTimeout = metav1.Duration{Duration: 250 * time.Millisecond}
-	}
 
 	if obj.Conntrack.MaxPerCore == nil {
-		obj.Conntrack.MaxPerCore = pointer.Int32Ptr(32 * 1024)
+		obj.Conntrack.MaxPerCore = pointer.Int32(32 * 1024)
 	}
 	if obj.Conntrack.Min == nil {
-		obj.Conntrack.Min = pointer.Int32Ptr(128 * 1024)
+		obj.Conntrack.Min = pointer.Int32(128 * 1024)
 	}
 
 	if obj.IPTables.MasqueradeBit == nil {

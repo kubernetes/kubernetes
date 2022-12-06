@@ -33,7 +33,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
@@ -43,6 +42,16 @@ import (
 // TestWorkloadDefaults detects changes to defaults within PodTemplateSpec.
 // Defaulting changes within this type can cause spurious rollouts of workloads on API server update.
 func TestWorkloadDefaults(t *testing.T) {
+	t.Run("enabled_features", func(t *testing.T) { testWorkloadDefaults(t, true) })
+	t.Run("disabled_features", func(t *testing.T) { testWorkloadDefaults(t, false) })
+}
+func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
+	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	for feature, featureSpec := range features {
+		if !featureSpec.LockToDefault {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)()
+		}
+	}
 	rc := &v1.ReplicationController{Spec: v1.ReplicationControllerSpec{Template: &v1.PodTemplateSpec{}}}
 	template := rc.Spec.Template
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
@@ -177,6 +186,16 @@ func TestWorkloadDefaults(t *testing.T) {
 // TestPodDefaults detects changes to defaults within PodSpec.
 // Defaulting changes within this type (*especially* within containers) can cause kubelets to restart containers on API server update.
 func TestPodDefaults(t *testing.T) {
+	t.Run("enabled_features", func(t *testing.T) { testPodDefaults(t, true) })
+	t.Run("disabled_features", func(t *testing.T) { testPodDefaults(t, false) })
+}
+func testPodDefaults(t *testing.T, featuresEnabled bool) {
+	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	for feature, featureSpec := range features {
+		if !featureSpec.LockToDefault {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)()
+		}
+	}
 	pod := &v1.Pod{}
 	// New defaults under PodSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
@@ -372,7 +391,7 @@ func detectDefaults(t *testing.T, obj runtime.Object, v reflect.Value) map[strin
 				t.Logf("unhandled non-primitive map type %s: %s", visit.path, visit.value.Type().Elem())
 			}
 
-		case visit.value.Kind() == reflect.Ptr:
+		case visit.value.Kind() == reflect.Pointer:
 			if visit.value.IsNil() {
 				if visit.value.Type().Elem().Kind() == reflect.Struct {
 					visit.value.Set(reflect.New(visit.value.Type().Elem()))
@@ -1842,13 +1861,11 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 		name                          string
 		expectedInternalTrafficPolicy *v1.ServiceInternalTrafficPolicyType
 		svc                           v1.Service
-		featureGateOn                 bool
 	}{
 		{
 			name:                          "must set default internalTrafficPolicy",
 			expectedInternalTrafficPolicy: &cluster,
 			svc:                           v1.Service{},
-			featureGateOn:                 true,
 		},
 		{
 			name:                          "must not set default internalTrafficPolicy when it's cluster",
@@ -1858,7 +1875,6 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 					InternalTrafficPolicy: &cluster,
 				},
 			},
-			featureGateOn: true,
 		},
 		{
 			name:                          "must not set default internalTrafficPolicy when type is ExternalName",
@@ -1868,7 +1884,6 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 					Type: v1.ServiceTypeExternalName,
 				},
 			},
-			featureGateOn: true,
 		},
 		{
 			name:                          "must not set default internalTrafficPolicy when it's local",
@@ -1878,18 +1893,10 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 					InternalTrafficPolicy: &local,
 				},
 			},
-			featureGateOn: true,
-		},
-		{
-			name:                          "must not set default internalTrafficPolicy when gate is disabled",
-			expectedInternalTrafficPolicy: nil,
-			svc:                           v1.Service{},
-			featureGateOn:                 false,
 		},
 	}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, test.featureGateOn)()
 			obj := roundTrip(t, runtime.Object(&test.svc))
 			svc := obj.(*v1.Service)
 

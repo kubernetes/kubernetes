@@ -432,7 +432,7 @@ func (c *Controller) Enqueue() {
 }
 
 // Run the controller until stopped.
-func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
@@ -441,25 +441,25 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer klog.Infof("Shutting down cluster_authentication_trust_controller controller")
 
 	// we have a personal informer that is narrowly scoped, start it.
-	go c.kubeSystemConfigMapInformer.Run(stopCh)
+	go c.kubeSystemConfigMapInformer.Run(ctx.Done())
 
 	// wait for your secondary caches to fill before starting your work
-	if !cache.WaitForNamedCacheSync("cluster_authentication_trust_controller", stopCh, c.preRunCaches...) {
+	if !cache.WaitForNamedCacheSync("cluster_authentication_trust_controller", ctx.Done(), c.preRunCaches...) {
 		return
 	}
 
 	// only run one worker
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.Until(c.runWorker, time.Second, ctx.Done())
 
 	// checks are cheap.  run once a minute just to be sure we stay in sync in case fsnotify fails again
 	// start timer that rechecks every minute, just in case.  this also serves to prime the controller quickly.
 	_ = wait.PollImmediateUntil(1*time.Minute, func() (bool, error) {
 		c.queue.Add(keyFn())
 		return false, nil
-	}, stopCh)
+	}, ctx.Done())
 
 	// wait until we're told to stop
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (c *Controller) runWorker() {

@@ -10,10 +10,12 @@ import (
 	"sigs.k8s.io/kustomize/api/konfig"
 )
 
+const managedByFlag = "enable-managedby-label"
+
 func AddFlagEnableManagedbyLabel(set *pflag.FlagSet) {
 	set.BoolVar(
 		&theFlags.enable.managedByLabel,
-		"enable-managedby-label",
+		managedByFlag,
 		false,
 		`enable adding `+konfig.ManagedbyLabelKey)
 }

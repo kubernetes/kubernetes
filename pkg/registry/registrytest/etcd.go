@@ -38,10 +38,7 @@ func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*st
 	server, config := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 
 	options := options.NewEtcdOptions(config)
-	completedConfig, err := kubeapiserver.NewStorageFactoryConfig().Complete(options)
-	if err != nil {
-		t.Fatal(err)
-	}
+	completedConfig := kubeapiserver.NewStorageFactoryConfig().Complete(options)
 	completedConfig.APIResourceConfig = serverstorage.NewResourceConfig()
 	factory, err := completedConfig.New()
 	if err != nil {

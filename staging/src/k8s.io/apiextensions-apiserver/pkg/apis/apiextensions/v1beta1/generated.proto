@@ -26,7 +26,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1";
 
 // ConversionRequest describes the conversion request parameters.
 message ConversionRequest {
@@ -277,7 +277,7 @@ message CustomResourceDefinitionSpec {
   // Defaults to true in v1beta for backwards compatibility.
   // Deprecated: will be required to be false in v1. Preservation of unknown fields can be specified
   // in the validation schema using the `x-kubernetes-preserve-unknown-fields: true` extension.
-  // See https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#pruning-versus-preserving-unknown-fields for details.
+  // See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#field-pruning for details.
   // +optional
   optional bool preserveUnknownFields = 10;
 }

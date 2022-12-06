@@ -62,7 +62,7 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 
 // given a wwn and lun, find the device and associated devicemapper parent
 func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (string, string) {
-	fcPathExp := "^(pci-.*-fc|fc)-0x" + wwn + "-lun-" + lun
+	fcPathExp := "^(pci-.*-fc|fc)-0x" + wwn + "-lun-" + lun + "$"
 	r := regexp.MustCompile(fcPathExp)
 	devPath := byPath
 	if dirs, err := io.ReadDir(devPath); err == nil {
@@ -71,7 +71,7 @@ func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (
 			if r.MatchString(name) {
 				if disk, err1 := io.EvalSymlinks(devPath + name); err1 == nil {
 					dm := deviceUtil.FindMultipathDeviceForDevice(disk)
-					klog.Infof("fc: find disk: %v, dm: %v", disk, dm)
+					klog.Infof("fc: find disk: %v, dm: %v, fc path: %v", disk, dm, name)
 					return disk, dm
 				}
 			}
@@ -211,7 +211,7 @@ func searchDisk(b fcDiskMounter) (string, error) {
 		diskIDs = wwids
 	}
 
-	rescaned := false
+	rescanned := false
 	// two-phase search:
 	// first phase, search existing device path, if a multipath dm is found, exit loop
 	// otherwise, in second phase, rescan scsi bus and search again, return with any findings
@@ -228,13 +228,13 @@ func searchDisk(b fcDiskMounter) (string, error) {
 			}
 		}
 		// if a dm is found, exit loop
-		if rescaned || dm != "" {
+		if rescanned || dm != "" {
 			break
 		}
 		// rescan and search again
 		// rescan scsi bus
 		scsiHostRescan(io)
-		rescaned = true
+		rescanned = true
 	}
 	// if no disk matches input wwn and lun, exit
 	if disk == "" && dm == "" {

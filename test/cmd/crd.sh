@@ -45,8 +45,22 @@ run_crd_tests() {
         "storage": true,
         "schema": {
           "openAPIV3Schema": {
-            "x-kubernetes-preserve-unknown-fields": true,
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "metadata": {"type": "object"},
+              "nestedField": {
+                "type": "object",
+                "properties": {
+                  "someSubfield": {"type": "string"},
+                  "otherSubfield": {"type": "string"},
+                  "newSubfield": {"type": "string"}
+                }
+              },
+              "otherField": {"type": "string"},
+              "someField": {"type": "string"},
+              "newField": {"type": "string"},
+              "patched": {"type": "string"}
+            }
           }
         }
       }
@@ -56,7 +70,7 @@ run_crd_tests() {
 __EOF__
 
   # Post-Condition: assertion object exist
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \\\"foos.company.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'foos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"foos.company.com\"}}{{$id_field}}:{{end}}{{end}}" 'foos.company.com:'
 
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
@@ -90,7 +104,7 @@ __EOF__
 __EOF__
 
   # Post-Condition: assertion object exist
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \\\"foos.company.com\\\" \\\"bars.company.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \"foos.company.com\" \"bars.company.com\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:'
 
   # This test ensures that the name printer is able to output a resource
   # in the proper "kind.group/resource_name" format, and that the
@@ -129,7 +143,7 @@ __EOF__
 __EOF__
 
   # Post-Condition: assertion crd with non-matching kind and resource exists
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \\\"foos.company.com\\\" \\\"bars.company.com\\\" \\\"resources.mygroup.example.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \"foos.company.com\" \"bars.company.com\" \"resources.mygroup.example.com\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:'
 
   # This test ensures that we can create complex validation without client-side validation complaining
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
@@ -171,7 +185,7 @@ __EOF__
 __EOF__
 
   # Post-Condition: assertion crd with non-matching kind and resource exists
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \\\"foos.company.com\\\" \\\"bars.company.com\\\" \\\"resources.mygroup.example.com\\\" \\\"validfoos.company.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:validfoos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \"foos.company.com\" \"bars.company.com\" \"resources.mygroup.example.com\" \"validfoos.company.com\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:validfoos.company.com:'
 
   run_non_native_resource_tests
 

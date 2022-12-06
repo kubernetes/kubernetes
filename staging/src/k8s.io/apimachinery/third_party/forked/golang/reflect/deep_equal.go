@@ -100,7 +100,8 @@ func makeUsefulPanic(v reflect.Value) {
 // Tests for deep equality using reflected types. The map argument tracks
 // comparisons that have already been seen, which allows short circuiting on
 // recursive types.
-func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool, depth int) bool {
+// equateNilAndEmpty controls whether empty maps/slices are equivalent to nil
+func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool, equateNilAndEmpty bool, depth int) bool {
 	defer makeUsefulPanic(v1)
 
 	if !v1.IsValid() || !v2.IsValid() {
@@ -150,17 +151,36 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		// We don't need to check length here because length is part of
 		// an array's type, which has already been filtered for.
 		for i := 0; i < v1.Len(); i++ {
-			if !e.deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
+			if !e.deepValueEqual(v1.Index(i), v2.Index(i), visited, equateNilAndEmpty, depth+1) {
 				return false
 			}
 		}
 		return true
 	case reflect.Slice:
-		if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
-			return false
-		}
-		if v1.IsNil() || v1.Len() == 0 {
-			return true
+		if equateNilAndEmpty {
+			if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
+				return false
+			}
+
+			if v1.IsNil() || v1.Len() == 0 {
+				return true
+			}
+		} else {
+			if v1.IsNil() != v2.IsNil() {
+				return false
+			}
+
+			// Optimize nil and empty cases
+			// Two lists that are BOTH nil are equal
+			// No need to check v2 is nil since v1.IsNil == v2.IsNil from above
+			if v1.IsNil() {
+				return true
+			}
+
+			// Two lists that are both empty and both non nil are equal
+			if v1.Len() == 0 || v2.Len() == 0 {
+				return true
+			}
 		}
 		if v1.Len() != v2.Len() {
 			return false
@@ -169,7 +189,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			return true
 		}
 		for i := 0; i < v1.Len(); i++ {
-			if !e.deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
+			if !e.deepValueEqual(v1.Index(i), v2.Index(i), visited, equateNilAndEmpty, depth+1) {
 				return false
 			}
 		}
@@ -178,22 +198,40 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		if v1.IsNil() || v2.IsNil() {
 			return v1.IsNil() == v2.IsNil()
 		}
-		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
+		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, equateNilAndEmpty, depth+1)
 	case reflect.Ptr:
-		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
+		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, equateNilAndEmpty, depth+1)
 	case reflect.Struct:
 		for i, n := 0, v1.NumField(); i < n; i++ {
-			if !e.deepValueEqual(v1.Field(i), v2.Field(i), visited, depth+1) {
+			if !e.deepValueEqual(v1.Field(i), v2.Field(i), visited, equateNilAndEmpty, depth+1) {
 				return false
 			}
 		}
 		return true
 	case reflect.Map:
-		if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
-			return false
-		}
-		if v1.IsNil() || v1.Len() == 0 {
-			return true
+		if equateNilAndEmpty {
+			if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
+				return false
+			}
+			if v1.IsNil() || v1.Len() == 0 {
+				return true
+			}
+		} else {
+			if v1.IsNil() != v2.IsNil() {
+				return false
+			}
+
+			// Optimize nil and empty cases
+			// Two maps that are BOTH nil are equal
+			// No need to check v2 is nil since v1.IsNil == v2.IsNil from above
+			if v1.IsNil() {
+				return true
+			}
+
+			// Two maps that are both empty and both non nil are equal
+			if v1.Len() == 0 || v2.Len() == 0 {
+				return true
+			}
 		}
 		if v1.Len() != v2.Len() {
 			return false
@@ -202,7 +240,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			return true
 		}
 		for _, k := range v1.MapKeys() {
-			if !e.deepValueEqual(v1.MapIndex(k), v2.MapIndex(k), visited, depth+1) {
+			if !e.deepValueEqual(v1.MapIndex(k), v2.MapIndex(k), visited, equateNilAndEmpty, depth+1) {
 				return false
 			}
 		}
@@ -232,6 +270,14 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 // Unexported field members cannot be compared and will cause an informative panic; you must add an Equality
 // function for these types.
 func (e Equalities) DeepEqual(a1, a2 interface{}) bool {
+	return e.deepEqual(a1, a2, true)
+}
+
+func (e Equalities) DeepEqualWithNilDifferentFromEmpty(a1, a2 interface{}) bool {
+	return e.deepEqual(a1, a2, false)
+}
+
+func (e Equalities) deepEqual(a1, a2 interface{}, equateNilAndEmpty bool) bool {
 	if a1 == nil || a2 == nil {
 		return a1 == a2
 	}
@@ -240,7 +286,7 @@ func (e Equalities) DeepEqual(a1, a2 interface{}) bool {
 	if v1.Type() != v2.Type() {
 		return false
 	}
-	return e.deepValueEqual(v1, v2, make(map[visit]bool), 0)
+	return e.deepValueEqual(v1, v2, make(map[visit]bool), equateNilAndEmpty, 0)
 }
 
 func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool, depth int) bool {
@@ -327,7 +373,7 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 			return true
 		}
 		return e.deepValueDerive(v1.Elem(), v2.Elem(), visited, depth+1)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if v1.IsNil() {
 			return true
 		}

@@ -30,11 +30,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/utils/pointer"
 )
 
 // noopRecorder is an EventRecorder that does nothing. record.FakeRecorder has a fixed
@@ -720,7 +722,6 @@ func TestGetPersistentVolumeClaims(t *testing.T) {
 	statefulSet.Spec.Selector.MatchLabels = nil
 	claims := getPersistentVolumeClaims(statefulSet, pod)
 	pvc := newPVC("datadir-foo-0")
-	pvc.SetNamespace(v1.NamespaceDefault)
 	resultClaims := map[string]v1.PersistentVolumeClaim{"datadir": pvc}
 
 	if !reflect.DeepEqual(claims, resultClaims) {
@@ -777,7 +778,7 @@ func newPod() *v1.Pod {
 func newPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
+			Namespace: v1.NamespaceDefault,
 			Name:      name,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -838,7 +839,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
-			Replicas:             func() *int32 { i := int32(replicas); return &i }(),
+			Replicas:             pointer.Int32(int32(replicas)),
 			Template:             template,
 			VolumeClaimTemplates: claims,
 			ServiceName:          "governingsvc",
@@ -893,7 +894,7 @@ func newStatefulSetWithLabels(replicas int, name string, uid types.UID, labels m
 				MatchLabels:      nil,
 				MatchExpressions: testMatchExpressions,
 			},
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 				WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -937,4 +938,40 @@ func newStatefulSetWithLabels(replicas int, name string, uid types.UID, labels m
 			ServiceName: "governingsvc",
 		},
 	}
+}
+
+func TestGetStatefulSetMaxUnavailable(t *testing.T) {
+	testCases := []struct {
+		maxUnavailable         *intstr.IntOrString
+		replicaCount           int
+		expectedMaxUnavailable int
+	}{
+		// it wouldn't hurt to also test 0 and 0%, even if they should have been forbidden by API validation.
+		{maxUnavailable: nil, replicaCount: 10, expectedMaxUnavailable: 1},
+		{maxUnavailable: intOrStrP(intstr.FromInt(3)), replicaCount: 10, expectedMaxUnavailable: 3},
+		{maxUnavailable: intOrStrP(intstr.FromInt(3)), replicaCount: 0, expectedMaxUnavailable: 3},
+		{maxUnavailable: intOrStrP(intstr.FromInt(0)), replicaCount: 0, expectedMaxUnavailable: 1},
+		{maxUnavailable: intOrStrP(intstr.FromString("10%")), replicaCount: 25, expectedMaxUnavailable: 2},
+		{maxUnavailable: intOrStrP(intstr.FromString("100%")), replicaCount: 5, expectedMaxUnavailable: 5},
+		{maxUnavailable: intOrStrP(intstr.FromString("50%")), replicaCount: 5, expectedMaxUnavailable: 2},
+		{maxUnavailable: intOrStrP(intstr.FromString("10%")), replicaCount: 5, expectedMaxUnavailable: 1},
+		{maxUnavailable: intOrStrP(intstr.FromString("1%")), replicaCount: 0, expectedMaxUnavailable: 1},
+		{maxUnavailable: intOrStrP(intstr.FromString("0%")), replicaCount: 0, expectedMaxUnavailable: 1},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			gotMaxUnavailable, err := getStatefulSetMaxUnavailable(tc.maxUnavailable, tc.replicaCount)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if gotMaxUnavailable != tc.expectedMaxUnavailable {
+				t.Errorf("Expected maxUnavailable %v, got pods %v", tc.expectedMaxUnavailable, gotMaxUnavailable)
+			}
+		})
+	}
+}
+
+func intOrStrP(v intstr.IntOrString) *intstr.IntOrString {
+	return &v
 }

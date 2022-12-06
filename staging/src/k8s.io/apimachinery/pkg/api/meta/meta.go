@@ -130,7 +130,6 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1.PartialObjectMetadata {
 				Annotations:                m.GetAnnotations(),
 				OwnerReferences:            m.GetOwnerReferences(),
 				Finalizers:                 m.GetFinalizers(),
-				ClusterName:                m.GetClusterName(),
 				ManagedFields:              m.GetManagedFields(),
 			},
 		}
@@ -600,7 +599,7 @@ func (a genericAccessor) SetFinalizers(finalizers []string) {
 func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 	var ret []metav1.OwnerReference
 	s := a.ownerReferences
-	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
+	if s.Kind() != reflect.Pointer || s.Elem().Kind() != reflect.Slice {
 		klog.Errorf("expect %v to be a pointer to slice", s)
 		return ret
 	}
@@ -618,7 +617,7 @@ func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 
 func (a genericAccessor) SetOwnerReferences(references []metav1.OwnerReference) {
 	s := a.ownerReferences
-	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
+	if s.Kind() != reflect.Pointer || s.Elem().Kind() != reflect.Slice {
 		klog.Errorf("expect %v to be a pointer to slice", s)
 	}
 	s = s.Elem()

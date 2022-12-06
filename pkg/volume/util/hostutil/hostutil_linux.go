@@ -27,9 +27,9 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/opencontainers/selinux/go-selinux"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 )
@@ -263,7 +263,7 @@ func GetSELinux(path string, mountInfoFilename string, selinuxEnabled seLinuxEna
 // GetSELinuxSupport returns true if given path is on a mount that supports
 // SELinux.
 func (hu *HostUtil) GetSELinuxSupport(pathname string) (bool, error) {
-	return GetSELinux(pathname, procMountInfoPath, selinux.SELinuxEnabled)
+	return GetSELinux(pathname, procMountInfoPath, selinux.GetEnabled)
 }
 
 // GetOwner returns the integer ID for the user and group of the given path
@@ -298,4 +298,36 @@ func GetModeLinux(pathname string) (os.FileMode, error) {
 		return 0, err
 	}
 	return info.Mode(), nil
+}
+
+// GetSELinuxMountContext returns value of -o context=XYZ mount option on
+// given mount point.
+func (hu *HostUtil) GetSELinuxMountContext(pathname string) (string, error) {
+	return getSELinuxMountContext(pathname, procMountInfoPath, selinux.GetEnabled)
+}
+
+// getSELinux is common implementation of GetSELinuxSupport on Linux.
+// Using an extra function for unit tests.
+func getSELinuxMountContext(path string, mountInfoFilename string, selinuxEnabled seLinuxEnabledFunc) (string, error) {
+	// Skip /proc/mounts parsing if SELinux is disabled.
+	if !selinuxEnabled() {
+		return "", nil
+	}
+
+	info, err := findMountInfo(path, mountInfoFilename)
+	if err != nil {
+		return "", err
+	}
+
+	for _, opt := range info.SuperOptions {
+		if !strings.HasPrefix(opt, "context=") {
+			continue
+		}
+		// Remove context=
+		context := strings.TrimPrefix(opt, "context=")
+		// Remove double quotes
+		context = strings.Trim(context, "\"")
+		return context, nil
+	}
+	return "", nil
 }

@@ -57,10 +57,6 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("OOMScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
 	}
 
-	if config.UDPIdleTimeout.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("UDPIdleTimeout"), config.UDPIdleTimeout, "must be greater than 0"))
-	}
-
 	if config.ConfigSyncPeriod.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
 	}
@@ -85,9 +81,6 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 			if err != nil || !isDual {
 				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)"))
 			}
-		// if not DualStack only one CIDR allowed
-		case len(cidrs) > 1:
-			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "only one CIDR allowed (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
 		// if we are here means that len(cidrs) == 1, we need to validate it
 		default:
 			if _, _, err := netutils.ParseCIDRSloppy(config.ClusterCIDR); err != nil {
@@ -102,6 +95,12 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
 	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
+	if config.DetectLocalMode == kubeproxyconfig.LocalModeBridgeInterface {
+		allErrs = append(allErrs, validateInterface(config.DetectLocal.BridgeInterface, newPath.Child("InterfaceName"))...)
+	}
+	if config.DetectLocalMode == kubeproxyconfig.LocalModeInterfaceNamePrefix {
+		allErrs = append(allErrs, validateInterface(config.DetectLocal.InterfaceNamePrefix, newPath.Child("InterfacePrefix"))...)
+	}
 
 	return allErrs
 }
@@ -182,7 +181,6 @@ func validateProxyMode(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) fiel
 
 func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
 	validModes := sets.NewString(
-		string(kubeproxyconfig.ProxyModeUserspace),
 		string(kubeproxyconfig.ProxyModeIPTables),
 		string(kubeproxyconfig.ProxyModeIPVS),
 	)
@@ -197,7 +195,6 @@ func validateProxyModeLinux(mode kubeproxyconfig.ProxyMode, fldPath *field.Path)
 
 func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Path) field.ErrorList {
 	validModes := sets.NewString(
-		string(kubeproxyconfig.ProxyModeUserspace),
 		string(kubeproxyconfig.ProxyModeKernelspace),
 	)
 
@@ -205,7 +202,7 @@ func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Pat
 		return nil
 	}
 
-	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace])", strings.Join(validModes.List(), ","))
+	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently 'kernelspace'])", strings.Join(validModes.List(), ","))
 	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
 }
 
@@ -315,5 +312,13 @@ func validateShowHiddenMetricsVersion(version string, fldPath *field.Path) field
 		allErrs = append(allErrs, field.Invalid(fldPath, version, e.Error()))
 	}
 
+	return allErrs
+}
+
+func validateInterface(iface string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(iface) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, iface, "must not be empty"))
+	}
 	return allErrs
 }

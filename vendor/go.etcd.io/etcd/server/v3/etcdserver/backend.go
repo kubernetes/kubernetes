@@ -99,7 +99,7 @@ func openBackend(cfg config.ServerConfig, hooks backend.Hooks) backend.Backend {
 func recoverSnapshotBackend(cfg config.ServerConfig, oldbe backend.Backend, snapshot raftpb.Snapshot, beExist bool, hooks backend.Hooks) (backend.Backend, error) {
 	consistentIndex := uint64(0)
 	if beExist {
-		consistentIndex, _ = cindex.ReadConsistentIndex(oldbe.BatchTx())
+		consistentIndex, _ = cindex.ReadConsistentIndex(oldbe.ReadTx())
 	}
 	if snapshot.Metadata.Index <= consistentIndex {
 		return oldbe, nil

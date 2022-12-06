@@ -83,6 +83,13 @@ var (
 		// highest bucket start of 0.01 sec * 2^16 == 655.36 sec
 		Buckets: prometheus.ExponentialBuckets(.01, 2, 17),
 	})
+
+	isDefragActive = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "etcd",
+		Subsystem: "disk",
+		Name:      "defrag_inflight",
+		Help:      "Whether or not defrag is active on the member. 1 means active, 0 means not.",
+	})
 )
 
 func init() {
@@ -92,4 +99,5 @@ func init() {
 	prometheus.MustRegister(writeSec)
 	prometheus.MustRegister(defragSec)
 	prometheus.MustRegister(snapshotTransferSec)
+	prometheus.MustRegister(isDefragActive)
 }

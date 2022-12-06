@@ -141,15 +141,18 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 
 		// Use http/1.1 instead of http/2.
 		// This is a workaround for http/2-enabled clients not load-balancing concurrent requests to multiple backends.
-		// See http://issue.k8s.io/75791 for details.
+		// See https://issue.k8s.io/75791 for details.
 		cfg.NextProtos = []string{"http/1.1"}
 
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
 
 		// Add a transport wrapper that allows detection of TLS connections to
-		// servers without SAN extension in their serving certificates
-		cfg.Wrap(x509metrics.NewMissingSANRoundTripperWrapperConstructor(x509MissingSANCounter))
+		// servers with serving certificates with deprecated characteristics
+		cfg.Wrap(x509metrics.NewDeprecatedCertificateRoundTripperWrapperConstructor(
+			x509MissingSANCounter,
+			x509InsecureSHA1Counter,
+		))
 
 		client, err := rest.UnversionedRESTClientFor(cfg)
 		if err == nil {

@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	v1 "k8s.io/api/core/v1"
@@ -788,7 +788,7 @@ func (cont *IngressController) CreateStaticIP(name string) string {
 	return ip.Address
 }
 
-// deleteStaticIPs delets all static-ips allocated through calls to
+// deleteStaticIPs deletes all static-ips allocated through calls to
 // CreateStaticIP.
 func (cont *IngressController) deleteStaticIPs() error {
 	if cont.staticIPName != "" {

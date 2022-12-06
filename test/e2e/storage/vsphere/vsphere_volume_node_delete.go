@@ -19,7 +19,7 @@ package vsphere
 import (
 	"context"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/vmware/govmomi/object"
 
@@ -28,10 +28,12 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-unregister")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		client     clientset.Interface
 		namespace  string
@@ -44,7 +46,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 		framework.ExpectNoError(err)
 		workingDir = GetAndExpectStringEnvVar("VSPHERE_WORKING_DIR")
 	})
@@ -53,7 +55,9 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		ginkgo.By("Get total Ready nodes")
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nodeList.Items) > 1, true, "At least 2 nodes are required for this test")
+		if len(nodeList.Items) < 2 {
+			framework.Failf("At least 2 nodes are required for this test, got instead: %v", len(nodeList.Items))
+		}
 
 		totalNodesCount := len(nodeList.Items)
 		nodeVM := nodeList.Items[0]

@@ -18,6 +18,7 @@ package operationexecutor
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"strconv"
 	"testing"
 	"time"
@@ -668,7 +669,7 @@ func (fopg *fakeOperationGenerator) GenerateExpandAndRecoverVolumeFunc(pvc *v1.P
 	}, nil
 }
 
-func (fopg *fakeOperationGenerator) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)
@@ -750,7 +751,7 @@ func getTestPodWithSecret(podName, secretName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: "k8s.gcr.io/mounttest:0.8",
+					Image: "registry.k8s.io/mounttest:0.8",
 					Args: []string{
 						"--file_content=/etc/secret-volume/data-1",
 						"--file_mode=/etc/secret-volume/data-1"},
@@ -789,7 +790,7 @@ func getTestPodWithGCEPD(podName, pdName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "pd-volume-test",
-					Image: "k8s.gcr.io/mounttest:0.8",
+					Image: "registry.k8s.io/mounttest:0.8",
 					Args: []string{
 						"--file_content=/etc/pd-volume/data-1",
 					},

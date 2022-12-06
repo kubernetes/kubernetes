@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/pkg/errors"
@@ -119,7 +118,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 		}
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, flags.out, "upgrade/diff", false, false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade/diff", false, false)
 	}
 	if err != nil {
 		return err
@@ -171,7 +170,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		if path == "" {
 			return errors.New("empty manifest path")
 		}
-		existingManifest, err := ioutil.ReadFile(path)
+		existingManifest, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}

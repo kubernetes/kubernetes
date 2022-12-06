@@ -28,9 +28,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -49,19 +48,23 @@ func (sarAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (au
 func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
-			Name: "alice",
+			Name:   "alice",
+			UID:    "alice",
+			Groups: []string{user.AllAuthenticated},
 		},
 	}, true, nil
 }
 
 func TestSubjectAccessReview(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
-
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Unset BearerToken to disable BearerToken authenticator.
+			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
+			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+			config.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
 	tests := []struct {
 		name           string
@@ -146,17 +149,25 @@ func TestSubjectAccessReview(t *testing.T) {
 
 func TestSelfSubjectAccessReview(t *testing.T) {
 	username := "alice"
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+	authenticatorFunc := func(req *http.Request) (*authenticator.Response, bool, error) {
 		return &authenticator.Response{
-			User: &user.DefaultInfo{Name: username},
+			User: &user.DefaultInfo{
+				Name:   username,
+				UID:    username,
+				Groups: []string{user.AllAuthenticated},
+			},
 		}, true, nil
-	})
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	}
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Unset BearerToken to disable BearerToken authenticator.
+			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
+			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(authenticatorFunc)
+			config.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
 	tests := []struct {
 		name           string
@@ -229,13 +240,15 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 }
 
 func TestLocalSubjectAccessReview(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
-
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Unset BearerToken to disable BearerToken authenticator.
+			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
+			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+			config.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
 	tests := []struct {
 		name           string

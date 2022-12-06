@@ -20,7 +20,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpointer "k8s.io/utils/pointer"
@@ -75,6 +76,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.NodeStatusMaxImages = 50
 			obj.TopologyManagerPolicy = kubeletconfig.NoneTopologyManagerPolicy
 			obj.TopologyManagerScope = kubeletconfig.ContainerTopologyManagerScope
+			obj.TopologyManagerPolicyOptions = make(map[string]string)
 			obj.QOSReserved = map[string]string{
 				"memory": "50%",
 			}
@@ -91,7 +93,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.KubeAPIQPS = 5
 			obj.KubeAPIBurst = 10
 			obj.HairpinMode = v1beta1.PromiscuousBridge
-			obj.EvictionHard = kubeletconfigv1beta1.DefaultEvictionHard
+			obj.EvictionHard = eviction.DefaultEvictionHard
 			obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 			obj.MakeIPTablesUtilChains = true
 			obj.IPTablesMasqueradeBit = kubeletconfigv1beta1.DefaultIPTablesMasqueradeBit
@@ -110,6 +112,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.EnableSystemLogHandler = true
 			obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(rand.Float64())
+			obj.LocalStorageCapacityIsolation = true
 		},
 	}
 }

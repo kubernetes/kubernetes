@@ -31,12 +31,14 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-directory")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -60,7 +62,7 @@ var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
 		ginkgo.By("Create a pod for further testing")
 		hostBaseDir = path.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
-		basePod = f.PodClient().CreateSync(newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
+		basePod = e2epod.NewPodClient(f).CreateSync(newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
 		targetDir = path.Join(hostBaseDir, "adir")
 		ginkgo.By("Should automatically create a new directory 'adir' when HostPathType is HostPathDirectoryOrCreate")
@@ -103,6 +105,7 @@ var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-file")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -127,7 +130,7 @@ var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
 		ginkgo.By("Create a pod for further testing")
 		hostBaseDir = path.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
-		basePod = f.PodClient().CreateSync(newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
+		basePod = e2epod.NewPodClient(f).CreateSync(newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
 		targetFile = path.Join(hostBaseDir, "afile")
 		ginkgo.By("Should automatically create a new file 'afile' when HostPathType is HostPathFileOrCreate")
@@ -171,6 +174,7 @@ var _ = utils.SIGDescribe("HostPathType File [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-socket")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns           string
@@ -194,7 +198,7 @@ var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 		ginkgo.By("Create a pod for further testing")
 		hostBaseDir = path.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
-		basePod = f.PodClient().CreateSync(newHostPathTypeTestPodWithCommand(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate, fmt.Sprintf("nc -lU %s", path.Join(mountBaseDir, "asocket"))))
+		basePod = e2epod.NewPodClient(f).CreateSync(newHostPathTypeTestPodWithCommand(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate, fmt.Sprintf("nc -lU %s", path.Join(mountBaseDir, "asocket"))))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
 		targetSocket = path.Join(hostBaseDir, "asocket")
 	})
@@ -236,6 +240,7 @@ var _ = utils.SIGDescribe("HostPathType Socket [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-char-dev")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns            string
@@ -259,7 +264,7 @@ var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 		ginkgo.By("Create a pod for further testing")
 		hostBaseDir = path.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
-		basePod = f.PodClient().CreateSync(newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
+		basePod = e2epod.NewPodClient(f).CreateSync(newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
 		targetCharDev = path.Join(hostBaseDir, "achardev")
 		ginkgo.By("Create a character device for further testing")
@@ -305,6 +310,7 @@ var _ = utils.SIGDescribe("HostPathType Character Device [Slow]", func() {
 
 var _ = utils.SIGDescribe("HostPathType Block Device [Slow]", func() {
 	f := framework.NewDefaultFramework("host-path-type-block-dev")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		ns             string
@@ -328,7 +334,7 @@ var _ = utils.SIGDescribe("HostPathType Block Device [Slow]", func() {
 		ginkgo.By("Create a pod for further testing")
 		hostBaseDir = path.Join("/tmp", ns)
 		mountBaseDir = "/mnt/test"
-		basePod = f.PodClient().CreateSync(newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
+		basePod = e2epod.NewPodClient(f).CreateSync(newHostPathTypeTestPod(map[string]string{}, hostBaseDir, mountBaseDir, &hostPathDirectoryOrCreate))
 		ginkgo.By(fmt.Sprintf("running on node %s", basePod.Spec.NodeName))
 		targetBlockDev = path.Join(hostBaseDir, "ablkdev")
 		ginkgo.By("Create a block device for further testing")

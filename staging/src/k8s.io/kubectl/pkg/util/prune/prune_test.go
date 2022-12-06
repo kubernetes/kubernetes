@@ -48,23 +48,48 @@ func (m *testRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*
 
 func TestGetRESTMappings(t *testing.T) {
 	tests := []struct {
-		mapper      *testRESTMapper
-		pr          []Resource
-		expectedns  int
-		expectednns int
-		expectederr error
+		mapper             *testRESTMapper
+		pr                 []Resource
+		namespaceSpecified bool
+		expectedns         int
+		expectednns        int
+		expectederr        error
 	}{
 		{
-			mapper:      &testRESTMapper{},
-			pr:          []Resource{},
-			expectedns:  14,
+			mapper:             &testRESTMapper{},
+			pr:                 []Resource{},
+			namespaceSpecified: false,
+			expectedns:         14,
+			expectednns:        2,
+			expectederr:        nil,
+		},
+		{
+			mapper:             &testRESTMapper{},
+			pr:                 []Resource{},
+			namespaceSpecified: true,
+			expectedns:         14,
+			// it will be 0 non-namespaced resources after the deprecation period has passed.
+			// for details, refer to https://github.com/kubernetes/kubernetes/pull/110907/.
 			expectednns: 2,
 			expectederr: nil,
+		},
+		{
+			mapper: &testRESTMapper{},
+			pr: []Resource{
+				{"apps", "v1", "DaemonSet", true},
+				{"core", "v1", "Pod", true},
+				{"", "v1", "Foo2", false},
+				{"foo", "v1", "Foo3", false},
+			},
+			namespaceSpecified: false,
+			expectedns:         2,
+			expectednns:        2,
+			expectederr:        nil,
 		},
 	}
 
 	for _, tc := range tests {
-		actualns, actualnns, actualerr := GetRESTMappings(tc.mapper, tc.pr)
+		actualns, actualnns, actualerr := GetRESTMappings(tc.mapper, tc.pr, tc.namespaceSpecified)
 		if tc.expectederr != nil {
 			assert.NotEmptyf(t, actualerr, "getRESTMappings error expected but not fired")
 		}

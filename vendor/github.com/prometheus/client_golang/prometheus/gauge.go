@@ -210,7 +210,8 @@ func (v *GaugeVec) GetMetricWith(labels Labels) (Gauge, error) {
 // WithLabelValues works as GetMetricWithLabelValues, but panics where
 // GetMetricWithLabelValues would have returned an error. Not returning an
 // error allows shortcuts like
-//     myVec.WithLabelValues("404", "GET").Add(42)
+//
+//	myVec.WithLabelValues("404", "GET").Add(42)
 func (v *GaugeVec) WithLabelValues(lvs ...string) Gauge {
 	g, err := v.GetMetricWithLabelValues(lvs...)
 	if err != nil {
@@ -221,7 +222,8 @@ func (v *GaugeVec) WithLabelValues(lvs ...string) Gauge {
 
 // With works as GetMetricWith, but panics where GetMetricWithLabels would have
 // returned an error. Not returning an error allows shortcuts like
-//     myVec.With(prometheus.Labels{"code": "404", "method": "GET"}).Add(42)
+//
+//	myVec.With(prometheus.Labels{"code": "404", "method": "GET"}).Add(42)
 func (v *GaugeVec) With(labels Labels) Gauge {
 	g, err := v.GetMetricWith(labels)
 	if err != nil {

@@ -1,0 +1,31 @@
+strict digraph full {
+  // Node definitions.
+  "ref1-[]\"\\Iñtërnâtiônàlizætiøn,🐹" [
+    label="uid=ref1-[]\"\\Iñtërnâtiônàlizætiøn,🐹\nnamespace=ref1ns\nref1kind-Iñtërnâtiônàlizætiøn,🐹.version.ref1group/ref1name-Iñtërnâtiônàlizætiøn,🐹\n"
+    group="ref1group"
+    version="version"
+    kind="ref1kind-Iñtërnâtiônàlizætiøn,🐹"
+    namespace="ref1ns"
+    name="ref1name-Iñtërnâtiônàlizætiøn,🐹"
+    uid="ref1-[]\"\\Iñtërnâtiônàlizætiøn,🐹"
+    missing="false"
+    beingDeleted="false"
+    deletingDependents="false"
+    virtual="false"
+  ];
+  "ref2-" [
+    label="uid=ref2-\nnamespace=ref2ns\nref2kind-.version.ref2group/ref2name-\n"
+    group="ref2group"
+    version="version"
+    kind="ref2kind-"
+    namespace="ref2ns"
+    name="ref2name-"
+    uid="ref2-"
+    missing="false"
+    beingDeleted="false"
+    deletingDependents="false"
+    virtual="false"
+  ];
+  // Edge definitions.
+  "ref1-[]\"\\Iñtërnâtiônàlizætiøn,🐹" -> "ref2-";
+}

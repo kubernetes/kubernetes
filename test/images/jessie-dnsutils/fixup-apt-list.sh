@@ -22,7 +22,7 @@ DEB_ARCH=$(dpkg --print-architecture)
 
 case ${DEB_ARCH} in
     s390x|arm64|ppc64el)
-        # we have to use the archive mirrors.
+        # We have to use the archive mirrors.
         # See: https://lists.debian.org/debian-devel-announce/2019/03/msg00006.html
         echo "deb http://archive.debian.org/debian/ jessie main contrib non-free" | tee /etc/apt/sources.list
         echo "deb-src http://archive.debian.org/debian/ jessie main contrib non-free" | tee -a /etc/apt/sources.list

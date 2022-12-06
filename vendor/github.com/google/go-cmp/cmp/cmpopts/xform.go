@@ -23,6 +23,7 @@ func (xf xformFilter) filter(p cmp.Path) bool {
 // that the transformer cannot be recursively applied upon its own output.
 //
 // An example use case is a transformer that splits a string by lines:
+//
 //	AcyclicTransformer("SplitLines", func(s string) []string{
 //		return strings.Split(s, "\n")
 //	})

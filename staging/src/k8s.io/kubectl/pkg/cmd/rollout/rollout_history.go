@@ -18,6 +18,7 @@ package rollout
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/spf13/cobra"
 
@@ -27,7 +28,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -84,7 +85,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Short:                 i18n.T("View rollout history"),
 		Long:                  historyLong,
 		Example:               historyExample,
-		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
+		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -151,6 +152,44 @@ func (o *RolloutHistoryOptions) Run() error {
 		Do()
 	if err := r.Err(); err != nil {
 		return err
+	}
+
+	if o.PrintFlags.OutputFlagSpecified() {
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return err
+		}
+
+		return r.Visit(func(info *resource.Info, err error) error {
+			if err != nil {
+				return err
+			}
+
+			mapping := info.ResourceMapping()
+			historyViewer, err := o.HistoryViewer(o.RESTClientGetter, mapping)
+			if err != nil {
+				return err
+			}
+			historyInfo, err := historyViewer.GetHistory(info.Namespace, info.Name)
+			if err != nil {
+				return err
+			}
+
+			if o.Revision > 0 {
+				printer.PrintObj(historyInfo[o.Revision], o.Out)
+			} else {
+				sortedKeys := make([]int64, 0, len(historyInfo))
+				for k := range historyInfo {
+					sortedKeys = append(sortedKeys, k)
+				}
+				sort.Slice(sortedKeys, func(i, j int) bool { return sortedKeys[i] < sortedKeys[j] })
+				for _, k := range sortedKeys {
+					printer.PrintObj(historyInfo[k], o.Out)
+				}
+			}
+
+			return nil
+		})
 	}
 
 	return r.Visit(func(info *resource.Info, err error) error {

@@ -30,12 +30,10 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
 
@@ -125,17 +123,25 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 	// validation with resource counting, but we did this before QoS was even defined.
 	// let's not make that mistake again with other resources now that QoS is defined.
 	requiredSet := quota.ToSet(required).Intersection(validationSet)
-	missingSet := sets.NewString()
+	missingSetResourceToContainerNames := make(map[string]sets.String)
 	for i := range pod.Spec.Containers {
-		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSet)
+		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSetResourceToContainerNames)
 	}
 	for i := range pod.Spec.InitContainers {
-		enforcePodContainerConstraints(&pod.Spec.InitContainers[i], requiredSet, missingSet)
+		enforcePodContainerConstraints(&pod.Spec.InitContainers[i], requiredSet, missingSetResourceToContainerNames)
 	}
-	if len(missingSet) == 0 {
+	if len(missingSetResourceToContainerNames) == 0 {
 		return nil
 	}
-	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
+	var resources = sets.NewString()
+	for resource := range missingSetResourceToContainerNames {
+		resources.Insert(resource)
+	}
+	var errorMessages = make([]string, 0, len(missingSetResourceToContainerNames))
+	for _, resource := range resources.List() {
+		errorMessages = append(errorMessages, fmt.Sprintf("%s for: %s", resource, strings.Join(missingSetResourceToContainerNames[resource].List(), ",")))
+	}
+	return fmt.Errorf("must specify %s", strings.Join(errorMessages, "; "))
 }
 
 // GroupResource that this evaluator tracks
@@ -225,14 +231,21 @@ var _ quota.Evaluator = &podEvaluator{}
 
 // enforcePodContainerConstraints checks for required resources that are not set on this container and
 // adds them to missingSet.
-func enforcePodContainerConstraints(container *corev1.Container, requiredSet, missingSet sets.String) {
+func enforcePodContainerConstraints(container *corev1.Container, requiredSet sets.String, missingSetResourceToContainerNames map[string]sets.String) {
 	requests := container.Resources.Requests
 	limits := container.Resources.Limits
 	containerUsage := podComputeUsageHelper(requests, limits)
 	containerSet := quota.ToSet(quota.ResourceNames(containerUsage))
 	if !containerSet.Equal(requiredSet) {
-		difference := requiredSet.Difference(containerSet)
-		missingSet.Insert(difference.List()...)
+		if difference := requiredSet.Difference(containerSet); difference.Len() != 0 {
+			for _, diff := range difference.List() {
+				if _, ok := missingSetResourceToContainerNames[diff]; !ok {
+					missingSetResourceToContainerNames[diff] = sets.NewString(container.Name)
+				} else {
+					missingSetResourceToContainerNames[diff].Insert(container.Name)
+				}
+			}
+		}
 	}
 }
 
@@ -317,8 +330,8 @@ func podMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 
 // PodUsageFunc returns the quota usage for a pod.
 // A pod is charged for quota if the following are not true.
-//  - pod has a terminal phase (failed or succeeded)
-//  - pod has been marked for deletion and grace period has expired
+//   - pod has a terminal phase (failed or succeeded)
+//   - pod has been marked for deletion and grace period has expired
 func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, error) {
 	pod, err := toExternalPodOrError(obj)
 	if err != nil {
@@ -354,10 +367,9 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
 	}
 
-	if feature.DefaultFeatureGate.Enabled(features.PodOverhead) {
-		requests = quota.Add(requests, pod.Spec.Overhead)
-		limits = quota.Add(limits, pod.Spec.Overhead)
-	}
+	requests = quota.Add(requests, pod.Spec.Overhead)
+	limits = quota.Add(limits, pod.Spec.Overhead)
+
 	result = quota.Add(result, podComputeUsageHelper(requests, limits))
 	return result, nil
 }
@@ -411,9 +423,6 @@ func crossNamespaceWeightedPodAffinityTerms(terms []corev1.WeightedPodAffinityTe
 }
 
 func usesCrossNamespacePodAffinity(pod *corev1.Pod) bool {
-	if !feature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector) {
-		return false
-	}
 	if pod == nil || pod.Spec.Affinity == nil {
 		return false
 	}

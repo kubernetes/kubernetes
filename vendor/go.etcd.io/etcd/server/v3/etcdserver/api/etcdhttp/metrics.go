@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/raft/v3"
+	"go.etcd.io/etcd/server/v3/auth"
 	"go.etcd.io/etcd/server/v3/etcdserver"
 	"go.uber.org/zap"
 )
@@ -39,14 +40,16 @@ const (
 // HandleMetricsHealth registers metrics and health handlers.
 func HandleMetricsHealth(lg *zap.Logger, mux *http.ServeMux, srv etcdserver.ServerV2) {
 	mux.Handle(PathMetrics, promhttp.Handler())
-	mux.Handle(PathHealth, NewHealthHandler(lg, func(excludedAlarms AlarmSet) Health { return checkV2Health(lg, srv, excludedAlarms) }))
+	mux.Handle(PathHealth, NewHealthHandler(lg, func(excludedAlarms AlarmSet, serializable bool) Health { return checkV2Health(lg, srv, excludedAlarms) }))
 }
 
 // HandleMetricsHealthForV3 registers metrics and health handlers. it checks health by using v3 range request
 // and its corresponding timeout.
 func HandleMetricsHealthForV3(lg *zap.Logger, mux *http.ServeMux, srv *etcdserver.EtcdServer) {
 	mux.Handle(PathMetrics, promhttp.Handler())
-	mux.Handle(PathHealth, NewHealthHandler(lg, func(excludedAlarms AlarmSet) Health { return checkV3Health(lg, srv, excludedAlarms) }))
+	mux.Handle(PathHealth, NewHealthHandler(lg, func(excludedAlarms AlarmSet, serializable bool) Health {
+		return checkV3Health(lg, srv, excludedAlarms, serializable)
+	}))
 }
 
 // HandlePrometheus registers prometheus handler on '/metrics'.
@@ -55,7 +58,7 @@ func HandlePrometheus(mux *http.ServeMux) {
 }
 
 // NewHealthHandler handles '/health' requests.
-func NewHealthHandler(lg *zap.Logger, hfunc func(excludedAlarms AlarmSet) Health) http.HandlerFunc {
+func NewHealthHandler(lg *zap.Logger, hfunc func(excludedAlarms AlarmSet, serializable bool) Health) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.Header().Set("Allow", http.MethodGet)
@@ -64,7 +67,12 @@ func NewHealthHandler(lg *zap.Logger, hfunc func(excludedAlarms AlarmSet) Health
 			return
 		}
 		excludedAlarms := getExcludedAlarms(r)
-		h := hfunc(excludedAlarms)
+		// Passing the query parameter "serializable=true" ensures that the
+		// health of the local etcd is checked vs the health of the cluster.
+		// This is useful for probes attempting to validate the liveness of
+		// the etcd process vs readiness of the cluster to serve requests.
+		serializableFlag := getSerializableFlag(r)
+		h := hfunc(excludedAlarms, serializableFlag)
 		defer func() {
 			if h.Health == "true" {
 				healthSuccess.Inc()
@@ -127,9 +135,13 @@ func getExcludedAlarms(r *http.Request) (alarms AlarmSet) {
 	return alarms
 }
 
+func getSerializableFlag(r *http.Request) bool {
+	return r.URL.Query().Get("serializable") == "true"
+}
+
 // TODO: etcdserver.ErrNoLeader in health API
 
-func checkHealth(lg *zap.Logger, srv etcdserver.ServerV2, excludedAlarms AlarmSet) Health {
+func checkHealth(lg *zap.Logger, srv etcdserver.ServerV2, excludedAlarms AlarmSet, serializable bool) Health {
 	h := Health{}
 	h.Health = "true"
 	as := srv.Alarms()
@@ -137,8 +149,7 @@ func checkHealth(lg *zap.Logger, srv etcdserver.ServerV2, excludedAlarms AlarmSe
 		for _, v := range as {
 			alarmName := v.Alarm.String()
 			if _, found := excludedAlarms[alarmName]; found {
-				lg.Debug("/health excluded alarm", zap.String("alarm", alarmName))
-				delete(excludedAlarms, alarmName)
+				lg.Debug("/health excluded alarm", zap.String("alarm", v.String()))
 				continue
 			}
 
@@ -156,11 +167,7 @@ func checkHealth(lg *zap.Logger, srv etcdserver.ServerV2, excludedAlarms AlarmSe
 		}
 	}
 
-	if len(excludedAlarms) > 0 {
-		lg.Warn("fail exclude alarms from health check", zap.String("exclude alarms", fmt.Sprintf("%+v", excludedAlarms)))
-	}
-
-	if uint64(srv.Leader()) == raft.None {
+	if !serializable && uint64(srv.Leader()) == raft.None {
 		h.Health = "false"
 		h.Reason = "RAFT NO LEADER"
 		lg.Warn("serving /health false; no leader")
@@ -170,7 +177,7 @@ func checkHealth(lg *zap.Logger, srv etcdserver.ServerV2, excludedAlarms AlarmSe
 }
 
 func checkV2Health(lg *zap.Logger, srv etcdserver.ServerV2, excludedAlarms AlarmSet) (h Health) {
-	if h = checkHealth(lg, srv, excludedAlarms); h.Health != "true" {
+	if h = checkHealth(lg, srv, excludedAlarms, false); h.Health != "true" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -186,14 +193,14 @@ func checkV2Health(lg *zap.Logger, srv etcdserver.ServerV2, excludedAlarms Alarm
 	return
 }
 
-func checkV3Health(lg *zap.Logger, srv *etcdserver.EtcdServer, excludedAlarms AlarmSet) (h Health) {
-	if h = checkHealth(lg, srv, excludedAlarms); h.Health != "true" {
+func checkV3Health(lg *zap.Logger, srv *etcdserver.EtcdServer, excludedAlarms AlarmSet, serializable bool) (h Health) {
+	if h = checkHealth(lg, srv, excludedAlarms, serializable); h.Health != "true" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), srv.Cfg.ReqTimeout())
-	_, err := srv.Range(ctx, &etcdserverpb.RangeRequest{KeysOnly: true, Limit: 1})
+	_, err := srv.Range(ctx, &etcdserverpb.RangeRequest{KeysOnly: true, Limit: 1, Serializable: serializable})
 	cancel()
-	if err != nil {
+	if err != nil && err != auth.ErrUserEmpty && err != auth.ErrPermissionDenied {
 		h.Health = "false"
 		h.Reason = fmt.Sprintf("RANGE ERROR:%s", err)
 		lg.Warn("serving /health false; Range fails", zap.Error(err))

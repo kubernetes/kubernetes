@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -46,7 +45,7 @@ import (
 )
 
 func bytesBody(bodyBytes []byte) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader(bodyBytes))
+	return io.NopCloser(bytes.NewReader(bodyBytes))
 }
 
 func defaultHeaders() http.Header {
@@ -184,7 +183,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			return &http.Response{StatusCode: http.StatusOK, Header: defaultHeaders(), Body: bytesBody(res)}, nil
 		case "PUT":
 			decoder := codecs.UniversalDeserializer()
-			body, err := ioutil.ReadAll(req.Body)
+			body, err := io.ReadAll(req.Body)
 			if err != nil {
 				return nil, err
 			}
@@ -201,7 +200,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			}
 			return &http.Response{StatusCode: http.StatusOK, Header: defaultHeaders(), Body: bytesBody(res)}, nil
 		case "PATCH":
-			body, err := ioutil.ReadAll(req.Body)
+			body, err := io.ReadAll(req.Body)
 			if err != nil {
 				return nil, err
 			}

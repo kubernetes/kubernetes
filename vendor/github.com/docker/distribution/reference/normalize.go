@@ -56,6 +56,35 @@ func ParseNormalizedNamed(s string) (Named, error) {
 	return named, nil
 }
 
+// ParseDockerRef normalizes the image reference following the docker convention. This is added
+// mainly for backward compatibility.
+// The reference returned can only be either tagged or digested. For reference contains both tag
+// and digest, the function returns digested reference, e.g. docker.io/library/busybox:latest@
+// sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa will be returned as
+// docker.io/library/busybox@sha256:7cc4b5aefd1d0cadf8d97d4350462ba51c694ebca145b08d7d41b41acc8db5aa.
+func ParseDockerRef(ref string) (Named, error) {
+	named, err := ParseNormalizedNamed(ref)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := named.(NamedTagged); ok {
+		if canonical, ok := named.(Canonical); ok {
+			// The reference is both tagged and digested, only
+			// return digested.
+			newNamed, err := WithName(canonical.Name())
+			if err != nil {
+				return nil, err
+			}
+			newCanonical, err := WithDigest(newNamed, canonical.Digest())
+			if err != nil {
+				return nil, err
+			}
+			return newCanonical, nil
+		}
+	}
+	return TagNameOnly(named), nil
+}
+
 // splitDockerDomain splits a repository name to domain and remotename string.
 // If no valid domain is found, the default domain is used. Repository name
 // needs to be already validated before.

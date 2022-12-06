@@ -32,22 +32,23 @@ import (
 
 const (
 	grpcOverheadBytes = 512 * 1024
-	maxStreams        = math.MaxUint32
 	maxSendBytes      = math.MaxInt32
 )
 
-func Server(s *etcdserver.EtcdServer, tls *tls.Config, gopts ...grpc.ServerOption) *grpc.Server {
+func Server(s *etcdserver.EtcdServer, tls *tls.Config, interceptor grpc.UnaryServerInterceptor, gopts ...grpc.ServerOption) *grpc.Server {
 	var opts []grpc.ServerOption
 	opts = append(opts, grpc.CustomCodec(&codec{}))
 	if tls != nil {
 		bundle := credentials.NewBundle(credentials.Config{TLSConfig: tls})
 		opts = append(opts, grpc.Creds(bundle.TransportCredentials()))
 	}
-
 	chainUnaryInterceptors := []grpc.UnaryServerInterceptor{
 		newLogUnaryInterceptor(s),
 		newUnaryInterceptor(s),
 		grpc_prometheus.UnaryServerInterceptor,
+	}
+	if interceptor != nil {
+		chainUnaryInterceptors = append(chainUnaryInterceptors, interceptor)
 	}
 
 	chainStreamInterceptors := []grpc.StreamServerInterceptor{
@@ -66,7 +67,7 @@ func Server(s *etcdserver.EtcdServer, tls *tls.Config, gopts ...grpc.ServerOptio
 
 	opts = append(opts, grpc.MaxRecvMsgSize(int(s.Cfg.MaxRequestBytes+grpcOverheadBytes)))
 	opts = append(opts, grpc.MaxSendMsgSize(maxSendBytes))
-	opts = append(opts, grpc.MaxConcurrentStreams(maxStreams))
+	opts = append(opts, grpc.MaxConcurrentStreams(s.Cfg.MaxConcurrentStreams))
 
 	grpcServer := grpc.NewServer(append(opts, gopts...)...)
 

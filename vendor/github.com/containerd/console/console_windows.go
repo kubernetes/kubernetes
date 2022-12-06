@@ -17,10 +17,10 @@
 package console
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 )
 
@@ -103,7 +103,7 @@ func (m *master) Reset() error {
 		{m.err, m.errMode},
 	} {
 		if err := windows.SetConsoleMode(s.fd, s.mode); err != nil {
-			return errors.Wrap(err, "unable to restore console mode")
+			return fmt.Errorf("unable to restore console mode: %w", err)
 		}
 	}
 
@@ -114,7 +114,7 @@ func (m *master) Size() (WinSize, error) {
 	var info windows.ConsoleScreenBufferInfo
 	err := windows.GetConsoleScreenBufferInfo(m.out, &info)
 	if err != nil {
-		return WinSize{}, errors.Wrap(err, "unable to get console info")
+		return WinSize{}, fmt.Errorf("unable to get console info: %w", err)
 	}
 
 	winsize := WinSize{
@@ -139,7 +139,7 @@ func (m *master) DisableEcho() error {
 	mode |= windows.ENABLE_LINE_INPUT
 
 	if err := windows.SetConsoleMode(m.in, mode); err != nil {
-		return errors.Wrap(err, "unable to set console to disable echo")
+		return fmt.Errorf("unable to set console to disable echo: %w", err)
 	}
 
 	return nil
@@ -192,7 +192,7 @@ func makeInputRaw(fd windows.Handle, mode uint32) error {
 	}
 
 	if err := windows.SetConsoleMode(fd, mode); err != nil {
-		return errors.Wrap(err, "unable to set console to raw mode")
+		return fmt.Errorf("unable to set console to raw mode: %w", err)
 	}
 
 	return nil

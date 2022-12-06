@@ -28,9 +28,6 @@ func DropDisabledFields(pspSpec, oldPSPSpec *policy.PodSecurityPolicySpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !allowedProcMountTypesInUse(oldPSPSpec) {
 		pspSpec.AllowedProcMountTypes = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		pspSpec.AllowedCSIDrivers = nil
-	}
 }
 
 func allowedProcMountTypesInUse(oldPSPSpec *policy.PodSecurityPolicySpec) bool {

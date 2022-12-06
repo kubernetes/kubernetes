@@ -36,7 +36,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
 )
@@ -262,7 +262,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			kubeConfig:         configWithAnotherClusterCa,
 			expectedError:      true,
 		},
-		{ // if KubeConfig is not equal to the existingKubeConfig - tollerate custom server addresses
+		{ // if KubeConfig is not equal to the existingKubeConfig - tolerate custom server addresses
 			name:               "KubeConfig referst to the cluster with another address",
 			existingKubeConfig: config,
 			kubeConfig:         configWithAnotherClusterAddress,
@@ -483,8 +483,27 @@ func TestValidateKubeConfig(t *testing.T) {
 	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
 	configWithAnotherServerURL := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
 
+	configWithSameClusterCaByExternalFile := config.DeepCopy()
+	currentCtx, exists := configWithSameClusterCaByExternalFile.Contexts[configWithSameClusterCaByExternalFile.CurrentContext]
+	if !exists {
+		t.Fatal("failed to find CurrentContext in Contexts of the kubeconfig")
+	}
+	if configWithSameClusterCaByExternalFile.Clusters[currentCtx.Cluster] == nil {
+		t.Fatal("failed to find the given CurrentContext Cluster in Clusters of the kubeconfig")
+	}
+	tmpfile, err := os.CreateTemp("", "external-ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+	if _, err := tmpfile.Write(pkiutil.EncodeCertPEM(caCert)); err != nil {
+		t.Fatal(err)
+	}
+	configWithSameClusterCaByExternalFile.Clusters[currentCtx.Cluster].CertificateAuthorityData = nil
+	configWithSameClusterCaByExternalFile.Clusters[currentCtx.Cluster].CertificateAuthority = tmpfile.Name()
+
 	// create a valid config but with whitespace around the CA PEM.
-	// validateKubeConfig() should tollerate that.
+	// validateKubeConfig() should tolerate that.
 	configWhitespace := config.DeepCopy()
 	configWhitespaceCtx := configWhitespace.Contexts[configWhitespace.CurrentContext]
 	configWhitespaceCA := string(configWhitespace.Clusters[configWhitespaceCtx.Cluster].CertificateAuthorityData)
@@ -516,6 +535,11 @@ func TestValidateKubeConfig(t *testing.T) {
 		},
 		"kubeconfig exist and is valid even if its CA contains whitespace": {
 			existingKubeConfig: configWhitespace,
+			kubeConfig:         config,
+			expectedError:      false,
+		},
+		"kubeconfig exist and is valid even if its CA is provided as an external file": {
+			existingKubeConfig: configWithSameClusterCaByExternalFile,
 			kubeConfig:         config,
 			expectedError:      false,
 		},

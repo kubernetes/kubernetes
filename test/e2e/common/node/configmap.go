@@ -26,13 +26,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -77,7 +80,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume configMaps", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "consume configMaps", pod, 0, []string{
 			"CONFIG_DATA_1=value-1",
 		})
 	})
@@ -121,7 +124,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume configMaps", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "consume configMaps", pod, 0, []string{
 			"data-1=value-1", "data-2=value-2", "data-3=value-3",
 			"p-data-1=value-1", "p-data-2=value-2", "p-data-3=value-3",
 		})
@@ -221,7 +224,9 @@ var _ = SIGDescribe("ConfigMap", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap by label selector")
+		if !testConfigMapFound {
+			framework.Failf("failed to find ConfigMap %s/%s by label selector", testNamespaceName, testConfigMap.ObjectMeta.Name)
+		}
 
 		ginkgo.By("deleting the ConfigMap by collection with a label selector")
 		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{

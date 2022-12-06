@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -198,17 +199,17 @@ func (c *controller) processLoop() {
 // can't return an error.  The handlers MUST NOT modify the objects
 // received; this concerns not only the top level of structure but all
 // the data structures reachable from it.
-//  * OnAdd is called when an object is added.
-//  * OnUpdate is called when an object is modified. Note that oldObj is the
-//      last known state of the object-- it is possible that several changes
-//      were combined together, so you can't use this to see every single
-//      change. OnUpdate is also called when a re-list happens, and it will
-//      get called even if nothing changed. This is useful for periodically
-//      evaluating or syncing something.
-//  * OnDelete will get the final state of the item if it is known, otherwise
-//      it will get an object of type DeletedFinalStateUnknown. This can
-//      happen if the watch is closed and misses the delete event and we don't
-//      notice the deletion until the subsequent re-list.
+//   - OnAdd is called when an object is added.
+//   - OnUpdate is called when an object is modified. Note that oldObj is the
+//     last known state of the object-- it is possible that several changes
+//     were combined together, so you can't use this to see every single
+//     change. OnUpdate is also called when a re-list happens, and it will
+//     get called even if nothing changed. This is useful for periodically
+//     evaluating or syncing something.
+//   - OnDelete will get the final state of the item if it is known, otherwise
+//     it will get an object of type DeletedFinalStateUnknown. This can
+//     happen if the watch is closed and misses the delete event and we don't
+//     notice the deletion until the subsequent re-list.
 type ResourceEventHandler interface {
 	OnAdd(obj interface{})
 	OnUpdate(oldObj, newObj interface{})
@@ -304,15 +305,14 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 // notifications to be faulty.
 //
 // Parameters:
-//  * lw is list and watch functions for the source of the resource you want to
-//    be informed of.
-//  * objType is an object of the type that you expect to receive.
-//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
-//    calls, even if nothing changed). Otherwise, re-list will be delayed as
-//    long as possible (until the upstream source closes the watch or times out,
-//    or you stop the controller).
-//  * h is the object you want notifications sent to.
-//
+//   - lw is list and watch functions for the source of the resource you want to
+//     be informed of.
+//   - objType is an object of the type that you expect to receive.
+//   - resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//     calls, even if nothing changed). Otherwise, re-list will be delayed as
+//     long as possible (until the upstream source closes the watch or times out,
+//     or you stop the controller).
+//   - h is the object you want notifications sent to.
 func NewInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -331,16 +331,15 @@ func NewInformer(
 // notifications to be faulty.
 //
 // Parameters:
-//  * lw is list and watch functions for the source of the resource you want to
-//    be informed of.
-//  * objType is an object of the type that you expect to receive.
-//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
-//    calls, even if nothing changed). Otherwise, re-list will be delayed as
-//    long as possible (until the upstream source closes the watch or times out,
-//    or you stop the controller).
-//  * h is the object you want notifications sent to.
-//  * indexers is the indexer for the received object type.
-//
+//   - lw is list and watch functions for the source of the resource you want to
+//     be informed of.
+//   - objType is an object of the type that you expect to receive.
+//   - resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//     calls, even if nothing changed). Otherwise, re-list will be delayed as
+//     long as possible (until the upstream source closes the watch or times out,
+//     or you stop the controller).
+//   - h is the object you want notifications sent to.
+//   - indexers is the indexer for the received object type.
 func NewIndexerInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -406,20 +405,62 @@ func NewTransformingIndexerInformer(
 	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, transformer)
 }
 
+// Multiplexes updates in the form of a list of Deltas into a Store, and informs
+// a given handler of events OnUpdate, OnAdd, OnDelete
+func processDeltas(
+	// Object which receives event notifications from the given deltas
+	handler ResourceEventHandler,
+	clientState Store,
+	transformer TransformFunc,
+	deltas Deltas,
+) error {
+	// from oldest to newest
+	for _, d := range deltas {
+		obj := d.Object
+		if transformer != nil {
+			var err error
+			obj, err = transformer(obj)
+			if err != nil {
+				return err
+			}
+		}
+
+		switch d.Type {
+		case Sync, Replaced, Added, Updated:
+			if old, exists, err := clientState.Get(obj); err == nil && exists {
+				if err := clientState.Update(obj); err != nil {
+					return err
+				}
+				handler.OnUpdate(old, obj)
+			} else {
+				if err := clientState.Add(obj); err != nil {
+					return err
+				}
+				handler.OnAdd(obj)
+			}
+		case Deleted:
+			if err := clientState.Delete(obj); err != nil {
+				return err
+			}
+			handler.OnDelete(obj)
+		}
+	}
+	return nil
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
 // Parameters
-//  * lw is list and watch functions for the source of the resource you want to
-//    be informed of.
-//  * objType is an object of the type that you expect to receive.
-//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
-//    calls, even if nothing changed). Otherwise, re-list will be delayed as
-//    long as possible (until the upstream source closes the watch or times out,
-//    or you stop the controller).
-//  * h is the object you want notifications sent to.
-//  * clientState is the store you want to populate
-//
+//   - lw is list and watch functions for the source of the resource you want to
+//     be informed of.
+//   - objType is an object of the type that you expect to receive.
+//   - resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//     calls, even if nothing changed). Otherwise, re-list will be delayed as
+//     long as possible (until the upstream source closes the watch or times out,
+//     or you stop the controller).
+//   - h is the object you want notifications sent to.
+//   - clientState is the store you want to populate
 func newInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -444,38 +485,10 @@ func newInformer(
 		RetryOnError:     false,
 
 		Process: func(obj interface{}) error {
-			// from oldest to newest
-			for _, d := range obj.(Deltas) {
-				obj := d.Object
-				if transformer != nil {
-					var err error
-					obj, err = transformer(obj)
-					if err != nil {
-						return err
-					}
-				}
-
-				switch d.Type {
-				case Sync, Replaced, Added, Updated:
-					if old, exists, err := clientState.Get(obj); err == nil && exists {
-						if err := clientState.Update(obj); err != nil {
-							return err
-						}
-						h.OnUpdate(old, obj)
-					} else {
-						if err := clientState.Add(obj); err != nil {
-							return err
-						}
-						h.OnAdd(obj)
-					}
-				case Deleted:
-					if err := clientState.Delete(obj); err != nil {
-						return err
-					}
-					h.OnDelete(obj)
-				}
+			if deltas, ok := obj.(Deltas); ok {
+				return processDeltas(h, clientState, transformer, deltas)
 			}
-			return nil
+			return errors.New("object given as Process argument is not Deltas")
 		},
 	}
 	return New(cfg)

@@ -174,8 +174,11 @@ func TestStart(t *testing.T) {
 	notifierFactory.EXPECT().NewCgroupNotifier(testCgroupPath, memoryUsageAttribute, int64(0)).Return(notifier, nil).Times(1)
 
 	var events chan<- struct{} = m.events
-	notifier.EXPECT().Start(events).Return()
-	notifier.EXPECT().Stop().Return().AnyTimes()
+	notifier.EXPECT().Start(events).DoAndReturn(func(events chan<- struct{}) {
+		for i := 0; i < 4; i++ {
+			events <- struct{}{}
+		}
+	})
 
 	err := m.UpdateThreshold(nodeSummary(noResources, noResources, noResources, isAllocatableEvictionThreshold(threshold)))
 	if err != nil {
@@ -184,9 +187,6 @@ func TestStart(t *testing.T) {
 
 	go m.Start()
 
-	for i := 0; i < 4; i++ {
-		m.events <- struct{}{}
-	}
 	wg.Wait()
 }
 

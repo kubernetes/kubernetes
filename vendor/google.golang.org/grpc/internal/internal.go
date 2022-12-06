@@ -38,11 +38,10 @@ var (
 	// KeepaliveMinPingTime is the minimum ping interval.  This must be 10s by
 	// default, but tests may wish to set it lower for convenience.
 	KeepaliveMinPingTime = 10 * time.Second
-	// ParseServiceConfigForTesting is for creating a fake
-	// ClientConn for resolver testing only
-	ParseServiceConfigForTesting interface{} // func(string) *serviceconfig.ParseResult
+	// ParseServiceConfig parses a JSON representation of the service config.
+	ParseServiceConfig interface{} // func(string) *serviceconfig.ParseResult
 	// EqualServiceConfigForTesting is for testing service config generation and
-	// parsing. Both a and b should be returned by ParseServiceConfigForTesting.
+	// parsing. Both a and b should be returned by ParseServiceConfig.
 	// This function compares the config without rawJSON stripped, in case the
 	// there's difference in white space.
 	EqualServiceConfigForTesting func(a, b serviceconfig.Config) bool
@@ -64,6 +63,76 @@ var (
 	// xDS-enabled server invokes this method on a grpc.Server when a particular
 	// listener moves to "not-serving" mode.
 	DrainServerTransports interface{} // func(*grpc.Server, string)
+	// AddExtraServerOptions adds an array of ServerOption that will be
+	// effective globally for newly created servers. The priority will be: 1.
+	// user-provided; 2. this method; 3. default values.
+	AddExtraServerOptions interface{} // func(opt ...ServerOption)
+	// ClearExtraServerOptions clears the array of extra ServerOption. This
+	// method is useful in testing and benchmarking.
+	ClearExtraServerOptions func()
+	// AddExtraDialOptions adds an array of DialOption that will be effective
+	// globally for newly created client channels. The priority will be: 1.
+	// user-provided; 2. this method; 3. default values.
+	AddExtraDialOptions interface{} // func(opt ...DialOption)
+	// ClearExtraDialOptions clears the array of extra DialOption. This
+	// method is useful in testing and benchmarking.
+	ClearExtraDialOptions func()
+
+	// NewXDSResolverWithConfigForTesting creates a new xds resolver builder using
+	// the provided xds bootstrap config instead of the global configuration from
+	// the supported environment variables.  The resolver.Builder is meant to be
+	// used in conjunction with the grpc.WithResolvers DialOption.
+	//
+	// Testing Only
+	//
+	// This function should ONLY be used for testing and may not work with some
+	// other features, including the CSDS service.
+	NewXDSResolverWithConfigForTesting interface{} // func([]byte) (resolver.Builder, error)
+
+	// RegisterRLSClusterSpecifierPluginForTesting registers the RLS Cluster
+	// Specifier Plugin for testing purposes, regardless of the XDSRLS environment
+	// variable.
+	//
+	// TODO: Remove this function once the RLS env var is removed.
+	RegisterRLSClusterSpecifierPluginForTesting func()
+
+	// UnregisterRLSClusterSpecifierPluginForTesting unregisters the RLS Cluster
+	// Specifier Plugin for testing purposes. This is needed because there is no way
+	// to unregister the RLS Cluster Specifier Plugin after registering it solely
+	// for testing purposes using RegisterRLSClusterSpecifierPluginForTesting().
+	//
+	// TODO: Remove this function once the RLS env var is removed.
+	UnregisterRLSClusterSpecifierPluginForTesting func()
+
+	// RegisterRBACHTTPFilterForTesting registers the RBAC HTTP Filter for testing
+	// purposes, regardless of the RBAC environment variable.
+	//
+	// TODO: Remove this function once the RBAC env var is removed.
+	RegisterRBACHTTPFilterForTesting func()
+
+	// UnregisterRBACHTTPFilterForTesting unregisters the RBAC HTTP Filter for
+	// testing purposes. This is needed because there is no way to unregister the
+	// HTTP Filter after registering it solely for testing purposes using
+	// RegisterRBACHTTPFilterForTesting().
+	//
+	// TODO: Remove this function once the RBAC env var is removed.
+	UnregisterRBACHTTPFilterForTesting func()
+
+	// RegisterOutlierDetectionBalancerForTesting registers the Outlier
+	// Detection Balancer for testing purposes, regardless of the Outlier
+	// Detection environment variable.
+	//
+	// TODO: Remove this function once the Outlier Detection env var is removed.
+	RegisterOutlierDetectionBalancerForTesting func()
+
+	// UnregisterOutlierDetectionBalancerForTesting unregisters the Outlier
+	// Detection Balancer for testing purposes. This is needed because there is
+	// no way to unregister the Outlier Detection Balancer after registering it
+	// solely for testing purposes using
+	// RegisterOutlierDetectionBalancerForTesting().
+	//
+	// TODO: Remove this function once the Outlier Detection env var is removed.
+	UnregisterOutlierDetectionBalancerForTesting func()
 )
 
 // HealthChecker defines the signature of the client-side LB channel health checking function.
@@ -86,3 +155,9 @@ const (
 	// that supports backend returned by grpclb balancer.
 	CredsBundleModeBackendFromBalancer = "backend-from-balancer"
 )
+
+// RLSLoadBalancingPolicyName is the name of the RLS LB policy.
+//
+// It currently has an experimental suffix which would be removed once
+// end-to-end testing of the policy is completed.
+const RLSLoadBalancingPolicyName = "rls_experimental"

@@ -19,7 +19,6 @@ package kubeconfig
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -143,7 +142,7 @@ func TestCreateWithToken(t *testing.T) {
 }
 
 func TestWriteKubeconfigToDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -177,7 +176,7 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 					err,
 				)
 			}
-			newFile, _ := ioutil.ReadFile(configPath)
+			newFile, _ := os.ReadFile(configPath)
 			if !bytes.Equal(newFile, rt.file) {
 				t.Errorf(
 					"failed WriteToDisk config write:\n\texpected: %s\n\t  actual: %s",
@@ -311,6 +310,24 @@ func TestHasCredentials(t *testing.T) {
 				CurrentContext: "kubernetes",
 				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
 				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"kubernetes": {ClientKey: "A", ClientCertificate: "B"}},
+			},
+			expected: true,
+		},
+		{
+			name: "exec authentication credentials",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"kubernetes": {Exec: &clientcmdapi.ExecConfig{Command: "command"}}},
+			},
+			expected: true,
+		},
+		{
+			name: "authprovider authentication credentials",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"kubernetes": {AuthProvider: &clientcmdapi.AuthProviderConfig{Name: "A"}}},
 			},
 			expected: true,
 		},

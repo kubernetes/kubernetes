@@ -18,7 +18,6 @@
 
 // Package connectivity defines connectivity semantics.
 // For details, see https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md.
-// All APIs in this package are experimental.
 package connectivity
 
 import (
@@ -45,7 +44,7 @@ func (s State) String() string {
 		return "SHUTDOWN"
 	default:
 		logger.Errorf("unknown connectivity state: %d", s)
-		return "Invalid-State"
+		return "INVALID_STATE"
 	}
 }
 
@@ -61,3 +60,35 @@ const (
 	// Shutdown indicates the ClientConn has started shutting down.
 	Shutdown
 )
+
+// ServingMode indicates the current mode of operation of the server.
+//
+// Only xDS enabled gRPC servers currently report their serving mode.
+type ServingMode int
+
+const (
+	// ServingModeStarting indicates that the server is starting up.
+	ServingModeStarting ServingMode = iota
+	// ServingModeServing indicates that the server contains all required
+	// configuration and is serving RPCs.
+	ServingModeServing
+	// ServingModeNotServing indicates that the server is not accepting new
+	// connections. Existing connections will be closed gracefully, allowing
+	// in-progress RPCs to complete. A server enters this mode when it does not
+	// contain the required configuration to serve RPCs.
+	ServingModeNotServing
+)
+
+func (s ServingMode) String() string {
+	switch s {
+	case ServingModeStarting:
+		return "STARTING"
+	case ServingModeServing:
+		return "SERVING"
+	case ServingModeNotServing:
+		return "NOT_SERVING"
+	default:
+		logger.Errorf("unknown serving mode: %d", s)
+		return "INVALID_MODE"
+	}
+}

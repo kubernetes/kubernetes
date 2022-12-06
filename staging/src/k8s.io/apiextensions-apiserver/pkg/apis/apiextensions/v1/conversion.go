@@ -18,6 +18,7 @@ package v1
 
 import (
 	"bytes"
+	unsafe "unsafe"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -205,5 +206,10 @@ func Convert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversi
 			}
 		}
 	}
+	return nil
+}
+
+func Convert_apiextensions_ValidationRules_To_v1_ValidationRules(in *apiextensions.ValidationRules, out *ValidationRules, s conversion.Scope) error {
+	*out = *(*ValidationRules)(unsafe.Pointer(in))
 	return nil
 }

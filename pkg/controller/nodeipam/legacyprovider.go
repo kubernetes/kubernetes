@@ -31,7 +31,7 @@ import (
 	nodesync "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync"
 )
 
-func startLegacyIPAM(
+func createLegacyIPAM(
 	ic *Controller,
 	nodeInformer coreinformers.NodeInformer,
 	cloud cloudprovider.Interface,
@@ -39,7 +39,7 @@ func startLegacyIPAM(
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
-) {
+) *ipam.Controller {
 	cfg := &ipam.Config{
 		Resync:       ipamResyncInterval,
 		MaxBackoff:   ipamMaxBackoff,
@@ -67,4 +67,5 @@ func startLegacyIPAM(
 	if err := ipamc.Start(nodeInformer); err != nil {
 		klog.Fatalf("Error trying to Init(): %v", err)
 	}
+	return ipamc
 }

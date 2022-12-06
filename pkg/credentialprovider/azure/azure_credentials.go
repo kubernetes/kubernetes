@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/spf13/pflag"
@@ -91,39 +90,6 @@ type RegistriesClient interface {
 	List(ctx context.Context) ([]containerregistry.Registry, error)
 }
 
-// azRegistriesClient implements RegistriesClient.
-type azRegistriesClient struct {
-	client containerregistry.RegistriesClient
-}
-
-func newAzRegistriesClient(subscriptionID, endpoint string, token *adal.ServicePrincipalToken) *azRegistriesClient {
-	registryClient := containerregistry.NewRegistriesClient(subscriptionID)
-	registryClient.BaseURI = endpoint
-	registryClient.Authorizer = autorest.NewBearerAuthorizer(token)
-
-	return &azRegistriesClient{
-		client: registryClient,
-	}
-}
-
-func (az *azRegistriesClient) List(ctx context.Context) ([]containerregistry.Registry, error) {
-	iterator, err := az.client.ListComplete(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]containerregistry.Registry, 0)
-	for ; iterator.NotDone(); err = iterator.Next() {
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, iterator.Value())
-	}
-
-	return result, nil
-}
-
 // NewACRProvider parses the specified configFile and returns a DockerConfigProvider
 func NewACRProvider(configFile *string) credentialprovider.DockerConfigProvider {
 	return &acrProvider{
@@ -136,7 +102,6 @@ type acrProvider struct {
 	file                  *string
 	config                *auth.AzureAuthConfig
 	environment           *azure.Environment
-	registryClient        RegistriesClient
 	servicePrincipalToken *adal.ServicePrincipalToken
 	cache                 cache.Store
 }
@@ -209,11 +174,7 @@ func (a *acrProvider) Enabled() bool {
 	a.servicePrincipalToken, err = auth.GetServicePrincipalToken(a.config, a.environment)
 	if err != nil {
 		klog.Errorf("Failed to create service principal token: %v", err)
-		return false
 	}
-
-	a.registryClient = newAzRegistriesClient(a.config.SubscriptionID, a.environment.ResourceManagerEndpoint, a.servicePrincipalToken)
-
 	return true
 }
 
@@ -324,11 +285,21 @@ func getLoginServer(registry containerregistry.Registry) string {
 }
 
 func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialprovider.DockerConfigEntry, error) {
-	// Run EnsureFresh to make sure the token is valid and does not expire
-	if err := a.servicePrincipalToken.EnsureFresh(); err != nil {
-		klog.Errorf("Failed to ensure fresh service principal token: %v", err)
-		return nil, err
+	if a.servicePrincipalToken == nil {
+		token, err := auth.GetServicePrincipalToken(a.config, a.environment)
+		if err != nil {
+			klog.Errorf("Failed to create service principal token: %v", err)
+			return nil, err
+		}
+		a.servicePrincipalToken = token
+	} else {
+		// Run EnsureFresh to make sure the token is valid and does not expire
+		if err := a.servicePrincipalToken.EnsureFresh(); err != nil {
+			klog.Errorf("Failed to ensure fresh service principal token: %v", err)
+			return nil, err
+		}
 	}
+
 	armAccessToken := a.servicePrincipalToken.OAuthToken()
 
 	klog.V(4).Infof("discovering auth redirects for: %s", loginServer)

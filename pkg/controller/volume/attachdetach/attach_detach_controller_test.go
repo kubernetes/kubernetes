@@ -26,14 +26,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	kcache "k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -431,16 +428,9 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	var plugins []volume.VolumePlugin
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, tc.csiMigration)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, tc.csiMigration)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InTreePluginGCEUnregister, tc.csiMigration)()
+	plugins = append(plugins, controllervolumetesting.CreateTestPlugin()...)
+	plugins = append(plugins, csi.ProbeVolumePlugins()...)
 
-	if tc.csiMigration {
-		// if InTreePluginGCEUnregister is enabled, only the CSI plugin is registered but not the in-tree one
-		plugins = append(plugins, csi.ProbeVolumePlugins()...)
-	} else {
-		plugins = controllervolumetesting.CreateTestPlugin()
-	}
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	podInformer := informerFactory.Core().V1().Pods().Informer()
 	pvInformer := informerFactory.Core().V1().PersistentVolumes().Informer()
@@ -523,7 +513,14 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		podInformer.GetIndexer().Add(newPod)
 	}
 	if tc.pvName != "" {
-		newPv := controllervolumetesting.NewPV(tc.pvName, tc.volName)
+		var newPv *v1.PersistentVolume
+		if tc.csiMigration {
+			// NewPV returns a GCEPersistentDisk volume, which is migrated.
+			newPv = controllervolumetesting.NewPV(tc.pvName, tc.volName)
+		} else {
+			// Otherwise use NFS, which is not subject to migration.
+			newPv = controllervolumetesting.NewNFSPV(tc.pvName, tc.volName)
+		}
 		_, err = adc.kubeClient.CoreV1().PersistentVolumes().Create(context.TODO(), newPv, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Run failed with error. Failed to create a new pv: <%v>", err)

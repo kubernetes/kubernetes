@@ -41,20 +41,19 @@ type metricsRecorder struct {
 	// how often the recorder runs to flush the metrics.
 	interval time.Duration
 
-	// stopCh is used to stop the goroutine which periodically flushes metrics. It's currently only
-	// used in tests.
-	stopCh chan struct{}
+	// stopCh is used to stop the goroutine which periodically flushes metrics.
+	stopCh <-chan struct{}
 	// isStoppedCh indicates whether the goroutine is stopped. It's used in tests only to make sure
 	// the metric flushing goroutine is stopped so that tests can collect metrics for verification.
 	isStoppedCh chan struct{}
 }
 
-func newMetricsRecorder(bufferSize int, interval time.Duration) *metricsRecorder {
+func newMetricsRecorder(bufferSize int, interval time.Duration, stopCh <-chan struct{}) *metricsRecorder {
 	recorder := &metricsRecorder{
 		bufferCh:    make(chan *frameworkMetric, bufferSize),
 		bufferSize:  bufferSize,
 		interval:    interval,
-		stopCh:      make(chan struct{}),
+		stopCh:      stopCh,
 		isStoppedCh: make(chan struct{}),
 	}
 	go recorder.run()

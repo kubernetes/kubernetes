@@ -48,9 +48,9 @@ func (HTTPIngressRuleValue) SwaggerDoc() map[string]string {
 }
 
 var map_IPBlock = map[string]string{
-	"":       "IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\",\"2001:db9::/64\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
-	"cidr":   "CIDR is a string representing the IP Block Valid examples are \"192.168.1.1/24\" or \"2001:db9::/64\"",
-	"except": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" or \"2001:db9::/64\" Except values will be rejected if they are outside the CIDR range",
+	"":       "IPBlock describes a particular CIDR (Ex. \"192.168.1.0/24\",\"2001:db8::/64\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
+	"cidr":   "CIDR is a string representing the IP Block Valid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"",
+	"except": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.0/24\" or \"2001:db8::/64\" Except values will be rejected if they are outside the CIDR range",
 }
 
 func (IPBlock) SwaggerDoc() map[string]string {
@@ -131,6 +131,37 @@ func (IngressList) SwaggerDoc() map[string]string {
 	return map_IngressList
 }
 
+var map_IngressLoadBalancerIngress = map[string]string{
+	"":         "IngressLoadBalancerIngress represents the status of a load-balancer ingress point.",
+	"ip":       "IP is set for load-balancer ingress points that are IP based.",
+	"hostname": "Hostname is set for load-balancer ingress points that are DNS based.",
+	"ports":    "Ports provides information about the ports exposed by this LoadBalancer.",
+}
+
+func (IngressLoadBalancerIngress) SwaggerDoc() map[string]string {
+	return map_IngressLoadBalancerIngress
+}
+
+var map_IngressLoadBalancerStatus = map[string]string{
+	"":        "IngressLoadBalancerStatus represents the status of a load-balancer.",
+	"ingress": "Ingress is a list containing ingress points for the load-balancer.",
+}
+
+func (IngressLoadBalancerStatus) SwaggerDoc() map[string]string {
+	return map_IngressLoadBalancerStatus
+}
+
+var map_IngressPortStatus = map[string]string{
+	"":         "IngressPortStatus represents the error condition of a service port",
+	"port":     "Port is the port number of the ingress port.",
+	"protocol": "Protocol is the protocol of the ingress port. The supported values are: \"TCP\", \"UDP\", \"SCTP\"",
+	"error":    "Error is to record the problem with the service port The format of the error shall comply with the following rules: - built-in error values shall be specified in this file and those shall use\n  CamelCase names\n- cloud provider specific error values must have names that comply with the\n  format foo.example.com/CamelCase.",
+}
+
+func (IngressPortStatus) SwaggerDoc() map[string]string {
+	return map_IngressPortStatus
+}
+
 var map_IngressRule = map[string]string{
 	"":     "IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.",
 	"host": "Host is the fully qualified domain name of a network host, as defined by RFC 3986. Note the following deviations from the \"host\" part of the URI as defined in RFC 3986: 1. IPs are not allowed. Currently an IngressRuleValue can only apply to\n   the IP in the Spec of the parent Ingress.\n2. The `:` delimiter is not respected because ports are not allowed.\n\t  Currently the port of an Ingress is implicitly :80 for http and\n\t  :443 for https.\nBoth these may change in the future. Incoming requests are matched against the host before the IngressRuleValue. If the host is unspecified, the Ingress routes all traffic based on the specified IngressRuleValue.\n\nHost can be \"precise\" which is a domain name without the terminating dot of a network host (e.g. \"foo.bar.com\") or \"wildcard\", which is a domain name prefixed with a single wildcard label (e.g. \"*.foo.com\"). The wildcard character '*' must appear by itself as the first DNS label and matches only a single label. You cannot have a wildcard label by itself (e.g. Host == \"*\"). Requests will be matched against the Host field in the following way: 1. If Host is precise, the request matches this rule if the http host header is equal to Host. 2. If Host is a wildcard, then the request matches this rule if the http host header is to equal to the suffix (removing the first label) of the wildcard rule.",
@@ -160,7 +191,7 @@ func (IngressServiceBackend) SwaggerDoc() map[string]string {
 
 var map_IngressSpec = map[string]string{
 	"":                 "IngressSpec describes the Ingress the user wishes to exist.",
-	"ingressClassName": "IngressClassName is the name of the IngressClass cluster resource. The associated IngressClass defines which controller will implement the resource. This replaces the deprecated `kubernetes.io/ingress.class` annotation. For backwards compatibility, when that annotation is set, it must be given precedence over this field. The controller may emit a warning if the field and annotation have different values. Implementations of this API should ignore Ingresses without a class specified. An IngressClass resource may be marked as default, which can be used to set a default value for this field. For more information, refer to the IngressClass documentation.",
+	"ingressClassName": "IngressClassName is the name of an IngressClass cluster resource. Ingress controller implementations use this field to know whether they should be serving this Ingress resource, by a transitive connection (controller -> IngressClass -> Ingress resource). Although the `kubernetes.io/ingress.class` annotation (simple constant name) was never formally defined, it was widely supported by Ingress controllers to create a direct binding between Ingress controller and Ingress resources. Newly created Ingress resources should prefer using the field. However, even though the annotation is officially deprecated, for backwards compatibility reasons, ingress controllers should still honor that annotation if present.",
 	"defaultBackend":   "DefaultBackend is the backend that should handle requests that don't match any rule. If Rules are not specified, DefaultBackend must be specified. If DefaultBackend is not set, the handling of requests that do not match any of the rules will be up to the Ingress controller.",
 	"tls":              "TLS configuration. Currently the Ingress only supports a single TLS port, 443. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension, if the ingress controller fulfilling the ingress supports SNI.",
 	"rules":            "A list of host rules used to configure the Ingress. If unspecified, or no rule matches, all traffic is sent to the default backend.",
@@ -193,6 +224,7 @@ var map_NetworkPolicy = map[string]string{
 	"":         "NetworkPolicy describes what network traffic is allowed for a set of Pods",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "Specification of the desired behavior for this NetworkPolicy.",
+	"status":   "Status is the current state of the NetworkPolicy. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (NetworkPolicy) SwaggerDoc() map[string]string {
@@ -244,7 +276,7 @@ var map_NetworkPolicyPort = map[string]string{
 	"":         "NetworkPolicyPort describes a port to allow traffic on",
 	"protocol": "The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.",
 	"port":     "The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.",
-	"endPort":  "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate \"NetworkPolicyEndPort\".",
+	"endPort":  "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.",
 }
 
 func (NetworkPolicyPort) SwaggerDoc() map[string]string {
@@ -261,6 +293,15 @@ var map_NetworkPolicySpec = map[string]string{
 
 func (NetworkPolicySpec) SwaggerDoc() map[string]string {
 	return map_NetworkPolicySpec
+}
+
+var map_NetworkPolicyStatus = map[string]string{
+	"":           "NetworkPolicyStatus describe the current state of the NetworkPolicy.",
+	"conditions": "Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy. Current service state",
+}
+
+func (NetworkPolicyStatus) SwaggerDoc() map[string]string {
+	return map_NetworkPolicyStatus
 }
 
 var map_ServiceBackendPort = map[string]string{

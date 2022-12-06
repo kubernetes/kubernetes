@@ -84,8 +84,14 @@ type ClusterConfiguration struct {
 
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking
+
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string
+
+	// CIKubernetesVersion is the target CI version of the control plane.
+	// Useful for running kubeadm with CI Kubernetes version.
+	// +k8s:conversion-gen=false
+	CIKubernetesVersion string
 
 	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
 	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
@@ -116,8 +122,8 @@ type ClusterConfiguration struct {
 	CertificatesDir string
 
 	// ImageRepository sets the container registry to pull images from.
-	// If empty, `k8s.gcr.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/`)
-	// `gcr.io/k8s-staging-ci-images` will be used as a default for control plane components and for kube-proxy, while `k8s.gcr.io`
+	// If empty, `registry.k8s.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/`)
+	// `gcr.io/k8s-staging-ci-images` will be used as a default for control plane components and for kube-proxy, while `registry.k8s.io`
 	// will be used for all the other images.
 	ImageRepository string
 
@@ -212,13 +218,13 @@ type NodeRegistrationOptions struct {
 	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
 	CRISocket string
 
-	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
-	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your control-plane node, set this field to an
-	// empty slice, i.e. `taints: []` in the YAML file. This field is solely used for Node registration.
+	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil,
+	// it will be defaulted with a control-plane taint for control-plane nodes. If you don't want to taint your control-plane
+	// node, set this field to an empty slice, i.e. `taints: []` in the YAML file. This field is solely used for Node registration.
 	Taints []v1.Taint
 
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
-	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
+	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config ConfigMap
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
 	// A key in this map is the flag name as it appears on the
 	// command line except without leading dash(es).
@@ -421,8 +427,8 @@ type HostPathMount struct {
 type Patches struct {
 	// Directory is a path to a directory that contains files named "target[suffix][+patchtype].extension".
 	// For example, "kube-apiserver0+merge.yaml" or just "etcd.json". "target" can be one of
-	// "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd". "patchtype" can be one
-	// of "strategic" "merge" or "json" and they match the patch formats supported by kubectl.
+	// "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd", "kubeletconfiguration".
+	// "patchtype" can be one of "strategic" "merge" or "json" and they match the patch formats supported by kubectl.
 	// The default "patchtype" is "strategic". "extension" must be either "json" or "yaml".
 	// "suffix" is an optional string that can be used to determine which patches are applied
 	// first alpha-numerically.

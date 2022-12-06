@@ -358,7 +358,7 @@ spec:
     spec:
       containers:
       - name: pause-win
-        image: k8s.gcr.io/pause:3.6
+        image: registry.k8s.io/pause:3.9
       nodeSelector:
         kubernetes.io/os: windows
       tolerations:

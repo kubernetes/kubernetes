@@ -35,6 +35,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
@@ -122,8 +123,9 @@ var parseFuncs = []parseFunc{
 }
 
 // parseCRILog parses logs in CRI log format. CRI Log format example:
-//   2016-10-06T00:17:09.669794202Z stdout P log content 1
-//   2016-10-06T00:17:09.669794203Z stderr F log content 2
+//
+//	2016-10-06T00:17:09.669794202Z stdout P log content 1
+//	2016-10-06T00:17:09.669794203Z stderr F log content 2
 func parseCRILog(log []byte, msg *logMessage) error {
 	var err error
 	// Parse timestamp
@@ -181,8 +183,9 @@ type jsonLog struct {
 
 // parseDockerJSONLog parses logs in Docker JSON log format. Docker JSON log format
 // example:
-//   {"log":"content 1","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}
-//   {"log":"content 2","stream":"stderr","time":"2016-10-20T18:39:20.57606444Z"}
+//
+//	{"log":"content 1","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}
+//	{"log":"content 2","stream":"stderr","time":"2016-10-20T18:39:20.57606444Z"}
 func parseDockerJSONLog(log []byte, msg *logMessage) error {
 	var l = &jsonLog{}
 
@@ -234,13 +237,13 @@ func newLogWriter(stdout io.Writer, stderr io.Writer, opts *LogOptions) *logWrit
 }
 
 // writeLogs writes logs into stdout, stderr.
-func (w *logWriter) write(msg *logMessage) error {
+func (w *logWriter) write(msg *logMessage, addPrefix bool) error {
 	if msg.timestamp.Before(w.opts.since) {
 		// Skip the line because it's older than since
 		return nil
 	}
 	line := msg.log
-	if w.opts.timestamp {
+	if w.opts.timestamp && addPrefix {
 		prefix := append([]byte(msg.timestamp.Format(timeFormatOut)), delimiter[0])
 		line = append(prefix, line...)
 	}
@@ -311,6 +314,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	var watcher *fsnotify.Watcher
 	var parse parseFunc
 	var stop bool
+	isNewLine := true
 	found := true
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
@@ -396,7 +400,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 			continue
 		}
 		// Write the log line into the stream.
-		if err := writer.write(msg); err != nil {
+		if err := writer.write(msg, isNewLine); err != nil {
 			if err == errMaximumWrite {
 				klog.V(2).InfoS("Finished parsing log file, hit bytes limit", "path", path, "limit", opts.bytes)
 				return nil
@@ -407,18 +411,26 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 		if limitedMode {
 			limitedNum--
 		}
-
+		if len(msg.log) > 0 {
+			isNewLine = msg.log[len(msg.log)-1] == eol[0]
+		} else {
+			isNewLine = true
+		}
 	}
 }
 
-func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
-	s, err := r.ContainerStatus(id)
+func isContainerRunning(ctx context.Context, id string, r internalapi.RuntimeService) (bool, error) {
+	resp, err := r.ContainerStatus(ctx, id, false)
 	if err != nil {
 		return false, err
 	}
+	status := resp.GetStatus()
+	if status == nil {
+		return false, remote.ErrContainerStatusNil
+	}
 	// Only keep following container log when it is running.
-	if s.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
-		klog.V(5).InfoS("Container is not running", "containerId", id, "state", s.State)
+	if status.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
+		klog.V(5).InfoS("Container is not running", "containerId", id, "state", status.State)
 		// Do not return error because it's normal that the container stops
 		// during waiting.
 		return false, nil
@@ -431,7 +443,7 @@ func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
 // the error is error happens during waiting new logs.
 func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
 	// no need to wait if the pod is not running
-	if running, err := isContainerRunning(id, runtimeService); !running {
+	if running, err := isContainerRunning(ctx, id, runtimeService); !running {
 		return false, false, err
 	}
 	errRetry := 5

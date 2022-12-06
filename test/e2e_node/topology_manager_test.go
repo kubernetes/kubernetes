@@ -19,7 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -44,7 +45,7 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -200,7 +201,6 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
-	newCfg.FeatureGates["CPUManager"] = true
 	newCfg.FeatureGates["TopologyManager"] = true
 
 	// Set the Topology Manager policy
@@ -340,6 +340,13 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	var cpuCap, cpuAlloc int64
 
 	cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
+	ginkgo.By(fmt.Sprintf("checking node CPU capacity (%d) and allocatable CPUs (%d)", cpuCap, cpuAlloc))
+
+	// Albeit even the weakest CI machines usually have 2 cpus, let's be extra careful and
+	// check explicitly. We prefer to skip than a false negative (and a failed test).
+	if cpuAlloc < 1 {
+		e2eskipper.Skipf("Skipping basic CPU Manager tests since CPU capacity < 2")
+	}
 
 	ginkgo.By("running a non-Gu pod")
 	runNonGuPodTest(f, cpuCap)
@@ -347,13 +354,13 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	ginkgo.By("running a Gu pod")
 	runGuPodTest(f, 1)
 
-	ginkgo.By("running multiple Gu and non-Gu pods")
-	runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
-
-	// Skip rest of the tests if CPU capacity < 3.
-	if cpuCap < 3 {
+	// Skip rest of the tests if CPU allocatable < 3.
+	if cpuAlloc < 3 {
 		e2eskipper.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 	}
+
+	ginkgo.By("running multiple Gu and non-Gu pods")
+	runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
 
 	ginkgo.By("running a Gu pod requesting multiple CPUs")
 	runMultipleCPUGuPod(f)
@@ -374,7 +381,7 @@ func waitForAllContainerRemoval(podName, podNS string) {
 	rs, _, err := getCRIClient()
 	framework.ExpectNoError(err)
 	gomega.Eventually(func() bool {
-		containers, err := rs.ListContainers(&runtimeapi.ContainerFilter{
+		containers, err := rs.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
 			LabelSelector: map[string]string{
 				types.KubernetesPodNameLabel:      podName,
 				types.KubernetesPodNamespaceLabel: podNS,
@@ -394,7 +401,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 		podName := fmt.Sprintf("gu-pod-%d", podID)
 		framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 		pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2epod.NewPodClient(f).CreateSync(pod)
 		framework.Logf("created pod %s", podName)
 		podMap[podName] = pod
 	}
@@ -436,7 +443,7 @@ func runTopologyManagerNegativeTest(f *framework.Framework, ctnAttrs, initCtnAtt
 	framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 	pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 
-	pod = f.PodClient().Create(pod)
+	pod = e2epod.NewPodClient(f).Create(pod)
 	err := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 		if pod.Status.Phase != v1.PodPending {
 			return true, nil
@@ -444,7 +451,7 @@ func runTopologyManagerNegativeTest(f *framework.Framework, ctnAttrs, initCtnAtt
 		return false, nil
 	})
 	framework.ExpectNoError(err)
-	pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	pod, err = e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	if pod.Status.Phase != v1.PodFailed {
@@ -471,7 +478,7 @@ func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
 	// the SRIOVDP configuration is hw-dependent, so we allow per-test-host customization.
 	framework.Logf("host-local SRIOV Device Plugin Config Map %q", cmFile)
 	if cmFile != "" {
-		data, err = ioutil.ReadFile(cmFile)
+		data, err = os.ReadFile(cmFile)
 		if err != nil {
 			framework.Failf("unable to load the SRIOV Device Plugin ConfigMap: %v", err)
 		}
@@ -965,6 +972,7 @@ func hostPrecheck() (int, int) {
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeFeature:TopologyManager]", func() {
 	f := framework.NewDefaultFramework("topology-manager-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("With kubeconfig updated to static CPU Manager policy run the Topology Manager tests", func() {
 		runTopologyManagerTests(f)

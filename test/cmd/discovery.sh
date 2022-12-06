@@ -27,7 +27,7 @@ run_RESTMapper_evaluation_tests() {
 
   RESTMAPPER_ERROR_FILE="${KUBE_TEMP}/restmapper-error"
 
-  ### Non-existent resource type should give a recognizeable error
+  ### Non-existent resource type should give a recognizable error
   # Pre-condition: None
   # Command
   kubectl get "${kube_flags[@]:?}" unknownresourcetype 2>"${RESTMAPPER_ERROR_FILE}" || true
@@ -82,7 +82,7 @@ run_resource_aliasing_tests() {
   kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/controller.yaml "${kube_flags[@]}"
   kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/service.yaml "${kube_flags[@]}"
 
-  object="all -l'app=cassandra'"
+  object="all -l app=cassandra"
   request="{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}"
 
   # all 4 cassandra's might not be in the request immediately...
@@ -91,6 +91,36 @@ run_resource_aliasing_tests() {
   kube::test::get_object_assert "$object" "$request" '(cassandra:){2}(cassandra:(cassandra::?)?)?'
 
   kubectl delete all -l app=cassandra "${kube_flags[@]}"
+
+  set +o nounset
+  set +o errexit
+}
+
+run_crd_deletion_recreation_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing resource creation, deletion, and re-creation"
+
+  output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-cluster-scoped.yaml)
+  kube::test::if_has_string "${output_message}" 'created'
+  output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-cluster-scoped-resource.yaml)
+  kube::test::if_has_string "${output_message}" 'created'
+  output_message=$(kubectl delete -f hack/testdata/CRD/example-crd-1-cluster-scoped.yaml)
+  kube::test::if_has_string "${output_message}" 'deleted'
+  # Invalidate local cache because cluster scoped CRD in cache is stale.
+  # Invalidation of cache may take up to 6 hours and we are manually
+  # invalidate cache and expect that scope changed CRD should be created without problem.
+  kubectl api-resources
+  output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-namespaced.yaml)
+  kube::test::if_has_string "${output_message}" 'created'
+  output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-1-namespaced-resource.yaml)
+  kube::test::if_has_string "${output_message}" 'created'
+
+  # Cleanup
+  kubectl delete -f hack/testdata/CRD/example-crd-1-namespaced-resource.yaml
+  kubectl delete -f hack/testdata/CRD/example-crd-1-namespaced.yaml
 
   set +o nounset
   set +o errexit

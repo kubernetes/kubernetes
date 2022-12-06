@@ -25,7 +25,7 @@ import (
 )
 
 /*
-Sharing the host namespaces must be disallowed.
+Sharing the host network, PID, and IPC namespaces must be disallowed.
 
 **Restricted Fields:**
 

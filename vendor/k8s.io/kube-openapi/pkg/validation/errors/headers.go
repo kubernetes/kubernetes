@@ -20,6 +20,7 @@ type Validation struct {
 	Name    string
 	In      string
 	Value   interface{}
+	Valid   interface{}
 	message string
 	Values  []interface{}
 }

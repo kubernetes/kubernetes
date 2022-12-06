@@ -16,9 +16,5 @@
 Package baggage provides functionality for storing and retrieving
 baggage items in Go context. For propagating the baggage, see the
 go.opentelemetry.io/otel/propagation package.
-
-This package is currently in a pre-GA phase. Backwards incompatible changes
-may be introduced in subsequent minor version releases as we work to track the
-evolving OpenTelemetry specification and user feedback.
 */
 package baggage // import "go.opentelemetry.io/otel/baggage"

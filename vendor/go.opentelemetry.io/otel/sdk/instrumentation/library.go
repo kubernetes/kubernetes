@@ -12,24 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
-Package instrumentation provides an instrumentation library structure to be
-passed to both the OpenTelemetry Tracer and Meter components.
-
-This package is currently in a pre-GA phase. Backwards incompatible changes
-may be introduced in subsequent minor version releases as we work to track the
-evolving OpenTelemetry specification and user feedback.
-
-For more information see
-[this](https://github.com/open-telemetry/oteps/blob/main/text/0083-component.md).
-*/
 package instrumentation // import "go.opentelemetry.io/otel/sdk/instrumentation"
 
 // Library represents the instrumentation library.
-type Library struct {
-	// Name is the name of the instrumentation library. This should be the
-	// Go package name of that library.
-	Name string
-	// Version is the version of the instrumentation library.
-	Version string
-}
+// Deprecated: please use Scope instead.
+type Library = Scope

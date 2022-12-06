@@ -48,7 +48,7 @@ func TestErrors(t *testing.T) {
 	for _, test := range cases {
 		observer := httptest.NewRecorder()
 		fns[test.fn](observer, &http.Request{RequestURI: test.uri})
-		result := string(observer.Body.Bytes())
+		result := observer.Body.String()
 		if result != test.expected {
 			t.Errorf("%s(..., %q) != %q, got %q", test.fn, test.uri, test.expected, result)
 		}
@@ -79,7 +79,7 @@ func TestForbidden(t *testing.T) {
 		scheme := runtime.NewScheme()
 		negotiatedSerializer := serializer.NewCodecFactory(scheme).WithoutConversion()
 		Forbidden(request.NewDefaultContext(), test.attributes, observer, &http.Request{URL: &url.URL{Path: "/path"}}, test.reason, negotiatedSerializer)
-		result := string(observer.Body.Bytes())
+		result := observer.Body.String()
 		if result != test.expected {
 			t.Errorf("Forbidden response body(%#v...)\n expected: %v\ngot:       %v", test.attributes, test.expected, result)
 		}

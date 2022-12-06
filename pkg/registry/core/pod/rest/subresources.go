@@ -25,10 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
-	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -49,6 +47,12 @@ var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OP
 // New returns an empty podProxyOptions object.
 func (r *ProxyREST) New() runtime.Object {
 	return &api.PodProxyOptions{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *ProxyREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
 }
 
 // ConnectMethods returns the list of HTTP methods that can be proxied
@@ -73,7 +77,7 @@ func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object,
 	}
 	location.Path = net.JoinPreservingTrailingSlash(location.Path, proxyOpts.Path)
 	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
-	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, false, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder), nil
 }
 
 // Support both GET and POST methods. We must support GET for browsers that want to use WebSockets.
@@ -93,6 +97,12 @@ func (r *AttachREST) New() runtime.Object {
 	return &api.PodAttachOptions{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *AttachREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Connect returns a handler for the pod exec proxy
 func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	attachOpts, ok := opts.(*api.PodAttachOptions)
@@ -103,7 +113,7 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -130,6 +140,12 @@ func (r *ExecREST) New() runtime.Object {
 	return &api.PodExecOptions{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *ExecREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Connect returns a handler for the pod exec proxy
 func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	execOpts, ok := opts.(*api.PodExecOptions)
@@ -140,7 +156,7 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -167,6 +183,12 @@ func (r *PortForwardREST) New() runtime.Object {
 	return &api.PodPortForwardOptions{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *PortForwardREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // NewConnectOptions returns the versioned object that represents the
 // portforward parameters
 func (r *PortForwardREST) NewConnectOptions() (runtime.Object, bool, string) {
@@ -188,13 +210,11 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
-func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired, interceptRedirects bool, responder rest.Responder) *proxy.UpgradeAwareHandler {
+func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *proxy.UpgradeAwareHandler {
 	handler := proxy.NewUpgradeAwareHandler(location, transport, wrapTransport, upgradeRequired, proxy.NewErrorResponder(responder))
-	handler.InterceptRedirects = interceptRedirects && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
-	handler.RequireSameHostRedirects = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }

@@ -6,8 +6,8 @@ are welcome. Please take a look at [the architecture](ARCHITECTURE.md) to get
 a better understanding for the high-level goals.
 
 New features must be accompanied by tests. Before starting work on any large
-feature, please [join](https://cilium.herokuapp.com/) the
-[#libbpf-go](https://cilium.slack.com/messages/libbpf-go) channel on Slack to
+feature, please [join](https://ebpf.io/slack) the
+[#ebpf-go](https://cilium.slack.com/messages/ebpf-go) channel on Slack to
 discuss the design first.
 
 When submitting pull requests, consider writing details about what problem you

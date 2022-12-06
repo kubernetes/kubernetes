@@ -1,6 +1,6 @@
 ![Gomega: Ginkgo's Preferred Matcher Library](http://onsi.github.io/gomega/images/gomega.png)
 
-[![Build Status](https://travis-ci.org/onsi/gomega.svg?branch=master)](https://travis-ci.org/onsi/gomega)
+[![test](https://github.com/onsi/gomega/actions/workflows/test.yml/badge.svg)](https://github.com/onsi/gomega/actions/workflows/test.yml)
 
 Jump straight to the [docs](http://onsi.github.io/gomega/) to learn about Gomega, including a list of [all available matchers](http://onsi.github.io/gomega/#provided-matchers).
 

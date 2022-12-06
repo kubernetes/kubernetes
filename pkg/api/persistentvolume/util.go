@@ -17,7 +17,9 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	nodeapi "k8s.io/kubernetes/pkg/api/node"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -25,20 +27,41 @@ import (
 // DropDisabledFields removes disabled fields from the pv spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
 func DropDisabledFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.PersistentVolumeSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandCSIVolumes) && !hasExpansionSecrets(oldPVSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSINodeExpandSecret) && !hasNodeExpansionSecrets(oldPVSpec) {
 		if pvSpec.CSI != nil {
-			pvSpec.CSI.ControllerExpandSecretRef = nil
+			pvSpec.CSI.NodeExpandSecretRef = nil
 		}
 	}
 }
 
-func hasExpansionSecrets(oldPVSpec *api.PersistentVolumeSpec) bool {
+func hasNodeExpansionSecrets(oldPVSpec *api.PersistentVolumeSpec) bool {
 	if oldPVSpec == nil || oldPVSpec.CSI == nil {
 		return false
 	}
 
-	if oldPVSpec.CSI.ControllerExpandSecretRef != nil {
+	if oldPVSpec.CSI.NodeExpandSecretRef != nil {
 		return true
 	}
 	return false
+}
+
+func GetWarningsForPersistentVolume(pv *api.PersistentVolume) []string {
+	if pv == nil {
+		return nil
+	}
+	return warningsForPersistentVolumeSpecAndMeta(nil, &pv.Spec)
+}
+
+func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.PersistentVolumeSpec) []string {
+	var warnings []string
+
+	if pvSpec.NodeAffinity != nil && pvSpec.NodeAffinity.Required != nil {
+		termFldPath := fieldPath.Child("spec", "nodeAffinity", "required", "nodeSelectorTerms")
+		// use of deprecated node labels in node affinity
+		for i, term := range pvSpec.NodeAffinity.Required.NodeSelectorTerms {
+			warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
+		}
+	}
+
+	return warnings
 }

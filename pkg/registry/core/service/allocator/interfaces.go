@@ -29,6 +29,11 @@ type Interface interface {
 
 	// For testing
 	Free() int
+
+	// Destroy shuts down all internal structures.
+	// Destroy needs to be implemented in thread-safe way and be prepared for being
+	// called more than once.
+	Destroy()
 }
 
 // Snapshottable is an Interface that can be snapshotted and restored. Snapshottable
@@ -40,3 +45,5 @@ type Snapshottable interface {
 }
 
 type AllocatorFactory func(max int, rangeSpec string) (Interface, error)
+
+type AllocatorWithOffsetFactory func(max int, rangeSpec string, offset int) (Interface, error)

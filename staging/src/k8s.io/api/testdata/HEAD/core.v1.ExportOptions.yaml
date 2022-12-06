@@ -1,4 +1,0 @@
-apiVersion: v1
-exact: false
-export: true
-kind: ExportOptions

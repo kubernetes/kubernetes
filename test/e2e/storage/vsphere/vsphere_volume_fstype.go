@@ -21,16 +21,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -57,7 +59,7 @@ const (
 	Test to verify if an invalid fstype specified in storage class fails pod creation.
 
 	Steps
-	1. Create StorageClass with inavlid.
+	1. Create StorageClass with invalid.
 	2. Create PVC which uses the StorageClass created in step 1.
 	3. Wait for PV to be provisioned.
 	4. Wait for PVC's status to become Bound.
@@ -68,6 +70,7 @@ const (
 
 var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-fstype")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		client    clientset.Interface
 		namespace string
@@ -107,7 +110,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 
 	// Create Pod and verify the persistent volume is accessible
 	pod := createPodAndVerifyVolumeAccessible(client, namespace, pvclaim, persistentvolumes)
-	_, err := framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/cat", "/mnt/volume1/fstype"}, expectedContent, time.Minute)
+	_, err := e2eoutput.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/cat", "/mnt/volume1/fstype"}, expectedContent, time.Minute)
 	framework.ExpectNoError(err)
 
 	// Detach and delete volume
@@ -147,7 +150,9 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 			isFound = true
 		}
 	}
-	framework.ExpectEqual(isFound, true, "Unable to verify MountVolume.MountDevice failure")
+	if !isFound {
+		framework.Failf("Unable to verify MountVolume.MountDevice failure for volume %s", persistentvolumes[0].Name)
+	}
 }
 
 func createVolume(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {

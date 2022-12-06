@@ -97,14 +97,6 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebho
 	}
 }
 
-// SetDefaults_Rule sets defaults for webhook rule
-func SetDefaults_Rule(obj *admissionregistrationv1beta1.Rule) {
-	if obj.Scope == nil {
-		s := admissionregistrationv1beta1.AllScopes
-		obj.Scope = &s
-	}
-}
-
 // SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference
 func SetDefaults_ServiceReference(obj *admissionregistrationv1beta1.ServiceReference) {
 	if obj.Port == nil {

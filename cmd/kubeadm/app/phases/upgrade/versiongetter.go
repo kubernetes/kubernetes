@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
@@ -105,7 +105,7 @@ func (g *KubeVersionGetter) KubeletVersions() (map[string]uint16, error) {
 
 // computeKubeletVersions returns a string-int map that describes how many nodes are of a specific version
 func computeKubeletVersions(nodes []v1.Node) map[string]uint16 {
-	kubeletVersions := map[string]uint16{}
+	kubeletVersions := make(map[string]uint16)
 	for _, node := range nodes {
 		kver := node.Status.NodeInfo.KubeletVersion
 		if _, found := kubeletVersions[kver]; !found {

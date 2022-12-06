@@ -20,6 +20,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"path"
@@ -34,9 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -76,6 +79,7 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 
 var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
 		ginkgo.Context("once the node is setup", func() {
 			ginkgo.It("container runtime's oom-score-adj should be -999", func() {
@@ -104,7 +108,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					framework.ExpectNoError(err, "failed to list all pause processes on the node")
 					existingPausePIDSet := sets.NewInt(existingPausePIDs...)
 
-					podClient := f.PodClient()
+					podClient := e2epod.NewPodClient(f)
 					podName := "besteffort" + string(uuid.NewUUID())
 					podClient.Create(&v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
@@ -153,11 +157,11 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 				})
 				// Log the running containers here to help debugging.
 				ginkgo.AfterEach(func() {
-					if ginkgo.CurrentGinkgoTestDescription().Failed {
+					if ginkgo.CurrentSpecReport().Failed() {
 						ginkgo.By("Dump all running containers")
 						runtime, _, err := getCRIClient()
 						framework.ExpectNoError(err)
-						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
+						containers, err := runtime.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
 							State: &runtimeapi.ContainerStateValue{
 								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 							},
@@ -171,7 +175,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 				})
 			})
 			ginkgo.It("guaranteed container's oom-score-adj should be -998", func() {
-				podClient := f.PodClient()
+				podClient := e2epod.NewPodClient(f)
 				podName := "guaranteed" + string(uuid.NewUUID())
 				podClient.Create(&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -212,7 +216,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 
 			})
 			ginkgo.It("burstable container's oom-score-adj should be between [2, 1000)", func() {
-				podClient := f.PodClient()
+				podClient := e2epod.NewPodClient(f)
 				podName := "burstable" + string(uuid.NewUUID())
 				podClient.Create(&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{

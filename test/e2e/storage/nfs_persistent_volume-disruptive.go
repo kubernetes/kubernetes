@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,9 +39,10 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
+type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string)
 type disruptiveTest struct {
 	testItStmt string
 	runTest    testBody
@@ -77,6 +78,7 @@ func checkForControllerManagerHealthy(duration time.Duration) error {
 var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		c                           clientset.Interface
 		ns                          string
@@ -270,7 +272,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			func(t disruptiveTest) {
 				ginkgo.It(t.testItStmt, func() {
 					ginkgo.By("Executing Spec")
-					t.runTest(c, f, clientPod)
+					t.runTest(c, f, clientPod, e2epod.VolumeMountPath1)
 				})
 			}(test)
 		}

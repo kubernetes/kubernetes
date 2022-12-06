@@ -44,11 +44,13 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -78,6 +80,7 @@ const (
 var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	var certCtx *certContext
 	f := framework.NewDefaultFramework("webhook")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	servicePort := int32(8443)
 	containerPort := int32(8444)
 
@@ -790,7 +793,6 @@ func deployWebhookAndService(f *framework.Framework, image string, certCtx *cert
 				"webhook",
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
-				"--alsologtostderr",
 				"-v=4",
 				// Use a non-default port for containers.
 				fmt.Sprintf("--port=%d", containerPort),
@@ -836,7 +838,7 @@ func deployWebhookAndService(f *framework.Framework, image string, certCtx *cert
 			Selector: serviceLabels,
 			Ports: []v1.ServicePort{
 				{
-					Protocol:   "TCP",
+					Protocol:   v1.ProtocolTCP,
 					Port:       servicePort,
 					TargetPort: intstr.FromInt(int(containerPort)),
 				},
@@ -1155,6 +1157,8 @@ func testWebhook(f *framework.Framework) {
 		Labels: map[string]string{
 			skipNamespaceLabelKey: skipNamespaceLabelValue,
 			f.UniqueName:          "true",
+			// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace in 1.24
+			admissionapi.EnforceLevelLabel: string(admissionapi.LevelRestricted),
 		},
 	}})
 	framework.ExpectNoError(err, "creating namespace %q", skippedNamespaceName)
@@ -1179,7 +1183,7 @@ func testAttachingPodWebhook(f *framework.Framework) {
 	ginkgo.By("'kubectl attach' the pod, should be denied by the webhook")
 	timer := time.NewTimer(30 * time.Second)
 	defer timer.Stop()
-	_, err = framework.NewKubectlCommand(f.Namespace.Name, "attach", fmt.Sprintf("--namespace=%v", f.Namespace.Name), pod.Name, "-i", "-c=container1").WithTimeout(timer.C).Exec()
+	_, err = e2ekubectl.NewKubectlCommand(f.Namespace.Name, "attach", fmt.Sprintf("--namespace=%v", f.Namespace.Name), pod.Name, "-i", "-c=container1").WithTimeout(timer.C).Exec()
 	framework.ExpectError(err, "'kubectl attach' the pod, should be denied by the webhook")
 	if e, a := "attaching to pod 'to-be-attached-pod' is not allowed", err.Error(); !strings.Contains(a, e) {
 		framework.Failf("unexpected 'kubectl attach' error message. expected to contain %q, got %q", e, a)
@@ -2195,7 +2199,7 @@ func testSlowWebhookTimeoutNoError(f *framework.Framework) {
 }
 
 // createAdmissionWebhookMultiVersionTestCRDWithV1Storage creates a new CRD specifically
-// for the admissin webhook calling test.
+// for the admission webhook calling test.
 func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framework, opts ...crd.Option) (*crd.TestCrd, error) {
 	group := fmt.Sprintf("%s.example.com", f.BaseName)
 	return crd.CreateMultiVersionTestCRD(f, group, append([]crd.Option{func(crd *apiextensionsv1.CustomResourceDefinition) {
@@ -2369,8 +2373,12 @@ func newMutateConfigMapWebhookFixture(f *framework.Framework, certCtx *certConte
 func createWebhookConfigurationReadyNamespace(f *framework.Framework) {
 	ns, err := f.ClientSet.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   f.Namespace.Name + "-markers",
-			Labels: map[string]string{f.UniqueName + "-markers": "true"},
+			Name: f.Namespace.Name + "-markers",
+			Labels: map[string]string{
+				f.UniqueName + "-markers": "true",
+				// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace in 1.24
+				admissionapi.EnforceLevelLabel: string(admissionapi.LevelRestricted),
+			},
 		},
 	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating namespace for webhook configuration ready markers")

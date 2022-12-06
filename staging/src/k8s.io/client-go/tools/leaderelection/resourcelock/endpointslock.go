@@ -39,11 +39,11 @@ type endpointsLock struct {
 // Get returns the election record from a Endpoints Annotation
 func (el *endpointsLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
 	var record LeaderElectionRecord
-	var err error
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Get(ctx, el.EndpointsMeta.Name, metav1.GetOptions{})
+	ep, err := el.Client.Endpoints(el.EndpointsMeta.Namespace).Get(ctx, el.EndpointsMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
+	el.e = ep
 	if el.e.Annotations == nil {
 		el.e.Annotations = make(map[string]string)
 	}

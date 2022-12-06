@@ -20,7 +20,7 @@ import (
 	"context"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -28,8 +28,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/klog/v2"
 )
 
@@ -165,6 +166,8 @@ func makePodToVerifyCgroupRemoved(baseName string) *v1.Pod {
 
 var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 	f := framework.NewDefaultFramework("kubelet-cgroup-manager")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+
 	ginkgo.Describe("QOS containers", func() {
 		ginkgo.Context("On enabling QOS cgroup hierarchy", func() {
 			ginkgo.It("Top level QoS containers should have been created [NodeConformance]", func() {
@@ -173,7 +176,7 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 				}
 				cgroupsToVerify := []string{burstableCgroup, bestEffortCgroup}
 				pod := makePodToVerifyCgroups(cgroupsToVerify)
-				f.PodClient().Create(pod)
+				e2epod.NewPodClient(f).Create(pod)
 				err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 				framework.ExpectNoError(err)
 			})
@@ -191,7 +194,7 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 					podUID        string
 				)
 				ginkgo.By("Creating a Guaranteed pod in Namespace", func() {
-					guaranteedPod = f.PodClient().Create(&v1.Pod{
+					guaranteedPod = e2epod.NewPodClient(f).Create(&v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
@@ -211,16 +214,16 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 				ginkgo.By("Checking if the pod cgroup was created", func() {
 					cgroupsToVerify := []string{"pod" + podUID}
 					pod := makePodToVerifyCgroups(cgroupsToVerify)
-					f.PodClient().Create(pod)
+					e2epod.NewPodClient(f).Create(pod)
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})
 				ginkgo.By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					err := f.PodClient().Delete(context.TODO(), guaranteedPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
+					err := e2epod.NewPodClient(f).Delete(context.TODO(), guaranteedPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 					framework.ExpectNoError(err)
 					pod := makePodToVerifyCgroupRemoved("pod" + podUID)
-					f.PodClient().Create(pod)
+					e2epod.NewPodClient(f).Create(pod)
 					err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})
@@ -236,7 +239,7 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 					bestEffortPod *v1.Pod
 				)
 				ginkgo.By("Creating a BestEffort pod in Namespace", func() {
-					bestEffortPod = f.PodClient().Create(&v1.Pod{
+					bestEffortPod = e2epod.NewPodClient(f).Create(&v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
@@ -256,16 +259,16 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 				ginkgo.By("Checking if the pod cgroup was created", func() {
 					cgroupsToVerify := []string{"besteffort/pod" + podUID}
 					pod := makePodToVerifyCgroups(cgroupsToVerify)
-					f.PodClient().Create(pod)
+					e2epod.NewPodClient(f).Create(pod)
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})
 				ginkgo.By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					err := f.PodClient().Delete(context.TODO(), bestEffortPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
+					err := e2epod.NewPodClient(f).Delete(context.TODO(), bestEffortPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 					framework.ExpectNoError(err)
 					pod := makePodToVerifyCgroupRemoved("besteffort/pod" + podUID)
-					f.PodClient().Create(pod)
+					e2epod.NewPodClient(f).Create(pod)
 					err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})
@@ -281,7 +284,7 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 					burstablePod *v1.Pod
 				)
 				ginkgo.By("Creating a Burstable pod in Namespace", func() {
-					burstablePod = f.PodClient().Create(&v1.Pod{
+					burstablePod = e2epod.NewPodClient(f).Create(&v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
@@ -301,16 +304,16 @@ var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 				ginkgo.By("Checking if the pod cgroup was created", func() {
 					cgroupsToVerify := []string{"burstable/pod" + podUID}
 					pod := makePodToVerifyCgroups(cgroupsToVerify)
-					f.PodClient().Create(pod)
+					e2epod.NewPodClient(f).Create(pod)
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})
 				ginkgo.By("Checking if the pod cgroup was deleted", func() {
 					gp := int64(1)
-					err := f.PodClient().Delete(context.TODO(), burstablePod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
+					err := e2epod.NewPodClient(f).Delete(context.TODO(), burstablePod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 					framework.ExpectNoError(err)
 					pod := makePodToVerifyCgroupRemoved("burstable/pod" + podUID)
-					f.PodClient().Create(pod)
+					e2epod.NewPodClient(f).Create(pod)
 					err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})

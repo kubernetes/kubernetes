@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	"k8s.io/apiserver/pkg/server/httplog"
 )
 
 // WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by timeout.
@@ -93,6 +94,10 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resultCh := make(chan interface{})
 	var tw timeoutWriter
 	tw, w = newTimeoutWriter(w)
+
+	// Make a copy of request and work on it in new goroutine
+	// to avoid race condition when accessing/modifying request (e.g. headers)
+	rCopy := r.Clone(r.Context())
 	go func() {
 		defer func() {
 			err := recover()
@@ -107,7 +112,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			resultCh <- err
 		}()
-		t.handler.ServeHTTP(w, r)
+		t.handler.ServeHTTP(w, rCopy)
 	}()
 	select {
 	case err := <-resultCh:
@@ -137,8 +142,10 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				utilruntime.HandleError(err)
 			}()
 		}()
-
-		postTimeoutFn()
+		httplog.SetStacktracePredicate(r.Context(), func(status int) bool {
+			return false
+		})
+		defer postTimeoutFn()
 		tw.timeout(err)
 	}
 }

@@ -1,12 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - saad-ali
-  - msau42
+  - sig-storage-reviewers
   - andyzhangx
 approvers:
-  - saad-ali
-  - msau42
+  - sig-storage-approvers
 labels:
   - sig/storage
 emeritus_approvers:

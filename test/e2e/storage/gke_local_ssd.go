@@ -20,19 +20,22 @@ import (
 	"fmt"
 	"os/exec"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = utils.SIGDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
 
 	f := framework.NewDefaultFramework("localssd")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gke")
@@ -63,7 +66,7 @@ func doTestWriteAndReadToLocalSsd(f *framework.Framework) {
 	var msg string
 	var out = []string{"hello world"}
 
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2eoutput.TestContainerOutput(f, msg, pod, 0, out)
 }
 
 func testPodWithSsd(command string) *v1.Pod {

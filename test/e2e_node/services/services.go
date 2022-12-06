@@ -18,13 +18,11 @@ package services
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"testing"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -62,7 +60,7 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // namespace controller.
 // * kubelet: kubelet binary is outside. (We plan to move main kubelet start logic out when we have
 // standard kubelet launcher)
-func (e *E2EServices) Start() error {
+func (e *E2EServices) Start(featureGates map[string]bool) error {
 	var err error
 	if e.services, err = e.startInternalServices(); err != nil {
 		return fmt.Errorf("failed to start internal services: %v", err)
@@ -73,7 +71,7 @@ func (e *E2EServices) Start() error {
 		klog.Info("nothing to do in node-e2e-services, running conformance suite")
 	} else {
 		// Start kubelet
-		e.kubelet, err = e.startKubelet()
+		e.kubelet, err = e.startKubelet(featureGates)
 		if err != nil {
 			return fmt.Errorf("failed to start kubelet: %v", err)
 		}
@@ -97,7 +95,11 @@ func (e *E2EServices) Stop() {
 	}
 	if e.kubelet != nil {
 		if err := e.kubelet.kill(); err != nil {
-			klog.Errorf("Failed to stop kubelet: %v", err)
+			klog.Errorf("Failed to kill kubelet: %v", err)
+		}
+		// Stop the kubelet systemd unit which will delete the kubelet transient unit.
+		if err := e.kubelet.stopUnit(); err != nil {
+			klog.Errorf("Failed to stop kubelet systemd unit: %v", err)
 		}
 	}
 	for _, d := range e.rmDirs {
@@ -111,11 +113,6 @@ func (e *E2EServices) Stop() {
 // RunE2EServices actually start the e2e services. This function is used to
 // start e2e services in current process. This is only used in run-services-mode.
 func RunE2EServices(t *testing.T) {
-	// Populate global DefaultFeatureGate with value from TestContext.FeatureGates.
-	// This way, statically-linked components see the same feature gate config as the test context.
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates); err != nil {
-		t.Fatal(err)
-	}
 	e := newE2EServices()
 	if err := e.run(t); err != nil {
 		klog.Fatalf("Failed to run e2e services: %v", err)
@@ -141,7 +138,7 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 			[]string{"--run-services-mode", fmt.Sprintf("--bearer-token=%s", framework.TestContext.BearerToken)},
 			os.Args[1:]...,
 		)...)
-	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
+	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false, "")
 	return server, server.start()
 }
 
@@ -167,7 +164,7 @@ func (e *E2EServices) collectLogFiles() {
 			if err != nil {
 				klog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
-				if err = ioutil.WriteFile(targetLink, out, 0644); err != nil {
+				if err = os.WriteFile(targetLink, out, 0644); err != nil {
 					klog.Errorf("failed to write logs to %q: %v", targetLink, err)
 				}
 			}

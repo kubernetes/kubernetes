@@ -468,7 +468,7 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 						removeIndex++
 					}
 				default:
-					t.Errorf("unknow operation: %v", op)
+					t.Errorf("unknown operation: %v", op)
 				}
 			}
 			output, err := nt.list()

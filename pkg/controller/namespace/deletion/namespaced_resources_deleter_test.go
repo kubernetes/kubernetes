@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/fake"
-	scheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/metadata"
 	metadatafake "k8s.io/client-go/metadata/fake"
 	restclient "k8s.io/client-go/rest"
@@ -420,7 +419,7 @@ func TestDeleteEncounters404(t *testing.T) {
 		}
 		return false, nil, nil
 	}
-	mockMetadataClient := metadatafake.NewSimpleMetadataClient(scheme.Scheme)
+	mockMetadataClient := metadatafake.NewSimpleMetadataClient(metadatafake.NewTestScheme())
 	mockMetadataClient.PrependReactor("delete-collection", "flakes", ns1FlakesNotFound)
 	mockMetadataClient.PrependReactor("list", "flakes", ns1FlakesNotFound)
 

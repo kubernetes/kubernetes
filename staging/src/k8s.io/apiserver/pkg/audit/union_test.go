@@ -80,3 +80,36 @@ func TestUnion(t *testing.T) {
 		}
 	}
 }
+
+type cannotMultipleRunBackend struct {
+	started chan struct{}
+}
+
+func (b *cannotMultipleRunBackend) ProcessEvents(events ...*auditinternal.Event) bool {
+	return true
+}
+
+func (b *cannotMultipleRunBackend) Run(stopCh <-chan struct{}) error {
+	close(b.started)
+	return nil
+}
+
+func (b *cannotMultipleRunBackend) Shutdown() {}
+
+func (b *cannotMultipleRunBackend) String() string {
+	return "cannotMultipleRunBackend"
+}
+
+func TestUnionRun(t *testing.T) {
+	backends := []Backend{
+		&cannotMultipleRunBackend{started: make(chan struct{})},
+		&cannotMultipleRunBackend{started: make(chan struct{})},
+		&cannotMultipleRunBackend{started: make(chan struct{})},
+	}
+
+	b := Union(backends...)
+
+	if err := b.Run(make(chan struct{})); err != nil {
+		t.Errorf("union backend run: %v", err)
+	}
+}

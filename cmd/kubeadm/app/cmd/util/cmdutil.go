@@ -17,31 +17,44 @@ limitations under the License.
 package util
 
 import (
+	"bufio"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-// SubCmdRunE returns a function that handles a case where a subcommand must be specified
+// SubCmdRun returns a function that handles a case where a subcommand must be specified
 // Without this callback, if a user runs just the command without a subcommand,
 // or with an invalid subcommand, cobra will print usage information, but still exit cleanly.
-// We want to return an error code in these cases so that the
-// user knows that their command was invalid.
-func SubCmdRunE(name string) func(*cobra.Command, []string) error {
-	return func(_ *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return errors.Errorf("missing subcommand; %q is not meant to be run on its own", name)
+func SubCmdRun() func(c *cobra.Command, args []string) {
+	return func(c *cobra.Command, args []string) {
+		if len(args) > 0 {
+			kubeadmutil.CheckErr(usageErrorf(c, "invalid subcommand %q", strings.Join(args, " ")))
 		}
-
-		return errors.Errorf("invalid subcommand: %q", args[0])
+		c.Help()
+		kubeadmutil.CheckErr(kubeadmutil.ErrExit)
 	}
+}
+
+func usageErrorf(c *cobra.Command, format string, args ...interface{}) error {
+	msg := fmt.Sprintf(format, args...)
+	return errors.Errorf("%s\nSee '%s -h' for help and examples", msg, c.CommandPath())
 }
 
 // ValidateExactArgNumber validates that the required top-level arguments are specified
@@ -99,4 +112,32 @@ func DefaultInitConfiguration() *kubeadmapiv1.InitConfiguration {
 		},
 	}
 	return initCfg
+}
+
+// InteractivelyConfirmAction asks the user whether they _really_ want to take the action.
+func InteractivelyConfirmAction(action, question string, r io.Reader) error {
+	fmt.Printf("[%s] %s [y/N]: ", action, question)
+	scanner := bufio.NewScanner(r)
+	scanner.Scan()
+	if err := scanner.Err(); err != nil {
+		return errors.Wrap(err, "couldn't read from standard input")
+	}
+	answer := scanner.Text()
+	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
+		return nil
+	}
+
+	return errors.New("won't proceed; the user didn't answer (Y|y) in order to continue")
+}
+
+// GetClientSet gets a real or fake client depending on whether the user is dry-running or not
+func GetClientSet(file string, dryRun bool) (clientset.Interface, error) {
+	if dryRun {
+		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
+		if err != nil {
+			return nil, err
+		}
+		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
+	}
+	return kubeconfigutil.ClientSetFromFile(file)
 }

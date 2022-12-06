@@ -1,3 +1,5 @@
+# NOTE: This module will go out of support by March 31, 2023.  For authenticating with Azure AD, use module [azidentity](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity) instead.  For help migrating from `adal` to `azidentiy` please consult the [migration guide](https://aka.ms/azsdk/go/identity/migration).  General information about the retirement of this and other legacy modules can be found [here](https://azure.microsoft.com/updates/support-for-azure-sdk-libraries-that-do-not-conform-to-our-current-azure-sdk-guidelines-will-be-retired-as-of-31-march-2023/).
+
 # Azure Active Directory authentication for Go
 
 This is a standalone package for authenticating with Azure Active
@@ -18,7 +20,7 @@ go get -u github.com/Azure/go-autorest/autorest/adal
 
 ## Usage
 
-An Active Directory application is required in order to use this library. An application can be registered in the [Azure Portal](https://portal.azure.com/) by following these [guidelines](https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-integrating-applications) or using the [Azure CLI](https://github.com/Azure/azure-cli).
+An Active Directory application is required in order to use this library. An application can be registered in the [Azure Portal](https://portal.azure.com/) by following these [guidelines](https://docs.microsoft.com/azure/active-directory/develop/active-directory-integrating-applications) or using the [Azure CLI](https://github.com/Azure/azure-cli).
 
 ### Register an Azure AD Application with secret
 
@@ -88,7 +90,7 @@ An Active Directory application is required in order to use this library. An app
 ### Grant the necessary permissions
 
 Azure relies on a Role-Based Access Control (RBAC) model to manage the access to resources at a fine-grained
-level. There is a set of [pre-defined roles](https://docs.microsoft.com/en-us/azure/active-directory/role-based-access-built-in-roles)
+level. There is a set of [pre-defined roles](https://docs.microsoft.com/azure/active-directory/role-based-access-built-in-roles)
 which can be assigned to a service principal of an Azure AD application depending of your needs.
 
 ```
@@ -104,7 +106,7 @@ It is also possible to define custom role definitions.
 az role definition create --role-definition role-definition.json
 ```
 
-* Check [custom roles](https://docs.microsoft.com/en-us/azure/active-directory/role-based-access-control-custom-roles) for more details regarding the content of `role-definition.json` file.
+* Check [custom roles](https://docs.microsoft.com/azure/active-directory/role-based-access-control-custom-roles) for more details regarding the content of `role-definition.json` file.
 
 
 ### Acquire Access Token

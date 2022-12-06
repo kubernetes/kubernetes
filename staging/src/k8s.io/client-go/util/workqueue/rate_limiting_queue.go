@@ -50,6 +50,13 @@ func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitin
 	}
 }
 
+func NewRateLimitingQueueWithDelayingInterface(di DelayingInterface, rateLimiter RateLimiter) RateLimitingInterface {
+	return &rateLimitingType{
+		DelayingInterface: di,
+		rateLimiter:       rateLimiter,
+	}
+}
+
 // rateLimitingType wraps an Interface and provides rateLimited re-enquing
 type rateLimitingType struct {
 	DelayingInterface

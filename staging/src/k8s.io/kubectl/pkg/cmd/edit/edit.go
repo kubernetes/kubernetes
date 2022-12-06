@@ -22,7 +22,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -53,33 +53,35 @@ var (
 		saved copy to include the latest resource version.`))
 
 	editExample = templates.Examples(i18n.T(`
-		# Edit the service named 'docker-registry'
-		kubectl edit svc/docker-registry
+		# Edit the service named 'registry'
+		kubectl edit svc/registry
 
 		# Use an alternative editor
-		KUBE_EDITOR="nano" kubectl edit svc/docker-registry
+		KUBE_EDITOR="nano" kubectl edit svc/registry
 
 		# Edit the job 'myjob' in JSON using the v1 API format
 		kubectl edit job.v1.batch/myjob -o json
 
 		# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation
-		kubectl edit deployment/mydeployment -o yaml --save-config`))
+		kubectl edit deployment/mydeployment -o yaml --save-config
+
+		# Edit the deployment/mydeployment's status subresource
+		kubectl edit deployment mydeployment --subresource='status'`))
 )
 
 // NewCmdEdit creates the `edit` command
 func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := editor.NewEditOptions(editor.NormalEditMode, ioStreams)
-	o.ValidateOptions = cmdutil.ValidateOptions{EnableValidation: true}
-
 	cmd := &cobra.Command{
 		Use:                   "edit (RESOURCE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Edit a resource on the server"),
 		Long:                  editLong,
 		Example:               editExample,
-		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
+		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -90,11 +92,12 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 
 	usage := "to use to edit the resource"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
-	cmdutil.AddValidateOptionFlags(cmd, &o.ValidateOptions)
+	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().BoolVarP(&o.OutputPatch, "output-patch", "", o.OutputPatch, "Output the patch if the resource is edited.")
 	cmd.Flags().BoolVar(&o.WindowsLineEndings, "windows-line-endings", o.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-edit")
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &o.ApplyAnnotation)
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, edit will operate on the subresource of the requested object.", editor.SupportedSubresources...)
 	return cmd
 }

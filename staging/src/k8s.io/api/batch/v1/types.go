@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -27,10 +27,13 @@ const (
 
 	// JobTrackingFinalizer is a finalizer for Job's pods. It prevents them from
 	// being deleted before being accounted in the Job status.
-	// The apiserver and job controller use this string as a Job annotation, to
-	// mark Jobs that are being tracked using pod finalizers. Two releases after
-	// the JobTrackingWithFinalizers graduates to GA, JobTrackingFinalizer will
-	// no longer be used as a Job annotation.
+	//
+	// Additionally, the apiserver and job controller use this string as a Job
+	// annotation, to mark Jobs that are being tracked using pod finalizers.
+	// However, this behavior is deprecated in kubernetes 1.26. This means that, in
+	// 1.27+, one release after JobTrackingWithFinalizers graduates to GA, the
+	// apiserver and job controller will ignore this annotation and they will
+	// always track jobs using finalizers.
 	JobTrackingFinalizer = "batch.kubernetes.io/job-tracking"
 )
 
@@ -87,6 +90,120 @@ const (
 	IndexedCompletion CompletionMode = "Indexed"
 )
 
+// PodFailurePolicyAction specifies how a Pod failure is handled.
+// +enum
+type PodFailurePolicyAction string
+
+const (
+	// This is an action which might be taken on a pod failure - mark the
+	// pod's job as Failed and terminate all running pods.
+	PodFailurePolicyActionFailJob PodFailurePolicyAction = "FailJob"
+
+	// This is an action which might be taken on a pod failure - the counter towards
+	// .backoffLimit, represented by the job's .status.failed field, is not
+	// incremented and a replacement pod is created.
+	PodFailurePolicyActionIgnore PodFailurePolicyAction = "Ignore"
+
+	// This is an action which might be taken on a pod failure - the pod failure
+	// is handled in the default way - the counter towards .backoffLimit,
+	// represented by the job's .status.failed field, is incremented.
+	PodFailurePolicyActionCount PodFailurePolicyAction = "Count"
+)
+
+// +enum
+type PodFailurePolicyOnExitCodesOperator string
+
+const (
+	PodFailurePolicyOnExitCodesOpIn    PodFailurePolicyOnExitCodesOperator = "In"
+	PodFailurePolicyOnExitCodesOpNotIn PodFailurePolicyOnExitCodesOperator = "NotIn"
+)
+
+// PodFailurePolicyOnExitCodesRequirement describes the requirement for handling
+// a failed pod based on its container exit codes. In particular, it lookups the
+// .state.terminated.exitCode for each app container and init container status,
+// represented by the .status.containerStatuses and .status.initContainerStatuses
+// fields in the Pod status, respectively. Containers completed with success
+// (exit code 0) are excluded from the requirement check.
+type PodFailurePolicyOnExitCodesRequirement struct {
+	// Restricts the check for exit codes to the container with the
+	// specified name. When null, the rule applies to all containers.
+	// When specified, it should match one the container or initContainer
+	// names in the pod template.
+	// +optional
+	ContainerName *string `json:"containerName" protobuf:"bytes,1,opt,name=containerName"`
+
+	// Represents the relationship between the container exit code(s) and the
+	// specified values. Containers completed with success (exit code 0) are
+	// excluded from the requirement check. Possible values are:
+	// - In: the requirement is satisfied if at least one container exit code
+	//   (might be multiple if there are multiple containers not restricted
+	//   by the 'containerName' field) is in the set of specified values.
+	// - NotIn: the requirement is satisfied if at least one container exit code
+	//   (might be multiple if there are multiple containers not restricted
+	//   by the 'containerName' field) is not in the set of specified values.
+	// Additional values are considered to be added in the future. Clients should
+	// react to an unknown operator by assuming the requirement is not satisfied.
+	Operator PodFailurePolicyOnExitCodesOperator `json:"operator" protobuf:"bytes,2,req,name=operator"`
+
+	// Specifies the set of values. Each returned container exit code (might be
+	// multiple in case of multiple containers) is checked against this set of
+	// values with respect to the operator. The list of values must be ordered
+	// and must not contain duplicates. Value '0' cannot be used for the In operator.
+	// At least one element is required. At most 255 elements are allowed.
+	// +listType=set
+	Values []int32 `json:"values" protobuf:"varint,3,rep,name=values"`
+}
+
+// PodFailurePolicyOnPodConditionsPattern describes a pattern for matching
+// an actual pod condition type.
+type PodFailurePolicyOnPodConditionsPattern struct {
+	// Specifies the required Pod condition type. To match a pod condition
+	// it is required that specified type equals the pod condition type.
+	Type corev1.PodConditionType `json:"type" protobuf:"bytes,1,req,name=type"`
+
+	// Specifies the required Pod condition status. To match a pod condition
+	// it is required that the specified status equals the pod condition status.
+	// Defaults to True.
+	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,req,name=status"`
+}
+
+// PodFailurePolicyRule describes how a pod failure is handled when the requirements are met.
+// One of OnExitCodes and onPodConditions, but not both, can be used in each rule.
+type PodFailurePolicyRule struct {
+	// Specifies the action taken on a pod failure when the requirements are satisfied.
+	// Possible values are:
+	// - FailJob: indicates that the pod's job is marked as Failed and all
+	//   running pods are terminated.
+	// - Ignore: indicates that the counter towards the .backoffLimit is not
+	//   incremented and a replacement pod is created.
+	// - Count: indicates that the pod is handled in the default way - the
+	//   counter towards the .backoffLimit is incremented.
+	// Additional values are considered to be added in the future. Clients should
+	// react to an unknown action by skipping the rule.
+	Action PodFailurePolicyAction `json:"action" protobuf:"bytes,1,req,name=action"`
+
+	// Represents the requirement on the container exit codes.
+	// +optional
+	OnExitCodes *PodFailurePolicyOnExitCodesRequirement `json:"onExitCodes" protobuf:"bytes,2,opt,name=onExitCodes"`
+
+	// Represents the requirement on the pod conditions. The requirement is represented
+	// as a list of pod condition patterns. The requirement is satisfied if at
+	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
+	// +listType=atomic
+	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions" protobuf:"bytes,3,opt,name=onPodConditions"`
+}
+
+// PodFailurePolicy describes how failed pods influence the backoffLimit.
+type PodFailurePolicy struct {
+	// A list of pod failure policy rules. The rules are evaluated in order.
+	// Once a rule matches a Pod failure, the remaining of the rules are ignored.
+	// When no rule matches the Pod failure, the default handling applies - the
+	// counter of pod failures is incremented and it is checked against
+	// the backoffLimit. At most 20 elements are allowed.
+	// +listType=atomic
+	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
+}
+
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
 
@@ -114,6 +231,19 @@ type JobSpec struct {
 	// resumed again.
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,3,opt,name=activeDeadlineSeconds"`
+
+	// Specifies the policy of handling failed pods. In particular, it allows to
+	// specify the set of actions and conditions which need to be
+	// satisfied to take the associated action.
+	// If empty, the default behaviour applies - the counter of failed pods,
+	// represented by the jobs's .status.failed field, is incremented and it is
+	// checked against the backoffLimit. This field cannot be used in combination
+	// with restartPolicy=OnFailure.
+	//
+	// This field is alpha-level. To use this field, you must enable the
+	// `JobPodFailurePolicy` feature gate (disabled by default).
+	// +optional
+	PodFailurePolicy *PodFailurePolicy `json:"podFailurePolicy,omitempty" protobuf:"bytes,11,opt,name=podFailurePolicy"`
 
 	// Specifies the number of retries before marking this job failed.
 	// Defaults to 6
@@ -146,7 +276,7 @@ type JobSpec struct {
 
 	// Describes the pod that will be created when executing a job.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
-	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
+	Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
 	// execution (either Complete or Failed). If this field is set,
@@ -176,9 +306,10 @@ type JobSpec struct {
 	// `$(job-name)-$(index)-$(random-string)`,
 	// the Pod hostname takes the form `$(job-name)-$(index)`.
 	//
-	// This field is beta-level. More completion modes can be added in the future.
-	// If the Job controller observes a mode that it doesn't recognize, the
-	// controller skips updates for the Job.
+	// More completion modes can be added in the future.
+	// If the Job controller observes a mode that it doesn't recognize, which
+	// is possible during upgrades due to version skew, the controller
+	// skips updates for the Job.
 	// +optional
 	CompletionMode *CompletionMode `json:"completionMode,omitempty" protobuf:"bytes,9,opt,name=completionMode,casttype=CompletionMode"`
 
@@ -189,9 +320,6 @@ type JobSpec struct {
 	// with this Job. Users must design their workload to gracefully handle this.
 	// Suspending a Job will reset the StartTime field of the Job, effectively
 	// resetting the ActiveDeadlineSeconds timer too. Defaults to false.
-	//
-	// This field is beta-level, gated by SuspendJob feature flag (enabled by
-	// default).
 	//
 	// +optional
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,10,opt,name=suspend"`
@@ -259,9 +387,6 @@ type JobStatus struct {
 	// (3) Remove the pod UID from the arrays while increasing the corresponding
 	//     counter.
 	//
-	// This field is beta-level. The job controller only makes use of this field
-	// when the feature gate JobTrackingWithFinalizers is enabled (enabled
-	// by default).
 	// Old jobs might not be tracked using this field, in which case the field
 	// remains null.
 	// +optional
@@ -269,8 +394,8 @@ type JobStatus struct {
 
 	// The number of pods which have a Ready condition.
 	//
-	// This field is alpha-level. The job controller populates the field when
-	// the feature gate JobReadyPods is enabled (disabled by default).
+	// This field is beta-level. The job controller populates the field when
+	// the feature gate JobReadyPods is enabled (enabled by default).
 	// +optional
 	Ready *int32 `json:"ready,omitempty" protobuf:"varint,9,opt,name=ready"`
 }
@@ -289,10 +414,9 @@ type UncountedTerminatedPods struct {
 	Failed []types.UID `json:"failed,omitempty" protobuf:"bytes,2,rep,name=failed,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
 
-// +enum
 type JobConditionType string
 
-// These are valid conditions of a job.
+// These are built-in conditions of a job.
 const (
 	// JobSuspended means the job has been suspended.
 	JobSuspended JobConditionType = "Suspended"
@@ -300,6 +424,8 @@ const (
 	JobComplete JobConditionType = "Complete"
 	// JobFailed means the job has failed its execution.
 	JobFailed JobConditionType = "Failed"
+	// FailureTarget means the job is about to fail its execution.
+	JobFailureTarget JobConditionType = "FailureTarget"
 )
 
 // JobCondition describes current state of a job.
@@ -307,7 +433,7 @@ type JobCondition struct {
 	// Type of job condition, Complete or Failed.
 	Type JobConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=JobConditionType"`
 	// Status of the condition, one of True, False, Unknown.
-	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
+	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition was checked.
 	// +optional
 	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
@@ -378,6 +504,19 @@ type CronJobSpec struct {
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
+	// The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
+	// If not specified, this will default to the time zone of the kube-controller-manager process.
+	// The set of valid time zone names and the time zone offset is loaded from the system-wide time zone
+	// database by the API server during CronJob validation and the controller manager during execution.
+	// If no system-wide time zone database can be found a bundled version of the database is used instead.
+	// If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host
+	// configuration, the controller will stop creating new new Jobs and will create a system event with the
+	// reason UnknownTimeZone.
+	// More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones
+	// This is beta field and must be enabled via the `CronJobTimeZone` feature gate.
+	// +optional
+	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
+
 	// Optional deadline in seconds for starting the job if it misses scheduled
 	// time for any reason.  Missed jobs executions will be counted as failed ones.
 	// +optional
@@ -434,7 +573,7 @@ type CronJobStatus struct {
 	// A list of pointers to currently running jobs.
 	// +optional
 	// +listType=atomic
-	Active []v1.ObjectReference `json:"active,omitempty" protobuf:"bytes,1,rep,name=active"`
+	Active []corev1.ObjectReference `json:"active,omitempty" protobuf:"bytes,1,rep,name=active"`
 
 	// Information when was the last time the job was successfully scheduled.
 	// +optional

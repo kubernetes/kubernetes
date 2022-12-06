@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package utils
@@ -14,7 +15,7 @@ import (
 func EnsureProcHandle(fh *os.File) error {
 	var buf unix.Statfs_t
 	if err := unix.Fstatfs(int(fh.Fd()), &buf); err != nil {
-		return fmt.Errorf("ensure %s is on procfs: %v", fh.Name(), err)
+		return fmt.Errorf("ensure %s is on procfs: %w", fh.Name(), err)
 	}
 	if buf.Type != unix.PROC_SUPER_MAGIC {
 		return fmt.Errorf("%s is not on procfs", fh.Name())
@@ -52,7 +53,7 @@ func CloseExecFrom(minFd int) error {
 		// Intentionally ignore errors from unix.CloseOnExec -- the cases where
 		// this might fail are basically file descriptors that have already
 		// been closed (including and especially the one that was created when
-		// ioutil.ReadDir did the "opendir" syscall).
+		// os.ReadDir did the "opendir" syscall).
 		unix.CloseOnExec(fd)
 	}
 	return nil

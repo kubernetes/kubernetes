@@ -34,12 +34,10 @@ import (
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
@@ -78,8 +76,6 @@ func TestConvert(t *testing.T) {
 }
 
 func BenchmarkVerifyPod(b *testing.B) {
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.PodSecurity, true)()
-
 	p, err := newPlugin(nil)
 	if err != nil {
 		b.Fatal(err)
@@ -188,8 +184,6 @@ func BenchmarkVerifyPod(b *testing.B) {
 }
 
 func BenchmarkVerifyNamespace(b *testing.B) {
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.PodSecurity, true)()
-
 	p, err := newPlugin(nil)
 	if err != nil {
 		b.Fatal(err)

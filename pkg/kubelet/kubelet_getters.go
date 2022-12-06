@@ -19,8 +19,8 @@ package kubelet
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
@@ -75,6 +75,12 @@ func (kl *Kubelet) getPluginsRegistrationDir() string {
 // For per-pod plugin data, see getPodPluginDir.
 func (kl *Kubelet) getPluginDir(pluginName string) string {
 	return filepath.Join(kl.getPluginsDir(), pluginName)
+}
+
+// getCheckpointsDir returns a data directory name for checkpoints.
+// Checkpoints can be stored in this directory for further use.
+func (kl *Kubelet) getCheckpointsDir() string {
+	return filepath.Join(kl.getRootDir(), config.DefaultKubeletCheckpointsDirName)
 }
 
 // getVolumeDevicePluginsDir returns the full path to the directory under which plugin
@@ -185,8 +191,8 @@ func (kl *Kubelet) GetPods() []*v1.Pod {
 // container runtime cache. This function converts kubecontainer.Pod to
 // v1.Pod, so only the fields that exist in both kubecontainer.Pod and
 // v1.Pod are considered meaningful.
-func (kl *Kubelet) GetRunningPods() ([]*v1.Pod, error) {
-	pods, err := kl.runtimeCache.GetPods()
+func (kl *Kubelet) GetRunningPods(ctx context.Context) ([]*v1.Pod, error) {
+	pods, err := kl.runtimeCache.GetPods(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -297,11 +303,11 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
 		return volumes, fmt.Errorf("error checking if path %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
-		klog.InfoS("Path does not exist", "path", podVolDir)
+		klog.V(6).InfoS("Path does not exist", "path", podVolDir)
 		return volumes, nil
 	}
 
-	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
+	volumePluginDirs, err := os.ReadDir(podVolDir)
 	if err != nil {
 		klog.ErrorS(err, "Could not read directory", "path", podVolDir)
 		return volumes, err
@@ -370,7 +376,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 	}
 
 	// Explicitly walks /<volume>/<container name>/<subPathIndex>
-	volumePluginDirs, err := ioutil.ReadDir(podSubpathsDir)
+	volumePluginDirs, err := os.ReadDir(podSubpathsDir)
 	if err != nil {
 		klog.ErrorS(err, "Could not read directory", "path", podSubpathsDir)
 		return volumes, err
@@ -378,7 +384,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 	for _, volumePluginDir := range volumePluginDirs {
 		volumePluginName := volumePluginDir.Name()
 		volumePluginPath := filepath.Join(podSubpathsDir, volumePluginName)
-		containerDirs, err := ioutil.ReadDir(volumePluginPath)
+		containerDirs, err := os.ReadDir(volumePluginPath)
 		if err != nil {
 			return volumes, fmt.Errorf("could not read directory %s: %v", volumePluginPath, err)
 		}

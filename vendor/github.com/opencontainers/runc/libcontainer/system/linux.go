@@ -1,8 +1,10 @@
+//go:build linux
 // +build linux
 
 package system
 
 import (
+	"os"
 	"os/exec"
 	"unsafe"
 
@@ -29,6 +31,25 @@ func (p ParentDeathSignal) Set() error {
 	return SetParentDeathSignal(uintptr(p))
 }
 
+// Eaccess is similar to unix.Access except for setuid/setgid binaries
+// it checks against the effective (rather than real) uid and gid.
+func Eaccess(path string) error {
+	err := unix.Faccessat2(unix.AT_FDCWD, path, unix.X_OK, unix.AT_EACCESS)
+	if err != unix.ENOSYS && err != unix.EPERM { //nolint:errorlint // unix errors are bare
+		return err
+	}
+
+	// Faccessat2() not available; check if we are a set[ug]id binary.
+	if os.Getuid() == os.Geteuid() && os.Getgid() == os.Getegid() {
+		// For a non-set[ug]id binary, use access(2).
+		return unix.Access(path, unix.X_OK)
+	}
+
+	// For a setuid/setgid binary, there is no fallback way
+	// so assume we can execute the binary.
+	return nil
+}
+
 func Execv(cmd string, args []string, env []string) error {
 	name, err := exec.LookPath(cmd)
 	if err != nil {
@@ -42,17 +63,9 @@ func Exec(cmd string, args []string, env []string) error {
 	for {
 		err := unix.Exec(cmd, args, env)
 		if err != unix.EINTR { //nolint:errorlint // unix errors are bare
-			return err
+			return &os.PathError{Op: "exec", Path: cmd, Err: err}
 		}
 	}
-}
-
-func Prlimit(pid, resource int, limit unix.Rlimit) error {
-	_, _, err := unix.RawSyscall6(unix.SYS_PRLIMIT64, uintptr(pid), uintptr(resource), uintptr(unsafe.Pointer(&limit)), uintptr(unsafe.Pointer(&limit)), 0, 0)
-	if err != 0 {
-		return err
-	}
-	return nil
 }
 
 func SetParentDeathSignal(sig uintptr) error {

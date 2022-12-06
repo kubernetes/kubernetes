@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -70,7 +71,7 @@ func TestAddFlags(t *testing.T) {
 		"--audit-log-truncate-enabled=true",
 		"--audit-log-truncate-max-batch-size=45",
 		"--audit-log-truncate-max-event-size=44",
-		"--audit-log-version=audit.k8s.io/v1alpha1",
+		"--audit-log-version=audit.k8s.io/v1",
 		"--audit-policy-file=/policy",
 		"--audit-webhook-config-file=/webhook-config",
 		"--audit-webhook-mode=blocking",
@@ -84,7 +85,7 @@ func TestAddFlags(t *testing.T) {
 		"--audit-webhook-truncate-max-batch-size=43",
 		"--audit-webhook-truncate-max-event-size=42",
 		"--audit-webhook-initial-backoff=2s",
-		"--audit-webhook-version=audit.k8s.io/v1alpha1",
+		"--audit-webhook-version=audit.k8s.io/v1",
 		"--authentication-token-webhook-cache-ttl=3m",
 		"--authentication-token-webhook-config-file=/token-webhook-config",
 		"--authorization-mode=AlwaysDeny,RBAC",
@@ -153,10 +154,11 @@ func TestAddFlags(t *testing.T) {
 			StorageConfig: storagebackend.Config{
 				Type: "etcd3",
 				Transport: storagebackend.TransportConfig{
-					ServerList:    nil,
-					KeyFile:       "/var/run/kubernetes/etcd.key",
-					TrustedCAFile: "/var/run/kubernetes/etcdca.crt",
-					CertFile:      "/var/run/kubernetes/etcdce.crt",
+					ServerList:     nil,
+					KeyFile:        "/var/run/kubernetes/etcd.key",
+					TrustedCAFile:  "/var/run/kubernetes/etcdca.crt",
+					CertFile:       "/var/run/kubernetes/etcdce.crt",
+					TracerProvider: oteltrace.NewNoopTracerProvider(),
 				},
 				Paging:                true,
 				Prefix:                "/registry",
@@ -164,6 +166,7 @@ func TestAddFlags(t *testing.T) {
 				CountMetricPollPeriod: time.Minute,
 				DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
 				HealthcheckTimeout:    storagebackend.DefaultHealthcheckTimeout,
+				ReadycheckTimeout:     storagebackend.DefaultReadinessTimeout,
 				LeaseManagerConfig: etcd3.LeaseManagerConfig{
 					ReuseDurationSeconds: 100,
 					MaxObjectCount:       1000,
@@ -228,7 +231,7 @@ func TestAddFlags(t *testing.T) {
 						MaxEventSize: 44,
 					},
 				},
-				GroupVersionString: "audit.k8s.io/v1alpha1",
+				GroupVersionString: "audit.k8s.io/v1",
 			},
 			WebhookOptions: apiserveroptions.AuditWebhookOptions{
 				ConfigFile: "/webhook-config",
@@ -252,7 +255,7 @@ func TestAddFlags(t *testing.T) {
 					},
 				},
 				InitialBackoff:     2 * time.Second,
-				GroupVersionString: "audit.k8s.io/v1alpha1",
+				GroupVersionString: "audit.k8s.io/v1",
 			},
 			PolicyFile: "/policy",
 		},
@@ -315,8 +318,7 @@ func TestAddFlags(t *testing.T) {
 		Traces: &apiserveroptions.TracingOptions{
 			ConfigFile: "/var/run/kubernetes/tracing_config.yaml",
 		},
-		IdentityLeaseDurationSeconds:      3600,
-		IdentityLeaseRenewIntervalSeconds: 10,
+		AggregatorRejectForwardingRedirects: true,
 	}
 
 	if !reflect.DeepEqual(expected, s) {

@@ -31,9 +31,9 @@ import (
 // reverse index across the registry endpoints. A registry endpoint is made
 // up of a host (e.g. registry.example.com), but it may also contain a path
 // (e.g. registry.example.com/foo) This index is important for two reasons:
-// - registry endpoints may overlap, and when this happens we must find the
-//   most specific match for a given image
-// - iterating a map does not yield predictable results
+//   - registry endpoints may overlap, and when this happens we must find the
+//     most specific match for a given image
+//   - iterating a map does not yield predictable results
 type DockerKeyring interface {
 	Lookup(image string) ([]AuthConfig, bool)
 }
@@ -120,7 +120,7 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 
 	// Update the index used to identify which credentials to use for a given
 	// image. The index is reverse-sorted so more specific paths are matched
-	// first. For example, if for the given image "quay.io/coreos/etcd",
+	// first. For example, if for the given image "gcr.io/etcd-development/etcd",
 	// credentials for "quay.io/coreos" should match before "quay.io".
 	sort.Sort(sort.Reverse(sort.StringSlice(dk.index)))
 }
@@ -197,8 +197,9 @@ func URLsMatchStr(glob string, target string) (bool, error) {
 // glob wild cards in the host name.
 //
 // Examples:
-//    globURL=*.docker.io, targetURL=blah.docker.io => match
-//    globURL=*.docker.io, targetURL=not.right.io   => no match
+//
+//	globURL=*.docker.io, targetURL=blah.docker.io => match
+//	globURL=*.docker.io, targetURL=not.right.io   => no match
 //
 // Note that we don't support wildcards in ports and paths yet.
 func URLsMatch(globURL *url.URL, targetURL *url.URL) (bool, error) {

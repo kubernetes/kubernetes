@@ -92,6 +92,10 @@ func (plugin *downwardAPIPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *downwardAPIPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName:         spec.Name(),
@@ -119,14 +123,16 @@ func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) 
 	}, nil
 }
 
-func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	downwardAPIVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			DownwardAPI: &v1.DownwardAPIVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(downwardAPIVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(downwardAPIVolume),
+	}, nil
 }
 
 // downwardAPIVolume retrieves downward API data and placing them into the volume on the host.
@@ -153,17 +159,10 @@ var _ volume.Mounter = &downwardAPIVolumeMounter{}
 // downward API volumes are always ReadOnlyManaged
 func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        true,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       true,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *downwardAPIVolumeMounter) CanMount() error {
-	return nil
 }
 
 // SetUp puts in place the volume plugin.

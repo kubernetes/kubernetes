@@ -28,34 +28,29 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/junit"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 type chaosMonkeyAdapter struct {
 	test        Test
-	testReport  *junit.TestCase
 	framework   *framework.Framework
 	upgradeType UpgradeType
 	upgCtx      UpgradeContext
 }
 
 func (cma *chaosMonkeyAdapter) Test(sem *chaosmonkey.Semaphore) {
-	start := time.Now()
 	var once sync.Once
 	ready := func() {
 		once.Do(func() {
 			sem.Ready()
 		})
 	}
-	defer FinalizeUpgradeTest(start, cma.testReport)
 	defer ready()
 	if skippable, ok := cma.test.(Skippable); ok && skippable.Skip(cma.upgCtx) {
 		ginkgo.By("skipping test " + cma.test.Name())
-		cma.testReport.Skipped = "skipping test " + cma.test.Name()
 		return
 	}
 
@@ -65,43 +60,15 @@ func (cma *chaosMonkeyAdapter) Test(sem *chaosmonkey.Semaphore) {
 	cma.test.Test(cma.framework, sem.StopCh, cma.upgradeType)
 }
 
-// FinalizeUpgradeTest fills the necessary information about junit.TestCase.
-func FinalizeUpgradeTest(start time.Time, tc *junit.TestCase) {
-	tc.Time = time.Since(start).Seconds()
-	r := recover()
-	if r == nil {
-		return
-	}
-
-	switch r := r.(type) {
-	case e2eginkgowrapper.FailurePanic:
-		tc.Failures = []*junit.Failure{
-			{
-				Message: r.Message,
-				Type:    "Failure",
-				Value:   fmt.Sprintf("%s\n\n%s", r.Message, r.FullStackTrace),
-			},
-		}
-	case e2eskipper.SkipPanic:
-		tc.Skipped = fmt.Sprintf("%s:%d %q", r.Filename, r.Line, r.Message)
-	default:
-		tc.Errors = []*junit.Error{
-			{
-				Message: fmt.Sprintf("%v", r),
-				Type:    "Panic",
-				Value:   fmt.Sprintf("%v", r),
-			},
-		}
-	}
-}
-
 func CreateUpgradeFrameworks(tests []Test) map[string]*framework.Framework {
 	nsFilter := regexp.MustCompile("[^[:word:]-]+") // match anything that's not a word character or hyphen
 	testFrameworks := map[string]*framework.Framework{}
 	for _, t := range tests {
 		ns := nsFilter.ReplaceAllString(t.Name(), "-") // and replace with a single hyphen
 		ns = strings.Trim(ns, "-")
-		testFrameworks[t.Name()] = framework.NewDefaultFramework(ns)
+		f := framework.NewDefaultFramework(ns)
+		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+		testFrameworks[t.Name()] = f
 	}
 	return testFrameworks
 }
@@ -124,7 +91,6 @@ func RunUpgradeSuite(
 		testSuite.TestCases = append(testSuite.TestCases, testCase)
 		cma := chaosMonkeyAdapter{
 			test:        t,
-			testReport:  testCase,
 			framework:   testFrameworks[t.Name()],
 			upgradeType: upgradeType,
 			upgCtx:      *upgCtx,

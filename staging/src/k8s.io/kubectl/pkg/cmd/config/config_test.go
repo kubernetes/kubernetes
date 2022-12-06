@@ -921,7 +921,7 @@ func testClearLocationOfOrigin(config *clientcmdapi.Config) {
 }
 func testSetNilMapsToEmpties(curr reflect.Value) {
 	actualCurrValue := curr
-	if curr.Kind() == reflect.Ptr {
+	if curr.Kind() == reflect.Pointer {
 		actualCurrValue = curr.Elem()
 	}
 

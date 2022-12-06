@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -18,8 +21,8 @@ package controlplane
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -261,6 +264,8 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
+	controllerManagerConfig := filepath.FromSlash("/etc/kubernetes/controller-manager.conf")
+	schedulerConfig := filepath.FromSlash("/etc/kubernetes/scheduler.conf")
 	volMap := make(map[string]map[string]v1.Volume)
 	volMap[kubeadmconstants.KubeAPIServer] = map[string]v1.Volume{}
 	volMap[kubeadmconstants.KubeAPIServer]["k8s-certs"] = v1.Volume{
@@ -304,7 +309,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		Name: "kubeconfig",
 		VolumeSource: v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{
-				Path: "/etc/kubernetes/controller-manager.conf",
+				Path: controllerManagerConfig,
 				Type: &hostPathFileOrCreate,
 			},
 		},
@@ -314,7 +319,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		Name: "kubeconfig",
 		VolumeSource: v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{
-				Path: "/etc/kubernetes/scheduler.conf",
+				Path: schedulerConfig,
 				Type: &hostPathFileOrCreate,
 			},
 		},
@@ -344,13 +349,13 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	}
 	volMountMap[kubeadmconstants.KubeControllerManager]["kubeconfig"] = v1.VolumeMount{
 		Name:      "kubeconfig",
-		MountPath: "/etc/kubernetes/controller-manager.conf",
+		MountPath: controllerManagerConfig,
 		ReadOnly:  true,
 	}
 	volMountMap[kubeadmconstants.KubeScheduler] = map[string]v1.VolumeMount{}
 	volMountMap[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.VolumeMount{
 		Name:      "kubeconfig",
-		MountPath: "/etc/kubernetes/scheduler.conf",
+		MountPath: schedulerConfig,
 		ReadOnly:  true,
 	}
 
@@ -415,7 +420,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		Name: "kubeconfig",
 		VolumeSource: v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{
-				Path: "/etc/kubernetes/controller-manager.conf",
+				Path: controllerManagerConfig,
 				Type: &hostPathFileOrCreate,
 			},
 		},
@@ -425,7 +430,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		Name: "kubeconfig",
 		VolumeSource: v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{
-				Path: "/etc/kubernetes/scheduler.conf",
+				Path: schedulerConfig,
 				Type: &hostPathFileOrCreate,
 			},
 		},
@@ -465,13 +470,13 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	}
 	volMountMap2[kubeadmconstants.KubeControllerManager]["kubeconfig"] = v1.VolumeMount{
 		Name:      "kubeconfig",
-		MountPath: "/etc/kubernetes/controller-manager.conf",
+		MountPath: controllerManagerConfig,
 		ReadOnly:  true,
 	}
 	volMountMap2[kubeadmconstants.KubeScheduler] = map[string]v1.VolumeMount{}
 	volMountMap2[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.VolumeMount{
 		Name:      "kubeconfig",
-		MountPath: "/etc/kubernetes/scheduler.conf",
+		MountPath: schedulerConfig,
 		ReadOnly:  true,
 	}
 	var tests = []struct {
@@ -507,7 +512,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		},
 	}
 
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}

@@ -247,6 +247,12 @@ var plugins = map[string]map[string]plugin{
 				"consolidate": {},
 			},
 		},
+		"v3": plugin{
+			namedOptions: map[string]option{
+				"consolidate": {},
+				"stacktrace":  {},
+			},
+		},
 	},
 
 	"health": {

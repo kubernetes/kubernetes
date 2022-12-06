@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
-// PodDevicesEntry connects pod information to devices, without topology information (k8s <= 1.19)
+// PodDevicesEntryV1 connects pod information to devices, without topology information (k8s <= 1.19)
 type PodDevicesEntryV1 struct {
 	PodUID        string
 	ContainerName string
@@ -37,7 +37,7 @@ type PodDevicesEntryV1 struct {
 	AllocResp     []byte
 }
 
-// checkpointData struct is used to store pod to device allocation information
+// checkpointDataV1 struct is used to store pod to device allocation information
 // in a checkpoint file, without topology information (k8s <= 1.19)
 type checkpointDataV1 struct {
 	PodDeviceEntries  []PodDevicesEntryV1
@@ -63,13 +63,13 @@ func (cp checkpointDataV1) checksum() checksum.Checksum {
 	return checksum.Checksum(hash.Sum32())
 }
 
-// Data holds checkpoint data and its checksum, in V1 (k8s <= 1.19) format
+// DataV1 holds checkpoint data and its checksum, in V1 (k8s <= 1.19) format
 type DataV1 struct {
 	Data     checkpointDataV1
 	Checksum checksum.Checksum
 }
 
-// New returns an instance of Checkpoint, in V1 (k8s <= 1.19) format.
+// NewV1 returns an instance of Checkpoint, in V1 (k8s <= 1.19) format.
 // Users should avoid creating checkpoints in formats different than the most recent one,
 // use the old formats only to validate existing checkpoint and convert them to most recent
 // format. The only exception should be test code.
@@ -90,7 +90,7 @@ func (cp *DataV1) MarshalCheckpoint() ([]byte, error) {
 	return json.Marshal(*cp)
 }
 
-// MarshalCheckpoint returns marshalled data
+// UnmarshalCheckpoint returns unmarshalled data
 func (cp *DataV1) UnmarshalCheckpoint(blob []byte) error {
 	return json.Unmarshal(blob, cp)
 }

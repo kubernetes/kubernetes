@@ -20,15 +20,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
-	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 
@@ -43,7 +42,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	"k8s.io/kubernetes/test/utils/crd"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var (
@@ -52,16 +53,18 @@ var (
 
 var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.16
 		Testname: Custom Resource OpenAPI Publish, with validation schema
 		Description: Register a custom resource definition with a validating schema consisting of objects, arrays and
 		primitives. Attempt to create and apply a change a custom resource using valid properties, via kubectl;
-		client-side validation MUST pass. Attempt both operations with unknown properties and without required
-		properties; client-side validation MUST reject the operations. Attempt kubectl explain; the output MUST
+		kubectl validation MUST pass. Attempt both operations with unknown properties and without required
+		properties; kubectl validation MUST reject the operations. Attempt kubectl explain; the output MUST
 		explain the custom resource properties. Attempt kubectl explain on custom resource properties; the output MUST
 		explain the nested custom resource properties.
+		All validation should be the same.
 	*/
 	framework.ConformanceIt("works for CRD with validation schema", func() {
 		crd, err := setupCRD(f, schemaFoo, "foo", "v1")
@@ -72,42 +75,45 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-foo")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
-		ginkgo.By("client-side validation (kubectl create and apply) allows request with known and required properties")
+		ginkgo.By("kubectl validation (kubectl create and apply) allows request with known and required properties")
 		validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, validCR, ns, "create", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, validCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create valid CR %s: %v", validCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
 			framework.Failf("failed to delete valid CR: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, validCR, ns, "apply", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, validCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply valid CR %s: %v", validCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
 			framework.Failf("failed to delete valid CR: %v", err)
 		}
 
-		ginkgo.By("client-side validation (kubectl create and apply) rejects request with value outside defined enum values")
+		ginkgo.By("kubectl validation (kubectl create and apply) rejects request with value outside defined enum values")
 		badEnumValueCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar", "feeling":"NonExistentValue"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, badEnumValueCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `Unsupported value: "NonExistentValue"`) {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, badEnumValueCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `Unsupported value: "NonExistentValue"`) {
 			framework.Failf("unexpected no error when creating CR with unknown enum value: %v", err)
 		}
 
-		ginkgo.By("client-side validation (kubectl create and apply) rejects request with unknown properties when disallowed by the schema")
+		// TODO: server-side validation and client-side validation produce slightly different error messages.
+		// Because server-side is default in beta but not GA yet, we will produce different behaviors in the default vs GA only conformance tests. We have made the error generic enough to pass both, but should go back and make the error more specific once server-side validation goes GA.
+		ginkgo.By("kubectl validation (kubectl create and apply) rejects request with unknown properties when disallowed by the schema")
 		unknownCR := fmt.Sprintf(`{%s,"spec":{"foo":true}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "create", "-f", "-"); err == nil || (!strings.Contains(err.Error(), `unknown field "foo"`) && !strings.Contains(err.Error(), `unknown field "spec.foo"`)) {
 			framework.Failf("unexpected no error when creating CR with unknown field: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, unknownCR, ns, "apply", "-f", "-"); err == nil || (!strings.Contains(err.Error(), `unknown field "foo"`) && !strings.Contains(err.Error(), `unknown field "spec.foo"`)) {
 			framework.Failf("unexpected no error when applying CR with unknown field: %v", err)
 		}
 
-		ginkgo.By("client-side validation (kubectl create and apply) rejects request without required properties")
+		// TODO: see above note, we should check the value of the error once server-side validation is GA.
+		ginkgo.By("kubectl validation (kubectl create and apply) rejects request without required properties")
 		noRequireCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"age":"10"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "create", "-f", "-"); err == nil || (!strings.Contains(err.Error(), `missing required field "name"`) && !strings.Contains(err.Error(), `spec.bars[0].name: Required value`)) {
 			framework.Failf("unexpected no error when creating CR without required field: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, noRequireCR, ns, "apply", "-f", "-"); err == nil || (!strings.Contains(err.Error(), `missing required field "name"`) && !strings.Contains(err.Error(), `spec.bars[0].name: Required value`)) {
 			framework.Failf("unexpected no error when applying CR without required field: %v", err)
 		}
 
@@ -128,7 +134,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 
 		ginkgo.By("kubectl explain works to return error when explain is called on property that doesn't exist")
-		if _, err := framework.RunKubectl(f.Namespace.Name, "explain", crd.Crd.Spec.Names.Plural+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, "explain", crd.Crd.Spec.Names.Plural+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
 			framework.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
 		}
 
@@ -139,9 +145,9 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 	/*
 		Release: v1.16
-		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in object
-		Description: Register a custom resource definition with x-preserve-unknown-fields in the top level object.
-		Attempt to create and apply a change a custom resource, via kubectl; client-side validation MUST accept unknown
+		Testname: Custom Resource OpenAPI Publish, with x-kubernetes-preserve-unknown-fields in object
+		Description: Register a custom resource definition with x-kubernetes-preserve-unknown-fields in the top level object.
+		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST contain a valid DESCRIPTION stanza.
 	*/
 	framework.ConformanceIt("works for CRD without validation schema", func() {
@@ -153,18 +159,18 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
-		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
+		ginkgo.By("kubectl validation (kubectl create and apply) allows request with any unknown properties")
 		randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
 
@@ -180,9 +186,9 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 	/*
 		Release: v1.16
-		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields at root
-		Description: Register a custom resource definition with x-preserve-unknown-fields in the schema root.
-		Attempt to create and apply a change a custom resource, via kubectl; client-side validation MUST accept unknown
+		Testname: Custom Resource OpenAPI Publish, with x-kubernetes-preserve-unknown-fields at root
+		Description: Register a custom resource definition with x-kubernetes-preserve-unknown-fields in the schema root.
+		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST show the custom resource KIND.
 	*/
 	framework.ConformanceIt("works for CRD preserving unknown fields at the schema root", func() {
@@ -194,18 +200,18 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
-		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
+		ginkgo.By("kubectl validation (kubectl create and apply) allows request with any unknown properties")
 		randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD that allows unknown properties at the root: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
 
@@ -221,9 +227,9 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 	/*
 		Release: v1.16
-		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in embedded object
-		Description: Register a custom resource definition with x-preserve-unknown-fields in an embedded object.
-		Attempt to create and apply a change a custom resource, via kubectl; client-side validation MUST accept unknown
+		Testname: Custom Resource OpenAPI Publish, with x-kubernetes-preserve-unknown-fields in embedded object
+		Description: Register a custom resource definition with x-kubernetes-preserve-unknown-fields in an embedded object.
+		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST show that x-preserve-unknown-properties is used on the
 		nested field.
 	*/
@@ -236,18 +242,18 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
-		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
+		ginkgo.By("kubectl validation (kubectl create and apply) allows request with any unknown properties")
 		randomCR := fmt.Sprintf(`{%s,"spec":{"a":null,"b":[{"c":"d"}]}}`, meta)
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD that allows unknown properties in a nested object: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
-		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
+		if _, err := e2ekubectl.RunKubectlInput(f.Namespace.Name, randomCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
+		if _, err := e2ekubectl.RunKubectl(f.Namespace.Name, ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
 
@@ -662,7 +668,7 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 			spec = etagSpec
 		} else if resp.StatusCode != http.StatusOK {
 			return false, fmt.Errorf("unexpected response: %d", resp.StatusCode)
-		} else if bs, err := ioutil.ReadAll(resp.Body); err != nil {
+		} else if bs, err := io.ReadAll(resp.Body); err != nil {
 			return false, err
 		} else if err := json.Unmarshal(bs, spec); err != nil {
 			return false, err
@@ -690,7 +696,7 @@ func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
 	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&external, &internal, nil); err != nil {
 		return err
 	}
-	kubeOut := kubeopenapispec.Schema{}
+	kubeOut := spec.Schema{}
 	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, &kubeOut, validation.StripUnsupportedFormatsPostProcess); err != nil {
 		return err
 	}
@@ -710,7 +716,7 @@ func dropDefaults(s *spec.Schema) {
 }
 
 func verifyKubectlExplain(ns, name, pattern string) error {
-	result, err := framework.RunKubectl(ns, "explain", name)
+	result, err := e2ekubectl.RunKubectl(ns, "explain", name)
 	if err != nil {
 		return fmt.Errorf("failed to explain %s: %v", name, err)
 	}

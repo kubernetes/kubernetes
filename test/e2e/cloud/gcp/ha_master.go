@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -35,6 +35,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 func addMasterReplica(zone string) error {
@@ -161,6 +162,7 @@ func waitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 
 var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	f := framework.NewDefaultFramework("ha-master")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var ns string
 	var additionalReplicaZones []string
@@ -181,7 +183,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		for _, zone := range additionalNodesZones {
 			removeWorkerNodes(zone)
 		}
-		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
+		framework.ExpectNoError(e2enode.AllNodesReady(c, 5*time.Minute))
 
 		// Clean-up additional master replicas if the test execution was broken.
 		for _, zone := range additionalReplicaZones {
@@ -216,7 +218,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 			additionalNodesZones = removeZoneFromZones(additionalNodesZones, zone)
 		}
 		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute))
-		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
+		framework.ExpectNoError(e2enode.AllNodesReady(c, 5*time.Minute))
 
 		// Verify that API server works correctly with HA master.
 		rcName := "ha-master-" + strconv.Itoa(len(existingRCs))

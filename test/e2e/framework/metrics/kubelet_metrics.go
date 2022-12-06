@@ -19,7 +19,7 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/metrics/testutil"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -43,6 +43,8 @@ const (
 	podWorkerDurationKey = "pod_worker_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	podStartDurationKey = "pod_start_duration_seconds"
+	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
+	PodStartSLIDurationKey = "pod_start_sli_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	cgroupManagerOperationsKey = "cgroup_manager_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
@@ -73,7 +75,7 @@ func GrabKubeletMetricsWithoutProxy(nodeName, path string) (KubeletMetrics, erro
 		return KubeletMetrics{}, err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -175,6 +177,7 @@ func GetDefaultKubeletLatencyMetrics(ms KubeletMetrics) KubeletLatencyMetrics {
 		podWorkerDurationKey,
 		podWorkerStartDurationKey,
 		podStartDurationKey,
+		PodStartSLIDurationKey,
 		cgroupManagerOperationsKey,
 		dockerOperationsLatencyKey,
 		podWorkerStartDurationKey,
@@ -226,7 +229,7 @@ func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration
 	for _, m := range latencyMetrics {
 		if m.Latency > threshold {
 			badMetrics = append(badMetrics, m)
-			e2elog.Logf("%+v", m)
+			framework.Logf("%+v", m)
 		}
 	}
 	return badMetrics, nil

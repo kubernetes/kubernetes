@@ -52,6 +52,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&IngressList{},
 		&IngressClass{},
 		&IngressClassList{},
+		&ClusterCIDR{},
+		&ClusterCIDRList{},
 	)
 	return nil
 }

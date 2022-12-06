@@ -22,7 +22,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -67,7 +67,7 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 		Short:                 i18n.T("Edit latest last-applied-configuration annotations of a resource/object"),
 		Long:                  applyEditLastAppliedLong,
 		Example:               applyEditLastAppliedExample,
-		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
+		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
 			cmdutil.CheckErr(o.Run())
@@ -83,6 +83,7 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 	cmd.Flags().BoolVar(&o.WindowsLineEndings, "windows-line-endings", o.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, FieldManagerClientSideApply)
+	cmdutil.AddValidateFlags(cmd)
 
 	return cmd
 }

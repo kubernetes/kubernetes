@@ -10,7 +10,12 @@ type Label struct {
 	// fieldSpecs for selectors. Custom fieldSpecs specified by
 	// FieldSpecs will be merged with builtin fieldSpecs if this
 	// is true.
-	IncludeSelectors bool        `json:"includeSelectors,omitempty" yaml:"includeSelectors,omitempty"`
+	IncludeSelectors bool `json:"includeSelectors,omitempty" yaml:"includeSelectors,omitempty"`
+	// IncludeTemplates inidicates should transformer include the
+	// spec/template/metadata fieldSpec. Custom fieldSpecs specified by
+	// FieldSpecs will be merged with spec/template/metadata fieldSpec if this
+	// is true. If IncludeSelectors is true, IncludeTemplates is not needed.
+	IncludeTemplates bool        `json:"includeTemplates,omitempty" yaml:"includeTemplates,omitempty"`
 	FieldSpecs       []FieldSpec `json:"fields,omitempty" yaml:"fields,omitempty"`
 }
 

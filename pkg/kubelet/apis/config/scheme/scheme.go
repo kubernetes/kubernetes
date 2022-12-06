@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigv1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 )
 
@@ -34,6 +35,9 @@ func NewSchemeAndCodecs(mutators ...serializer.CodecFactoryOptionsMutator) (*run
 		return nil, nil, err
 	}
 	if err := kubeletconfigv1beta1.AddToScheme(scheme); err != nil {
+		return nil, nil, err
+	}
+	if err := kubeletconfigv1.AddToScheme(scheme); err != nil {
 		return nil, nil, err
 	}
 	codecs := serializer.NewCodecFactory(scheme, mutators...)

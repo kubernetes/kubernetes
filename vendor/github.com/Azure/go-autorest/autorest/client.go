@@ -31,7 +31,7 @@ import (
 
 const (
 	// DefaultPollingDelay is a reasonable delay between polling requests.
-	DefaultPollingDelay = 60 * time.Second
+	DefaultPollingDelay = 30 * time.Second
 
 	// DefaultPollingDuration is a reasonable total polling duration.
 	DefaultPollingDuration = 15 * time.Minute

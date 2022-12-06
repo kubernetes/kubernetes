@@ -40,13 +40,11 @@ const updateEnvVar = "UPDATE_POD_SECURITY_FIXTURE_DATA"
 // and that in-memory fixtures match serialized fixtures in testdata.
 // When adding new versions or checks, serialized fixtures can be updated by running:
 //
-//     UPDATE_POD_SECURITY_FIXTURE_DATA=true go test k8s.io/pod-security-admission/test
+//	UPDATE_POD_SECURITY_FIXTURE_DATA=true go test k8s.io/pod-security-admission/test
 func TestFixtures(t *testing.T) {
 	expectedFiles := sets.NewString("testdata/README.md")
 
 	defaultChecks := policy.DefaultChecks()
-
-	const newestMinorVersionToTest = 23
 
 	policyVersions := computeVersionsToTest(t, defaultChecks)
 	newestMinorVersionWithPolicyChanges := policyVersions[len(policyVersions)-1].Minor()
@@ -61,11 +59,25 @@ func TestFixtures(t *testing.T) {
 			failDir := filepath.Join("testdata", string(level), fmt.Sprintf("v1.%d", version), "fail")
 
 			// render the minimal valid pod fixture
-			validPod, err := GetMinimalValidPod(level, api.MajorMinorVersion(1, version))
+			osNeutralPod, err := GetMinimalValidPod(level, api.MajorMinorVersion(1, version))
 			if err != nil {
 				t.Fatal(err)
 			}
-			expectedFiles.Insert(testFixtureFile(t, passDir, "base", validPod))
+			expectedFiles.Insert(testFixtureFile(t, passDir, "base", osNeutralPod))
+			// Don't generate OS specific pods when version < 1.25 as pod os field based restriction is not enabled.
+			if level == api.LevelRestricted && version >= podOSBasedRestrictionEnabledVersion {
+				linuxPod, err := GetMinimalValidLinuxPod(level, api.MajorMinorVersion(1, version))
+				if err != nil {
+					t.Fatal(err)
+				}
+				expectedFiles.Insert(testFixtureFile(t, passDir, "base_linux", linuxPod))
+
+				windowsPod, err := GetMinimalValidWindowsPod(level, api.MajorMinorVersion(1, version))
+				if err != nil {
+					t.Fatal(err)
+				}
+				expectedFiles.Insert(testFixtureFile(t, passDir, "base_windows", windowsPod))
+			}
 
 			// render check-specific fixtures
 			checkIDs, err := checksForLevelAndVersion(defaultChecks, level, api.MajorMinorVersion(1, version))
@@ -82,10 +94,10 @@ func TestFixtures(t *testing.T) {
 				}
 
 				for i, pod := range checkData.pass {
-					expectedFiles.Insert(testFixtureFile(t, passDir, fmt.Sprintf("%s%d", strings.ToLower(checkID), i), pod))
+					expectedFiles.Insert(testFixtureFile(t, passDir, fmt.Sprintf("%s%d", strings.ToLower(string(checkID)), i), pod))
 				}
 				for i, pod := range checkData.fail {
-					expectedFiles.Insert(testFixtureFile(t, failDir, fmt.Sprintf("%s%d", strings.ToLower(checkID), i), pod))
+					expectedFiles.Insert(testFixtureFile(t, failDir, fmt.Sprintf("%s%d", strings.ToLower(string(checkID)), i), pod))
 				}
 			}
 		}

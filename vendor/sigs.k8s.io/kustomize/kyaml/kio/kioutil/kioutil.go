@@ -41,19 +41,35 @@ const (
 
 	// Deprecated: use IdAnnotation instead.
 	LegacyIdAnnotation = "config.k8s.io/id"
+
+	// InternalAnnotationsMigrationResourceIDAnnotation is used to uniquely identify
+	// resources during round trip to and from a function execution. We will use it
+	// to track the internal annotations and reconcile them if needed.
+	InternalAnnotationsMigrationResourceIDAnnotation = internalPrefix + "annotations-migration-resource-id"
 )
 
 func GetFileAnnotations(rn *yaml.RNode) (string, string, error) {
-	if err := CopyLegacyAnnotations(rn); err != nil {
-		return "", "", err
+	rm, _ := rn.GetMeta()
+	annotations := rm.Annotations
+	path, found := annotations[PathAnnotation]
+	if !found {
+		path = annotations[LegacyPathAnnotation]
 	}
-	meta, err := rn.GetMeta()
-	if err != nil {
-		return "", "", err
+	index, found := annotations[IndexAnnotation]
+	if !found {
+		index = annotations[LegacyIndexAnnotation]
 	}
-	path := meta.Annotations[PathAnnotation]
-	index := meta.Annotations[IndexAnnotation]
 	return path, index, nil
+}
+
+func GetIdAnnotation(rn *yaml.RNode) string {
+	rm, _ := rn.GetMeta()
+	annotations := rm.Annotations
+	id, found := annotations[IdAnnotation]
+	if !found {
+		id = annotations[LegacyIdAnnotation]
+	}
+	return id
 }
 
 func CopyLegacyAnnotations(rn *yaml.RNode) error {
@@ -377,13 +393,16 @@ func ConfirmInternalAnnotationUnchanged(r1 *yaml.RNode, r2 *yaml.RNode, exclusio
 	return nil
 }
 
-// GetInternalAnnotations returns a map of all the annotations of the provided RNode that begin
-// with the prefix `internal.config.kubernetes.io`
+// GetInternalAnnotations returns a map of all the annotations of the provided
+// RNode that satisfies one of the following: 1) begin with the prefix
+// `internal.config.kubernetes.io` 2) is one of `config.kubernetes.io/path`,
+// `config.kubernetes.io/index` and `config.k8s.io/id`.
 func GetInternalAnnotations(rn *yaml.RNode) map[string]string {
-	annotations := rn.GetAnnotations()
+	meta, _ := rn.GetMeta()
+	annotations := meta.Annotations
 	result := make(map[string]string)
 	for k, v := range annotations {
-		if strings.HasPrefix(k, internalPrefix) {
+		if strings.HasPrefix(k, internalPrefix) || k == LegacyPathAnnotation || k == LegacyIndexAnnotation || k == LegacyIdAnnotation {
 			result[k] = v
 		}
 	}

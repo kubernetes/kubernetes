@@ -35,16 +35,18 @@ func TestCheckRegistry(t *testing.T) {
 		generateCheck("d", api.LevelBaseline, []string{"v1.11", "v1.15", "v1.20"}),
 		generateCheck("e", api.LevelRestricted, []string{"v1.0"}),
 		generateCheck("f", api.LevelRestricted, []string{"v1.12", "v1.16", "v1.21"}),
+		withOverrides(generateCheck("g", api.LevelRestricted, []string{"v1.10"}), []CheckID{"a"}),
+		withOverrides(generateCheck("h", api.LevelRestricted, []string{"v1.0"}), []CheckID{"b"}),
 	}
+	multiOverride := generateCheck("i", api.LevelRestricted, []string{"v1.10", "v1.21"})
+	multiOverride.Versions[0].OverrideCheckIDs = []CheckID{"c"}
+	multiOverride.Versions[1].OverrideCheckIDs = []CheckID{"d"}
+	checks = append(checks, multiOverride)
 
 	reg, err := NewEvaluator(checks)
 	require.NoError(t, err)
 
-	levelCases := []struct {
-		level           api.Level
-		version         string
-		expectedReasons []string
-	}{
+	levelCases := []registryTestCase{
 		{api.LevelPrivileged, "v1.0", nil},
 		{api.LevelPrivileged, "latest", nil},
 		{api.LevelBaseline, "v1.0", []string{"a:v1.0", "c:v1.0"}},
@@ -53,29 +55,112 @@ func TestCheckRegistry(t *testing.T) {
 		{api.LevelBaseline, "v1.10", []string{"a:v1.0", "b:v1.10", "c:v1.10"}},
 		{api.LevelBaseline, "v1.11", []string{"a:v1.0", "b:v1.10", "c:v1.10", "d:v1.11"}},
 		{api.LevelBaseline, "latest", []string{"a:v1.0", "b:v1.10", "c:v1.10", "d:v1.20"}},
-		{api.LevelRestricted, "v1.0", []string{"a:v1.0", "c:v1.0", "e:v1.0"}},
-		{api.LevelRestricted, "v1.4", []string{"a:v1.0", "c:v1.0", "e:v1.0"}},
-		{api.LevelRestricted, "v1.5", []string{"a:v1.0", "c:v1.5", "e:v1.0"}},
-		{api.LevelRestricted, "v1.10", []string{"a:v1.0", "b:v1.10", "c:v1.10", "e:v1.0"}},
-		{api.LevelRestricted, "v1.11", []string{"a:v1.0", "b:v1.10", "c:v1.10", "d:v1.11", "e:v1.0"}},
-		{api.LevelRestricted, "latest", []string{"a:v1.0", "b:v1.10", "c:v1.10", "d:v1.20", "e:v1.0", "f:v1.21"}},
-		{api.LevelRestricted, "v1.10000", []string{"a:v1.0", "b:v1.10", "c:v1.10", "d:v1.20", "e:v1.0", "f:v1.21"}},
+		{api.LevelRestricted, "v1.0", []string{"a:v1.0", "c:v1.0", "e:v1.0", "h:v1.0"}},
+		{api.LevelRestricted, "v1.4", []string{"a:v1.0", "c:v1.0", "e:v1.0", "h:v1.0"}},
+		{api.LevelRestricted, "v1.5", []string{"a:v1.0", "c:v1.5", "e:v1.0", "h:v1.0"}},
+		{api.LevelRestricted, "v1.10", []string{"e:v1.0", "g:v1.10", "h:v1.0", "i:v1.10"}},
+		{api.LevelRestricted, "v1.11", []string{"d:v1.11", "e:v1.0", "g:v1.10", "h:v1.0", "i:v1.10"}},
+		{api.LevelRestricted, "latest", []string{"c:v1.10", "e:v1.0", "f:v1.21", "g:v1.10", "h:v1.0", "i:v1.21"}},
+		{api.LevelRestricted, "v1.10000", []string{"c:v1.10", "e:v1.0", "f:v1.21", "g:v1.10", "h:v1.0", "i:v1.21"}},
 	}
 	for _, test := range levelCases {
-		t.Run(fmt.Sprintf("%s:%s", test.level, test.version), func(t *testing.T) {
-			results := reg.EvaluatePod(api.LevelVersion{test.level, versionOrPanic(test.version)}, nil, nil)
-
-			// Set extract the ForbiddenReasons from the results.
-			var actualReasons []string
-			for _, result := range results {
-				actualReasons = append(actualReasons, result.ForbiddenReason)
-			}
-			assert.ElementsMatch(t, test.expectedReasons, actualReasons)
-		})
+		test.Run(t, reg)
 	}
 }
 
-func generateCheck(id string, level api.Level, versions []string) Check {
+func TestCheckRegistry_NoBaseline(t *testing.T) {
+	checks := []Check{
+		generateCheck("e", api.LevelRestricted, []string{"v1.0"}),
+		generateCheck("f", api.LevelRestricted, []string{"v1.12", "v1.16", "v1.21"}),
+		withOverrides(generateCheck("g", api.LevelRestricted, []string{"v1.10"}), []CheckID{"a"}),
+		withOverrides(generateCheck("h", api.LevelRestricted, []string{"v1.0"}), []CheckID{"b"}),
+	}
+
+	reg, err := NewEvaluator(checks)
+	require.NoError(t, err)
+
+	levelCases := []registryTestCase{
+		{api.LevelPrivileged, "v1.0", nil},
+		{api.LevelPrivileged, "latest", nil},
+		{api.LevelBaseline, "v1.0", nil},
+		{api.LevelBaseline, "v1.10", nil},
+		{api.LevelBaseline, "latest", nil},
+		{api.LevelRestricted, "v1.0", []string{"e:v1.0", "h:v1.0"}},
+		{api.LevelRestricted, "v1.10", []string{"e:v1.0", "g:v1.10", "h:v1.0"}},
+		{api.LevelRestricted, "latest", []string{"e:v1.0", "f:v1.21", "g:v1.10", "h:v1.0"}},
+		{api.LevelRestricted, "v1.10000", []string{"e:v1.0", "f:v1.21", "g:v1.10", "h:v1.0"}},
+	}
+	for _, test := range levelCases {
+		test.Run(t, reg)
+	}
+}
+
+func TestCheckRegistry_NoRestricted(t *testing.T) {
+	checks := []Check{
+		generateCheck("a", api.LevelBaseline, []string{"v1.0"}),
+		generateCheck("b", api.LevelBaseline, []string{"v1.10"}),
+		generateCheck("c", api.LevelBaseline, []string{"v1.0", "v1.5", "v1.10"}),
+		generateCheck("d", api.LevelBaseline, []string{"v1.11", "v1.15", "v1.20"}),
+	}
+
+	reg, err := NewEvaluator(checks)
+	require.NoError(t, err)
+
+	levelCases := []registryTestCase{
+		{api.LevelBaseline, "v1.0", []string{"a:v1.0", "c:v1.0"}},
+		{api.LevelBaseline, "v1.4", []string{"a:v1.0", "c:v1.0"}},
+		{api.LevelBaseline, "v1.5", []string{"a:v1.0", "c:v1.5"}},
+		{api.LevelBaseline, "v1.10", []string{"a:v1.0", "b:v1.10", "c:v1.10"}},
+		{api.LevelBaseline, "v1.11", []string{"a:v1.0", "b:v1.10", "c:v1.10", "d:v1.11"}},
+		{api.LevelBaseline, "latest", []string{"a:v1.0", "b:v1.10", "c:v1.10", "d:v1.20"}},
+	}
+	for _, test := range levelCases {
+		test.Run(t, reg)
+		// Restricted results should be identical to baseline.
+		restrictedTest := test
+		restrictedTest.level = api.LevelRestricted
+		restrictedTest.Run(t, reg)
+	}
+}
+
+func TestCheckRegistry_Empty(t *testing.T) {
+	reg, err := NewEvaluator(nil)
+	require.NoError(t, err)
+
+	levelCases := []registryTestCase{
+		{api.LevelPrivileged, "latest", nil},
+		{api.LevelBaseline, "latest", nil},
+		{api.LevelRestricted, "latest", nil},
+	}
+	for _, test := range levelCases {
+		test.Run(t, reg)
+		// Restricted results should be identical to baseline.
+		restrictedTest := test
+		restrictedTest.level = api.LevelRestricted
+		restrictedTest.Run(t, reg)
+	}
+}
+
+type registryTestCase struct {
+	level           api.Level
+	version         string
+	expectedReasons []string
+}
+
+func (tc *registryTestCase) Run(t *testing.T, registry Evaluator) {
+	t.Run(fmt.Sprintf("%s:%s", tc.level, tc.version), func(t *testing.T) {
+		results := registry.EvaluatePod(api.LevelVersion{tc.level, versionOrPanic(tc.version)}, nil, nil)
+
+		// Set extract the ForbiddenReasons from the results.
+		var actualReasons []string
+		for _, result := range results {
+			actualReasons = append(actualReasons, result.ForbiddenReason)
+		}
+		assert.Equal(t, tc.expectedReasons, actualReasons)
+	})
+}
+
+func generateCheck(id CheckID, level api.Level, versions []string) Check {
 	c := Check{
 		ID:    id,
 		Level: level,
@@ -90,6 +175,13 @@ func generateCheck(id string, level api.Level, versions []string) Check {
 				}
 			},
 		})
+	}
+	return c
+}
+
+func withOverrides(c Check, overrides []CheckID) Check {
+	for i := range c.Versions {
+		c.Versions[i].OverrideCheckIDs = overrides
 	}
 	return c
 }

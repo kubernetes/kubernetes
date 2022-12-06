@@ -2,7 +2,7 @@ package internal
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"sync"
 
@@ -109,7 +109,7 @@ func detectKernelVersion() (Version, error) {
 	// Example format: Ubuntu 4.15.0-91.92-generic 4.15.18
 	// This method exists in the kernel itself, see d18acd15c
 	// ("perf tools: Fix kernel version error in ubuntu").
-	if pvs, err := ioutil.ReadFile("/proc/version_signature"); err == nil {
+	if pvs, err := os.ReadFile("/proc/version_signature"); err == nil {
 		// If /proc/version_signature exists, failing to parse it is an error.
 		// It only exists on Ubuntu, where the real patch level is not obtainable
 		// through any other method.

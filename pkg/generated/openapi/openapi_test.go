@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -43,6 +44,12 @@ func TestOpenAPIRoundtrip(t *testing.T) {
 				t.Error(err)
 				return
 			}
+
+			// Remove the embedded v2 schema if it presents.
+			// The v2 schema either become the schema (when serving v2) or get pruned (v3)
+			// and it is never round-tripped.
+			delete(roundTripped.Extensions, common.ExtensionV2Schema)
+			delete(value.Schema.Extensions, common.ExtensionV2Schema)
 
 			if !reflect.DeepEqual(value.Schema, roundTripped) {
 				t.Errorf("unexpected diff (a=expected,b=roundtripped):\n%s", diff.ObjectReflectDiff(value.Schema, roundTripped))

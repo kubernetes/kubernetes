@@ -217,7 +217,7 @@ func (p *parserHelper) buildMacroCallArg(expr *exprpb.Expr) *exprpb.Expr {
 		return &exprpb.Expr{Id: expr.GetId()}
 	}
 
-	switch expr.ExprKind.(type) {
+	switch expr.GetExprKind().(type) {
 	case *exprpb.Expr_CallExpr:
 		// Iterate the AST from `expr` recursively looking for macros. Because we are at most
 		// starting from the top level macro, this recursion is bounded by the size of the AST. This
@@ -241,6 +241,20 @@ func (p *parserHelper) buildMacroCallArg(expr *exprpb.Expr) *exprpb.Expr {
 				},
 			},
 		}
+	case *exprpb.Expr_ListExpr:
+		listExpr := expr.GetListExpr()
+		macroListArgs := make([]*exprpb.Expr, len(listExpr.GetElements()))
+		for i, elem := range listExpr.GetElements() {
+			macroListArgs[i] = p.buildMacroCallArg(elem)
+		}
+		return &exprpb.Expr{
+			Id: expr.GetId(),
+			ExprKind: &exprpb.Expr_ListExpr{
+				ListExpr: &exprpb.Expr_CreateList{
+					Elements: macroListArgs,
+				},
+			},
+		}
 	}
 
 	return expr
@@ -253,6 +267,8 @@ func (p *parserHelper) addMacroCall(exprID int64, function string, target *exprp
 	if target != nil {
 		if _, found := p.macroCalls[target.GetId()]; found {
 			macroTarget = &exprpb.Expr{Id: target.GetId()}
+		} else {
+			macroTarget = p.buildMacroCallArg(target)
 		}
 	}
 
@@ -417,6 +433,11 @@ func (e *exprHelper) Fold(iterVar string,
 // Ident implements the ExprHelper interface method.
 func (e *exprHelper) Ident(name string) *exprpb.Expr {
 	return e.parserHelper.newIdent(e.nextMacroID(), name)
+}
+
+// AccuIdent implements the ExprHelper interface method.
+func (e *exprHelper) AccuIdent() *exprpb.Expr {
+	return e.parserHelper.newIdent(e.nextMacroID(), AccumulatorName)
 }
 
 // GlobalCall implements the ExprHelper interface method.

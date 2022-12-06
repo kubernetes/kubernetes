@@ -16,6 +16,7 @@ package gomock
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 )
 
@@ -95,7 +96,7 @@ func (cs callSet) FindMatch(receiver interface{}, method string, args []interfac
 		_, _ = fmt.Fprintf(&callsErrors, "there are no expected calls of the method %q for that receiver", method)
 	}
 
-	return nil, fmt.Errorf(callsErrors.String())
+	return nil, errors.New(callsErrors.String())
 }
 
 // Failures returns the calls that are not satisfied.

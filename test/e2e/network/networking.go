@@ -33,8 +33,9 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // checkConnectivityToHost launches a pod to test connectivity to the specified
@@ -79,6 +80,7 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 var _ = common.SIGDescribe("Networking", func() {
 	var svcname = "nettest"
 	f := framework.NewDefaultFramework(svcname)
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func() {
 		ginkgo.By("Running container which tries to connect to 8.8.8.8")
@@ -616,13 +618,13 @@ var _ = common.SIGDescribe("Networking", func() {
 
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
 		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
-			result, err = e2essh.SSH("sudo iptables-save -t nat", host, framework.TestContext.Provider)
+			result, err = e2essh.SSH("sudo iptables-save -t mangle", host, framework.TestContext.Provider)
 			if err != nil || result.Code != 0 {
 				e2essh.LogResult(result)
 				return false, err
 			}
 
-			if strings.Contains(result.Stdout, "\n-A KUBE-MARK-DROP ") {
+			if strings.Contains(result.Stdout, "\n:KUBE-IPTABLES-HINT") {
 				return true, nil
 			}
 			return false, nil

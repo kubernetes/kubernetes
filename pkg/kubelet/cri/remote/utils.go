@@ -17,9 +17,7 @@ limitations under the License.
 package remote
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -27,16 +25,6 @@ import (
 // maxMsgSize use 16MB as the default message size limit.
 // grpc library default is 4MB
 const maxMsgSize = 1024 * 1024 * 16
-
-// getContextWithTimeout returns a context with timeout.
-func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), timeout)
-}
-
-// getContextWithCancel returns a context with cancel.
-func getContextWithCancel() (context.Context, context.CancelFunc) {
-	return context.WithCancel(context.Background())
-}
 
 // verifySandboxStatus verified whether all required fields are set in PodSandboxStatus.
 func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {

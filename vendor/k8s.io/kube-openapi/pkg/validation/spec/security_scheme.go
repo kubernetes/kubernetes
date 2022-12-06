@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/swag"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // SecuritySchemeProps describes a swagger security scheme in the securityDefinitions section
@@ -61,4 +62,21 @@ func (s *SecurityScheme) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	return json.Unmarshal(data, &s.VendorExtensible)
+}
+
+func (s *SecurityScheme) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		Extensions
+		SecuritySchemeProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	x.Extensions.sanitize()
+	if len(x.Extensions) == 0 {
+		x.Extensions = nil
+	}
+	s.VendorExtensible.Extensions = x.Extensions
+	s.SecuritySchemeProps = x.SecuritySchemeProps
+	return nil
 }

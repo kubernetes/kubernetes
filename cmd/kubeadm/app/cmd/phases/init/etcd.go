@@ -72,6 +72,7 @@ func getEtcdPhaseFlags() []string {
 		options.CfgPath,
 		options.ImageRepository,
 		options.Patches,
+		options.DryRun,
 	}
 	return flags
 }

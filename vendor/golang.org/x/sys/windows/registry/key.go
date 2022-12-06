@@ -20,7 +20,6 @@
 //		log.Fatal(err)
 //	}
 //	fmt.Printf("Windows system root is %q\n", s)
-//
 package registry
 
 import (

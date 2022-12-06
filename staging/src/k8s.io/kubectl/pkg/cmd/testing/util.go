@@ -150,6 +150,22 @@ func EmptyTestData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationC
 	return pods, svc, rc
 }
 
+func SubresourceTestData() *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+		Spec: corev1.PodSpec{
+			RestartPolicy:                 corev1.RestartPolicyAlways,
+			DNSPolicy:                     corev1.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+			SecurityContext:               &corev1.PodSecurityContext{},
+			EnableServiceLinks:            &enableServiceLinks,
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodPending,
+		},
+	}
+}
+
 func GenResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, error) {
 	jsonBytes, err := json.Marshal(bodyStruct)
 	if err != nil {

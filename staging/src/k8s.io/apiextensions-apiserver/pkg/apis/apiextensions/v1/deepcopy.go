@@ -250,5 +250,11 @@ func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 		**out = **in
 	}
 
+	if in.XValidations != nil {
+		in, out := &in.XValidations, &out.XValidations
+		*out = make([]ValidationRule, len(*in))
+		copy(*out, *in)
+	}
+
 	return out
 }

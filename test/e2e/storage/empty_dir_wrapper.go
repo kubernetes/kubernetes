@@ -31,8 +31,9 @@ import (
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -56,6 +57,7 @@ const (
 
 var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.13
@@ -144,7 +146,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 				},
 			},
 		}
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 		defer func() {
 			ginkgo.By("Cleaning up the secret")
@@ -216,7 +218,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 
 	gitServerPod := e2epod.NewAgnhostPod(f.Namespace.Name, gitServerPodName, nil, nil, []v1.ContainerPort{{ContainerPort: int32(containerPort)}}, "fake-gitserver")
 	gitServerPod.ObjectMeta.Labels = labels
-	f.PodClient().CreateSync(gitServerPod)
+	e2epod.NewPodClient(f).CreateSync(gitServerPod)
 
 	// Portal IP and port
 	httpPort := 2345

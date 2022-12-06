@@ -15,7 +15,7 @@ spec:
     spec:
       initContainers:
       - name: install
-        image: k8s.gcr.io/galera-install:0.1
+        image: registry.k8s.io/galera-install:0.1
         imagePullPolicy: Always
         args:
         - "--work-dir=/work-dir"
@@ -44,7 +44,7 @@ spec:
           mountPath: "/etc/mysql"
       containers:
       - name: mysql
-        image: k8s.gcr.io/mysql-galera:e2e
+        image: registry.k8s.io/mysql-galera:e2e
         ports:
         - containerPort: 3306
           name: mysql
@@ -58,7 +58,7 @@ spec:
         - --defaults-file=/etc/mysql/my-galera.cnf
         - --user=root
         readinessProbe:
-          # TODO: If docker exec is buggy just use k8s.gcr.io/mysql-healthz:1.0
+          # TODO: If docker exec is buggy just use registry.k8s.io/mysql-healthz:1.0
           exec:
             command:
             - sh

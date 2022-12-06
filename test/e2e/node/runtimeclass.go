@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/pod-security-admission/api"
+
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,12 +34,13 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
+	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func() {
 		labelFooName := "foo-" + string(uuid.NewUUID())
@@ -58,8 +61,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			labelFooName: "bar",
 		}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectError(err, "should be forbidden")
-		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
+		if !apierrors.IsForbidden(err) {
+			framework.Failf("expected 'forbidden' as error, got instead: %v", err)
+		}
 	})
 
 	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func() {
@@ -86,9 +90,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		ginkgo.By("Trying to apply a label on the found node.")
 		for key, value := range nodeSelector {
-			framework.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
-			framework.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
-			defer framework.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
+			e2enode.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
+			defer e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, key)
 		}
 
 		ginkgo.By("Trying to apply taint on the found node.")
@@ -98,7 +102,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			Effect: v1.TaintEffectNoSchedule,
 		}
 		e2enode.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
-		framework.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
+		e2enode.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
 		defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
 
 		ginkgo.By("Trying to create runtimeclass and pod")
@@ -111,7 +115,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
-		pod = f.PodClient().Create(pod)
+		pod = e2epod.NewPodClient(f).Create(pod)
 
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
 
@@ -142,9 +146,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		ginkgo.By("Trying to apply a label on the found node.")
 		for key, value := range nodeSelector {
-			framework.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
-			framework.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
-			defer framework.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
+			e2enode.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
+			defer e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, key)
 		}
 
 		ginkgo.By("Trying to create runtimeclass and pod")
@@ -157,7 +161,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
-		pod = f.PodClient().Create(pod)
+		pod = e2epod.NewPodClient(f).Create(pod)
 
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
 

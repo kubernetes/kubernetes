@@ -22,6 +22,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -76,18 +78,11 @@ func TestDropDisabledFields(t *testing.T) {
 			oldSpec:             specWithCSISecrets(nil),
 			expectOldSpec:       specWithCSISecrets(nil),
 		},
-		"disabled csi expansion clears secrets when old pv did not had secrets": {
-			csiExpansionEnabled: false,
-			newSpec:             specWithCSISecrets(secretRef),
-			expectNewSpec:       specWithCSISecrets(nil),
-			oldSpec:             specWithCSISecrets(nil),
-			expectOldSpec:       specWithCSISecrets(nil),
-		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandCSIVolumes, tc.csiExpansionEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeExpandSecret, tc.csiExpansionEnabled)()
 
 			DropDisabledFields(tc.newSpec, tc.oldSpec)
 			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {
@@ -111,7 +106,78 @@ func specWithCSISecrets(secret *api.SecretReference) *api.PersistentVolumeSpec {
 	}
 
 	if secret != nil {
-		pvSpec.CSI.ControllerExpandSecretRef = secret
+		pvSpec.CSI.NodeExpandSecretRef = secret
 	}
 	return pvSpec
+}
+
+func TestWarnings(t *testing.T) {
+	testcases := []struct {
+		name     string
+		template *api.PersistentVolume
+		expected []string
+	}{
+		{
+			name:     "null",
+			template: nil,
+			expected: nil,
+		},
+		{
+			name: "no warning",
+			template: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeBound,
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "warning",
+			template: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PersistentVolumeSpec{
+					NodeAffinity: &api.VolumeNodeAffinity{
+						Required: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key:      "beta.kubernetes.io/os",
+											Operator: "Equal",
+											Values:   []string{"windows"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeBound,
+				},
+			},
+			expected: []string{
+				`spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].key: beta.kubernetes.io/os is deprecated since v1.14; use "kubernetes.io/os" instead`,
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run("podspec_"+tc.name, func(t *testing.T) {
+			actual := sets.NewString(GetWarningsForPersistentVolume(tc.template)...)
+			expected := sets.NewString(tc.expected...)
+			for _, missing := range expected.Difference(actual).List() {
+				t.Errorf("missing: %s", missing)
+			}
+			for _, extra := range actual.Difference(expected).List() {
+				t.Errorf("extra: %s", extra)
+			}
+		})
+
+	}
 }

@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,12 +31,15 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-placement")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	const (
 		NodeLabelKey = "vsphere_e2e_label_volume_placement"
 	)
@@ -48,7 +51,6 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		node1KeyValueLabel map[string]string
 		node2Name          string
 		node2KeyValueLabel map[string]string
-		isNodeLabeled      bool
 		nodeInfo           *NodeInfo
 		vsp                *VSphere
 	)
@@ -57,42 +59,30 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		Bootstrap(f)
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
-		if !isNodeLabeled {
-			node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel = testSetupVolumePlacement(c, ns)
-			isNodeLabeled = true
-			nodeInfo = TestContext.NodeMapper.GetNodeInfo(node1Name)
-			vsp = nodeInfo.VSphere
-		}
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel = testSetupVolumePlacement(c, ns)
+		ginkgo.DeferCleanup(func() {
+			if len(node1KeyValueLabel) > 0 {
+				e2enode.RemoveLabelOffNode(c, node1Name, NodeLabelKey)
+			}
+			if len(node2KeyValueLabel) > 0 {
+				e2enode.RemoveLabelOffNode(c, node2Name, NodeLabelKey)
+			}
+		})
+		nodeInfo = TestContext.NodeMapper.GetNodeInfo(node1Name)
+		vsp = nodeInfo.VSphere
 		ginkgo.By("creating vmdk")
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 		framework.ExpectNoError(err)
 		volumePaths = append(volumePaths, volumePath)
+		ginkgo.DeferCleanup(func() {
+			for _, volumePath := range volumePaths {
+				vsp.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
+			}
+			volumePaths = nil
+		})
 	})
 
-	ginkgo.AfterEach(func() {
-		for _, volumePath := range volumePaths {
-			vsp.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
-		}
-		volumePaths = nil
-	})
-
-	/*
-		Steps
-		1. Remove labels assigned to node 1 and node 2
-		2. Delete VMDK volume
-	*/
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(ns) > 0 {
-			if len(node1KeyValueLabel) > 0 {
-				framework.RemoveLabelOffNode(c, node1Name, NodeLabelKey)
-			}
-			if len(node2KeyValueLabel) > 0 {
-				framework.RemoveLabelOffNode(c, node2Name, NodeLabelKey)
-			}
-		}
-	})
 	/*
 		Steps
 
@@ -318,10 +308,10 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 
 			// Create empty files on the mounted volumes on the pod to verify volume is writable
 			ginkgo.By("Creating empty file on volume mounted on pod-A")
-			framework.CreateEmptyFileOnPod(ns, podA.Name, podAFileName)
+			e2eoutput.CreateEmptyFileOnPod(ns, podA.Name, podAFileName)
 
 			ginkgo.By("Creating empty file volume mounted on pod-B")
-			framework.CreateEmptyFileOnPod(ns, podB.Name, podBFileName)
+			e2eoutput.CreateEmptyFileOnPod(ns, podB.Name, podBFileName)
 
 			// Verify newly and previously created files present on the volume mounted on the pod
 			ginkgo.By("Verify newly Created file and previously created files present on volume mounted on pod-A")
@@ -348,12 +338,12 @@ func testSetupVolumePlacement(client clientset.Interface, namespace string) (nod
 	node1LabelValue := "vsphere_e2e_" + string(uuid.NewUUID())
 	node1KeyValueLabel = make(map[string]string)
 	node1KeyValueLabel[NodeLabelKey] = node1LabelValue
-	framework.AddOrUpdateLabelOnNode(client, node1Name, NodeLabelKey, node1LabelValue)
+	e2enode.AddOrUpdateLabelOnNode(client, node1Name, NodeLabelKey, node1LabelValue)
 
 	node2LabelValue := "vsphere_e2e_" + string(uuid.NewUUID())
 	node2KeyValueLabel = make(map[string]string)
 	node2KeyValueLabel[NodeLabelKey] = node2LabelValue
-	framework.AddOrUpdateLabelOnNode(client, node2Name, NodeLabelKey, node2LabelValue)
+	e2enode.AddOrUpdateLabelOnNode(client, node2Name, NodeLabelKey, node2LabelValue)
 	return node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel
 }
 
@@ -372,7 +362,9 @@ func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace st
 	for _, volumePath := range volumePaths {
 		isAttached, err := diskIsAttached(volumePath, nodeName)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isAttached, true, "disk:"+volumePath+" is not attached with the node")
+		if !isAttached {
+			framework.Failf("Volume: %s is not attached to the node: %v", volumePath, nodeName)
+		}
 	}
 	return pod
 }

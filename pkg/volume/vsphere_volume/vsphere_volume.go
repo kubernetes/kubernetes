@@ -75,8 +75,7 @@ func (plugin *vsphereVolumePlugin) GetPluginName() string {
 }
 
 func (plugin *vsphereVolumePlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
 }
 
 func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
@@ -103,6 +102,10 @@ func (plugin *vsphereVolumePlugin) SupportsMountOption() bool {
 
 func (plugin *vsphereVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return true
+}
+
+func (plugin *vsphereVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
 }
 
 func (plugin *vsphereVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
@@ -150,17 +153,17 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 		}}, nil
 }
 
-func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
 	if !ok {
-		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+		return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
 	hu := kvh.GetHostUtil()
 	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
 	volumePath, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	volumePath = strings.Replace(volumePath, "\\040", " ", -1)
 	klog.V(5).Infof("vSphere volume path is %q", volumePath)
@@ -172,7 +175,9 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(vsphereVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(vsphereVolume),
+	}, nil
 }
 
 // Abstract interface to disk operations.
@@ -208,21 +213,14 @@ type vsphereVolumeMounter struct {
 
 func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		SupportsSELinux: true,
-		Managed:         true,
+		SELinuxRelabel: true,
+		Managed:        true,
 	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *vsphereVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return b.SetUpAt(b.GetPath(), mounterArgs)
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *vsphereVolumeMounter) CanMount() error {
-	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.

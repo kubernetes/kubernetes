@@ -659,9 +659,9 @@ func TestCopyToPod(t *testing.T) {
 
 	for name, test := range tests {
 		opts := NewCopyOptions(ioStreams)
-		opts.Complete(tf, cmd)
+		opts.Complete(tf, cmd, []string{test.src, fmt.Sprintf("pod-ns/pod-name:%s", test.dest)})
 		t.Run(name, func(t *testing.T) {
-			err = opts.Run([]string{test.src, fmt.Sprintf("pod-ns/pod-name:%s", test.dest)})
+			err = opts.Run()
 			//If error is NotFound error , it indicates that the
 			//request has been sent correctly.
 			//Treat this as no error.
@@ -723,7 +723,7 @@ func TestCopyToPodNoPreserve(t *testing.T) {
 		PodName:      "pod-name",
 		File:         newRemotePath("foo"),
 	}
-	opts.Complete(tf, cmd)
+	opts.Complete(tf, cmd, nil)
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -754,14 +754,13 @@ func TestValidate(t *testing.T) {
 			expectedErr: true,
 		},
 	}
-	tf := cmdtesting.NewTestFactory()
 	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	opts := NewCopyOptions(ioStreams)
-	cmd := NewCmdCp(tf, ioStreams)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := opts.Validate(cmd, test.args)
+			opts.args = test.args
+			err := opts.Validate()
 			if (err != nil) != test.expectedErr {
 				t.Errorf("expected error: %v, saw: %v, error: %v", test.expectedErr, err != nil, err)
 			}

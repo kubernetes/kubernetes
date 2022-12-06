@@ -138,14 +138,16 @@ spec:
         operator: "Exists"
       containers:
       - name: node-cache
-        image: k8s.gcr.io/dns/k8s-dns-node-cache:1.21.1
+        image: registry.k8s.io/dns/k8s-dns-node-cache:1.22.13
         resources:
           requests:
             cpu: 25m
             memory: 5Mi
         args: [ "-localip", "__PILLAR__LOCAL__DNS__,__PILLAR__DNS__SERVER__", "-conf", "/etc/Corefile", "-upstreamsvc", "kube-dns-upstream" ]
         securityContext:
-          privileged: true
+          capabilities:
+            add:
+            - NET_ADMIN
         ports:
         - containerPort: 53
           name: dns

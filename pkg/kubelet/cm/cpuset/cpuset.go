@@ -76,7 +76,7 @@ func NewCPUSet(cpus ...int) CPUSet {
 	return b.Result()
 }
 
-// NewCPUSet returns a new CPUSet containing the supplied elements, as slice of int64.
+// NewCPUSetInt64 returns a new CPUSet containing the supplied elements, as slice of int64.
 func NewCPUSetInt64(cpus ...int64) CPUSet {
 	b := NewBuilder()
 	for _, c := range cpus {
@@ -191,7 +191,7 @@ func (s CPUSet) Difference(s2 CPUSet) CPUSet {
 // ToSlice returns a slice of integers that contains all elements from
 // this set.
 func (s CPUSet) ToSlice() []int {
-	result := []int{}
+	result := make([]int, 0, len(s.elems))
 	for cpu := range s.elems {
 		result = append(result, cpu)
 	}
@@ -202,7 +202,7 @@ func (s CPUSet) ToSlice() []int {
 // ToSliceNoSort returns a slice of integers that contains all elements from
 // this set.
 func (s CPUSet) ToSliceNoSort() []int {
-	result := []int{}
+	result := make([]int, 0, len(s.elems))
 	for cpu := range s.elems {
 		result = append(result, cpu)
 	}
@@ -212,7 +212,7 @@ func (s CPUSet) ToSliceNoSort() []int {
 // ToSliceInt64 returns an ordered slice of int64 that contains all elements from
 // this set
 func (s CPUSet) ToSliceInt64() []int64 {
-	var result []int64
+	result := make([]int64, 0, len(s.elems))
 	for cpu := range s.elems {
 		result = append(result, int64(cpu))
 	}
@@ -223,7 +223,7 @@ func (s CPUSet) ToSliceInt64() []int64 {
 // ToSliceNoSortInt64 returns a slice of int64 that contains all elements from
 // this set.
 func (s CPUSet) ToSliceNoSortInt64() []int64 {
-	var result []int64
+	result := make([]int64, 0, len(s.elems))
 	for cpu := range s.elems {
 		result = append(result, int64(cpu))
 	}

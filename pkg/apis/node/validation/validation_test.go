@@ -99,8 +99,8 @@ func TestValidateRuntimeUpdate(t *testing.T) {
 		old:         old,
 		new: node.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        "empty",
-				ClusterName: "somethingelse", // immutable
+				Name:      "empty",
+				Namespace: "somethingelse", // immutable
 			},
 			Handler: "bar",
 		},

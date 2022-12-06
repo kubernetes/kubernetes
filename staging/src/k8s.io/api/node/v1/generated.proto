@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/node/v1";
 
 // Overhead structure represents the resource overhead associated with running a pod.
 message Overhead {
@@ -64,8 +64,6 @@ message RuntimeClass {
   // Overhead represents the resource overhead associated with running a pod for a
   // given RuntimeClass. For more details, see
   //  https://kubernetes.io/docs/concepts/scheduling-eviction/pod-overhead/
-  // This field is in beta starting v1.18
-  // and is only honored by servers that enable the PodOverhead feature.
   // +optional
   optional Overhead overhead = 3;
 

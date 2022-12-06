@@ -30,4 +30,5 @@ type CriuOpts struct {
 	LazyPages               bool               // restore memory pages lazily using userfaultfd
 	StatusFd                int                // fd for feedback when lazy server is ready
 	LsmProfile              string             // LSM profile used to restore the container
+	LsmMountContext         string             // LSM mount context value to use during restore
 }

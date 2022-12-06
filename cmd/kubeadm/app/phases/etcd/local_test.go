@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -18,7 +21,6 @@ package etcd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -138,7 +140,7 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	    patched: "true"
 	`)
 
-	err = ioutil.WriteFile(filepath.Join(patchesPath, kubeadmconstants.Etcd+".yaml"), []byte(patchString), 0644)
+	err = os.WriteFile(filepath.Join(patchesPath, kubeadmconstants.Etcd+".yaml"), []byte(patchString), 0644)
 	if err != nil {
 		t.Fatalf("WriteFile returned unexpected error: %v", err)
 	}
@@ -177,19 +179,21 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
+				"--experimental-initial-corrupt-check=true",
+				"--experimental-watch-progress-notify-interval=5s",
 				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 				fmt.Sprintf("--initial-advertise-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 				"--data-dir=/var/lib/etcd",
-				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
-				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
-				"--trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerCertName),
+				"--key-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerKeyName),
+				"--trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
 				"--client-cert-auth=true",
-				"--peer-cert-file=" + kubeadmconstants.EtcdPeerCertName,
-				"--peer-key-file=" + kubeadmconstants.EtcdPeerKeyName,
-				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--peer-cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerCertName),
+				"--peer-key-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerKeyName),
+				"--peer-trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
 				"--snapshot-count=10000",
 				"--peer-client-cert-auth=true",
 				fmt.Sprintf("--initial-cluster=foo=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
@@ -206,19 +210,21 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
+				"--experimental-initial-corrupt-check=true",
+				"--experimental-watch-progress-notify-interval=5s",
 				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 				fmt.Sprintf("--initial-advertise-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 				"--data-dir=/var/lib/etcd",
-				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
-				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
-				"--trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerCertName),
+				"--key-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerKeyName),
+				"--trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
 				"--client-cert-auth=true",
-				"--peer-cert-file=" + kubeadmconstants.EtcdPeerCertName,
-				"--peer-key-file=" + kubeadmconstants.EtcdPeerKeyName,
-				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--peer-cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerCertName),
+				"--peer-key-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerKeyName),
+				"--peer-trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
 				"--snapshot-count=10000",
 				"--peer-client-cert-auth=true",
 				"--initial-cluster-state=existing",
@@ -236,19 +242,21 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=bar",
+				"--experimental-initial-corrupt-check=true",
+				"--experimental-watch-progress-notify-interval=5s",
 				"--listen-client-urls=https://10.0.1.10:2379",
 				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 				"--advertise-client-urls=https://10.0.1.10:2379",
 				fmt.Sprintf("--listen-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 				fmt.Sprintf("--initial-advertise-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
 				"--data-dir=/var/lib/etcd",
-				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
-				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
-				"--trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerCertName),
+				"--key-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerKeyName),
+				"--trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
 				"--client-cert-auth=true",
-				"--peer-cert-file=" + kubeadmconstants.EtcdPeerCertName,
-				"--peer-key-file=" + kubeadmconstants.EtcdPeerKeyName,
-				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--peer-cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerCertName),
+				"--peer-key-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerKeyName),
+				"--peer-trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
 				"--snapshot-count=10000",
 				"--peer-client-cert-auth=true",
 				fmt.Sprintf("--initial-cluster=bar=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
@@ -261,19 +269,21 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
+				"--experimental-initial-corrupt-check=true",
+				"--experimental-watch-progress-notify-interval=5s",
 				fmt.Sprintf("--listen-client-urls=https://[::1]:%d,https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-metrics-urls=http://[::1]:%d", kubeadmconstants.EtcdMetricsPort),
 				fmt.Sprintf("--advertise-client-urls=https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-peer-urls=https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenPeerPort),
 				fmt.Sprintf("--initial-advertise-peer-urls=https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenPeerPort),
 				"--data-dir=/var/lib/etcd",
-				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
-				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
-				"--trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerCertName),
+				"--key-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerKeyName),
+				"--trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
 				"--client-cert-auth=true",
-				"--peer-cert-file=" + kubeadmconstants.EtcdPeerCertName,
-				"--peer-key-file=" + kubeadmconstants.EtcdPeerKeyName,
-				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
+				"--peer-cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerCertName),
+				"--peer-key-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerKeyName),
+				"--peer-trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
 				"--snapshot-count=10000",
 				"--peer-client-cert-auth=true",
 				fmt.Sprintf("--initial-cluster=foo=https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenPeerPort),

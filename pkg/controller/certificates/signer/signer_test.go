@@ -17,6 +17,7 @@ limitations under the License.
 package signer
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/x509"
@@ -31,15 +32,12 @@ import (
 
 	capi "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
 	"k8s.io/kubernetes/pkg/controller/certificates"
-	"k8s.io/kubernetes/pkg/features"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -146,6 +144,24 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
+			name:       "should sign without key encipherment if signerName is kubernetes.io/kube-apiserver-client",
+			signerName: "kubernetes.io/kube-apiserver-client",
+			commonName: "hello-world",
+			org:        []string{"some-org"},
+			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature},
+			approved:   true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
+					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) == 0 {
+					t.Errorf("expected certificate to be issued but it was not")
+				}
+			},
+		},
+		{
 			name:       "should refuse to sign if signerName is kubernetes.io/kube-apiserver-client and contains an unexpected usage",
 			signerName: "kubernetes.io/kube-apiserver-client",
 			commonName: "hello-world",
@@ -185,6 +201,24 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
+			name:       "should sign without usage key encipherment if signerName is kubernetes.io/kube-apiserver-client-kubelet",
+			signerName: "kubernetes.io/kube-apiserver-client-kubelet",
+			commonName: "system:node:hello-world",
+			org:        []string{"system:nodes"},
+			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature},
+			approved:   true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
+					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) == 0 {
+					t.Errorf("expected certificate to be issued but it was not")
+				}
+			},
+		},
+		{
 			name:       "should sign if signerName is kubernetes.io/legacy-unknown",
 			signerName: "kubernetes.io/legacy-unknown",
 			approved:   true,
@@ -205,6 +239,25 @@ func TestHandle(t *testing.T) {
 			commonName: "system:node:testnode",
 			org:        []string{"system:nodes"},
 			usages:     []capi.KeyUsage{capi.UsageServerAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+			dnsNames:   []string{"example.com"},
+			approved:   true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
+					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) == 0 {
+					t.Errorf("expected certificate to be issued but it was not")
+				}
+			},
+		},
+		{
+			name:       "should sign without usage key encipherment if signerName is kubernetes.io/kubelet-serving",
+			signerName: "kubernetes.io/kubelet-serving",
+			commonName: "system:node:testnode",
+			org:        []string{"system:nodes"},
+			usages:     []capi.KeyUsage{capi.UsageServerAuth, capi.UsageDigitalSignature},
 			dnsNames:   []string{"example.com"},
 			approved:   true,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -294,7 +347,8 @@ func TestHandle(t *testing.T) {
 			}
 
 			csr := makeTestCSR(csrBuilder{cn: c.commonName, signerName: c.signerName, approved: c.approved, failed: c.failed, usages: c.usages, org: c.org, dnsNames: c.dnsNames})
-			if err := s.handle(csr); err != nil && !c.err {
+			ctx := context.TODO()
+			if err := s.handle(ctx, csr); err != nil && !c.err {
 				t.Errorf("unexpected err: %v", err)
 			}
 			c.verify(t, client.Actions())
@@ -360,83 +414,63 @@ func Test_signer_duration(t *testing.T) {
 		name              string
 		certTTL           time.Duration
 		expirationSeconds *int32
-		wantGateEnabled   time.Duration
-		wantGateDisabled  time.Duration
+		want              time.Duration
 	}{
 		{
 			name:              "can request shorter duration than TTL",
 			certTTL:           time.Hour,
 			expirationSeconds: csr.DurationToExpirationSeconds(30 * time.Minute),
-			wantGateEnabled:   30 * time.Minute,
-			wantGateDisabled:  time.Hour,
+			want:              30 * time.Minute,
 		},
 		{
 			name:              "cannot request longer duration than TTL",
 			certTTL:           time.Hour,
 			expirationSeconds: csr.DurationToExpirationSeconds(3 * time.Hour),
-			wantGateEnabled:   time.Hour,
-			wantGateDisabled:  time.Hour,
+			want:              time.Hour,
 		},
 		{
 			name:              "cannot request negative duration",
 			certTTL:           time.Hour,
 			expirationSeconds: csr.DurationToExpirationSeconds(-time.Minute),
-			wantGateEnabled:   10 * time.Minute,
-			wantGateDisabled:  time.Hour,
+			want:              10 * time.Minute,
 		},
 		{
 			name:              "cannot request duration less than 10 mins",
 			certTTL:           time.Hour,
 			expirationSeconds: csr.DurationToExpirationSeconds(10*time.Minute - time.Second),
-			wantGateEnabled:   10 * time.Minute,
-			wantGateDisabled:  time.Hour,
+			want:              10 * time.Minute,
 		},
 		{
 			name:              "can request duration of exactly 10 mins",
 			certTTL:           time.Hour,
 			expirationSeconds: csr.DurationToExpirationSeconds(10 * time.Minute),
-			wantGateEnabled:   10 * time.Minute,
-			wantGateDisabled:  time.Hour,
+			want:              10 * time.Minute,
 		},
 		{
 			name:              "can request duration equal to the default",
 			certTTL:           time.Hour,
 			expirationSeconds: csr.DurationToExpirationSeconds(time.Hour),
-			wantGateEnabled:   time.Hour,
-			wantGateDisabled:  time.Hour,
+			want:              time.Hour,
 		},
 		{
 			name:              "can choose not to request a duration to get the default",
 			certTTL:           time.Hour,
 			expirationSeconds: nil,
-			wantGateEnabled:   time.Hour,
-			wantGateDisabled:  time.Hour,
+			want:              time.Hour,
 		},
 	}
 	for _, tt := range tests {
 		tt := tt
 
-		f := func(t *testing.T, want time.Duration) {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			s := &signer{
 				certTTL: tt.certTTL,
 			}
-			if got := s.duration(tt.expirationSeconds); got != want {
-				t.Errorf("duration() = %v, want %v", got, want)
+			if got := s.duration(tt.expirationSeconds); got != tt.want {
+				t.Errorf("duration() = %v, want %v", got, tt.want)
 			}
-		}
-
-		// regular tests
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel() // these are safe to run in parallel but not the feature gate disabled tests
-
-			f(t, tt.wantGateEnabled)
 		})
-
-		// same tests with the feature gate disabled
-		t.Run("feature gate disabled - "+tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSRDuration, false)()
-			f(t, tt.wantGateDisabled)
-		})
-
 	}
 }

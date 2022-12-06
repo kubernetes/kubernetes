@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/install"
 	clientauthenticationv1 "k8s.io/client-go/pkg/apis/clientauthentication/v1"
-	clientauthenticationv1alpha1 "k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
 	clientauthenticationv1beta1 "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/metrics"
@@ -73,9 +72,8 @@ var (
 	globalCache = newCache()
 	// The list of API versions we accept.
 	apiVersions = map[string]schema.GroupVersion{
-		clientauthenticationv1alpha1.SchemeGroupVersion.String(): clientauthenticationv1alpha1.SchemeGroupVersion,
-		clientauthenticationv1beta1.SchemeGroupVersion.String():  clientauthenticationv1beta1.SchemeGroupVersion,
-		clientauthenticationv1.SchemeGroupVersion.String():       clientauthenticationv1.SchemeGroupVersion,
+		clientauthenticationv1beta1.SchemeGroupVersion.String(): clientauthenticationv1beta1.SchemeGroupVersion,
+		clientauthenticationv1.SchemeGroupVersion.String():      clientauthenticationv1.SchemeGroupVersion,
 	}
 )
 
@@ -201,13 +199,17 @@ func newAuthenticator(c *cache, isTerminalFunc func(int) bool, config *api.ExecC
 		now:             time.Now,
 		environ:         os.Environ,
 
-		defaultDialer: defaultDialer,
-		connTracker:   connTracker,
+		connTracker: connTracker,
 	}
 
 	for _, env := range config.Env {
 		a.env = append(a.env, env.Name+"="+env.Value)
 	}
+
+	// these functions are made comparable and stored in the cache so that repeated clientset
+	// construction with the same rest.Config results in a single TLS cache and Authenticator
+	a.getCert = &transport.GetCertHolder{GetCert: a.cert}
+	a.dial = &transport.DialHolder{Dial: defaultDialer.DialContext}
 
 	return c.put(key, a), nil
 }
@@ -263,8 +265,6 @@ type Authenticator struct {
 	now             func() time.Time
 	environ         func() []string
 
-	// defaultDialer is used for clients which don't specify a custom dialer
-	defaultDialer *connrotation.Dialer
 	// connTracker tracks all connections opened that we need to close when rotating a client certificate
 	connTracker *connrotation.ConnectionTracker
 
@@ -275,6 +275,12 @@ type Authenticator struct {
 	mu          sync.Mutex
 	cachedCreds *credentials
 	exp         time.Time
+
+	// getCert makes Authenticator.cert comparable to support TLS config caching
+	getCert *transport.GetCertHolder
+	// dial is used for clients which do not specify a custom dialer
+	// it is comparable to support TLS config caching
+	dial *transport.DialHolder
 }
 
 type credentials struct {
@@ -290,8 +296,8 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	// also configured to allow client certificates for authentication. For requests
 	// like "kubectl get --token (token) pods" we should assume the intention is to
 	// use the provided token for authentication. The same can be said for when the
-	// user specifies basic auth.
-	if c.HasTokenAuth() || c.HasBasicAuth() {
+	// user specifies basic auth or cert auth.
+	if c.HasTokenAuth() || c.HasBasicAuth() || c.HasCertAuth() {
 		return nil
 	}
 
@@ -299,20 +305,23 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 		return &roundTripper{a, rt}
 	})
 
-	if c.TLS.GetCert != nil {
+	if c.HasCertCallback() {
 		return errors.New("can't add TLS certificate callback: transport.Config.TLS.GetCert already set")
 	}
-	c.TLS.GetCert = a.cert
+	c.TLS.GetCertHolder = a.getCert // comparable for TLS config caching
 
-	var d *connrotation.Dialer
-	if c.Dial != nil {
+	if c.DialHolder != nil {
+		if c.DialHolder.Dial == nil {
+			return errors.New("invalid transport.Config.DialHolder: wrapped Dial function is nil")
+		}
+
 		// if c has a custom dialer, we have to wrap it
-		d = connrotation.NewDialerWithTracker(c.Dial, a.connTracker)
+		// TLS config caching is not supported for this config
+		d := connrotation.NewDialerWithTracker(c.DialHolder.Dial, a.connTracker)
+		c.DialHolder = &transport.DialHolder{Dial: d.DialContext}
 	} else {
-		d = a.defaultDialer
+		c.DialHolder = a.dial // comparable for TLS config caching
 	}
-
-	c.Dial = d.DialContext
 
 	return nil
 }
@@ -348,11 +357,7 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	if res.StatusCode == http.StatusUnauthorized {
-		resp := &clientauthentication.Response{
-			Header: res.Header,
-			Code:   int32(res.StatusCode),
-		}
-		if err := r.a.maybeRefreshCreds(creds, resp); err != nil {
+		if err := r.a.maybeRefreshCreds(creds); err != nil {
 			klog.Errorf("refreshing credentials: %v", err)
 		}
 	}
@@ -382,7 +387,7 @@ func (a *Authenticator) getCreds() (*credentials, error) {
 		return a.cachedCreds, nil
 	}
 
-	if err := a.refreshCredsLocked(nil); err != nil {
+	if err := a.refreshCredsLocked(); err != nil {
 		return nil, err
 	}
 
@@ -391,7 +396,7 @@ func (a *Authenticator) getCreds() (*credentials, error) {
 
 // maybeRefreshCreds executes the plugin to force a rotation of the
 // credentials, unless they were rotated already.
-func (a *Authenticator) maybeRefreshCreds(creds *credentials, r *clientauthentication.Response) error {
+func (a *Authenticator) maybeRefreshCreds(creds *credentials) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -402,12 +407,12 @@ func (a *Authenticator) maybeRefreshCreds(creds *credentials, r *clientauthentic
 		return nil
 	}
 
-	return a.refreshCredsLocked(r)
+	return a.refreshCredsLocked()
 }
 
 // refreshCredsLocked executes the plugin and reads the credentials from
 // stdout. It must be called while holding the Authenticator's mutex.
-func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) error {
+func (a *Authenticator) refreshCredsLocked() error {
 	interactive, err := a.interactiveFunc()
 	if err != nil {
 		return fmt.Errorf("exec plugin cannot support interactive mode: %w", err)
@@ -415,7 +420,6 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 
 	cred := &clientauthentication.ExecCredential{
 		Spec: clientauthentication.ExecCredentialSpec{
-			Response:    r,
 			Interactive: interactive,
 		},
 	}

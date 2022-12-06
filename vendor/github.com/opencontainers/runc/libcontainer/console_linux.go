@@ -18,7 +18,7 @@ func mountConsole(slavePath string) error {
 	if f != nil {
 		f.Close()
 	}
-	return unix.Mount(slavePath, "/dev/console", "bind", unix.MS_BIND, "")
+	return mount(slavePath, "/dev/console", "", "bind", unix.MS_BIND, "")
 }
 
 // dupStdio opens the slavePath for the console and dups the fds to the current

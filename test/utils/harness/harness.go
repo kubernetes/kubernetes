@@ -17,7 +17,6 @@ limitations under the License.
 package harness
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -29,11 +28,13 @@ import (
 //
 // Example usage:
 // ```
-// func MyTest(tt *testing.T) {
-//   t := harness.For(tt)
-//   defer t.Close()
-//   ...
-// }
+//
+//	func MyTest(tt *testing.T) {
+//	  t := harness.For(tt)
+//	  defer t.Close()
+//	  ...
+//	}
+//
 // ```
 type Harness struct {
 	*testing.T
@@ -56,11 +57,11 @@ func (h *Harness) Close() {
 	}
 }
 
-// TempDir is a wrapper around ioutil.TempDir for tests.
+// TempDir is a wrapper around os.MkdirTemp for tests.
 // It automatically fails the test if we can't create a temp file,
 // and deletes the temp directory when Close is called on the Harness
 func (h *Harness) TempDir(baseDir string, prefix string) string {
-	tempDir, err := ioutil.TempDir(baseDir, prefix)
+	tempDir, err := os.MkdirTemp(baseDir, prefix)
 	if err != nil {
 		h.Fatalf("unable to create tempdir: %v", err)
 	}

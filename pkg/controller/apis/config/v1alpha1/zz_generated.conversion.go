@@ -96,9 +96,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_DeprecatedControllerConfiguration_To_config_DeprecatedControllerConfiguration(in *v1alpha1.DeprecatedControllerConfiguration, out *config.DeprecatedControllerConfiguration, s conversion.Scope) error {
-	out.DeletingPodsQPS = in.DeletingPodsQPS
-	out.DeletingPodsBurst = in.DeletingPodsBurst
-	out.RegisterRetryCount = in.RegisterRetryCount
 	return nil
 }
 
@@ -108,9 +105,6 @@ func Convert_v1alpha1_DeprecatedControllerConfiguration_To_config_DeprecatedCont
 }
 
 func autoConvert_config_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration(in *config.DeprecatedControllerConfiguration, out *v1alpha1.DeprecatedControllerConfiguration, s conversion.Scope) error {
-	out.DeletingPodsQPS = in.DeletingPodsQPS
-	out.DeletingPodsBurst = in.DeletingPodsBurst
-	out.RegisterRetryCount = in.RegisterRetryCount
 	return nil
 }
 

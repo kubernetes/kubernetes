@@ -107,7 +107,3 @@ func (f *flexVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) 
 func (f *flexVolumeMounter) GetAttributes() volume.Attributes {
 	return (*mounterDefaults)(f).GetAttributes()
 }
-
-func (f *flexVolumeMounter) CanMount() error {
-	return nil
-}

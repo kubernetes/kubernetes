@@ -33,7 +33,6 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/apis/audit/install"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 )
 
@@ -145,7 +144,7 @@ func TestLogEventsJson(t *testing.T) {
 			},
 		},
 	} {
-		versions := []schema.GroupVersion{auditv1.SchemeGroupVersion, auditv1beta1.SchemeGroupVersion}
+		versions := []schema.GroupVersion{auditv1.SchemeGroupVersion}
 		for _, version := range versions {
 			var buf bytes.Buffer
 			backend := NewBackend(&buf, FormatJson, version)

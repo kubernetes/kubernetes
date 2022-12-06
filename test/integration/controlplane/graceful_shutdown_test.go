@@ -18,7 +18,6 @@ package controlplane
 
 import (
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sync"
 	"testing"
@@ -55,7 +54,7 @@ func TestGracefulShutdown(t *testing.T) {
 		if respErr.err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		bs, err := ioutil.ReadAll(respErr.resp.Body)
+		bs, err := io.ReadAll(respErr.resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -71,7 +70,14 @@ func TestGracefulShutdown(t *testing.T) {
 	resp.Body.Close()
 
 	t.Logf("shutting down server")
-	tearDownOnce.Do(server.TearDownFn)
+	// We tear it down in the background to ensure that
+	// pending requests should work fine.
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		tearDownOnce.Do(server.TearDownFn)
+	}()
 
 	t.Logf("server should fail new requests")
 	if err := wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, func() (done bool, err error) {
@@ -96,11 +102,13 @@ func TestGracefulShutdown(t *testing.T) {
 		t.Fatal(respErr.err)
 	}
 	defer respErr.resp.Body.Close()
-	bs, err := ioutil.ReadAll(respErr.resp.Body)
+	bs, err := io.ReadAll(respErr.resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("response: code %d, body: %s", respErr.resp.StatusCode, string(bs))
+
+	wg.Wait()
 }
 
 type responseErrorPair struct {

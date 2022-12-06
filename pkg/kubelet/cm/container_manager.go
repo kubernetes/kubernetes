@@ -22,7 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -47,7 +50,7 @@ type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService) error
+	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -73,7 +76,7 @@ type ContainerManager interface {
 	GetNodeAllocatableReservation() v1.ResourceList
 
 	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
-	GetCapacity() v1.ResourceList
+	GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList
 
 	// GetDevicePluginResourceCapacity returns the node capacity (amount of total device plugin resources),
 	// node allocatable (amount of total healthy resources reported by device plugin),
@@ -115,6 +118,16 @@ type ContainerManager interface {
 	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
 	GetNodeAllocatableAbsolute() v1.ResourceList
 
+	// PrepareResource prepares pod resources
+	PrepareResources(pod *v1.Pod, container *v1.Container) (*dra.ContainerInfo, error)
+
+	// UnrepareResources unprepares pod resources
+	UnprepareResources(*v1.Pod) error
+
+	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
+	// might need to unprepare resources.
+	PodMightNeedToUnprepareResources(UID types.UID) bool
+
 	// Implements the podresources Provider API for CPUs, Memory and Devices
 	podresources.CPUsProvider
 	podresources.DevicesProvider
@@ -125,6 +138,7 @@ type NodeConfig struct {
 	RuntimeCgroupsName    string
 	SystemCgroupsName     string
 	KubeletCgroupsName    string
+	KubeletOOMScoreAdj    int32
 	ContainerRuntime      string
 	CgroupsPerQOS         bool
 	CgroupRoot            string
@@ -132,17 +146,18 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	QOSReserved                             map[v1.ResourceName]int64
-	ExperimentalCPUManagerPolicy            string
-	ExperimentalCPUManagerPolicyOptions     map[string]string
-	ExperimentalTopologyManagerScope        string
-	ExperimentalCPUManagerReconcilePeriod   time.Duration
-	ExperimentalMemoryManagerPolicy         string
-	ExperimentalMemoryManagerReservedMemory []kubeletconfig.MemoryReservation
-	ExperimentalPodPidsLimit                int64
-	EnforceCPULimits                        bool
-	CPUCFSQuotaPeriod                       time.Duration
-	ExperimentalTopologyManagerPolicy       string
+	QOSReserved                              map[v1.ResourceName]int64
+	CPUManagerPolicy                         string
+	CPUManagerPolicyOptions                  map[string]string
+	ExperimentalTopologyManagerScope         string
+	CPUManagerReconcilePeriod                time.Duration
+	ExperimentalMemoryManagerPolicy          string
+	ExperimentalMemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
+	ExperimentalPodPidsLimit                 int64
+	EnforceCPULimits                         bool
+	CPUCFSQuotaPeriod                        time.Duration
+	ExperimentalTopologyManagerPolicy        string
+	ExperimentalTopologyManagerPolicyOptions map[string]string
 }
 
 type NodeAllocatableConfig struct {

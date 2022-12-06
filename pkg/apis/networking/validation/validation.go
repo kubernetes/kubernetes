@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -53,6 +54,10 @@ var (
 		networking.IngressClassParametersReferenceScopeCluster,
 	)
 )
+
+type NetworkPolicyValidationOptions struct {
+	AllowInvalidLabelValueInSelector bool
+}
 
 // ValidateNetworkPolicyName can be used to check whether the given networkpolicy
 // name is valid.
@@ -97,17 +102,20 @@ func ValidateNetworkPolicyPort(port *networking.NetworkPolicyPort, portPath *fie
 }
 
 // ValidateNetworkPolicyPeer validates a NetworkPolicyPeer
-func ValidateNetworkPolicyPeer(peer *networking.NetworkPolicyPeer, peerPath *field.Path) field.ErrorList {
+func ValidateNetworkPolicyPeer(peer *networking.NetworkPolicyPeer, opts NetworkPolicyValidationOptions, peerPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	numPeers := 0
+	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
+		AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
+	}
 
 	if peer.PodSelector != nil {
 		numPeers++
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(peer.PodSelector, peerPath.Child("podSelector"))...)
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(peer.PodSelector, labelSelectorValidationOpts, peerPath.Child("podSelector"))...)
 	}
 	if peer.NamespaceSelector != nil {
 		numPeers++
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(peer.NamespaceSelector, peerPath.Child("namespaceSelector"))...)
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(peer.NamespaceSelector, labelSelectorValidationOpts, peerPath.Child("namespaceSelector"))...)
 	}
 	if peer.IPBlock != nil {
 		numPeers++
@@ -124,9 +132,16 @@ func ValidateNetworkPolicyPeer(peer *networking.NetworkPolicyPeer, peerPath *fie
 }
 
 // ValidateNetworkPolicySpec tests if required fields in the networkpolicy spec are set.
-func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *field.Path) field.ErrorList {
+func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, opts NetworkPolicyValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&spec.PodSelector, fldPath.Child("podSelector"))...)
+	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
+		AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
+	}
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(
+		&spec.PodSelector,
+		labelSelectorValidationOpts,
+		fldPath.Child("podSelector"),
+	)...)
 
 	// Validate ingress rules.
 	for i, ingress := range spec.Ingress {
@@ -137,7 +152,7 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *fiel
 		}
 		for i, from := range ingress.From {
 			fromPath := ingressPath.Child("from").Index(i)
-			allErrs = append(allErrs, ValidateNetworkPolicyPeer(&from, fromPath)...)
+			allErrs = append(allErrs, ValidateNetworkPolicyPeer(&from, opts, fromPath)...)
 		}
 	}
 	// Validate egress rules
@@ -149,7 +164,7 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *fiel
 		}
 		for i, to := range egress.To {
 			toPath := egressPath.Child("to").Index(i)
-			allErrs = append(allErrs, ValidateNetworkPolicyPeer(&to, toPath)...)
+			allErrs = append(allErrs, ValidateNetworkPolicyPeer(&to, opts, toPath)...)
 		}
 	}
 	// Validate PolicyTypes
@@ -168,18 +183,39 @@ func ValidateNetworkPolicySpec(spec *networking.NetworkPolicySpec, fldPath *fiel
 }
 
 // ValidateNetworkPolicy validates a networkpolicy.
-func ValidateNetworkPolicy(np *networking.NetworkPolicy) field.ErrorList {
+func ValidateNetworkPolicy(np *networking.NetworkPolicy, opts NetworkPolicyValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&np.ObjectMeta, true, ValidateNetworkPolicyName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateNetworkPolicySpec(&np.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateNetworkPolicySpec(&np.Spec, opts, field.NewPath("spec"))...)
 	return allErrs
 }
 
+// ValidationOptionsForNetworking generates NetworkPolicyValidationOptions for Networking
+func ValidationOptionsForNetworking(new, old *networking.NetworkPolicy) NetworkPolicyValidationOptions {
+	opts := NetworkPolicyValidationOptions{
+		AllowInvalidLabelValueInSelector: false,
+	}
+	if old != nil {
+		labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
+			AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
+		}
+		if len(unversionedvalidation.ValidateLabelSelector(&old.Spec.PodSelector, labelSelectorValidationOpts, nil)) > 0 {
+			opts.AllowInvalidLabelValueInSelector = true
+		}
+	}
+	return opts
+}
+
 // ValidateNetworkPolicyUpdate tests if an update to a NetworkPolicy is valid.
-func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy) field.ErrorList {
+func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy, opts NetworkPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, ValidateNetworkPolicySpec(&update.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateNetworkPolicySpec(&update.Spec, opts, field.NewPath("spec"))...)
 	return allErrs
+}
+
+// ValidateNetworkPolicyStatusUpdate tests if an update to a NetworkPolicy status is valid
+func ValidateNetworkPolicyStatusUpdate(status, oldstatus networking.NetworkPolicyStatus, fldPath *field.Path) field.ErrorList {
+	return unversionedvalidation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))
 }
 
 // ValidateIPBlock validates a cidr and the except fields of an IpBlock NetworkPolicyPeer
@@ -313,7 +349,29 @@ func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path, opts
 // ValidateIngressStatusUpdate tests if required fields in the Ingress are set when updating status.
 func ValidateIngressStatusUpdate(ingress, oldIngress *networking.Ingress) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, apivalidation.ValidateLoadBalancerStatus(&ingress.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
+	allErrs = append(allErrs, ValidateIngressLoadBalancerStatus(&ingress.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
+	return allErrs
+}
+
+// ValidateLIngressoadBalancerStatus validates required fields on an IngressLoadBalancerStatus
+func ValidateIngressLoadBalancerStatus(status *networking.IngressLoadBalancerStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, ingress := range status.Ingress {
+		idxPath := fldPath.Child("ingress").Index(i)
+		if len(ingress.IP) > 0 {
+			if isIP := (netutils.ParseIPSloppy(ingress.IP) != nil); !isIP {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
+			}
+		}
+		if len(ingress.Hostname) > 0 {
+			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
+			}
+			if isIP := (netutils.ParseIPSloppy(ingress.Hostname) != nil); isIP {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, "must be a DNS name, not an IP address"))
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -596,4 +654,90 @@ func allowInvalidWildcardHostRule(oldIngress *networking.Ingress) bool {
 		}
 	}
 	return false
+}
+
+// ValidateClusterCIDRName validates that the given name can be used as an
+// ClusterCIDR name.
+var ValidateClusterCIDRName = apimachineryvalidation.NameIsDNSLabel
+
+// ValidateClusterCIDR validates a ClusterCIDR.
+func ValidateClusterCIDR(cc *networking.ClusterCIDR) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&cc.ObjectMeta, false, ValidateClusterCIDRName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateClusterCIDRSpec(&cc.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateClusterCIDRSpec validates ClusterCIDR Spec.
+func ValidateClusterCIDRSpec(spec *networking.ClusterCIDRSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.NodeSelector != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNodeSelector(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
+	}
+
+	// Validate if CIDR is specified for at least one IP Family(IPv4/IPv6).
+	if spec.IPv4 == "" && spec.IPv6 == "" {
+		allErrs = append(allErrs, field.Required(fldPath, "one or both of `ipv4` and `ipv6` must be specified"))
+		return allErrs
+	}
+
+	// Validate specified IPv4 CIDR and PerNodeHostBits.
+	if spec.IPv4 != "" {
+		allErrs = append(allErrs, validateCIDRConfig(spec.IPv4, spec.PerNodeHostBits, 32, v1.IPv4Protocol, fldPath)...)
+	}
+
+	// Validate specified IPv6 CIDR and PerNodeHostBits.
+	if spec.IPv6 != "" {
+		allErrs = append(allErrs, validateCIDRConfig(spec.IPv6, spec.PerNodeHostBits, 128, v1.IPv6Protocol, fldPath)...)
+	}
+
+	return allErrs
+}
+
+func validateCIDRConfig(configCIDR string, perNodeHostBits, maxMaskSize int32, ipFamily v1.IPFamily, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	minPerNodeHostBits := int32(4)
+
+	ip, ipNet, err := netutils.ParseCIDRSloppy(configCIDR)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child(string(ipFamily)), configCIDR, fmt.Sprintf("must be a valid CIDR: %s", configCIDR)))
+		return allErrs
+	}
+
+	if ipFamily == v1.IPv4Protocol && !netutils.IsIPv4(ip) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child(string(ipFamily)), configCIDR, "must be a valid IPv4 CIDR"))
+	}
+	if ipFamily == v1.IPv6Protocol && !netutils.IsIPv6(ip) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child(string(ipFamily)), configCIDR, "must be a valid IPv6 CIDR"))
+	}
+
+	// Validate PerNodeHostBits
+	maskSize, _ := ipNet.Mask.Size()
+	maxPerNodeHostBits := maxMaskSize - int32(maskSize)
+
+	if perNodeHostBits < minPerNodeHostBits {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perNodeHostBits"), perNodeHostBits, fmt.Sprintf("must be greater than or equal to %d", minPerNodeHostBits)))
+	}
+	if perNodeHostBits > maxPerNodeHostBits {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perNodeHostBits"), perNodeHostBits, fmt.Sprintf("must be less than or equal to %d", maxPerNodeHostBits)))
+	}
+	return allErrs
+}
+
+// ValidateClusterCIDRUpdate tests if an update to a ClusterCIDR is valid.
+func ValidateClusterCIDRUpdate(update, old *networking.ClusterCIDR) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validateClusterCIDRUpdateSpec(&update.Spec, &old.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateClusterCIDRUpdateSpec(update, old *networking.ClusterCIDRSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.NodeSelector, old.NodeSelector, fldPath.Child("nodeSelector"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.PerNodeHostBits, old.PerNodeHostBits, fldPath.Child("perNodeHostBits"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv4, old.IPv4, fldPath.Child("ipv4"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv6, old.IPv6, fldPath.Child("ipv6"))...)
+
+	return allErrs
 }

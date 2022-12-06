@@ -39,7 +39,7 @@ func TestNewCmdCompletion(t *testing.T) {
 	cmd := newCmdCompletion(&out, "")
 	parentCmd.AddCommand(cmd)
 	if err := parentCmd.Execute(); err != nil {
-		t.Errorf("Cannot exectute newCmdCompletion: %v", err)
+		t.Errorf("Cannot execute newCmdCompletion: %v", err)
 	}
 }
 

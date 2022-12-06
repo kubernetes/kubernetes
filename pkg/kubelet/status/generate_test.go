@@ -21,7 +21,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"k8s.io/api/core/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func TestGenerateContainersReadyCondition(t *testing.T) {
@@ -414,6 +419,77 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 		assert.Equal(t, test.expected.Status, condition.Status)
 		assert.Equal(t, test.expected.Reason, condition.Reason)
 
+	}
+}
+
+func TestGeneratePodHasNetworkCondition(t *testing.T) {
+	for desc, test := range map[string]struct {
+		pod      *v1.Pod
+		status   *kubecontainer.PodStatus
+		expected v1.PodCondition
+	}{
+		"Empty pod status": {
+			pod:    &v1.Pod{},
+			status: &kubecontainer.PodStatus{},
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+			},
+		},
+		"Pod sandbox status not ready": {
+			pod: &v1.Pod{},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_NOTREADY,
+					},
+				},
+			},
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+			},
+		},
+		"Pod sandbox status ready but no IP configured": {
+			pod: &v1.Pod{},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+					},
+				},
+			},
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+			},
+		},
+		"Pod sandbox status ready and IP configured": {
+			pod: &v1.Pod{},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "10.0.0.10",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+					},
+				},
+			},
+			expected: v1.PodCondition{
+				Status: v1.ConditionTrue,
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			test.expected.Type = kubetypes.PodHasNetwork
+			condition := GeneratePodHasNetworkCondition(test.pod, test.status)
+			require.Equal(t, test.expected.Type, condition.Type)
+			require.Equal(t, test.expected.Status, condition.Status)
+		})
 	}
 }
 

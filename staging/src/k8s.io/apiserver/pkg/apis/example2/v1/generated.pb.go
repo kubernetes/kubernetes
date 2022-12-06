@@ -18,15 +18,17 @@ limitations under the License.
 // source: k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/example2/v1/generated.proto
 
 /*
-	Package v1 is a generated protocol buffer package.
+Package v1 is a generated protocol buffer package.
 
-	It is generated from these files:
-		k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/example2/v1/generated.proto
+It is generated from these files:
 
-	It has these top-level messages:
-		ReplicaSet
-		ReplicaSetSpec
-		ReplicaSetStatus
+	k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/example2/v1/generated.proto
+
+It has these top-level messages:
+
+	ReplicaSet
+	ReplicaSetSpec
+	ReplicaSetStatus
 */
 package v1
 

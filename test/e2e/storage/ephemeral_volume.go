@@ -30,8 +30,9 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var (
@@ -45,6 +46,7 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 	)
 
 	f := framework.NewDefaultFramework("pv")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -52,6 +54,7 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 
 	ginkgo.Describe("When pod refers to non-existent ephemeral storage", func() {
 		for _, testSource := range invalidEphemeralSource("pod-ephm-test") {
+			testSource := testSource
 			ginkgo.It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func() {
 				pod := testEphemeralVolumePod(f, testSource.volumeType, testSource.source)
 				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})

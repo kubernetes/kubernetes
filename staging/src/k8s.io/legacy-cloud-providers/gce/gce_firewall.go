@@ -66,3 +66,12 @@ func (g *Cloud) UpdateFirewall(f *compute.Firewall) error {
 	mc := newFirewallMetricContext("update")
 	return mc.Observe(g.c.Firewalls().Update(ctx, meta.GlobalKey(f.Name), f))
 }
+
+// PatchFirewall applies the given firewall as an update to an existing service.
+func (g *Cloud) PatchFirewall(f *compute.Firewall) error {
+	ctx, cancel := cloud.ContextWithCallTimeout()
+	defer cancel()
+
+	mc := newFirewallMetricContext("Patch")
+	return mc.Observe(g.c.Firewalls().Patch(ctx, meta.GlobalKey(f.Name), f))
+}

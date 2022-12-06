@@ -105,9 +105,6 @@ func (t *Tester) TestNamespace() string {
 // TestContext returns a namespaced context that will be used when making storage calls.
 // Namespace is determined by TestNamespace()
 func (t *Tester) TestContext() context.Context {
-	if t.clusterScope {
-		return genericapirequest.NewContext()
-	}
 	return genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace())
 }
 
@@ -171,8 +168,6 @@ func (t *Tester) TestCreate(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testCreateInvokesValidation(opts, invalid...)
 	t.testCreateValidatesNames(valid.DeepCopyObject(), dryRunOpts)
 	t.testCreateValidatesNames(valid.DeepCopyObject(), opts)
-	t.testCreateIgnoreClusterName(valid.DeepCopyObject(), dryRunOpts)
-	t.testCreateIgnoreClusterName(valid.DeepCopyObject(), opts)
 }
 
 // Test updating an object.
@@ -193,7 +188,6 @@ func (t *Tester) TestUpdate(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testUpdatePropagatesUpdatedObjectError(valid.DeepCopyObject(), createFn, getFn, dryRunOpts)
 	t.testUpdatePropagatesUpdatedObjectError(valid.DeepCopyObject(), createFn, getFn, opts)
 	t.testUpdateIgnoreGenerationUpdates(valid.DeepCopyObject(), createFn, getFn)
-	t.testUpdateIgnoreClusterName(valid.DeepCopyObject(), createFn, getFn)
 }
 
 // Test deleting an object.
@@ -509,22 +503,6 @@ func (t *Tester) testCreateResetsUserData(valid runtime.Object, opts metav1.Crea
 	}
 }
 
-func (t *Tester) testCreateIgnoreClusterName(valid runtime.Object, opts metav1.CreateOptions) {
-	objectMeta := t.getObjectMetaOrFail(valid)
-	objectMeta.SetName(t.namer(3))
-	objectMeta.SetClusterName("clustername-to-ignore")
-
-	obj, err := t.storage.(rest.Creater).Create(t.TestContext(), valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	defer t.delete(t.TestContext(), obj)
-	createdObjectMeta := t.getObjectMetaOrFail(obj)
-	if len(createdObjectMeta.GetClusterName()) != 0 {
-		t.Errorf("Expected empty clusterName on created object, got '%v'", createdObjectMeta.GetClusterName())
-	}
-}
-
 // =============================================================================
 // Update tests.
 
@@ -793,41 +771,6 @@ func (t *Tester) testUpdateRejectsMismatchedNamespace(obj runtime.Object, create
 	}
 }
 
-func (t *Tester) testUpdateIgnoreClusterName(obj runtime.Object, createFn CreateFunc, getFn GetFunc) {
-	ctx := t.TestContext()
-
-	foo := obj.DeepCopyObject()
-	name := t.namer(9)
-	t.setObjectMeta(foo, name)
-
-	if err := createFn(ctx, foo); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	storedFoo, err := getFn(ctx, foo)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	older := storedFoo.DeepCopyObject()
-	olderMeta := t.getObjectMetaOrFail(older)
-	olderMeta.SetClusterName("clustername-to-ignore")
-
-	_, _, err = t.storage.(rest.Updater).Update(t.TestContext(), olderMeta.GetName(), rest.DefaultUpdatedObjectInfo(older), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	updatedFoo, err := getFn(ctx, older)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if clusterName := t.getObjectMetaOrFail(updatedFoo).GetClusterName(); len(clusterName) != 0 {
-		t.Errorf("Unexpected clusterName update: expected empty, got %v", clusterName)
-	}
-
-}
-
 // =============================================================================
 // Deletion tests.
 
@@ -878,8 +821,8 @@ func (t *Tester) testDeleteNonExist(obj runtime.Object, opts metav1.DeleteOption
 
 }
 
-//  This test the fast-fail path. We test that the precondition gets verified
-//  again before deleting the object in tests of pkg/storage/etcd.
+// This test the fast-fail path. We test that the precondition gets verified
+// again before deleting the object in tests of pkg/storage/etcd.
 func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc, opts metav1.DeleteOptions) {
 	ctx := t.TestContext()
 
@@ -915,8 +858,8 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	}
 }
 
-//  This test the fast-fail path. We test that the precondition gets verified
-//  again before deleting the object in tests of pkg/storage/etcd.
+// This test the fast-fail path. We test that the precondition gets verified
+// again before deleting the object in tests of pkg/storage/etcd.
 func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc, opts metav1.DeleteOptions) {
 	ctx := t.TestContext()
 
@@ -1456,13 +1399,12 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	}
 	m.SetContinue("continuetoken")
 	m.SetResourceVersion("11")
-	m.SetSelfLink("/list/link")
 
 	table, err := t.storage.(rest.TableConvertor).ConvertToTable(ctx, listObj, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if table.ResourceVersion != "11" || table.SelfLink != "/list/link" || table.Continue != "continuetoken" {
+	if table.ResourceVersion != "11" || table.Continue != "continuetoken" {
 		t.Errorf("printer lost list meta: %#v", table.ListMeta)
 	}
 	if len(table.Rows) != len(items) {

@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 const (
@@ -64,6 +66,10 @@ type Items struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (i *Items) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshaling {
+		return jsonv2.Unmarshal(data, i)
+	}
+
 	var validations CommonValidations
 	if err := json.Unmarshal(data, &validations); err != nil {
 		return err
@@ -84,6 +90,28 @@ func (i *Items) UnmarshalJSON(data []byte) error {
 	i.CommonValidations = validations
 	i.SimpleSchema = simpleSchema
 	i.VendorExtensible = vendorExtensible
+	return nil
+}
+
+func (i *Items) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		CommonValidations
+		SimpleSchema
+		Extensions
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	if err := i.Refable.Ref.fromMap(x.Extensions); err != nil {
+		return err
+	}
+	x.Extensions.sanitize()
+	if len(x.Extensions) == 0 {
+		x.Extensions = nil
+	}
+	i.CommonValidations = x.CommonValidations
+	i.SimpleSchema = x.SimpleSchema
+	i.VendorExtensible.Extensions = x.Extensions
 	return nil
 }
 

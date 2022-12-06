@@ -114,11 +114,11 @@ const (
 // NewCachingConfigMapManager creates a manager that keeps a cache of all configmaps
 // necessary for registered pods.
 // It implement the following logic:
-// - whenever a pod is create or updated, the cached versions of all configmaps
-//   are invalidated
-// - every GetObject() call tries to fetch the value from local cache; if it is
-//   not there, invalidated or too old, we fetch it from apiserver and refresh the
-//   value in cache; otherwise it is just fetched from cache
+//   - whenever a pod is create or updated, the cached versions of all configmaps
+//     are invalidated
+//   - every GetObject() call tries to fetch the value from local cache; if it is
+//     not there, invalidated or too old, we fetch it from apiserver and refresh the
+//     value in cache; otherwise it is just fetched from cache
 func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.GetObjectTTLFunc) Manager {
 	getConfigMap := func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
 		return kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, opts)
@@ -132,9 +132,9 @@ func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.G
 // NewWatchingConfigMapManager creates a manager that keeps a cache of all configmaps
 // necessary for registered pods.
 // It implements the following logic:
-// - whenever a pod is created or updated, we start individual watches for all
-//   referenced objects that aren't referenced from other registered pods
-// - every GetObject() returns a value from local cache propagated via watches
+//   - whenever a pod is created or updated, we start individual watches for all
+//     referenced objects that aren't referenced from other registered pods
+//   - every GetObject() returns a value from local cache propagated via watches
 func NewWatchingConfigMapManager(kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
 	listConfigMap := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
 		return kubeClient.CoreV1().ConfigMaps(namespace).List(context.TODO(), opts)

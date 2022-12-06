@@ -54,13 +54,13 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade",
 		Short: "Upgrade your cluster smoothly to a newer version with this command",
-		RunE:  cmdutil.SubCmdRunE("upgrade"),
+		Run:   cmdutil.SubCmdRun(),
 	}
 
 	cmd.AddCommand(newCmdApply(flags))
 	cmd.AddCommand(newCmdPlan(flags))
 	cmd.AddCommand(newCmdDiff(out))
-	cmd.AddCommand(newCmdNode())
+	cmd.AddCommand(newCmdNode(out))
 	return cmd
 }
 

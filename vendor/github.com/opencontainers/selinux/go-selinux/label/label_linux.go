@@ -1,12 +1,13 @@
 package label
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"os/user"
 	"strings"
 
 	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/pkg/errors"
 )
 
 // Valid Label Options
@@ -53,11 +54,11 @@ func InitLabels(options []string) (plabel string, mlabel string, retErr error) {
 				return "", selinux.PrivContainerMountLabel(), nil
 			}
 			if i := strings.Index(opt, ":"); i == -1 {
-				return "", "", errors.Errorf("Bad label option %q, valid options 'disable' or \n'user, role, level, type, filetype' followed by ':' and a value", opt)
+				return "", "", fmt.Errorf("Bad label option %q, valid options 'disable' or \n'user, role, level, type, filetype' followed by ':' and a value", opt)
 			}
 			con := strings.SplitN(opt, ":", 2)
 			if !validOptions[con[0]] {
-				return "", "", errors.Errorf("Bad label option %q, valid options 'disable, user, role, level, type, filetype'", con[0])
+				return "", "", fmt.Errorf("Bad label option %q, valid options 'disable, user, role, level, type, filetype'", con[0])
 			}
 			if con[0] == "filetype" {
 				mcon["type"] = con[1]
@@ -102,9 +103,11 @@ func SetFileCreateLabel(fileLabel string) error {
 	return selinux.SetFSCreateLabel(fileLabel)
 }
 
-// Relabel changes the label of path to the filelabel string.
+// Relabel changes the label of path and all the entries beneath the path.
 // It changes the MCS label to s0 if shared is true.
 // This will allow all containers to share the content.
+//
+// The path itself is guaranteed to be relabeled last.
 func Relabel(path string, fileLabel string, shared bool) error {
 	if !selinux.GetEnabled() || fileLabel == "" {
 		return nil
@@ -151,7 +154,7 @@ func Relabel(path string, fileLabel string, shared bool) error {
 		path = strings.TrimSuffix(path, "/")
 	}
 	if exclude_paths[path] {
-		return errors.Errorf("SELinux relabeling of %s is not allowed", path)
+		return fmt.Errorf("SELinux relabeling of %s is not allowed", path)
 	}
 
 	if shared {

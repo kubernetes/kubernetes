@@ -17,6 +17,7 @@
 package internal
 
 import (
+	"math"
 	"path"
 	"runtime/metrics"
 	"strings"
@@ -60,9 +61,9 @@ func RuntimeMetricsToProm(d *metrics.Description) (string, string, string, bool)
 	// name has - replaced with _ and is concatenated with the unit and
 	// other data.
 	name = strings.ReplaceAll(name, "-", "_")
-	name = name + "_" + unit
-	if d.Cumulative {
-		name = name + "_total"
+	name += "_" + unit
+	if d.Cumulative && d.Kind != metrics.KindFloat64Histogram {
+		name += "_total"
 	}
 
 	valid := model.IsValidMetricName(model.LabelValue(namespace + "_" + subsystem + "_" + name))
@@ -74,4 +75,68 @@ func RuntimeMetricsToProm(d *metrics.Description) (string, string, string, bool)
 		valid = false
 	}
 	return namespace, subsystem, name, valid
+}
+
+// RuntimeMetricsBucketsForUnit takes a set of buckets obtained for a runtime/metrics histogram
+// type (so, lower-bound inclusive) and a unit from a runtime/metrics name, and produces
+// a reduced set of buckets. This function always removes any -Inf bucket as it's represented
+// as the bottom-most upper-bound inclusive bucket in Prometheus.
+func RuntimeMetricsBucketsForUnit(buckets []float64, unit string) []float64 {
+	switch unit {
+	case "bytes":
+		// Re-bucket as powers of 2.
+		return reBucketExp(buckets, 2)
+	case "seconds":
+		// Re-bucket as powers of 10 and then merge all buckets greater
+		// than 1 second into the +Inf bucket.
+		b := reBucketExp(buckets, 10)
+		for i := range b {
+			if b[i] <= 1 {
+				continue
+			}
+			b[i] = math.Inf(1)
+			b = b[:i+1]
+			break
+		}
+		return b
+	}
+	return buckets
+}
+
+// reBucketExp takes a list of bucket boundaries (lower bound inclusive) and
+// downsamples the buckets to those a multiple of base apart. The end result
+// is a roughly exponential (in many cases, perfectly exponential) bucketing
+// scheme.
+func reBucketExp(buckets []float64, base float64) []float64 {
+	bucket := buckets[0]
+	var newBuckets []float64
+	// We may see a -Inf here, in which case, add it and skip it
+	// since we risk producing NaNs otherwise.
+	//
+	// We need to preserve -Inf values to maintain runtime/metrics
+	// conventions. We'll strip it out later.
+	if bucket == math.Inf(-1) {
+		newBuckets = append(newBuckets, bucket)
+		buckets = buckets[1:]
+		bucket = buckets[0]
+	}
+	// From now on, bucket should always have a non-Inf value because
+	// Infs are only ever at the ends of the bucket lists, so
+	// arithmetic operations on it are non-NaN.
+	for i := 1; i < len(buckets); i++ {
+		if bucket >= 0 && buckets[i] < bucket*base {
+			// The next bucket we want to include is at least bucket*base.
+			continue
+		} else if bucket < 0 && buckets[i] < bucket/base {
+			// In this case the bucket we're targeting is negative, and since
+			// we're ascending through buckets here, we need to divide to get
+			// closer to zero exponentially.
+			continue
+		}
+		// The +Inf bucket will always be the last one, and we'll always
+		// end up including it here because bucket
+		newBuckets = append(newBuckets, bucket)
+		bucket = buckets[i]
+	}
+	return append(newBuckets, bucket)
 }

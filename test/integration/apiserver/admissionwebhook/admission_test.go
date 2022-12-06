@@ -22,7 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path"
@@ -36,12 +36,10 @@ import (
 	admissionreviewv1 "k8s.io/api/admission/v1"
 	"k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	admissionv1 "k8s.io/api/admissionregistration/v1"
-	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -54,12 +52,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	dynamic "k8s.io/client-go/dynamic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	apisv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -137,10 +138,12 @@ var (
 	// admissionExemptResources lists objects which are exempt from admission validation/mutation,
 	// only resources exempted from admission processing by API server should be listed here.
 	admissionExemptResources = map[schema.GroupVersionResource]bool{
-		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):   true,
-		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): true,
-		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"):        true,
-		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"):      true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):      true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"):    true,
+		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"):           true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"):         true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"):       true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): true,
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
@@ -152,6 +155,7 @@ var (
 		// Non persistent Reviews resource
 		gvr("authentication.k8s.io", "v1", "tokenreviews"):                  `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
 		gvr("authentication.k8s.io", "v1beta1", "tokenreviews"):             `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
+		gvr("authentication.k8s.io", "v1alpha1", "selfsubjectreviews"):      `{"metadata": {"name": "SelfSubjectReview"},"status":{"userInfo":{}}}`,
 		gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"):      `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"uid": "token", "user": "user1","groups": ["group1","group2"],"resourceAttributes": {"name":"name1","namespace":"` + testNamespace + `"}}}`,
 		gvr("authorization.k8s.io", "v1", "subjectaccessreviews"):           `{"metadata": {"name": "", "namespace":""}, "spec": {"user":"user1","resourceAttributes": {"name":"name1", "namespace":"` + testNamespace + `"}}}`,
 		gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"):       `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,
@@ -446,6 +450,8 @@ func TestWebhookAdmissionWithoutWatchCache(t *testing.T) {
 
 // testWebhookAdmission tests communication between API server and webhook process.
 func testWebhookAdmission(t *testing.T, watchCache bool) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APISelfSubjectReview, true)()
+
 	// holder communicates expectations to webhooks, and results from webhooks
 	holder := &holder{
 		t:                 t,
@@ -493,7 +499,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 		// force enable all resources so we can check storage.
 		"--runtime-config=api/all=true",
 		// enable feature-gates that protect resources to check their storage, too.
-		"--feature-gates=EphemeralContainers=true",
+		// e.g. "--feature-gates=EphemeralContainers=true",
 	}, etcdConfig)
 	defer server.TearDownFn()
 
@@ -513,7 +519,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// create CRDs
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
-	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -577,8 +583,8 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// Note: this only works because there are no overlapping resource names in-process that are not co-located
 	convertedResources := map[string]schema.GroupVersionResource{}
 	// build the webhook rules enumerating the specific group/version/resources we want
-	convertedV1beta1Rules := []admissionv1beta1.RuleWithOperations{}
-	convertedV1Rules := []admissionv1.RuleWithOperations{}
+	convertedV1beta1Rules := []admissionregistrationv1beta1.RuleWithOperations{}
+	convertedV1Rules := []admissionregistrationv1.RuleWithOperations{}
 	for _, gvr := range gvrsToTest {
 		metaGVR := metav1.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
 
@@ -589,13 +595,13 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 			convertedGVR = gvr
 			convertedResources[gvr.Resource] = gvr
 			// add an admission rule indicating we can receive this version
-			convertedV1beta1Rules = append(convertedV1beta1Rules, admissionv1beta1.RuleWithOperations{
-				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-				Rule:       admissionv1beta1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
+			convertedV1beta1Rules = append(convertedV1beta1Rules, admissionregistrationv1beta1.RuleWithOperations{
+				Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
+				Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
 			})
-			convertedV1Rules = append(convertedV1Rules, admissionv1.RuleWithOperations{
-				Operations: []admissionv1.OperationType{admissionv1.OperationAll},
-				Rule:       admissionv1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
+			convertedV1Rules = append(convertedV1Rules, admissionregistrationv1.RuleWithOperations{
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+				Rule:       admissionregistrationv1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
 			})
 		}
 
@@ -1262,7 +1268,7 @@ func testNoPruningCustomFancy(c *testContext) {
 func newV1beta1WebhookHandler(t *testing.T, holder *holder, phase string, converted bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Error(err)
 			return
@@ -1360,7 +1366,7 @@ func newV1beta1WebhookHandler(t *testing.T, holder *holder, phase string, conver
 func newV1WebhookHandler(t *testing.T, holder *holder, phase string, converted bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Error(err)
 			return
@@ -1533,28 +1539,28 @@ func shouldTestResourceVerb(gvr schema.GroupVersionResource, resource metav1.API
 // webhook registration helpers
 //
 
-func createV1beta1ValidationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix string, client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1beta1.RuleWithOperations) error {
-	fail := admissionv1beta1.Fail
-	equivalent := admissionv1beta1.Equivalent
-	webhookConfig := &admissionv1beta1.ValidatingWebhookConfiguration{
+func createV1beta1ValidationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix string, client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionregistrationv1beta1.RuleWithOperations) error {
+	fail := admissionregistrationv1beta1.Fail
+	equivalent := admissionregistrationv1beta1.Equivalent
+	webhookConfig := &admissionregistrationv1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
-		Webhooks: []admissionv1beta1.ValidatingWebhook{
+		Webhooks: []admissionregistrationv1beta1.ValidatingWebhook{
 			{
 				Name: "admission.integration.test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
 					URL:      &endpoint,
 					CABundle: localhostCert,
 				},
-				Rules: []admissionv1beta1.RuleWithOperations{{
-					Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-					Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+				Rules: []admissionregistrationv1beta1.RuleWithOperations{{
+					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
+					Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
 				}},
 				FailurePolicy:           &fail,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			},
 			{
 				Name: "admission.integration.testconversion",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
 					URL:      &convertedEndpoint,
 					CABundle: localhostCert,
 				},
@@ -1586,28 +1592,28 @@ func createV1beta1ValidationWebhook(etcdClient *clientv3.Client, etcdStoragePref
 	return nil
 }
 
-func createV1beta1MutationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix string, client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1beta1.RuleWithOperations) error {
-	fail := admissionv1beta1.Fail
-	equivalent := admissionv1beta1.Equivalent
-	webhookConfig := &admissionv1beta1.MutatingWebhookConfiguration{
+func createV1beta1MutationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix string, client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionregistrationv1beta1.RuleWithOperations) error {
+	fail := admissionregistrationv1beta1.Fail
+	equivalent := admissionregistrationv1beta1.Equivalent
+	webhookConfig := &admissionregistrationv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "mutation.integration.test"},
-		Webhooks: []admissionv1beta1.MutatingWebhook{
+		Webhooks: []admissionregistrationv1beta1.MutatingWebhook{
 			{
 				Name: "mutation.integration.test",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
 					URL:      &endpoint,
 					CABundle: localhostCert,
 				},
-				Rules: []admissionv1beta1.RuleWithOperations{{
-					Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-					Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+				Rules: []admissionregistrationv1beta1.RuleWithOperations{{
+					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
+					Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
 				}},
 				FailurePolicy:           &fail,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			},
 			{
 				Name: "mutation.integration.testconversion",
-				ClientConfig: admissionv1beta1.WebhookClientConfig{
+				ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
 					URL:      &convertedEndpoint,
 					CABundle: localhostCert,
 				},
@@ -1639,31 +1645,31 @@ func createV1beta1MutationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix
 	return nil
 }
 
-func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1.RuleWithOperations) error {
-	fail := admissionv1.Fail
-	equivalent := admissionv1.Equivalent
-	none := admissionv1.SideEffectClassNone
+func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionregistrationv1.RuleWithOperations) error {
+	fail := admissionregistrationv1.Fail
+	equivalent := admissionregistrationv1.Equivalent
+	none := admissionregistrationv1.SideEffectClassNone
 	// Attaching Admission webhook to API server
-	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionv1.ValidatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: "admissionv1.integration.test"},
-		Webhooks: []admissionv1.ValidatingWebhook{
+	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "admissionregistrationv1.integration.test"},
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{
 			{
-				Name: "admissionv1.integration.test",
-				ClientConfig: admissionv1.WebhookClientConfig{
+				Name: "admissionregistrationv1.integration.test",
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &endpoint,
 					CABundle: localhostCert,
 				},
-				Rules: []admissionv1.RuleWithOperations{{
-					Operations: []admissionv1.OperationType{admissionv1.OperationAll},
-					Rule:       admissionv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+				Rules: []admissionregistrationv1.RuleWithOperations{{
+					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+					Rule:       admissionregistrationv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
 				}},
 				FailurePolicy:           &fail,
 				AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				SideEffects:             &none,
 			},
 			{
-				Name: "admissionv1.integration.testconversion",
-				ClientConfig: admissionv1.WebhookClientConfig{
+				Name: "admissionregistrationv1.integration.testconversion",
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &convertedEndpoint,
 					CABundle: localhostCert,
 				},
@@ -1678,23 +1684,23 @@ func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEn
 	return err
 }
 
-func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionv1.RuleWithOperations) error {
-	fail := admissionv1.Fail
-	equivalent := admissionv1.Equivalent
-	none := admissionv1.SideEffectClassNone
+func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionregistrationv1.RuleWithOperations) error {
+	fail := admissionregistrationv1.Fail
+	equivalent := admissionregistrationv1.Equivalent
+	none := admissionregistrationv1.SideEffectClassNone
 	// Attaching Mutation webhook to API server
-	_, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1.MutatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "mutationv1.integration.test"},
-		Webhooks: []admissionv1.MutatingWebhook{
+		Webhooks: []admissionregistrationv1.MutatingWebhook{
 			{
 				Name: "mutationv1.integration.test",
-				ClientConfig: admissionv1.WebhookClientConfig{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &endpoint,
 					CABundle: localhostCert,
 				},
-				Rules: []admissionv1.RuleWithOperations{{
-					Operations: []admissionv1.OperationType{admissionv1.OperationAll},
-					Rule:       admissionv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+				Rules: []admissionregistrationv1.RuleWithOperations{{
+					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+					Rule:       admissionregistrationv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
 				}},
 				FailurePolicy:           &fail,
 				AdmissionReviewVersions: []string{"v1", "v1beta1"},
@@ -1702,7 +1708,7 @@ func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndp
 			},
 			{
 				Name: "mutationv1.integration.testconversion",
-				ClientConfig: admissionv1.WebhookClientConfig{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &convertedEndpoint,
 					CABundle: localhostCert,
 				},
@@ -1718,7 +1724,8 @@ func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndp
 }
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
-//     go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+//
+//	go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var localhostCert = []byte(`-----BEGIN CERTIFICATE-----
 MIIDGDCCAgCgAwIBAgIQTKCKn99d5HhQVCLln2Q+eTANBgkqhkiG9w0BAQsFADAS
 MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw

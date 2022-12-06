@@ -63,34 +63,43 @@ func fmtPortName(in string) string {
 type ServicePort interface {
 	// String returns service string.  An example format can be: `IP:Port/Protocol`.
 	String() string
-	// GetClusterIP returns service cluster IP in net.IP format.
+	// ClusterIP returns service cluster IP in net.IP format.
 	ClusterIP() net.IP
-	// GetPort returns service port if present. If return 0 means not present.
+	// Port returns service port if present. If return 0 means not present.
 	Port() int
-	// GetSessionAffinityType returns service session affinity type
+	// SessionAffinityType returns service session affinity type
 	SessionAffinityType() v1.ServiceAffinity
-	// GetStickyMaxAgeSeconds returns service max connection age
+	// StickyMaxAgeSeconds returns service max connection age
 	StickyMaxAgeSeconds() int
 	// ExternalIPStrings returns service ExternalIPs as a string array.
 	ExternalIPStrings() []string
 	// LoadBalancerIPStrings returns service LoadBalancerIPs as a string array.
 	LoadBalancerIPStrings() []string
-	// GetProtocol returns service protocol.
+	// Protocol returns service protocol.
 	Protocol() v1.Protocol
 	// LoadBalancerSourceRanges returns service LoadBalancerSourceRanges if present empty array if not
 	LoadBalancerSourceRanges() []string
-	// GetHealthCheckNodePort returns service health check node port if present.  If return 0, it means not present.
+	// HealthCheckNodePort returns service health check node port if present.  If return 0, it means not present.
 	HealthCheckNodePort() int
-	// GetNodePort returns a service Node port if present. If return 0, it means not present.
+	// NodePort returns a service Node port if present. If return 0, it means not present.
 	NodePort() int
-	// NodeLocalExternal returns if a service has only node local endpoints for external traffic.
-	NodeLocalExternal() bool
-	// NodeLocalInternal returns if a service has only node local endpoints for internal traffic.
-	NodeLocalInternal() bool
+	// ExternalPolicyLocal returns if a service has only node local endpoints for external traffic.
+	ExternalPolicyLocal() bool
+	// InternalPolicyLocal returns if a service has only node local endpoints for internal traffic.
+	InternalPolicyLocal() bool
 	// InternalTrafficPolicy returns service InternalTrafficPolicy
 	InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType
 	// HintsAnnotation returns the value of the v1.AnnotationTopologyAwareHints annotation.
 	HintsAnnotation() string
+	// ExternallyAccessible returns true if the service port is reachable via something
+	// other than ClusterIP (NodePort/ExternalIP/LoadBalancer)
+	ExternallyAccessible() bool
+	// UsesClusterEndpoints returns true if the service port ever sends traffic to
+	// endpoints based on "Cluster" traffic policy
+	UsesClusterEndpoints() bool
+	// UsesLocalEndpoints returns true if the service port ever sends traffic to
+	// endpoints based on "Local" traffic policy
+	UsesLocalEndpoints() bool
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.
@@ -110,12 +119,12 @@ type Endpoint interface {
 	// This is only set when watching EndpointSlices. If using Endpoints, this is always
 	// true since only ready endpoints are read from Endpoints.
 	IsServing() bool
-	// IsTerminating retruns true if an endpoint is terminating. For pods,
+	// IsTerminating returns true if an endpoint is terminating. For pods,
 	// that is any pod with a deletion timestamp.
 	// This is only set when watching EndpointSlices. If using Endpoints, this is always
 	// false since terminating endpoints are always excluded from Endpoints.
 	IsTerminating() bool
-	// GetZoneHint returns the zone hint for the endpoint. This is based on
+	// GetZoneHints returns the zone hint for the endpoint. This is based on
 	// endpoint.hints.forZones[0].name in the EndpointSlice API.
 	GetZoneHints() sets.String
 	// IP returns IP part of the endpoint.

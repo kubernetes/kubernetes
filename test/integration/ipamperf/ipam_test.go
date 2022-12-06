@@ -19,7 +19,6 @@ package ipamperf
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -28,32 +27,33 @@ import (
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller/nodeipam"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
+	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
 )
 
-func setupAllocator(apiURL string, config *Config, clusterCIDR, serviceCIDR *net.IPNet, subnetMaskSize int) (*clientset.Clientset, util.ShutdownFunc, error) {
+func setupAllocator(kubeConfig *restclient.Config, config *Config, clusterCIDR, serviceCIDR *net.IPNet, subnetMaskSize int) (*clientset.Clientset, util.ShutdownFunc, error) {
 	controllerStopChan := make(chan struct{})
 	shutdownFunc := func() {
 		close(controllerStopChan)
 	}
 
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
-		Host:          apiURL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
-		QPS:           float32(config.KubeQPS),
-		Burst:         config.KubeQPS,
-	})
+	clientConfig := restclient.CopyConfig(kubeConfig)
+	clientConfig.QPS = float32(config.KubeQPS)
+	clientConfig.Burst = config.KubeQPS
+	clientSet := clientset.NewForConfigOrDie(clientConfig)
 
 	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 	ipamController, err := nodeipam.NewNodeIpamController(
-		sharedInformer.Core().V1().Nodes(), config.Cloud, clientSet,
-		[]*net.IPNet{clusterCIDR}, serviceCIDR, nil, []int{subnetMaskSize}, config.AllocatorType,
+		sharedInformer.Core().V1().Nodes(),
+		sharedInformer.Networking().V1alpha1().ClusterCIDRs(),
+		config.Cloud, clientSet, []*net.IPNet{clusterCIDR}, serviceCIDR, nil,
+		[]int{subnetMaskSize}, config.AllocatorType,
 	)
 	if err != nil {
 		return nil, shutdownFunc, err
@@ -64,13 +64,18 @@ func setupAllocator(apiURL string, config *Config, clusterCIDR, serviceCIDR *net
 	return clientSet, shutdownFunc, nil
 }
 
-func runTest(t *testing.T, apiURL string, config *Config, clusterCIDR, serviceCIDR *net.IPNet, subnetMaskSize int) (*Results, error) {
+func runTest(t *testing.T, kubeConfig *restclient.Config, config *Config, clusterCIDR, serviceCIDR *net.IPNet, subnetMaskSize int) (*Results, error) {
 	t.Helper()
 	klog.Infof("Running test %s", t.Name())
 
-	defer deleteNodes(apiURL, config) // cleanup nodes on after controller shutdown
+	nodeClientConfig := restclient.CopyConfig(kubeConfig)
+	nodeClientConfig.QPS = float32(config.CreateQPS)
+	nodeClientConfig.Burst = config.CreateQPS
+	nodeClient := clientset.NewForConfigOrDie(nodeClientConfig)
 
-	clientSet, shutdownFunc, err := setupAllocator(apiURL, config, clusterCIDR, serviceCIDR, subnetMaskSize)
+	defer deleteNodes(nodeClient) // cleanup nodes on after controller shutdown
+
+	clientSet, shutdownFunc, err := setupAllocator(kubeConfig, config, clusterCIDR, serviceCIDR, subnetMaskSize)
 	if err != nil {
 		t.Fatalf("Error starting IPAM allocator: %v", err)
 	}
@@ -81,7 +86,7 @@ func runTest(t *testing.T, apiURL string, config *Config, clusterCIDR, serviceCI
 		t.Fatalf("Could not start test observer: %v", err)
 	}
 
-	if err := createNodes(apiURL, config); err != nil {
+	if err := createNodes(nodeClient, config); err != nil {
 		t.Fatalf("Could not create nodes: %v", err)
 	}
 
@@ -101,7 +106,7 @@ func logResults(allResults []*Results) {
 	}
 	if resultsLogFile != "" {
 		klog.Infof("Logging results to %s", resultsLogFile)
-		if err := ioutil.WriteFile(resultsLogFile, jStr, os.FileMode(0644)); err != nil {
+		if err := os.WriteFile(resultsLogFile, jStr, os.FileMode(0644)); err != nil {
 			klog.Errorf("Error logging results to %s: %v", resultsLogFile, err)
 		}
 	}
@@ -115,8 +120,13 @@ func TestPerformance(t *testing.T) {
 		t.Skip("Skipping because we want to run short tests")
 	}
 
-	apiURL, apiserverShutdown := util.StartApiserver()
-	defer apiserverShutdown()
+	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+		},
+	})
+	defer tearDownFn()
 
 	_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.96.0.0/11") // allows up to 8K nodes
 	_, serviceCIDR, _ := netutils.ParseCIDRSloppy("10.94.0.0/24") // does not matter for test - pick upto  250 services
@@ -150,7 +160,7 @@ func TestPerformance(t *testing.T) {
 				t.Fatalf("Unable to create mock cloud: %v", err)
 			}
 			test.Cloud = cloud
-			if results, err := runTest(t, apiURL, test, clusterCIDR, serviceCIDR, subnetMaskSize); err == nil {
+			if results, err := runTest(t, kubeConfig, test, clusterCIDR, serviceCIDR, subnetMaskSize); err == nil {
 				allResults = append(allResults, results)
 			}
 		})

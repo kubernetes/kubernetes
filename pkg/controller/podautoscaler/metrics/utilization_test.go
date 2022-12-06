@@ -49,19 +49,19 @@ func (tc *resourceUtilizationRatioTestCase) runTest(t *testing.T) {
 	assert.Equal(t, tc.expectedRawAverageValue, actualRawAverageValue, "the raw average value should be as expected")
 }
 
-type metricUtilizationRatioTestCase struct {
-	metrics           PodMetricsInfo
-	targetUtilization int64
+type metricUsageRatioTestCase struct {
+	metrics     PodMetricsInfo
+	targetUsage int64
 
-	expectedUtilizationRatio   float64
-	expectedCurrentUtilization int64
+	expectedUsageRatio   float64
+	expectedCurrentUsage int64
 }
 
-func (tc *metricUtilizationRatioTestCase) runTest(t *testing.T) {
-	actualUtilizationRatio, actualCurrentUtilization := GetMetricUtilizationRatio(tc.metrics, tc.targetUtilization)
+func (tc *metricUsageRatioTestCase) runTest(t *testing.T) {
+	actualUsageRatio, actualCurrentUsage := GetMetricUsageRatio(tc.metrics, tc.targetUsage)
 
-	assert.Equal(t, tc.expectedUtilizationRatio, actualUtilizationRatio, "the utilization ratios should be as expected")
-	assert.Equal(t, tc.expectedCurrentUtilization, actualCurrentUtilization, "the current utilization should be as expected")
+	assert.Equal(t, tc.expectedUsageRatio, actualUsageRatio, "the usage ratios should be as expected")
+	assert.Equal(t, tc.expectedCurrentUsage, actualCurrentUsage, "the current usage should be as expected")
 }
 
 func TestGetResourceUtilizationRatioBaseCase(t *testing.T) {
@@ -135,14 +135,14 @@ func TestGetResourceUtilizationRatioNoRequests(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestGetMetricUtilizationRatioBaseCase(t *testing.T) {
-	tc := metricUtilizationRatioTestCase{
+func TestGetMetricUsageRatioBaseCase(t *testing.T) {
+	tc := metricUsageRatioTestCase{
 		metrics: PodMetricsInfo{
 			"test-pod-0": {Value: 5000}, "test-pod-1": {Value: 10000},
 		},
-		targetUtilization:          10000,
-		expectedUtilizationRatio:   .75,
-		expectedCurrentUtilization: 7500,
+		targetUsage:          10000,
+		expectedUsageRatio:   .75,
+		expectedCurrentUsage: 7500,
 	}
 
 	tc.runTest(t)

@@ -24,9 +24,11 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 )
 
@@ -71,9 +73,13 @@ func DiskUsage(path string) (UsageInfo, error) {
 	// First check whether the quota system knows about this directory
 	// A nil quantity or error means that the path does not support quotas
 	// or xfs_quota tool is missing and we should use other mechanisms.
+	startTime := time.Now()
 	consumption, _ := fsquota.GetConsumption(path)
 	if consumption != nil {
 		usage.Bytes = consumption.Value()
+		defer servermetrics.CollectVolumeStatCalDuration("fsquota", startTime)
+	} else {
+		defer servermetrics.CollectVolumeStatCalDuration("du", startTime)
 	}
 
 	inodes, _ := fsquota.GetInodes(path)

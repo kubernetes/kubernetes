@@ -15,10 +15,6 @@
 /*
 Package trace contains support for OpenTelemetry distributed tracing.
 
-This package is currently in a pre-GA phase. Backwards incompatible changes
-may be introduced in subsequent minor version releases as we work to track the
-evolving OpenTelemetry specification and user feedback.
-
 The following assumes a basic familiarity with OpenTelemetry concepts.
 See https://opentelemetry.io.
 */

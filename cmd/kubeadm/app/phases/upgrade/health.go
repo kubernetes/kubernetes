@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -65,7 +65,6 @@ func (c *healthCheck) Name() string {
 // CheckClusterHealth makes sure:
 // - the API /healthz endpoint is healthy
 // - all control-plane Nodes are Ready
-// - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
 func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.String) error {
 	fmt.Println("[upgrade] Running cluster health checks")
@@ -115,20 +114,16 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 			Namespace: ns,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: utilpointer.Int32Ptr(0),
+			BackoffLimit: pointer.Int32(0),
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					SecurityContext: &v1.PodSecurityContext{
-						RunAsUser:    utilpointer.Int64Ptr(999),
-						RunAsGroup:   utilpointer.Int64Ptr(999),
-						RunAsNonRoot: utilpointer.BoolPtr(true),
+						RunAsUser:    pointer.Int64(999),
+						RunAsGroup:   pointer.Int64(999),
+						RunAsNonRoot: pointer.Bool(true),
 					},
 					Tolerations: []v1.Toleration{
-						{
-							Key:    constants.LabelNodeRoleOldControlPlane,
-							Effect: v1.TaintEffectNoSchedule,
-						},
 						{
 							Key:    constants.LabelNodeRoleControlPlane,
 							Effect: v1.TaintEffectNoSchedule,
@@ -172,7 +167,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 		return errors.Wrapf(lastError, "could not create Job %q in the namespace %q", jobName, ns)
 	}
 
-	// Waiting and manually deleteing the Job is a workaround to not enabling the TTL controller.
+	// Waiting and manually deleting the Job is a workaround to not enabling the TTL controller.
 	// TODO: refactor this if the TTL controller is enabled in kubeadm once it goes Beta.
 
 	// Wait for the Job to complete
@@ -212,34 +207,17 @@ func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error 
 
 // controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
 func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
-	// list nodes labeled with a "master" node-role
-	selectorOldControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
-		constants.LabelNodeRoleOldControlPlane: "",
-	}))
-	nodesWithOldLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selectorOldControlPlane.String(),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", constants.LabelNodeRoleOldControlPlane)
-	}
-
-	// list nodes labeled with a "control-plane" node-role
 	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
 		constants.LabelNodeRoleControlPlane: "",
 	}))
-	nodesControlPlane, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selectorControlPlane.String(),
 	})
 	if err != nil {
 		return errors.Wrapf(err, "could not list nodes labeled with %q", constants.LabelNodeRoleControlPlane)
 	}
 
-	nodes := append(nodesWithOldLabel.Items, nodesControlPlane.Items...)
-	if len(nodes) == 0 {
-		return errors.New("failed to find any nodes with a control-plane role")
-	}
-
-	notReadyControlPlanes := getNotReadyNodes(nodes)
+	notReadyControlPlanes := getNotReadyNodes(nodes.Items)
 	if len(notReadyControlPlanes) != 0 {
 		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
 	}
@@ -248,7 +226,7 @@ func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterCon
 
 // staticPodManifestHealth makes sure the required static pods are presents
 func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
-	nonExistentManifests := []string{}
+	var nonExistentManifests []string
 	for _, component := range constants.ControlPlaneComponents {
 		manifestFile := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())
 		if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
@@ -263,7 +241,7 @@ func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfigu
 
 // getNotReadyNodes returns a string slice of nodes in the cluster that are NotReady
 func getNotReadyNodes(nodes []v1.Node) []string {
-	notReadyNodes := []string{}
+	var notReadyNodes []string
 	for _, node := range nodes {
 		for _, condition := range node.Status.Conditions {
 			if condition.Type == v1.NodeReady && condition.Status != v1.ConditionTrue {

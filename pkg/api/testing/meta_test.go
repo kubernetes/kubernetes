@@ -56,11 +56,6 @@ func TestAccessorImplementations(t *testing.T) {
 						t.Errorf("%v (%v) did not preserve resource version", gv.WithKind(kind), knownType)
 						continue
 					}
-					m.SetSelfLink("102030")
-					if m.GetSelfLink() != "102030" {
-						t.Errorf("%v (%v) did not preserve self link", gv.WithKind(kind), knownType)
-						continue
-					}
 				case isOM:
 					m := om.GetObjectMeta()
 					if m == nil {
@@ -70,11 +65,6 @@ func TestAccessorImplementations(t *testing.T) {
 					m.SetResourceVersion("102030")
 					if m.GetResourceVersion() != "102030" {
 						t.Errorf("%v (%v) did not preserve resource version", gv.WithKind(kind), knownType)
-						continue
-					}
-					m.SetSelfLink("102030")
-					if m.GetSelfLink() != "102030" {
-						t.Errorf("%v (%v) did not preserve self link", gv.WithKind(kind), knownType)
 						continue
 					}
 					labels := map[string]string{"a": "b"}

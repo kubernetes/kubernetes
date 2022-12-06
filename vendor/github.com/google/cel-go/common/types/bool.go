@@ -111,10 +111,7 @@ func (b Bool) ConvertToType(typeVal ref.Type) ref.Val {
 // Equal implements the ref.Val interface method.
 func (b Bool) Equal(other ref.Val) ref.Val {
 	otherBool, ok := other.(Bool)
-	if !ok {
-		return ValOrErr(other, "no such overload")
-	}
-	return Bool(b == otherBool)
+	return Bool(ok && b == otherBool)
 }
 
 // Negate implements the traits.Negater interface method.
@@ -133,12 +130,13 @@ func (b Bool) Value() interface{} {
 }
 
 // IsBool returns whether the input ref.Val or ref.Type is equal to BoolType.
-func IsBool(elem interface{}) bool {
-	switch elem := elem.(type) {
-	case ref.Type:
-		return elem == BoolType
+func IsBool(elem ref.Val) bool {
+	switch v := elem.(type) {
+	case Bool:
+		return true
 	case ref.Val:
-		return IsBool(elem.Type())
+		return v.Type() == BoolType
+	default:
+		return false
 	}
-	return false
 }

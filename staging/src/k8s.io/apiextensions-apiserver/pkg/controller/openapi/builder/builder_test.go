@@ -31,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -540,10 +538,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 							actions.Insert(action)
 						}
 						if action == "patch" {
-							expected := []string{"application/json-patch+json", "application/merge-patch+json"}
-							if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-								expected = append(expected, "application/apply-patch+yaml")
-							}
+							expected := []string{"application/json-patch+json", "application/merge-patch+json", "application/apply-patch+yaml"}
 							assert.Equal(t, operation.Consumes, expected)
 						} else {
 							assert.Equal(t, operation.Consumes, []string{"application/json", "application/yaml"})
@@ -720,21 +715,21 @@ func TestBuildOpenAPIV3(t *testing.T) {
 			"with properties",
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
 			nil,
-			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"allOf":[{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}]},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{},
 		},
 		{
 			"with v3 nullable field",
 			`{"type":"object","properties":{"spec":{"type":"object", "nullable": true},"status":{"type":"object"}}}`,
 			nil,
-			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object", "nullable": true},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"allOf":[{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}]},"spec":{"type":"object", "nullable": true},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{},
 		},
 		{
 			"with default not pruned for v3",
 			`{"type":"object","properties":{"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}}}`,
 			nil,
-			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"allOf":[{"$ref":"#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}]},"spec":{"type":"object","properties":{"field":{"type":"string","default":"foo"}}},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{},
 		},
 	}
@@ -782,6 +777,10 @@ func TestBuildOpenAPIV3(t *testing.T) {
 			}
 
 			gotSchema := *got.Components.Schemas["io.k8s.bar.v1.Foo"]
+			listSchemaRef := got.Components.Schemas["io.k8s.bar.v1.FooList"].Properties["items"].Items.Schema.Ref.String()
+			if strings.Contains(listSchemaRef, "#/definitions/") || !strings.Contains(listSchemaRef, "#/components/schemas/") {
+				t.Errorf("Expected list schema ref to contain #/components/schemas/ prefix. Got %s", listSchemaRef)
+			}
 			gotProperties := properties(gotSchema.Properties)
 			wantedProperties := properties(wantedSchema.Properties)
 			if !gotProperties.Equal(wantedProperties) {

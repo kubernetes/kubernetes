@@ -57,7 +57,7 @@ type storageAccountState struct {
 	defaultContainerCreated bool
 }
 
-//BlobDiskController : blob disk controller struct
+// BlobDiskController : blob disk controller struct
 type BlobDiskController struct {
 	common   *controllerCommon
 	accounts map[string]*storageAccountState
@@ -227,7 +227,7 @@ func (c *BlobDiskController) deleteVhdBlob(accountName, accountKey, blobName str
 	return blob.Delete(nil)
 }
 
-//CreateBlobDisk : create a blob disk in a node
+// CreateBlobDisk : create a blob disk in a node
 func (c *BlobDiskController) CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error) {
 	klog.V(4).Infof("azureDisk - creating blob data disk named:%s on StorageAccountType:%s", dataDiskName, storageAccountType)
 
@@ -253,7 +253,7 @@ func (c *BlobDiskController) CreateBlobDisk(dataDiskName string, storageAccountT
 	return diskURI, nil
 }
 
-//DeleteBlobDisk : delete a blob disk from a node
+// DeleteBlobDisk : delete a blob disk from a node
 func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 	storageAccountName, vhdName, err := diskNameAndSANameFromURI(diskURI)
 	if err != nil {
@@ -602,7 +602,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 	return SAName, nil
 }
 
-//Gets storage account exist, provisionStatus, Error if any
+// Gets storage account exist, provisionStatus, Error if any
 func (c *BlobDiskController) getStorageAccountState(storageAccountName string) (bool, storage.ProvisioningState, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()

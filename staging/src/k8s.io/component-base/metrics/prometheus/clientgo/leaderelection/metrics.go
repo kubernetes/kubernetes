@@ -24,8 +24,9 @@ import (
 
 var (
 	leaderGauge = k8smetrics.NewGaugeVec(&k8smetrics.GaugeOpts{
-		Name: "leader_election_master_status",
-		Help: "Gauge of if the reporting system is master of the relevant lease, 0 indicates backup, 1 indicates master. 'name' is the string used to identify the lease. Please make sure to group by name.",
+		Name:           "leader_election_master_status",
+		StabilityLevel: k8smetrics.ALPHA,
+		Help:           "Gauge of if the reporting system is master of the relevant lease, 0 indicates backup, 1 indicates master. 'name' is the string used to identify the lease. Please make sure to group by name.",
 	}, []string{"name"})
 )
 

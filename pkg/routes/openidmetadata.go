@@ -19,7 +19,7 @@ package routes
 import (
 	"net/http"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/serviceaccount"

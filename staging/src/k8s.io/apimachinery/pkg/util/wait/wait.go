@@ -29,9 +29,11 @@ import (
 )
 
 // For any test of the style:
-//   ...
-//   <- time.After(timeout):
-//      t.Errorf("Timed out")
+//
+//	...
+//	<- time.After(timeout):
+//	   t.Errorf("Timed out")
+//
 // The value for timeout should effectively be "forever." Obviously we don't want our tests to truly lock up forever, but 30s
 // is long enough that it is effectively forever for the things that can slow down a run on a heavily contended machine
 // (GC, seeks, etc), but not so long as to make a developer ctrl-c a test run if they do happen to break that test.
@@ -288,13 +290,13 @@ func (b *Backoff) Step() time.Duration {
 	return duration
 }
 
-// contextForChannel derives a child context from a parent channel.
+// ContextForChannel derives a child context from a parent channel.
 //
 // The derived context's Done channel is closed when the returned cancel function
 // is called or when the parent channel is closed, whichever happens first.
 //
 // Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
-func contextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
+func ContextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
@@ -464,7 +466,7 @@ func PollWithContext(ctx context.Context, interval, timeout time.Duration, condi
 // PollUntil always waits interval before the first run of 'condition'.
 // 'condition' will always be invoked at least once.
 func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
-	ctx, cancel := contextForChannel(stopCh)
+	ctx, cancel := ContextForChannel(stopCh)
 	defer cancel()
 	return PollUntilWithContext(ctx, interval, condition.WithContext())
 }
@@ -531,7 +533,7 @@ func PollImmediateWithContext(ctx context.Context, interval, timeout time.Durati
 // PollImmediateUntil runs the 'condition' before waiting for the interval.
 // 'condition' will always be invoked at least once.
 func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
-	ctx, cancel := contextForChannel(stopCh)
+	ctx, cancel := ContextForChannel(stopCh)
 	defer cancel()
 	return PollImmediateUntilWithContext(ctx, interval, condition.WithContext())
 }
@@ -566,7 +568,7 @@ func PollImmediateInfiniteWithContext(ctx context.Context, interval time.Duratio
 	return poll(ctx, true, poller(interval, 0), condition)
 }
 
-// Internally used, each of the the public 'Poll*' function defined in this
+// Internally used, each of the public 'Poll*' function defined in this
 // package should invoke this internal function with appropriate parameters.
 // ctx: the context specified by the caller, for infinite polling pass
 // a context that never gets cancelled or expired.
@@ -615,7 +617,7 @@ type WaitWithContextFunc func(ctx context.Context) <-chan struct{}
 
 // WaitFor continually checks 'fn' as driven by 'wait'.
 //
-// WaitFor gets a channel from 'wait()'', and then invokes 'fn' once for every value
+// WaitFor gets a channel from 'wait()”, and then invokes 'fn' once for every value
 // placed on the channel and once more when the channel is closed. If the channel is closed
 // and 'fn' returns false without error, WaitFor returns ErrWaitTimeout.
 //
@@ -629,14 +631,14 @@ type WaitWithContextFunc func(ctx context.Context) <-chan struct{}
 // "uniform pseudo-random", the `fn` might still run one or multiple time,
 // though eventually `WaitFor` will return.
 func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
-	ctx, cancel := contextForChannel(done)
+	ctx, cancel := ContextForChannel(done)
 	defer cancel()
 	return WaitForWithContext(ctx, wait.WithContext(), fn.WithContext())
 }
 
 // WaitForWithContext continually checks 'fn' as driven by 'wait'.
 //
-// WaitForWithContext gets a channel from 'wait()'', and then invokes 'fn'
+// WaitForWithContext gets a channel from 'wait()”, and then invokes 'fn'
 // once for every value placed on the channel and once more when the
 // channel is closed. If the channel is closed and 'fn'
 // returns false without error, WaitForWithContext returns ErrWaitTimeout.

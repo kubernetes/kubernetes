@@ -17,24 +17,33 @@ limitations under the License.
 package cel
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
 	"testing"
+	"time"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
 func TestValidationExpressions(t *testing.T) {
 	tests := []struct {
-		name   string
-		schema *schema.Structural
-		obj    map[string]interface{}
-		valid  []string
-		errors map[string]string // rule -> string that error message must contain
+		name          string
+		schema        *schema.Structural
+		obj           interface{}
+		oldObj        interface{}
+		valid         []string
+		errors        map[string]string // rule -> string that error message must contain
+		costBudget    int64
+		isRoot        bool
+		expectSkipped bool
 	}{
 		// tests where val1 and val2 are equal but val3 is different
 		// equality, comparisons and type specific functions
@@ -77,6 +86,92 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val7 == 1.0",
 			},
 		},
+		{name: "numeric comparisons",
+			obj: objs(
+				int64(5),      // val1, integer type, integer value
+				int64(10),     // val2, integer type, integer value
+				int64(15),     // val3, integer type, integer value
+				float64(10.0), // val4, number type, parsed from decimal literal
+				float64(10.0), // val5, float type, parsed from decimal literal
+				float64(10.0), // val6, double type, parsed from decimal literal
+				int64(10),     // val7, number type, parsed from integer literal
+				int64(10),     // val8, float type, parsed from integer literal
+				int64(10),     // val9, double type, parsed from integer literal
+			),
+			schema: schemas(integerType, integerType, integerType, numberType, floatType, doubleType, numberType, floatType, doubleType),
+			valid: []string{
+				// xref: https://github.com/google/cel-spec/wiki/proposal-210
+
+				// compare integers with all float types
+				"double(self.val1) < self.val4",
+				"double(self.val1) <= self.val4",
+				"double(self.val2) <= self.val4",
+				"double(self.val2) == self.val4",
+				"double(self.val2) >= self.val4",
+				"double(self.val3) > self.val4",
+				"double(self.val3) >= self.val4",
+
+				"self.val1 < int(self.val4)",
+				"self.val2 == int(self.val4)",
+				"self.val3 > int(self.val4)",
+
+				"double(self.val1) < self.val5",
+				"double(self.val2) == self.val5",
+				"double(self.val3) > self.val5",
+
+				"self.val1 < int(self.val5)",
+				"self.val2 == int(self.val5)",
+				"self.val3 > int(self.val5)",
+
+				"double(self.val1) < self.val6",
+				"double(self.val2) == self.val6",
+				"double(self.val3) > self.val6",
+
+				"self.val1 < int(self.val6)",
+				"self.val2 == int(self.val6)",
+				"self.val3 > int(self.val6)",
+
+				// Also compare with float types backed by integer values,
+				// which is how integer literals are parsed from JSON for custom resources.
+				"double(self.val1) < self.val7",
+				"double(self.val2) == self.val7",
+				"double(self.val3) > self.val7",
+
+				"self.val1 < int(self.val7)",
+				"self.val2 == int(self.val7)",
+				"self.val3 > int(self.val7)",
+
+				"double(self.val1) < self.val8",
+				"double(self.val2) == self.val8",
+				"double(self.val3) > self.val8",
+
+				"self.val1 < int(self.val8)",
+				"self.val2 == int(self.val8)",
+				"self.val3 > int(self.val8)",
+
+				"double(self.val1) < self.val9",
+				"double(self.val2) == self.val9",
+				"double(self.val3) > self.val9",
+
+				"self.val1 < int(self.val9)",
+				"self.val2 == int(self.val9)",
+				"self.val3 > int(self.val9)",
+
+				// compare literal integers and floats
+				"double(5) < 10.0",
+				"double(10) == 10.0",
+				"double(15) > 10.0",
+
+				"5 < int(10.0)",
+				"10 == int(10.0)",
+				"15 > int(10.0)",
+
+				// compare integers with literal floats
+				"double(self.val1) < 10.0",
+				"double(self.val2) == 10.0",
+				"double(self.val3) > 10.0",
+			},
+		},
 		{name: "unicode strings",
 			obj:    objs("Rook takes 👑", "Rook takes 👑"),
 			schema: schemas(stringType, stringType),
@@ -106,6 +201,10 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.substring(4, 10).trim() == 'takes'",
 				"self.val1.upperAscii() == 'ROOK TAKES 👑'",
 				"self.val1.lowerAscii() == 'rook takes 👑'",
+			},
+			errors: map[string]string{
+				// Invalid regex with a string constant regex pattern is compile time error
+				"self.val1.matches(')')": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
 			},
 		},
 		{name: "escaped strings",
@@ -533,6 +632,7 @@ func TestValidationExpressions(t *testing.T) {
 			},
 		},
 		{name: "typemeta and objectmeta access not specified",
+			isRoot: true,
 			obj: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
@@ -675,7 +775,7 @@ func TestValidationExpressions(t *testing.T) {
 			}),
 			valid: []string{
 				// 'kind', 'apiVersion', 'metadata.name' and 'metadata.generateName' are always accessible
-				// even if not specified in the schema, regardless of if x-preserve-unknown-fields is set.
+				// even if not specified in the schema, regardless of if x-kubernetes-preserve-unknown-fields is set.
 				"self.embedded.kind == 'Pod'",
 				"self.embedded.apiVersion == 'v1'",
 				"self.embedded.metadata.name == 'foo'",
@@ -685,7 +785,7 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.embedded)",
 			},
 			// only field declared in the schema can be field selected in CEL expressions, regardless of if
-			// x-preserve-unknown-fields is set.
+			// x-kubernetes-preserve-unknown-fields is set.
 			errors: map[string]string{
 				"has(self.embedded.spec)": "undefined field 'spec'",
 			},
@@ -698,17 +798,21 @@ func TestValidationExpressions(t *testing.T) {
 				"something": intOrStringType(),
 			}),
 			valid: []string{
-				// typical int-or-string usage would be to check both types
-				"type(self.something) == int ? self.something == 1 : self.something == '25%'",
-				// to require the value be a particular type, guard it with a runtime type check
+				// In Kubernetes 1.24 and later, the CEL type returns false for an int-or-string comparison against the
+				// other type, making it safe to write validation rules like:
+				"self.something == '25%'",
+				"self.something != 1",
+				"self.something == 1 || self.something == '25%'",
+				"self.something == '25%' || self.something == 1",
+
+				// In Kubernetes 1.23 and earlier, all int-or-string access must be guarded by a type check to prevent
+				// a runtime error attempting an equality check between string and int types.
 				"type(self.something) == string && self.something == '25%'",
-			},
-			errors: map[string]string{
-				// because the type is dynamic type checking fails a runtime even for unrelated types
-				"self.something == ['anything']": "no such overload",
-				// type checking fails a runtime if the value is an int and the expression assumes it is a string
-				// without a type check guard
-				"self.something == 1": "no such overload",
+				"type(self.something) == int ? self.something == 1 : self.something == '25%'",
+
+				// Because the type is dynamic it receives no type checking, and evaluates to false when compared to
+				// other types at runtime.
+				"self.something != ['anything']",
 			},
 		},
 		{name: "int in intOrString",
@@ -719,17 +823,21 @@ func TestValidationExpressions(t *testing.T) {
 				"something": intOrStringType(),
 			}),
 			valid: []string{
-				// typical int-or-string usage would be to check both types
-				"type(self.something) == int ? self.something == 1 : self.something == '25%'",
-				// to require the value be a particular type, guard it with a runtime type check
+				// In Kubernetes 1.24 and later, the CEL type returns false for an int-or-string comparison against the
+				// other type, making it safe to write validation rules like:
+				"self.something == 1",
+				"self.something != 'some string'",
+				"self.something == 1 || self.something == '25%'",
+				"self.something == '25%' || self.something == 1",
+
+				// In Kubernetes 1.23 and earlier, all int-or-string access must be guarded by a type check to prevent
+				// a runtime error attempting an equality check between string and int types.
 				"type(self.something) == int && self.something == 1",
-			},
-			errors: map[string]string{
-				// because the type is dynamic type checking fails a runtime even for unrelated types
-				"self.something == ['anything']": "no such overload",
-				// type checking fails a runtime if the value is an int and the expression assumes it is a string
-				// without a type check guard
-				"self.something == 'anything'": "no such overload",
+				"type(self.something) == int ? self.something == 1 : self.something == '25%'",
+
+				// Because the type is dynamic it receives no type checking, and evaluates to false when compared to
+				// other types at runtime.
+				"self.something != ['anything']",
 			},
 		},
 		{name: "null in intOrString",
@@ -1343,41 +1451,353 @@ func TestValidationExpressions(t *testing.T) {
 			}),
 			errors: map[string]string{
 				// data is validated before CEL evaluation, so these errors should not be surfaced to end users
-				"has(self.o)":             "invalid data, expected map[string]interface{} to match the provided schema with type=object",
-				"has(self.m)":             "invalid data, expected map[string]interface{} to match the provided schema with type=object",
-				"has(self.l)":             "invalid data, expected []interface{} to match the provided schema with type=array",
-				"has(self.s)":             "invalid data, expected []interface{} to match the provided schema with type=array",
-				"has(self.lm)":            "invalid data, expected []interface{} to match the provided schema with type=array",
+				"has(self.o)":             "invalid data, expected a map for the provided schema with type=object",
+				"has(self.m)":             "invalid data, expected a map for the provided schema with type=object",
+				"has(self.l)":             "invalid data, expected an array for the provided schema with type=array",
+				"has(self.s)":             "invalid data, expected an array for the provided schema with type=array",
+				"has(self.lm)":            "invalid data, expected an array for the provided schema with type=array",
 				"has(self.intorstring)":   "invalid data, expected XIntOrString value to be either a string or integer",
 				"self.nullable[0] == 'x'": "invalid data, got null for schema with nullable=false",
 				// TODO: also find a way to test the errors returned for: array with no items, object with no properties or additionalProperties, invalid listType and invalid type.
 			},
 		},
+		{name: "stdlib list functions",
+			obj: map[string]interface{}{
+				"ints":         []interface{}{int64(1), int64(2), int64(2), int64(3)},
+				"unsortedInts": []interface{}{int64(2), int64(1)},
+				"emptyInts":    []interface{}{},
+
+				"doubles":         []interface{}{float64(1), float64(2), float64(2), float64(3)},
+				"unsortedDoubles": []interface{}{float64(2), float64(1)},
+				"emptyDoubles":    []interface{}{},
+
+				"intBackedDoubles":          []interface{}{int64(1), int64(2), int64(2), int64(3)},
+				"unsortedIntBackedDDoubles": []interface{}{int64(2), int64(1)},
+				"emptyIntBackedDDoubles":    []interface{}{},
+
+				"durations":         []interface{}{"1s", "1m", "1m", "1h"},
+				"unsortedDurations": []interface{}{"1m", "1s"},
+				"emptyDurations":    []interface{}{},
+
+				"strings":         []interface{}{"a", "b", "b", "c"},
+				"unsortedStrings": []interface{}{"b", "a"},
+				"emptyStrings":    []interface{}{},
+
+				"dates":         []interface{}{"2000-01-01", "2000-02-01", "2000-02-01", "2010-01-01"},
+				"unsortedDates": []interface{}{"2000-02-01", "2000-01-01"},
+				"emptyDates":    []interface{}{},
+
+				"objs": []interface{}{
+					map[string]interface{}{"f1": "a", "f2": "a"},
+					map[string]interface{}{"f1": "a", "f2": "b"},
+					map[string]interface{}{"f1": "a", "f2": "b"},
+					map[string]interface{}{"f1": "a", "f2": "c"},
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"ints":         listType(&integerType),
+				"unsortedInts": listType(&integerType),
+				"emptyInts":    listType(&integerType),
+
+				"doubles":         listType(&doubleType),
+				"unsortedDoubles": listType(&doubleType),
+				"emptyDoubles":    listType(&doubleType),
+
+				"intBackedDoubles":          listType(&doubleType),
+				"unsortedIntBackedDDoubles": listType(&doubleType),
+				"emptyIntBackedDDoubles":    listType(&doubleType),
+
+				"durations":         listType(&durationFormat),
+				"unsortedDurations": listType(&durationFormat),
+				"emptyDurations":    listType(&durationFormat),
+
+				"strings":         listType(&stringType),
+				"unsortedStrings": listType(&stringType),
+				"emptyStrings":    listType(&stringType),
+
+				"dates":         listType(&dateFormat),
+				"unsortedDates": listType(&dateFormat),
+				"emptyDates":    listType(&dateFormat),
+
+				"objs": listType(objectTypePtr(map[string]schema.Structural{
+					"f1": stringType,
+					"f2": stringType,
+				})),
+			}),
+			valid: []string{
+				"self.ints.sum() == 8",
+				"self.ints.min() == 1",
+				"self.ints.max() == 3",
+				"self.emptyInts.sum() == 0",
+				"self.ints.isSorted()",
+				"self.emptyInts.isSorted()",
+				"self.unsortedInts.isSorted() == false",
+				"self.ints.indexOf(2) == 1",
+				"self.ints.lastIndexOf(2) == 2",
+				"self.ints.indexOf(10) == -1",
+				"self.ints.lastIndexOf(10) == -1",
+
+				"self.doubles.sum() == 8.0",
+				"self.doubles.min() == 1.0",
+				"self.doubles.max() == 3.0",
+				"self.emptyDoubles.sum() == 0.0",
+				"self.doubles.isSorted()",
+				"self.emptyDoubles.isSorted()",
+				"self.unsortedDoubles.isSorted() == false",
+				"self.doubles.indexOf(2.0) == 1",
+				"self.doubles.lastIndexOf(2.0) == 2",
+				"self.doubles.indexOf(10.0) == -1",
+				"self.doubles.lastIndexOf(10.0) == -1",
+
+				"self.intBackedDoubles.sum() == 8.0",
+				"self.intBackedDoubles.min() == 1.0",
+				"self.intBackedDoubles.max() == 3.0",
+				"self.emptyIntBackedDDoubles.sum() == 0.0",
+				"self.intBackedDoubles.isSorted()",
+				"self.emptyDoubles.isSorted()",
+				"self.unsortedIntBackedDDoubles.isSorted() == false",
+				"self.intBackedDoubles.indexOf(2.0) == 1",
+				"self.intBackedDoubles.lastIndexOf(2.0) == 2",
+				"self.intBackedDoubles.indexOf(10.0) == -1",
+				"self.intBackedDoubles.lastIndexOf(10.0) == -1",
+
+				"self.durations.sum() == duration('1h2m1s')",
+				"self.durations.min() == duration('1s')",
+				"self.durations.max() == duration('1h')",
+				"self.emptyDurations.sum() == duration('0')",
+				"self.durations.isSorted()",
+				"self.emptyDurations.isSorted()",
+				"self.unsortedDurations.isSorted() == false",
+				"self.durations.indexOf(duration('1m')) == 1",
+				"self.durations.lastIndexOf(duration('1m')) == 2",
+				"self.durations.indexOf(duration('2m')) == -1",
+				"self.durations.lastIndexOf(duration('2m')) == -1",
+
+				"self.strings.min() == 'a'",
+				"self.strings.max() == 'c'",
+				"self.strings.isSorted()",
+				"self.emptyStrings.isSorted()",
+				"self.unsortedStrings.isSorted() == false",
+				"self.strings.indexOf('b') == 1",
+				"self.strings.lastIndexOf('b') == 2",
+				"self.strings.indexOf('x') == -1",
+				"self.strings.lastIndexOf('x') == -1",
+
+				"self.dates.min() == timestamp('2000-01-01T00:00:00.000Z')",
+				"self.dates.max() == timestamp('2010-01-01T00:00:00.000Z')",
+				"self.dates.isSorted()",
+				"self.emptyDates.isSorted()",
+				"self.unsortedDates.isSorted() == false",
+				"self.dates.indexOf(timestamp('2000-02-01T00:00:00.000Z')) == 1",
+				"self.dates.lastIndexOf(timestamp('2000-02-01T00:00:00.000Z')) == 2",
+				"self.dates.indexOf(timestamp('2005-02-01T00:00:00.000Z')) == -1",
+				"self.dates.lastIndexOf(timestamp('2005-02-01T00:00:00.000Z')) == -1",
+
+				// array, map and object types use structural equality (aka "deep equals")
+				"[[1], [2]].indexOf([1]) == 0",
+				"[{'a': 1}, {'b': 2}].lastIndexOf({'b': 2}) == 1",
+				"self.objs.indexOf(self.objs[1]) == 1",
+				"self.objs.lastIndexOf(self.objs[1]) == 2",
+
+				// avoiding empty list error with min and max by appending an acceptable default minimum value
+				"([0] + self.emptyInts).min() == 0",
+
+				// handle CEL's dynamic dispatch appropriately (special cases to handle an empty list)
+				"dyn([]).sum() == 0",
+				"dyn([1, 2]).sum() == 3",
+				"dyn([1.0, 2.0]).sum() == 3.0",
+
+				"[].sum() == 0", // An empty list returns an 0 int
+			},
+			errors: map[string]string{
+				// return an error for min/max on empty list
+				"self.emptyInts.min() == 1":      "min called on empty list",
+				"self.emptyInts.max() == 3":      "max called on empty list",
+				"self.emptyDoubles.min() == 1.0": "min called on empty list",
+				"self.emptyDoubles.max() == 3.0": "max called on empty list",
+				"self.emptyStrings.min() == 'a'": "min called on empty list",
+				"self.emptyStrings.max() == 'c'": "max called on empty list",
+
+				// only allow sum on numeric types and duration
+				"['a', 'b'].sum() == 'c'": "found no matching overload for 'sum' applied to 'list(string).()", // compiler type checking error
+
+				// only allow min/max/indexOf/lastIndexOf on comparable types
+				"[[1], [2]].min() == [1]":                "found no matching overload for 'min' applied to 'list(list(int)).()",        // compiler type checking error
+				"[{'a': 1}, {'b': 2}].max() == {'b': 2}": "found no matching overload for 'max' applied to 'list(map(string, int)).()", // compiler type checking error
+			},
+		},
+		{name: "stdlib regex functions",
+			obj: map[string]interface{}{
+				"str": "this is a 123 string 456",
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"str": stringType,
+			}),
+			valid: []string{
+				"self.str.find('[0-9]+') == '123'",
+				"self.str.find('[0-9]+') != '456'",
+				"self.str.find('xyz') == ''",
+
+				"self.str.findAll('[0-9]+') == ['123', '456']",
+				"self.str.findAll('[0-9]+', 0) == []",
+				"self.str.findAll('[0-9]+', 1) == ['123']",
+				"self.str.findAll('[0-9]+', 2) == ['123', '456']",
+				"self.str.findAll('[0-9]+', 3) == ['123', '456']",
+				"self.str.findAll('[0-9]+', -1) == ['123', '456']",
+				"self.str.findAll('xyz') == []",
+				"self.str.findAll('xyz', 1) == []",
+			},
+			errors: map[string]string{
+				// Invalid regex with a string constant regex pattern is compile time error
+				"self.str.find(')') == ''":       "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.str.findAll(')') == []":    "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.str.findAll(')', 1) == []": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+			},
+		},
+		{name: "URL parsing",
+			obj: map[string]interface{}{
+				"url": "https://user:pass@kubernetes.io:80/docs/home?k1=a&k2=b&k2=c#anchor",
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"url": stringType,
+			}),
+			valid: []string{
+				"url('/path').getScheme() == ''",
+				"url('https://example.com/').getScheme() == 'https'",
+				"url('https://example.com:80/').getHost() == 'example.com:80'",
+				"url('https://example.com/').getHost() == 'example.com'",
+				"url('https://[::1]:80/').getHost() == '[::1]:80'",
+				"url('https://[::1]/').getHost() == '[::1]'",
+				"url('/path').getHost() == ''",
+				"url('https://example.com:80/').getHostname() == 'example.com'",
+				"url('https://127.0.0.1/').getHostname() == '127.0.0.1'",
+				"url('https://[::1]/').getHostname() == '::1'",
+				"url('/path').getHostname() == ''",
+				"url('https://example.com:80/').getPort() == '80'",
+				"url('https://example.com/').getPort() == ''",
+				"url('/path').getPort() == ''",
+				"url('https://example.com/path').getEscapedPath() == '/path'",
+				"url('https://example.com/with space/').getEscapedPath() == '/with%20space/'",
+				"url('https://example.com').getEscapedPath() == ''",
+				"url('https://example.com/path?k1=a&k2=b&k2=c').getQuery() == { 'k1': ['a'], 'k2': ['b', 'c']}",
+				"url('https://example.com/path?key with spaces=value with spaces').getQuery() == { 'key with spaces': ['value with spaces']}",
+				"url('https://example.com/path?').getQuery() == {}",
+				"url('https://example.com/path').getQuery() == {}",
+
+				// test with string input
+				"url(self.url).getScheme() == 'https'",
+				"url(self.url).getHost() == 'kubernetes.io:80'",
+				"url(self.url).getHostname() == 'kubernetes.io'",
+				"url(self.url).getPort() == '80'",
+				"url(self.url).getEscapedPath() == '/docs/home'",
+				"url(self.url).getQuery() == {'k1': ['a'], 'k2': ['b', 'c']}",
+
+				"isURL('https://user:pass@example.com:80/path?query=val#fragment')",
+				"isURL('/path') == true",
+				"isURL('https://a:b:c/') == false",
+				"isURL('../relative-path') == false",
+			},
+		},
+		{name: "transition rules",
+			obj: map[string]interface{}{
+				"v": "new",
+			},
+			oldObj: map[string]interface{}{
+				"v": "old",
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"v": stringType,
+			}),
+			valid: []string{
+				"oldSelf.v != self.v",
+				"oldSelf.v == 'old' && self.v == 'new'",
+			},
+		},
+		{name: "skipped transition rule for nil old primitive",
+			expectSkipped: true,
+			obj:           "exists",
+			oldObj:        nil,
+			schema:        &stringType,
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
+		{name: "skipped transition rule for nil old array",
+			expectSkipped: true,
+			obj:           []interface{}{},
+			oldObj:        nil,
+			schema:        listTypePtr(&stringType),
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
+		{name: "skipped transition rule for nil old object",
+			expectSkipped: true,
+			obj:           map[string]interface{}{"f": "exists"},
+			oldObj:        nil,
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": stringType,
+			}),
+			valid: []string{
+				"oldSelf.f == self.f",
+			},
+		},
+		{name: "skipped transition rule for old with non-nil interface but nil value",
+			expectSkipped: true,
+			obj:           []interface{}{},
+			oldObj:        nilInterfaceOfStringSlice(),
+			schema:        listTypePtr(&stringType),
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			for _, validRule := range tt.valid {
-				t.Run(validRule, func(t *testing.T) {
+	for i := range tests {
+		i := i
+		t.Run(tests[i].name, func(t *testing.T) {
+			t.Parallel()
+			tt := tests[i]
+			tt.costBudget = RuntimeCELCostBudget
+			ctx := context.TODO()
+			for j := range tt.valid {
+				validRule := tt.valid[j]
+				testName := validRule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
+					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := NewValidator(&s)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs := celValidator.Validate(field.NewPath("root"), &s, tt.obj)
+					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
+					}
+					if tt.expectSkipped {
+						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.
+						if remainingBudget != tt.costBudget {
+							t.Errorf("expected no cost expended for skipped validation, but got %d remaining from %d budget", remainingBudget, tt.costBudget)
+						}
+						return
 					}
 				})
 			}
 			for rule, expectErrToContain := range tt.errors {
-				t.Run(rule, func(t *testing.T) {
+				testName := rule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s)
+					celValidator := NewValidator(&s, true, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs := celValidator.Validate(field.NewPath("root"), &s, tt.obj)
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					if len(errs) == 0 {
 						t.Error("expected validation errors but got none")
 					}
@@ -1388,7 +1808,584 @@ func TestValidationExpressions(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
 
+// TestValidationExpressionsInSchema tests CEL integration with custom resource values and OpenAPIv3 for cases
+// where the validation rules are defined at any level within the schema.
+func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		oldObj interface{}
+		errors []string // strings that error message must contain
+	}{
+		{name: "invalid rule under array items",
+			obj: map[string]interface{}{
+				"f": []interface{}{1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": listType(cloneWithRule(&integerType, "self == 'abc'")),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under array items, parent has rule",
+			obj: map[string]interface{}{
+				"f": []interface{}{1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": withRule(listType(cloneWithRule(&integerType, "self == 'abc'")), "1 == 1"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under additionalProperties",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{"k": 1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": mapType(cloneWithRule(&integerType, "self == 'abc'")),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under additionalProperties, parent has rule",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{"k": 1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": withRule(mapType(cloneWithRule(&integerType, "self == 'abc'")), "1 == 1"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under unescaped field name",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under unescaped field name, parent has rule",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}), "1 == 1"),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		// check that escaped field names do not impact CEL rule validation
+		{name: "invalid rule under escaped field name",
+			obj: map[string]interface{}{
+				"f/2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under escaped field name, parent has rule",
+			obj: map[string]interface{}{
+				"f/2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}), "1 == 1"),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "failing rule under escaped field name",
+			obj: map[string]interface{}{
+				"f/2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
+			}),
+			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+		},
+		// unescapable field names that are not accessed by the CEL rule are allowed and should not impact CEL rule validation
+		{name: "invalid rule under unescapable field name",
+			obj: map[string]interface{}{
+				"a@b": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"a@b": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under unescapable field name, parent has rule",
+			obj: map[string]interface{}{
+				"f@2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f@2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}), "1 == 1"),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "failing rule under unescapable field name",
+			obj: map[string]interface{}{
+				"a@b": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"a@b": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
+			}),
+			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+		},
+		{name: "matchExpressions - 'values' must be specified when 'operator' is 'In' or 'NotIn'",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "In",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, (rule.operator != "In" && rule.operator != "NotIn") || ((has(rule.values) && size(rule.values) > 0)))`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - 'values' may not be specified when 'operator' is 'Exists' or 'DoesNotExist'",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "Exists",
+						"values":   []interface{}{"somevalue"},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, (rule.operator != "Exists" && rule.operator != "DoesNotExist") || ((!has(rule.values) || size(rule.values) == 0)))`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - invalid selector operator",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "badop",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, rule.operator == "In" || rule.operator == "NotIn" || rule.operator == "DoesNotExist")`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - invalid label value",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "badkey!",
+						"operator": "Exists",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, size(rule.key) <= 63 && rule.key.matches("^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"))`),
+			errors: []string{"failed rule"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.TODO()
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, tt.oldObj, math.MaxInt)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != field.ErrorTypeInvalid {
+					t.Errorf("expected only ErrorTypeInvalid errors, but got: %v", err)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+func genMatchSelectorSchema(rule string) *schema.Structural {
+	s := withRule(objectType(map[string]schema.Structural{
+		"matchExpressions": listType(objectTypePtr(map[string]schema.Structural{
+			"key":      stringType,
+			"operator": stringType,
+			"values":   listType(&stringType),
+		})),
+	}), rule)
+	return &s
+}
+
+func TestCELValidationLimit(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		valid  []string
+	}{
+		{
+			name:   "test limit",
+			obj:    objs(math.MaxInt64),
+			schema: schemas(integerType),
+			valid: []string{
+				"self.val1 > 0",
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			for j := range tt.valid {
+				validRule := tt.valid[j]
+				t.Run(validRule, func(t *testing.T) {
+					t.Parallel()
+					s := withRule(*tt.schema, validRule)
+					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), PerCallLimit)
+
+					// test with cost budget exceeded
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
+					var found bool
+					for _, err := range errs {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
+							found = true
+						} else {
+							t.Errorf("unexpected err: %v", err)
+						}
+					}
+					if !found {
+						t.Errorf("expect cost limit exceed err but did not find")
+					}
+					if len(errs) > 1 {
+						t.Errorf("expect to only return cost budget exceed err once but got: %v", len(errs))
+					}
+
+					// test with PerCallLimit exceeded
+					found = false
+					celValidator = NewValidator(&s, true, 0)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+					for _, err := range errs {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("expect PerCostLimit exceed err but did not find")
+					}
+				})
+			}
+		})
+	}
+
+}
+
+func TestCELValidationContextCancellation(t *testing.T) {
+	items := make([]interface{}, 1000)
+	for i := int64(0); i < 1000; i++ {
+		items[i] = i
+	}
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    map[string]interface{}
+		rule   string
+	}{
+		{name: "test cel validation with context cancellation",
+			obj: map[string]interface{}{
+				"array": items,
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"array": listType(&integerType),
+			}),
+			rule: "self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			s := withRule(*tt.schema, tt.rule)
+			celValidator := NewValidator(&s, true, PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			for _, err := range errs {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			// test context cancellation
+			found := false
+			evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
+			cancel()
+			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			for _, err := range errs {
+				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expect operation interrupted err but did not find")
+			}
+		})
+	}
+}
+
+// This is the most recursive operations we expect to be able to include in an expression.
+// This number could get larger with more improvements in the grammar or ANTLR stack, but should *never* decrease or previously valid expressions could be treated as invalid.
+const maxValidDepth = 243
+
+// TestCELMaxRecursionDepth tests CEL setting for maxRecursionDepth.
+func TestCELMaxRecursionDepth(t *testing.T) {
+	tests := []struct {
+		name          string
+		schema        *schema.Structural
+		obj           interface{}
+		oldObj        interface{}
+		valid         []string
+		errors        map[string]string // rule -> string that error message must contain
+		costBudget    int64
+		isRoot        bool
+		expectSkipped bool
+	}{
+		{name: "test CEL maxRecursionDepth",
+			obj:    objs(true),
+			schema: schemas(booleanType),
+			valid: []string{
+				strings.Repeat("self.val1"+" == ", maxValidDepth-1) + "self.val1",
+			},
+			errors: map[string]string{
+				strings.Repeat("self.val1"+" == ", maxValidDepth) + "self.val1": "max recursion depth exceeded",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.costBudget = RuntimeCELCostBudget
+			ctx := context.TODO()
+			for j := range tt.valid {
+				validRule := tt.valid[j]
+				testName := validRule
+				t.Run(testName, func(t *testing.T) {
+					t.Parallel()
+					s := withRule(*tt.schema, validRule)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
+					for _, err := range errs {
+						t.Errorf("unexpected error: %v", err)
+					}
+					if tt.expectSkipped {
+						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.
+						if remainingBudget != tt.costBudget {
+							t.Errorf("expected no cost expended for skipped validation, but got %d remaining from %d budget", remainingBudget, tt.costBudget)
+						}
+						return
+					}
+				})
+			}
+			for rule, expectErrToContain := range tt.errors {
+				testName := rule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
+					s := withRule(*tt.schema, rule)
+					celValidator := NewValidator(&s, true, PerCallLimit)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
+					if len(errs) == 0 {
+						t.Error("expected validation errors but got none")
+					}
+					for _, err := range errs {
+						if err.Type != field.ErrorTypeInvalid || !strings.Contains(err.Error(), expectErrToContain) {
+							t.Errorf("expected error to contain '%s', but got: %v", expectErrToContain, err)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func BenchmarkCELValidationWithContext(b *testing.B) {
+	items := make([]interface{}, 1000)
+	for i := int64(0); i < 1000; i++ {
+		items[i] = i
+	}
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    map[string]interface{}
+		rule   string
+	}{
+		{name: "benchmark for cel validation with context",
+			obj: map[string]interface{}{
+				"array": items,
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"array": listType(&integerType),
+			}),
+			rule: "self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)",
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			ctx := context.TODO()
+			s := withRule(*tt.schema, tt.rule)
+			celValidator := NewValidator(&s, true, PerCallLimit)
+			if celValidator == nil {
+				b.Fatal("expected non nil validator")
+			}
+			for i := 0; i < b.N; i++ {
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				for _, err := range errs {
+					b.Fatalf("validation failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
+	items := make([]interface{}, 1000)
+	for i := int64(0); i < 1000; i++ {
+		items[i] = i
+	}
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    map[string]interface{}
+		rule   string
+	}{
+		{name: "benchmark for cel validation with context",
+			obj: map[string]interface{}{
+				"array": items,
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"array": listType(&integerType),
+			}),
+			rule: "self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)",
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			ctx := context.TODO()
+			s := withRule(*tt.schema, tt.rule)
+			celValidator := NewValidator(&s, true, PerCallLimit)
+			if celValidator == nil {
+				b.Fatal("expected non nil validator")
+			}
+			for i := 0; i < b.N; i++ {
+				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
+				cancel()
+				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				//found := false
+				//for _, err := range errs {
+				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
+				//		found = true
+				//		break
+				//	}
+				//}
+				if len(errs) == 0 {
+					b.Errorf("expect operation interrupted err but did not find")
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkCELValidationWithAndWithoutOldSelfReference measures the additional cost of evaluating
+// validation rules that reference "oldSelf".
+func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
+	for _, rule := range []string{
+		"self.getMonth() >= 0",
+		"oldSelf.getMonth() >= 0",
+	} {
+		b.Run(rule, func(b *testing.B) {
+			obj := map[string]interface{}{
+				"datetime": time.Time{}.Format(strfmt.ISO8601LocalTime),
+			}
+			s := &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"datetime": {
+						Generic: schema.Generic{
+							Type: "string",
+						},
+						ValueValidation: &schema.ValueValidation{
+							Format: "date-time",
+						},
+						Extensions: schema.Extensions{
+							XValidations: []apiextensions.ValidationRule{
+								{Rule: rule},
+							},
+						},
+					},
+				},
+			}
+			validator := NewValidator(s, true, PerCallLimit)
+			if validator == nil {
+				b.Fatal("expected non nil validator")
+			}
+
+			ctx := context.TODO()
+			root := field.NewPath("root")
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				errs, _ := validator.Validate(ctx, root, s, obj, obj, RuntimeCELCostBudget)
+				for _, err := range errs {
+					b.Errorf("unexpected error: %v", err)
+				}
+			}
 		})
 	}
 }
@@ -1527,6 +2524,36 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 	return s
 }
 
+func withRulePtr(s *schema.Structural, rule string) *schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule: rule,
+		},
+	}
+	return s
+}
+
+func cloneWithRule(s *schema.Structural, rule string) *schema.Structural {
+	s = s.DeepCopy()
+	return withRulePtr(s, rule)
+}
+
+func withMaxLength(s schema.Structural, maxLength *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxLength = maxLength
+	return s
+}
+
+func withMaxItems(s schema.Structural, maxItems *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxItems = maxItems
+	return s
+}
+
 func withDefault(dflt interface{}, s schema.Structural) schema.Structural {
 	s.Generic.Default = schema.JSON{Object: dflt}
 	return s
@@ -1540,4 +2567,9 @@ func withNullable(nullable bool, s schema.Structural) schema.Structural {
 func withNullablePtr(nullable bool, s schema.Structural) *schema.Structural {
 	s.Generic.Nullable = nullable
 	return &s
+}
+
+func nilInterfaceOfStringSlice() []interface{} {
+	var slice []interface{} = nil
+	return slice
 }

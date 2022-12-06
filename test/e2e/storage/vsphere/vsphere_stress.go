@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -33,20 +33,22 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 /*
-	Induce stress to create volumes in parallel with multiple threads based on user configurable values for number of threads and iterations per thread.
-	The following actions will be performed as part of this test.
+Induce stress to create volumes in parallel with multiple threads based on user configurable values for number of threads and iterations per thread.
+The following actions will be performed as part of this test.
 
-	1. Create Storage Classes of 4 Categories (Default, SC with Non Default Datastore, SC with SPBM Policy, SC with VSAN Storage Capabilities.)
-	2. READ VCP_STRESS_INSTANCES, VCP_STRESS_ITERATIONS, VSPHERE_SPBM_POLICY_NAME and VSPHERE_DATASTORE from System Environment.
-	3. Launch goroutine for volume lifecycle operations.
-	4. Each instance of routine iterates for n times, where n is read from system env - VCP_STRESS_ITERATIONS
-	5. Each iteration creates 1 PVC, 1 POD using the provisioned PV, Verify disk is attached to the node, Verify pod can access the volume, delete the pod and finally delete the PVC.
+1. Create Storage Classes of 4 Categories (Default, SC with Non Default Datastore, SC with SPBM Policy, SC with VSAN Storage Capabilities.)
+2. READ VCP_STRESS_INSTANCES, VCP_STRESS_ITERATIONS, VSPHERE_SPBM_POLICY_NAME and VSPHERE_DATASTORE from System Environment.
+3. Launch goroutine for volume lifecycle operations.
+4. Each instance of routine iterates for n times, where n is read from system env - VCP_STRESS_ITERATIONS
+5. Each iteration creates 1 PVC, 1 POD using the provisioned PV, Verify disk is attached to the node, Verify pod can access the volume, delete the pod and finally delete the PVC.
 */
 var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-stress")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		client        clientset.Interface
 		namespace     string
@@ -70,11 +72,17 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		// Resulting 120 Volumes and POD Creation. Volumes will be provisioned with each different types of Storage Class,
 		// Each iteration creates PVC, verify PV is provisioned, then creates a pod, verify volume is attached to the node, and then delete the pod and delete pvc.
 		instances = GetAndExpectIntEnvVar(VCPStressInstances)
-		framework.ExpectEqual(instances <= volumesPerNode*len(nodeList.Items), true, fmt.Sprintf("Number of Instances should be less or equal: %v", volumesPerNode*len(nodeList.Items)))
-		framework.ExpectEqual(instances > len(scNames), true, "VCP_STRESS_INSTANCES should be greater than 3 to utilize all 4 types of storage classes")
+		if instances > volumesPerNode*len(nodeList.Items) {
+			framework.Failf("Number of Instances should be less or equal: %v, got instead %v", volumesPerNode*len(nodeList.Items), instances)
+		}
+		if instances <= len(scNames) {
+			framework.Failf("VCP_STRESS_INSTANCES should be greater than 3 to utilize all 4 types of storage classes, got instead %v", instances)
+		}
 
 		iterations = GetAndExpectIntEnvVar(VCPStressIterations)
-		framework.ExpectEqual(iterations > 0, true, "VCP_STRESS_ITERATIONS should be greater than 0")
+		if iterations <= 0 {
+			framework.Failf("VCP_STRESS_ITERATIONS should be greater than 0, got instead %v", iterations)
+		}
 
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
@@ -156,12 +164,14 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By(fmt.Sprintf("%v Verifing the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
+		ginkgo.By(fmt.Sprintf("%v Verifying the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
 		isVolumeAttached, verifyDiskAttachedError := diskIsAttached(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
-		framework.ExpectEqual(isVolumeAttached, true)
+		if !isVolumeAttached {
+			framework.Failf("Volume: %s is not attached to the node: %v", persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
+		}
 		framework.ExpectNoError(verifyDiskAttachedError)
 
-		ginkgo.By(fmt.Sprintf("%v Verifing the volume: %v is accessible in the pod: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Name))
+		ginkgo.By(fmt.Sprintf("%v Verifying the volume: %v is accessible in the pod: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Name))
 		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 		ginkgo.By(fmt.Sprintf("%v Deleting pod: %v", logPrefix, pod.Name))

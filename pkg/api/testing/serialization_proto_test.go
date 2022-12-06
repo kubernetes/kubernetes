@@ -80,7 +80,7 @@ func TestAllFieldsHaveTags(t *testing.T) {
 
 func fieldsHaveProtobufTags(obj reflect.Type) error {
 	switch obj.Kind() {
-	case reflect.Slice, reflect.Map, reflect.Ptr, reflect.Array:
+	case reflect.Slice, reflect.Map, reflect.Pointer, reflect.Array:
 		return fieldsHaveProtobufTags(obj.Elem())
 	case reflect.Struct:
 		for i := 0; i < obj.NumField(); i++ {

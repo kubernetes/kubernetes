@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -145,11 +146,16 @@ func TestPlugin(t *testing.T) {
 	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
+
+	// On Windows, Mount will create the parent of dir and mklink (create a symbolic link) at the volume path later,
+	// so mounter.SetUp will not create the directory. Otherwise mklink will error: "Cannot create a file when that file already exists".
+	if goruntime.GOOS != "windows" {
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("SetUp() failed, volume path not created: %s", path)
+			} else {
+				t.Errorf("SetUp() failed: %v", err)
+			}
 		}
 	}
 

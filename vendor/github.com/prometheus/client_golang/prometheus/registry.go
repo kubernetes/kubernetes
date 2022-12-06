@@ -15,8 +15,8 @@ package prometheus
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -252,9 +252,12 @@ func (errs MultiError) MaybeUnwrap() error {
 }
 
 // Registry registers Prometheus collectors, collects their metrics, and gathers
-// them into MetricFamilies for exposition. It implements both Registerer and
-// Gatherer. The zero value is not usable. Create instances with NewRegistry or
-// NewPedanticRegistry.
+// them into MetricFamilies for exposition. It implements Registerer, Gatherer,
+// and Collector. The zero value is not usable. Create instances with
+// NewRegistry or NewPedanticRegistry.
+//
+// Registry implements Collector to allow it to be used for creating groups of
+// metrics. See the Grouping example for how this can be done.
 type Registry struct {
 	mtx                   sync.RWMutex
 	collectorsByID        map[uint64]Collector // ID is a hash of the descIDs.
@@ -289,7 +292,7 @@ func (r *Registry) Register(c Collector) error {
 
 		// Is the descriptor valid at all?
 		if desc.err != nil {
-			return fmt.Errorf("descriptor %s is invalid: %s", desc, desc.err)
+			return fmt.Errorf("descriptor %s is invalid: %w", desc, desc.err)
 		}
 
 		// Is the descID unique?
@@ -407,6 +410,14 @@ func (r *Registry) MustRegister(cs ...Collector) {
 
 // Gather implements Gatherer.
 func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
+	r.mtx.RLock()
+
+	if len(r.collectorsByID) == 0 && len(r.uncheckedCollectors) == 0 {
+		// Fast path.
+		r.mtx.RUnlock()
+		return nil, nil
+	}
+
 	var (
 		checkedMetricChan   = make(chan Metric, capMetricChan)
 		uncheckedMetricChan = make(chan Metric, capMetricChan)
@@ -416,7 +427,6 @@ func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 		registeredDescIDs   map[uint64]struct{} // Only used for pedantic checks
 	)
 
-	r.mtx.RLock()
 	goroutineBudget := len(r.collectorsByID) + len(r.uncheckedCollectors)
 	metricFamiliesByName := make(map[string]*dto.MetricFamily, len(r.dimHashesByName))
 	checkedCollectors := make(chan Collector, len(r.collectorsByID))
@@ -549,6 +559,31 @@ func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 	return internal.NormalizeMetricFamilies(metricFamiliesByName), errs.MaybeUnwrap()
 }
 
+// Describe implements Collector.
+func (r *Registry) Describe(ch chan<- *Desc) {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	// Only report the checked Collectors; unchecked collectors don't report any
+	// Desc.
+	for _, c := range r.collectorsByID {
+		c.Describe(ch)
+	}
+}
+
+// Collect implements Collector.
+func (r *Registry) Collect(ch chan<- Metric) {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	for _, c := range r.collectorsByID {
+		c.Collect(ch)
+	}
+	for _, c := range r.uncheckedCollectors {
+		c.Collect(ch)
+	}
+}
+
 // WriteToTextfile calls Gather on the provided Gatherer, encodes the result in the
 // Prometheus text format, and writes it to a temporary file. Upon success, the
 // temporary file is renamed to the provided filename.
@@ -556,7 +591,7 @@ func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 // This is intended for use with the textfile collector of the node exporter.
 // Note that the node exporter expects the filename to be suffixed with ".prom".
 func WriteToTextfile(filename string, g Gatherer) error {
-	tmp, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename))
+	tmp, err := os.CreateTemp(filepath.Dir(filename), filepath.Base(filename))
 	if err != nil {
 		return err
 	}
@@ -575,7 +610,7 @@ func WriteToTextfile(filename string, g Gatherer) error {
 		return err
 	}
 
-	if err := os.Chmod(tmp.Name(), 0644); err != nil {
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
 		return err
 	}
 	return os.Rename(tmp.Name(), filename)
@@ -596,7 +631,7 @@ func processMetric(
 	}
 	dtoMetric := &dto.Metric{}
 	if err := metric.Write(dtoMetric); err != nil {
-		return fmt.Errorf("error collecting metric %v: %s", desc, err)
+		return fmt.Errorf("error collecting metric %v: %w", desc, err)
 	}
 	metricFamily, ok := metricFamiliesByName[desc.fqName]
 	if ok { // Existing name.
@@ -718,12 +753,13 @@ func (gs Gatherers) Gather() ([]*dto.MetricFamily, error) {
 	for i, g := range gs {
 		mfs, err := g.Gather()
 		if err != nil {
-			if multiErr, ok := err.(MultiError); ok {
+			multiErr := MultiError{}
+			if errors.As(err, &multiErr) {
 				for _, err := range multiErr {
-					errs = append(errs, fmt.Errorf("[from Gatherer #%d] %s", i+1, err))
+					errs = append(errs, fmt.Errorf("[from Gatherer #%d] %w", i+1, err))
 				}
 			} else {
-				errs = append(errs, fmt.Errorf("[from Gatherer #%d] %s", i+1, err))
+				errs = append(errs, fmt.Errorf("[from Gatherer #%d] %w", i+1, err))
 			}
 		}
 		for _, mf := range mfs {
@@ -884,11 +920,11 @@ func checkMetricConsistency(
 	h.Write(separatorByteSlice)
 	// Make sure label pairs are sorted. We depend on it for the consistency
 	// check.
-	if !sort.IsSorted(labelPairSorter(dtoMetric.Label)) {
+	if !sort.IsSorted(internal.LabelPairSorter(dtoMetric.Label)) {
 		// We cannot sort dtoMetric.Label in place as it is immutable by contract.
 		copiedLabels := make([]*dto.LabelPair, len(dtoMetric.Label))
 		copy(copiedLabels, dtoMetric.Label)
-		sort.Sort(labelPairSorter(copiedLabels))
+		sort.Sort(internal.LabelPairSorter(copiedLabels))
 		dtoMetric.Label = copiedLabels
 	}
 	for _, lp := range dtoMetric.Label {
@@ -935,7 +971,7 @@ func checkDescConsistency(
 			metricFamily.GetName(), dtoMetric, desc,
 		)
 	}
-	sort.Sort(labelPairSorter(lpsFromDesc))
+	sort.Sort(internal.LabelPairSorter(lpsFromDesc))
 	for i, lpFromDesc := range lpsFromDesc {
 		lpFromMetric := dtoMetric.Label[i]
 		if lpFromDesc.GetName() != lpFromMetric.GetName() ||
@@ -947,4 +983,90 @@ func checkDescConsistency(
 		}
 	}
 	return nil
+}
+
+var _ TransactionalGatherer = &MultiTRegistry{}
+
+// MultiTRegistry is a TransactionalGatherer that joins gathered metrics from multiple
+// transactional gatherers.
+//
+// It is caller responsibility to ensure two registries have mutually exclusive metric families,
+// no deduplication will happen.
+type MultiTRegistry struct {
+	tGatherers []TransactionalGatherer
+}
+
+// NewMultiTRegistry creates MultiTRegistry.
+func NewMultiTRegistry(tGatherers ...TransactionalGatherer) *MultiTRegistry {
+	return &MultiTRegistry{
+		tGatherers: tGatherers,
+	}
+}
+
+// Gather implements TransactionalGatherer interface.
+func (r *MultiTRegistry) Gather() (mfs []*dto.MetricFamily, done func(), err error) {
+	errs := MultiError{}
+
+	dFns := make([]func(), 0, len(r.tGatherers))
+	// TODO(bwplotka): Implement concurrency for those?
+	for _, g := range r.tGatherers {
+		// TODO(bwplotka): Check for duplicates?
+		m, d, err := g.Gather()
+		errs.Append(err)
+
+		mfs = append(mfs, m...)
+		dFns = append(dFns, d)
+	}
+
+	// TODO(bwplotka): Consider sort in place, given metric family in gather is sorted already.
+	sort.Slice(mfs, func(i, j int) bool {
+		return *mfs[i].Name < *mfs[j].Name
+	})
+	return mfs, func() {
+		for _, d := range dFns {
+			d()
+		}
+	}, errs.MaybeUnwrap()
+}
+
+// TransactionalGatherer represents transactional gatherer that can be triggered to notify gatherer that memory
+// used by metric family is no longer used by a caller. This allows implementations with cache.
+type TransactionalGatherer interface {
+	// Gather returns metrics in a lexicographically sorted slice
+	// of uniquely named MetricFamily protobufs. Gather ensures that the
+	// returned slice is valid and self-consistent so that it can be used
+	// for valid exposition. As an exception to the strict consistency
+	// requirements described for metric.Desc, Gather will tolerate
+	// different sets of label names for metrics of the same metric family.
+	//
+	// Even if an error occurs, Gather attempts to gather as many metrics as
+	// possible. Hence, if a non-nil error is returned, the returned
+	// MetricFamily slice could be nil (in case of a fatal error that
+	// prevented any meaningful metric collection) or contain a number of
+	// MetricFamily protobufs, some of which might be incomplete, and some
+	// might be missing altogether. The returned error (which might be a
+	// MultiError) explains the details. Note that this is mostly useful for
+	// debugging purposes. If the gathered protobufs are to be used for
+	// exposition in actual monitoring, it is almost always better to not
+	// expose an incomplete result and instead disregard the returned
+	// MetricFamily protobufs in case the returned error is non-nil.
+	//
+	// Important: done is expected to be triggered (even if the error occurs!)
+	// once caller does not need returned slice of dto.MetricFamily.
+	Gather() (_ []*dto.MetricFamily, done func(), err error)
+}
+
+// ToTransactionalGatherer transforms Gatherer to transactional one with noop as done function.
+func ToTransactionalGatherer(g Gatherer) TransactionalGatherer {
+	return &noTransactionGatherer{g: g}
+}
+
+type noTransactionGatherer struct {
+	g Gatherer
+}
+
+// Gather implements TransactionalGatherer interface.
+func (g *noTransactionGatherer) Gather() (_ []*dto.MetricFamily, done func(), err error) {
+	mfs, err := g.g.Gather()
+	return mfs, func() {}, err
 }

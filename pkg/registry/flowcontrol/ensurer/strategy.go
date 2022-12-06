@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
-	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,13 +37,14 @@ const (
 
 // ensureStrategy provides a strategy for ensuring apf bootstrap configurationWrapper.
 // We have two types of configurationWrapper objects:
-// - mandatory: the mandatory configurationWrapper objects are about ensuring that the P&F
-//   system itself won't crash; we have to be sure there's 'catch-all' place for
-//   everything to go. Any changes made by the cluster operators to these
-//   configurationWrapper objects will be stomped by the apiserver.
 //
-// - suggested: additional configurationWrapper objects for initial behavior.
-//   the cluster operators have an option to edit or delete these configurationWrapper objects.
+//   - mandatory: the mandatory configurationWrapper objects are about ensuring that the P&F
+//     system itself won't crash; we have to be sure there's 'catch-all' place for
+//     everything to go. Any changes made by the cluster operators to these
+//     configurationWrapper objects will be stomped by the apiserver.
+//
+//   - suggested: additional configurationWrapper objects for initial behavior.
+//     the cluster operators have an option to edit or delete these configurationWrapper objects.
 type ensureStrategy interface {
 	// Name of the strategy, for now we have two: 'mandatory' and 'suggested'.
 	// This comes handy in logging.
@@ -176,7 +177,7 @@ func (s *strategy) ShouldUpdate(current, bootstrap configurationObject) (runtime
 // shouldUpdateSpec inspects the auto-update annotation key and generation field to determine
 // whether the configurationWrapper object should be auto-updated.
 func shouldUpdateSpec(accessor metav1.Object) bool {
-	value, _ := accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]
+	value, _ := accessor.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey]
 	if autoUpdate, err := strconv.ParseBool(value); err == nil {
 		return autoUpdate
 	}
@@ -196,7 +197,7 @@ func shouldUpdateSpec(accessor metav1.Object) bool {
 // shouldUpdateAnnotation determines whether the current value of the auto-update annotation
 // key matches the desired value.
 func shouldUpdateAnnotation(accessor metav1.Object, desired bool) bool {
-	if value, ok := accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]; ok {
+	if value, ok := accessor.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey]; ok {
 		if current, err := strconv.ParseBool(value); err == nil && current == desired {
 			return false
 		}
@@ -211,7 +212,7 @@ func setAutoUpdateAnnotation(accessor metav1.Object, autoUpdate bool) {
 		accessor.SetAnnotations(map[string]string{})
 	}
 
-	accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey] = strconv.FormatBool(autoUpdate)
+	accessor.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey] = strconv.FormatBool(autoUpdate)
 }
 
 // ensureConfiguration ensures the boostrap configurationWrapper on the cluster based on the specified strategy.
@@ -280,7 +281,7 @@ func removeAutoUpdateEnabledConfiguration(wrapper configurationWrapper, name str
 		return fmt.Errorf("failed to retrieve the %s, will retry later name=%q error=%w", wrapper.TypeName(), name, err)
 	}
 
-	value := current.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]
+	value := current.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey]
 	autoUpdate, err := strconv.ParseBool(value)
 	if err != nil {
 		klog.ErrorS(err, fmt.Sprintf("Skipping deletion of the %s", wrapper.TypeName()), "name", name)
@@ -310,11 +311,14 @@ func removeAutoUpdateEnabledConfiguration(wrapper configurationWrapper, name str
 // getDanglingBootstrapObjectNames returns a list of names of bootstrap
 // configuration objects that are potentially candidates for deletion from
 // the cluster, given a set of bootstrap and current configuration.
-//  - bootstrap: a set of hard coded configuration kube-apiserver maintains in-memory.
-//  - current: a set of configuration objects that exist on the cluster
+//   - bootstrap: a set of hard coded configuration kube-apiserver maintains in-memory.
+//   - current: a set of configuration objects that exist on the cluster
+//
 // Any object present in current is added to the list if both a and b are true:
-//  a. the object in current is missing from the bootstrap configuration
-//  b. the object has the designated auto-update annotation key
+//
+//	a. the object in current is missing from the bootstrap configuration
+//	b. the object has the designated auto-update annotation key
+//
 // This function shares the common logic for both FlowSchema and
 // PriorityLevelConfiguration type and hence it accepts metav1.Object only.
 func getDanglingBootstrapObjectNames(bootstrap sets.String, current []metav1.Object) []string {
@@ -325,7 +329,7 @@ func getDanglingBootstrapObjectNames(bootstrap sets.String, current []metav1.Obj
 	candidates := make([]string, 0)
 	for i := range current {
 		object := current[i]
-		if _, ok := object.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey]; !ok {
+		if _, ok := object.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey]; !ok {
 			// the configuration object does not have the annotation key,
 			// it's probably a user defined configuration object,
 			// so we can skip it.

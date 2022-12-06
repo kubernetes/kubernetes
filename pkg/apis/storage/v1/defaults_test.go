@@ -52,7 +52,6 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 }
 
 func TestSetDefaultStorageCapacityEnabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
 	driver := &storagev1.CSIDriver{}
 
 	// field should be defaulted
@@ -63,18 +62,6 @@ func TestSetDefaultStorageCapacityEnabled(t *testing.T) {
 		t.Errorf("Expected StorageCapacity to be defaulted to: %+v, got: nil", defaultStorageCapacity)
 	} else if *outStorageCapacity != defaultStorageCapacity {
 		t.Errorf("Expected StorageCapacity to be defaulted to: %+v, got: %+v", defaultStorageCapacity, outStorageCapacity)
-	}
-}
-
-func TestSetDefaultStorageCapacityDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, false)()
-	driver := &storagev1.CSIDriver{}
-
-	// field should not be defaulted
-	output := roundTrip(t, runtime.Object(driver)).(*storagev1.CSIDriver)
-	outStorageCapacity := output.Spec.StorageCapacity
-	if outStorageCapacity != nil {
-		t.Errorf("Expected StorageCapacity to remain nil, got: %+v", outStorageCapacity)
 	}
 }
 
@@ -93,8 +80,6 @@ func TestSetDefaultVolumeBindingMode(t *testing.T) {
 }
 
 func TestSetDefaultCSIDriver(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-
 	enabled := true
 	disabled := false
 	tests := []struct {
@@ -133,5 +118,32 @@ func TestSetDefaultCSIDriver(t *testing.T) {
 				t.Errorf("CSIDriver defaults diff (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestSetDefaultSELinuxMountReadWriteOncePodEnabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	driver := &storagev1.CSIDriver{}
+
+	// field should be defaulted
+	defaultSELinuxMount := false
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1.CSIDriver)
+	outSELinuxMount := output.Spec.SELinuxMount
+	if outSELinuxMount == nil {
+		t.Errorf("Expected SELinuxMount to be defaulted to: %+v, got: nil", defaultSELinuxMount)
+	} else if *outSELinuxMount != defaultSELinuxMount {
+		t.Errorf("Expected SELinuxMount to be defaulted to: %+v, got: %+v", defaultSELinuxMount, outSELinuxMount)
+	}
+}
+
+func TestSetDefaultSELinuxMountReadWriteOncePodDisabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)()
+	driver := &storagev1.CSIDriver{}
+
+	// field should not be defaulted
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1.CSIDriver)
+	outSELinuxMount := output.Spec.SELinuxMount
+	if outSELinuxMount != nil {
+		t.Errorf("Expected SELinuxMount to remain nil, got: %+v", outSELinuxMount)
 	}
 }

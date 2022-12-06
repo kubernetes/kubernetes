@@ -26,11 +26,7 @@ stability_check_setup() {
   kube::golang::verify_go_version
   kube::util::ensure-temp-dir
   cd "${KUBE_ROOT}"
-  export KUBE_EXTRA_GOPATH=$KUBE_TEMP
   kube::golang::setup_env
-  pushd "${KUBE_EXTRA_GOPATH}" >/dev/null
-    GO111MODULE=on go get "gopkg.in/yaml.v2"
-  popd >/dev/null
 }
 
 find_files_to_check() {
@@ -45,10 +41,15 @@ find_files_to_check() {
         -o -wholename '*/vendor/*' \
         -o -wholename '*/hack/*' \
         -o -wholename '*_test.go' \
+        -o -wholename './test/instrumentation/*.go' \
         \) -prune \
     \) \
     \( -wholename '**/*.go' \
   \)
+}
+
+find_test_files() {
+  find './test/instrumentation' -wholename '**/*.go'
 }
 
 red=$(tput setaf 1)
@@ -58,7 +59,7 @@ reset=$(tput sgr0)
 kube::validate::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
-  doValidate=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | KUBE_ROOT=${KUBE_ROOT} xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
+  doValidate=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | grep -v ".git" | sort | KUBE_ROOT=${KUBE_ROOT} xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
 
   if $doValidate; then
     echo -e "${green}Diffing test/instrumentation/testdata/stable-metrics-list.yaml\n${reset}"
@@ -73,6 +74,24 @@ kube::validate::stablemetrics() {
   exit 1
 }
 
+kube::validate::test::stablemetrics() {
+  stability_check_setup
+  temp_file=$(mktemp)
+  doValidate=$(find_test_files | grep -E ".*.go" | grep -v ".*_test.go" | grep -v ".git" | sort | KUBE_ROOT=${KUBE_ROOT} xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
+
+  if $doValidate; then
+    echo -e "${green}Diffing test/instrumentation/testdata/test-stable-metrics-list.yaml\n${reset}"
+    if diff -u "$KUBE_ROOT/test/instrumentation/testdata/test-stable-metrics-list.yaml" "$temp_file"; then
+      echo -e "${green}\nPASS metrics stability verification ${reset}"
+      return 0
+    fi
+  fi
+
+  echo "${red}!!! Metrics stability static analysis test has failed!${reset}" >&2
+  echo "${red}!!! Please run './test/instrumentation/test-update.sh' to update the golden list.${reset}" >&2
+  exit 1
+}
+
 kube::update::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
@@ -84,5 +103,45 @@ kube::update::stablemetrics() {
   fi
   mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml"
   echo "${green}Updated golden list of stable metrics.${reset}"
+}
+
+kube::update::documentation::list() {
+  stability_check_setup
+  temp_file=$(mktemp)
+  doCheckStability=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | KUBE_ROOT=${KUBE_ROOT} xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" --allstabilityclasses -- 1>"${temp_file}")
+
+  if ! $doCheckStability; then
+    echo "${red}!!! updating golden list of metrics has failed! ${reset}" >&2
+    exit 1
+  fi
+  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/documentation/documentation-list.yaml"
+  echo "${green}Updated list of metrics for documentation ${reset}"
+}
+
+kube::update::documentation() {
+  stability_check_setup
+  temp_file=$(mktemp)
+  arg1=$1
+  arg2=$2
+  doUpdateDocs=$(go run "test/instrumentation/documentation/main.go" --major "$arg1" --minor "$arg2" -- 1>"${temp_file}")
+  if ! $doUpdateDocs; then
+    echo "${red}!!! updating documentation has failed! ${reset}" >&2
+    exit 1
+  fi
+  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/documentation/documentation.md"
+  echo "${green}Updated documentation of metrics.${reset}"
+}
+
+kube::update::test::stablemetrics() {
+  stability_check_setup
+  temp_file=$(mktemp)
+  doCheckStability=$(find_test_files | grep -E ".*.go" | grep -v ".*_test.go" | sort | KUBE_ROOT=${KUBE_ROOT} xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
+
+  if ! $doCheckStability; then
+    echo "${red}!!! updating golden list of test metrics has failed! ${reset}" >&2
+    exit 1
+  fi
+  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/test-stable-metrics-list.yaml"
+  echo "${green}Updated test list of stable metrics.${reset}"
 }
 

@@ -74,6 +74,7 @@ type cloudCIDRAllocator struct {
 	// and not blocking on long operations (which shouldn't be done from
 	// event handlers anyway).
 	nodeUpdateChannel chan string
+	broadcaster       record.EventBroadcaster
 	recorder          record.EventRecorder
 
 	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
@@ -91,9 +92,6 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
-	eventBroadcaster.StartStructuredLogging(0)
-	klog.V(0).Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	gceCloud, ok := cloud.(*gce.Cloud)
 	if !ok {
@@ -107,6 +105,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 		nodeLister:        nodeInformer.Lister(),
 		nodesSynced:       nodeInformer.Informer().HasSynced,
 		nodeUpdateChannel: make(chan string, cidrUpdateQueueSize),
+		broadcaster:       eventBroadcaster,
 		recorder:          recorder,
 		nodesInProcessing: map[string]*nodeProcessingInfo{},
 	}
@@ -135,6 +134,12 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 
 func (ca *cloudCIDRAllocator) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	// Start event processing pipeline.
+	ca.broadcaster.StartStructuredLogging(0)
+	klog.V(0).Infof("Sending events to api server.")
+	ca.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ca.client.CoreV1().Events("")})
+	defer ca.broadcaster.Shutdown()
 
 	klog.Infof("Starting cloud CIDR allocator")
 	defer klog.Infof("Shutting down cloud CIDR allocator")

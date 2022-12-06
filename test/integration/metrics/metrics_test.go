@@ -20,42 +20,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
 	"runtime"
 	"testing"
 
 	"github.com/prometheus/common/model"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/metrics/testutil"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func scrapeMetrics(s *httptest.Server) (testutil.Metrics, error) {
-	req, err := http.NewRequest("GET", s.URL+"/metrics", nil)
+func scrapeMetrics(s *kubeapiservertesting.TestServer) (testutil.Metrics, error) {
+	client, err := clientset.NewForConfig(s.ClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create http request: %v", err)
+		return nil, fmt.Errorf("couldn't create client")
 	}
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	body, err := client.RESTClient().Get().AbsPath("metrics").DoRaw(context.TODO())
 	if err != nil {
-		return nil, fmt.Errorf("Unable to contact metrics endpoint of API server: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from API Server: %v", resp)
+		return nil, fmt.Errorf("request failed: %v", err)
 	}
 	metrics := testutil.NewMetrics()
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to read response: %v", resp)
-	}
-	err = testutil.ParseMetrics(string(data), &metrics)
+	err = testutil.ParseMetrics(string(body), &metrics)
 	return metrics, err
 }
 
@@ -72,8 +61,8 @@ func TestAPIServerProcessMetrics(t *testing.T) {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
 
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer s.TearDownFn()
 
 	metrics, err := scrapeMetrics(s)
 	if err != nil {
@@ -88,18 +77,18 @@ func TestAPIServerProcessMetrics(t *testing.T) {
 }
 
 func TestAPIServerMetrics(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer s.TearDownFn()
 
 	// Make a request to the apiserver to ensure there's at least one data point
 	// for the metrics we're expecting -- otherwise, they won't be exported.
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	client := clientset.NewForConfigOrDie(s.ClientConfig)
 	if _, err := client.CoreV1().Pods(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error getting pods: %v", err)
 	}
 
 	// Make a request to a deprecated API to ensure there's at least one data point
-	if _, err := client.PolicyV1beta1().PodSecurityPolicies().List(context.TODO(), metav1.ListOptions{}); err != nil {
+	if _, err := client.StorageV1beta1().CSIStorageCapacities("default").List(context.TODO(), metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error getting rbac roles: %v", err)
 	}
 
@@ -116,10 +105,13 @@ func TestAPIServerMetrics(t *testing.T) {
 }
 
 func TestAPIServerMetricsLabels(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have service account controller running.
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer s.TearDownFn()
 
-	client, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
+	clientConfig := restclient.CopyConfig(s.ClientConfig)
+	clientConfig.QPS = -1
+	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
@@ -266,10 +258,13 @@ func TestAPIServerMetricsPods(t *testing.T) {
 		}
 	}
 
-	_, server, closeFn := framework.RunAnAPIServer(framework.NewControlPlaneConfig())
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have service account controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})
+	clientConfig := restclient.CopyConfig(server.ClientConfig)
+	clientConfig.QPS = -1
+	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
@@ -372,10 +367,12 @@ func TestAPIServerMetricsNamespaces(t *testing.T) {
 		}
 	}
 
-	_, server, closeFn := framework.RunAnAPIServer(framework.NewControlPlaneConfig())
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})
+	clientConfig := restclient.CopyConfig(server.ClientConfig)
+	clientConfig.QPS = -1
+	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
@@ -462,7 +459,7 @@ func TestAPIServerMetricsNamespaces(t *testing.T) {
 	}
 }
 
-func getSamples(s *httptest.Server) (model.Samples, error) {
+func getSamples(s *kubeapiservertesting.TestServer) (model.Samples, error) {
 	metrics, err := scrapeMetrics(s)
 	if err != nil {
 		return nil, err

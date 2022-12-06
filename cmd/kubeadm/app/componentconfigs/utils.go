@@ -64,7 +64,7 @@ func (errs UnsupportedConfigVersionsErrorMap) Error() string {
 }
 
 // warnDefaultComponentConfigValue prints a warning if the user modified a field in a certain
-// CompomentConfig from the default recommended value in kubeadm.
+// ComponentConfig from the default recommended value in kubeadm.
 func warnDefaultComponentConfigValue(componentConfigKind, paramName string, defaultValue, userValue interface{}) {
 	klog.Warningf("The recommended value for %q in %q is: %v; the provided value is: %v",
 		paramName, componentConfigKind, defaultValue, userValue)

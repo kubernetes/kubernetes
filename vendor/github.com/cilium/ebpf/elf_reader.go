@@ -19,7 +19,7 @@ import (
 )
 
 // elfCode is a convenience to reduce the amount of arguments that have to
-// be passed around explicitly. You should treat it's contents as immutable.
+// be passed around explicitly. You should treat its contents as immutable.
 type elfCode struct {
 	*internal.SafeELFFile
 	sections map[elf.SectionIndex]*elfSection
@@ -188,7 +188,7 @@ func LoadCollectionSpecFromReader(rd io.ReaderAt) (*CollectionSpec, error) {
 		return nil, fmt.Errorf("load programs: %w", err)
 	}
 
-	return &CollectionSpec{maps, progs}, nil
+	return &CollectionSpec{maps, progs, ec.ByteOrder}, nil
 }
 
 func loadLicense(sec *elf.Section) (string, error) {
@@ -520,8 +520,12 @@ func (ec *elfCode) loadMaps(maps map[string]*MapSpec) error {
 				return fmt.Errorf("map %s: missing flags", mapName)
 			}
 
-			if _, err := io.Copy(internal.DiscardZeroes{}, lr); err != nil {
-				return fmt.Errorf("map %s: unknown and non-zero fields in definition", mapName)
+			extra, err := io.ReadAll(lr)
+			if err != nil {
+				return fmt.Errorf("map %s: reading map tail: %w", mapName, err)
+			}
+			if len(extra) > 0 {
+				spec.Extra = *bytes.NewReader(extra)
 			}
 
 			if err := spec.clampPerfEventArraySize(); err != nil {
@@ -535,6 +539,9 @@ func (ec *elfCode) loadMaps(maps map[string]*MapSpec) error {
 	return nil
 }
 
+// loadBTFMaps iterates over all ELF sections marked as BTF map sections
+// (like .maps) and parses them into MapSpecs. Dump the .maps section and
+// any relocations with `readelf -x .maps -r <elf_file>`.
 func (ec *elfCode) loadBTFMaps(maps map[string]*MapSpec) error {
 	for _, sec := range ec.sections {
 		if sec.kind != btfMapSection {
@@ -545,33 +552,46 @@ func (ec *elfCode) loadBTFMaps(maps map[string]*MapSpec) error {
 			return fmt.Errorf("missing BTF")
 		}
 
-		_, err := io.Copy(internal.DiscardZeroes{}, bufio.NewReader(sec.Open()))
-		if err != nil {
-			return fmt.Errorf("section %v: initializing BTF map definitions: %w", sec.Name, internal.ErrNotSupported)
-		}
-
-		var ds btf.Datasec
+		// Each section must appear as a DataSec in the ELF's BTF blob.
+		var ds *btf.Datasec
 		if err := ec.btf.FindType(sec.Name, &ds); err != nil {
 			return fmt.Errorf("cannot find section '%s' in BTF: %w", sec.Name, err)
 		}
 
+		// Open a Reader to the ELF's raw section bytes so we can assert that all
+		// of them are zero on a per-map (per-Var) basis. For now, the section's
+		// sole purpose is to receive relocations, so all must be zero.
+		rs := sec.Open()
+
 		for _, vs := range ds.Vars {
+			// BPF maps are declared as and assigned to global variables,
+			// so iterate over each Var in the DataSec and validate their types.
 			v, ok := vs.Type.(*btf.Var)
 			if !ok {
 				return fmt.Errorf("section %v: unexpected type %s", sec.Name, vs.Type)
 			}
 			name := string(v.Name)
 
+			// The BTF metadata for each Var contains the full length of the map
+			// declaration, so read the corresponding amount of bytes from the ELF.
+			// This way, we can pinpoint which map declaration contains unexpected
+			// (and therefore unsupported) data.
+			_, err := io.Copy(internal.DiscardZeroes{}, io.LimitReader(rs, int64(vs.Size)))
+			if err != nil {
+				return fmt.Errorf("section %v: map %s: initializing BTF map definitions: %w", sec.Name, name, internal.ErrNotSupported)
+			}
+
 			if maps[name] != nil {
 				return fmt.Errorf("section %v: map %s already exists", sec.Name, name)
 			}
 
+			// Each Var representing a BTF map definition contains a Struct.
 			mapStruct, ok := v.Type.(*btf.Struct)
 			if !ok {
 				return fmt.Errorf("expected struct, got %s", v.Type)
 			}
 
-			mapSpec, err := mapSpecFromBTF(name, mapStruct, false, ec.btf)
+			mapSpec, err := mapSpecFromBTF(sec, &vs, mapStruct, ec.btf, name, false)
 			if err != nil {
 				return fmt.Errorf("map %v: %w", name, err)
 			}
@@ -582,32 +602,52 @@ func (ec *elfCode) loadBTFMaps(maps map[string]*MapSpec) error {
 
 			maps[name] = mapSpec
 		}
+
+		// Drain the ELF section reader to make sure all bytes are accounted for
+		// with BTF metadata.
+		i, err := io.Copy(io.Discard, rs)
+		if err != nil {
+			return fmt.Errorf("section %v: unexpected error reading remainder of ELF section: %w", sec.Name, err)
+		}
+		if i > 0 {
+			return fmt.Errorf("section %v: %d unexpected remaining bytes in ELF section, invalid BTF?", sec.Name, i)
+		}
 	}
 
 	return nil
 }
 
+// A programStub is a placeholder for a Program to be inserted at a certain map key.
+// It needs to be resolved into a Program later on in the loader process.
+type programStub string
+
+// A mapStub is a placeholder for a Map to be inserted at a certain map key.
+// It needs to be resolved into a Map later on in the loader process.
+type mapStub string
+
 // mapSpecFromBTF produces a MapSpec based on a btf.Struct def representing
 // a BTF map definition. The name and spec arguments will be copied to the
 // resulting MapSpec, and inner must be true on any resursive invocations.
-func mapSpecFromBTF(name string, def *btf.Struct, inner bool, spec *btf.Spec) (*MapSpec, error) {
-
+func mapSpecFromBTF(es *elfSection, vs *btf.VarSecinfo, def *btf.Struct, spec *btf.Spec, name string, inner bool) (*MapSpec, error) {
 	var (
-		key, value                 btf.Type
-		keySize, valueSize         uint32
-		mapType, flags, maxEntries uint32
-		pinType                    PinType
-		innerMapSpec               *MapSpec
-		err                        error
+		key, value         btf.Type
+		keySize, valueSize uint32
+		mapType            MapType
+		flags, maxEntries  uint32
+		pinType            PinType
+		innerMapSpec       *MapSpec
+		contents           []MapKV
+		err                error
 	)
 
 	for i, member := range def.Members {
 		switch member.Name {
 		case "type":
-			mapType, err = uintFromBTF(member.Type)
+			mt, err := uintFromBTF(member.Type)
 			if err != nil {
 				return nil, fmt.Errorf("can't get type: %w", err)
 			}
+			mapType = MapType(mt)
 
 		case "map_flags":
 			flags, err = uintFromBTF(member.Type)
@@ -717,7 +757,7 @@ func mapSpecFromBTF(name string, def *btf.Struct, inner bool, spec *btf.Spec) (*
 			case *btf.Struct:
 				// The values member pointing to an array of structs means we're expecting
 				// a map-in-map declaration.
-				if MapType(mapType) != ArrayOfMaps && MapType(mapType) != HashOfMaps {
+				if mapType != ArrayOfMaps && mapType != HashOfMaps {
 					return nil, errors.New("outer map needs to be an array or a hash of maps")
 				}
 				if inner {
@@ -731,13 +771,25 @@ func mapSpecFromBTF(name string, def *btf.Struct, inner bool, spec *btf.Spec) (*
 				// on kernels 5.2 and up)
 				// Pass the BTF spec from the parent object, since both parent and
 				// child must be created from the same BTF blob (on kernels that support BTF).
-				innerMapSpec, err = mapSpecFromBTF(name+"_inner", t, true, spec)
+				innerMapSpec, err = mapSpecFromBTF(es, vs, t, spec, name+"_inner", true)
 				if err != nil {
 					return nil, fmt.Errorf("can't parse BTF map definition of inner map: %w", err)
 				}
 
+			case *btf.FuncProto:
+				// The values member contains an array of function pointers, meaning an
+				// autopopulated PROG_ARRAY.
+				if mapType != ProgramArray {
+					return nil, errors.New("map needs to be a program array")
+				}
+
 			default:
 				return nil, fmt.Errorf("unsupported value type %q in 'values' field", t)
+			}
+
+			contents, err = resolveBTFValuesContents(es, vs, member)
+			if err != nil {
+				return nil, fmt.Errorf("resolving values contents: %w", err)
 			}
 
 		default:
@@ -745,7 +797,12 @@ func mapSpecFromBTF(name string, def *btf.Struct, inner bool, spec *btf.Spec) (*
 		}
 	}
 
-	bm := btf.NewMap(spec, key, value)
+	if key == nil {
+		key = &btf.Void{}
+	}
+	if value == nil {
+		value = &btf.Void{}
+	}
 
 	return &MapSpec{
 		Name:       SanitizeName(name, -1),
@@ -754,9 +811,10 @@ func mapSpecFromBTF(name string, def *btf.Struct, inner bool, spec *btf.Spec) (*
 		ValueSize:  valueSize,
 		MaxEntries: maxEntries,
 		Flags:      flags,
-		BTF:        &bm,
+		BTF:        &btf.Map{Spec: spec, Key: key, Value: value},
 		Pinning:    pinType,
 		InnerMap:   innerMapSpec,
+		Contents:   contents,
 	}, nil
 }
 
@@ -793,6 +851,64 @@ func resolveBTFArrayMacro(typ btf.Type) (btf.Type, error) {
 	return ptr.Target, nil
 }
 
+// resolveBTFValuesContents resolves relocations into ELF sections belonging
+// to btf.VarSecinfo's. This can be used on the 'values' member in BTF map
+// definitions to extract static declarations of map contents.
+func resolveBTFValuesContents(es *elfSection, vs *btf.VarSecinfo, member btf.Member) ([]MapKV, error) {
+	// The elements of a .values pointer array are not encoded in BTF.
+	// Instead, relocations are generated into each array index.
+	// However, it's possible to leave certain array indices empty, so all
+	// indices' offsets need to be checked for emitted relocations.
+
+	// The offset of the 'values' member within the _struct_ (in bits)
+	// is the starting point of the array. Convert to bytes. Add VarSecinfo
+	// offset to get the absolute position in the ELF blob.
+	start := (member.OffsetBits / 8) + vs.Offset
+	// 'values' is encoded in BTF as a zero (variable) length struct
+	// member, and its contents run until the end of the VarSecinfo.
+	// Add VarSecinfo offset to get the absolute position in the ELF blob.
+	end := vs.Size + vs.Offset
+	// The size of an address in this section. This determines the width of
+	// an index in the array.
+	align := uint32(es.SectionHeader.Addralign)
+
+	// Check if variable-length section is aligned.
+	if (end-start)%align != 0 {
+		return nil, errors.New("unaligned static values section")
+	}
+	elems := (end - start) / align
+
+	if elems == 0 {
+		return nil, nil
+	}
+
+	contents := make([]MapKV, 0, elems)
+
+	// k is the array index, off is its corresponding ELF section offset.
+	for k, off := uint32(0), start; k < elems; k, off = k+1, off+align {
+		r, ok := es.relocations[uint64(off)]
+		if !ok {
+			continue
+		}
+
+		// Relocation exists for the current offset in the ELF section.
+		// Emit a value stub based on the type of relocation to be replaced by
+		// a real fd later in the pipeline before populating the map.
+		// Map keys are encoded in MapKV entries, so empty array indices are
+		// skipped here.
+		switch t := elf.ST_TYPE(r.Info); t {
+		case elf.STT_FUNC:
+			contents = append(contents, MapKV{uint32(k), programStub(r.Name)})
+		case elf.STT_OBJECT:
+			contents = append(contents, MapKV{uint32(k), mapStub(r.Name)})
+		default:
+			return nil, fmt.Errorf("unknown relocation type %v", t)
+		}
+	}
+
+	return contents, nil
+}
+
 func (ec *elfCode) loadDataSections(maps map[string]*MapSpec) error {
 	for _, sec := range ec.sections {
 		if sec.kind != dataSection {
@@ -809,9 +925,9 @@ func (ec *elfCode) loadDataSections(maps map[string]*MapSpec) error {
 			return errors.New("data sections require BTF, make sure all consts are marked as static")
 		}
 
-		btfMap, err := ec.btf.Datasec(sec.Name)
-		if err != nil {
-			return err
+		var datasec *btf.Datasec
+		if err := ec.btf.FindType(sec.Name, &datasec); err != nil {
+			return fmt.Errorf("data section %s: can't get BTF: %w", sec.Name, err)
 		}
 
 		data, err := sec.Data()
@@ -830,7 +946,7 @@ func (ec *elfCode) loadDataSections(maps map[string]*MapSpec) error {
 			ValueSize:  uint32(len(data)),
 			MaxEntries: 1,
 			Contents:   []MapKV{{uint32(0), data}},
-			BTF:        btfMap,
+			BTF:        &btf.Map{Spec: ec.btf, Key: &btf.Void{}, Value: datasec},
 		}
 
 		switch sec.Name {
@@ -855,6 +971,8 @@ func getProgType(sectionName string) (ProgramType, AttachType, uint32, string) {
 	}{
 		// From https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/tools/lib/bpf/libbpf.c
 		"socket":                {SocketFilter, AttachNone, 0},
+		"sk_reuseport/migrate":  {SkReuseport, AttachSkReuseportSelectOrMigrate, 0},
+		"sk_reuseport":          {SkReuseport, AttachSkReuseportSelect, 0},
 		"seccomp":               {SocketFilter, AttachNone, 0},
 		"kprobe/":               {Kprobe, AttachNone, 0},
 		"uprobe/":               {Kprobe, AttachNone, 0},
@@ -884,6 +1002,7 @@ func getProgType(sectionName string) (ProgramType, AttachType, uint32, string) {
 		"fmod_ret.s/":           {Tracing, AttachModifyReturn, unix.BPF_F_SLEEPABLE},
 		"fexit.s/":              {Tracing, AttachTraceFExit, unix.BPF_F_SLEEPABLE},
 		"sk_lookup/":            {SkLookup, AttachSkLookup, 0},
+		"freplace/":             {Extension, AttachNone, 0},
 		"lsm/":                  {LSM, AttachLSMMac, 0},
 		"lsm.s/":                {LSM, AttachLSMMac, unix.BPF_F_SLEEPABLE},
 
@@ -907,6 +1026,11 @@ func getProgType(sectionName string) (ProgramType, AttachType, uint32, string) {
 		"cgroup/setsockopt":  {CGroupSockopt, AttachCGroupSetsockopt, 0},
 		"classifier":         {SchedCLS, AttachNone, 0},
 		"action":             {SchedACT, AttachNone, 0},
+
+		"cgroup/getsockname4": {CGroupSockAddr, AttachCgroupInet4GetSockname, 0},
+		"cgroup/getsockname6": {CGroupSockAddr, AttachCgroupInet6GetSockname, 0},
+		"cgroup/getpeername4": {CGroupSockAddr, AttachCgroupInet4GetPeername, 0},
+		"cgroup/getpeername6": {CGroupSockAddr, AttachCgroupInet6GetPeername, 0},
 	}
 
 	for prefix, t := range types {

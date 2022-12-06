@@ -21,7 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+
 	"k8s.io/utils/clock"
 )
 
@@ -30,7 +31,7 @@ import (
 // Integrator is created, and ends at the latest operation on the
 // Integrator.
 type Integrator interface {
-	metrics.ChangeObserver
+	fcmetrics.Gauge
 
 	GetResults() IntegratorResults
 
@@ -53,6 +54,7 @@ func (x *IntegratorResults) Equal(y *IntegratorResults) bool {
 }
 
 type integrator struct {
+	name  string
 	clock clock.PassiveClock
 	sync.Mutex
 	lastTime time.Time
@@ -61,18 +63,37 @@ type integrator struct {
 	min, max float64
 }
 
-// NewIntegrator makes one that uses the given clock
-func NewIntegrator(clock clock.PassiveClock) Integrator {
+// NewNamedIntegrator makes one that uses the given clock and name
+func NewNamedIntegrator(clock clock.PassiveClock, name string) Integrator {
 	return &integrator{
+		name:     name,
 		clock:    clock,
 		lastTime: clock.Now(),
 	}
 }
 
-func (igr *integrator) Observe(x float64) {
+func (igr *integrator) Set(x float64) {
 	igr.Lock()
 	igr.setLocked(x)
 	igr.Unlock()
+}
+
+func (igr *integrator) Add(deltaX float64) {
+	igr.Lock()
+	igr.setLocked(igr.x + deltaX)
+	igr.Unlock()
+}
+
+func (igr *integrator) Inc() {
+	igr.Add(1)
+}
+
+func (igr *integrator) Dec() {
+	igr.Add(-1)
+}
+
+func (igr *integrator) SetToCurrentTime() {
+	igr.Set(float64(time.Now().UnixNano()))
 }
 
 func (igr *integrator) setLocked(x float64) {
@@ -84,12 +105,6 @@ func (igr *integrator) setLocked(x float64) {
 	if x > igr.max {
 		igr.max = x
 	}
-}
-
-func (igr *integrator) Add(deltaX float64) {
-	igr.Lock()
-	igr.setLocked(igr.x + deltaX)
-	igr.Unlock()
 }
 
 func (igr *integrator) updateLocked() {

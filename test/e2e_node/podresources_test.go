@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -36,10 +35,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	testutils "k8s.io/kubernetes/test/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
+	"github.com/onsi/gomega/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -164,7 +167,7 @@ func newTestPodData() *testPodData {
 func (tpd *testPodData) createPodsForTest(f *framework.Framework, podReqs []podDesc) {
 	for _, podReq := range podReqs {
 		pod := makePodResourcesTestPod(podReq)
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 		framework.Logf("created pod %s", podReq.podName)
 		tpd.PodMap[podReq.podName] = pod
@@ -552,6 +555,7 @@ func podresourcesGetAllocatableResourcesTests(cli kubeletpodresourcesv1.PodResou
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:PodResources]", func() {
 	f := framework.NewDefaultFramework("podresources-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	reservedSystemCPUs := cpuset.MustParse("1")
 
@@ -820,6 +824,49 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			})
 		})
 	})
+
+	ginkgo.Context("when querying /metrics", func() {
+		ginkgo.BeforeEach(func() {
+			// ensure APIs have been called at least once
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err)
+
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err)
+			defer conn.Close()
+
+			_, err = cli.List(context.TODO(), &kubeletpodresourcesv1.ListPodResourcesRequest{})
+			framework.ExpectNoError(err)
+
+			_, err = cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should report the values for the podresources metrics", func() {
+			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
+			// being [Serial], we can also assume noone else but us is running pods.
+			ginkgo.By("Checking the value of the podresources metrics")
+
+			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"kubelet_pod_resources_endpoint_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSampleAtLeast(1),
+				}),
+				"kubelet_pod_resources_endpoint_requests_list": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSampleAtLeast(1),
+				}),
+				"kubelet_pod_resources_endpoint_requests_get_allocatable": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSampleAtLeast(1),
+				}),
+				// not checking errors: the calls don't have non-catastrophic (e.g. out of memory) error conditions yet.
+			})
+
+			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
+			gomega.Eventually(getPodResourcesMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+			ginkgo.By("Ensuring the metrics match the expectations a few more times")
+			gomega.Consistently(getPodResourcesMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
+		})
+
+	})
 })
 
 func requireLackOfSRIOVDevices() {
@@ -829,7 +876,7 @@ func requireLackOfSRIOVDevices() {
 }
 
 func getOnlineCPUs() (cpuset.CPUSet, error) {
-	onlineCPUList, err := ioutil.ReadFile("/sys/devices/system/cpu/online")
+	onlineCPUList, err := os.ReadFile("/sys/devices/system/cpu/online")
 	if err != nil {
 		return cpuset.CPUSet{}, err
 	}
@@ -908,4 +955,19 @@ func getKubeVirtDevicePluginPod() *v1.Pod {
 	}
 
 	return p
+}
+
+func getPodResourcesMetrics() (e2emetrics.KubeletMetrics, error) {
+	// we are running out of good names, so we need to be unnecessarily specific to avoid clashes
+	ginkgo.By("getting Pod Resources metrics from the metrics API")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+}
+
+func timelessSampleAtLeast(lower interface{}) types.GomegaMatcher {
+	return gstruct.PointTo(gstruct.MatchAllFields(gstruct.Fields{
+		// We already check Metric when matching the Id
+		"Metric":    gstruct.Ignore(),
+		"Value":     gomega.BeNumerically(">=", lower),
+		"Timestamp": gstruct.Ignore(),
+	}))
 }

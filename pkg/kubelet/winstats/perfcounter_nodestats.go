@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -33,8 +34,14 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+)
+
+const (
+	bootIdRegistry = `SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters`
+	bootIdKey      = `BootId`
 )
 
 // MemoryStatusEx is the same as Windows structure MEMORYSTATUSEX
@@ -144,11 +151,17 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 		return nil, err
 	}
 
+	bootId, err := getBootID()
+	if err != nil {
+		return nil, err
+	}
+
 	return &cadvisorapi.MachineInfo{
 		NumCores:       processorCount(),
 		MemoryCapacity: p.nodeInfo.memoryPhysicalCapacityBytes,
 		MachineID:      hostname,
 		SystemUUID:     systemUUID,
+		BootID:         bootId,
 	}, nil
 }
 
@@ -274,4 +287,17 @@ func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
 	}
 
 	return statex.TotalPhys, nil
+}
+
+func getBootID() (string, error) {
+	regKey, err := registry.OpenKey(registry.LOCAL_MACHINE, bootIdRegistry, registry.READ)
+	if err != nil {
+		return "", err
+	}
+	defer regKey.Close()
+	regValue, _, err := regKey.GetIntegerValue(bootIdKey)
+	if err != nil {
+		return "", err
+	}
+	return strconv.FormatUint(regValue, 10), nil
 }

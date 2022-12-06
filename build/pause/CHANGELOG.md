@@ -1,3 +1,16 @@
+# 3.9
+
+* Unsupported Windows Semi-Annual Channel container images removed (OS Versions removed: 20H2). ([#112924](https://github.com/kubernetes/kubernetes/pull/112924), [@marosset](https://github.com/marosset))
+
+# 3.8
+
+* Updating base image for Windows container images from nanoserver to `mcr.microsoft.com/oss/kubernetes/windows-pause-image-base` which gets built on a Windows machine.
+This addresses [Cannot modify registry keys during Windows pause image build process #109161](https://github.com/kubernetes/kubernetes/issues/109161)
+
+# 3.7
+
+* Unsupported Windows Semi-Annual Channel container images removed (OS Versions removed: 1903, 1909, 2004). ([#107056](https://github.com/kubernetes/kubernetes/pull/107056), [@jsturtevant](https://github.com/jsturtevant/))
+
 # 3.6
 
 * Support for Windows container images (OS Versions: 2022) was added. ([#104438](https://github.com/kubernetes/kubernetes/pull/104438), [@nick5616](https://github.com/nick5616))

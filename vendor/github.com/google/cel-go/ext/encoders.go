@@ -16,12 +16,11 @@ package ext
 
 import (
 	"encoding/base64"
+	"reflect"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker/decls"
-	"github.com/google/cel-go/interpreter/functions"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	"github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/common/types/ref"
 )
 
 // Encoders returns a cel.EnvOption to configure extended functions for string, byte, and object
@@ -57,42 +56,23 @@ type encoderLib struct{}
 
 func (encoderLib) CompileOptions() []cel.EnvOption {
 	return []cel.EnvOption{
-		cel.Declarations(
-			decls.NewFunction("base64.decode",
-				decls.NewOverload("base64_decode_string",
-					[]*exprpb.Type{decls.String},
-					decls.Bytes)),
-			decls.NewFunction("base64.encode",
-				decls.NewOverload("base64_encode_bytes",
-					[]*exprpb.Type{decls.Bytes},
-					decls.String)),
-		),
+		cel.Function("base64.decode",
+			cel.Overload("base64_decode_string", []*cel.Type{cel.StringType}, cel.BytesType,
+				cel.UnaryBinding(func(str ref.Val) ref.Val {
+					s := str.(types.String)
+					return bytesOrError(base64DecodeString(string(s)))
+				}))),
+		cel.Function("base64.encode",
+			cel.Overload("base64_encode_bytes", []*cel.Type{cel.BytesType}, cel.StringType,
+				cel.UnaryBinding(func(bytes ref.Val) ref.Val {
+					b := bytes.(types.Bytes)
+					return stringOrError(base64EncodeBytes([]byte(b)))
+				}))),
 	}
 }
 
 func (encoderLib) ProgramOptions() []cel.ProgramOption {
-	wrappedBase64EncodeBytes := callInBytesOutString(base64EncodeBytes)
-	wrappedBase64DecodeString := callInStrOutBytes(base64DecodeString)
-	return []cel.ProgramOption{
-		cel.Functions(
-			&functions.Overload{
-				Operator: "base64.decode",
-				Unary:    wrappedBase64DecodeString,
-			},
-			&functions.Overload{
-				Operator: "base64_decode_string",
-				Unary:    wrappedBase64DecodeString,
-			},
-			&functions.Overload{
-				Operator: "base64.encode",
-				Unary:    wrappedBase64EncodeBytes,
-			},
-			&functions.Overload{
-				Operator: "base64_encode_bytes",
-				Unary:    wrappedBase64EncodeBytes,
-			},
-		),
-	}
+	return []cel.ProgramOption{}
 }
 
 func base64DecodeString(str string) ([]byte, error) {
@@ -102,3 +82,7 @@ func base64DecodeString(str string) ([]byte, error) {
 func base64EncodeBytes(bytes []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(bytes), nil
 }
+
+var (
+	bytesListType = reflect.TypeOf([]byte{})
+)

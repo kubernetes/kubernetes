@@ -212,18 +212,19 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 				case string:
 					print := val
 					truncated := false
-					// truncate at newlines
-					newline := strings.Index(print, "\n")
-					if newline >= 0 {
+					// Truncate at the first newline, carriage return or formfeed
+					// (treated as a newline by tabwriter).
+					breakchar := strings.IndexAny(print, "\f\n\r")
+					if breakchar >= 0 {
 						truncated = true
-						print = print[:newline]
+						print = print[:breakchar]
 					}
-					fmt.Fprint(output, print)
+					WriteEscaped(output, print)
 					if truncated {
 						fmt.Fprint(output, "...")
 					}
 				default:
-					fmt.Fprint(output, val)
+					WriteEscaped(output, fmt.Sprint(val))
 				}
 			}
 		}
@@ -449,7 +450,7 @@ func formatEventType(eventType string) string {
 	if formatted, ok := formattedEventType[eventType]; ok {
 		return formatted
 	}
-	return string(eventType)
+	return eventType
 }
 
 // printRows writes the provided rows to output.
@@ -499,7 +500,7 @@ func formatLabelHeaders(columnLabels []string) []string {
 	formHead := make([]string, len(columnLabels))
 	for i, l := range columnLabels {
 		p := strings.Split(l, "/")
-		formHead[i] = strings.ToUpper((p[len(p)-1]))
+		formHead[i] = strings.ToUpper(p[len(p)-1])
 	}
 	return formHead
 }

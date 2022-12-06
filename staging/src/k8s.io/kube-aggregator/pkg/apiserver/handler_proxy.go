@@ -29,12 +29,11 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/egressselector"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/apiserver/pkg/util/x509metrics"
 	restclient "k8s.io/client-go/rest"
@@ -70,6 +69,9 @@ type proxyHandler struct {
 	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
 	// overwrites proxyTransport dialer if not nil
 	egressSelector *egressselector.EgressSelector
+
+	// reject to forward redirect response
+	rejectForwardingRedirects bool
 }
 
 type proxyHandlingInfo struct {
@@ -174,8 +176,9 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
-	handler.InterceptRedirects = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
-	handler.RequireSameHostRedirects = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
+	if r.rejectForwardingRedirects {
+		handler.RejectForwardingRedirects = true
+	}
 	utilflowcontrol.RequestDelegated(req.Context())
 	handler.ServeHTTP(w, newReq)
 }
@@ -204,7 +207,7 @@ func newRequestForProxy(location *url.URL, req *http.Request) (*http.Request, co
 
 	// If the original request has an audit ID, let's make sure we propagate this
 	// to the aggregated server.
-	if auditID, found := genericapirequest.AuditIDFrom(req.Context()); found {
+	if auditID, found := audit.AuditIDFrom(req.Context()); found {
 		newReq.Header.Set(auditinternal.HeaderAuditID, string(auditID))
 	}
 
@@ -228,6 +231,14 @@ func (r *responder) Error(_ http.ResponseWriter, _ *http.Request, err error) {
 
 // these methods provide locked access to fields
 
+// Sets serviceAvailable value on proxyHandler
+// not thread safe
+func (r *proxyHandler) setServiceAvailable(value bool) {
+	info := r.handlingInfo.Load().(proxyHandlingInfo)
+	info.serviceAvailable = true
+	r.handlingInfo.Store(info)
+}
+
 func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIService) {
 	if apiService.Spec.Service == nil {
 		r.handlingInfo.Store(proxyHandlingInfo{local: true})
@@ -245,7 +256,10 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 			CAData:     apiService.Spec.CABundle,
 		},
 	}
-	clientConfig.Wrap(x509metrics.NewMissingSANRoundTripperWrapperConstructor(x509MissingSANCounter))
+	clientConfig.Wrap(x509metrics.NewDeprecatedCertificateRoundTripperWrapperConstructor(
+		x509MissingSANCounter,
+		x509InsecureSHA1Counter,
+	))
 
 	newInfo := proxyHandlingInfo{
 		name:             apiService.Name,

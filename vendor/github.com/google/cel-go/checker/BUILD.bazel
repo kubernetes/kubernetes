@@ -8,9 +8,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "checker.go",
+        "cost.go",
         "env.go",
         "errors.go",
         "mapping.go",
+        "options.go",
         "printer.go",
         "standard.go",
         "types.go",
@@ -40,6 +42,7 @@ go_test(
     size = "small",
     srcs = [
         "checker_test.go",
+        "cost_test.go",
         "env_test.go",
     ],
     embed = [
@@ -51,7 +54,7 @@ go_test(
         "//test:go_default_library",
         "//test/proto2pb:go_default_library",
         "//test/proto3pb:go_default_library",
-        "@com_github_antlr//runtime/Go/antlr:go_default_library",
+        "@com_github_antlr_antlr4_runtime_go_antlr//:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",
     ],
 )

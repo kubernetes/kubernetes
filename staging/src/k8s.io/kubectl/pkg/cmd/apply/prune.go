@@ -70,7 +70,7 @@ func newPruner(o *ApplyOptions) pruner {
 
 func (p *pruner) pruneAll(o *ApplyOptions) error {
 
-	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(o.Mapper, o.PruneResources)
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(o.Mapper, o.PruneResources, o.Namespace != "")
 	if err != nil {
 		return fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}
@@ -82,6 +82,7 @@ func (p *pruner) pruneAll(o *ApplyOptions) error {
 			}
 		}
 	}
+
 	for _, m := range nonNamespacedRESTMappings {
 		if err := p.prune(metav1.NamespaceNone, m); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)

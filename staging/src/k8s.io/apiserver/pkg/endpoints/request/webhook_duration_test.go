@@ -24,7 +24,7 @@ import (
 	clocktesting "k8s.io/utils/clock/testing"
 )
 
-func TestWebhookDurationFrom(t *testing.T) {
+func TestLatencyTrackersFrom(t *testing.T) {
 	type testCase struct {
 		Durations    []time.Duration
 		SumDurations time.Duration
@@ -37,37 +37,37 @@ func TestWebhookDurationFrom(t *testing.T) {
 	}
 	t.Run("TestWebhookDurationFrom", func(t *testing.T) {
 		parent := context.TODO()
-		_, ok := WebhookDurationFrom(parent)
+		_, ok := LatencyTrackersFrom(parent)
 		if ok {
-			t.Error("expected WebhookDurationFrom to not be initialized")
+			t.Error("expected LatencyTrackersFrom to not be initialized")
 		}
 
 		clk := clocktesting.FakeClock{}
-		ctx := WithWebhookDurationAndCustomClock(parent, &clk)
-		wd, ok := WebhookDurationFrom(ctx)
+		ctx := WithLatencyTrackersAndCustomClock(parent, &clk)
+		wd, ok := LatencyTrackersFrom(ctx)
 		if !ok {
-			t.Error("expected webhook duration to be initialized")
+			t.Error("expected LatencyTrackersFrom to be initialized")
 		}
-		if wd.AdmitTracker.GetLatency() != 0 || wd.ValidateTracker.GetLatency() != 0 {
+		if wd.MutatingWebhookTracker.GetLatency() != 0 || wd.ValidatingWebhookTracker.GetLatency() != 0 {
 			t.Error("expected values to be initialized to 0")
 		}
 
 		for _, d := range tc.Durations {
-			wd.AdmitTracker.Track(func() { clk.Step(d) })
-			wd.ValidateTracker.Track(func() { clk.Step(d) })
+			wd.MutatingWebhookTracker.Track(func() { clk.Step(d) })
+			wd.ValidatingWebhookTracker.Track(func() { clk.Step(d) })
 		}
 
-		wd, ok = WebhookDurationFrom(ctx)
+		wd, ok = LatencyTrackersFrom(ctx)
 		if !ok {
 			t.Errorf("expected webhook duration to be initialized")
 		}
 
-		if wd.AdmitTracker.GetLatency() != tc.SumDurations {
-			t.Errorf("expected admit duration: %q, but got: %q", tc.SumDurations, wd.AdmitTracker.GetLatency())
+		if wd.MutatingWebhookTracker.GetLatency() != tc.SumDurations {
+			t.Errorf("expected admit duration: %q, but got: %q", tc.SumDurations, wd.MutatingWebhookTracker.GetLatency())
 		}
 
-		if wd.ValidateTracker.GetLatency() != tc.MaxDuration {
-			t.Errorf("expected validate duration: %q, but got: %q", tc.MaxDuration, wd.ValidateTracker.GetLatency())
+		if wd.ValidatingWebhookTracker.GetLatency() != tc.MaxDuration {
+			t.Errorf("expected validate duration: %q, but got: %q", tc.MaxDuration, wd.ValidatingWebhookTracker.GetLatency())
 		}
 	})
 }

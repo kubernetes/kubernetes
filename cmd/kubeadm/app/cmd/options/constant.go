@@ -145,4 +145,10 @@ const (
 
 	// Patches flag sets the folder where kubeadm component patches are stored
 	Patches = "patches"
+
+	// Print the addon manifests to STDOUT instead of installing them.
+	PrintManifest = "print-manifest"
+
+	// CleanupTmpDir flag indicates whether reset will cleanup the tmp dir
+	CleanupTmpDir = "cleanup-tmp-dir"
 )

@@ -630,3 +630,75 @@ func TestIterateBitMasks(t *testing.T) {
 		}
 	}
 }
+
+func TestIsLessThan(t *testing.T) {
+	tcases := []struct {
+		name               string
+		firstMask          []int
+		secondMask         []int
+		expectedFirstLower bool
+	}{
+		{
+			name:               "Check which value is lower of masks with equal bits set 1/1",
+			firstMask:          []int{0},
+			secondMask:         []int{0},
+			expectedFirstLower: false,
+		},
+		{
+			name:               "Check which value is lower of masks with unequal bits set 2/1",
+			firstMask:          []int{1},
+			secondMask:         []int{0},
+			expectedFirstLower: false,
+		},
+		{
+			name:               "Check which value is lower of masks with unequal bits set 1/2",
+			firstMask:          []int{0},
+			secondMask:         []int{1},
+			expectedFirstLower: true,
+		},
+	}
+	for _, tc := range tcases {
+		firstMask, _ := NewBitMask(tc.firstMask...)
+		secondMask, _ := NewBitMask(tc.secondMask...)
+		expectedFirstLower := firstMask.IsLessThan(secondMask)
+		if expectedFirstLower != tc.expectedFirstLower {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedFirstLower, expectedFirstLower)
+		}
+	}
+}
+
+func TestIsGreaterThan(t *testing.T) {
+	tcases := []struct {
+		name                 string
+		firstMask            []int
+		secondMask           []int
+		expectedFirstGreater bool
+	}{
+		{
+			name:                 "Check which value is greater of masks with equal bits set 1/1",
+			firstMask:            []int{0},
+			secondMask:           []int{0},
+			expectedFirstGreater: false,
+		},
+		{
+			name:                 "Check which value is greater of masks with unequal bits set 2/1",
+			firstMask:            []int{1},
+			secondMask:           []int{0},
+			expectedFirstGreater: true,
+		},
+		{
+			name:                 "Check which value is greater of masks with unequal bits set 1/2",
+			firstMask:            []int{0},
+			secondMask:           []int{1},
+			expectedFirstGreater: false,
+		},
+	}
+	for _, tc := range tcases {
+		firstMask, _ := NewBitMask(tc.firstMask...)
+		secondMask, _ := NewBitMask(tc.secondMask...)
+		expectedFirstGreater := firstMask.IsGreaterThan(secondMask)
+		if expectedFirstGreater != tc.expectedFirstGreater {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedFirstGreater, expectedFirstGreater)
+		}
+	}
+}

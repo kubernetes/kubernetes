@@ -41,7 +41,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
 )
 
@@ -69,16 +69,11 @@ type RouteController struct {
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
-	}
-
 	if len(clusterCIDRs) == 0 {
 		klog.Fatal("RouteController: Must specify clusterCIDR.")
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	rc := &RouteController{
@@ -95,18 +90,23 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	return rc
 }
 
-func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration) {
+func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
+
+	// Start event processing pipeline.
+	if rc.broadcaster != nil {
+		rc.broadcaster.StartStructuredLogging(0)
+		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: rc.kubeClient.CoreV1().Events("")})
+		defer rc.broadcaster.Shutdown()
+	}
 
 	klog.Info("Starting route controller")
 	defer klog.Info("Shutting down route controller")
+	controllerManagerMetrics.ControllerStarted("route")
+	defer controllerManagerMetrics.ControllerStopped("route")
 
 	if !cache.WaitForNamedCacheSync("route", ctx.Done(), rc.nodeListerSynced) {
 		return
-	}
-
-	if rc.broadcaster != nil {
-		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: rc.kubeClient.CoreV1().Events("")})
 	}
 
 	// TODO: If we do just the full Resync every 5 minutes (default value)
@@ -268,7 +268,9 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 			go func(n *v1.Node) {
 				defer wg.Done()
 				klog.Infof("node %v has no routes assigned to it. NodeNetworkUnavailable will be set to true", n.Name)
-				rc.updateNetworkingCondition(n, false)
+				if err := rc.updateNetworkingCondition(n, false); err != nil {
+					klog.Errorf("failed to update networking condition when no nodeRoutes: %v", err)
+				}
 			}(node)
 			continue
 		}
@@ -282,7 +284,9 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 		}
 		go func(n *v1.Node) {
 			defer wg.Done()
-			rc.updateNetworkingCondition(n, allRoutesCreated)
+			if err := rc.updateNetworkingCondition(n, allRoutesCreated); err != nil {
+				klog.Errorf("failed to update networking condition: %v", err)
+			}
 		}(node)
 	}
 	wg.Wait()

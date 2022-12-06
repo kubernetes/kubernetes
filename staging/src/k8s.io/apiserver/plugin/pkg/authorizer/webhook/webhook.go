@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/cache"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -77,24 +76,24 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
 // The config's cluster field is used to refer to the remote service, user refers to the returned authorizer.
 //
-//     # clusters refers to the remote service.
-//     clusters:
-//     - name: name-of-remote-authz-service
-//       cluster:
-//         certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
-//         server: https://authz.example.com/authorize # URL of remote service to query. Must use 'https'.
+//	# clusters refers to the remote service.
+//	clusters:
+//	- name: name-of-remote-authz-service
+//	  cluster:
+//	    certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
+//	    server: https://authz.example.com/authorize # URL of remote service to query. Must use 'https'.
 //
-//     # users refers to the API server's webhook configuration.
-//     users:
-//     - name: name-of-api-server
-//       user:
-//         client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
-//         client-key: /path/to/key.pem          # key matching the cert
+//	# users refers to the API server's webhook configuration.
+//	users:
+//	- name: name-of-api-server
+//	  user:
+//	    client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
+//	    client-key: /path/to/key.pem          # key matching the cert
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // https://kubernetes.io/docs/user-guide/kubeconfig-file/.
-func New(kubeConfigFile string, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*WebhookAuthorizer, error) {
-	subjectAccessReview, err := subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile, version, retryBackoff, customDial)
+func New(config *rest.Config, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff) (*WebhookAuthorizer, error) {
+	subjectAccessReview, err := subjectAccessReviewInterfaceFromConfig(config, version, retryBackoff)
 	if err != nil {
 		return nil, err
 	}
@@ -121,45 +120,45 @@ func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, un
 // serialized api.authorization.v1beta1.SubjectAccessReview object. An example request body is
 // provided below.
 //
-//     {
-//       "apiVersion": "authorization.k8s.io/v1beta1",
-//       "kind": "SubjectAccessReview",
-//       "spec": {
-//         "resourceAttributes": {
-//           "namespace": "kittensandponies",
-//           "verb": "GET",
-//           "group": "group3",
-//           "resource": "pods"
-//         },
-//         "user": "jane",
-//         "group": [
-//           "group1",
-//           "group2"
-//         ]
-//       }
-//     }
+//	{
+//	  "apiVersion": "authorization.k8s.io/v1beta1",
+//	  "kind": "SubjectAccessReview",
+//	  "spec": {
+//	    "resourceAttributes": {
+//	      "namespace": "kittensandponies",
+//	      "verb": "GET",
+//	      "group": "group3",
+//	      "resource": "pods"
+//	    },
+//	    "user": "jane",
+//	    "group": [
+//	      "group1",
+//	      "group2"
+//	    ]
+//	  }
+//	}
 //
 // The remote service is expected to fill the SubjectAccessReviewStatus field to either allow or
 // disallow access. A permissive response would return:
 //
-//     {
-//       "apiVersion": "authorization.k8s.io/v1beta1",
-//       "kind": "SubjectAccessReview",
-//       "status": {
-//         "allowed": true
-//       }
-//     }
+//	{
+//	  "apiVersion": "authorization.k8s.io/v1beta1",
+//	  "kind": "SubjectAccessReview",
+//	  "status": {
+//	    "allowed": true
+//	  }
+//	}
 //
 // To disallow access, the remote service would return:
 //
-//     {
-//       "apiVersion": "authorization.k8s.io/v1beta1",
-//       "kind": "SubjectAccessReview",
-//       "status": {
-//         "allowed": false,
-//         "reason": "user does not have read access to the namespace"
-//       }
-//     }
+//	{
+//	  "apiVersion": "authorization.k8s.io/v1beta1",
+//	  "kind": "SubjectAccessReview",
+//	  "status": {
+//	    "allowed": false,
+//	    "reason": "user does not have read access to the namespace"
+//	  }
+//	}
 //
 // TODO(mikedanese): We should eventually support failing closed when we
 // encounter an error. We are failing open now to preserve backwards compatible
@@ -247,7 +246,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 
 }
 
-//TODO: need to finish the method to get the rules when using webhook mode
+// TODO: need to finish the method to get the rules when using webhook mode
 func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo
@@ -269,10 +268,10 @@ func convertToSARExtra(extra map[string][]string) map[string]authorizationv1.Ext
 	return ret
 }
 
-// subjectAccessReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
+// subjectAccessReviewInterfaceFromConfig builds a client from the specified kubeconfig file,
 // and returns a SubjectAccessReviewInterface that uses that client. Note that the client submits SubjectAccessReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
-func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (subjectAccessReviewer, error) {
+func subjectAccessReviewInterfaceFromConfig(config *rest.Config, version string, retryBackoff wait.Backoff) (subjectAccessReviewer, error) {
 	localScheme := runtime.NewScheme()
 	if err := scheme.AddToScheme(localScheme); err != nil {
 		return nil, err
@@ -284,7 +283,7 @@ func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string, version s
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, customDial)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, config, groupVersions, retryBackoff)
 		if err != nil {
 			return nil, err
 		}
@@ -295,7 +294,7 @@ func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string, version s
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, customDial)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, config, groupVersions, retryBackoff)
 		if err != nil {
 			return nil, err
 		}

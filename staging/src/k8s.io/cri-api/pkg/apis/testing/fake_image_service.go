@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -131,7 +132,7 @@ func (r *FakeImageService) popError(f string) error {
 }
 
 // ListImages returns the list of images from FakeImageService or error if it was previously set.
-func (r *FakeImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+func (r *FakeImageService) ListImages(_ context.Context, filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -154,7 +155,7 @@ func (r *FakeImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtim
 }
 
 // ImageStatus returns the status of the image from the FakeImageService.
-func (r *FakeImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (r *FakeImageService) ImageStatus(_ context.Context, image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -163,11 +164,11 @@ func (r *FakeImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi
 		return nil, err
 	}
 
-	return r.Images[image.Image], nil
+	return &runtimeapi.ImageStatusResponse{Image: r.Images[image.Image]}, nil
 }
 
 // PullImage emulate pulling the image from the FakeImageService.
-func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *FakeImageService) PullImage(_ context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -188,7 +189,7 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 }
 
 // RemoveImage removes image from the FakeImageService.
-func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
+func (r *FakeImageService) RemoveImage(_ context.Context, image *runtimeapi.ImageSpec) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -204,7 +205,7 @@ func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 }
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (r *FakeImageService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
+func (r *FakeImageService) ImageFsInfo(_ context.Context) ([]*runtimeapi.FilesystemUsage, error) {
 	r.Lock()
 	defer r.Unlock()
 

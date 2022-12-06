@@ -2,7 +2,7 @@
 // +build windows
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -69,7 +69,24 @@ func (hns fakeHNS) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	}, nil
 }
 
+func (hns fakeHNS) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointsInfo), error) {
+	return nil, nil
+}
+
 func (hns fakeHNS) getEndpointByID(id string) (*endpointsInfo, error) {
+	return nil, nil
+}
+
+func (hns fakeHNS) getEndpointByName(name string) (*endpointsInfo, error) {
+	return &endpointsInfo{
+		isLocal:    true,
+		macAddress: macAddress,
+		hnsID:      guid,
+		hns:        hns,
+	}, nil
+}
+
+func (hns fakeHNS) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
 	return nil, nil
 }
 
@@ -103,7 +120,7 @@ func (hns fakeHNS) deleteEndpoint(hnsID string) error {
 	return nil
 }
 
-func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
 	return &loadBalancerInfo{
 		hnsID: guid,
 	}, nil
@@ -121,18 +138,19 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 		networkType: networkType,
 	}
 	proxier := &Proxier{
-		serviceMap:          make(proxy.ServiceMap),
-		endpointsMap:        make(proxy.EndpointsMap),
-		clusterCIDR:         clusterCIDR,
-		hostname:            testHostName,
-		nodeIP:              nodeIP,
-		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
-		network:             *hnsNetworkInfo,
-		sourceVip:           sourceVip,
-		hostMac:             macAddress,
-		isDSR:               false,
-		hns:                 newFakeHNS(),
-		endPointsRefCount:   make(endPointsReferenceCountMap),
+		svcPortMap:            make(proxy.ServicePortMap),
+		endpointsMap:          make(proxy.EndpointsMap),
+		clusterCIDR:           clusterCIDR,
+		hostname:              testHostName,
+		nodeIP:                nodeIP,
+		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
+		network:               *hnsNetworkInfo,
+		sourceVip:             sourceVip,
+		hostMac:               macAddress,
+		isDSR:                 false,
+		hns:                   newFakeHNS(),
+		endPointsRefCount:     make(endPointsReferenceCountMap),
+		forwardHealthCheckVip: true,
 	}
 
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, v1.IPv4Protocol, nil, proxier.serviceMapChange)
@@ -183,7 +201,7 @@ func TestCreateServiceVip(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.serviceMap[svcPortName]
+	svc := proxier.svcPortMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
@@ -234,8 +252,8 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -299,8 +317,8 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.String(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -381,8 +399,8 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
-				Port:     utilpointer.Int32(int32(svcPort1)),
+				Name:     pointer.String(svcPortName1.Port),
+				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -392,8 +410,8 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName2.Port),
-				Port:     utilpointer.Int32(int32(svcPort2)),
+				Name:     pointer.String(svcPortName2.Port),
+				Port:     pointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -440,8 +458,8 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName2.Port),
-				Port:     utilpointer.Int32(int32(svcPort2)),
+				Name:     pointer.String(svcPortName2.Port),
+				Port:     pointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -525,8 +543,8 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
-				Port:     utilpointer.Int32(int32(svcPort1)),
+				Name:     pointer.String(svcPortName1.Port),
+				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -536,8 +554,8 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName2.Port),
-				Port:     utilpointer.Int32(int32(svcPort2)),
+				Name:     pointer.String(svcPortName2.Port),
+				Port:     pointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -594,8 +612,8 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
-				Port:     utilpointer.Int32(int32(svcPort1)),
+				Name:     pointer.String(svcPortName1.Port),
+				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -605,13 +623,13 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
-				Port:     utilpointer.Int32(int32(svcPort1)),
+				Name:     pointer.String(svcPortName1.Port),
+				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			},
 				{
-					Name:     utilpointer.StringPtr("p443"),
-					Port:     utilpointer.Int32(int32(443)),
+					Name:     pointer.String("p443"),
+					Port:     pointer.Int32(int32(443)),
 					Protocol: &tcpProtocol,
 				}}
 		}))
@@ -679,8 +697,8 @@ func TestCreateLoadBalancer(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -689,7 +707,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.serviceMap[svcPortName]
+	svc := proxier.svcPortMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
@@ -699,7 +717,6 @@ func TestCreateLoadBalancer(t *testing.T) {
 			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
 		}
 	}
-
 }
 
 func TestCreateDsrLoadBalancer(t *testing.T) {
@@ -717,6 +734,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 		Port:           "p80",
 		Protocol:       v1.ProtocolTCP,
 	}
+	lbIP := "11.21.31.41"
 
 	makeServiceMap(proxier,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
@@ -729,6 +747,9 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: lbIP,
+			}}
 		}),
 	)
 	tcpProtocol := v1.ProtocolTCP
@@ -739,8 +760,8 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -749,7 +770,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.serviceMap[svcPortName]
+	svc := proxier.svcPortMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
@@ -760,6 +781,11 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 		}
 		if svcInfo.localTrafficDSR != true {
 			t.Errorf("Failed to create DSR loadbalancer with local traffic policy")
+		}
+		if len(svcInfo.loadBalancerIngressIPs) == 0 {
+			t.Errorf("svcInfo does not have any loadBalancerIngressIPs, %+v", svcInfo)
+		} else if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != guid {
+			t.Errorf("The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, guid, svcPortName.String())
 		}
 	}
 }
@@ -799,14 +825,14 @@ func TestEndpointSlice(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     &svcPortName.Port,
-			Port:     utilpointer.Int32Ptr(80),
+			Port:     pointer.Int32(80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"192.168.2.3"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			NodeName:   utilpointer.StringPtr("testhost2"),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			NodeName:   pointer.String("testhost2"),
 		}},
 	}
 
@@ -814,7 +840,7 @@ func TestEndpointSlice(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.serviceMap[svcPortName]
+	svc := proxier.svcPortMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())

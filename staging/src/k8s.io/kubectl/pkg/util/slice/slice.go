@@ -36,3 +36,22 @@ func ContainsString(slice []string, s string, modifier func(s string) string) bo
 	}
 	return false
 }
+
+// ToSet returns a single slice containing the unique values from one or more slices. The order of the items in the
+// result is not guaranteed.
+func ToSet[T comparable](slices ...[]T) []T {
+	if len(slices) == 0 {
+		return nil
+	}
+	m := map[T]struct{}{}
+	for _, slice := range slices {
+		for _, value := range slice {
+			m[value] = struct{}{}
+		}
+	}
+	result := []T{}
+	for k := range m {
+		result = append(result, k)
+	}
+	return result
+}

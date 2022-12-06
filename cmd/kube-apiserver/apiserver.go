@@ -20,6 +20,7 @@ package main
 
 import (
 	"os"
+	_ "time/tzdata" // for timeZone support in CronJob
 
 	"k8s.io/component-base/cli"
 	_ "k8s.io/component-base/logs/json/register"          // for JSON log format registration

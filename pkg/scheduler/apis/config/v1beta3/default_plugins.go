@@ -60,12 +60,8 @@ func getDefaultPlugins() *v1beta3.Plugins {
 }
 
 func applyFeatureGates(config *v1beta3.Plugins) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
-		// When feature is enabled, the default spreading is done by
-		// PodTopologySpread plugin, which is enabled by default.
-		klog.InfoS("Registering SelectorSpread plugin")
-		s := v1beta3.Plugin{Name: names.SelectorSpread, Weight: pointer.Int32Ptr(1)}
-		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, s)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1beta3.Plugin{Name: names.SchedulingGates})
 	}
 }
 

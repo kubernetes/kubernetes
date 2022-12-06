@@ -18,22 +18,24 @@ package e2enode
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/common/node"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/services"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
 
@@ -69,7 +71,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := node.ConformanceContainer{
-						PodClient: f.PodClient(),
+						PodClient: e2epod.NewPodClient(f),
 						Container: v1.Container{
 							Name:    name,
 							Image:   testCase.image,
@@ -81,7 +83,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					}
 
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
-					err := ioutil.WriteFile(configFile, []byte(auth), 0644)
+					err := os.WriteFile(configFile, []byte(auth), 0644)
 					framework.ExpectNoError(err)
 					defer os.Remove(configFile)
 

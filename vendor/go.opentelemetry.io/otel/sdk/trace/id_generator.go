@@ -26,8 +26,18 @@ import (
 
 // IDGenerator allows custom generators for TraceID and SpanID.
 type IDGenerator interface {
+	// DO NOT CHANGE: any modification will not be backwards compatible and
+	// must never be done outside of a new major release.
+
+	// NewIDs returns a new trace and span ID.
 	NewIDs(ctx context.Context) (trace.TraceID, trace.SpanID)
+	// DO NOT CHANGE: any modification will not be backwards compatible and
+	// must never be done outside of a new major release.
+
+	// NewSpanID returns a ID for a new span in the trace with traceID.
 	NewSpanID(ctx context.Context, traceID trace.TraceID) trace.SpanID
+	// DO NOT CHANGE: any modification will not be backwards compatible and
+	// must never be done outside of a new major release.
 }
 
 type randomIDGenerator struct {
@@ -42,7 +52,7 @@ func (gen *randomIDGenerator) NewSpanID(ctx context.Context, traceID trace.Trace
 	gen.Lock()
 	defer gen.Unlock()
 	sid := trace.SpanID{}
-	gen.randSource.Read(sid[:])
+	_, _ = gen.randSource.Read(sid[:])
 	return sid
 }
 
@@ -52,9 +62,9 @@ func (gen *randomIDGenerator) NewIDs(ctx context.Context) (trace.TraceID, trace.
 	gen.Lock()
 	defer gen.Unlock()
 	tid := trace.TraceID{}
-	gen.randSource.Read(tid[:])
+	_, _ = gen.randSource.Read(tid[:])
 	sid := trace.SpanID{}
-	gen.randSource.Read(sid[:])
+	_, _ = gen.randSource.Read(sid[:])
 	return tid, sid
 }
 

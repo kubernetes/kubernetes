@@ -100,7 +100,7 @@ func TestCloseAllRace(t *testing.T) {
 	dialer.CloseAll()
 
 	// Expect all connections to close within 5 seconds
-	for start := time.Now(); time.Now().Sub(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
+	for start := time.Now(); time.Since(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
 		// Ensure all connections were closed
 		if c := atomic.LoadInt64(&conns); c == 0 {
 			break

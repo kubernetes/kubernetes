@@ -26,43 +26,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
-	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
-
-func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testStatusStrategy Strategy) {
-	_, testCIDR, err := netutils.ParseCIDRSloppy(cidr)
-	if err != nil {
-		panic("invalid CIDR")
-	}
-	testStrategy, _ = StrategyForServiceCIDRs(*testCIDR, hasSecondary)
-	testStatusStrategy = NewServiceStatusStrategy(testStrategy)
-	return
-}
 
 func TestCheckGeneratedNameError(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		Resource: "foos",
 	})
 
-	testStrategy, _ := newStrategy("10.0.0.0/16", false)
 	expect := errors.NewNotFound(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(ctx, testStrategy, expect, &api.Service{}); err != expect {
+	if err := rest.CheckGeneratedNameError(ctx, Strategy, expect, &api.Service{}); err != expect {
 		t.Errorf("NotFoundError should be ignored: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(ctx, testStrategy, expect, &api.Service{}); err != expect {
+	if err := rest.CheckGeneratedNameError(ctx, Strategy, expect, &api.Service{}); err != expect {
 		t.Errorf("AlreadyExists should be returned when no GenerateName field: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(ctx, testStrategy, expect, &api.Service{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsAlreadyExists(err) {
+	if err := rest.CheckGeneratedNameError(ctx, Strategy, expect, &api.Service{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsAlreadyExists(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}
 }
@@ -114,9 +99,8 @@ func makeValidServiceCustom(tweaks ...func(svc *api.Service)) *api.Service {
 }
 
 func TestServiceStatusStrategy(t *testing.T) {
-	_, testStatusStrategy := newStrategy("10.0.0.0/16", false)
 	ctx := genericapirequest.NewDefaultContext()
-	if !testStatusStrategy.NamespaceScoped() {
+	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("Service must be namespace scoped")
 	}
 	oldService := makeValidService()
@@ -131,14 +115,14 @@ func TestServiceStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	testStatusStrategy.PrepareForUpdate(ctx, newService, oldService)
+	StatusStrategy.PrepareForUpdate(ctx, newService, oldService)
 	if newService.Status.LoadBalancer.Ingress[0].IP != "127.0.0.2" {
 		t.Errorf("Service status updates should allow change of status fields")
 	}
 	if newService.Spec.SessionAffinity != "None" {
 		t.Errorf("PrepareForUpdate should have preserved old spec")
 	}
-	errs := testStatusStrategy.ValidateUpdate(ctx, newService, oldService)
+	errs := StatusStrategy.ValidateUpdate(ctx, newService, oldService)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
 	}
@@ -166,234 +150,67 @@ func makeServiceWithPorts(ports []api.PortStatus) *api.Service {
 	}
 }
 
-func makeServiceWithLoadBalancerClass(loadBalancerClass *string) *api.Service {
-	return &api.Service{
-		Spec: api.ServiceSpec{
-			LoadBalancerClass: loadBalancerClass,
-		},
-	}
-}
-
-func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPolicyType) *api.Service {
-	return &api.Service{
-		Spec: api.ServiceSpec{
-			InternalTrafficPolicy: policy,
-		},
-	}
-}
-
 func TestDropDisabledField(t *testing.T) {
-	localInternalTrafficPolicy := api.ServiceInternalTrafficPolicyLocal
-
 	testCases := []struct {
-		name                        string
-		enableMixedProtocol         bool
-		enableLoadBalancerClass     bool
-		enableInternalTrafficPolicy bool
-		svc                         *api.Service
-		oldSvc                      *api.Service
-		compareSvc                  *api.Service
+		name       string
+		svc        *api.Service
+		oldSvc     *api.Service
+		compareSvc *api.Service
 	}{
 		/* svc.Status.Conditions */
 		{
-			name:                "mixed protocol not enabled, field not used in old, not used in new",
-			enableMixedProtocol: false,
-			svc:                 makeServiceWithConditions(nil),
-			oldSvc:              makeServiceWithConditions(nil),
-			compareSvc:          makeServiceWithConditions(nil),
+			name:       "mixed protocol enabled, field not used in old, not used in new",
+			svc:        makeServiceWithConditions(nil),
+			oldSvc:     makeServiceWithConditions(nil),
+			compareSvc: makeServiceWithConditions(nil),
 		},
 		{
-			name:                "mixed protocol not enabled, field used in old and in new",
-			enableMixedProtocol: false,
-			svc:                 makeServiceWithConditions([]metav1.Condition{}),
-			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
-			compareSvc:          makeServiceWithConditions([]metav1.Condition{}),
+			name:       "mixed protocol enabled, field used in old and in new",
+			svc:        makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:     makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc: makeServiceWithConditions([]metav1.Condition{}),
 		},
 		{
-			name:                "mixed protocol not enabled, field not used in old, used in new",
-			enableMixedProtocol: false,
-			svc:                 makeServiceWithConditions([]metav1.Condition{}),
-			oldSvc:              makeServiceWithConditions(nil),
-			compareSvc:          makeServiceWithConditions(nil),
+			name:       "mixed protocol enabled, field not used in old, used in new",
+			svc:        makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:     makeServiceWithConditions(nil),
+			compareSvc: makeServiceWithConditions([]metav1.Condition{}),
 		},
 		{
-			name:                "mixed protocol not enabled, field used in old, not used in new",
-			enableMixedProtocol: false,
-			svc:                 makeServiceWithConditions(nil),
-			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
-			compareSvc:          makeServiceWithConditions(nil),
-		},
-		{
-			name:                "mixed protocol enabled, field not used in old, not used in new",
-			enableMixedProtocol: true,
-			svc:                 makeServiceWithConditions(nil),
-			oldSvc:              makeServiceWithConditions(nil),
-			compareSvc:          makeServiceWithConditions(nil),
-		},
-		{
-			name:                "mixed protocol enabled, field used in old and in new",
-			enableMixedProtocol: true,
-			svc:                 makeServiceWithConditions([]metav1.Condition{}),
-			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
-			compareSvc:          makeServiceWithConditions([]metav1.Condition{}),
-		},
-		{
-			name:                "mixed protocol enabled, field not used in old, used in new",
-			enableMixedProtocol: true,
-			svc:                 makeServiceWithConditions([]metav1.Condition{}),
-			oldSvc:              makeServiceWithConditions(nil),
-			compareSvc:          makeServiceWithConditions([]metav1.Condition{}),
-		},
-		{
-			name:                "mixed protocol enabled, field used in old, not used in new",
-			enableMixedProtocol: true,
-			svc:                 makeServiceWithConditions(nil),
-			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
-			compareSvc:          makeServiceWithConditions(nil),
+			name:       "mixed protocol enabled, field used in old, not used in new",
+			svc:        makeServiceWithConditions(nil),
+			oldSvc:     makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc: makeServiceWithConditions(nil),
 		},
 		/* svc.Status.LoadBalancer.Ingress.Ports */
 		{
-			name:                "mixed protocol not enabled, field not used in old, not used in new",
-			enableMixedProtocol: false,
-			svc:                 makeServiceWithPorts(nil),
-			oldSvc:              makeServiceWithPorts(nil),
-			compareSvc:          makeServiceWithPorts(nil),
+			name:       "mixed protocol enabled, field not used in old, not used in new",
+			svc:        makeServiceWithPorts(nil),
+			oldSvc:     makeServiceWithPorts(nil),
+			compareSvc: makeServiceWithPorts(nil),
 		},
 		{
-			name:                "mixed protocol not enabled, field used in old and in new",
-			enableMixedProtocol: false,
-			svc:                 makeServiceWithPorts([]api.PortStatus{}),
-			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
-			compareSvc:          makeServiceWithPorts([]api.PortStatus{}),
+			name:       "mixed protocol enabled, field used in old and in new",
+			svc:        makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:     makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc: makeServiceWithPorts([]api.PortStatus{}),
 		},
 		{
-			name:                "mixed protocol not enabled, field not used in old, used in new",
-			enableMixedProtocol: false,
-			svc:                 makeServiceWithPorts([]api.PortStatus{}),
-			oldSvc:              makeServiceWithPorts(nil),
-			compareSvc:          makeServiceWithPorts(nil),
+			name:       "mixed protocol enabled, field not used in old, used in new",
+			svc:        makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:     makeServiceWithPorts(nil),
+			compareSvc: makeServiceWithPorts([]api.PortStatus{}),
 		},
 		{
-			name:                "mixed protocol not enabled, field used in old, not used in new",
-			enableMixedProtocol: false,
-			svc:                 makeServiceWithPorts(nil),
-			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
-			compareSvc:          makeServiceWithPorts(nil),
-		},
-		{
-			name:                "mixed protocol enabled, field not used in old, not used in new",
-			enableMixedProtocol: true,
-			svc:                 makeServiceWithPorts(nil),
-			oldSvc:              makeServiceWithPorts(nil),
-			compareSvc:          makeServiceWithPorts(nil),
-		},
-		{
-			name:                "mixed protocol enabled, field used in old and in new",
-			enableMixedProtocol: true,
-			svc:                 makeServiceWithPorts([]api.PortStatus{}),
-			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
-			compareSvc:          makeServiceWithPorts([]api.PortStatus{}),
-		},
-		{
-			name:                "mixed protocol enabled, field not used in old, used in new",
-			enableMixedProtocol: true,
-			svc:                 makeServiceWithPorts([]api.PortStatus{}),
-			oldSvc:              makeServiceWithPorts(nil),
-			compareSvc:          makeServiceWithPorts([]api.PortStatus{}),
-		},
-		{
-			name:                "mixed protocol enabled, field used in old, not used in new",
-			enableMixedProtocol: true,
-			svc:                 makeServiceWithPorts(nil),
-			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
-			compareSvc:          makeServiceWithPorts(nil),
-		},
-		/* svc.Spec.LoadBalancerClass */
-		{
-			name:                    "loadBalancerClass not enabled, field not used in old, not used in new",
-			enableLoadBalancerClass: false,
-			svc:                     makeServiceWithLoadBalancerClass(nil),
-			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
-			compareSvc:              makeServiceWithLoadBalancerClass(nil),
-		},
-		{
-			name:                    "loadBalancerClass not enabled, field used in old and in new",
-			enableLoadBalancerClass: false,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-		},
-		{
-			name:                    "loadBalancerClass not enabled, field not used in old, used in new",
-			enableLoadBalancerClass: false,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
-			compareSvc:              makeServiceWithLoadBalancerClass(nil),
-		},
-		{
-			name:                    "loadBalancerClass not enabled, field used in old, not used in new",
-			enableLoadBalancerClass: false,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-		},
-		{
-			name:                    "loadBalancerClass enabled, field not used in old, not used in new",
-			enableLoadBalancerClass: true,
-			svc:                     makeServiceWithLoadBalancerClass(nil),
-			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
-			compareSvc:              makeServiceWithLoadBalancerClass(nil),
-		},
-		{
-			name:                    "loadBalancerClass enabled, field used in old and in new",
-			enableLoadBalancerClass: true,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-		},
-		{
-			name:                    "loadBalancerClass enabled, field not used in old, used in new",
-			enableLoadBalancerClass: true,
-			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
-			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-		},
-		{
-			name:                    "loadBalancerClass enabled, field used in old, not used in new",
-			enableLoadBalancerClass: true,
-			svc:                     makeServiceWithLoadBalancerClass(nil),
-			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
-			compareSvc:              makeServiceWithLoadBalancerClass(nil),
-		},
-		/* svc.spec.internalTrafficPolicy */
-		{
-			name:                        "internal traffic policy not enabled, field used in old, not used in new",
-			enableInternalTrafficPolicy: false,
-			svc:                         makeServiceWithInternalTrafficPolicy(nil),
-			oldSvc:                      makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
-			compareSvc:                  makeServiceWithInternalTrafficPolicy(nil),
-		},
-		{
-			name:                        "internal traffic policy not enabled, field not used in old, used in new",
-			enableInternalTrafficPolicy: false,
-			svc:                         makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
-			oldSvc:                      makeServiceWithInternalTrafficPolicy(nil),
-			compareSvc:                  makeServiceWithInternalTrafficPolicy(nil),
-		},
-		{
-			name:                        "internal traffic policy enabled, field not used in old, used in new",
-			enableInternalTrafficPolicy: true,
-			svc:                         makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
-			oldSvc:                      makeServiceWithInternalTrafficPolicy(nil),
-			compareSvc:                  makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
+			name:       "mixed protocol enabled, field used in old, not used in new",
+			svc:        makeServiceWithPorts(nil),
+			oldSvc:     makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc: makeServiceWithPorts(nil),
 		},
 		/* add more tests for other dropped fields as needed */
 	}
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.enableMixedProtocol)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerClass, tc.enableLoadBalancerClass)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.enableInternalTrafficPolicy)()
 			old := tc.oldSvc.DeepCopy()
 
 			// to test against user using IPFamily not set on cluster

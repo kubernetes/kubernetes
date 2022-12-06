@@ -228,26 +228,29 @@ func TestTaintTolerationScore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(nil, test.nodes)
-			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot))
 
 			p, _ := New(nil, fh)
-			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
+			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
-				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, nodeName)
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
+			status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -271,7 +274,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			pod:  podWithTolerations("pod1", []v1.Toleration{}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"node(s) had taint {dedicated: user1}, that the pod didn't tolerate"),
+				"node(s) had untolerated taint {dedicated: user1}"),
 		},
 		{
 			name: "A pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
@@ -283,7 +286,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"node(s) had taint {dedicated: user1}, that the pod didn't tolerate"),
+				"node(s) had untolerated taint {dedicated: user1}"),
 		},
 		{
 			name: "A pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
@@ -307,7 +310,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "PreferNoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}}),
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"node(s) had taint {foo: bar}, that the pod didn't tolerate"),
+				"node(s) had untolerated taint {foo: bar}"),
 		},
 		{
 			name: "The pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +

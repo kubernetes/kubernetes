@@ -78,4 +78,3 @@ Docker image of Resource Consumer can be found in Google Container Registry as g
 ### Vertical autoscaling of pod
 1. Create consuming pod and start consuming appropriate amount of resources
 2. Observed that limits has been increased
-

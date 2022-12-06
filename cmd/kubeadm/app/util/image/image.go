@@ -21,11 +21,11 @@ import "regexp"
 var (
 	// tagMatcher is the regex used to match a tag.
 	// Basically we presume an image can be made of `[domain][:port][path]<name>[:tag][@sha256:digest]`
-	// We are obvously interested only in the tag, but for the purpose of properly matching it, we also match the digest
+	// We are obviously interested only in the tag, but for the purpose of properly matching it, we also match the digest
 	// (if present). All the parts before the tag we match in a single match everything (but not greedy) group.
 	// All matched sub-groups, except the tag one, get thrown away. Hence, in a result of FindStringSubmatch, if a tag
 	// matches, it's going to be the second returned element (after the full match).
-	tagMatcher = regexp.MustCompile(`^(?U:.*)(?::([[:word:]][[:word:].-]*))?(?:@sha256:[a-fA-F0-9]{64})?$`)
+	tagMatcher = regexp.MustCompile(`^(?U:.*)(?::([[:word:]][[:word:].-]*))?(?:@sha256:[a-fA-F\d]{64})?$`)
 )
 
 // TagFromImage extracts a tag from image. An empty string is returned if no tag is discovered.

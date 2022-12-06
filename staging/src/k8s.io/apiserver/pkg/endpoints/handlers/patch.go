@@ -23,9 +23,10 @@ import (
 	"strings"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
+	"go.opentelemetry.io/otel/attribute"
 	kjson "sigs.k8s.io/json"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
@@ -45,13 +46,12 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/finisher"
+	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utiltrace "k8s.io/utils/trace"
+	"k8s.io/component-base/tracing"
 )
 
 const (
@@ -62,14 +62,10 @@ const (
 // PatchResource returns a function that will handle a resource patch.
 func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		// For performance tracking purposes.
-		trace := utiltrace.New("Patch", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
-
-		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)
-			return
-		}
+		ctx, span := tracing.Start(ctx, "Patch", traceFields(req)...)
+		defer span.End(500 * time.Millisecond)
 
 		// Do this first, otherwise name extraction can fail for unrecognized content types
 		// TODO: handle this in negotiation
@@ -94,7 +90,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
 		// timeout inside the parent context is lower than requestTimeoutUpperBound.
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
+		ctx, cancel := context.WithTimeout(ctx, requestTimeoutUpperBound)
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
@@ -105,11 +101,13 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			return
 		}
 
-		patchBytes, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
+		patchBytes, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Patch)
 		if err != nil {
+			span.AddEvent("limitedReadBody failed", attribute.Int("len", len(patchBytes)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
 			return
 		}
+		span.AddEvent("limitedReadBody succeeded", attribute.Int("len", len(patchBytes)))
 
 		options := &metav1.PatchOptions{}
 		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
@@ -124,11 +122,10 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("PatchOptions"))
 
-		ae := audit.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
+		admit = admission.WithAudit(admit)
 
 		audit.LogRequestPatch(req.Context(), patchBytes)
-		trace.Step("Recorded the audit event")
+		span.AddEvent("Recorded the audit event")
 
 		baseContentType := runtime.ContentTypeJSON
 		if patchType == types.ApplyPatchType {
@@ -225,8 +222,6 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			patchType:   patchType,
 			patchBytes:  patchBytes,
 			userAgent:   req.UserAgent(),
-
-			trace: trace,
 		}
 
 		result, wasCreated, err := p.patchResource(ctx, scope)
@@ -234,22 +229,16 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object stored in database")
-
-		if err := setObjectSelfLink(ctx, result, req, scope.Namer); err != nil {
-			scope.err(err, w, req)
-			return
-		}
-		trace.Step("Self-link added")
+		span.AddEvent("Object stored in database")
 
 		status := http.StatusOK
 		if wasCreated {
 			status = http.StatusCreated
 		}
 
-		trace.Step("About to write a response")
-		defer trace.Step("Writing http response done")
-		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
+		span.AddEvent("About to write a response")
+		defer span.AddEvent("Writing http response done")
+		transformResponseObject(ctx, scope, req, w, status, outputMediaType, result)
 	}
 }
 
@@ -292,8 +281,6 @@ type patcher struct {
 	patchType   types.PatchType
 	patchBytes  []byte
 	userAgent   string
-
-	trace *utiltrace.Trace
 
 	// Set at invocation-time (by applyPatch) and immutable thereafter
 	namespace         string
@@ -513,11 +500,11 @@ func (p *applyPatcher) createNewObject(requestContext context.Context) (runtime.
 	return p.applyPatchToCurrentObject(requestContext, obj)
 }
 
-// strategicPatchObject applies a strategic merge patch of <patchBytes> to
-// <originalObject> and stores the result in <objToUpdate>.
+// strategicPatchObject applies a strategic merge patch of `patchBytes` to
+// `originalObject` and stores the result in `objToUpdate`.
 // It additionally returns the map[string]interface{} representation of the
-// <originalObject> and <patchBytes>.
-// NOTE: Both <originalObject> and <objToUpdate> are supposed to be versioned.
+// `originalObject` and `patchBytes`.
+// NOTE: Both `originalObject` and `objToUpdate` are supposed to be versioned.
 func strategicPatchObject(
 	requestContext context.Context,
 	defaulter runtime.ObjectDefaulter,
@@ -556,7 +543,7 @@ func strategicPatchObject(
 // TODO: rename this function because the name implies it is related to applyPatcher
 func (p *patcher) applyPatch(ctx context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
 	// Make sure we actually have a persisted currentObject
-	p.trace.Step("About to apply patch")
+	tracing.SpanFromContext(ctx).AddEvent("About to apply patch")
 	currentObjectHasUID, err := hasUID(currentObject)
 	if err != nil {
 		return nil, err
@@ -582,6 +569,14 @@ func (p *patcher) applyPatch(ctx context.Context, _, currentObject runtime.Objec
 		return nil, errors.NewConflict(p.resource.GroupResource(), p.name, fmt.Errorf("uid mismatch: the provided object specified uid %s, and no existing object was found", accessor.GetUID()))
 	}
 
+	// if this object supports namespace info
+	if objectMeta, err := meta.Accessor(objToUpdate); err == nil {
+		// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
+		if err := rest.EnsureObjectNamespaceMatchesRequestNamespace(rest.ExpectedNamespaceForResource(p.namespace, p.resource), objectMeta); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := checkName(objToUpdate, p.name, p.namespace, p.namer); err != nil {
 		return nil, err
 	}
@@ -597,7 +592,7 @@ func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime
 // and is given the currently persisted object and the patched object as input.
 // TODO: rename this function because the name implies it is related to applyPatcher
 func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
-	p.trace.Step("About to check admission control")
+	tracing.SpanFromContext(ctx).AddEvent("About to check admission control")
 	var operation admission.Operation
 	var options runtime.Object
 	if hasUID, err := hasUID(currentObject); err != nil {
@@ -657,8 +652,13 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		return obj, nil
 	}
 
+	transformers := []rest.TransformFunc{p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer}
+	if scope.FieldManager != nil {
+		transformers = append(transformers, fieldmanager.IgnoreManagedFieldsTimestampsTransformer)
+	}
+
 	wasCreated := false
-	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer)
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, transformers...)
 	requestFunc := func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)

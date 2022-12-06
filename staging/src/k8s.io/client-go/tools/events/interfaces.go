@@ -55,7 +55,7 @@ type EventBroadcaster interface {
 	// of StartRecordingToSink. This lets you also process events in a custom way (e.g. in tests).
 	// NOTE: events received on your eventHandler should be copied before being used.
 	// TODO: figure out if this can be removed.
-	StartEventWatcher(eventHandler func(event runtime.Object)) func()
+	StartEventWatcher(eventHandler func(event runtime.Object)) (func(), error)
 
 	// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured
 	// logging function. The return value can be ignored or used to stop recording, if desired.

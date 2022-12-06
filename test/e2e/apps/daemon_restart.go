@@ -35,14 +35,16 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // This test primarily checks 2 things:
@@ -204,6 +206,7 @@ func getContainerRestarts(c clientset.Interface, ns string, labelSelector labels
 var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("daemonrestart")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(uuid.NewUUID())
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
@@ -333,7 +336,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		postRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if postRestarts != preRestarts {
-			framework.DumpNodeDebugInfo(f.ClientSet, badNodes, framework.Logf)
+			e2edebug.DumpNodeDebugInfo(f.ClientSet, badNodes, framework.Logf)
 			framework.Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
 		}
 	})

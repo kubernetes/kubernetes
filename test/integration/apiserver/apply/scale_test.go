@@ -30,11 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	deploymentstorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
 	replicasetstorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
 	statefulsetstorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
@@ -49,9 +46,7 @@ type scaleTest struct {
 }
 
 func TestScaleAllResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	tests := []scaleTest{
@@ -239,9 +234,7 @@ func TestScaleAllResources(t *testing.T) {
 }
 
 func TestScaleUpdateOnlyStatus(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	resource := "deployments"
@@ -398,7 +391,7 @@ func assertReplicasValue(t *testing.T, obj *unstructured.Unstructured, value int
 	actualValue, found, err := unstructured.NestedInt64(obj.Object, "spec", "replicas")
 
 	if err != nil {
-		t.Fatalf("Error when retriving replicas field: %v", err)
+		t.Fatalf("Error when retrieving replicas field: %v", err)
 	}
 	if !found {
 		t.Fatalf("Replicas field not found")

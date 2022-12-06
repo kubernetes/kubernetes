@@ -33,9 +33,7 @@ import (
 )
 
 func TestInsecurePodLogs(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	clientSet, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			// I have no idea what this cert is, but it doesn't matter, we just want something that always fails validation
@@ -63,6 +61,7 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 `)
 		},
 	})
+	defer tearDownFn()
 
 	fakeKubeletServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte("fake-log"))

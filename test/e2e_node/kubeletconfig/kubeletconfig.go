@@ -18,7 +18,6 @@ package kubeletconfig
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -49,7 +48,7 @@ func GetCurrentKubeletConfigFromFile() (*kubeletconfig.KubeletConfiguration, err
 		return nil, err
 	}
 
-	data, err := ioutil.ReadFile(kubeletConfigFilePath)
+	data, err := os.ReadFile(kubeletConfigFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the kubelet config from the file %q: %w", kubeletConfigFilePath, err)
 	}
@@ -87,7 +86,7 @@ func WriteKubeletConfigFile(kubeletConfig *kubeletconfig.KubeletConfiguration) e
 		return err
 	}
 
-	if err := ioutil.WriteFile(kubeletConfigFilePath, data, 0644); err != nil {
+	if err := os.WriteFile(kubeletConfigFilePath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write the kubelet file to %q: %w", kubeletConfigFilePath, err)
 	}
 

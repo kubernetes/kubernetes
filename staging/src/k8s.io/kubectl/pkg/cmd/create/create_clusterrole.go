@@ -46,7 +46,7 @@ var (
 		kubectl create clusterrole pod-reader --verb=get --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
 		# Create a cluster role named "foo" with API Group specified
-		kubectl create clusterrole foo --verb=get,list,watch --resource=rs.extensions
+		kubectl create clusterrole foo --verb=get,list,watch --resource=rs.apps
 
 		# Create a cluster role named "foo" with SubResource specified
 		kubectl create clusterrole foo --verb=get,list,watch --resource=pods,pods/status
@@ -213,6 +213,7 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 		if c.FieldManager != "" {
 			createOptions.FieldManager = c.FieldManager
 		}
+		createOptions.FieldValidation = c.ValidationDirective
 		if c.DryRunStrategy == cmdutil.DryRunServer {
 			if err := c.DryRunVerifier.HasSupport(clusterRole.GroupVersionKind()); err != nil {
 				return err

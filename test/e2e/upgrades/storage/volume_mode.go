@@ -31,7 +31,7 @@ import (
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const devicePath = "/mnt/volume1"

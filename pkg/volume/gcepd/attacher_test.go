@@ -22,6 +22,8 @@ package gcepd
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -96,8 +98,9 @@ func TestAttachDetachRegional(t *testing.T) {
 		test: func(testcase *testcase) error {
 			attacher := newAttacher(testcase)
 			devicePath, err := attacher.Attach(spec, nodeName)
-			if devicePath != "/dev/disk/by-id/google-disk" {
-				return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
+			expectedDevicePath := filepath.FromSlash("/dev/disk/by-id/google-disk")
+			if devicePath != expectedDevicePath {
+				return fmt.Errorf("devicePath incorrect. Expected<\"%s\"> Actual: <%q>", expectedDevicePath, devicePath)
 			}
 			return err
 		},
@@ -118,34 +121,30 @@ func TestAttachDetach(t *testing.T) {
 	attachError := errors.New("fake attach error")
 	detachError := errors.New("fake detach error")
 	diskCheckError := errors.New("fake DiskIsAttached error")
+
+	attachTestFunc := func(testcase *testcase) error {
+		attacher := newAttacher(testcase)
+		devicePath, err := attacher.Attach(spec, nodeName)
+		expectedDevicePath := filepath.FromSlash("/dev/disk/by-id/google-disk")
+		if devicePath != expectedDevicePath {
+			return fmt.Errorf("devicePath incorrect. Expected<\"%s\"> Actual: <%q>", expectedDevicePath, devicePath)
+		}
+		return err
+	}
 	tests := []testcase{
 		// Successful Attach call
 		{
 			name:           "Attach_Positive",
 			diskIsAttached: diskIsAttachedCall{disksAttachedMap{nodeName: {}}, nil},
 			attach:         attachCall{diskName, nodeName, readOnly, regional, nil},
-			test: func(testcase *testcase) error {
-				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, nodeName)
-				if devicePath != "/dev/disk/by-id/google-disk" {
-					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
-				}
-				return err
-			},
+			test:           attachTestFunc,
 		},
 
 		// Disk is already attached
 		{
 			name:           "Attach_Positive_AlreadyAttached",
 			diskIsAttached: diskIsAttachedCall{disksAttachedMap{nodeName: {diskName}}, nil},
-			test: func(testcase *testcase) error {
-				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, nodeName)
-				if devicePath != "/dev/disk/by-id/google-disk" {
-					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
-				}
-				return err
-			},
+			test:           attachTestFunc,
 		},
 
 		// DiskIsAttached fails and Attach succeeds
@@ -153,14 +152,7 @@ func TestAttachDetach(t *testing.T) {
 			name:           "Attach_Positive_CheckFails",
 			diskIsAttached: diskIsAttachedCall{disksAttachedMap{nodeName: {}}, diskCheckError},
 			attach:         attachCall{diskName, nodeName, readOnly, regional, nil},
-			test: func(testcase *testcase) error {
-				attacher := newAttacher(testcase)
-				devicePath, err := attacher.Attach(spec, nodeName)
-				if devicePath != "/dev/disk/by-id/google-disk" {
-					return fmt.Errorf("devicePath incorrect. Expected<\"/dev/disk/by-id/google-disk\"> Actual: <%q>", devicePath)
-				}
-				return err
-			},
+			test:           attachTestFunc,
 		},
 
 		// Attach call fails
@@ -406,9 +398,9 @@ func TestVerifyVolumesAttached(t *testing.T) {
 // and NewDetacher won't work.
 func newPlugin(t *testing.T) *gcePersistentDiskPlugin {
 	host := volumetest.NewFakeVolumeHost(t,
-		"/tmp", /* rootDir */
-		nil,    /* kubeClient */
-		nil,    /* plugins */
+		os.TempDir(), /* rootDir */
+		nil,          /* kubeClient */
+		nil,          /* plugins */
 	)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]

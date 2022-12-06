@@ -41,21 +41,21 @@ var ErrVersionConflict = errors.New("VersionError")
 
 // VolumeReactor is a core.Reactor that simulates etcd and API server. It
 // stores:
-// - Latest version of claims volumes saved by the controller.
-// - Queue of all saves (to simulate "volume/claim updated" events). This queue
-//   contains all intermediate state of an object - e.g. a claim.VolumeName
-//   is updated first and claim.Phase second. This queue will then contain both
-//   updates as separate entries.
-// - Number of changes since the last call to VolumeReactor.syncAll().
-// - Optionally, volume and claim fake watchers which should be the same ones
-//   used by the controller. Any time an event function like deleteVolumeEvent
-//   is called to simulate an event, the reactor's stores are updated and the
-//   controller is sent the event via the fake watcher.
-// - Optionally, list of error that should be returned by reactor, simulating
-//   etcd / API server failures. These errors are evaluated in order and every
-//   error is returned only once. I.e. when the reactor finds matching
-//   ReactorError, it return appropriate error and removes the ReactorError from
-//   the list.
+//   - Latest version of claims volumes saved by the controller.
+//   - Queue of all saves (to simulate "volume/claim updated" events). This queue
+//     contains all intermediate state of an object - e.g. a claim.VolumeName
+//     is updated first and claim.Phase second. This queue will then contain both
+//     updates as separate entries.
+//   - Number of changes since the last call to VolumeReactor.syncAll().
+//   - Optionally, volume and claim fake watchers which should be the same ones
+//     used by the controller. Any time an event function like deleteVolumeEvent
+//     is called to simulate an event, the reactor's stores are updated and the
+//     controller is sent the event via the fake watcher.
+//   - Optionally, list of error that should be returned by reactor, simulating
+//     etcd / API server failures. These errors are evaluated in order and every
+//     error is returned only once. I.e. when the reactor finds matching
+//     ReactorError, it return appropriate error and removes the ReactorError from
+//     the list.
 type VolumeReactor struct {
 	volumes              map[string]*v1.PersistentVolume
 	claims               map[string]*v1.PersistentVolumeClaim

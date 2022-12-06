@@ -72,6 +72,20 @@ func getCmd(env Getenver, w io.Writer) *exec.Cmd {
 	if len(env.Getenv(dryRunEnvKey)) > 0 {
 		ginkgoArgs = append(ginkgoArgs, "--dryRun=true")
 	}
+	// NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it as "24h" for backward compatibility
+	// if this is not set by env of extraGinkgoArgsEnvKey.
+	exists := func(args []string) bool {
+		for _, arg := range args {
+			if strings.Contains(arg, "--timeout") {
+				return true
+			}
+		}
+		return false
+	}(ginkgoArgs)
+
+	if !exists {
+		ginkgoArgs = append(ginkgoArgs, "--timeout=24h")
+	}
 
 	args := []string{}
 	args = append(args, ginkgoArgs...)

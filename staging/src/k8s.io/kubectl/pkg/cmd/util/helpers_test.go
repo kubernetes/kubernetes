@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	goerrors "errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -346,6 +348,60 @@ func TestCheckInvalidErr(t *testing.T) {
 			"The request is invalid",
 			DefaultErrorExitCode,
 		},
+		// invalid error that that includes a message but no details
+		{
+			&errors.StatusError{metav1.Status{
+				Status: metav1.StatusFailure,
+				Code:   http.StatusUnprocessableEntity,
+				Reason: metav1.StatusReasonInvalid,
+				// Details is nil.
+				Message: "Some message",
+			}},
+			"The request is invalid: Some message",
+			DefaultErrorExitCode,
+		},
+		// webhook response that sets code=422 with no reason
+		{
+			&errors.StatusError{metav1.Status{
+				Status:  "Failure",
+				Message: `admission webhook "my.webhook" denied the request without explanation`,
+				Code:    422,
+			}},
+			`Error from server: admission webhook "my.webhook" denied the request without explanation`,
+			DefaultErrorExitCode,
+		},
+		// webhook response that sets code=422 with no reason and non-nil details
+		{
+			&errors.StatusError{metav1.Status{
+				Status:  "Failure",
+				Message: `admission webhook "my.webhook" denied the request without explanation`,
+				Code:    422,
+				Details: &metav1.StatusDetails{},
+			}},
+			`Error from server: admission webhook "my.webhook" denied the request without explanation`,
+			DefaultErrorExitCode,
+		},
+		// source-wrapped webhook response that sets code=422 with no reason
+		{
+			AddSourceToErr("creating", "configmap.yaml", &errors.StatusError{metav1.Status{
+				Status:  "Failure",
+				Message: `admission webhook "my.webhook" denied the request without explanation`,
+				Code:    422,
+			}}),
+			`Error from server: error when creating "configmap.yaml": admission webhook "my.webhook" denied the request without explanation`,
+			DefaultErrorExitCode,
+		},
+		// webhook response that sets reason=Invalid and code=422 and a message
+		{
+			&errors.StatusError{metav1.Status{
+				Status:  "Failure",
+				Reason:  "Invalid",
+				Message: `admission webhook "my.webhook" denied the request without explanation`,
+				Code:    422,
+			}},
+			`The request is invalid: admission webhook "my.webhook" denied the request without explanation`,
+			DefaultErrorExitCode,
+		},
 	})
 }
 
@@ -465,5 +521,72 @@ func TestDifferenceFunc(t *testing.T) {
 		})) {
 			t.Errorf("%s -> Expected: %v, but got: %v", tc.name, tc.expected, result)
 		}
+	}
+}
+
+func TestGetValidationDirective(t *testing.T) {
+	tests := []struct {
+		validateFlag      string
+		expectedDirective string
+		expectedErr       error
+	}{
+		{
+			expectedDirective: metav1.FieldValidationStrict,
+		},
+		{
+			validateFlag:      "true",
+			expectedDirective: metav1.FieldValidationStrict,
+		},
+		{
+			validateFlag:      "True",
+			expectedDirective: metav1.FieldValidationStrict,
+		},
+		{
+			validateFlag:      "strict",
+			expectedDirective: metav1.FieldValidationStrict,
+		},
+		{
+			validateFlag:      "warn",
+			expectedDirective: metav1.FieldValidationWarn,
+		},
+		{
+			validateFlag:      "ignore",
+			expectedDirective: metav1.FieldValidationIgnore,
+		},
+		{
+			validateFlag:      "false",
+			expectedDirective: metav1.FieldValidationIgnore,
+		},
+		{
+			validateFlag:      "False",
+			expectedDirective: metav1.FieldValidationIgnore,
+		},
+		{
+			validateFlag:      "foo",
+			expectedDirective: metav1.FieldValidationStrict,
+			expectedErr:       goerrors.New(`invalid - validate option "foo"; must be one of: strict (or true), warn, ignore (or false)`),
+		},
+	}
+
+	for _, tc := range tests {
+		cmd := &cobra.Command{}
+		AddValidateFlags(cmd)
+		if tc.validateFlag != "" {
+			cmd.Flags().Set("validate", tc.validateFlag)
+		}
+		directive, err := GetValidationDirective(cmd)
+		if directive != tc.expectedDirective {
+			t.Errorf("validation directive, expected: %v, but got: %v", tc.expectedDirective, directive)
+		}
+		if tc.expectedErr != nil {
+			if err.Error() != tc.expectedErr.Error() {
+				t.Errorf("GetValidationDirective error, expected: %v, but got: %v", tc.expectedErr, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("expecte no error, but got: %v", err)
+			}
+		}
+
 	}
 }

@@ -3,7 +3,6 @@ package apparmor
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 
@@ -19,7 +18,7 @@ var (
 func isEnabled() bool {
 	checkAppArmor.Do(func() {
 		if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil {
-			buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")
+			buf, err := os.ReadFile("/sys/module/apparmor/parameters/enabled")
 			appArmorEnabled = err == nil && len(buf) > 1 && buf[0] == 'Y'
 		}
 	})
@@ -52,7 +51,7 @@ func setProcAttr(attr, value string) error {
 // changeOnExec reimplements aa_change_onexec from libapparmor in Go
 func changeOnExec(name string) error {
 	if err := setProcAttr("exec", "exec "+name); err != nil {
-		return fmt.Errorf("apparmor failed to apply profile: %s", err)
+		return fmt.Errorf("apparmor failed to apply profile: %w", err)
 	}
 	return nil
 }

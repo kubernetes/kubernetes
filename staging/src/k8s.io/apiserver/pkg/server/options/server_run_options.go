@@ -202,17 +202,13 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"List of directives for HSTS, comma separated. If this list is empty, then HSTS directives will not "+
 		"be added. Example: 'max-age=31536000,includeSubDomains,preload'")
 
-	deprecatedTargetRAMMB := 0
-	fs.IntVar(&deprecatedTargetRAMMB, "target-ram-mb", deprecatedTargetRAMMB,
-		"DEPRECATED: Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
-	fs.MarkDeprecated("target-ram-mb", "This flag will be removed in v1.23")
-
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs or OpenID Discovery).")
 
 	deprecatedMasterServiceNamespace := metav1.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
 		"DEPRECATED: the namespace from which the Kubernetes master services should be injected into pods.")
+	fs.MarkDeprecated("master-service-namespace", "This flag will be removed in v1.27")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
 		"This and --max-mutating-requests-inflight are summed to determine the server's total concurrency limit "+

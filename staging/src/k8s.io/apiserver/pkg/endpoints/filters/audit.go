@@ -44,23 +44,21 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		auditContext, err := evaluatePolicyAndCreateAuditEvent(req, policy)
+		ac, err := evaluatePolicyAndCreateAuditEvent(req, policy)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to create audit event: %v", err))
 			responsewriters.InternalError(w, req, errors.New("failed to create audit event"))
 			return
 		}
 
-		ev := auditContext.Event
-		if ev == nil || req.Context() == nil {
+		if ac == nil || ac.Event == nil {
 			handler.ServeHTTP(w, req)
 			return
 		}
-
-		req = req.WithContext(audit.WithAuditContext(req.Context(), auditContext))
+		ev := ac.Event
 
 		ctx := req.Context()
-		omitStages := auditContext.RequestAuditConfig.OmitStages
+		omitStages := ac.RequestAuditConfig.OmitStages
 
 		ev.Stage = auditinternal.StageRequestReceived
 		if processed := processAuditEvent(ctx, sink, ev, omitStages); !processed {
@@ -124,19 +122,23 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 // - error if anything bad happened
 func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRuleEvaluator) (*audit.AuditContext, error) {
 	ctx := req.Context()
+	ac := audit.AuditContextFrom(ctx)
+	if ac == nil {
+		// Auditing not enabled.
+		return nil, nil
+	}
 
 	attribs, err := GetAuthorizerAttributes(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
+		return ac, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
 	}
 
 	ls := policy.EvaluatePolicyRule(attribs)
 	audit.ObservePolicyLevel(ctx, ls.Level)
+	ac.RequestAuditConfig = ls.RequestAuditConfig
 	if ls.Level == auditinternal.LevelNone {
 		// Don't audit.
-		return &audit.AuditContext{
-			RequestAuditConfig: ls.RequestAuditConfig,
-		}, nil
+		return ac, nil
 	}
 
 	requestReceivedTimestamp, ok := request.ReceivedTimestampFrom(ctx)
@@ -148,10 +150,36 @@ func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRul
 		return nil, fmt.Errorf("failed to complete audit event from request: %v", err)
 	}
 
-	return &audit.AuditContext{
-		RequestAuditConfig: ls.RequestAuditConfig,
-		Event:              ev,
-	}, nil
+	ac.Event = ev
+
+	return ac, nil
+}
+
+// writeLatencyToAnnotation writes the latency incurred in different
+// layers of the apiserver to the annotations of the audit object.
+// it should be invoked after ev.StageTimestamp has been set appropriately.
+func writeLatencyToAnnotation(ctx context.Context, ev *auditinternal.Event) {
+	// we will track latency in annotation only when the total latency
+	// of the given request exceeds 500ms, this is in keeping with the
+	// traces in rest/handlers for create, delete, update,
+	// get, list, and deletecollection.
+	const threshold = 500 * time.Millisecond
+	latency := ev.StageTimestamp.Time.Sub(ev.RequestReceivedTimestamp.Time)
+	if latency <= threshold {
+		return
+	}
+
+	// if we are tracking latency incurred inside different layers within
+	// the apiserver, add these as annotation to the audit event object.
+	layerLatencies := request.AuditAnnotationsFromLatencyTrackers(ctx)
+	if len(layerLatencies) == 0 {
+		// latency tracking is not enabled for this request
+		return
+	}
+
+	// record the total latency for this request, for convenience.
+	layerLatencies["apiserver.latency.k8s.io/total"] = latency.String()
+	audit.AddAuditAnnotationsMap(ctx, layerLatencies)
 }
 
 func processAuditEvent(ctx context.Context, sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) bool {
@@ -161,11 +189,16 @@ func processAuditEvent(ctx context.Context, sink audit.Sink, ev *auditinternal.E
 		}
 	}
 
-	if ev.Stage == auditinternal.StageRequestReceived {
+	switch {
+	case ev.Stage == auditinternal.StageRequestReceived:
 		ev.StageTimestamp = metav1.NewMicroTime(ev.RequestReceivedTimestamp.Time)
-	} else {
+	case ev.Stage == auditinternal.StageResponseComplete:
+		ev.StageTimestamp = metav1.NewMicroTime(time.Now())
+		writeLatencyToAnnotation(ctx, ev)
+	default:
 		ev.StageTimestamp = metav1.NewMicroTime(time.Now())
 	}
+
 	audit.ObserveEvent(ctx)
 	return sink.ProcessEvents(ev)
 }

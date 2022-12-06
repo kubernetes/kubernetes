@@ -18,9 +18,9 @@ package prober
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -35,47 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 )
-
-func TestFormatURL(t *testing.T) {
-	testCases := []struct {
-		scheme string
-		host   string
-		port   int
-		path   string
-		result string
-	}{
-		{"http", "localhost", 93, "", "http://localhost:93"},
-		{"https", "localhost", 93, "/path", "https://localhost:93/path"},
-		{"http", "localhost", 93, "?foo", "http://localhost:93?foo"},
-		{"https", "localhost", 93, "/path?bar", "https://localhost:93/path?bar"},
-	}
-	for _, test := range testCases {
-		url := formatURL(test.scheme, test.host, test.port, test.path)
-		if url.String() != test.result {
-			t.Errorf("Expected %s, got %s", test.result, url.String())
-		}
-	}
-}
-
-func TestFindPortByName(t *testing.T) {
-	container := v1.Container{
-		Ports: []v1.ContainerPort{
-			{
-				Name:          "foo",
-				ContainerPort: 8080,
-			},
-			{
-				Name:          "bar",
-				ContainerPort: 9000,
-			},
-		},
-	}
-	want := 8080
-	got, err := findPortByName(container, "foo")
-	if got != want || err != nil {
-		t.Errorf("Expected %v, got %v, err: %v", want, got, err)
-	}
-}
 
 func TestGetURLParts(t *testing.T) {
 	testCases := []struct {
@@ -114,7 +73,7 @@ func TestGetURLParts(t *testing.T) {
 		if host == "" {
 			host = state.PodIP
 		}
-		port, err := extractPort(test.probe.Port, container)
+		port, err := probe.ResolveContainerPort(test.probe.Port, &container)
 		if test.ok && err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -158,7 +117,7 @@ func TestGetTCPAddrParts(t *testing.T) {
 				},
 			},
 		}
-		port, err := extractPort(test.probe.Port, container)
+		port, err := probe.ResolveContainerPort(test.probe.Port, &container)
 		if !test.ok && err == nil {
 			t.Errorf("Expected error for %+v, got %s:%d", test, host, port)
 		}
@@ -173,34 +132,8 @@ func TestGetTCPAddrParts(t *testing.T) {
 	}
 }
 
-func TestHTTPHeaders(t *testing.T) {
-	testCases := []struct {
-		input  []v1.HTTPHeader
-		output http.Header
-	}{
-		{[]v1.HTTPHeader{}, http.Header{}},
-		{[]v1.HTTPHeader{
-			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
-		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"}}},
-		{[]v1.HTTPHeader{
-			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
-			{Name: "X-Muffins-Or-Plumcakes", Value: "Muffins!"},
-		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"},
-			"X-Muffins-Or-Plumcakes": {"Muffins!"}}},
-		{[]v1.HTTPHeader{
-			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
-			{Name: "X-Muffins-Or-Cupcakes", Value: "Cupcakes, too"},
-		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins", "Cupcakes, too"}}},
-	}
-	for _, test := range testCases {
-		headers := buildHeader(test.input)
-		if !reflect.DeepEqual(test.output, headers) {
-			t.Errorf("Expected %#v, got %#v", test.output, headers)
-		}
-	}
-}
-
 func TestProbe(t *testing.T) {
+	ctx := context.Background()
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
 
 	execProbe := &v1.Probe{
@@ -303,7 +236,7 @@ func TestProbe(t *testing.T) {
 				prober.exec = fakeExecProber{test.execResult, nil}
 			}
 
-			result, err := prober.probe(probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+			result, err := prober.probe(ctx, probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
 			if test.expectError && err == nil {
 				t.Errorf("[%s] Expected probe error but no error was returned.", testID)
 			}
@@ -317,7 +250,7 @@ func TestProbe(t *testing.T) {
 			if len(test.expectCommand) > 0 {
 				prober.exec = execprobe.New()
 				prober.runner = &containertest.FakeContainerCommandRunner{}
-				_, err := prober.probe(probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+				_, err := prober.probe(ctx, probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
 				if err != nil {
 					t.Errorf("[%s] Didn't expect probe error but got: %v", testID, err)
 					continue
@@ -331,6 +264,7 @@ func TestProbe(t *testing.T) {
 }
 
 func TestNewExecInContainer(t *testing.T) {
+	ctx := context.Background()
 	limit := 1024
 	tenKilobyte := strings.Repeat("logs-123", 128*10)
 
@@ -372,7 +306,7 @@ func TestNewExecInContainer(t *testing.T) {
 		container := v1.Container{}
 		containerID := kubecontainer.ContainerID{Type: "docker", ID: "containerID"}
 		cmd := []string{"/foo", "bar"}
-		exec := prober.newExecInContainer(container, containerID, cmd, 0)
+		exec := prober.newExecInContainer(ctx, container, containerID, cmd, 0)
 
 		var dataBuffer bytes.Buffer
 		writer := ioutils.LimitWriter(&dataBuffer, int64(limit))

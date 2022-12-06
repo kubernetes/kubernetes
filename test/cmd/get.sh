@@ -134,9 +134,9 @@ run_kubectl_get_tests() {
 
   ### Test kubectl get chunk size does not result in a --watch error when resource list is served in multiple chunks
   # Pre-condition: ConfigMap one two tree does not exist
-  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"one\\\" }}found{{end}}{{end}}:" ':'
-  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"two\\\" }}found{{end}}{{end}}:" ':'
-  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"three\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \"one\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \"two\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \"three\" }}found{{end}}{{end}}:" ':'
 
   # Post-condition: Create three configmaps and ensure that we can --watch them with a --chunk-size of 1
   kubectl create cm one "${kube_flags[@]}"
@@ -174,6 +174,14 @@ run_kubectl_get_tests() {
   ## check --allow-missing-template-keys=false results in an error for a missing key with go
   output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o go-template='{{.missing}}' "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'map has no entry for key "missing"'
+
+  ## check --subresource=status works
+  output_message=$(kubectl get "${kube_flags[@]}" pod valid-pod --subresource=status)
+  kube::test::if_has_string "${output_message}" 'valid-pod'
+
+   ## check --subresource=scale returns an error for pods
+  output_message=$(! kubectl get pod valid-pod --subresource=scale 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'the server could not find the requested resource'
 
   ### Test kubectl get watch
   output_message=$(kubectl get pods -w --request-timeout=1 "${kube_flags[@]}")
@@ -240,6 +248,48 @@ run_retrieve_multiple_tests() {
   kubectl config set-context "${CONTEXT}" --namespace=""
   kube::log::status "Testing kubectl(v1:multiget)"
   kube::test::get_object_assert 'nodes/127.0.0.1 service/kubernetes' "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:kubernetes:'
+
+  set +o nounset
+  set +o errexit
+}
+
+run_kubectl_response_compression_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing kubectl get objects with/without response compression"
+
+  ### Test creation of large configmap objects
+  # Pre-condition: no configmaps exists
+  kube::test::get_object_assert configmaps "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Commands to create 3 configmaps each of size 50KB. Sum of their sizes should be >128KB (defaultGzipThresholdBytes)
+  # for apiserver to allow gzip compression of the response. This is required to test the disable-compression option
+  # from client-side
+  some_string=$(dd status=none if=/dev/urandom bs=1K count=50 2>/dev/null | base64)
+  kubectl create configmap "cm-one" --from-literal=somekey="${some_string}"
+  kubectl create configmap "cm-two" --from-literal=somekey="${some_string}"
+  kubectl create configmap "cm-three" --from-literal=somekey="${some_string}"
+  output_message=$(kubectl get configmaps 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: All configmaps should be created
+  kube::test::if_has_string "${output_message}" "cm-one"
+  kube::test::if_has_string "${output_message}" "cm-two"
+  kube::test::if_has_string "${output_message}" "cm-three"
+
+  ### Test list call WITH compression
+  output_message=$(kubectl get configmaps --v=8 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: Response headers should include "accept-encoding" header
+  kube::test::if_has_string "${output_message}" "Vary: Accept-Encoding"
+
+  ### Test list call WITHOUT compression
+  output_message=$(kubectl get configmaps --disable-compression=true --v=8 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: Response headers should NOT include "accept-encoding" header
+  kube::test::if_has_not_string "${output_message}" "Vary: Accept-Encoding"
+
+  # cleanup
+  kubectl delete configmap "cm-one"
+  kubectl delete configmap "cm-two"
+  kubectl delete configmap "cm-three"
 
   set +o nounset
   set +o errexit
@@ -355,7 +405,7 @@ run_kubectl_all_namespace_tests() {
   kube::log::status "Testing kubectl --all-namespace"
 
   # Pre-condition: the "default" namespace exists
-  kube::test::get_object_assert namespaces "{{range.items}}{{if eq $id_field \\\"default\\\"}}{{$id_field}}:{{end}}{{end}}" 'default:'
+  kube::test::get_object_assert namespaces "{{range.items}}{{if eq $id_field \"default\"}}{{$id_field}}:{{end}}{{end}}" 'default:'
 
   ### Create POD
   # Pre-condition: no POD exists
@@ -412,16 +462,73 @@ run_deprecated_api_tests() {
   set -o nounset
   set -o errexit
 
-  create_and_use_new_namespace
   kube::log::status "Testing deprecated APIs"
 
+  # Create deprecated CRD
+  kubectl "${kube_flags_with_token[@]:?}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "metadata": {
+    "name": "deprecated.example.com"
+  },
+  "spec": {
+    "group": "example.com",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "deprecated",
+      "kind": "DeprecatedKind"
+    },
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      },
+      {
+        "name": "v1beta1",
+        "deprecated": true,
+        "served": true,
+        "storage": false,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
+  }
+}
+__EOF__
+
+  # Ensure the API server has recognized and started serving the associated CR API
+  local tries=5
+  for i in $(seq 1 $tries); do
+      local output
+      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group example.com -oname)
+      if kube::test::if_has_string "$output" deprecated.example.com; then
+          break
+      fi
+      echo "${i}: Waiting for CR API to be available"
+      sleep "$i"
+  done
+
   # Test deprecated API request output
-  # TODO(liggitt): switch this to a custom deprecated resource once CRDs support marking versions as deprecated
-  output_message=$(kubectl get podsecuritypolicies.v1beta1.policy 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
-  output_message=$(! kubectl get podsecuritypolicies.v1beta1.policy --warnings-as-errors 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
+  output_message=$(kubectl get deprecated.v1beta1.example.com 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'example.com/v1beta1 DeprecatedKind is deprecated'
+  output_message=$(! kubectl get deprecated.v1beta1.example.com --warnings-as-errors 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'example.com/v1beta1 DeprecatedKind is deprecated'
   kube::test::if_has_string "${output_message}" 'error: 1 warning received'
+
+  # Delete deprecated CRD
+  kubectl delete "${kube_flags[@]}" crd deprecated.example.com
 
   set +o nounset
   set +o errexit

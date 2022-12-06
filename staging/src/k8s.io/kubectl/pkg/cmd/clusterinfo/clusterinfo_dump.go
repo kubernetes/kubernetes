@@ -62,7 +62,7 @@ type ClusterInfoDumpOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdClusterInfoDump(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoDumpOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("json"),
 
@@ -75,7 +75,7 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Long:    dumpLong,
 		Example: dumpExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Complete(restClientGetter, cmd))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -126,7 +126,7 @@ func setupOutputWriter(dir string, defaultWriter io.Writer, filename string, fil
 	return file
 }
 
-func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *ClusterInfoDumpOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command) error {
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 
 	o.PrintObj = printer.PrintObj
 
-	config, err := f.ToRESTConfig()
+	config, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -154,12 +154,12 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 		return err
 	}
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, _, err = restClientGetter.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
-	// TODO this should eventually just be the completed kubeconfigflag struct
-	o.RESTClientGetter = f
+
+	o.RESTClientGetter = restClientGetter
 	o.LogsForObject = polymorphichelpers.LogsForObjectFn
 
 	return nil

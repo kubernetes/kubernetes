@@ -1,10 +1,9 @@
-// +build linux freebsd,cgo openbsd,cgo
+//go:build linux || freebsd || openbsd || darwin
+// +build linux freebsd openbsd darwin
 
 package mountinfo
 
 import (
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -15,10 +14,6 @@ func mountedByStat(path string) (bool, error) {
 	var st unix.Stat_t
 
 	if err := unix.Lstat(path, &st); err != nil {
-		if err == unix.ENOENT {
-			// Treat ENOENT as "not mounted".
-			return false, nil
-		}
 		return false, &os.PathError{Op: "stat", Path: path, Err: err}
 	}
 	dev := st.Dev
@@ -37,26 +32,18 @@ func mountedByStat(path string) (bool, error) {
 
 func normalizePath(path string) (realPath string, err error) {
 	if realPath, err = filepath.Abs(path); err != nil {
-		return "", fmt.Errorf("unable to get absolute path for %q: %w", path, err)
+		return "", err
 	}
 	if realPath, err = filepath.EvalSymlinks(realPath); err != nil {
-		return "", fmt.Errorf("failed to canonicalise path for %q: %w", path, err)
+		return "", err
 	}
 	if _, err := os.Stat(realPath); err != nil {
-		return "", fmt.Errorf("failed to stat target of %q: %w", path, err)
+		return "", err
 	}
 	return realPath, nil
 }
 
 func mountedByMountinfo(path string) (bool, error) {
-	path, err := normalizePath(path)
-	if err != nil {
-		if errors.Is(err, unix.ENOENT) {
-			// treat ENOENT as "not mounted"
-			return false, nil
-		}
-		return false, err
-	}
 	entries, err := GetMounts(SingleEntryFilter(path))
 	if err != nil {
 		return false, err

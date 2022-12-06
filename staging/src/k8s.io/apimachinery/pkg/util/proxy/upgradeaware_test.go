@@ -501,61 +501,54 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		for _, redirect := range []bool{false, true} {
-			tcName := k
-			backendPath := "/hello"
-			if redirect {
-				tcName += " with redirect"
-				backendPath = "/redirect"
-			}
-			func() { // Cleanup after each test case.
-				backend := http.NewServeMux()
-				backend.Handle("/hello", websocket.Handler(func(ws *websocket.Conn) {
-					if ws.Request().Header.Get("Authorization") != tc.ExpectedAuth {
-						t.Errorf("%s: unexpected headers on request: %v", k, ws.Request().Header)
-						defer ws.Close()
-						ws.Write([]byte("you failed"))
-						return
-					}
+		tcName := k
+		backendPath := "/hello"
+		func() { // Cleanup after each test case.
+			backend := http.NewServeMux()
+			backend.Handle("/hello", websocket.Handler(func(ws *websocket.Conn) {
+				if ws.Request().Header.Get("Authorization") != tc.ExpectedAuth {
+					t.Errorf("%s: unexpected headers on request: %v", k, ws.Request().Header)
 					defer ws.Close()
-					body := make([]byte, 5)
-					ws.Read(body)
-					ws.Write([]byte("hello " + string(body)))
-				}))
-				backend.Handle("/redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					http.Redirect(w, r, "/hello", http.StatusFound)
-				}))
-				backendServer := tc.ServerFunc(backend)
-				defer backendServer.Close()
-
-				serverURL, _ := url.Parse(backendServer.URL)
-				serverURL.Path = backendPath
-				proxyHandler := NewUpgradeAwareHandler(serverURL, tc.ProxyTransport, false, false, &noErrorsAllowed{t: t})
-				proxyHandler.UpgradeTransport = tc.UpgradeTransport
-				proxyHandler.InterceptRedirects = redirect
-				proxy := httptest.NewServer(proxyHandler)
-				defer proxy.Close()
-
-				ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
-				if err != nil {
-					t.Fatalf("%s: websocket dial err: %s", tcName, err)
+					ws.Write([]byte("you failed"))
+					return
 				}
 				defer ws.Close()
+				body := make([]byte, 5)
+				ws.Read(body)
+				ws.Write([]byte("hello " + string(body)))
+			}))
+			backend.Handle("/redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "/hello", http.StatusFound)
+			}))
+			backendServer := tc.ServerFunc(backend)
+			defer backendServer.Close()
 
-				if _, err := ws.Write([]byte("world")); err != nil {
-					t.Fatalf("%s: write err: %s", tcName, err)
-				}
+			serverURL, _ := url.Parse(backendServer.URL)
+			serverURL.Path = backendPath
+			proxyHandler := NewUpgradeAwareHandler(serverURL, tc.ProxyTransport, false, false, &noErrorsAllowed{t: t})
+			proxyHandler.UpgradeTransport = tc.UpgradeTransport
+			proxy := httptest.NewServer(proxyHandler)
+			defer proxy.Close()
 
-				response := make([]byte, 20)
-				n, err := ws.Read(response)
-				if err != nil {
-					t.Fatalf("%s: read err: %s", tcName, err)
-				}
-				if e, a := "hello world", string(response[0:n]); e != a {
-					t.Fatalf("%s: expected '%#v', got '%#v'", tcName, e, a)
-				}
-			}()
-		}
+			ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
+			if err != nil {
+				t.Fatalf("%s: websocket dial err: %s", tcName, err)
+			}
+			defer ws.Close()
+
+			if _, err := ws.Write([]byte("world")); err != nil {
+				t.Fatalf("%s: write err: %s", tcName, err)
+			}
+
+			response := make([]byte, 20)
+			n, err := ws.Read(response)
+			if err != nil {
+				t.Fatalf("%s: read err: %s", tcName, err)
+			}
+			if e, a := "hello world", string(response[0:n]); e != a {
+				t.Fatalf("%s: expected '%#v', got '%#v'", tcName, e, a)
+			}
+		}()
 	}
 }
 
@@ -614,107 +607,198 @@ func TestProxyUpgradeConnectionErrorResponse(t *testing.T) {
 }
 
 func TestProxyUpgradeErrorResponseTerminates(t *testing.T) {
-	for _, intercept := range []bool{true, false} {
-		for _, code := range []int{400, 500} {
-			t.Run(fmt.Sprintf("intercept=%v,code=%v", intercept, code), func(t *testing.T) {
-				// Set up a backend server
-				backend := http.NewServeMux()
-				backend.Handle("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(code)
-					w.Write([]byte(`some data`))
-				}))
-				backend.Handle("/there", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					t.Error("request to /there")
-				}))
-				backendServer := httptest.NewServer(backend)
-				defer backendServer.Close()
-				backendServerURL, _ := url.Parse(backendServer.URL)
-				backendServerURL.Path = "/hello"
+	for _, code := range []int{400, 500} {
+		t.Run(fmt.Sprintf("code=%v", code), func(t *testing.T) {
+			// Set up a backend server
+			backend := http.NewServeMux()
+			backend.Handle("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(code)
+				w.Write([]byte(`some data`))
+			}))
+			backend.Handle("/there", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Error("request to /there")
+			}))
+			backendServer := httptest.NewServer(backend)
+			defer backendServer.Close()
+			backendServerURL, _ := url.Parse(backendServer.URL)
+			backendServerURL.Path = "/hello"
 
-				// Set up a proxy pointing to a specific path on the backend
-				proxyHandler := NewUpgradeAwareHandler(backendServerURL, nil, false, false, &noErrorsAllowed{t: t})
-				proxyHandler.InterceptRedirects = intercept
-				proxy := httptest.NewServer(proxyHandler)
-				defer proxy.Close()
-				proxyURL, _ := url.Parse(proxy.URL)
+			// Set up a proxy pointing to a specific path on the backend
+			proxyHandler := NewUpgradeAwareHandler(backendServerURL, nil, false, false, &noErrorsAllowed{t: t})
+			proxy := httptest.NewServer(proxyHandler)
+			defer proxy.Close()
+			proxyURL, _ := url.Parse(proxy.URL)
 
-				conn, err := net.Dial("tcp", proxyURL.Host)
-				require.NoError(t, err)
-				bufferedReader := bufio.NewReader(conn)
+			conn, err := net.Dial("tcp", proxyURL.Host)
+			require.NoError(t, err)
+			bufferedReader := bufio.NewReader(conn)
 
-				// Send upgrade request resulting in a non-101 response from the backend
-				req, _ := http.NewRequest("GET", "/", nil)
-				req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
-				require.NoError(t, req.Write(conn))
-				// Verify we get the correct response and full message body content
-				resp, err := http.ReadResponse(bufferedReader, nil)
-				require.NoError(t, err)
-				data, err := ioutil.ReadAll(resp.Body)
-				require.NoError(t, err)
-				require.Equal(t, resp.StatusCode, code)
-				require.Equal(t, data, []byte(`some data`))
-				resp.Body.Close()
+			// Send upgrade request resulting in a non-101 response from the backend
+			req, _ := http.NewRequest("GET", "/", nil)
+			req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+			require.NoError(t, req.Write(conn))
+			// Verify we get the correct response and full message body content
+			resp, err := http.ReadResponse(bufferedReader, nil)
+			require.NoError(t, err)
+			data, err := ioutil.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, resp.StatusCode, code)
+			require.Equal(t, data, []byte(`some data`))
+			resp.Body.Close()
 
-				// try to read from the connection to verify it was closed
-				b := make([]byte, 1)
-				conn.SetReadDeadline(time.Now().Add(time.Second))
-				if _, err := conn.Read(b); err != io.EOF {
-					t.Errorf("expected EOF, got %v", err)
-				}
+			// try to read from the connection to verify it was closed
+			b := make([]byte, 1)
+			conn.SetReadDeadline(time.Now().Add(time.Second))
+			if _, err := conn.Read(b); err != io.EOF {
+				t.Errorf("expected EOF, got %v", err)
+			}
 
-				// Send another request to another endpoint to verify it is not received
-				req, _ = http.NewRequest("GET", "/there", nil)
-				req.Write(conn)
-				// wait to ensure the handler does not receive the request
-				time.Sleep(time.Second)
+			// Send another request to another endpoint to verify it is not received
+			req, _ = http.NewRequest("GET", "/there", nil)
+			req.Write(conn)
+			// wait to ensure the handler does not receive the request
+			time.Sleep(time.Second)
 
-				// clean up
-				conn.Close()
-			})
-		}
+			// clean up
+			conn.Close()
+		})
 	}
 }
 
 func TestProxyUpgradeErrorResponse(t *testing.T) {
-	for _, intercept := range []bool{true, false} {
-		for _, code := range []int{200, 300, 302, 307} {
-			t.Run(fmt.Sprintf("intercept=%v,code=%v", intercept, code), func(t *testing.T) {
-				// Set up a backend server
-				backend := http.NewServeMux()
-				backend.Handle("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					http.Redirect(w, r, "https://example.com/there", code)
-				}))
-				backendServer := httptest.NewServer(backend)
-				defer backendServer.Close()
-				backendServerURL, _ := url.Parse(backendServer.URL)
-				backendServerURL.Path = "/hello"
+	for _, code := range []int{200, 300, 302, 307} {
+		t.Run(fmt.Sprintf("code=%v", code), func(t *testing.T) {
+			// Set up a backend server
+			backend := http.NewServeMux()
+			backend.Handle("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "https://example.com/there", code)
+			}))
+			backendServer := httptest.NewServer(backend)
+			defer backendServer.Close()
+			backendServerURL, _ := url.Parse(backendServer.URL)
+			backendServerURL.Path = "/hello"
 
-				// Set up a proxy pointing to a specific path on the backend
-				proxyHandler := NewUpgradeAwareHandler(backendServerURL, nil, false, false, &fakeResponder{t: t})
-				proxyHandler.InterceptRedirects = intercept
-				proxyHandler.RequireSameHostRedirects = true
-				proxy := httptest.NewServer(proxyHandler)
-				defer proxy.Close()
-				proxyURL, _ := url.Parse(proxy.URL)
+			// Set up a proxy pointing to a specific path on the backend
+			proxyHandler := NewUpgradeAwareHandler(backendServerURL, nil, false, false, &fakeResponder{t: t})
+			proxy := httptest.NewServer(proxyHandler)
+			defer proxy.Close()
+			proxyURL, _ := url.Parse(proxy.URL)
 
-				conn, err := net.Dial("tcp", proxyURL.Host)
-				require.NoError(t, err)
-				bufferedReader := bufio.NewReader(conn)
+			conn, err := net.Dial("tcp", proxyURL.Host)
+			require.NoError(t, err)
+			bufferedReader := bufio.NewReader(conn)
 
-				// Send upgrade request resulting in a non-101 response from the backend
-				req, _ := http.NewRequest("GET", "/", nil)
-				req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
-				require.NoError(t, req.Write(conn))
-				// Verify we get the correct response and full message body content
-				resp, err := http.ReadResponse(bufferedReader, nil)
-				require.NoError(t, err)
-				assert.Equal(t, fakeStatusCode, resp.StatusCode)
-				resp.Body.Close()
+			// Send upgrade request resulting in a non-101 response from the backend
+			req, _ := http.NewRequest("GET", "/", nil)
+			req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+			require.NoError(t, req.Write(conn))
+			// Verify we get the correct response and full message body content
+			resp, err := http.ReadResponse(bufferedReader, nil)
+			require.NoError(t, err)
+			assert.Equal(t, fakeStatusCode, resp.StatusCode)
+			resp.Body.Close()
 
-				// clean up
-				conn.Close()
-			})
-		}
+			// clean up
+			conn.Close()
+		})
+	}
+}
+
+func TestRejectForwardingRedirectsOption(t *testing.T) {
+	originalBody := []byte(`some data`)
+	testCases := []struct {
+		name                      string
+		rejectForwardingRedirects bool
+		serverStatusCode          int
+		redirect                  string
+		expectStatusCode          int
+		expectBody                []byte
+	}{
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 200 response",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          200,
+			expectStatusCode:          200,
+			expectBody:                originalBody,
+		},
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 301 response",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          301,
+			redirect:                  "/",
+			expectStatusCode:          502,
+			expectBody:                []byte(`the backend attempted to redirect this request, which is not permitted`),
+		},
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 304 response with a location header",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          304,
+			redirect:                  "/",
+			expectStatusCode:          502,
+			expectBody:                []byte(`the backend attempted to redirect this request, which is not permitted`),
+		},
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 304 response with no location header",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          304,
+			expectStatusCode:          304,
+			expectBody:                []byte{}, // client doesn't read the body for 304 responses
+		},
+		{
+			name:                      "reject redirection disabled in proxy, backend server sending 200 response",
+			rejectForwardingRedirects: false,
+			serverStatusCode:          200,
+			expectStatusCode:          200,
+			expectBody:                originalBody,
+		},
+		{
+			name:                      "reject redirection disabled in proxy, backend server sending 301 response",
+			rejectForwardingRedirects: false,
+			serverStatusCode:          301,
+			redirect:                  "/",
+			expectStatusCode:          301,
+			expectBody:                originalBody,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set up a backend server
+			backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tc.redirect != "" {
+					w.Header().Set("Location", tc.redirect)
+				}
+				w.WriteHeader(tc.serverStatusCode)
+				w.Write(originalBody)
+			}))
+			defer backendServer.Close()
+			backendServerURL, _ := url.Parse(backendServer.URL)
+
+			// Set up a proxy pointing to the backend
+			proxyHandler := NewUpgradeAwareHandler(backendServerURL, nil, false, false, &fakeResponder{t: t})
+			proxyHandler.RejectForwardingRedirects = tc.rejectForwardingRedirects
+			proxy := httptest.NewServer(proxyHandler)
+			defer proxy.Close()
+			proxyURL, _ := url.Parse(proxy.URL)
+
+			conn, err := net.Dial("tcp", proxyURL.Host)
+			require.NoError(t, err)
+			bufferedReader := bufio.NewReader(conn)
+
+			req, _ := http.NewRequest("GET", proxyURL.String(), nil)
+			require.NoError(t, req.Write(conn))
+			// Verify we get the correct response and message body content
+			resp, err := http.ReadResponse(bufferedReader, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectStatusCode, resp.StatusCode)
+			data, err := ioutil.ReadAll(resp.Body)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectBody, data)
+			assert.Equal(t, int64(len(tc.expectBody)), resp.ContentLength)
+			resp.Body.Close()
+
+			// clean up
+			conn.Close()
+		})
 	}
 }
 
@@ -1127,7 +1211,8 @@ func TestProxyRedirectsforRootPath(t *testing.T) {
 }
 
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
-//    go run generate_cert.go  --rsa-bits 1024 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+//
+//	go run generate_cert.go  --rsa-bits 1024 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var exampleCert = []byte(`-----BEGIN CERTIFICATE-----
 MIIDADCCAeigAwIBAgIQVHG3Fn9SdWayyLOZKCW1vzANBgkqhkiG9w0BAQsFADAS
 MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw

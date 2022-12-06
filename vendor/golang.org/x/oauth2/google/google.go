@@ -92,9 +92,10 @@ func JWTConfigFromJSON(jsonKey []byte, scope ...string) (*jwt.Config, error) {
 
 // JSON key file types.
 const (
-	serviceAccountKey  = "service_account"
-	userCredentialsKey = "authorized_user"
-	externalAccountKey = "external_account"
+	serviceAccountKey          = "service_account"
+	userCredentialsKey         = "authorized_user"
+	externalAccountKey         = "external_account"
+	impersonatedServiceAccount = "impersonated_service_account"
 )
 
 // credentialsFile is the unmarshalled representation of a credentials file.
@@ -121,8 +122,13 @@ type credentialsFile struct {
 	TokenURLExternal               string                           `json:"token_url"`
 	TokenInfoURL                   string                           `json:"token_info_url"`
 	ServiceAccountImpersonationURL string                           `json:"service_account_impersonation_url"`
+	Delegates                      []string                         `json:"delegates"`
 	CredentialSource               externalaccount.CredentialSource `json:"credential_source"`
 	QuotaProjectID                 string                           `json:"quota_project_id"`
+	WorkforcePoolUserProject       string                           `json:"workforce_pool_user_project"`
+
+	// Service account impersonation
+	SourceCredentials *credentialsFile `json:"source_credentials"`
 }
 
 func (f *credentialsFile) jwtConfig(scopes []string, subject string) *jwt.Config {
@@ -176,8 +182,26 @@ func (f *credentialsFile) tokenSource(ctx context.Context, params CredentialsPar
 			CredentialSource:               f.CredentialSource,
 			QuotaProjectID:                 f.QuotaProjectID,
 			Scopes:                         params.Scopes,
+			WorkforcePoolUserProject:       f.WorkforcePoolUserProject,
 		}
 		return cfg.TokenSource(ctx)
+	case impersonatedServiceAccount:
+		if f.ServiceAccountImpersonationURL == "" || f.SourceCredentials == nil {
+			return nil, errors.New("missing 'source_credentials' field or 'service_account_impersonation_url' in credentials")
+		}
+
+		ts, err := f.SourceCredentials.tokenSource(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		imp := externalaccount.ImpersonateTokenSource{
+			Ctx:       ctx,
+			URL:       f.ServiceAccountImpersonationURL,
+			Scopes:    params.Scopes,
+			Ts:        ts,
+			Delegates: f.Delegates,
+		}
+		return oauth2.ReuseTokenSource(nil, imp), nil
 	case "":
 		return nil, errors.New("missing 'type' field in credentials")
 	default:

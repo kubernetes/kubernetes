@@ -89,7 +89,7 @@ func TestGetNestedMountpoints(t *testing.T) {
 		{
 			name:     "Unsorted Nested Pod",
 			err:      false,
-			expected: sets.NewString("nested", "nested2"),
+			expected: sets.NewString("nested", "nested2", "nested-vol", "nested.vol"),
 			volname:  "vol1",
 			pod: v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -105,6 +105,9 @@ func TestGetNestedMountpoints(t *testing.T) {
 								{MountPath: "/dir/nested", Name: "vol2"},
 								{MountPath: "/ignore2", Name: "vol5"},
 								{MountPath: "/dir", Name: "vol1"},
+								{MountPath: "/dir/nested-vol", Name: "vol6"},
+								{MountPath: "/dir/nested.vol", Name: "vol7"},
+								{MountPath: "/dir/nested2/double", Name: "vol8"},
 								{MountPath: "/dir/nested2", Name: "vol3"},
 							},
 						},

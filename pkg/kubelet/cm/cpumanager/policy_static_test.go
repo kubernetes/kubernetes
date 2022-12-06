@@ -22,6 +22,9 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -39,6 +42,7 @@ type staticPolicyTest struct {
 	stAssignments   state.ContainerCPUAssignments
 	stDefaultCPUSet cpuset.CPUSet
 	pod             *v1.Pod
+	topologyHint    *topologymanager.TopologyHint
 	expErr          error
 	expCPUAlloc     bool
 	expCSet         cpuset.CPUSet
@@ -190,6 +194,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 
 	// these are the cases which must behave the same regardless the policy options.
 	// So we will permutate the options to ensure this holds true.
+
 	optionsInsensitiveTestCases := []staticPolicyTest{
 		{
 			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
@@ -493,6 +498,42 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expCSet:         cpuset.NewCPUSet(),
 		},
 	}
+	newNUMAAffinity := func(bits ...int) bitmask.BitMask {
+		affinity, _ := bitmask.NewBitMask(bits...)
+		return affinity
+	}
+	alignBySocketOptionTestCases := []staticPolicyTest{
+		{
+			description: "Align by socket: true, cpu's within same socket of numa in hint are part of allocation",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				AlignBySocketOption: "true",
+			},
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(2, 11, 21, 22),
+			pod:             makePod("fakePod", "fakeContainer2", "2000m", "2000m"),
+			topologyHint:    &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 2), Preferred: true},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(2, 11),
+		},
+		{
+			description: "Align by socket: false, cpu's are taken strictly from NUMA nodes in hint",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				AlignBySocketOption: "false",
+			},
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(2, 11, 21, 22),
+			pod:             makePod("fakePod", "fakeContainer2", "2000m", "2000m"),
+			topologyHint:    &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 2), Preferred: true},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(2, 21),
+		},
+	}
 
 	for _, testCase := range optionsInsensitiveTestCases {
 		for _, options := range []map[string]string{
@@ -514,10 +555,17 @@ func TestStaticPolicyAdd(t *testing.T) {
 	for _, testCase := range smtalignOptionTestCases {
 		runStaticPolicyTestCase(t, testCase)
 	}
+	for _, testCase := range alignBySocketOptionTestCases {
+		runStaticPolicyTestCaseWithFeatureGate(t, testCase)
+	}
 }
 
 func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
-	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), testCase.options)
+	tm := topologymanager.NewFakeManager()
+	if testCase.topologyHint != nil {
+		tm = topologymanager.NewFakeManagerWithHint(testCase.topologyHint)
+	}
+	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), tm, testCase.options)
 
 	st := &mockState{
 		assignments:   testCase.stAssignments,
@@ -556,6 +604,11 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 				testCase.description, container.Name, st.assignments)
 		}
 	}
+}
+
+func runStaticPolicyTestCaseWithFeatureGate(t *testing.T, testCase staticPolicyTest) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
+	runStaticPolicyTestCase(t, testCase)
 }
 
 func TestStaticPolicyReuseCPUs(t *testing.T) {

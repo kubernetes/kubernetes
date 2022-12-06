@@ -17,7 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -143,6 +142,17 @@ func TestConfigDirCleaner(t *testing.T) {
 				"test-path",
 			},
 		},
+		"cleanup temp directory": {
+			setupDirs: []string{
+				"tmp",
+			},
+			setupFiles: []string{
+				"tmp/kubeadm-init-dryrun2845575027",
+			},
+			verifyExists: []string{
+				"tmp",
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -150,7 +160,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			t.Logf("Running test: %s", name)
 
 			// Create a temporary directory for our fake config dir:
-			tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
+			tmpDir, err := os.MkdirTemp("", "kubeadm-reset-test")
 			if err != nil {
 				t.Errorf("Unable to create temporary directory: %s", err)
 			}
@@ -174,7 +184,12 @@ func TestConfigDirCleaner(t *testing.T) {
 			if test.resetDir == "" {
 				test.resetDir = "pki"
 			}
-			resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir), false)
+			dirsToClean := []string{
+				filepath.Join(tmpDir, test.resetDir),
+				filepath.Join(tmpDir, kubeadmconstants.ManifestsSubDirName),
+				filepath.Join(tmpDir, kubeadmconstants.TempDirForKubeadm),
+			}
+			resetConfigDir(tmpDir, dirsToClean, false)
 
 			// Verify the files we cleanup implicitly in every test:
 			assertExists(t, tmpDir)
@@ -182,6 +197,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			assertNotExists(t, filepath.Join(tmpDir, kubeadmconstants.KubeletKubeConfigFileName))
 			assertDirEmpty(t, filepath.Join(tmpDir, "manifests"))
 			assertDirEmpty(t, filepath.Join(tmpDir, "pki"))
+			assertDirEmpty(t, filepath.Join(tmpDir, "tmp"))
 
 			// Verify the files as requested by the test:
 			for _, path := range test.verifyExists {

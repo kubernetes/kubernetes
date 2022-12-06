@@ -59,13 +59,6 @@ func TestHandleGetAction(t *testing.T) {
 			expectedObjectJSON: []byte(``),
 			expectedErr:        true, // we expect a NotFound error here
 		},
-		{
-			name:               "get kube-system secret bootstrap-token-abcdef",
-			action:             core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, "kube-system", "bootstrap-token-abcdef"),
-			expectedHandled:    true,
-			expectedObjectJSON: []byte(``),
-			expectedErr:        true, // we expect a NotFound error here
-		},
 		{ // an ask for a kubernetes service in the _kube-system_ ns should not be answered
 			name:               "get kube-system services",
 			action:             core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "services"}, "kube-system", "kubernetes"),
@@ -83,13 +76,6 @@ func TestHandleGetAction(t *testing.T) {
 		{ // an ask for an other node than the control-plane should not be answered
 			name:               "get other-node",
 			action:             core.NewRootGetAction(schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "other-node"),
-			expectedHandled:    false,
-			expectedObjectJSON: []byte(``),
-			expectedErr:        false,
-		},
-		{ // an ask for a secret in any other ns than kube-system should not be answered
-			name:               "get default secret bootstrap-token-abcdef",
-			action:             core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, "default", "bootstrap-token-abcdef"),
 			expectedHandled:    false,
 			expectedObjectJSON: []byte(``),
 			expectedErr:        false,

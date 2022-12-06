@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
@@ -39,8 +40,9 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -126,7 +128,7 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 }
 
 // SetupNVIDIAGPUNode install Nvidia Drivers and wait for Nvidia GPUs to be available on nodes
-func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *framework.ContainerResourceGatherer {
+func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *e2edebug.ContainerResourceGatherer {
 	logOSImages(f)
 
 	var err error
@@ -160,10 +162,10 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 		pods.Items = append(pods.Items, devicepluginPods.Items...)
 	}
 
-	var rsgather *framework.ContainerResourceGatherer
+	var rsgather *e2edebug.ContainerResourceGatherer
 	if setupResourceGatherer {
 		framework.Logf("Starting ResourceUsageGather for the created DaemonSet pods.")
-		rsgather, err = framework.NewResourceUsageGatherer(f.ClientSet, framework.ResourceGathererOptions{InKubemark: false, Nodes: framework.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
+		rsgather, err = e2edebug.NewResourceUsageGatherer(f.ClientSet, e2edebug.ResourceGathererOptions{InKubemark: false, Nodes: e2edebug.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
 		framework.ExpectNoError(err, "creating ResourceUsageGather for the daemonset pods")
 		go rsgather.StartGatheringData()
 	}
@@ -194,17 +196,17 @@ func testNvidiaGPUs(f *framework.Framework) {
 	framework.Logf("Creating %d pods and have the pods run a CUDA app", gpuPodNum)
 	podList := []*v1.Pod{}
 	for i := int64(0); i < gpuPodNum; i++ {
-		podList = append(podList, f.PodClient().Create(makeCudaAdditionDevicePluginTestPod()))
+		podList = append(podList, e2epod.NewPodClient(f).Create(makeCudaAdditionDevicePluginTestPod()))
 	}
 	framework.Logf("Wait for all test pods to succeed")
 	// Wait for all pods to succeed
 	for _, pod := range podList {
-		f.PodClient().WaitForSuccess(pod.Name, 5*time.Minute)
+		e2epod.NewPodClient(f).WaitForSuccess(pod.Name, 5*time.Minute)
 		logContainers(f, pod)
 	}
 
 	framework.Logf("Stopping ResourceUsageGather")
-	constraints := make(map[string]framework.ResourceConstraint)
+	constraints := make(map[string]e2edebug.ResourceConstraint)
 	// For now, just gets summary. Can pass valid constraints in the future.
 	summary, err := rsgather.StopAndSummarize([]int{50, 90, 100}, constraints)
 	f.TestSummaries = append(f.TestSummaries, summary)
@@ -221,6 +223,7 @@ func logContainers(f *framework.Framework, pod *v1.Pod) {
 
 var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.It("run Nvidia GPU Device Plugin tests", func() {
 		testNvidiaGPUs(f)
 	})
@@ -237,7 +240,7 @@ func testNvidiaGPUsJob(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	// make sure job is running by waiting for its first pod to start running
-	err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
+	err = e2ejob.WaitForJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
 	framework.ExpectNoError(err)
 
 	numNodes, err := e2enode.TotalRegistered(f.ClientSet)
@@ -297,7 +300,7 @@ func VerifyJobNCompletions(f *framework.Framework, completions int32) {
 	successes := int32(0)
 	regex := regexp.MustCompile("PASSED")
 	for _, podName := range createdPodNames {
-		f.PodClient().WaitForFinish(podName, 5*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(podName, 5*time.Minute)
 		logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podName, "vector-addition")
 		framework.ExpectNoError(err, "Should be able to get logs for pod %v", podName)
 		if regex.MatchString(logs) {
@@ -322,6 +325,7 @@ var _ = SIGDescribe("GPUDevicePluginAcrossRecreate [Feature:Recreate]", func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 	f := framework.NewDefaultFramework("device-plugin-gpus-recreate")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.It("run Nvidia GPU Device Plugin tests with a recreation", func() {
 		testNvidiaGPUsJob(f)
 	})

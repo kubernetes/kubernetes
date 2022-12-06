@@ -19,14 +19,13 @@ package dryrun
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -61,7 +60,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 			continue
 		}
 
-		fileBytes, err := ioutil.ReadFile(file.RealPath)
+		fileBytes, err := os.ReadFile(file.RealPath)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -124,9 +123,9 @@ func (w *Waiter) SetTimeout(_ time.Duration) {}
 // WaitForStaticPodControlPlaneHashes returns an empty hash for all control plane images;
 func (w *Waiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]string, error) {
 	return map[string]string{
-		constants.KubeAPIServer:         "",
-		constants.KubeControllerManager: "",
-		constants.KubeScheduler:         "",
+		kubeadmconstants.KubeAPIServer:         "",
+		kubeadmconstants.KubeControllerManager: "",
+		kubeadmconstants.KubeScheduler:         "",
 	}, nil
 }
 

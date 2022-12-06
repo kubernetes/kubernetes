@@ -17,6 +17,7 @@ limitations under the License.
 package transport
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -36,6 +37,11 @@ type tlsTransportCache struct {
 	transports map[tlsCacheKey]*http.Transport
 }
 
+// DialerStopCh is stop channel that is passed down to dynamic cert dialer.
+// It's exposed as variable for testing purposes to avoid testing for goroutine
+// leakages.
+var DialerStopCh = wait.NeverStop
+
 const idleConnsPerHost = 25
 
 var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
@@ -50,6 +56,9 @@ type tlsCacheKey struct {
 	serverName         string
 	nextProtos         string
 	disableCompression bool
+	// these functions are wrapped to allow them to be used as map keys
+	getCert *GetCertHolder
+	dial    *DialHolder
 }
 
 func (t tlsCacheKey) String() string {
@@ -57,7 +66,8 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t", t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression)
+	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
+		t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -83,12 +93,14 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return nil, err
 	}
 	// The options didn't require a custom TLS config
-	if tlsConfig == nil && config.Dial == nil && config.Proxy == nil {
+	if tlsConfig == nil && config.DialHolder == nil && config.Proxy == nil {
 		return http.DefaultTransport, nil
 	}
 
-	dial := config.Dial
-	if dial == nil {
+	var dial func(ctx context.Context, network, address string) (net.Conn, error)
+	if config.DialHolder != nil {
+		dial = config.DialHolder.Dial
+	} else {
 		dial = (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -101,7 +113,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		dynamicCertDialer := certRotatingDialer(tlsConfig.GetClientCertificate, dial)
 		tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
 		dial = dynamicCertDialer.connDialer.DialContext
-		go dynamicCertDialer.Run(wait.NeverStop)
+		go dynamicCertDialer.Run(DialerStopCh)
 	}
 
 	proxy := http.ProxyFromEnvironment
@@ -133,7 +145,7 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		return tlsCacheKey{}, false, err
 	}
 
-	if c.TLS.GetCert != nil || c.Dial != nil || c.Proxy != nil {
+	if c.Proxy != nil {
 		// cannot determine equality for functions
 		return tlsCacheKey{}, false, nil
 	}
@@ -144,6 +156,8 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		disableCompression: c.DisableCompression,
+		getCert:            c.TLS.GetCertHolder,
+		dial:               c.DialHolder,
 	}
 
 	if c.TLS.ReloadTLSFiles {

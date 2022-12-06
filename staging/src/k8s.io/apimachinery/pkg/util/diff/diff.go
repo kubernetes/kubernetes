@@ -135,7 +135,7 @@ func IgnoreUnset() cmp.Option {
 				if v2.Len() == 0 {
 					return true
 				}
-			case reflect.Interface, reflect.Ptr:
+			case reflect.Interface, reflect.Pointer:
 				if v2.IsNil() {
 					return true
 				}

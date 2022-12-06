@@ -95,6 +95,8 @@ function set-windows-node-image() {
     WINDOWS_NODE_IMAGE="windows-server-2004-dc-core-v20210914"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win20h2" ]]; then
     WINDOWS_NODE_IMAGE="windows-server-20h2-dc-core-v20210914"
+  elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win2022" ]]; then
+    WINDOWS_NODE_IMAGE="windows-server-2022-dc-core-v20220513"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
     exit 1
@@ -255,13 +257,13 @@ function copy-to-staging() {
 function set-preferred-region() {
   case ${ZONE} in
     asia-*)
-      PREFERRED_REGION=("asia" "us" "eu")
+      PREFERRED_REGION=("asia-northeast1" "us-central1" "europe-west6")
       ;;
     europe-*)
-      PREFERRED_REGION=("eu" "us" "asia")
+      PREFERRED_REGION=("europe-west6" "us-central1" "asia-northeast1")
       ;;
     *)
-      PREFERRED_REGION=("us" "eu" "asia")
+      PREFERRED_REGION=("us-central1" "europe-west6" "asia-northeast1")
       ;;
   esac
 
@@ -325,7 +327,7 @@ function upload-tars() {
 
   for region in "${PREFERRED_REGION[@]}"; do
     suffix="-${region}"
-    if [[ "${suffix}" == "-us" ]]; then
+    if [[ "${suffix}" == "-us-central1" ]]; then
       suffix=""
     fi
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
@@ -730,7 +732,7 @@ function yaml-map-string-string {
 # Returns kubelet flags used on both Linux and Windows nodes.
 function construct-common-kubelet-flags {
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
-  flags+=" --cloud-provider=gce"
+  flags+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}"
   # TODO(mtaufen): ROTATE_CERTIFICATES seems unused; delete it?
   if [[ -n "${ROTATE_CERTIFICATES:-}" ]]; then
     flags+=" --rotate-certificates=true"
@@ -749,9 +751,19 @@ function construct-linux-kubelet-flags {
   flags="$(construct-common-kubelet-flags)"
   # Keep in sync with CONTAINERIZED_MOUNTER_HOME in configure-helper.sh
   flags+=" --experimental-mounter-path=/home/kubernetes/containerized_mounter/mounter"
-  flags+=" --experimental-check-node-capabilities-before-mount=true"
   # Keep in sync with the mkdir command in configure-helper.sh (until the TODO is resolved)
   flags+=" --cert-dir=/var/lib/kubelet/pki/"
+
+  # If ENABLE_AUTH_PROVIDER_GCP is set to true, kubelet is enabled to use out-of-tree auth 
+  # credential provider instead of in-tree auth credential provider.
+  # https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider
+  if [[ "${ENABLE_AUTH_PROVIDER_GCP:-false}" == "true" ]]; then
+    # Keep the values of --image-credential-provider-config and --image-credential-provider-bin-dir
+    # in sync with value of auth_config_file and auth_provider_dir set in install-auth-provider-gcp function
+    # in gci/configure.sh.
+    flags+="  --image-credential-provider-config=/home/kubernetes/cri_auth_config.yaml"
+    flags+="  --image-credential-provider-bin-dir=/home/kubernetes/bin"
+  fi
 
   if [[ "${node_type}" == "master" ]]; then
     flags+=" ${MASTER_KUBELET_TEST_ARGS:-}"
@@ -781,9 +793,6 @@ function construct-linux-kubelet-flags {
       flags+=" --resolv-conf=/run/systemd/resolve/resolv.conf"
     fi
   fi
-  if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
-    flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
-  fi
   flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
   local node_labels
   node_labels="$(build-linux-node-labels "${node_type}")"
@@ -794,14 +803,11 @@ function construct-linux-kubelet-flags {
     flags+=" --register-with-taints=${NODE_TAINTS}"
   fi
 
-  flags+=" --container-runtime=remote"
-  if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
-    CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
-    flags+=" --runtime-cgroups=/system.slice/containerd.service"
-  fi
+  CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+  flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
 
-  if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
-    flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+  if [[ "${CONTAINER_RUNTIME_ENDPOINT}" =~ /containerd.sock$ ]]; then
+    flags+=" --runtime-cgroups=/system.slice/containerd.service"
   fi
 
   KUBELET_ARGS="${flags}"
@@ -861,11 +867,9 @@ function construct-windows-kubelet-flags {
   # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
   # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
   flags+=" --feature-gates=KubeletPodResources=false"
-  flags+=" --container-runtime=remote"
-  if [[ "${WINDOWS_CONTAINER_RUNTIME}" == "containerd" ]]; then
-    WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
-    flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
-  fi
+
+  WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
+  flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
 
   KUBELET_ARGS="${flags}"
 }
@@ -1107,7 +1111,7 @@ METADATA_AGENT_CLUSTER_LEVEL_MEMORY_REQUEST: $(yaml-quote "${METADATA_AGENT_CLUS
 DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote "${DOCKER_REGISTRY_MIRROR_URL:-}")
 ENABLE_L7_LOADBALANCING: $(yaml-quote "${ENABLE_L7_LOADBALANCING:-none}")
 ENABLE_CLUSTER_LOGGING: $(yaml-quote "${ENABLE_CLUSTER_LOGGING:-false}")
-ENABLE_CLUSTER_UI: $(yaml-quote "${ENABLE_CLUSTER_UI:-false}")
+ENABLE_AUTH_PROVIDER_GCP: $(yaml-quote "${ENABLE_AUTH_PROVIDER_GCP:-false}")
 ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote "${ENABLE_NODE_PROBLEM_DETECTOR:-none}")
 NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote "${NODE_PROBLEM_DETECTOR_VERSION:-}")
 NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TAR_HASH:-}")
@@ -1134,7 +1138,6 @@ KUBE_PROXY_MODE: $(yaml-quote "${KUBE_PROXY_MODE:-iptables}")
 DETECT_LOCAL_MODE: $(yaml-quote "${DETECT_LOCAL_MODE:-}")
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
 ADMISSION_CONTROL: $(yaml-quote "${ADMISSION_CONTROL:-}")
-ENABLE_POD_SECURITY_POLICY: $(yaml-quote "${ENABLE_POD_SECURITY_POLICY:-}")
 MASTER_IP_RANGE: $(yaml-quote "${MASTER_IP_RANGE}")
 RUNTIME_CONFIG: $(yaml-quote "${RUNTIME_CONFIG}")
 CA_CERT: $(yaml-quote "${CA_CERT_BASE64:-}")
@@ -1185,6 +1188,7 @@ CONTAINER_RUNTIME: $(yaml-quote "${CONTAINER_RUNTIME:-}")
 CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote "${CONTAINER_RUNTIME_ENDPOINT:-}")
 CONTAINER_RUNTIME_NAME: $(yaml-quote "${CONTAINER_RUNTIME_NAME:-}")
 CONTAINER_RUNTIME_TEST_HANDLER: $(yaml-quote "${CONTAINER_RUNTIME_TEST_HANDLER:-}")
+CONTAINERD_INFRA_CONTAINER: $(yaml-quote "${CONTAINER_INFRA_CONTAINER:-}")
 UBUNTU_INSTALL_CONTAINERD_VERSION: $(yaml-quote "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}")
 UBUNTU_INSTALL_RUNC_VERSION: $(yaml-quote "${UBUNTU_INSTALL_RUNC_VERSION:-}")
 NODE_LOCAL_SSDS_EXT: $(yaml-quote "${NODE_LOCAL_SSDS_EXT:-}")
@@ -1261,6 +1265,11 @@ EOF
 DOCKER_LOG_MAX_FILE: $(yaml-quote "${DOCKER_LOG_MAX_FILE}")
 EOF
   fi
+  if [ -n "${CLOUD_PROVIDER_FLAG:-}" ]; then
+    cat >>"$file" <<EOF
+CLOUD_PROVIDER_FLAG: $(yaml-quote "${CLOUD_PROVIDER_FLAG}")
+EOF
+  fi
   if [ -n "${FEATURE_GATES:-}" ]; then
     cat >>"$file" <<EOF
 FEATURE_GATES: $(yaml-quote "${FEATURE_GATES}")
@@ -1307,6 +1316,7 @@ ETCD_PEER_KEY: $(yaml-quote "${ETCD_PEER_KEY_BASE64:-}")
 ETCD_PEER_CERT: $(yaml-quote "${ETCD_PEER_CERT_BASE64:-}")
 SERVICEACCOUNT_ISSUER: $(yaml-quote "${SERVICEACCOUNT_ISSUER:-}")
 KUBECTL_PRUNE_WHITELIST_OVERRIDE: $(yaml-quote "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}")
+CCM_FEATURE_GATES:  $(yaml-quote "${CCM_FEATURE_GATES:-}")
 KUBE_SCHEDULER_RUNASUSER: 2001
 KUBE_SCHEDULER_RUNASGROUP: 2001
 KUBE_ADDON_MANAGER_RUNASUSER: 2002
@@ -1328,6 +1338,12 @@ EOF
     if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]; then
       cat >>"$file" <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT_SEC: $(yaml-quote "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC}")
+EOF
+    fi
+    # KUBE_APISERVER_GODEBUG (if set) controls the value of GODEBUG env var for kube-apiserver.
+    if [ -n "${KUBE_APISERVER_GODEBUG:-}" ]; then
+      cat >>"$file" <<EOF
+KUBE_APISERVER_GODEBUG: $(yaml-quote "${KUBE_APISERVER_GODEBUG}")
 EOF
     fi
     # ETCD_IMAGE (if set) allows to use a custom etcd image.
@@ -1538,6 +1554,7 @@ NODE_BINARY_TAR_URL: $(yaml-quote "${NODE_BINARY_TAR_URL}")
 NODE_BINARY_TAR_HASH: $(yaml-quote "${NODE_BINARY_TAR_HASH}")
 CSI_PROXY_STORAGE_PATH: $(yaml-quote "${CSI_PROXY_STORAGE_PATH}")
 CSI_PROXY_VERSION: $(yaml-quote "${CSI_PROXY_VERSION}")
+CSI_PROXY_FLAGS: $(yaml-quote "${CSI_PROXY_FLAGS}")
 ENABLE_CSI_PROXY: $(yaml-quote "${ENABLE_CSI_PROXY}")
 K8S_DIR: $(yaml-quote "${WINDOWS_K8S_DIR}")
 NODE_DIR: $(yaml-quote "${WINDOWS_NODE_DIR}")
@@ -1559,6 +1576,7 @@ KUBEPROXY_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_KUBEPROXY_KUBECONFIG_FILE}")
 WINDOWS_INFRA_CONTAINER: $(yaml-quote "${WINDOWS_INFRA_CONTAINER}")
 WINDOWS_ENABLE_PIGZ: $(yaml-quote "${WINDOWS_ENABLE_PIGZ}")
 WINDOWS_ENABLE_HYPERV: $(yaml-quote "${WINDOWS_ENABLE_HYPERV}")
+ENABLE_AUTH_PROVIDER_GCP: $(yaml-quote "${ENABLE_AUTH_PROVIDER_GCP}")
 ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote "${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR}")
 NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote "${NODE_PROBLEM_DETECTOR_VERSION}")
 NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TAR_HASH}")
@@ -2436,6 +2454,12 @@ function create-network() {
         --allow "tcp:3389" &
     fi
   fi
+
+  kube::util::wait-for-jobs || {
+    code=$?
+    echo -e "${color_red}Failed to create firewall rules.${color_norm}" >&2
+    exit $code
+  }
 }
 
 function expand-default-subnetwork() {
@@ -2558,11 +2582,13 @@ function create-cloud-nat-router() {
 }
 
 function delete-all-firewall-rules() {
-  if fws=$(gcloud compute firewall-rules list --project "${NETWORK_PROJECT}" --filter="network=${NETWORK}" --format="value(name)"); then
-    echo "Deleting firewall rules remaining in network ${NETWORK}: ${fws}"
-    delete-firewall-rules "$fws"
+  local -a fws
+  kube::util::read-array fws < <(gcloud compute firewall-rules list --project "${NETWORK_PROJECT}" --filter="network=${NETWORK}" --format="value(name)")
+  if (( "${#fws[@]}" > 0 )); then
+    echo "Deleting firewall rules remaining in network ${NETWORK}: ${fws[*]}"
+    delete-firewall-rules "${fws[@]}"
   else
-    echo "Failed to list firewall rules from the network ${NETWORK}"
+    echo "No firewall rules in network ${NETWORK}"
   fi
 }
 
@@ -2606,7 +2632,7 @@ function delete-subnetworks() {
       # This value should be kept in sync with number of regions.
       local parallelism=9
       gcloud compute networks subnets list --network="${NETWORK}" --project "${NETWORK_PROJECT}" --format='value(region.basename())' | \
-        xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
+        xargs -I {} -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
     elif [[ "${CREATE_CUSTOM_NETWORK:-}" == "true" ]]; then
       echo "Deleting custom subnet..."
       gcloud --quiet compute networks subnets delete "${SUBNETWORK}" --project "${NETWORK_PROJECT}" --region="${REGION}" || true
@@ -3106,7 +3132,9 @@ function create-nodes-firewall() {
 
   # Wait for last batch of jobs
   kube::util::wait-for-jobs || {
-    echo -e "${color_red}Some commands failed.${color_norm}" >&2
+    code=$?
+    echo -e "${color_red}Failed to create firewall rule.${color_norm}" >&2
+    exit $code
   }
 }
 
@@ -3727,12 +3755,13 @@ function kube-down() {
     # Delete all remaining firewall rules and network.
     delete-firewall-rules \
       "${CLUSTER_NAME}-default-internal-master" \
-      "${CLUSTER_NAME}-default-internal-node" \
+      "${CLUSTER_NAME}-default-internal-node"
+
+    if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+      delete-firewall-rules \
       "${NETWORK}-default-ssh" \
       "${NETWORK}-default-rdp" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
-
-    if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
       delete-cloud-nat-router
       # Delete all remaining firewall rules in the network.
       delete-all-firewall-rules || true

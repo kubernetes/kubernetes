@@ -36,8 +36,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 type durations []time.Duration
@@ -48,6 +49,7 @@ func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 
 var _ = common.SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -225,8 +227,8 @@ func newQuerier() *endpointQueries {
 
 // join merges the incoming streams of requests and added endpoints. It has
 // nice properties like:
-//  * remembering an endpoint if it happens to arrive before it is requested.
-//  * closing all outstanding requests (returning nil) if it is stopped.
+//   - remembering an endpoint if it happens to arrive before it is requested.
+//   - closing all outstanding requests (returning nil) if it is stopped.
 func (eq *endpointQueries) join() {
 	defer func() {
 		// Terminate all pending requests, so that no goroutine will

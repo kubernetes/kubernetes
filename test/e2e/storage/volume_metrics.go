@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -40,6 +40,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // This test needs to run in serial because other tests could interfere
@@ -56,6 +57,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		err            error
 	)
 	f := framework.NewDefaultFramework("pv")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -262,7 +264,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
 			found := findVolumeStatMetric(kubeletKeyName, pvcNamespace, pvcName, kubeMetrics)
-			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			if !found {
+				framework.Failf("PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			}
 		}
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -326,7 +330,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
 			found := findVolumeStatMetric(kubeletKeyName, pvcNamespace, pvcName, kubeMetrics)
-			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			if !found {
+				framework.Failf("PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			}
 		}
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -426,7 +432,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Forced detach metric should be present
 		forceDetachKey := "attachdetach_controller_forced_detaches"
 		_, ok := updatedControllerMetrics[forceDetachKey]
-		framework.ExpectEqual(ok, true, "Key %q not found in A/D Controller metrics", forceDetachKey)
+		if !ok {
+			framework.Failf("Key %q not found in A/D Controller metrics", forceDetachKey)
+		}
 
 		// Wait and validate
 		totalVolumesKey := "attachdetach_controller_total_volumes"
@@ -713,10 +721,14 @@ func verifyMetricCount(oldMetrics, newMetrics *storageControllerMetrics, metricN
 
 	newLatencyCount, ok := newMetrics.latencyMetrics[metricName]
 	if !expectFailure {
-		framework.ExpectEqual(ok, true, "Error getting updated latency metrics for %s", metricName)
+		if !ok {
+			framework.Failf("Error getting updated latency metrics for %s", metricName)
+		}
 	}
 	newStatusCounts, ok := newMetrics.statusMetrics[metricName]
-	framework.ExpectEqual(ok, true, "Error getting updated status metrics for %s", metricName)
+	if !ok {
+		framework.Failf("Error getting updated status metrics for %s", metricName)
+	}
 
 	newStatusCount := int64(0)
 	if expectFailure {

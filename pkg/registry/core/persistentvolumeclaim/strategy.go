@@ -27,11 +27,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // persistentvolumeclaimStrategy implements behavior for PersistentVolumeClaim objects
@@ -64,7 +65,7 @@ func (persistentvolumeclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*
 func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	pvc.Status = api.PersistentVolumeClaimStatus{}
-	pvcutil.DropDisabledFields(&pvc.Spec)
+	pvcutil.DropDisabledFields(&pvc.Spec, nil)
 
 	// For data sources, we need to do 2 things to implement KEP 1495
 
@@ -85,7 +86,7 @@ func (persistentvolumeclaimStrategy) Validate(ctx context.Context, obj runtime.O
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (persistentvolumeclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	return pvcutil.GetWarningsForPersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 }
 
 // Canonicalize normalizes the object after validation.
@@ -102,7 +103,7 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, 
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
 
-	pvcutil.DropDisabledFields(&newPvc.Spec)
+	pvcutil.DropDisabledFields(&newPvc.Spec, &oldPvc.Spec)
 
 	// We need to use similar logic to PrepareForCreate here both to preserve backwards
 	// compatibility with the old behavior (ignoring of garbage dataSources at both create
@@ -111,6 +112,10 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, 
 	// in again here.
 	pvcutil.EnforceDataSourceBackwardsCompatibility(&newPvc.Spec, &oldPvc.Spec)
 	pvcutil.NormalizeDataSources(&newPvc.Spec)
+
+	// We also normalize the data source fields of the old PVC, so that objects saved
+	// from an earlier version will pass validation.
+	pvcutil.NormalizeDataSources(&oldPvc.Spec)
 }
 
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -123,7 +128,7 @@ func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, ol
 
 // WarningsOnUpdate returns warnings for the given update.
 func (persistentvolumeclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	return pvcutil.GetWarningsForPersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 }
 
 func (persistentvolumeclaimStrategy) AllowUnconditionalUpdate() bool {

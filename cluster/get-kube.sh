@@ -190,6 +190,7 @@ if [[ -z "${KUBERNETES_SKIP_RELEASE_VALIDATION-}" ]]; then
   if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     # Use KUBERNETES_RELEASE_URL for Releases and Pre-Releases
     # ie. 1.18.0 or 1.19.0-beta.0
+    # shellcheck disable=SC2269 # this line is a noop but it helps with reading
     KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL}"
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     # Override KUBERNETES_RELEASE_URL to point to the CI bucket;

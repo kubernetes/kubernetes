@@ -20,11 +20,15 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+
+	utilexec "k8s.io/utils/exec"
+	testexec "k8s.io/utils/exec/testing"
 )
 
 func TestReadProcMountsFrom(t *testing.T) {
@@ -521,6 +525,14 @@ func TestSensitiveMountOptions(t *testing.T) {
 	}
 }
 
+func TestHasSystemd(t *testing.T) {
+	mounter := &Mounter{}
+	_ = mounter.hasSystemd()
+	if mounter.withSystemd == nil {
+		t.Error("Failed to run detectSystemd()")
+	}
+}
+
 func mountArgsContainString(t *testing.T, mountArgs []string, wanted string) bool {
 	for _, mountArg := range mountArgs {
 		if mountArg == wanted {
@@ -544,4 +556,67 @@ func mountArgsContainOption(t *testing.T, mountArgs []string, option string) boo
 	}
 
 	return strings.Contains(mountArgs[optionsIndex], option)
+}
+
+func TestDetectSafeNotMountedBehavior(t *testing.T) {
+	// example output for umount from util-linux 2.30.2
+	notMountedOutput := "umount: /foo: not mounted."
+
+	// Arrange
+	testcases := []struct {
+		fakeCommandAction testexec.FakeCommandAction
+		expectedSafe      bool
+	}{
+		{
+			fakeCommandAction: makeFakeCommandAction(notMountedOutput, errors.New("any error")),
+			expectedSafe:      true,
+		},
+		{
+			fakeCommandAction: makeFakeCommandAction(notMountedOutput, nil),
+			expectedSafe:      false,
+		},
+		{
+			fakeCommandAction: makeFakeCommandAction("any output", nil),
+			expectedSafe:      false,
+		},
+		{
+			fakeCommandAction: makeFakeCommandAction("any output", errors.New("any error")),
+			expectedSafe:      false,
+		},
+	}
+
+	for _, v := range testcases {
+		// Prepare
+		fakeexec := &testexec.FakeExec{
+			LookPathFunc: func(s string) (string, error) {
+				return "fake-umount", nil
+			},
+			CommandScript: []testexec.FakeCommandAction{v.fakeCommandAction},
+		}
+		// Act
+		isSafe := detectSafeNotMountedBehaviorWithExec(fakeexec)
+		// Assert
+		if isSafe != v.expectedSafe {
+			var adj string
+			if v.expectedSafe {
+				adj = "safe"
+			} else {
+				adj = "unsafe"
+			}
+			t.Errorf("Expected to detect %s umount behavior, but did not", adj)
+		}
+	}
+}
+
+func makeFakeCommandAction(stdout string, err error) testexec.FakeCommandAction {
+	c := testexec.FakeCmd{
+		CombinedOutputScript: []testexec.FakeAction{
+			func() ([]byte, []byte, error) {
+				return []byte(stdout), nil, err
+			},
+		},
+	}
+	return func(cmd string, args ...string) utilexec.Cmd {
+		return testexec.InitFakeCmd(&c, cmd, args...)
+	}
 }

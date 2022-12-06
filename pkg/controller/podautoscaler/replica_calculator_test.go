@@ -78,9 +78,9 @@ type metricInfo struct {
 	selector     *metav1.LabelSelector
 	metricType   metricType
 
-	targetUtilization       int64
-	perPodTargetUtilization int64
-	expectedUtilization     int64
+	targetUsage       int64
+	perPodTargetUsage int64
+	expectedUsage     int64
 }
 
 type replicaCalcTestCase struct {
@@ -376,38 +376,38 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	}
 
 	var outReplicas int32
-	var outUtilization int64
+	var outUsage int64
 	var outTimestamp time.Time
 	switch tc.metric.metricType {
 	case objectMetric:
 		if tc.metric.singleObject == nil {
 			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
 		}
-		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject, selector, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, testNamespace, tc.metric.singleObject, selector, nil)
 	case objectPerPodMetric:
 		if tc.metric.singleObject == nil {
 			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
 		}
-		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, testNamespace, tc.metric.singleObject, nil)
 	case externalMetric:
 		if tc.metric.selector == nil {
 			t.Fatal("Metric specified as externalMetric but metric.selector is nil.")
 		}
-		if tc.metric.targetUtilization <= 0 {
-			t.Fatalf("Metric specified as externalMetric but metric.targetUtilization is %d which is <=0.", tc.metric.targetUtilization)
+		if tc.metric.targetUsage <= 0 {
+			t.Fatalf("Metric specified as externalMetric but metric.targetUsage is %d which is <=0.", tc.metric.targetUsage)
 		}
-		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.selector, selector)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, testNamespace, tc.metric.selector, selector)
 	case externalPerPodMetric:
 		if tc.metric.selector == nil {
 			t.Fatal("Metric specified as externalPerPodMetric but metric.selector is nil.")
 		}
-		if tc.metric.perPodTargetUtilization <= 0 {
-			t.Fatalf("Metric specified as externalPerPodMetric but metric.perPodTargetUtilization is %d which is <=0.", tc.metric.perPodTargetUtilization)
+		if tc.metric.perPodTargetUsage <= 0 {
+			t.Fatalf("Metric specified as externalPerPodMetric but metric.perPodTargetUsage is %d which is <=0.", tc.metric.perPodTargetUsage)
 		}
 
-		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUtilization, tc.metric.name, testNamespace, tc.metric.selector)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, testNamespace, tc.metric.selector)
 	case podMetric:
-		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, testNamespace, selector, nil)
 	default:
 		t.Fatalf("Unknown metric type: %d", tc.metric.metricType)
 	}
@@ -419,7 +419,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	}
 	require.NoError(t, err, "there should not have been an error calculating the replica count")
 	assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
-	assert.Equal(t, tc.metric.expectedUtilization, outUtilization, "utilization should be as expected")
+	assert.Equal(t, tc.metric.expectedUsage, outUsage, "usage should be as expected")
 	assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 }
 func makePodMetricLevels(containerMetric ...int64) [][]int64 {
@@ -674,11 +674,11 @@ func TestReplicaCalcScaleUpCM(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{20000, 10000, 30000},
-			targetUtilization:   15000,
-			expectedUtilization: 20000,
-			metricType:          podMetric,
+			name:          "qps",
+			levels:        []int64{20000, 10000, 30000},
+			targetUsage:   15000,
+			expectedUsage: 20000,
+			metricType:    podMetric,
 		},
 	}
 	tc.runTest(t)
@@ -691,11 +691,11 @@ func TestReplicaCalcScaleUpCMUnreadyHotCpuNoLessScale(t *testing.T) {
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
 		podStartTime:     []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{50000, 10000, 30000},
-			targetUtilization:   15000,
-			expectedUtilization: 30000,
-			metricType:          podMetric,
+			name:          "qps",
+			levels:        []int64{50000, 10000, 30000},
+			targetUsage:   15000,
+			expectedUsage: 30000,
+			metricType:    podMetric,
 		},
 	}
 	tc.runTest(t)
@@ -708,11 +708,11 @@ func TestReplicaCalcScaleUpCMUnreadyHotCpuScaleWouldScaleDown(t *testing.T) {
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
 		podStartTime:     []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{50000, 15000, 30000},
-			targetUtilization:   15000,
-			expectedUtilization: 31666,
-			metricType:          podMetric,
+			name:          "qps",
+			levels:        []int64{50000, 15000, 30000},
+			targetUsage:   15000,
+			expectedUsage: 31666,
+			metricType:    podMetric,
 		},
 	}
 	tc.runTest(t)
@@ -723,10 +723,10 @@ func TestReplicaCalcScaleUpCMObject(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{20000},
-			targetUtilization:   15000,
-			expectedUtilization: 20000,
+			name:          "qps",
+			levels:        []int64{20000},
+			targetUsage:   15000,
+			expectedUsage: 20000,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",
@@ -742,11 +742,11 @@ func TestReplicaCalcScaleUpCMPerPodObject(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		metric: &metricInfo{
-			metricType:              objectPerPodMetric,
-			name:                    "qps",
-			levels:                  []int64{20000},
-			perPodTargetUtilization: 5000,
-			expectedUtilization:     6667,
+			metricType:        objectPerPodMetric,
+			name:              "qps",
+			levels:            []int64{20000},
+			perPodTargetUsage: 5000,
+			expectedUsage:     6667,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",
@@ -763,10 +763,10 @@ func TestReplicaCalcScaleUpCMObjectIgnoresUnreadyPods(t *testing.T) {
 		expectedReplicas: 5, // If we did not ignore unready pods, we'd expect 15 replicas.
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{50000},
-			targetUtilization:   10000,
-			expectedUtilization: 50000,
+			name:          "qps",
+			levels:        []int64{50000},
+			targetUsage:   10000,
+			expectedUsage: 50000,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",
@@ -782,12 +782,12 @@ func TestReplicaCalcScaleUpCMExternal(t *testing.T) {
 		currentReplicas:  1,
 		expectedReplicas: 2,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{8600},
-			targetUtilization:   4400,
-			expectedUtilization: 8600,
-			selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:          podMetric,
+			name:          "qps",
+			levels:        []int64{8600},
+			targetUsage:   4400,
+			expectedUsage: 8600,
+			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:    podMetric,
 		},
 	}
 	tc.runTest(t)
@@ -799,12 +799,12 @@ func TestReplicaCalcScaleUpCMExternalIgnoresUnreadyPods(t *testing.T) {
 		expectedReplicas: 2, // Would expect 6 if we didn't ignore unready pods
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{8600},
-			targetUtilization:   4400,
-			expectedUtilization: 8600,
-			selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:          externalMetric,
+			name:          "qps",
+			levels:        []int64{8600},
+			targetUsage:   4400,
+			expectedUsage: 8600,
+			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:    externalMetric,
 		},
 	}
 	tc.runTest(t)
@@ -815,11 +815,11 @@ func TestReplicaCalcScaleUpCMExternalNoLabels(t *testing.T) {
 		currentReplicas:  1,
 		expectedReplicas: 2,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{8600},
-			targetUtilization:   4400,
-			expectedUtilization: 8600,
-			metricType:          podMetric,
+			name:          "qps",
+			levels:        []int64{8600},
+			targetUsage:   4400,
+			expectedUsage: 8600,
+			metricType:    podMetric,
 		},
 	}
 	tc.runTest(t)
@@ -830,12 +830,12 @@ func TestReplicaCalcScaleUpPerPodCMExternal(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 4,
 		metric: &metricInfo{
-			name:                    "qps",
-			levels:                  []int64{8600},
-			perPodTargetUtilization: 2150,
-			expectedUtilization:     2867,
-			selector:                &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:              externalPerPodMetric,
+			name:              "qps",
+			levels:            []int64{8600},
+			perPodTargetUsage: 2150,
+			expectedUsage:     2867,
+			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:        externalPerPodMetric,
 		},
 	}
 	tc.runTest(t)
@@ -881,11 +881,11 @@ func TestReplicaCalcScaleDownCM(t *testing.T) {
 		currentReplicas:  5,
 		expectedReplicas: 3,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{12000, 12000, 12000, 12000, 12000},
-			targetUtilization:   20000,
-			expectedUtilization: 12000,
-			metricType:          podMetric,
+			name:          "qps",
+			levels:        []int64{12000, 12000, 12000, 12000, 12000},
+			targetUsage:   20000,
+			expectedUsage: 12000,
+			metricType:    podMetric,
 		},
 	}
 	tc.runTest(t)
@@ -896,10 +896,10 @@ func TestReplicaCalcScaleDownPerPodCMObject(t *testing.T) {
 		currentReplicas:  5,
 		expectedReplicas: 3,
 		metric: &metricInfo{
-			name:                    "qps",
-			levels:                  []int64{6000},
-			perPodTargetUtilization: 2000,
-			expectedUtilization:     1200,
+			name:              "qps",
+			levels:            []int64{6000},
+			perPodTargetUsage: 2000,
+			expectedUsage:     1200,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",
@@ -916,10 +916,10 @@ func TestReplicaCalcScaleDownCMObject(t *testing.T) {
 		currentReplicas:  5,
 		expectedReplicas: 3,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{12000},
-			targetUtilization:   20000,
-			expectedUtilization: 12000,
+			name:          "qps",
+			levels:        []int64{12000},
+			targetUsage:   20000,
+			expectedUsage: 12000,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",
@@ -935,12 +935,12 @@ func TestReplicaCalcScaleDownCMExternal(t *testing.T) {
 		currentReplicas:  5,
 		expectedReplicas: 3,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{8600},
-			targetUtilization:   14334,
-			expectedUtilization: 8600,
-			selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:          externalMetric,
+			name:          "qps",
+			levels:        []int64{8600},
+			targetUsage:   14334,
+			expectedUsage: 8600,
+			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:    externalMetric,
 		},
 	}
 	tc.runTest(t)
@@ -951,12 +951,12 @@ func TestReplicaCalcScaleDownPerPodCMExternal(t *testing.T) {
 		currentReplicas:  5,
 		expectedReplicas: 3,
 		metric: &metricInfo{
-			name:                    "qps",
-			levels:                  []int64{8600},
-			perPodTargetUtilization: 2867,
-			expectedUtilization:     1720,
-			selector:                &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:              externalPerPodMetric,
+			name:              "qps",
+			levels:            []int64{8600},
+			perPodTargetUsage: 2867,
+			expectedUsage:     1720,
+			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:        externalPerPodMetric,
 		},
 	}
 	tc.runTest(t)
@@ -1178,11 +1178,11 @@ func TestReplicaCalcToleranceCM(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{20000, 21000, 21000},
-			targetUtilization:   20000,
-			expectedUtilization: 20666,
-			metricType:          podMetric,
+			name:          "qps",
+			levels:        []int64{20000, 21000, 21000},
+			targetUsage:   20000,
+			expectedUsage: 20666,
+			metricType:    podMetric,
 		},
 	}
 	tc.runTest(t)
@@ -1193,10 +1193,10 @@ func TestReplicaCalcToleranceCMObject(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{20666},
-			targetUtilization:   20000,
-			expectedUtilization: 20666,
+			name:          "qps",
+			levels:        []int64{20666},
+			targetUsage:   20000,
+			expectedUsage: 20666,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",
@@ -1212,11 +1212,11 @@ func TestReplicaCalcTolerancePerPodCMObject(t *testing.T) {
 		currentReplicas:  4,
 		expectedReplicas: 4,
 		metric: &metricInfo{
-			metricType:              objectPerPodMetric,
-			name:                    "qps",
-			levels:                  []int64{20166},
-			perPodTargetUtilization: 5000,
-			expectedUtilization:     5042,
+			metricType:        objectPerPodMetric,
+			name:              "qps",
+			levels:            []int64{20166},
+			perPodTargetUsage: 5000,
+			expectedUsage:     5042,
 			singleObject: &autoscalingv2.CrossVersionObjectReference{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",
@@ -1232,12 +1232,12 @@ func TestReplicaCalcToleranceCMExternal(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{8600},
-			targetUtilization:   8888,
-			expectedUtilization: 8600,
-			selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:          externalMetric,
+			name:          "qps",
+			levels:        []int64{8600},
+			targetUsage:   8888,
+			expectedUsage: 8600,
+			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:    externalMetric,
 		},
 	}
 	tc.runTest(t)
@@ -1248,12 +1248,12 @@ func TestReplicaCalcTolerancePerPodCMExternal(t *testing.T) {
 		currentReplicas:  3,
 		expectedReplicas: 3,
 		metric: &metricInfo{
-			name:                    "qps",
-			levels:                  []int64{8600},
-			perPodTargetUtilization: 2900,
-			expectedUtilization:     2867,
-			selector:                &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:              externalPerPodMetric,
+			name:              "qps",
+			levels:            []int64{8600},
+			perPodTargetUsage: 2900,
+			expectedUsage:     2867,
+			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:        externalPerPodMetric,
 		},
 	}
 	tc.runTest(t)
@@ -1464,6 +1464,24 @@ func TestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcMissingMetricsScaleDownTargetOver100(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  4,
+		expectedReplicas: 2,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("2.0"), resource.MustParse("2.0")},
+			levels:   makePodMetricLevels(200, 100, 100),
+
+			targetUtilization:   300,
+			expectedUtilization: 6,
+			expectedValue:       numContainersPerPod * 100,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcDuringRollingUpdateWithMaxSurge(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  2,
@@ -1488,11 +1506,11 @@ func TestReplicaCalcDuringRollingUpdateWithMaxSurgeCM(t *testing.T) {
 		expectedReplicas: 2,
 		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning},
 		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{10000, 10000},
-			targetUtilization:   17000,
-			expectedUtilization: 10000,
-			metricType:          podMetric,
+			name:          "qps",
+			levels:        []int64{10000, 10000},
+			targetUsage:   17000,
+			expectedUsage: 10000,
+			metricType:    podMetric,
 		},
 	}
 	tc.runTest(t)

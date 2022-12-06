@@ -47,9 +47,20 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 	}
 }
 
+func FakeProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
+	return []volume.VolumePlugin{
+		&hostPathPlugin{
+			host:          nil,
+			config:        volumeConfig,
+			noTypeChecker: true,
+		},
+	}
+}
+
 type hostPathPlugin struct {
-	host   volume.VolumeHost
-	config volume.VolumeConfig
+	host          volume.VolumeHost
+	config        volume.VolumeConfig
+	noTypeChecker bool
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
@@ -97,6 +108,10 @@ func (plugin *hostPathPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *hostPathPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *hostPathPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -121,10 +136,11 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
 	return &hostPathMounter{
-		hostPath: &hostPath{path: path, pathType: pathType},
-		readOnly: readOnly,
-		mounter:  plugin.host.GetMounter(plugin.GetPluginName()),
-		hu:       kvh.GetHostUtil(),
+		hostPath:      &hostPath{path: path, pathType: pathType},
+		readOnly:      readOnly,
+		mounter:       plugin.host.GetMounter(plugin.GetPluginName()),
+		hu:            kvh.GetHostUtil(),
+		noTypeChecker: plugin.noTypeChecker,
 	}, nil
 }
 
@@ -165,7 +181,7 @@ func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volu
 	return newProvisioner(options, plugin.host, plugin)
 }
 
-func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	hostPathVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -174,7 +190,9 @@ func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) 
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(hostPathVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(hostPathVolume),
+	}, nil
 }
 
 func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error) {
@@ -203,26 +221,20 @@ func (hp *hostPath) GetPath() string {
 
 type hostPathMounter struct {
 	*hostPath
-	readOnly bool
-	mounter  mount.Interface
-	hu       hostutil.HostUtils
+	readOnly      bool
+	mounter       mount.Interface
+	hu            hostutil.HostUtils
+	noTypeChecker bool
 }
 
 var _ volume.Mounter = &hostPathMounter{}
 
 func (b *hostPathMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       b.readOnly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *hostPathMounter) CanMount() error {
-	return nil
 }
 
 // SetUp does nothing.
@@ -235,7 +247,11 @@ func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	if *b.pathType == v1.HostPathUnset {
 		return nil
 	}
-	return checkType(b.GetPath(), b.pathType, b.hu)
+	if b.noTypeChecker {
+		return nil
+	} else {
+		return checkType(b.GetPath(), b.pathType, b.hu)
+	}
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.

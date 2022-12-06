@@ -36,6 +36,11 @@ import (
 	"k8s.io/pod-security-admission/policy"
 )
 
+const (
+	newestMinorVersionToTest            = 25
+	podOSBasedRestrictionEnabledVersion = 25
+)
+
 // Options hold configuration for running integration tests against an existing server.
 type Options struct {
 	// ClientConfig is a client configuration with sufficient permission to create, update, and delete
@@ -73,8 +78,8 @@ func toJSON(pod *corev1.Pod) string {
 // checksForLevelAndVersion returns the set of check IDs that apply when evaluating the given level and version.
 // checks are assumed to be well-formed and valid to pass to policy.NewEvaluator().
 // level must be api.LevelRestricted or api.LevelBaseline
-func checksForLevelAndVersion(checks []policy.Check, level api.Level, version api.Version) ([]string, error) {
-	retval := []string{}
+func checksForLevelAndVersion(checks []policy.Check, level api.Level, version api.Version) ([]policy.CheckID, error) {
+	retval := []policy.CheckID{}
 	for _, check := range checks {
 		if !version.Older(check.Versions[0].MinimumVersion) && (level == check.Level || level == api.LevelRestricted) {
 			retval = append(retval, check.ID)
@@ -115,13 +120,28 @@ func computeVersionsToTest(t *testing.T, checks []policy.Check) []api.Version {
 		}
 	}
 
+	for _, versionsForLevel := range minimalValidLinuxPods {
+		for version := range versionsForLevel {
+			if version.Major() != 1 {
+				t.Fatalf("expected major version 1, got %d", version.Major())
+			}
+			seenVersions[version] = true
+		}
+	}
+
+	for _, versionsForLevel := range minimalValidWindowsPods {
+		for version := range versionsForLevel {
+			if version.Major() != 1 {
+				t.Fatalf("expected major version 1, got %d", version.Major())
+			}
+			seenVersions[version] = true
+		}
+	}
+
 	alwaysIncludeVersions := []api.Version{
 		// include the oldest version by default
 		api.MajorMinorVersion(1, 0),
-		// include the release under development (1.23 at time of writing).
-		// this can be incremented to the current version whenever is convenient.
-		// TODO: find a way to use api.LatestVersion() here
-		api.MajorMinorVersion(1, 23),
+		api.MajorMinorVersion(1, newestMinorVersionToTest),
 	}
 	for _, version := range alwaysIncludeVersions {
 		seenVersions[version] = true
@@ -296,13 +316,36 @@ func Run(t *testing.T, opts Options) {
 				}
 			}
 
-			minimalValidPod, err := GetMinimalValidPod(level, version)
+			minimalValidOSNeutralPod, err := GetMinimalValidPod(level, version)
 			if err != nil {
 				t.Fatal(err)
 			}
+			var minimalValidLinuxPod, minimalValidWindowsPod *corev1.Pod
+			if level == api.LevelRestricted && version.Minor() >= podOSBasedRestrictionEnabledVersion {
+				minimalValidLinuxPod, err = GetMinimalValidLinuxPod(level, version)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				minimalValidWindowsPod, err = GetMinimalValidWindowsPod(level, version)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
 			t.Run(ns+"_pass_base", func(t *testing.T) {
-				createPod(t, 0, minimalValidPod.DeepCopy(), true, "")
-				createController(t, 0, minimalValidPod.DeepCopy(), true, "")
+				createPod(t, 0, minimalValidOSNeutralPod.DeepCopy(), true, "")
+				createController(t, 0, minimalValidOSNeutralPod.DeepCopy(), true, "")
+				if minimalValidLinuxPod != nil && minimalValidWindowsPod != nil {
+					// Linux specific pods
+					createPod(t, 0, minimalValidLinuxPod.DeepCopy(), true, "")
+					createController(t, 0, minimalValidLinuxPod.DeepCopy(), true, "")
+
+					// Windows specific pods
+					createPod(t, 0, minimalValidWindowsPod.DeepCopy(), true, "")
+					createController(t, 0, minimalValidWindowsPod.DeepCopy(), true, "")
+				}
+
 			})
 
 			checkIDs, err := checksForLevelAndVersion(opts.Checks, level, version)
@@ -318,7 +361,7 @@ func Run(t *testing.T, opts Options) {
 					t.Fatal(err)
 				}
 
-				t.Run(ns+"_pass_"+checkID, func(t *testing.T) {
+				t.Run(ns+"_pass_"+string(checkID), func(t *testing.T) {
 					for i, pod := range checkData.pass {
 						createPod(t, i, pod, true, "")
 						createController(t, i, pod, true, "")
@@ -332,7 +375,7 @@ func Run(t *testing.T, opts Options) {
 						disabledRequiredFeatures = append(disabledRequiredFeatures, f)
 					}
 				}
-				t.Run(ns+"_fail_"+checkID, func(t *testing.T) {
+				t.Run(ns+"_fail_"+string(checkID), func(t *testing.T) {
 					if len(disabledRequiredFeatures) > 0 {
 						t.Skipf("features required for failure cases are disabled: %v", disabledRequiredFeatures)
 					}

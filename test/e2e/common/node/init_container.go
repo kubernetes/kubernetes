@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,7 +39,9 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 func recordEvents(events []watch.Event, f func(watch.Event) (bool, error)) func(watch.Event) (bool, error) {
@@ -158,9 +160,10 @@ func initContainersInvariants(pod *v1.Pod) error {
 
 var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("init-container")
-	var podClient *framework.PodClient
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2epod.NewPodClient(f)
 	})
 
 	/*
@@ -233,7 +236,9 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			framework.ExpectEqual(status.Ready, true)
+			if !status.Ready {
+				framework.Failf("init container %s should be in Ready status", status.Name)
+			}
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}
@@ -310,7 +315,9 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			framework.ExpectEqual(status.Ready, true)
+			if !status.Ready {
+				framework.Failf("init container %s should be in Ready status", status.Name)
+			}
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}

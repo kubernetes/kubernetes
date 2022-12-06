@@ -25,6 +25,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
+// NewTestQueue creates a priority queue with an empty informer factory.
+func NewTestQueue(ctx context.Context, lessFn framework.LessFunc, opts ...Option) *PriorityQueue {
+	return NewTestQueueWithObjects(ctx, lessFn, nil, opts...)
+}
+
 // NewTestQueueWithObjects creates a priority queue with an informer factory
 // populated with the provided objects.
 func NewTestQueueWithObjects(
@@ -34,13 +39,17 @@ func NewTestQueueWithObjects(
 	opts ...Option,
 ) *PriorityQueue {
 	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(objs...), 0)
+	return NewTestQueueWithInformerFactory(ctx, lessFn, informerFactory, opts...)
+}
+
+func NewTestQueueWithInformerFactory(
+	ctx context.Context,
+	lessFn framework.LessFunc,
+	informerFactory informers.SharedInformerFactory,
+	opts ...Option,
+) *PriorityQueue {
 	pq := NewPriorityQueue(lessFn, informerFactory, opts...)
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 	return pq
-}
-
-// NewTestQueue creates a priority queue with an empty informer factory.
-func NewTestQueue(ctx context.Context, lessFn framework.LessFunc, opts ...Option) *PriorityQueue {
-	return NewTestQueueWithObjects(ctx, lessFn, nil, opts...)
 }

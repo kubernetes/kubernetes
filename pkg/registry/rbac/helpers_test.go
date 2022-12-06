@@ -190,7 +190,6 @@ func TestNewMetadataFields(t *testing.T) {
 		objMeta.Annotations = nil
 		objMeta.OwnerReferences = nil
 		objMeta.Finalizers = nil
-		objMeta.ClusterName = ""
 		objMeta.ManagedFields = nil
 
 		if !reflect.DeepEqual(metav1.ObjectMeta{}, objMeta) {

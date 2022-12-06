@@ -444,18 +444,6 @@ func (u *Unstructured) SetFinalizers(finalizers []string) {
 	u.setNestedStringSlice(finalizers, "metadata", "finalizers")
 }
 
-func (u *Unstructured) GetClusterName() string {
-	return getNestedString(u.Object, "metadata", "clusterName")
-}
-
-func (u *Unstructured) SetClusterName(clusterName string) {
-	if len(clusterName) == 0 {
-		RemoveNestedField(u.Object, "metadata", "clusterName")
-		return
-	}
-	u.setNestedField(clusterName, "metadata", "clusterName")
-}
-
 func (u *Unstructured) GetManagedFields() []metav1.ManagedFieldsEntry {
 	items, found, err := NestedSlice(u.Object, "metadata", "managedFields")
 	if !found || err != nil {

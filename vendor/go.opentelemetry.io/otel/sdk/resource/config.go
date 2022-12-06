@@ -24,34 +24,15 @@ import (
 type config struct {
 	// detectors that will be evaluated.
 	detectors []Detector
-
-	// telemetrySDK is used to specify non-default
-	// `telemetry.sdk.*` attributes.
-	telemetrySDK Detector
-
-	// HostResource is used to specify non-default `host.*`
-	// attributes.
-	host Detector
-
-	// FromEnv is used to specify non-default OTEL_RESOURCE_ATTRIBUTES
-	// attributes.
-	fromEnv Detector
+	// SchemaURL to associate with the Resource.
+	schemaURL string
 }
 
 // Option is the interface that applies a configuration option.
 type Option interface {
-	// Apply sets the Option value of a config.
-	Apply(*config)
-
-	// A private method to prevent users implementing the
-	// interface and so future additions to it will not
-	// violate compatibility.
-	private()
+	// apply sets the Option value of a config.
+	apply(config) config
 }
-
-type option struct{}
-
-func (option) private() {}
 
 // WithAttributes adds attributes to the configured Resource.
 func WithAttributes(attributes ...attribute.KeyValue) Option {
@@ -63,7 +44,7 @@ type detectAttributes struct {
 }
 
 func (d detectAttributes) Detect(context.Context) (*Resource, error) {
-	return NewWithAttributes(d.attributes...), nil
+	return NewSchemaless(d.attributes...), nil
 }
 
 // WithDetectors adds detectors to be evaluated for the configured resource.
@@ -72,94 +53,147 @@ func WithDetectors(detectors ...Detector) Option {
 }
 
 type detectorsOption struct {
-	option
 	detectors []Detector
 }
 
-// Apply implements Option.
-func (o detectorsOption) Apply(cfg *config) {
+func (o detectorsOption) apply(cfg config) config {
 	cfg.detectors = append(cfg.detectors, o.detectors...)
+	return cfg
 }
 
-// WithTelemetrySDK overrides the builtin `telemetry.sdk.*`
-// attributes.  Use nil to disable these attributes entirely.
-func WithTelemetrySDK(d Detector) Option {
-	return telemetrySDKOption{Detector: d}
+// WithFromEnv adds attributes from environment variables to the configured resource.
+func WithFromEnv() Option {
+	return WithDetectors(fromEnv{})
 }
 
-type telemetrySDKOption struct {
-	option
-	Detector
+// WithHost adds attributes from the host to the configured resource.
+func WithHost() Option {
+	return WithDetectors(host{})
 }
 
-// Apply implements Option.
-func (o telemetrySDKOption) Apply(cfg *config) {
-	cfg.telemetrySDK = o.Detector
+// WithTelemetrySDK adds TelemetrySDK version info to the configured resource.
+func WithTelemetrySDK() Option {
+	return WithDetectors(telemetrySDK{})
 }
 
-// WithHost overrides the builtin `host.*` attributes.  Use nil to
-// disable these attributes entirely.
-func WithHost(d Detector) Option {
-	return hostOption{Detector: d}
+// WithSchemaURL sets the schema URL for the configured resource.
+func WithSchemaURL(schemaURL string) Option {
+	return schemaURLOption(schemaURL)
 }
 
-type hostOption struct {
-	option
-	Detector
+type schemaURLOption string
+
+func (o schemaURLOption) apply(cfg config) config {
+	cfg.schemaURL = string(o)
+	return cfg
 }
 
-// Apply implements Option.
-func (o hostOption) Apply(cfg *config) {
-	cfg.host = o.Detector
-}
-
-// WithFromEnv overrides the builtin detector for
-// OTEL_RESOURCE_ATTRIBUTES.  Use nil to disable environment checking.
-func WithFromEnv(d Detector) Option {
-	return fromEnvOption{Detector: d}
-}
-
-type fromEnvOption struct {
-	option
-	Detector
-}
-
-// Apply implements Option.
-func (o fromEnvOption) Apply(cfg *config) {
-	cfg.fromEnv = o.Detector
-}
-
-// WithoutBuiltin disables all the builtin detectors, including the
-// telemetry.sdk.*, host.*, and the environment detector.
-func WithoutBuiltin() Option {
-	return noBuiltinOption{}
-}
-
-type noBuiltinOption struct {
-	option
-}
-
-// Apply implements Option.
-func (o noBuiltinOption) Apply(cfg *config) {
-	cfg.host = nil
-	cfg.telemetrySDK = nil
-	cfg.fromEnv = nil
-}
-
-// New returns a Resource combined from the provided attributes,
-// user-provided detectors and builtin detectors.
-func New(ctx context.Context, opts ...Option) (*Resource, error) {
-	cfg := config{
-		telemetrySDK: TelemetrySDK{},
-		host:         Host{},
-		fromEnv:      FromEnv{},
-	}
-	for _, opt := range opts {
-		opt.Apply(&cfg)
-	}
-	detectors := append(
-		[]Detector{cfg.telemetrySDK, cfg.host, cfg.fromEnv},
-		cfg.detectors...,
+// WithOS adds all the OS attributes to the configured Resource.
+// See individual WithOS* functions to configure specific attributes.
+func WithOS() Option {
+	return WithDetectors(
+		osTypeDetector{},
+		osDescriptionDetector{},
 	)
-	return Detect(ctx, detectors...)
+}
+
+// WithOSType adds an attribute with the operating system type to the configured Resource.
+func WithOSType() Option {
+	return WithDetectors(osTypeDetector{})
+}
+
+// WithOSDescription adds an attribute with the operating system description to the
+// configured Resource. The formatted string is equivalent to the output of the
+// `uname -snrvm` command.
+func WithOSDescription() Option {
+	return WithDetectors(osDescriptionDetector{})
+}
+
+// WithProcess adds all the Process attributes to the configured Resource.
+//
+// Warning! This option will include process command line arguments. If these
+// contain sensitive information it will be included in the exported resource.
+//
+// This option is equivalent to calling WithProcessPID,
+// WithProcessExecutableName, WithProcessExecutablePath,
+// WithProcessCommandArgs, WithProcessOwner, WithProcessRuntimeName,
+// WithProcessRuntimeVersion, and WithProcessRuntimeDescription. See each
+// option function for information about what resource attributes each
+// includes.
+func WithProcess() Option {
+	return WithDetectors(
+		processPIDDetector{},
+		processExecutableNameDetector{},
+		processExecutablePathDetector{},
+		processCommandArgsDetector{},
+		processOwnerDetector{},
+		processRuntimeNameDetector{},
+		processRuntimeVersionDetector{},
+		processRuntimeDescriptionDetector{},
+	)
+}
+
+// WithProcessPID adds an attribute with the process identifier (PID) to the
+// configured Resource.
+func WithProcessPID() Option {
+	return WithDetectors(processPIDDetector{})
+}
+
+// WithProcessExecutableName adds an attribute with the name of the process
+// executable to the configured Resource.
+func WithProcessExecutableName() Option {
+	return WithDetectors(processExecutableNameDetector{})
+}
+
+// WithProcessExecutablePath adds an attribute with the full path to the process
+// executable to the configured Resource.
+func WithProcessExecutablePath() Option {
+	return WithDetectors(processExecutablePathDetector{})
+}
+
+// WithProcessCommandArgs adds an attribute with all the command arguments (including
+// the command/executable itself) as received by the process to the configured
+// Resource.
+//
+// Warning! This option will include process command line arguments. If these
+// contain sensitive information it will be included in the exported resource.
+func WithProcessCommandArgs() Option {
+	return WithDetectors(processCommandArgsDetector{})
+}
+
+// WithProcessOwner adds an attribute with the username of the user that owns the process
+// to the configured Resource.
+func WithProcessOwner() Option {
+	return WithDetectors(processOwnerDetector{})
+}
+
+// WithProcessRuntimeName adds an attribute with the name of the runtime of this
+// process to the configured Resource.
+func WithProcessRuntimeName() Option {
+	return WithDetectors(processRuntimeNameDetector{})
+}
+
+// WithProcessRuntimeVersion adds an attribute with the version of the runtime of
+// this process to the configured Resource.
+func WithProcessRuntimeVersion() Option {
+	return WithDetectors(processRuntimeVersionDetector{})
+}
+
+// WithProcessRuntimeDescription adds an attribute with an additional description
+// about the runtime of the process to the configured Resource.
+func WithProcessRuntimeDescription() Option {
+	return WithDetectors(processRuntimeDescriptionDetector{})
+}
+
+// WithContainer adds all the Container attributes to the configured Resource.
+// See individual WithContainer* functions to configure specific attributes.
+func WithContainer() Option {
+	return WithDetectors(
+		cgroupContainerIDDetector{},
+	)
+}
+
+// WithContainerID adds an attribute with the id of the container to the configured Resource.
+func WithContainerID() Option {
+	return WithDetectors(cgroupContainerIDDetector{})
 }

@@ -6,6 +6,8 @@ package resid
 import (
 	"reflect"
 	"strings"
+
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 // ResId is an identifier of a k8s resource object.
@@ -37,9 +39,9 @@ func NewResIdKindOnly(k string, n string) ResId {
 }
 
 const (
-	noNamespace          = "~X"
-	noName               = "~N"
-	separator            = "|"
+	noNamespace          = "[noNs]"
+	noName               = "[noName]"
+	separator            = "/"
 	TotallyNotANamespace = "_non_namespaceable_"
 	DefaultNamespace     = "default"
 )
@@ -55,31 +57,55 @@ func (id ResId) String() string {
 		nm = noName
 	}
 	return strings.Join(
-		[]string{id.Gvk.String(), ns, nm}, separator)
+		[]string{id.Gvk.String(), strings.Join([]string{nm, ns}, fieldSep)}, separator)
+}
+
+// LegacySortString returns an older version of String() that LegacyOrderTransformer depends on
+// to keep its ordering stable across Kustomize versions
+func (id ResId) LegacySortString() string {
+	legacyNoNamespace := "~X"
+	legacyNoName := "~N"
+	legacySeparator := "|"
+
+	ns := id.Namespace
+	if ns == "" {
+		ns = legacyNoNamespace
+	}
+	nm := id.Name
+	if nm == "" {
+		nm = legacyNoName
+	}
+	return strings.Join(
+		[]string{id.Gvk.String(), ns, nm}, legacySeparator)
 }
 
 func FromString(s string) ResId {
 	values := strings.Split(s, separator)
-	g := GvkFromString(values[0])
+	gvk := GvkFromString(values[0])
 
-	ns := values[1]
+	values = strings.Split(values[1], fieldSep)
+	last := len(values) - 1
+
+	ns := values[last]
 	if ns == noNamespace {
 		ns = ""
 	}
-	nm := values[2]
+	nm := strings.Join(values[:last], fieldSep)
 	if nm == noName {
 		nm = ""
 	}
 	return ResId{
-		Gvk:       g,
+		Gvk:       gvk,
 		Namespace: ns,
 		Name:      nm,
 	}
 }
 
-// GvknString of ResId based on GVK and name
-func (id ResId) GvknString() string {
-	return id.Gvk.String() + separator + id.Name
+// FromRNode returns the ResId for the RNode
+func FromRNode(rn *yaml.RNode) ResId {
+	group, version := ParseGroupVersion(rn.GetApiVersion())
+	return NewResIdWithNamespace(
+		Gvk{Group: group, Version: version, Kind: rn.GetKind()}, rn.GetName(), rn.GetNamespace())
 }
 
 // GvknEquals returns true if the other id matches

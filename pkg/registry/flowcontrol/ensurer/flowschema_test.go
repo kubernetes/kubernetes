@@ -21,15 +21,15 @@ import (
 	"reflect"
 	"testing"
 
-	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/client-go/kubernetes/fake"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
-	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
+	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta3"
 	"k8s.io/client-go/tools/cache"
-	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
+	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -40,9 +40,9 @@ func TestEnsureFlowSchema(t *testing.T) {
 	tests := []struct {
 		name      string
 		strategy  func(flowcontrolclient.FlowSchemaInterface, flowcontrollisters.FlowSchemaLister) FlowSchemaEnsurer
-		current   *flowcontrolv1beta2.FlowSchema
-		bootstrap *flowcontrolv1beta2.FlowSchema
-		expected  *flowcontrolv1beta2.FlowSchema
+		current   *flowcontrolv1beta3.FlowSchema
+		bootstrap *flowcontrolv1beta3.FlowSchema
+		expected  *flowcontrolv1beta3.FlowSchema
 	}{
 		// for suggested configurations
 		{
@@ -93,7 +93,7 @@ func TestEnsureFlowSchema(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset().FlowcontrolV1beta2().FlowSchemas()
+			client := fake.NewSimpleClientset().FlowcontrolV1beta3().FlowSchemas()
 			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
@@ -102,7 +102,7 @@ func TestEnsureFlowSchema(t *testing.T) {
 
 			ensurer := test.strategy(client, flowcontrollisters.NewFlowSchemaLister(indexer))
 
-			err := ensurer.Ensure([]*flowcontrolv1beta2.FlowSchema{test.bootstrap})
+			err := ensurer.Ensure([]*flowcontrolv1beta3.FlowSchema{test.bootstrap})
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}
@@ -127,9 +127,9 @@ func TestEnsureFlowSchema(t *testing.T) {
 func TestSuggestedFSEnsureStrategy_ShouldUpdate(t *testing.T) {
 	tests := []struct {
 		name              string
-		current           *flowcontrolv1beta2.FlowSchema
-		bootstrap         *flowcontrolv1beta2.FlowSchema
-		newObjectExpected *flowcontrolv1beta2.FlowSchema
+		current           *flowcontrolv1beta3.FlowSchema
+		bootstrap         *flowcontrolv1beta3.FlowSchema
+		newObjectExpected *flowcontrolv1beta3.FlowSchema
 	}{
 		{
 			name:              "auto update is enabled, first generation, spec does not match - spec update expected",
@@ -234,23 +234,23 @@ func TestSuggestedFSEnsureStrategy_ShouldUpdate(t *testing.T) {
 }
 
 func TestFlowSchemaSpecChanged(t *testing.T) {
-	fs1 := &flowcontrolv1beta2.FlowSchema{
-		Spec: flowcontrolv1beta2.FlowSchemaSpec{},
+	fs1 := &flowcontrolv1beta3.FlowSchema{
+		Spec: flowcontrolv1beta3.FlowSchemaSpec{},
 	}
-	fs2 := &flowcontrolv1beta2.FlowSchema{
-		Spec: flowcontrolv1beta2.FlowSchemaSpec{
+	fs2 := &flowcontrolv1beta3.FlowSchema{
+		Spec: flowcontrolv1beta3.FlowSchemaSpec{
 			MatchingPrecedence: 1,
 		},
 	}
-	fs1Defaulted := &flowcontrolv1beta2.FlowSchema{
-		Spec: flowcontrolv1beta2.FlowSchemaSpec{
-			MatchingPrecedence: flowcontrolapisv1beta2.FlowSchemaDefaultMatchingPrecedence,
+	fs1Defaulted := &flowcontrolv1beta3.FlowSchema{
+		Spec: flowcontrolv1beta3.FlowSchemaSpec{
+			MatchingPrecedence: flowcontrolapisv1beta3.FlowSchemaDefaultMatchingPrecedence,
 		},
 	}
 	testCases := []struct {
 		name        string
-		expected    *flowcontrolv1beta2.FlowSchema
-		actual      *flowcontrolv1beta2.FlowSchema
+		expected    *flowcontrolv1beta3.FlowSchema
+		actual      *flowcontrolv1beta3.FlowSchema
 		specChanged bool
 	}{
 		{
@@ -283,7 +283,7 @@ func TestFlowSchemaSpecChanged(t *testing.T) {
 func TestRemoveFlowSchema(t *testing.T) {
 	tests := []struct {
 		name           string
-		current        *flowcontrolv1beta2.FlowSchema
+		current        *flowcontrolv1beta3.FlowSchema
 		bootstrapName  string
 		removeExpected bool
 	}{
@@ -314,7 +314,7 @@ func TestRemoveFlowSchema(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset().FlowcontrolV1beta2().FlowSchemas()
+			client := fake.NewSimpleClientset().FlowcontrolV1beta3().FlowSchemas()
 			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
@@ -348,18 +348,18 @@ func TestRemoveFlowSchema(t *testing.T) {
 func TestGetFlowSchemaRemoveCandidate(t *testing.T) {
 	tests := []struct {
 		name      string
-		current   []*flowcontrolv1beta2.FlowSchema
-		bootstrap []*flowcontrolv1beta2.FlowSchema
+		current   []*flowcontrolv1beta3.FlowSchema
+		bootstrap []*flowcontrolv1beta3.FlowSchema
 		expected  []string
 	}{
 		{
 			name: "no object has been removed from the bootstrap configuration",
-			bootstrap: []*flowcontrolv1beta2.FlowSchema{
+			bootstrap: []*flowcontrolv1beta3.FlowSchema{
 				newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 				newFlowSchema("fs2", "pl2", 200).WithAutoUpdateAnnotation("true").Object(),
 				newFlowSchema("fs3", "pl3", 300).WithAutoUpdateAnnotation("true").Object(),
 			},
-			current: []*flowcontrolv1beta2.FlowSchema{
+			current: []*flowcontrolv1beta3.FlowSchema{
 				newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 				newFlowSchema("fs2", "pl2", 200).WithAutoUpdateAnnotation("true").Object(),
 				newFlowSchema("fs3", "pl3", 300).WithAutoUpdateAnnotation("true").Object(),
@@ -368,8 +368,8 @@ func TestGetFlowSchemaRemoveCandidate(t *testing.T) {
 		},
 		{
 			name:      "bootstrap is empty, all current objects with the annotation should be candidates",
-			bootstrap: []*flowcontrolv1beta2.FlowSchema{},
-			current: []*flowcontrolv1beta2.FlowSchema{
+			bootstrap: []*flowcontrolv1beta3.FlowSchema{},
+			current: []*flowcontrolv1beta3.FlowSchema{
 				newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 				newFlowSchema("fs2", "pl2", 200).WithAutoUpdateAnnotation("true").Object(),
 				newFlowSchema("fs3", "pl3", 300).Object(),
@@ -378,10 +378,10 @@ func TestGetFlowSchemaRemoveCandidate(t *testing.T) {
 		},
 		{
 			name: "object(s) have been removed from the bootstrap configuration",
-			bootstrap: []*flowcontrolv1beta2.FlowSchema{
+			bootstrap: []*flowcontrolv1beta3.FlowSchema{
 				newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 			},
-			current: []*flowcontrolv1beta2.FlowSchema{
+			current: []*flowcontrolv1beta3.FlowSchema{
 				newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 				newFlowSchema("fs2", "pl2", 200).WithAutoUpdateAnnotation("true").Object(),
 				newFlowSchema("fs3", "pl3", 300).WithAutoUpdateAnnotation("true").Object(),
@@ -390,10 +390,10 @@ func TestGetFlowSchemaRemoveCandidate(t *testing.T) {
 		},
 		{
 			name: "object(s) without the annotation key are ignored",
-			bootstrap: []*flowcontrolv1beta2.FlowSchema{
+			bootstrap: []*flowcontrolv1beta3.FlowSchema{
 				newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 			},
-			current: []*flowcontrolv1beta2.FlowSchema{
+			current: []*flowcontrolv1beta3.FlowSchema{
 				newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 				newFlowSchema("fs2", "pl2", 200).Object(),
 				newFlowSchema("fs3", "pl3", 300).Object(),
@@ -425,17 +425,17 @@ func TestGetFlowSchemaRemoveCandidate(t *testing.T) {
 }
 
 type fsBuilder struct {
-	object *flowcontrolv1beta2.FlowSchema
+	object *flowcontrolv1beta3.FlowSchema
 }
 
 func newFlowSchema(name, plName string, matchingPrecedence int32) *fsBuilder {
 	return &fsBuilder{
-		object: &flowcontrolv1beta2.FlowSchema{
+		object: &flowcontrolv1beta3.FlowSchema{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
-			Spec: flowcontrolv1beta2.FlowSchemaSpec{
-				PriorityLevelConfiguration: flowcontrolv1beta2.PriorityLevelConfigurationReference{
+			Spec: flowcontrolv1beta3.FlowSchemaSpec{
+				PriorityLevelConfiguration: flowcontrolv1beta3.PriorityLevelConfigurationReference{
 					Name: plName,
 				},
 				MatchingPrecedence: matchingPrecedence,
@@ -444,7 +444,7 @@ func newFlowSchema(name, plName string, matchingPrecedence int32) *fsBuilder {
 	}
 }
 
-func (b *fsBuilder) Object() *flowcontrolv1beta2.FlowSchema {
+func (b *fsBuilder) Object() *flowcontrolv1beta3.FlowSchema {
 	return b.object
 }
 
@@ -463,5 +463,5 @@ func setAnnotation(accessor metav1.Object, value string) {
 		accessor.SetAnnotations(map[string]string{})
 	}
 
-	accessor.GetAnnotations()[flowcontrolv1beta2.AutoUpdateAnnotationKey] = value
+	accessor.GetAnnotations()[flowcontrolv1beta3.AutoUpdateAnnotationKey] = value
 }

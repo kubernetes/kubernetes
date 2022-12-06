@@ -28,13 +28,14 @@ import (
 var baseLabelsNames = []string{"machine_id", "system_uuid", "boot_id"}
 
 const (
-	prometheusModeLabelName     = "mode"
-	prometheusTypeLabelName     = "type"
-	prometheusLevelLabelName    = "level"
-	prometheusNodeLabelName     = "node_id"
-	prometheusCoreLabelName     = "core_id"
-	prometheusThreadLabelName   = "thread_id"
-	prometheusPageSizeLabelName = "page_size"
+	prometheusModeLabelName       = "mode"
+	prometheusTypeLabelName       = "type"
+	prometheusLevelLabelName      = "level"
+	prometheusNodeLabelName       = "node_id"
+	prometheusCoreLabelName       = "core_id"
+	prometheusThreadLabelName     = "thread_id"
+	prometheusPageSizeLabelName   = "page_size"
+	prometheusTargetNodeLabelName = "target_node_id"
 
 	nvmMemoryMode    = "memory_mode"
 	nvmAppDirectMode = "app_direct_mode"
@@ -189,6 +190,15 @@ func NewPrometheusMachineCollector(i infoProvider, includedMetrics container.Met
 				extraLabels: []string{prometheusNodeLabelName, prometheusPageSizeLabelName},
 				getValues: func(machineInfo *info.MachineInfo) metricValues {
 					return getHugePagesCount(machineInfo)
+				},
+			},
+			{
+				name:        "machine_node_distance",
+				help:        "Distance between NUMA node and target NUMA node.",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{prometheusNodeLabelName, prometheusTargetNodeLabelName},
+				getValues: func(machineInfo *info.MachineInfo) metricValues {
+					return getDistance(machineInfo)
 				},
 			},
 		}...)
@@ -350,6 +360,22 @@ func getCaches(machineInfo *info.MachineInfo) metricValues {
 				metricValue{
 					value:     float64(cache.Size),
 					labels:    []string{nodeID, emptyLabelValue, cache.Type, strconv.Itoa(cache.Level)},
+					timestamp: machineInfo.Timestamp,
+				})
+		}
+	}
+	return mValues
+}
+
+func getDistance(machineInfo *info.MachineInfo) metricValues {
+	mValues := make(metricValues, 0, len(machineInfo.Topology)^2)
+	for _, node := range machineInfo.Topology {
+		nodeID := strconv.Itoa(node.Id)
+		for i, target := range node.Distances {
+			mValues = append(mValues,
+				metricValue{
+					value:     float64(target),
+					labels:    []string{nodeID, strconv.Itoa(i)},
 					timestamp: machineInfo.Timestamp,
 				})
 		}

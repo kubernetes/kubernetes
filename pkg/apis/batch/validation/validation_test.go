@@ -17,6 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"archive/zip"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -29,6 +35,17 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/utils/pointer"
+)
+
+var (
+	timeZoneEmpty      = ""
+	timeZoneLocal      = "LOCAL"
+	timeZoneUTC        = "UTC"
+	timeZoneCorrect    = "Continent/Zone"
+	timeZoneBadPrefix  = " Continent/Zone"
+	timeZoneBadSuffix  = "Continent/Zone "
+	timeZoneBadName    = "Continent/InvalidZone"
+	timeZoneEmptySpace = " "
 )
 
 var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
@@ -64,23 +81,85 @@ func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.Pod
 			Labels: selector.MatchLabels,
 		},
 		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+			RestartPolicy:  api.RestartPolicyOnFailure,
+			DNSPolicy:      api.DNSClusterFirst,
+			Containers:     []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+			InitContainers: []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 		},
 	}
 }
 
 func TestValidateJob(t *testing.T) {
+	validJobObjectMeta := metav1.ObjectMeta{
+		Name:      "myjob",
+		Namespace: metav1.NamespaceDefault,
+		UID:       types.UID("1a2b3c"),
+	}
 	validManualSelector := getValidManualSelector()
 	validPodTemplateSpecForManual := getValidPodTemplateSpecForManual(validManualSelector)
 	validGeneratedSelector := getValidGeneratedSelector()
 	validPodTemplateSpecForGenerated := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	validPodTemplateSpecForGeneratedRestartPolicyNever := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	validPodTemplateSpecForGeneratedRestartPolicyNever.Spec.RestartPolicy = api.RestartPolicyNever
 
 	successCases := map[string]struct {
 		opts JobValidationOptions
 		job  batch.Job
 	}{
+		"valid pod failure policy": {
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   api.DisruptionTarget,
+										Status: api.ConditionTrue,
+									},
+								},
+							},
+							{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   api.PodConditionType("CustomConditionType"),
+										Status: api.ConditionFalse,
+									},
+								},
+							},
+							{
+								Action: batch.PodFailurePolicyActionCount,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									ContainerName: pointer.String("abc"),
+									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+									Values:        []int32{1, 2, 3},
+								},
+							},
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									ContainerName: pointer.String("def"),
+									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+									Values:        []int32{4},
+								},
+							},
+							{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
+									Values:   []int32{5, 6, 7},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"valid manual selector": {
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
@@ -169,6 +248,402 @@ func TestValidateJob(t *testing.T) {
 	negative := int32(-1)
 	negative64 := int64(-1)
 	errorCases := map[string]batch.Job{
+		`spec.podFailurePolicy.rules[0]: Invalid value: specifying one of OnExitCodes and OnPodConditions is required`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onExitCodes.values[1]: Duplicate value: 11`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{11, 11},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onExitCodes.values: Too many: 256: must have at most 255 items`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values: func() (values []int32) {
+									tooManyValues := make([]int32, maxPodFailurePolicyOnExitCodesValues+1)
+									for i := range tooManyValues {
+										tooManyValues[i] = int32(i)
+									}
+									return tooManyValues
+								}(),
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules: Too many: 21: must have at most 20 items`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: func() []batch.PodFailurePolicyRule {
+						tooManyRules := make([]batch.PodFailurePolicyRule, maxPodFailurePolicyRules+1)
+						for i := range tooManyRules {
+							tooManyRules[i] = batch.PodFailurePolicyRule{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{int32(i + 1)},
+								},
+							}
+						}
+						return tooManyRules
+					}(),
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onPodConditions: Too many: 21: must have at most 20 items`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnPodConditions: func() []batch.PodFailurePolicyOnPodConditionsPattern {
+								tooManyPatterns := make([]batch.PodFailurePolicyOnPodConditionsPattern, maxPodFailurePolicyOnPodConditionsPatterns+1)
+								for i := range tooManyPatterns {
+									tooManyPatterns[i] = batch.PodFailurePolicyOnPodConditionsPattern{
+										Type:   api.PodConditionType(fmt.Sprintf("CustomType_%d", i)),
+										Status: api.ConditionTrue,
+									}
+								}
+								return tooManyPatterns
+							}(),
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onExitCodes.values[2]: Duplicate value: 13`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{12, 13, 13, 13},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onExitCodes.values: Invalid value: []int32{19, 11}: must be ordered`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{19, 11},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onExitCodes.values: Invalid value: []int32{}: at least one value is required`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].action: Required value: valid values: ["Count" "FailJob" "Ignore"]`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: "",
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{1, 2, 3},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onExitCodes.operator: Required value: valid values: ["In" "NotIn"]`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: "",
+								Values:   []int32{1, 2, 3},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0]: Invalid value: specifying both OnExitCodes and OnPodConditions is not supported`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("abc"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{1, 2, 3},
+							},
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+								{
+									Type:   api.DisruptionTarget,
+									Status: api.ConditionTrue,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onExitCodes.values[1]: Invalid value: 0: must not be 0 for the In operator`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:   []int32{1, 0, 2},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[1].onExitCodes.containerName: Invalid value: "xyz": must be one of the container or initContainer names in the pod template`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("abc"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{1, 2, 3},
+							},
+						},
+						{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("xyz"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{5, 6, 7},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].action: Unsupported value: "UnknownAction": supported values: "Count", "FailJob", "Ignore"`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: "UnknownAction",
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								ContainerName: pointer.String("abc"),
+								Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+								Values:        []int32{1, 2, 3},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onExitCodes.operator: Unsupported value: "UnknownOperator": supported values: "In", "NotIn"`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: "UnknownOperator",
+								Values:   []int32{1, 2, 3},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onPodConditions[0].status: Required value: valid values: ["False" "True" "Unknown"]`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+								{
+									Type: api.DisruptionTarget,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onPodConditions[0].status: Unsupported value: "UnknownStatus": supported values: "False", "True", "Unknown"`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+								{
+									Type:   api.DisruptionTarget,
+									Status: "UnknownStatus",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onPodConditions[0].type: Invalid value: "": name part must be non-empty`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+								{
+									Status: api.ConditionTrue,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.podFailurePolicy.rules[0].onPodConditions[0].type: Invalid value: "Invalid Condition Type": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+								{
+									Type:   api.PodConditionType("Invalid Condition Type"),
+									Status: api.ConditionTrue,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		`spec.template.spec.restartPolicy: Invalid value: "OnFailure": only "Never" is supported when podFailurePolicy is specified`: {
+			ObjectMeta: validJobObjectMeta,
+			Spec: batch.JobSpec{
+				Selector: validGeneratedSelector,
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: validGeneratedSelector.MatchLabels,
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicyOnFailure,
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+					},
+				},
+				PodFailurePolicy: &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{},
+				},
+			},
+		},
 		"spec.parallelism:must be greater than or equal to 0": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
@@ -372,6 +847,9 @@ func TestValidateJob(t *testing.T) {
 func TestValidateJobUpdate(t *testing.T) {
 	validGeneratedSelector := getValidGeneratedSelector()
 	validPodTemplateSpecForGenerated := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	validPodTemplateSpecForGeneratedRestartPolicyNever := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	validPodTemplateSpecForGeneratedRestartPolicyNever.Spec.RestartPolicy = api.RestartPolicyNever
+
 	validNodeAffinity := &api.Affinity{
 		NodeAffinity: &api.NodeAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
@@ -473,6 +951,100 @@ func TestValidateJobUpdate(t *testing.T) {
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
 				Field: "spec.selector",
+			},
+		},
+		"add pod failure policy": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.PodFailurePolicy = &batch.PodFailurePolicy{
+					Rules: []batch.PodFailurePolicyRule{
+						{
+							Action: batch.PodFailurePolicyActionIgnore,
+							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+								{
+									Type:   api.DisruptionTarget,
+									Status: api.ConditionTrue,
+								},
+							},
+						},
+					},
+				}
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.podFailurePolicy",
+			},
+		},
+		"remove pod failure policy": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   api.DisruptionTarget,
+										Status: api.ConditionTrue,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.PodFailurePolicy.Rules = append(job.Spec.PodFailurePolicy.Rules, batch.PodFailurePolicyRule{
+					Action: batch.PodFailurePolicyActionCount,
+					OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+						{
+							Type:   api.DisruptionTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				})
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.podFailurePolicy",
+			},
+		},
+		"update pod failure policy": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   api.DisruptionTarget,
+										Status: api.ConditionTrue,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.PodFailurePolicy = nil
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.podFailurePolicy",
 			},
 		},
 		"immutable pod template": {
@@ -869,6 +1441,12 @@ func TestValidateCronJob(t *testing.T) {
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
 	validPodTemplateSpec.Labels = map[string]string{}
 
+	zoneDir := t.TempDir()
+	if err := setupFakeTimeZoneDatabase(zoneDir); err != nil {
+		t.Fatalf("Unexpected error setting up fake timezone database: %v", err)
+	}
+	t.Setenv("ZONEINFO", zoneDir)
+
 	successCases := map[string]batch.CronJob{
 		"basic scheduled job": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -902,19 +1480,38 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+		"correct timeZone value": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneCorrect,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateCronJob(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-			t.Errorf("expected success for %s: %v", k, errs)
-		}
+		t.Run(k, func(t *testing.T) {
+			if errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("expected success for %s: %v", k, errs)
+			}
 
-		// Update validation should pass same success cases
-		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
-		v = *v.DeepCopy()
-		v.ResourceVersion = "1"
-		if errs := ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-			t.Errorf("expected success for %s: %v", k, errs)
-		}
+			// Update validation should pass same success cases
+			// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
+			v = *v.DeepCopy()
+			v.ResourceVersion = "1"
+			if errs := ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("expected success for %s: %v", k, errs)
+			}
+		})
 	}
 
 	negative := int32(-1)
@@ -945,6 +1542,125 @@ func TestValidateCronJob(t *testing.T) {
 			},
 			Spec: batch.CronJobSpec{
 				Schedule:          "",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.schedule: cannot use both timeZone field and TZ or CRON_TZ in schedule": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "TZ=UTC 0 * * * *",
+				TimeZone:          &timeZoneUTC,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: timeZone must be nil or non-empty string": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneEmpty,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: timeZone must be an explicit time zone as defined in https://www.iana.org/time-zones": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneLocal,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \" Continent/Zone\": unknown time zone  Continent/Zone": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneBadPrefix,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \"Continent/Zone \": unknown time zone Continent/Zone ": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneBadSuffix,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \"Continent/InvalidZone\": unknown time zone  Continent/InvalidZone": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneBadName,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"spec.timeZone: Invalid value: \" \": unknown time zone  ": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneEmptySpace,
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
@@ -1165,53 +1881,298 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-	}
-	errorCases["spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0"] = batch.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mycronjob",
-			Namespace: metav1.NamespaceDefault,
-			UID:       types.UID("1a2b3c"),
-		},
-		Spec: batch.CronJobSpec{
-			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batch.AllowConcurrent,
-			JobTemplate: batch.JobTemplateSpec{
-				Spec: batch.JobSpec{
-					TTLSecondsAfterFinished: &negative,
-					Template:                validPodTemplateSpec,
+		"spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						TTLSecondsAfterFinished: &negative,
+						Template:                validPodTemplateSpec,
+					},
 				},
 			},
 		},
 	}
 
 	for k, v := range errorCases {
-		errs := ValidateCronJob(&v, corevalidation.PodValidationOptions{})
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		} else {
-			s := strings.Split(k, ":")
-			err := errs[0]
-			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %v, expected: %s", err, k)
+		t.Run(k, func(t *testing.T) {
+			errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{})
+			if len(errs) == 0 {
+				t.Errorf("expected failure for %s", k)
+			} else {
+				s := strings.Split(k, ":")
+				err := errs[0]
+				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+					t.Errorf("unexpected error: %v, expected: %s", err, k)
+				}
 			}
-		}
 
-		// Update validation should fail all failure cases other than the 52 character name limit
-		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
-		v = *v.DeepCopy()
-		v.ResourceVersion = "1"
-		errs = ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{})
-		if len(errs) == 0 {
-			if k == "metadata.name: must be no more than 52 characters" {
-				continue
+			// Update validation should fail all failure cases other than the 52 character name limit
+			// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
+			oldSpec := *v.DeepCopy()
+			oldSpec.ResourceVersion = "1"
+			oldSpec.Spec.TimeZone = nil
+
+			newSpec := *v.DeepCopy()
+			newSpec.ResourceVersion = "2"
+
+			errs = ValidateCronJobUpdate(&newSpec, &oldSpec, corevalidation.PodValidationOptions{})
+			if len(errs) == 0 {
+				if k == "metadata.name: must be no more than 52 characters" {
+					return
+				}
+				t.Errorf("expected failure for %s", k)
+			} else {
+				s := strings.Split(k, ":")
+				err := errs[0]
+				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+					t.Errorf("unexpected error: %v, expected: %s", err, k)
+				}
 			}
-			t.Errorf("expected failure for %s", k)
-		} else {
-			s := strings.Split(k, ":")
-			err := errs[0]
-			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %v, expected: %s", err, k)
-			}
+		})
+	}
+}
+
+// Sets up fake timezone database in a zoneDir directory with a single valid
+// time zone called "Continent/Zone" by copying UTC metadata from golang's
+// built-in databse. Returns an error in case of problems.
+func setupFakeTimeZoneDatabase(zoneDir string) error {
+	reader, err := zip.OpenReader(runtime.GOROOT() + "/lib/time/zoneinfo.zip")
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	if err := os.Mkdir(filepath.Join(zoneDir, "Continent"), os.ModePerm); err != nil {
+		return err
+	}
+	zoneFile, err := os.OpenFile(filepath.Join(zoneDir, "Continent", "Zone"), os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer zoneFile.Close()
+
+	for _, file := range reader.File {
+		if file.Name != "UTC" {
+			continue
+		}
+		rc, err := file.Open()
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(zoneFile, rc); err != nil {
+			return err
+		}
+		rc.Close()
+		break
+	}
+	return nil
+}
+
+func TestValidateCronJobSpec(t *testing.T) {
+	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
+	validPodTemplateSpec.Labels = map[string]string{}
+
+	type testCase struct {
+		old       *batch.CronJobSpec
+		new       *batch.CronJobSpec
+		expectErr bool
+	}
+
+	cases := map[string]testCase{
+		"no validation because timeZone is nil for old and new": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          nil,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          nil,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"check validation because timeZone is different for new": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          nil,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/New_York"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"check validation because timeZone is different for new and invalid": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          nil,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"old timeZone and new timeZone are valid": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/New_York"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/Chicago"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"old timeZone is valid, but new timeZone is invalid": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/New_York"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"old timeZone and new timeZone are invalid, but unchanged": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"old timeZone and new timeZone are invalid, but different": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("still broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"old timeZone is invalid, but new timeZone is valid": {
+			old: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("broken"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+			new: &batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          pointer.String("America/New_York"),
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+	}
+
+	for k, v := range cases {
+		errs := validateCronJobSpec(v.new, v.old, field.NewPath("spec"), corevalidation.PodValidationOptions{})
+		if len(errs) > 0 && !v.expectErr {
+			t.Errorf("unexpected error for %s: %v", k, errs)
+		} else if len(errs) == 0 && v.expectErr {
+			t.Errorf("expected error for %s but got nil", k)
 		}
 	}
 }

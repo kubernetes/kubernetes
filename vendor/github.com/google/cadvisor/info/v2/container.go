@@ -265,7 +265,7 @@ type FsInfo struct {
 type RequestOptions struct {
 	// Type of container identifier specified - TypeName (default) or TypeDocker
 	IdType string `json:"type"`
-	// Number of stats to return
+	// Number of stats to return, -1 means no limit.
 	Count int `json:"count"`
 	// Whether to include stats for child subcontainers.
 	Recursive bool `json:"recursive"`

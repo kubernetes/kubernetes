@@ -49,8 +49,8 @@ const (
 	kubeLoadBalancerLocalSetComment = "Kubernetes service load balancer ip + port with externalTrafficPolicy=local"
 	kubeLoadBalancerLocalSet        = "KUBE-LOAD-BALANCER-LOCAL"
 
-	kubeLoadbalancerFWSetComment = "Kubernetes service load balancer ip + port for load balancer with sourceRange"
-	kubeLoadbalancerFWSet        = "KUBE-LOAD-BALANCER-FW"
+	kubeLoadBalancerFWSetComment = "Kubernetes service load balancer ip + port for load balancer with sourceRange"
+	kubeLoadBalancerFWSet        = "KUBE-LOAD-BALANCER-FW"
 
 	kubeLoadBalancerSourceIPSetComment = "Kubernetes service load balancer ip + port + source IP for packet filter purpose"
 	kubeLoadBalancerSourceIPSet        = "KUBE-LOAD-BALANCER-SOURCE-IP"
@@ -78,6 +78,9 @@ const (
 
 	kubeHealthCheckNodePortSetComment = "Kubernetes health check node port"
 	kubeHealthCheckNodePortSet        = "KUBE-HEALTH-CHECK-NODE-PORT"
+
+	kubeIPVSSetComment = "Addresses on the ipvs interface"
+	kubeIPVSSet        = "KUBE-IPVS-IPS"
 )
 
 // IPSetVersioner can query the current ipset version.
@@ -133,7 +136,7 @@ func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
 }
 
 func (set *IPSet) isEmpty() bool {
-	return len(set.activeEntries.UnsortedList()) == 0
+	return set.activeEntries.Len() == 0
 }
 
 func (set *IPSet) getComment() string {
