@@ -442,6 +442,8 @@ rules:
       branch: release-1.26
     - repository: component-base
       branch: release-1.26
+    - repository: kms
+      branch: release-1.26
     source:
       branch: release-1.26
       dir: staging/src/k8s.io/apiserver
