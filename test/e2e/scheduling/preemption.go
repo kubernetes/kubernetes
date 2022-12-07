@@ -88,6 +88,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		for _, node := range nodeList.Items {
 			nodeCopy := node.DeepCopy()
 			delete(nodeCopy.Status.Capacity, testExtendedResource)
+			delete(nodeCopy.Status.Allocatable, testExtendedResource)
 			err := patchNode(cs, &node, nodeCopy)
 			framework.ExpectNoError(err)
 		}
@@ -138,6 +139,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// Update each node to advertise 3 available extended resources
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("5")
+			nodeCopy.Status.Allocatable[testExtendedResource] = resource.MustParse("5")
 			err := patchNode(cs, &node, nodeCopy)
 			framework.ExpectNoError(err)
 
@@ -228,6 +230,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// Update each node to advertise 3 available extended resources
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("5")
+			nodeCopy.Status.Allocatable[testExtendedResource] = resource.MustParse("5")
 			err := patchNode(cs, &node, nodeCopy)
 			framework.ExpectNoError(err)
 
@@ -329,6 +332,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		node := nodeList.Items[0]
 		nodeCopy := node.DeepCopy()
 		nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("1")
+		nodeCopy.Status.Allocatable[testExtendedResource] = resource.MustParse("1")
 		err := patchNode(cs, &node, nodeCopy)
 		framework.ExpectNoError(err)
 
@@ -408,6 +412,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				ginkgo.By(fmt.Sprintf("Apply 10 fake resource to node %v.", node.Name))
 				nodeCopy := node.DeepCopy()
 				nodeCopy.Status.Capacity[fakeRes] = resource.MustParse("10")
+				nodeCopy.Status.Allocatable[fakeRes] = resource.MustParse("10")
 				err = patchNode(cs, node, nodeCopy)
 				framework.ExpectNoError(err)
 				nodes = append(nodes, node)
@@ -420,6 +425,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			for _, node := range nodes {
 				nodeCopy := node.DeepCopy()
 				delete(nodeCopy.Status.Capacity, fakeRes)
+				delete(nodeCopy.Status.Allocatable, fakeRes)
 				err := patchNode(cs, node, nodeCopy)
 				framework.ExpectNoError(err)
 			}
@@ -558,6 +564,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			if node != nil {
 				nodeCopy := node.DeepCopy()
 				delete(nodeCopy.Status.Capacity, fakecpu)
+				delete(nodeCopy.Status.Allocatable, fakecpu)
 				err := patchNode(cs, node, nodeCopy)
 				framework.ExpectNoError(err)
 			}
@@ -590,6 +597,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// update Node API object with a fake resource
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Status.Capacity[fakecpu] = resource.MustParse("1000")
+			nodeCopy.Status.Allocatable[fakecpu] = resource.MustParse("1000")
 			err = patchNode(cs, node, nodeCopy)
 			framework.ExpectNoError(err)
 
