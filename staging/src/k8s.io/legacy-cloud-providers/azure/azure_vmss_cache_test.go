@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
@@ -32,6 +31,7 @@ import (
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient/mockvmssclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient"
+	"k8s.io/utils/pointer"
 )
 
 func TestExtractVmssVMName(t *testing.T) {
@@ -101,17 +101,17 @@ func TestVMSSVMCache(t *testing.T) {
 	// validate getting VMSS VM via cache.
 	for i := range expectedVMs {
 		vm := expectedVMs[i]
-		vmName := to.String(vm.OsProfile.ComputerName)
+		vmName := pointer.StringDeref(vm.OsProfile.ComputerName, "")
 		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 		assert.NoError(t, err)
 		assert.Equal(t, "vmss", ssName)
-		assert.Equal(t, to.String(vm.InstanceID), instanceID)
+		assert.Equal(t, pointer.StringDeref(vm.InstanceID, ""), instanceID)
 		assert.Equal(t, &vm, realVM)
 	}
 
 	// validate deleteCacheForNode().
 	vm := expectedVMs[0]
-	vmName := to.String(vm.OsProfile.ComputerName)
+	vmName := pointer.StringDeref(vm.OsProfile.ComputerName, "")
 	err = ss.deleteCacheForNode(vmName)
 	assert.NoError(t, err)
 
@@ -128,7 +128,7 @@ func TestVMSSVMCache(t *testing.T) {
 	ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, "vmss", ssName)
-	assert.Equal(t, to.String(vm.InstanceID), instanceID)
+	assert.Equal(t, pointer.StringDeref(vm.InstanceID, ""), instanceID)
 	assert.Equal(t, &vm, realVM)
 }
 
@@ -157,8 +157,8 @@ func TestVMSSVMCacheWithDeletingNodes(t *testing.T) {
 
 	for i := range expectedVMs {
 		vm := expectedVMs[i]
-		vmName := to.String(vm.OsProfile.ComputerName)
-		assert.Equal(t, vm.ProvisioningState, to.StringPtr(string(compute.ProvisioningStateDeleting)))
+		vmName := pointer.StringDeref(vm.OsProfile.ComputerName, "")
+		assert.Equal(t, vm.ProvisioningState, pointer.String(string(compute.ProvisioningStateDeleting)))
 
 		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 		assert.Nil(t, realVM)

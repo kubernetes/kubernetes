@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
@@ -34,6 +33,7 @@ import (
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -86,11 +86,11 @@ func TestStandardAttachDisk(t *testing.T) {
 		for _, vm := range expectedVMs {
 			vm.StorageProfile = &compute.StorageProfile{
 				OsDisk: &compute.OSDisk{
-					Name: to.StringPtr("osdisk1"),
+					Name: pointer.String("osdisk1"),
 					ManagedDisk: &compute.ManagedDiskParameters{
-						ID: to.StringPtr("ManagedID"),
+						ID: pointer.String("ManagedID"),
 						DiskEncryptionSet: &compute.DiskEncryptionSetParameters{
-							ID: to.StringPtr("DiskEncryptionSetID"),
+							ID: pointer.String("DiskEncryptionSetID"),
 						},
 					},
 				},
@@ -195,8 +195,8 @@ func TestGetDataDisks(t *testing.T) {
 			nodeName: "vm1",
 			expectedDataDisks: []compute.DataDisk{
 				{
-					Lun:  to.Int32Ptr(0),
-					Name: to.StringPtr("disk1"),
+					Lun:  pointer.Int32(0),
+					Name: pointer.String("disk1"),
 				},
 			},
 			expectedError: false,
@@ -207,8 +207,8 @@ func TestGetDataDisks(t *testing.T) {
 			nodeName: "vm1",
 			expectedDataDisks: []compute.DataDisk{
 				{
-					Lun:  to.Int32Ptr(0),
-					Name: to.StringPtr("disk1"),
+					Lun:  pointer.Int32(0),
+					Name: pointer.String("disk1"),
 				},
 			},
 			expectedError: false,

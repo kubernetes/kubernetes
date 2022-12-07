@@ -31,7 +31,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/util/flowcontrol"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 // 2065-01-24 05:20:00 +0000 UTC
@@ -134,7 +134,7 @@ func TestAllNeverRateLimiter(t *testing.T) {
 	assert.Equal(t, saErr3, rerr3)
 
 	sa := storage.AccountCreateParameters{
-		Location: to.StringPtr("eastus"),
+		Location: pointer.String("eastus"),
 	}
 
 	rerr4 := saClient.Create(context.TODO(), "rg", "sa1", sa)
@@ -194,7 +194,7 @@ func TestAllRetryAfterReader(t *testing.T) {
 	assert.Equal(t, saErr3, rerr3)
 
 	sa := storage.AccountCreateParameters{
-		Location: to.StringPtr("eastus"),
+		Location: pointer.String("eastus"),
 	}
 
 	rerr4 := saClient.Create(context.TODO(), "rg", "sa1", sa)
@@ -221,7 +221,7 @@ func TestAllThrottle(t *testing.T) {
 	}
 
 	sa := storage.AccountCreateParameters{
-		Location: to.StringPtr("eastus"),
+		Location: pointer.String("eastus"),
 	}
 
 	r := getTestStorageAccount("sa1")
@@ -230,7 +230,7 @@ func TestAllThrottle(t *testing.T) {
 	armClient.EXPECT().PostResource(gomock.Any(), resourceID, "listKeys", struct{}{}).Return(response, throttleErr).Times(1)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(response, throttleErr).Times(1)
 	armClient.EXPECT().PutResource(gomock.Any(), resourceID, sa).Return(response, throttleErr).Times(1)
-	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(r.ID), "").Return(throttleErr).Times(1)
+	armClient.EXPECT().DeleteResource(gomock.Any(), pointer.StringDeref(r.ID, ""), "").Return(throttleErr).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(3)
 
 	saClient := getTestStorageAccountClient(armClient)
@@ -361,7 +361,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 	}
 
 	lastResult := storage.AccountListResult{
-		NextLink: to.StringPtr("next"),
+		NextLink: pointer.String("next"),
 	}
 
 	for _, test := range tests {
@@ -406,7 +406,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	}
 
 	lastResult := storage.AccountListResult{
-		NextLink: to.StringPtr("next"),
+		NextLink: pointer.String("next"),
 	}
 
 	armClient := mockarmclient.NewMockInterface(ctrl)
@@ -483,7 +483,7 @@ func TestCreate(t *testing.T) {
 
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/sa1"
 	sa := storage.AccountCreateParameters{
-		Location: to.StringPtr("eastus"),
+		Location: pointer.String("eastus"),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	response := &http.Response{
@@ -504,7 +504,7 @@ func TestCreateResponderError(t *testing.T) {
 
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/sa1"
 	sa := storage.AccountCreateParameters{
-		Location: to.StringPtr("eastus"),
+		Location: pointer.String("eastus"),
 	}
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	response := &http.Response{
@@ -525,7 +525,7 @@ func TestDelete(t *testing.T) {
 
 	r := getTestStorageAccount("sa1")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(r.ID), "").Return(nil).Times(1)
+	armClient.EXPECT().DeleteResource(gomock.Any(), pointer.StringDeref(r.ID, ""), "").Return(nil).Times(1)
 
 	rtClient := getTestStorageAccountClient(armClient)
 	rerr := rtClient.Delete(context.TODO(), "rg", "sa1")
@@ -534,9 +534,9 @@ func TestDelete(t *testing.T) {
 
 func getTestStorageAccount(name string) storage.Account {
 	return storage.Account{
-		ID:       to.StringPtr(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/%s", name)),
-		Name:     to.StringPtr(name),
-		Location: to.StringPtr("eastus"),
+		ID:       pointer.String(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/%s", name)),
+		Name:     pointer.String(name),
+		Location: pointer.String("eastus"),
 	}
 }
 
