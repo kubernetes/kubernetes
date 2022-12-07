@@ -98,6 +98,19 @@ type Server struct {
 	// the HTTP/2 spec's recommendations.
 	MaxConcurrentStreams uint32
 
+	// MaxDecoderHeaderTableSize optionally specifies the http2
+	// SETTINGS_HEADER_TABLE_SIZE to send in the initial settings frame. It
+	// informs the remote endpoint of the maximum size of the header compression
+	// table used to decode header blocks, in octets. If zero, the default value
+	// of 4096 is used.
+	MaxDecoderHeaderTableSize uint32
+
+	// MaxEncoderHeaderTableSize optionally specifies an upper limit for the
+	// header compression table used for encoding request headers. Received
+	// SETTINGS_HEADER_TABLE_SIZE settings are capped at this limit. If zero,
+	// the default value of 4096 is used.
+	MaxEncoderHeaderTableSize uint32
+
 	// MaxReadFrameSize optionally specifies the largest frame
 	// this server is willing to read. A valid value is between
 	// 16k and 16M, inclusive. If zero or otherwise invalid, a
@@ -168,6 +181,20 @@ func (s *Server) maxConcurrentStreams() uint32 {
 		return v
 	}
 	return defaultMaxStreams
+}
+
+func (s *Server) maxDecoderHeaderTableSize() uint32 {
+	if v := s.MaxDecoderHeaderTableSize; v > 0 {
+		return v
+	}
+	return initialHeaderTableSize
+}
+
+func (s *Server) maxEncoderHeaderTableSize() uint32 {
+	if v := s.MaxEncoderHeaderTableSize; v > 0 {
+		return v
+	}
+	return initialHeaderTableSize
 }
 
 // maxQueuedControlFrames is the maximum number of control frames like
@@ -394,7 +421,6 @@ func (s *Server) ServeConn(c net.Conn, opts *ServeConnOpts) {
 		advMaxStreams:               s.maxConcurrentStreams(),
 		initialStreamSendWindowSize: initialWindowSize,
 		maxFrameSize:                initialMaxFrameSize,
-		headerTableSize:             initialHeaderTableSize,
 		serveG:                      newGoroutineLock(),
 		pushEnabled:                 true,
 		sawClientPreface:            opts.SawClientPreface,
@@ -424,12 +450,13 @@ func (s *Server) ServeConn(c net.Conn, opts *ServeConnOpts) {
 	sc.flow.add(initialWindowSize)
 	sc.inflow.add(initialWindowSize)
 	sc.hpackEncoder = hpack.NewEncoder(&sc.headerWriteBuf)
+	sc.hpackEncoder.SetMaxDynamicTableSizeLimit(s.maxEncoderHeaderTableSize())
 
 	fr := NewFramer(sc.bw, c)
 	if s.CountError != nil {
 		fr.countError = s.CountError
 	}
-	fr.ReadMetaHeaders = hpack.NewDecoder(initialHeaderTableSize, nil)
+	fr.ReadMetaHeaders = hpack.NewDecoder(s.maxDecoderHeaderTableSize(), nil)
 	fr.MaxHeaderListSize = sc.maxHeaderListSize()
 	fr.SetMaxReadFrameSize(s.maxReadFrameSize())
 	sc.framer = fr
@@ -559,9 +586,9 @@ type serverConn struct {
 	streams                     map[uint32]*stream
 	initialStreamSendWindowSize int32
 	maxFrameSize                int32
-	headerTableSize             uint32
 	peerMaxHeaderListSize       uint32            // zero means unknown (default)
 	canonHeader                 map[string]string // http2-lower-case -> Go-Canonical-Case
+	canonHeaderKeysSize         int               // canonHeader keys size in bytes
 	writingFrame                bool              // started writing a frame (on serve goroutine or separate)
 	writingFrameAsync           bool              // started a frame on its own goroutine but haven't heard back on wroteFrameCh
 	needsFrameFlush             bool              // last frame write wasn't a flush
@@ -622,7 +649,9 @@ type stream struct {
 	resetQueued      bool        // RST_STREAM queued for write; set by sc.resetStream
 	gotTrailerHeader bool        // HEADER frame for trailers was seen
 	wroteHeaders     bool        // whether we wrote headers (not status 100)
+	readDeadline     *time.Timer // nil if unused
 	writeDeadline    *time.Timer // nil if unused
+	closeErr         error       // set before cw is closed
 
 	trailer    http.Header // accumulated trailers
 	reqTrailer http.Header // handler's Request.Trailer
@@ -738,6 +767,13 @@ func (sc *serverConn) condlogf(err error, format string, args ...interface{}) {
 	}
 }
 
+// maxCachedCanonicalHeadersKeysSize is an arbitrarily-chosen limit on the size
+// of the entries in the canonHeader cache.
+// This should be larger than the size of unique, uncommon header keys likely to
+// be sent by the peer, while not so high as to permit unreasonable memory usage
+// if the peer sends an unbounded number of unique header keys.
+const maxCachedCanonicalHeadersKeysSize = 2048
+
 func (sc *serverConn) canonicalHeader(v string) string {
 	sc.serveG.check()
 	buildCommonHeaderMapsOnce()
@@ -753,14 +789,10 @@ func (sc *serverConn) canonicalHeader(v string) string {
 		sc.canonHeader = make(map[string]string)
 	}
 	cv = http.CanonicalHeaderKey(v)
-	// maxCachedCanonicalHeaders is an arbitrarily-chosen limit on the number of
-	// entries in the canonHeader cache. This should be larger than the number
-	// of unique, uncommon header keys likely to be sent by the peer, while not
-	// so high as to permit unreasonable memory usage if the peer sends an unbounded
-	// number of unique header keys.
-	const maxCachedCanonicalHeaders = 32
-	if len(sc.canonHeader) < maxCachedCanonicalHeaders {
+	size := 100 + len(v)*2 // 100 bytes of map overhead + key + value
+	if sc.canonHeaderKeysSize+size <= maxCachedCanonicalHeadersKeysSize {
 		sc.canonHeader[v] = cv
+		sc.canonHeaderKeysSize += size
 	}
 	return cv
 }
@@ -862,6 +894,7 @@ func (sc *serverConn) serve() {
 			{SettingMaxFrameSize, sc.srv.maxReadFrameSize()},
 			{SettingMaxConcurrentStreams, sc.advMaxStreams},
 			{SettingMaxHeaderListSize, sc.maxHeaderListSize()},
+			{SettingHeaderTableSize, sc.srv.maxDecoderHeaderTableSize()},
 			{SettingInitialWindowSize, uint32(sc.srv.initialStreamRecvWindowSize())},
 		},
 	})
@@ -869,7 +902,9 @@ func (sc *serverConn) serve() {
 
 	// Each connection starts with initialWindowSize inflow tokens.
 	// If a higher value is configured, we add more tokens.
-	sc.sendWindowUpdate(nil)
+	if diff := sc.srv.initialConnRecvWindowSize() - initialWindowSize; diff > 0 {
+		sc.sendWindowUpdate(nil, int(diff))
+	}
 
 	if err := sc.readPreface(); err != nil {
 		sc.condlogf(err, "http2: server: error reading preface from client %v: %v", sc.conn.RemoteAddr(), err)
@@ -946,6 +981,8 @@ func (sc *serverConn) serve() {
 				}
 			case *startPushRequest:
 				sc.startPush(v)
+			case func(*serverConn):
+				v(sc)
 			default:
 				panic(fmt.Sprintf("unexpected type %T", v))
 			}
@@ -1469,8 +1506,7 @@ func (sc *serverConn) processFrame(f Frame) error {
 			if sc.inflow.available() < int32(f.Length) {
 				return sc.countError("data_flow", streamError(f.Header().StreamID, ErrCodeFlowControl))
 			}
-			sc.inflow.take(int32(f.Length))
-			sc.sendWindowUpdate(nil) // conn-level
+			sc.sendWindowUpdate(nil, int(f.Length)) // conn-level
 		}
 		return nil
 	}
@@ -1578,6 +1614,9 @@ func (sc *serverConn) closeStream(st *stream, err error) {
 		panic(fmt.Sprintf("invariant; can't close stream in state %v", st.state))
 	}
 	st.state = stateClosed
+	if st.readDeadline != nil {
+		st.readDeadline.Stop()
+	}
 	if st.writeDeadline != nil {
 		st.writeDeadline.Stop()
 	}
@@ -1599,10 +1638,18 @@ func (sc *serverConn) closeStream(st *stream, err error) {
 	if p := st.body; p != nil {
 		// Return any buffered unread bytes worth of conn-level flow control.
 		// See golang.org/issue/16481
-		sc.sendWindowUpdate(nil)
+		sc.sendWindowUpdate(nil, p.Len())
 
 		p.CloseWithError(err)
 	}
+	if e, ok := err.(StreamError); ok {
+		if e.Cause != nil {
+			err = e.Cause
+		} else {
+			err = errStreamClosed
+		}
+	}
+	st.closeErr = err
 	st.cw.Close() // signals Handler's CloseNotifier, unblocks writes, etc
 	sc.writeSched.CloseStream(st.id)
 }
@@ -1645,7 +1692,6 @@ func (sc *serverConn) processSetting(s Setting) error {
 	}
 	switch s.ID {
 	case SettingHeaderTableSize:
-		sc.headerTableSize = s.Val
 		sc.hpackEncoder.SetMaxDynamicTableSize(s.Val)
 	case SettingEnablePush:
 		sc.pushEnabled = s.Val != 0
@@ -1737,7 +1783,7 @@ func (sc *serverConn) processData(f *DataFrame) error {
 		// sendWindowUpdate, which also schedules sending the
 		// frames.
 		sc.inflow.take(int32(f.Length))
-		sc.sendWindowUpdate(nil) // conn-level
+		sc.sendWindowUpdate(nil, int(f.Length)) // conn-level
 
 		if st != nil && st.resetQueued {
 			// Already have a stream error in flight. Don't send another.
@@ -1755,7 +1801,7 @@ func (sc *serverConn) processData(f *DataFrame) error {
 			return sc.countError("data_flow", streamError(id, ErrCodeFlowControl))
 		}
 		sc.inflow.take(int32(f.Length))
-		sc.sendWindowUpdate(nil) // conn-level
+		sc.sendWindowUpdate(nil, int(f.Length)) // conn-level
 
 		st.body.CloseWithError(fmt.Errorf("sender tried to send more than declared Content-Length of %d bytes", st.declBodyBytes))
 		// RFC 7540, sec 8.1.2.6: A request or response is also malformed if the
@@ -1773,7 +1819,7 @@ func (sc *serverConn) processData(f *DataFrame) error {
 		if len(data) > 0 {
 			wrote, err := st.body.Write(data)
 			if err != nil {
-				sc.sendWindowUpdate32(nil, int32(f.Length)-int32(wrote))
+				sc.sendWindowUpdate(nil, int(f.Length)-wrote)
 				return sc.countError("body_write_err", streamError(id, ErrCodeStreamClosed))
 			}
 			if wrote != len(data) {
@@ -1841,10 +1887,22 @@ func (st *stream) copyTrailersToHandlerRequest() {
 	}
 }
 
+// onReadTimeout is run on its own goroutine (from time.AfterFunc)
+// when the stream's ReadTimeout has fired.
+func (st *stream) onReadTimeout() {
+	// Wrap the ErrDeadlineExceeded to avoid callers depending on us
+	// returning the bare error.
+	st.body.CloseWithError(fmt.Errorf("%w", os.ErrDeadlineExceeded))
+}
+
 // onWriteTimeout is run on its own goroutine (from time.AfterFunc)
 // when the stream's WriteTimeout has fired.
 func (st *stream) onWriteTimeout() {
-	st.sc.writeFrameFromHandler(FrameWriteRequest{write: streamError(st.id, ErrCodeInternal)})
+	st.sc.writeFrameFromHandler(FrameWriteRequest{write: StreamError{
+		StreamID: st.id,
+		Code:     ErrCodeInternal,
+		Cause:    os.ErrDeadlineExceeded,
+	}})
 }
 
 func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
@@ -1952,6 +2010,9 @@ func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 	// (in Go 1.8), though. That's a more sane option anyway.
 	if sc.hs.ReadTimeout != 0 {
 		sc.conn.SetReadDeadline(time.Time{})
+		if st.body != nil {
+			st.readDeadline = time.AfterFunc(sc.hs.ReadTimeout, st.onReadTimeout)
+		}
 	}
 
 	go sc.runHandler(rw, req, handler)
@@ -2318,43 +2379,28 @@ func (sc *serverConn) noteBodyReadFromHandler(st *stream, n int, err error) {
 
 func (sc *serverConn) noteBodyRead(st *stream, n int) {
 	sc.serveG.check()
-	sc.sendWindowUpdate(nil) // conn-level
+	sc.sendWindowUpdate(nil, n) // conn-level
 	if st.state != stateHalfClosedRemote && st.state != stateClosed {
 		// Don't send this WINDOW_UPDATE if the stream is closed
 		// remotely.
-		sc.sendWindowUpdate(st)
+		sc.sendWindowUpdate(st, n)
 	}
 }
 
 // st may be nil for conn-level
-func (sc *serverConn) sendWindowUpdate(st *stream) {
+func (sc *serverConn) sendWindowUpdate(st *stream, n int) {
 	sc.serveG.check()
-
-	var n int32
-	if st == nil {
-		if avail, windowSize := sc.inflow.n, sc.srv.initialConnRecvWindowSize(); avail > windowSize/2 {
-			return
-		} else {
-			n = windowSize - avail
-		}
-	} else {
-		if avail, windowSize := st.inflow.n, sc.srv.initialStreamRecvWindowSize(); avail > windowSize/2 {
-			return
-		} else {
-			n = windowSize - avail
-		}
-	}
 	// "The legal range for the increment to the flow control
 	// window is 1 to 2^31-1 (2,147,483,647) octets."
 	// A Go Read call on 64-bit machines could in theory read
 	// a larger Read than this. Very unlikely, but we handle it here
 	// rather than elsewhere for now.
 	const maxUint31 = 1<<31 - 1
-	for n >= maxUint31 {
+	for n > maxUint31 {
 		sc.sendWindowUpdate32(st, maxUint31)
 		n -= maxUint31
 	}
-	sc.sendWindowUpdate32(st, n)
+	sc.sendWindowUpdate32(st, int32(n))
 }
 
 // st may be nil for conn-level
@@ -2470,7 +2516,15 @@ type responseWriterState struct {
 
 type chunkWriter struct{ rws *responseWriterState }
 
-func (cw chunkWriter) Write(p []byte) (n int, err error) { return cw.rws.writeChunk(p) }
+func (cw chunkWriter) Write(p []byte) (n int, err error) {
+	n, err = cw.rws.writeChunk(p)
+	if err == errStreamClosed {
+		// If writing failed because the stream has been closed,
+		// return the reason it was closed.
+		err = cw.rws.stream.closeErr
+	}
+	return n, err
+}
 
 func (rws *responseWriterState) hasTrailers() bool { return len(rws.trailers) > 0 }
 
@@ -2664,23 +2718,85 @@ func (rws *responseWriterState) promoteUndeclaredTrailers() {
 	}
 }
 
+func (w *responseWriter) SetReadDeadline(deadline time.Time) error {
+	st := w.rws.stream
+	if !deadline.IsZero() && deadline.Before(time.Now()) {
+		// If we're setting a deadline in the past, reset the stream immediately
+		// so writes after SetWriteDeadline returns will fail.
+		st.onReadTimeout()
+		return nil
+	}
+	w.rws.conn.sendServeMsg(func(sc *serverConn) {
+		if st.readDeadline != nil {
+			if !st.readDeadline.Stop() {
+				// Deadline already exceeded, or stream has been closed.
+				return
+			}
+		}
+		if deadline.IsZero() {
+			st.readDeadline = nil
+		} else if st.readDeadline == nil {
+			st.readDeadline = time.AfterFunc(deadline.Sub(time.Now()), st.onReadTimeout)
+		} else {
+			st.readDeadline.Reset(deadline.Sub(time.Now()))
+		}
+	})
+	return nil
+}
+
+func (w *responseWriter) SetWriteDeadline(deadline time.Time) error {
+	st := w.rws.stream
+	if !deadline.IsZero() && deadline.Before(time.Now()) {
+		// If we're setting a deadline in the past, reset the stream immediately
+		// so writes after SetWriteDeadline returns will fail.
+		st.onWriteTimeout()
+		return nil
+	}
+	w.rws.conn.sendServeMsg(func(sc *serverConn) {
+		if st.writeDeadline != nil {
+			if !st.writeDeadline.Stop() {
+				// Deadline already exceeded, or stream has been closed.
+				return
+			}
+		}
+		if deadline.IsZero() {
+			st.writeDeadline = nil
+		} else if st.writeDeadline == nil {
+			st.writeDeadline = time.AfterFunc(deadline.Sub(time.Now()), st.onWriteTimeout)
+		} else {
+			st.writeDeadline.Reset(deadline.Sub(time.Now()))
+		}
+	})
+	return nil
+}
+
 func (w *responseWriter) Flush() {
+	w.FlushError()
+}
+
+func (w *responseWriter) FlushError() error {
 	rws := w.rws
 	if rws == nil {
 		panic("Header called after Handler finished")
 	}
+	var err error
 	if rws.bw.Buffered() > 0 {
-		if err := rws.bw.Flush(); err != nil {
-			// Ignore the error. The frame writer already knows.
-			return
-		}
+		err = rws.bw.Flush()
 	} else {
 		// The bufio.Writer won't call chunkWriter.Write
 		// (writeChunk with zero bytes, so we have to do it
 		// ourselves to force the HTTP response header and/or
 		// final DATA frame (with END_STREAM) to be sent.
-		rws.writeChunk(nil)
+		_, err = chunkWriter{rws}.Write(nil)
+		if err == nil {
+			select {
+			case <-rws.stream.cw:
+				err = rws.stream.closeErr
+			default:
+			}
+		}
 	}
+	return err
 }
 
 func (w *responseWriter) CloseNotify() <-chan bool {
