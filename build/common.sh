@@ -96,7 +96,7 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
 readonly __default_distroless_iptables_version=v0.1.2
-readonly __default_go_runner_version=v2.3.1-go1.19.3-bullseye.0
+readonly __default_go_runner_version=v2.3.1-go1.19.4-bullseye.0
 readonly __default_setcap_version=bullseye-v1.3.0
 
 # These are the base images for the Docker-wrapped binaries.
