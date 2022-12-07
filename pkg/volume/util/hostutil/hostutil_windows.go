@@ -21,13 +21,31 @@ package hostutil
 
 import (
 	"fmt"
+	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
+)
+
+const (
+	// Amount of time to wait between attempting to use a Unix domain socket.
+	// As detailed in https://github.com/kubernetes/kubernetes/issues/104584
+	// the first attempt will most likely fail, hence the need to retry
+	socketDialRetryPeriod = 1 * time.Second
+	// Overall timeout value to dial a Unix domain socket, including retries
+	socketDialTimeout = 4 * time.Second
+
+	// Running os.Stat on a Unix Socket on Windows will result in the error:
+	// "The file cannot be accessed by the system."
+	errSystemCannotAccess = 1920
 )
 
 // HostUtil implements HostUtils for Windows platforms.
@@ -86,9 +104,70 @@ func (hu *HostUtil) MakeRShared(path string) error {
 	return nil
 }
 
+// IsUnixDomainSocket returns whether a given file is a AF_UNIX socket file
+// Note that due to the retry logic inside, it could take up to 4 seconds
+// to determine whether or not the file path supplied is a Unix domain socket
+func IsUnixDomainSocket(filePath string) (bool, error) {
+	// Due to the absence of golang support for os.ModeSocket in Windows (https://github.com/golang/go/issues/33357)
+	// we need to dial the file and check if we receive an error to determine if a file is Unix Domain Socket file.
+
+	// Note that querrying for the Reparse Points (https://docs.microsoft.com/en-us/windows/win32/fileio/reparse-points)
+	// for the file (using FSCTL_GET_REPARSE_POINT) and checking for reparse tag: reparseTagSocket
+	// does NOT work in 1809 if the socket file is created within a bind mounted directory by a container
+	// and the FSCTL is issued in the host by the kubelet.
+
+	klog.V(6).InfoS("Function IsUnixDomainSocket starts", "filePath", filePath)
+	// As detailed in https://github.com/kubernetes/kubernetes/issues/104584 we cannot rely
+	// on the Unix Domain socket working on the very first try, hence the potential need to
+	// dial multiple times
+	var lastSocketErr error
+	err := wait.PollImmediate(socketDialRetryPeriod, socketDialTimeout,
+		func() (bool, error) {
+			klog.V(6).InfoS("Dialing the socket", "filePath", filePath)
+			var c net.Conn
+			c, lastSocketErr = net.Dial("unix", filePath)
+			if lastSocketErr == nil {
+				c.Close()
+				klog.V(6).InfoS("Socket dialed successfully", "filePath", filePath)
+				return true, nil
+			}
+			klog.V(6).InfoS("Failed the current attempt to dial the socket, so pausing before retry",
+				"filePath", filePath, "err", lastSocketErr, "socketDialRetryPeriod",
+				socketDialRetryPeriod)
+			return false, nil
+		})
+
+	// PollImmediate will return "timed out waiting for the condition" if the function it
+	// invokes never returns true
+	if err != nil {
+		klog.V(2).InfoS("Failed all attempts to dial the socket so marking it as a non-Unix Domain socket. Last socket error along with the error from PollImmediate follow",
+			"filePath", filePath, "lastSocketErr", lastSocketErr, "err", err)
+		return false, nil
+	}
+	return true, nil
+}
+
+func isSystemCannotAccessErr(err error) bool {
+	if fserr, ok := err.(*fs.PathError); ok {
+		if errno, ok := fserr.Err.(syscall.Errno); ok && errno == errSystemCannotAccess {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GetFileType checks for sockets/block/character devices
 func (hu *(HostUtil)) GetFileType(pathname string) (FileType, error) {
-	return getFileType(pathname)
+	filetype, err := getFileType(pathname)
+
+	// os.Stat will return a 1920 error if we use it on a Unix Socket on Windows.
+	// In this case, we need to use a different method to check if it's a Unix Socket.
+	if isSystemCannotAccessErr(err) {
+		return FileTypeSocket, nil
+	}
+
+	return filetype, err
 }
 
 // PathExists checks whether the path exists
