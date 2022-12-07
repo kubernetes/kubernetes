@@ -80,6 +80,7 @@ func TestUpdateThreshold(t *testing.T) {
 		evictionThreshold  evictionapi.Threshold
 		expectedThreshold  resource.Quantity
 		updateThresholdErr error
+		expectedCalls      bool
 		expectErr          bool
 	}{
 		{
@@ -95,6 +96,7 @@ func TestUpdateThreshold(t *testing.T) {
 				},
 			},
 			expectedThreshold:  resource.MustParse("4Gi"),
+			expectedCalls:      true,
 			updateThresholdErr: nil,
 			expectErr:          false,
 		},
@@ -111,6 +113,7 @@ func TestUpdateThreshold(t *testing.T) {
 				},
 			},
 			expectedThreshold:  resource.MustParse("6Gi"),
+			expectedCalls:      true,
 			updateThresholdErr: nil,
 			expectErr:          false,
 		},
@@ -127,7 +130,24 @@ func TestUpdateThreshold(t *testing.T) {
 				},
 			},
 			expectedThreshold:  resource.MustParse("4Gi"),
+			expectedCalls:      true,
 			updateThresholdErr: fmt.Errorf("unexpected error"),
+			expectErr:          true,
+		},
+		{
+			description: "error updating when capacity is less than usage_in_bytes",
+			available:   resource.MustParse("2Gi"),
+			usage:       resource.MustParse("3Gi"),
+			evictionThreshold: evictionapi.Threshold{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+			expectedThreshold:  resource.MustParse("0Gi"),
+			expectedCalls:      false,
+			updateThresholdErr: nil,
 			expectErr:          true,
 		},
 	}
@@ -138,7 +158,9 @@ func TestUpdateThreshold(t *testing.T) {
 			notifier := NewMockCgroupNotifier(t)
 
 			m := newTestMemoryThresholdNotifier(tc.evictionThreshold, notifierFactory, nil)
-			notifierFactory.EXPECT().NewCgroupNotifier(testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr).Times(1)
+			if tc.expectedCalls {
+				notifierFactory.EXPECT().NewCgroupNotifier(testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr).Times(1)
+			}
 			var events chan<- struct{} = m.events
 			notifier.EXPECT().Start(events).Return().Maybe()
 			err := m.UpdateThreshold(nodeSummary(tc.available, tc.workingSet, tc.usage, isAllocatableEvictionThreshold(tc.evictionThreshold)))
