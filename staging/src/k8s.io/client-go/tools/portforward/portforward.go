@@ -50,7 +50,9 @@ type PortForwarder struct {
 	Ready         chan struct{}
 	requestIDLock sync.Mutex
 	requestID     int
+	outLock       sync.Mutex
 	out           io.Writer
+	errLock       sync.Mutex
 	errOut        io.Writer
 }
 
@@ -213,7 +215,9 @@ func (pf *PortForwarder) forward() error {
 			listenSuccess = true
 		default:
 			if pf.errOut != nil {
+				pf.errLock.Lock()
 				fmt.Fprintf(pf.errOut, "Unable to listen on port %d: %v\n", port.Local, err)
+				pf.errLock.Unlock()
 			}
 		}
 	}
@@ -284,12 +288,16 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 	localPortUInt, err := strconv.ParseUint(localPort, 10, 16)
 
 	if err != nil {
+		pf.outLock.Lock()
+		defer pf.outLock.Unlock()
 		fmt.Fprintf(pf.out, "Failed to forward from %s:%d -> %d\n", hostname, localPortUInt, port.Remote)
 		return nil, fmt.Errorf("error parsing local port: %s from %s (%s)", err, listenerAddress, host)
 	}
 	port.Local = uint16(localPortUInt)
 	if pf.out != nil {
+		pf.outLock.Lock()
 		fmt.Fprintf(pf.out, "Forwarding from %s -> %d\n", net.JoinHostPort(hostname, strconv.Itoa(int(localPortUInt))), port.Remote)
+		pf.outLock.Unlock()
 	}
 
 	return listener, nil
@@ -330,7 +338,9 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	defer conn.Close()
 
 	if pf.out != nil {
+		pf.outLock.Lock()
 		fmt.Fprintf(pf.out, "Handling connection for %d\n", port.Local)
+		pf.outLock.Unlock()
 	}
 
 	requestID := pf.nextRequestID()

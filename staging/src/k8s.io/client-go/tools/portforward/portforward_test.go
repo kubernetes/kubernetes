@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -143,18 +144,28 @@ func (s *fakeStream) Headers() http.Header              { return s.headers }
 func (*fakeStream) Identifier() uint32                  { return 0 }
 
 type fakeConn struct {
+	sendLock      sync.Mutex
 	sendBuffer    *bytes.Buffer
+	receiveLock   sync.Mutex
 	receiveBuffer *bytes.Buffer
 }
 
-func (f fakeConn) Read(p []byte) (int, error)       { return f.sendBuffer.Read(p) }
-func (f fakeConn) Write(p []byte) (int, error)      { return f.receiveBuffer.Write(p) }
-func (fakeConn) Close() error                       { return nil }
-func (fakeConn) LocalAddr() net.Addr                { return nil }
-func (fakeConn) RemoteAddr() net.Addr               { return nil }
-func (fakeConn) SetDeadline(t time.Time) error      { return nil }
-func (fakeConn) SetReadDeadline(t time.Time) error  { return nil }
-func (fakeConn) SetWriteDeadline(t time.Time) error { return nil }
+func (f *fakeConn) Read(p []byte) (int, error) {
+	f.sendLock.Lock()
+	defer f.sendLock.Unlock()
+	return f.sendBuffer.Read(p)
+}
+func (f *fakeConn) Write(p []byte) (int, error) {
+	f.receiveLock.Lock()
+	defer f.receiveLock.Unlock()
+	return f.receiveBuffer.Write(p)
+}
+func (*fakeConn) Close() error                       { return nil }
+func (*fakeConn) LocalAddr() net.Addr                { return nil }
+func (*fakeConn) RemoteAddr() net.Addr               { return nil }
+func (*fakeConn) SetDeadline(t time.Time) error      { return nil }
+func (*fakeConn) SetReadDeadline(t time.Time) error  { return nil }
+func (*fakeConn) SetWriteDeadline(t time.Time) error { return nil }
 
 func TestParsePortsAndNew(t *testing.T) {
 	tests := []struct {
@@ -477,43 +488,57 @@ func TestGetPortsReturnsDynamicallyAssignedLocalPort(t *testing.T) {
 func TestHandleConnection(t *testing.T) {
 	out := bytes.NewBufferString("")
 
-	pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, out, nil)
-	if err != nil {
-		t.Fatalf("error while calling New: %s", err)
+	tests := []struct {
+		portRules   []string
+		localPorts  []uint16
+		remotePorts []uint16
+	}{
+		{portRules: []string{":2222"}, localPorts: []uint16{1111}, remotePorts: []uint16{2222}},
+		{portRules: []string{":2222", ":3333"}, localPorts: []uint16{1111, 1112}, remotePorts: []uint16{2222, 3333}},
+		{portRules: []string{":2222", ":3333", ":4444"}, localPorts: []uint16{1111, 1112, 1113}, remotePorts: []uint16{2222, 3333, 4444}},
 	}
 
-	// Setup fake local connection
-	localConnection := &fakeConn{
-		sendBuffer:    bytes.NewBufferString("test data from local"),
-		receiveBuffer: bytes.NewBufferString(""),
-	}
-
-	// Setup fake remote connection to send data on the data stream after it receives data from the local connection
-	remoteDataToSend := bytes.NewBufferString("test data from remote")
-	remoteDataReceived := bytes.NewBufferString("")
-	remoteErrorToSend := bytes.NewBufferString("")
-	blockRemoteSend := make(chan struct{})
-	remoteConnection := newFakeConnection()
-	remoteConnection.dataStream.readFunc = func(p []byte) (int, error) {
-		<-blockRemoteSend // Wait for the expected data to be received before responding
-		return remoteDataToSend.Read(p)
-	}
-	remoteConnection.dataStream.writeFunc = func(p []byte) (int, error) {
-		n, err := remoteDataReceived.Write(p)
-		if remoteDataReceived.String() == "test data from local" {
-			close(blockRemoteSend)
+	for _, test := range tests {
+		pf, err := New(&fakeDialer{}, test.portRules, nil, nil, out, nil)
+		if err != nil {
+			t.Fatalf("error while calling New: %s", err)
 		}
-		return n, err
-	}
-	remoteConnection.errorStream.readFunc = remoteErrorToSend.Read
-	pf.streamConn = remoteConnection
 
-	// Test handleConnection
-	pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
-	assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
-	assert.Equal(t, "test data from local", remoteDataReceived.String())
-	assert.Equal(t, "test data from remote", localConnection.receiveBuffer.String())
-	assert.Equal(t, "Handling connection for 1111\n", out.String())
+		// Setup fake local connection
+		localConnection := &fakeConn{
+			sendBuffer:    bytes.NewBufferString("test data from local"),
+			receiveBuffer: bytes.NewBufferString(""),
+		}
+
+		// Setup fake remote connection to send data on the data stream after it receives data from the local connection
+		remoteDataToSend := bytes.NewBufferString("test data from remote")
+		remoteDataReceived := bytes.NewBufferString("")
+		remoteErrorToSend := bytes.NewBufferString("")
+		blockRemoteSend := make(chan struct{})
+		remoteConnection := newFakeConnection()
+		remoteConnection.dataStream.readFunc = func(p []byte) (int, error) {
+			<-blockRemoteSend // Wait for the expected data to be received before responding
+			return remoteDataToSend.Read(p)
+		}
+		remoteConnection.dataStream.writeFunc = func(p []byte) (int, error) {
+			n, err := remoteDataReceived.Write(p)
+			if remoteDataReceived.String() == "test data from local" {
+				close(blockRemoteSend)
+			}
+			return n, err
+		}
+		remoteConnection.errorStream.readFunc = remoteErrorToSend.Read
+		pf.streamConn = remoteConnection
+
+		// Test handleConnection
+		for index := range test.localPorts {
+			pf.handleConnection(localConnection, ForwardedPort{Local: test.localPorts[index], Remote: test.remotePorts[index]})
+			assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
+			assert.Equal(t, "test data from local", remoteDataReceived.String())
+			assert.Equal(t, "test data from remote", localConnection.receiveBuffer.String())
+			assert.Contains(t, out.String(), fmt.Sprintf("Handling connection for %d\n", test.localPorts[index]))
+		}
+	}
 }
 
 func TestHandleConnectionSendsRemoteError(t *testing.T) {
