@@ -358,7 +358,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			Finalizers: []string{testFinalizer},
 			Affinity:   &testNodeAffinity,
 		})
-		framework.Logf("Created pod: %v", victimPod.Name)
+		framework.Logf("Created pod: %v on node: %s", victimPod.Name, victimPod.Spec.NodeName)
 
 		ginkgo.By("Wait for the victim pod to be scheduled")
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, victimPod))
@@ -376,7 +376,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			},
 			Affinity: &testNodeAffinity,
 		})
-		framework.Logf("Created pod: %v", preemptorPod.Name)
+		framework.Logf("Created pod: %v on node: %s", preemptorPod.Name, preemptorPod.Spec.NodeName)
 
 		ginkgo.By("Waiting for the victim pod to be terminating")
 		err = e2epod.WaitForPodTerminatingInNamespaceTimeout(f.ClientSet, victimPod.Name, victimPod.Namespace, framework.PodDeleteTimeout)
