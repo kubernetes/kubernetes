@@ -235,6 +235,12 @@ func (s *Status) AsError() error {
 	return errors.New(s.Message())
 }
 
+// WithError returns status with specified type of error.
+func (s *Status) WithError(err error) *Status {
+	s.err = err
+	return s
+}
+
 // Equal checks equality of two statuses. This is useful for testing with
 // cmp.Equal.
 func (s *Status) Equal(x *Status) bool {
@@ -255,9 +261,6 @@ func NewStatus(code Code, reasons ...string) *Status {
 	s := &Status{
 		code:    code,
 		reasons: reasons,
-	}
-	if code == Error {
-		s.err = errors.New(s.Message())
 	}
 	return s
 }
