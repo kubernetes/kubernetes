@@ -392,6 +392,8 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 }
 
 func TestComponentPod(t *testing.T) {
+	// priority value for system-node-critical class
+	priority := int32(2000001000)
 	var tests = []struct {
 		name     string
 		expected v1.Pod
@@ -419,6 +421,7 @@ func TestComponentPod(t *testing.T) {
 							Name: "foo",
 						},
 					},
+					Priority:          &priority,
 					PriorityClassName: "system-node-critical",
 					HostNetwork:       true,
 					Volumes:           []v1.Volume{},
