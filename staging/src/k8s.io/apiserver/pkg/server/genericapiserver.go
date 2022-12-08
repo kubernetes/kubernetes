@@ -19,7 +19,6 @@ package server
 import (
 	"fmt"
 	"net/http"
-	gpath "path"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
@@ -51,12 +51,11 @@ import (
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	openapibuilder2 "k8s.io/kube-openapi/pkg/builder"
+	builder2 "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/handler3"
-	openapiutil "k8s.io/kube-openapi/pkg/util"
-	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/clock"
 )
@@ -85,10 +84,6 @@ type APIGroupInfo struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
-
-	// StaticOpenAPISpec is the spec derived from the definitions of all resources installed together.
-	// It is set during InstallAPIGroups, InstallAPIGroup, and InstallLegacyAPIGroup.
-	StaticOpenAPISpec *spec.Swagger
 }
 
 func (a *APIGroupInfo) destroyStorage() {
@@ -170,7 +165,8 @@ type GenericAPIServer struct {
 
 	// StaticOpenAPISpec is the spec derived from the restful container endpoints.
 	// It is set during PrepareRun.
-	StaticOpenAPISpec *spec.Swagger
+	StaticOpenAPISpec   *spec.Swagger
+	StaticTypeConverter fieldmanager.LazyTypeConverter
 
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guarantee of ordering between them.  The map key is a name used for error reporting.
@@ -398,6 +394,44 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
 		}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+
+		// May be nil if installV2 results in (ignored) error
+		if s.StaticOpenAPISpec != nil {
+			models, err := utilopenapi.ToProtoModels(s.StaticOpenAPISpec)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+			err = s.StaticTypeConverter.InstallModels(models, false)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+			// Prune defaults from served openapi.
+			// Must be done after creating the SMD models since SSA requires the
+			// defaults to be populated.
+			//!TODO: Is there documentation about why we do this? Is this necessary?
+			s.StaticOpenAPISpec.Definitions = handler.PruneDefaults(s.StaticOpenAPISpec.Definitions)
+		}
+	} else if s.openAPIConfig != nil {
+		// Even if we skil OpenAPI installation we still need the models
+		// for SSA.
+		spec, err := builder2.BuildOpenAPISpecFromRoutes(
+			restfuladapter.AdaptWebServices(
+				s.Handler.GoRestfulContainer.RegisteredWebServices(),
+			),
+			s.openAPIConfig)
+
+		if err == nil {
+			models, err := utilopenapi.ToProtoModels(spec)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+			err = s.StaticTypeConverter.InstallModels(models, false)
+			if err != nil {
+				utilruntime.HandleError(err)
+			}
+		} else {
+			utilruntime.HandleError(err)
+		}
 	}
 
 	if s.openAPIV3Config != nil && !s.skipOpenAPIInstallation {
@@ -653,7 +687,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
-func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, openAPIModels openapiproto.Models) error {
+func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	var resourceInfos []*storageversion.ResourceInfo
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
@@ -667,15 +701,6 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		}
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
-		}
-		apiGroupVersion.OpenAPIModels = openAPIModels
-
-		if openAPIModels != nil {
-			typeConverter, err := fieldmanager.NewTypeConverter(openAPIModels, false)
-			if err != nil {
-				return err
-			}
-			apiGroupVersion.TypeConverter = typeConverter
 		}
 
 		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
@@ -732,12 +757,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 		return fmt.Errorf("%q is not in the allowed legacy API prefixes: %v", apiPrefix, s.legacyAPIGroupPrefixes.List())
 	}
 
-	openAPIModels, err := s.getOpenAPIModels(apiPrefix, apiGroupInfo)
-	if err != nil {
-		return fmt.Errorf("unable to get openapi models: %v", err)
-	}
-
-	if err := s.installAPIResources(apiPrefix, apiGroupInfo, openAPIModels); err != nil {
+	if err := s.installAPIResources(apiPrefix, apiGroupInfo); err != nil {
 		return err
 	}
 
@@ -769,13 +789,8 @@ func (s *GenericAPIServer) InstallAPIGroups(apiGroupInfos ...*APIGroupInfo) erro
 		}
 	}
 
-	openAPIModels, err := s.getOpenAPIModels(APIGroupPrefix, apiGroupInfos...)
-	if err != nil {
-		return fmt.Errorf("unable to get openapi models: %v", err)
-	}
-
 	for _, apiGroupInfo := range apiGroupInfos {
-		if err := s.installAPIResources(APIGroupPrefix, apiGroupInfo, openAPIModels); err != nil {
+		if err := s.installAPIResources(APIGroupPrefix, apiGroupInfo); err != nil {
 			return fmt.Errorf("unable to install api resources: %v", err)
 		}
 
@@ -847,6 +862,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 
 		EquivalentResourceRegistry: s.EquivalentResourceRegistry,
 
+		TypeConverter:     s.StaticTypeConverter,
 		Admit:             s.admissionControl,
 		MinRequestTimeout: s.minRequestTimeout,
 		Authorizer:        s.Authorizer,
@@ -865,55 +881,4 @@ func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec
 		ParameterCodec:         parameterCodec,
 		NegotiatedSerializer:   codecs,
 	}
-}
-
-// getOpenAPIModels is a private method for getting the OpenAPI models
-func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*APIGroupInfo) (openapiproto.Models, error) {
-	if s.openAPIConfig == nil {
-		return nil, nil
-	}
-	pathsToIgnore := openapiutil.NewTrie(s.openAPIConfig.IgnorePrefixes)
-	resourceNames := make([]string, 0)
-	for _, apiGroupInfo := range apiGroupInfos {
-		groupResources, err := getResourceNamesForGroup(apiPrefix, apiGroupInfo, pathsToIgnore)
-		if err != nil {
-			return nil, err
-		}
-		resourceNames = append(resourceNames, groupResources...)
-	}
-
-	// Build the openapi definitions for those resources and convert it to proto models
-	openAPISpec, err := openapibuilder2.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
-	if err != nil {
-		return nil, err
-	}
-	for _, apiGroupInfo := range apiGroupInfos {
-		apiGroupInfo.StaticOpenAPISpec = openAPISpec
-	}
-	return utilopenapi.ToProtoModels(openAPISpec)
-}
-
-// getResourceNamesForGroup is a private method for getting the canonical names for each resource to build in an api group
-func getResourceNamesForGroup(apiPrefix string, apiGroupInfo *APIGroupInfo, pathsToIgnore openapiutil.Trie) ([]string, error) {
-	// Get the canonical names of every resource we need to build in this api group
-	resourceNames := make([]string, 0)
-	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
-		for resource, storage := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
-			path := gpath.Join(apiPrefix, groupVersion.Group, groupVersion.Version, resource)
-			if !pathsToIgnore.HasPrefix(path) {
-				kind, err := genericapi.GetResourceKind(groupVersion, storage, apiGroupInfo.Scheme)
-				if err != nil {
-					return nil, err
-				}
-				sampleObject, err := apiGroupInfo.Scheme.New(kind)
-				if err != nil {
-					return nil, err
-				}
-				name := openapiutil.GetCanonicalTypeName(sampleObject)
-				resourceNames = append(resourceNames, name)
-			}
-		}
-	}
-
-	return resourceNames, nil
 }

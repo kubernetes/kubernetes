@@ -345,13 +345,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		isCreater = true
 	}
 
-	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
-	if a.group.OpenAPIModels != nil {
-		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
-			resetFields = resetFieldsStrategy.GetResetFields()
-		}
-	}
-
 	var versionedList interface{}
 	if isLister {
 		list := lister.NewList()
@@ -685,7 +678,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
-	if a.group.OpenAPIModels != nil {
+
+	if a.group.TypeConverter != nil {
+		var resetFields map[fieldpath.APIVersion]*fieldpath.Set
+		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
+			resetFields = resetFieldsStrategy.GetResetFields()
+		}
 		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
 			a.group.TypeConverter,
 			a.group.UnsafeConvertor,

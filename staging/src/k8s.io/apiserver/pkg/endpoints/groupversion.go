@@ -34,7 +34,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storageversion"
-	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // ConvertabilityChecker indicates what versions a GroupKind is available in.
@@ -94,9 +93,6 @@ type APIGroupVersion struct {
 	Admit admission.Interface
 
 	MinRequestTimeout time.Duration
-
-	// OpenAPIModels exposes the OpenAPI models to each individual handler.
-	OpenAPIModels openapiproto.Models
 
 	// The limit on the request body size that would be accepted and decoded in a write request.
 	// 0 means no limit.

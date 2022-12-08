@@ -54,6 +54,7 @@ import (
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -681,6 +682,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		Version: c.Version,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
+	}
+
+	// Can't use SSA without the generated openapi definitions
+	if c.OpenAPIConfig != nil {
+		s.StaticTypeConverter = fieldmanager.NewLazyTypeConverter()
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
