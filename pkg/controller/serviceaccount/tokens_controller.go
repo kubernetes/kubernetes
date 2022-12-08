@@ -23,8 +23,8 @@ import (
 	"time"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
 	kcpcorev1informers "github.com/kcp-dev/client-go/informers/core/v1"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
 	kcpcorev1listers "github.com/kcp-dev/client-go/listers/core/v1"
 	kcpthirdpartycache "github.com/kcp-dev/client-go/third_party/k8s.io/client-go/tools/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
@@ -704,7 +704,7 @@ func (e *TokensController) getSecret(clusterName logicalcluster.Name, ns string,
 // listTokenSecrets returns a list of all of the ServiceAccountToken secrets that
 // reference the given service account's name and uid
 func (e *TokensController) listTokenSecrets(serviceAccount *v1.ServiceAccount) ([]*v1.Secret, error) {
-	namespaceSecrets, err := e.updatedSecrets.ByIndex("namespace", serviceAccount.Namespace)
+	namespaceSecrets, err := e.updatedSecrets.ByIndex(kcpcache.ClusterAndNamespaceIndexName, kcpcache.ClusterAndNamespaceIndexKey(logicalcluster.From(serviceAccount), serviceAccount.Namespace))
 	if err != nil {
 		return nil, err
 	}
