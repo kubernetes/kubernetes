@@ -40,7 +40,6 @@ func (oa OpenAPI) InstallV2(c *restful.Container, mux *mux.PathRecorderMux) (*ha
 	if err != nil {
 		klog.Fatalf("Failed to build open api spec for root: %v", err)
 	}
-	spec.Definitions = handler.PruneDefaults(spec.Definitions)
 	openAPIVersionedService, err := handler.NewOpenAPIService(spec)
 	if err != nil {
 		klog.Fatalf("Failed to create OpenAPIService: %v", err)

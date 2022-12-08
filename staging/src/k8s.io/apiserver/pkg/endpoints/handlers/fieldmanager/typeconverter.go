@@ -18,6 +18,7 @@ package fieldmanager
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +34,17 @@ import (
 type TypeConverter interface {
 	ObjectToTyped(runtime.Object) (*typed.TypedValue, error)
 	TypedToObject(*typed.TypedValue) (runtime.Object, error)
+}
+
+type LazyTypeConverter interface {
+	TypeConverter
+
+	TypeResolver() TypeResolver
+	InstallTypeResolver(resolver TypeResolver)
+
+	// Convenience method which installs a TypeResolver from
+	// the given
+	InstallModels(proto.Models, bool) error
 }
 
 // DeducedTypeConverter is a TypeConverter for CRDs that don't have a
@@ -64,8 +76,12 @@ func (DeducedTypeConverter) TypedToObject(value *typed.TypedValue) (runtime.Obje
 	return valueToObject(value.AsValue())
 }
 
+type TypeResolver interface {
+	Type(gvk schema.GroupVersionKind) *typed.ParseableType
+}
+
 type typeConverter struct {
-	parser *managedfields.GvkParser
+	parser atomic.Value
 }
 
 var _ TypeConverter = &typeConverter{}
@@ -74,16 +90,49 @@ var _ TypeConverter = &typeConverter{}
 // will automatically find the proper version of the object, and the
 // corresponding schema information.
 func NewTypeConverter(models proto.Models, preserveUnknownFields bool) (TypeConverter, error) {
-	parser, err := managedfields.NewGVKParser(models, preserveUnknownFields)
-	if err != nil {
+	res := NewLazyTypeConverter()
+	if err := res.InstallModels(models, preserveUnknownFields); err != nil {
 		return nil, err
 	}
-	return &typeConverter{parser: parser}, nil
+	return res, nil
+}
+
+func NewLazyTypeConverter() LazyTypeConverter {
+	return &typeConverter{
+		parser: atomic.Value{},
+	}
+}
+
+func (c *typeConverter) InstallModels(models proto.Models, preserveUnknownFields bool) error {
+	parser, err := managedfields.NewGVKParser(models, preserveUnknownFields)
+	if err != nil {
+		return err
+	}
+
+	c.parser.Store(parser)
+	return nil
+}
+
+func (c *typeConverter) InstallTypeResolver(resolver TypeResolver) {
+	c.parser.Store(resolver)
+}
+
+func (c *typeConverter) TypeResolver() TypeResolver {
+	if res, ok := c.parser.Load().(TypeResolver); ok {
+		return res
+	}
+	return nil
+
 }
 
 func (c *typeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
-	t := c.parser.Type(gvk)
+	parser := c.TypeResolver()
+	if parser == nil {
+		return nil, newNoCorrespondingTypeError(gvk)
+	}
+
+	t := parser.Type(gvk)
 	if t == nil {
 		return nil, newNoCorrespondingTypeError(gvk)
 	}
