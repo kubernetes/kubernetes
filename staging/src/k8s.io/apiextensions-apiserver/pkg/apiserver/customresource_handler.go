@@ -17,6 +17,8 @@ limitations under the License.
 package apiserver
 
 import (
+	gjson "encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -45,6 +47,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -58,6 +61,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
@@ -71,7 +75,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
-	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/scale"
@@ -120,10 +123,9 @@ type crdHandler struct {
 	// minRequestTimeout applies to CR's list/watch calls
 	minRequestTimeout time.Duration
 
-	// staticOpenAPISpec is used as a base for the schema of CR's for the
-	// purpose of managing fields, it is how CR handlers get the structure
-	// of TypeMeta and ObjectMeta
-	staticOpenAPISpec *spec.Swagger
+	// Type Converter containing internal types which may be referred to by
+	// CRDs. Used for Server-Side-Apply.
+	staticTypeConverter fieldmanager.TypeConverter
 
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
@@ -178,7 +180,7 @@ func NewCustomResourceDefinitionHandler(
 	authorizer authorizer.Authorizer,
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
-	staticOpenAPISpec *spec.Swagger,
+	staticTypeConverter fieldmanager.TypeConverter,
 	maxRequestBodyBytes int64) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
@@ -193,7 +195,7 @@ func NewCustomResourceDefinitionHandler(
 		authorizer:              authorizer,
 		requestTimeout:          requestTimeout,
 		minRequestTimeout:       minRequestTimeout,
-		staticOpenAPISpec:       staticOpenAPISpec,
+		staticTypeConverter:     staticTypeConverter,
 		maxRequestBodyBytes:     maxRequestBodyBytes,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -676,18 +678,15 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		structuralSchemas[v.Name] = s
 	}
 
-	openAPIModels, err := buildOpenAPIModelsForApply(r.staticOpenAPISpec, crd)
+	// CRD group-versions each get their own type converter.
+	// Fetch the ObjectMeta and TypeMeta schemas to allow this
+	typeConverter, err := buildOpenAPIModelsForApply(r.staticTypeConverter, crd)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error building openapi models for %s: %v", crd.Name, err))
-		openAPIModels = nil
-	}
 
-	var typeConverter fieldmanager.TypeConverter = fieldmanager.DeducedTypeConverter{}
-	if openAPIModels != nil {
-		typeConverter, err = fieldmanager.NewTypeConverter(openAPIModels, crd.Spec.PreserveUnknownFields)
-		if err != nil {
-			return nil, err
-		}
+		// Fall back to deduced type converter in case of failure to setup SSA for
+		// CRDs
+		typeConverter = fieldmanager.DeducedTypeConverter{}
 	}
 
 	safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
@@ -1365,29 +1364,111 @@ func hasServedCRDVersion(spec *apiextensionsv1.CustomResourceDefinitionSpec, ver
 // buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
 // and merges it with the models defined in the static OpenAPI spec.
 // Returns nil models ifthe static spec is nil, or an error is encountered.
-func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensionsv1.CustomResourceDefinition) (proto.Models, error) {
-	if staticOpenAPISpec == nil {
-		return nil, nil
+func buildOpenAPIModelsForApply(staticTypeConverter fieldmanager.TypeConverter, crd *apiextensionsv1.CustomResourceDefinition) (fieldmanager.TypeConverter, error) {
+	// Cannot construct CRD models if native models are not available.
+	// At a minimum need TypeMeta/ObjectMeta since those are injected by builder,
+	// but there may be other native type dependencies found inside $refs.
+	if staticTypeConverter == nil {
+		return nil, errors.New("cannot construct SMD schemas without static types")
 	}
 
-	specs := []*spec.Swagger{}
+	// Create openapi spec from each CRD schema and flatten into a single list
+	// Any unresolved references should be found within staticDefs
+	mergedOpenAPI := &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Info: &spec.Info{
+				InfoProps: spec.InfoProps{
+					Title:   "Kubernetes CRD Swagger",
+					Version: "v0.1.0",
+				},
+			},
+			Swagger:     "2.0",
+			Definitions: map[string]spec.Schema{},
+		},
+	}
+
 	for _, v := range crd.Spec.Versions {
 		// Defaults are not pruned here, but before being served.
 		// See flag description in builder.go for flag usage
 		s, err := builder.BuildOpenAPIV2(crd, v.Name, builder.Options{V2: true, SkipFilterSchemaForKubectlOpenAPIV2Validation: true, StripValueValidation: true, StripNullable: true, AllowNonStructural: false})
 		if err != nil {
+			// Failed to build open api
 			return nil, err
 		}
-		specs = append(specs, s)
+
+		// Build a dependency tree of which static definitions were referred by
+		// the spec
+		for k, def := range s.Definitions {
+			mergedOpenAPI.Definitions[k] = def
+		}
 	}
 
-	mergedOpenAPI, err := builder.MergeSpecs(staticOpenAPISpec, specs...)
+	//TEMPORARY HACK:
+	// Gnostic ParseDocument errors if there are unresolved refs. We don't want
+	// this behavior since some of the refs are found in the static type converter
+	//
+	// Workaround by inserting an empty schema for every type contained by
+	// static type converter.
+	//
+	// After parsing, we can remove the fake schemas.
+	// This will not be necessary once we remove gnostic ParseDocument by
+	// implementing direct conversion from spec.Schema to SMD Schema
+	toRemove := map[string]struct{}{}
+	gvkStaticTypes, ok := staticTypeConverter.(fieldmanager.LazyTypeConverter).TypeResolver().(*managedfields.GvkParser)
+
+	if ok {
+		for _, name := range gvkStaticTypes.Parser().TypeNames() {
+			if _, exists := mergedOpenAPI.Definitions[name]; !exists {
+				toRemove[name] = struct{}{}
+				mergedOpenAPI.Definitions[name] = spec.Schema{
+					SchemaProps: spec.SchemaProps{
+						Type: spec.StringOrArray{"object"},
+					},
+				}
+			}
+		}
+	} else {
+		return nil, errors.New("expected static type converter to use gvkParser")
+	}
+
+	// Implementation of ToProtoModels duplicated so we can remove fake schemas
+	//TEMPORARY HACK until direct conversion from spec.Schema -> TypeConverter
+	// is implemented
+	specBytes, err := gjson.MarshalIndent(mergedOpenAPI, " ", " ")
 	if err != nil {
 		return nil, err
 	}
-	models, err := utilopenapi.ToProtoModels(mergedOpenAPI)
+
+	doc, err := openapi_v2.ParseDocument(specBytes)
 	if err != nil {
 		return nil, err
 	}
-	return models, nil
+
+	filteredDefs := []*openapi_v2.NamedSchema{}
+
+	for _, def := range doc.Definitions.AdditionalProperties {
+		if _, shouldRemove := toRemove[def.Name]; !shouldRemove {
+			filteredDefs = append(filteredDefs, def)
+		}
+	}
+	doc.Definitions.AdditionalProperties = filteredDefs
+
+	models, err := proto.NewOpenAPIData(doc)
+	if err != nil {
+		return nil, err
+	}
+
+	crdParser, err := managedfields.NewGVKParser(models, crd.Spec.PreserveUnknownFields)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add knowledge of static types not contained CRD schema to the parser
+	//!TODO: would it be better to add delegating functionalty to smdschema?
+	crdParser.AddModelsFromParser(gvkStaticTypes)
+
+	result := fieldmanager.NewLazyTypeConverter()
+	result.InstallTypeResolver(crdParser)
+
+	return result, nil
 }

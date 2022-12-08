@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kube-openapi/pkg/schemaconv"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	smdschema "sigs.k8s.io/structured-merge-diff/v4/schema"
@@ -35,6 +36,10 @@ const groupVersionKindExtensionKey = "x-kubernetes-group-version-kind"
 type GvkParser struct {
 	gvks   map[schema.GroupVersionKind]string
 	parser typed.Parser
+}
+
+func (p *GvkParser) Parser() *typed.Parser {
+	return &p.parser
 }
 
 // Type returns a helper which can produce objects of the given type. Any
@@ -77,6 +82,44 @@ func NewGVKParser(models proto.Models, preserveUnknownFields bool) (*GvkParser, 
 		}
 	}
 	return &parser, nil
+}
+
+// Inserts models from the given parser into this one.
+// !TODO: would not need this if we could chain smdschema.Schema together
+// in a delegate chain for resolving types.
+func (p *GvkParser) AddModelsFromParser(other *GvkParser) {
+	newTypes := []smdschema.TypeDef{}
+	names := sets.NewString()
+
+	for _, typ := range p.parser.Schema.Types {
+		if !names.Has(typ.Name) {
+			names.Insert(typ.Name)
+			newTypes = append(newTypes, typ)
+		}
+	}
+
+	newGvks := map[schema.GroupVersionKind]string{}
+	for k, v := range p.gvks {
+		newGvks[k] = v
+	}
+
+	// Only add GVKs which will end up being inserted
+	for k, v := range other.gvks {
+		if !names.Has(v) {
+			newGvks[k] = v
+		}
+	}
+
+	for _, typ := range other.parser.Schema.Types {
+		if !names.Has(typ.Name) {
+			names.Insert(typ.Name)
+			newTypes = append(newTypes, typ)
+		}
+	}
+
+	p.parser.Schema = smdschema.Schema{
+		Types: newTypes,
+	}
 }
 
 // Get and parse GroupVersionKind from the extension. Returns empty if it doesn't have one.
