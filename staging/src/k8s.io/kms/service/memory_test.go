@@ -14,17 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package encryption
+package service
 
 import (
 	"bytes"
 	"context"
 	"testing"
-	"time"
-
-	"github.com/google/uuid"
-
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
 )
 
 func TestInMemory(t *testing.T) {
@@ -37,6 +32,7 @@ func TestInMemory(t *testing.T) {
 	}
 
 	t.Run("should have a healthy state after initialization", func(t *testing.T) {
+		t.Parallel()
 		res, err := m.Status(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -50,24 +46,24 @@ func TestInMemory(t *testing.T) {
 			t.Errorf("want 'ok', have: %q", res.Healthz)
 		}
 
-		if _, err := uuid.Parse(res.KeyID); err != nil {
-			t.Error(err)
-
+		if len(res.KeyID) == 0 {
+			t.Error("keyID should consist of 10 chars")
 		}
 	})
 
 	t.Run("should be able to de/encrypt", func(t *testing.T) {
-		uid, err := uuid.NewRandom()
+		t.Parallel()
+		uid, err := makeID(10)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		res, err := m.Encrypt(ctx, uid.String(), plaintext)
+		res, err := m.Encrypt(ctx, string(uid), plaintext)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		pt, err := m.Decrypt(ctx, uid.String(), &kmsv2.DecryptRequest{
+		pt, err := m.Decrypt(ctx, string(uid), &DecryptRequest{
 			Ciphertext: res.Ciphertext,
 			KeyID:      res.KeyID,
 		})
@@ -80,56 +76,14 @@ func TestInMemory(t *testing.T) {
 		}
 	})
 
-	t.Run("should be able to decrypt, but not encrypt on expired key", func(t *testing.T) {
-		key, err := randomBytes(keySize)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		counter := maxUsage - 1
-		aesgcm, err := newAESGCM(key, counter, time.Now().Add(week))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		m, err := newInMemory(aesgcm)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		id, err := uuid.NewRandom()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		res, err := m.Encrypt(ctx, id.String(), plaintext)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		decrypted, err := m.Decrypt(ctx, id.String(), &kmsv2.DecryptRequest{
-			Ciphertext: res.Ciphertext,
-			KeyID:      res.KeyID,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(decrypted, plaintext) {
-			t.Errorf("want: %q, have: %q", plaintext, decrypted)
-		}
-
-		if _, err := m.Encrypt(ctx, id.String(), plaintext); err != ErrKeyExpired {
-			t.Errorf("want: %q, have: %q", ErrKeyExpired, err)
-		}
-	})
-
 	t.Run("shouldn't attempt to decrypt on different keyIDs", func(t *testing.T) {
-		id, err := uuid.NewRandom()
+		t.Parallel()
+		id, err := makeID(10)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		res, err := m.Encrypt(ctx, id.String(), plaintext)
+		res, err := m.Encrypt(ctx, id, plaintext)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -139,7 +93,7 @@ func TestInMemory(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, err := n.Decrypt(ctx, id.String(), &kmsv2.DecryptRequest{
+		if _, err := n.Decrypt(ctx, id, &DecryptRequest{
 			Ciphertext: res.Ciphertext,
 			KeyID:      res.KeyID,
 		}); err != ErrKeyIDMismatch {

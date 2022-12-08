@@ -33,12 +33,17 @@ func TestAESGCM(t *testing.T) {
 
 	plaintext := []byte("lorem ipsum")
 	t.Run("should be able to encrypt and decrypt from scratch", func(t *testing.T) {
-		ciphertext, err := aesgcm.Encrypt(ctx, plaintext)
+		t.Parallel()
+		ciphertext, err := aesgcm.TransformToStorage(ctx, plaintext, DefaultContext{})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		decrypted, err := aesgcm.Decrypt(ctx, ciphertext)
+		if bytes.Equal(plaintext, ciphertext) {
+			t.Fatalf("plaintext (%q) and ciphertext (%q) shouldn't be equal", plaintext, ciphertext)
+		}
+
+		decrypted, _, err := aesgcm.TransformFromStorage(ctx, ciphertext, DefaultContext{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -49,12 +54,13 @@ func TestAESGCM(t *testing.T) {
 	})
 
 	t.Run("should not create the same cipher with same key and same plaintext", func(t *testing.T) {
-		ciphertextA, err := aesgcm.Encrypt(ctx, plaintext)
+		t.Parallel()
+		ciphertextA, err := aesgcm.TransformToStorage(ctx, plaintext, DefaultContext{})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		ciphertextB, err := aesgcm.Encrypt(ctx, plaintext)
+		ciphertextB, err := aesgcm.TransformToStorage(ctx, plaintext, DefaultContext{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,14 +71,16 @@ func TestAESGCM(t *testing.T) {
 	})
 
 	t.Run("should not be able to decrypt non-sense", func(t *testing.T) {
-		pt, err := aesgcm.Decrypt(ctx, []byte("lorem ipsum dolor"))
+		t.Parallel()
+		pt, _, err := aesgcm.TransformFromStorage(ctx, []byte("lorem ipsum dolor"), DefaultContext{})
 		if err == nil {
 			t.Errorf("non-sense got decrypted: %q", pt)
 		}
 	})
 
-	t.Run("should not be able to use cipher on high counter below max usage", func(t *testing.T) {
-		key, err := randomBytes(keySize)
+	t.Run("should be able to use cipher on high counter below max usage", func(t *testing.T) {
+		t.Parallel()
+		key, err := RandomBytes(keySize)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,13 +91,14 @@ func TestAESGCM(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, err := aesgcm.Encrypt(ctx, plaintext); err != nil {
+		if _, err := aesgcm.TransformToStorage(ctx, plaintext, DefaultContext{}); err != nil {
 			t.Errorf("want: nil, have: %q", err)
 		}
 	})
 
 	t.Run("should not be able to use cipher on counter beyond max usage", func(t *testing.T) {
-		key, err := randomBytes(keySize)
+		t.Parallel()
+		key, err := RandomBytes(keySize)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,59 +109,25 @@ func TestAESGCM(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, err := aesgcm.Encrypt(ctx, plaintext); err != ErrKeyExpired {
+		if _, err := aesgcm.TransformToStorage(ctx, plaintext, DefaultContext{}); err != ErrKeyExpired {
 			t.Error("key should be expired by counter")
 		}
 	})
 
 	t.Run("should not be able to use cipher on expiry by time", func(t *testing.T) {
-		key, err := randomBytes(keySize)
+		t.Parallel()
+		key, err := RandomBytes(keySize)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		aesgcm, err := newAESGCM(key, 0, time.Now().Add(-skew))
+		aesgcm, err := newAESGCM(key, 0, time.Now())
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err := aesgcm.Encrypt(ctx, plaintext); err != ErrKeyExpired {
+		if _, err := aesgcm.TransformToStorage(ctx, plaintext, DefaultContext{}); err != ErrKeyExpired {
 			t.Error("key should be expired by counter")
-		}
-	})
-
-	t.Run("should be able to decrypt with unknown key, should not be able to encrypt", func(t *testing.T) {
-		key, err := randomBytes(keySize)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		aesgcm, err := newAESGCM(key, 0, time.Now().Add(week))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		ciphertext, err := aesgcm.Encrypt(ctx, plaintext)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		unknown, err := FromKey(key)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		decrypted, err := unknown.Decrypt(ctx, ciphertext)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !bytes.Equal(decrypted, plaintext) {
-			t.Errorf("decrypted plaintext (%q) and plaintext (%q) should be equal", decrypted, plaintext)
-		}
-
-		if _, err := unknown.Encrypt(ctx, plaintext); err != ErrKeyExpired {
-			t.Errorf("key should be expired, but is %v", err)
 		}
 	})
 }

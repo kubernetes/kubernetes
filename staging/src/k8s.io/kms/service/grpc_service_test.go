@@ -19,57 +19,53 @@ package service
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	kmsapi "k8s.io/kms/apis/v2alpha1"
-	"k8s.io/kms/encryption"
 )
 
 func TestGRPCService(t *testing.T) {
 	t.Parallel()
+	defaultTimeout := 30 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	t.Cleanup(cancel)
 
-	id, err := uuid.NewRandom()
+	id, err := makeID(10)
 	if err != nil {
 		t.Fatal(err)
 	}
 	plaintext := []byte("lorem ipsum dolor sit amet")
-	ctx := context.Background()
-	address := filepath.Join(os.TempDir(), fmt.Sprintf("kmsv2-%s.sock", id))
-	kmsUpstream, err := encryption.NewInMemory()
+	address := filepath.Join(os.TempDir(), "kmsv2.sock")
+	kmsUpstream, err := NewInMemory()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	server, err := NewGRPCService(address, time.Second, kmsUpstream)
+	server, err := NewGRPCService(address, defaultTimeout, kmsUpstream)
 	if err != nil {
 		t.Fatal(err)
 	}
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
-			t.Error(err)
+			panic(err)
 		}
 	}()
-	defer server.Shutdown()
+	t.Cleanup(server.Shutdown)
 
-	client, close, err := newClient(address)
-	if err != nil {
-		t.Fatal(err)
-	}
+	client, close := newClient(t, address)
 	defer close()
 
 	t.Run("should be able to encrypt and decrypt through unix domain sockets", func(t *testing.T) {
 		encRes, err := client.Encrypt(ctx, &kmsapi.EncryptRequest{
 			Plaintext: plaintext,
-			Uid:       id.String(),
+			Uid:       id,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -79,7 +75,7 @@ func TestGRPCService(t *testing.T) {
 			Ciphertext:  encRes.Ciphertext,
 			KeyId:       encRes.KeyId,
 			Annotations: encRes.Annotations,
-			Uid:         id.String(),
+			Uid:         id,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -99,8 +95,8 @@ func TestGRPCService(t *testing.T) {
 		if status.Healthz != "ok" {
 			t.Errorf("want: %q, have: %q", "ok", status.Healthz)
 		}
-		if _, err := uuid.Parse(status.KeyId); err != nil {
-			t.Error(err)
+		if len(status.KeyId) == 0 {
+			t.Errorf("want: len(keyID) > 0, have: %d", len(status.KeyId))
 		}
 		if status.Version != "v2alpha1" {
 			t.Errorf("want %q, have: %q", "v2alpha1", status.Version)
@@ -108,7 +104,7 @@ func TestGRPCService(t *testing.T) {
 	})
 }
 
-func newClient(address string) (kmsapi.KeyManagementServiceClient, func() error, error) {
+func newClient(t *testing.T, address string) (kmsapi.KeyManagementServiceClient, func() error) {
 	cnn, err := grpc.Dial(
 		address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -117,8 +113,8 @@ func newClient(address string) (kmsapi.KeyManagementServiceClient, func() error,
 		}),
 	)
 	if err != nil {
-		return nil, func() error { return nil }, err
+		t.Fatal(err)
 	}
 
-	return kmsapi.NewKeyManagementServiceClient(cnn), cnn.Close, nil
+	return kmsapi.NewKeyManagementServiceClient(cnn), cnn.Close
 }

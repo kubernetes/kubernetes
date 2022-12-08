@@ -23,9 +23,6 @@ import (
 	"errors"
 	"sync/atomic"
 	"time"
-
-	"k8s.io/apiserver/pkg/storage/value"
-	kaes "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 )
 
 const (
@@ -46,7 +43,6 @@ const (
 var (
 	// week was picked by during discussions of KMSv2 development.
 	week = time.Hour * 24 * 7
-	skew = time.Minute
 
 	// ErrKeyExpired means that the expiration time of a key has come. It shouldn't be used any more.
 	ErrKeyExpired = errors.New("key is out of date and shouldn't be used anymore for encryption")
@@ -66,12 +62,12 @@ type AESGCM struct {
 	counter uint32
 	expiry  time.Time
 
-	transformer value.Transformer
+	transformer Transformer
 }
 
 // NewAESGCM returns a pointer to a AESGCM with a key and cipher.AEAD created.
 func NewAESGCM() (*AESGCM, error) {
-	key, err := randomBytes(keySize)
+	key, err := RandomBytes(keySize)
 	if err != nil {
 		return nil, err
 	}
@@ -89,49 +85,39 @@ func newAESGCM(key []byte, counter uint32, expiry time.Time) (*AESGCM, error) {
 		counter:     counter,
 		expiry:      expiry,
 		key:         key,
-		transformer: kaes.NewGCMTransformer(block),
+		transformer: NewGCMTransformer(block),
 	}, nil
 }
 
-// FromKey initializes a cipher.AEAD from bytes, which is marked as expired.
-// It is unknown how often it is already used, so we need to assume it is unsafe.
-func FromKey(key []byte) (*AESGCM, error) {
-	return newAESGCM(
-		key,
-		maxUsage,
-		time.Now().Add(-week).Add(-skew),
-	)
-}
-
-// IsValid checks if the key is safe to use, by checking the counter and expiry.
-func (c *AESGCM) IsValid() bool {
+// isValid checks if the key is safe to use, by checking the counter and expiry.
+func (c *AESGCM) isValid() bool {
 	return c.counter < maxUsage && time.Now().Before(c.expiry)
 }
 
 // Encrypt encrypts given plaintext. It will fail, if the key is invalid.
-func (c *AESGCM) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
+func (c *AESGCM) TransformToStorage(ctx context.Context, plaintext []byte, dataCtx Context) ([]byte, error) {
 	if uint64(len(plaintext)) >= spaceUsage {
 		return nil, ErrDataTooBig
 	}
 
-	if !c.IsValid() {
+	if !c.isValid() {
 		return nil, ErrKeyExpired
 	}
 
 	_ = atomic.AddUint32(&c.counter, 1)
 
-	return c.transformer.TransformToStorage(ctx, plaintext, value.DefaultContext{})
+	return c.transformer.TransformToStorage(ctx, plaintext, dataCtx)
 }
 
 // Decrypt decrypts a ciphertext. The nonce is assumed to be prepended.
 // Therefore any change to the standard nonceSize is a breaking change.
-func (k *AESGCM) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
-	plaintext, _, err := k.transformer.TransformFromStorage(ctx, ciphertext, value.DefaultContext{})
-	return plaintext, err
+func (k *AESGCM) TransformFromStorage(ctx context.Context, ciphertext []byte, dataCtx Context) ([]byte, bool, error) {
+	plaintext, stale, err := k.transformer.TransformFromStorage(ctx, ciphertext, dataCtx)
+	return plaintext, stale, err
 }
 
-// randomBytes generates length amount of bytes.
-func randomBytes(length int) (key []byte, err error) {
+// RandomBytes generates length amount of bytes.
+func RandomBytes(length int) (key []byte, err error) {
 	key = make([]byte, length)
 
 	if _, err = rand.Read(key); err != nil {

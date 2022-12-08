@@ -23,14 +23,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
 	"k8s.io/klog/v2"
-
 	kmsapi "k8s.io/kms/apis/v2alpha1"
-)
-
-const (
-	version = "v2alpha1"
 )
 
 type GRPCService struct {
@@ -38,7 +32,7 @@ type GRPCService struct {
 	timeout time.Duration
 	server  *grpc.Server
 
-	kmsUpstream kmsv2.Service
+	kmsUpstream Service
 }
 
 var _ kmsapi.KeyManagementServiceServer = (*GRPCService)(nil)
@@ -47,7 +41,7 @@ func NewGRPCService(
 	address string,
 	timeout time.Duration,
 
-	kmsUpstream kmsv2.Service,
+	kmsUpstream Service,
 ) (*GRPCService, error) {
 	klog.V(4).Infof("Configure KMS plugin with endpoint: %s", address)
 
@@ -97,8 +91,8 @@ func (s *GRPCService) Status(ctx context.Context, _ *kmsapi.StatusRequest) (*kms
 	}
 
 	return &kmsapi.StatusResponse{
-		Version: version,
-		Healthz: "ok",
+		Version: res.Version,
+		Healthz: res.Healthz,
 		KeyId:   res.KeyID,
 	}, nil
 }
@@ -107,7 +101,7 @@ func (s *GRPCService) Status(ctx context.Context, _ *kmsapi.StatusRequest) (*kms
 func (s *GRPCService) Decrypt(ctx context.Context, req *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
 	klog.V(4).Infof("decrypt request (id: %q) received", req.Uid)
 
-	plaintext, err := s.kmsUpstream.Decrypt(ctx, req.Uid, &kmsv2.DecryptRequest{
+	plaintext, err := s.kmsUpstream.Decrypt(ctx, req.Uid, &DecryptRequest{
 		Ciphertext:  req.Ciphertext,
 		KeyID:       req.KeyId,
 		Annotations: req.Annotations,
