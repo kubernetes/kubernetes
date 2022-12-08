@@ -376,7 +376,7 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 		}
 		oldPod, ok := oldObj.(*corev1.Pod)
 		if !ok {
-			klog.InfoS("failed to assert old pod type", "type", reflect.TypeOf(oldObj))
+			klog.InfoS("Failed to assert old pod type", "type", reflect.TypeOf(oldObj))
 			a.Metrics.RecordError(true, attrs)
 			return errorResponse(nil, &apierrors.NewBadRequest("failed to decode old pod").ErrStatus)
 		}

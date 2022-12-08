@@ -82,7 +82,7 @@ func NewHollowProxyOrDie(
 	if useRealProxier {
 		nodeIP := utilnode.GetNodeIP(client, nodeName)
 		if nodeIP == nil {
-			klog.InfoS("can't determine this node's IP, assuming 127.0.0.1")
+			klog.InfoS("Can't determine this node's IP, assuming 127.0.0.1")
 			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
