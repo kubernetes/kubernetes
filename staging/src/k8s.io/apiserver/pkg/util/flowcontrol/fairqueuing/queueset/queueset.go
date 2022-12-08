@@ -623,6 +623,7 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueToBoundLocked(queue *queue, f
 				timeoutCount++
 				disqueueSeats += req.MaxSeats()
 				req.NoteQueued(false)
+				qs.boundNextDispatchLocked(queue)
 				metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 			}
 			// we need to check if the next request has timed out.
