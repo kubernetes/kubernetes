@@ -113,6 +113,14 @@ var (
 		},
 		[]string{"resource"},
 	)
+	decodeErrorCounts = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "storage_decode_errors",
+			Help:           "Number of stored object decode errors split by object type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"type"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -130,6 +138,7 @@ func Register() {
 		legacyregistry.MustRegister(listStorageNumFetched)
 		legacyregistry.MustRegister(listStorageNumSelectorEvals)
 		legacyregistry.MustRegister(listStorageNumReturned)
+		legacyregistry.MustRegister(decodeErrorCounts)
 	})
 }
 
@@ -146,6 +155,11 @@ func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 // RecordEtcdBookmark updates the etcd_bookmark_counts metric.
 func RecordEtcdBookmark(resource string) {
 	etcdBookmarkCounts.WithLabelValues(resource).Inc()
+}
+
+// RecordDecodeError sets the storage_decode_errors metrics.
+func RecordDecodeError(resource string) {
+	decodeErrorCounts.WithLabelValues(resource).Inc()
 }
 
 // Reset resets the etcd_request_duration_seconds metric.

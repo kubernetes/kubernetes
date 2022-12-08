@@ -156,7 +156,12 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 		return storage.NewInternalError(err.Error())
 	}
 
-	return decode(s.codec, s.versioner, data, out, kv.ModRevision)
+	err = decode(s.codec, s.versioner, data, out, kv.ModRevision)
+	if err != nil {
+		metrics.RecordDecodeError(s.groupResourceString)
+		klog.V(4).Infof("Decoding %s \"%s\" failed: %v", s.groupResourceString, key, err)
+	}
+	return err
 }
 
 // Create implements storage.Interface.Create.
