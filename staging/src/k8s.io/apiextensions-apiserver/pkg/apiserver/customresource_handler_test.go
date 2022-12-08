@@ -27,8 +27,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -43,6 +41,7 @@ import (
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
+	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -54,14 +53,19 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/options"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kube-openapi/pkg/builder"
+	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -1009,7 +1013,7 @@ func TestBuildOpenAPIModelsForApply(t *testing.T) {
 		},
 	}
 
-	staticSpec, err := getOpenAPISpecFromFile()
+	typeConverter, err := getStaticTypeConverter()
 	if err != nil {
 		t.Fatalf("Failed to load openapi spec: %v", err)
 	}
@@ -1035,7 +1039,7 @@ func TestBuildOpenAPIModelsForApply(t *testing.T) {
 
 	for i, test := range tests {
 		crd.Spec.Versions[0].Schema = &test
-		models, err := buildOpenAPIModelsForApply(staticSpec, &crd)
+		models, err := buildOpenAPIModelsForApply(typeConverter, &crd)
 		if err != nil {
 			t.Fatalf("failed to convert to apply model: %v", err)
 		}
@@ -1045,22 +1049,69 @@ func TestBuildOpenAPIModelsForApply(t *testing.T) {
 	}
 }
 
-func getOpenAPISpecFromFile() (*spec.Swagger, error) {
-	path := filepath.Join("testdata", "swagger.json")
-	_, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-	byteSpec, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	staticSpec := &spec.Swagger{}
+func getStaticTypeConverter() (fieldmanager.TypeConverter, error) {
+	//!TODO: just use generatedopenapi.GetDefinitions
+	//!TODO: could be refactored to use BuildOpenAPIDefinitionsForResources?
+	// just include anything with a gvk (as reported by the definition namer)
 
-	err = yaml.Unmarshal(byteSpec, staticSpec)
+	names := []string{}
+
+	namer := openapi.NewDefinitionNamer(Scheme)
+	defs := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
+		friendlyName, _ := namer.GetDefinitionName(name)
+		return spec.MustCreateRef("#/definitions/" + friendlyName)
+	})
+
+	for unFriendlyName := range defs {
+		_, ext := namer.GetDefinitionName(unFriendlyName)
+		if len(ext) == 0 {
+			continue
+		}
+
+		gvks, ok := ext["x-kubernetes-group-version-kind"].([]any)
+		if !ok {
+			continue
+		}
+
+		// Want all items with public GVKs. Internal schemas have been observed
+		// to have strange bugs (like including a $ref to runtime.Object which
+		// is not a real schema)
+		shouldSkip := false
+		for _, gvk := range gvks {
+			if d, ok := gvk.(map[string]any); !ok {
+				shouldSkip = true
+			} else if version, ok := d["version"]; !ok {
+				shouldSkip = true
+			} else if version == "__internal" {
+				shouldSkip = true
+			}
+		}
+
+		if shouldSkip {
+			continue
+		}
+
+		names = append(names, unFriendlyName)
+	}
+
+	staticSpec, err := builder.BuildOpenAPIDefinitionsForResources(&common.Config{
+		GetDefinitions:    utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions),
+		GetDefinitionName: namer.GetDefinitionName,
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Kubernetes CRD Swagger",
+				Version: "v0.1.0",
+			},
+		},
+	}, names...)
 	if err != nil {
 		return nil, err
 	}
 
-	return staticSpec, nil
+	specModels, err := utilopenapi.ToProtoModels(staticSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	return fieldmanager.NewTypeConverter(specModels, false)
 }
