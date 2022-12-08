@@ -1050,18 +1050,18 @@ func TestBuildOpenAPIModelsForApply(t *testing.T) {
 }
 
 func getStaticTypeConverter() (fieldmanager.TypeConverter, error) {
-	//!TODO: just use generatedopenapi.GetDefinitions
-	//!TODO: could be refactored to use BuildOpenAPIDefinitionsForResources?
-	// just include anything with a gvk (as reported by the definition namer)
-
 	names := []string{}
-
 	namer := openapi.NewDefinitionNamer(Scheme)
 	defs := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
 		friendlyName, _ := namer.GetDefinitionName(name)
 		return spec.MustCreateRef("#/definitions/" + friendlyName)
 	})
 
+	// Build a list of all definitions we want to include in the spec by filtering
+	// all top-level types. The builder will grab any dependencies referred
+	// from there.
+	//!NOTE: This loop will be removed once we can directly convert to smdSchema
+	// without using ParseDocument/ToProtoModels
 	for unFriendlyName := range defs {
 		_, ext := namer.GetDefinitionName(unFriendlyName)
 		if len(ext) == 0 {
@@ -1069,7 +1069,7 @@ func getStaticTypeConverter() (fieldmanager.TypeConverter, error) {
 		}
 
 		gvks, ok := ext["x-kubernetes-group-version-kind"].([]any)
-		if !ok {
+		if !ok || len(gvks) == 0 {
 			continue
 		}
 
