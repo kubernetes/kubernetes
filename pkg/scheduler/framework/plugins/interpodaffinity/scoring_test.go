@@ -369,12 +369,13 @@ func TestPreferredAffinity(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod          *v1.Pod
-		pods         []*v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
-		name         string
-		wantStatus   *framework.Status
+		pod                                *v1.Pod
+		pods                               []*v1.Pod
+		nodes                              []*v1.Node
+		expectedList                       framework.NodeScoreList
+		name                               string
+		ignorePreferredTermsOfExistingPods bool
+		wantStatus                         *framework.Status
 	}{
 		{
 			name: "all nodes are same priority as Affinity is nil",
@@ -736,13 +737,41 @@ func TestPreferredAffinity(t *testing.T) {
 			},
 			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: framework.MaxNodeScore}},
 		},
+		{
+			name: "Ignore preferred terms of existing pods",
+			pod:  &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "node1", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "node2", Affinity: stayWithS2InRegion}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
+			},
+			expectedList:                       []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}},
+			ignorePreferredTermsOfExistingPods: true,
+		},
+		{
+			name: "Do not ignore preferred terms of existing pods",
+			pod:  &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "node1", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "node2", Affinity: stayWithS2InRegion}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
+			},
+			expectedList:                       []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: framework.MaxNodeScore}},
+			ignorePreferredTermsOfExistingPods: false,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			state := framework.NewCycleState()
-			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{HardPodAffinityWeight: 1}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
+			p := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.InterPodAffinityArgs{HardPodAffinityWeight: 1, IgnorePreferredTermsOfExistingPods: test.ignorePreferredTermsOfExistingPods}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
 			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				if !strings.Contains(status.Message(), test.wantStatus.Message()) {
