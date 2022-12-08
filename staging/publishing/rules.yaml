@@ -556,6 +556,8 @@ rules:
       branch: release-1.26
     - repository: code-generator
       branch: release-1.26
+    - repository: kms
+      branch: release-1.26
     source:
       branch: release-1.26
       dir: staging/src/k8s.io/kube-aggregator
@@ -691,6 +693,8 @@ rules:
     - repository: code-generator
       branch: release-1.26
     - repository: component-base
+      branch: release-1.26
+    - repository: kms
       branch: release-1.26
     source:
       branch: release-1.26
@@ -932,6 +936,8 @@ rules:
     - repository: code-generator
       branch: release-1.26
     - repository: component-base
+      branch: release-1.26
+    - repository: kms
       branch: release-1.26
     source:
       branch: release-1.26
@@ -1537,6 +1543,8 @@ rules:
       branch: release-1.26
     - repository: apiserver
       branch: release-1.26
+    - repository: kms
+      branch: release-1.26
     source:
       branch: release-1.26
       dir: staging/src/k8s.io/controller-manager
@@ -1660,6 +1668,8 @@ rules:
     - repository: controller-manager
       branch: release-1.26
     - repository: component-helpers
+      branch: release-1.26
+    - repository: kms
       branch: release-1.26
     source:
       branch: release-1.26
@@ -1796,6 +1806,8 @@ rules:
     - repository: cloud-provider
       branch: release-1.26
     - repository: component-helpers
+      branch: release-1.26
+    - repository: kms
       branch: release-1.26
     source:
       branch: release-1.26
@@ -2111,6 +2123,8 @@ rules:
       branch: release-1.26
     - repository: component-helpers
       branch: release-1.26
+    - repository: kms
+      branch: release-1.26
     source:
       branch: release-1.26
       dir: staging/src/k8s.io/legacy-cloud-providers
@@ -2376,6 +2390,8 @@ rules:
     - repository: client-go
       branch: release-1.26
     - repository: component-base
+      branch: release-1.26
+    - repository: kms
       branch: release-1.26
     source:
       branch: release-1.26
