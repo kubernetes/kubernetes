@@ -102,18 +102,16 @@ func (sameVersionConverter) IsMissingVersionError(error) bool {
 
 // NewFakeObjectCreater implements ObjectCreater, it can create empty
 // objects (unstructured) of the given GVK.
-func NewFakeObjectCreater(gvk schema.GroupVersionKind) runtime.ObjectCreater {
-	return &fakeObjectCreater{gvk: gvk}
+func NewFakeObjectCreater() runtime.ObjectCreater {
+	return &fakeObjectCreater{}
 }
 
-type fakeObjectCreater struct {
-	gvk schema.GroupVersionKind
-}
+type fakeObjectCreater struct{}
 
-func (f *fakeObjectCreater) New(_ schema.GroupVersionKind) (runtime.Object, error) {
+func (f *fakeObjectCreater) New(gvk schema.GroupVersionKind) (runtime.Object, error) {
 	u := unstructured.Unstructured{Object: map[string]interface{}{}}
-	u.SetAPIVersion(f.gvk.GroupVersion().String())
-	u.SetKind(f.gvk.Kind)
+	u.SetAPIVersion(gvk.GroupVersion().String())
+	u.SetKind(gvk.Kind)
 	return &u, nil
 }
 
@@ -167,7 +165,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainF
 					fieldmanager.NewManagedFieldsUpdater(
 						fieldmanager.NewStripMetaManager(f),
 					), gvk.GroupVersion(), subresource,
-				), NewFakeObjectCreater(gvk), gvk, fieldmanager.DefaultTrackOnCreateProbability,
+				), NewFakeObjectCreater(), gvk, fieldmanager.DefaultTrackOnCreateProbability,
 			), typeConverter, objectConverter, gvk.GroupVersion(),
 		),
 	)
