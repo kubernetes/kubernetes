@@ -656,8 +656,8 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 // TODO: move the GetResources logic to PodContainerManager.
 func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	opts := &kubecontainer.RunContainerOptions{}
-	if cm.draManager != nil {
-		resOpts, err := cm.PrepareResources(pod, container)
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		resOpts, err := cm.draManager.GetResources(pod, container)
 		if err != nil {
 			return nil, err
 		}
@@ -1040,18 +1040,14 @@ func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresources
 	return containerMemories
 }
 
-func (cm *containerManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*dra.ContainerInfo, error) {
-	return cm.draManager.PrepareResources(pod, container)
+func (cm *containerManagerImpl) PrepareDynamicResources(pod *v1.Pod) error {
+	return cm.draManager.PrepareResources(pod)
 }
 
-func (cm *containerManagerImpl) UnprepareResources(pod *v1.Pod) error {
+func (cm *containerManagerImpl) UnprepareDynamicResources(pod *v1.Pod) error {
 	return cm.draManager.UnprepareResources(pod)
 }
 
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
-	if cm.draManager != nil {
-		return cm.draManager.PodMightNeedToUnprepareResources(UID)
-	}
-
-	return false
+	return cm.draManager.PodMightNeedToUnprepareResources(UID)
 }

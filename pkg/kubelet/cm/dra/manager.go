@@ -71,85 +71,87 @@ func generateCDIAnnotations(
 	return kubeAnnotations, nil
 }
 
-// prepareContainerResources attempts to prepare all of required resource
+// PrepareResources attempts to prepare all of the required resource
 // plugin resources for the input container, issue an NodePrepareResource rpc request
 // for each new resource requirement, process their responses and update the cached
 // containerResources on success.
-func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Container) error {
+func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 	// Process resources for each resource claim referenced by container
-	for range container.Resources.Claims {
-		for i, podResourceClaim := range pod.Spec.ResourceClaims {
-			claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
-			klog.V(3).InfoS("Processing resource", "claim", claimName, "pod", pod.Name)
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		for range container.Resources.Claims {
+			for i, podResourceClaim := range pod.Spec.ResourceClaims {
+				claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+				klog.V(3).InfoS("Processing resource", "claim", claimName, "pod", pod.Name)
 
-			if claimInfo := m.cache.get(claimName, pod.Namespace); claimInfo != nil {
-				// resource is already prepared, add pod UID to it
-				claimInfo.addPodReference(pod.UID)
+				if claimInfo := m.cache.get(claimName, pod.Namespace); claimInfo != nil {
+					// resource is already prepared, add pod UID to it
+					claimInfo.addPodReference(pod.UID)
 
-				continue
-			}
+					continue
+				}
 
-			// Query claim object from the API server
-			resourceClaim, err := m.kubeClient.ResourceV1alpha1().ResourceClaims(pod.Namespace).Get(
-				context.TODO(),
-				claimName,
-				metav1.GetOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to fetch ResourceClaim %s referenced by pod %s: %+v", claimName, pod.Name, err)
-			}
+				// Query claim object from the API server
+				resourceClaim, err := m.kubeClient.ResourceV1alpha1().ResourceClaims(pod.Namespace).Get(
+					context.TODO(),
+					claimName,
+					metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("failed to fetch ResourceClaim %s referenced by pod %s: %+v", claimName, pod.Name, err)
+				}
 
-			// Check if pod is in the ReservedFor for the claim
-			if !resourceclaim.IsReservedForPod(pod, resourceClaim) {
-				return fmt.Errorf("pod %s(%s) is not allowed to use resource claim %s(%s)",
-					pod.Name, pod.UID, podResourceClaim.Name, resourceClaim.UID)
-			}
+				// Check if pod is in the ReservedFor for the claim
+				if !resourceclaim.IsReservedForPod(pod, resourceClaim) {
+					return fmt.Errorf("pod %s(%s) is not allowed to use resource claim %s(%s)",
+						pod.Name, pod.UID, podResourceClaim.Name, resourceClaim.UID)
+				}
 
-			// Call NodePrepareResource RPC
-			driverName := resourceClaim.Status.DriverName
+				// Call NodePrepareResource RPC
+				driverName := resourceClaim.Status.DriverName
 
-			client, err := dra.NewDRAPluginClient(driverName)
-			if err != nil {
-				return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", driverName, err)
-			}
+				client, err := dra.NewDRAPluginClient(driverName)
+				if err != nil {
+					return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", driverName, err)
+				}
 
-			response, err := client.NodePrepareResource(
-				context.Background(),
-				resourceClaim.Namespace,
-				resourceClaim.UID,
-				resourceClaim.Name,
-				resourceClaim.Status.Allocation.ResourceHandle)
-			if err != nil {
-				return fmt.Errorf("NodePrepareResource failed, claim UID: %s, claim name: %s, resource handle: %s, err: %+v",
-					resourceClaim.UID, resourceClaim.Name, resourceClaim.Status.Allocation.ResourceHandle, err)
-			}
-
-			klog.V(3).InfoS("NodePrepareResource succeeded", "response", response)
-
-			annotations, err := generateCDIAnnotations(resourceClaim.UID, driverName, response.CdiDevices)
-			if err != nil {
-				return fmt.Errorf("failed to generate container annotations, err: %+v", err)
-			}
-
-			// Cache prepared resource
-			err = m.cache.add(
-				resourceClaim.Name,
-				resourceClaim.Namespace,
-				&claimInfo{
-					driverName:  driverName,
-					claimUID:    resourceClaim.UID,
-					claimName:   resourceClaim.Name,
-					namespace:   resourceClaim.Namespace,
-					podUIDs:     sets.New(string(pod.UID)),
-					cdiDevices:  response.CdiDevices,
-					annotations: annotations,
-				})
-			if err != nil {
-				return fmt.Errorf(
-					"failed to cache prepared resource, claim: %s(%s), err: %+v",
-					resourceClaim.Name,
+				response, err := client.NodePrepareResource(
+					context.Background(),
+					resourceClaim.Namespace,
 					resourceClaim.UID,
-					err,
-				)
+					resourceClaim.Name,
+					resourceClaim.Status.Allocation.ResourceHandle)
+				if err != nil {
+					return fmt.Errorf("NodePrepareResource failed, claim UID: %s, claim name: %s, resource handle: %s, err: %+v",
+						resourceClaim.UID, resourceClaim.Name, resourceClaim.Status.Allocation.ResourceHandle, err)
+				}
+
+				klog.V(3).InfoS("NodePrepareResource succeeded", "response", response)
+
+				annotations, err := generateCDIAnnotations(resourceClaim.UID, driverName, response.CdiDevices)
+				if err != nil {
+					return fmt.Errorf("failed to generate container annotations, err: %+v", err)
+				}
+
+				// Cache prepared resource
+				err = m.cache.add(
+					resourceClaim.Name,
+					resourceClaim.Namespace,
+					&claimInfo{
+						driverName:  driverName,
+						claimUID:    resourceClaim.UID,
+						claimName:   resourceClaim.Name,
+						namespace:   resourceClaim.Namespace,
+						podUIDs:     sets.New(string(pod.UID)),
+						cdiDevices:  response.CdiDevices,
+						annotations: annotations,
+					})
+				if err != nil {
+					return fmt.Errorf(
+						"failed to cache prepared resource, claim: %s(%s), err: %+v",
+						resourceClaim.Name,
+						resourceClaim.UID,
+						err,
+					)
+				}
 			}
 		}
 	}
@@ -157,9 +159,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 	return nil
 }
 
-// getContainerInfo gets a container info from the claimInfo cache.
+// GetResources gets a ContainerInfo object from the claimInfo cache.
 // This information is used by the caller to update a container config.
-func (m *ManagerImpl) getContainerInfo(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
+func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
 	annotations := []kubecontainer.Annotation{}
 
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
@@ -181,15 +183,6 @@ func (m *ManagerImpl) getContainerInfo(pod *v1.Pod, container *v1.Container) (*C
 	}
 
 	return &ContainerInfo{Annotations: annotations}, nil
-}
-
-// PrepareResources calls plugin NodePrepareResource from the registered DRA resource plugins.
-func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
-	if err := m.prepareContainerResources(pod, container); err != nil {
-		return nil, err
-	}
-
-	return m.getContainerInfo(pod, container)
 }
 
 // UnprepareResources calls a plugin's NodeUnprepareResource API for each resource claim owned by a pod.
