@@ -317,6 +317,27 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 			existingPods:   nil,
 			expectedScores: []framework.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 40}},
 		},
+		{
+			// If the node doesn't have a resource
+			// CPU Score: (3000 * 100) / 6000 = 50
+			// Memory Score: (4000 * 100) / 10000 = 40
+			// Node1 Score: (50 * 1 + 40 * 1) / (1 + 1) = 45
+			// Node2 Score: (50 * 1 + 40 * 1) / (1 + 1) = 45
+			name: "if the node doesn't have a resource",
+			requestedPod: st.MakePod().Node("node1").
+				Req(map[v1.ResourceName]string{"cpu": "3000", "memory": "4000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000", v1.ResourceName(extendedRes): "4"}).Obj(),
+			},
+			expectedScores: []framework.NodeScore{{Name: "node1", Score: 45}, {Name: "node2", Score: 45}},
+			resources: []config.ResourceSpec{
+				{Name: extendedRes, Weight: 2},
+				{Name: string(v1.ResourceCPU), Weight: 1},
+				{Name: string(v1.ResourceMemory), Weight: 1},
+			},
+		},
 	}
 
 	for _, test := range tests {
