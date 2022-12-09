@@ -859,6 +859,13 @@ func (c *AutoScaling) CreateLaunchConfigurationRequest(input *CreateLaunchConfig
 // For more information, see Launch configurations (https://docs.aws.amazon.com/autoscaling/ec2/userguide/LaunchConfiguration.html)
 // in the Amazon EC2 Auto Scaling User Guide.
 //
+// Amazon EC2 Auto Scaling configures instances launched as part of an Auto
+// Scaling group using either a launch template or a launch configuration. We
+// strongly recommend that you do not use launch configurations. They do not
+// provide full functionality for Amazon EC2 Auto Scaling or Amazon EC2. For
+// information about using launch templates, see Launch templates (https://docs.aws.amazon.com/autoscaling/ec2/userguide/launch-templates.html)
+// in the Amazon EC2 Auto Scaling User Guide.
+//
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
 // the error.
@@ -1051,10 +1058,9 @@ func (c *AutoScaling) DeleteAutoScalingGroupRequest(input *DeleteAutoScalingGrou
 // Deletes the specified Auto Scaling group.
 //
 // If the group has instances or scaling activities in progress, you must specify
-// the option to force the deletion in order for it to succeed.
-//
-// If the group has policies, deleting the group deletes the policies, the underlying
-// alarm actions, and any alarm that no longer has an associated action.
+// the option to force the deletion in order for it to succeed. The force delete
+// operation will also terminate the EC2 instances. If the group has a warm
+// pool, the force delete option also deletes the warm pool.
 //
 // To remove instances from the Auto Scaling group before deleting it, call
 // the DetachInstances API with the list of instances and the option to decrement
@@ -1064,6 +1070,13 @@ func (c *AutoScaling) DeleteAutoScalingGroupRequest(input *DeleteAutoScalingGrou
 // To terminate all instances before deleting the Auto Scaling group, call the
 // UpdateAutoScalingGroup API and set the minimum size and desired capacity
 // of the Auto Scaling group to zero.
+//
+// If the group has scaling policies, deleting the group deletes the policies,
+// the underlying alarm actions, and any alarm that no longer has an associated
+// action.
+//
+// For more information, see Delete your Auto Scaling infrastructure (https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-process-shutdown.html)
+// in the Amazon EC2 Auto Scaling User Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -7327,6 +7340,11 @@ type CreateAutoScalingGroupInput struct {
 	// The name of the Auto Scaling group. This name must be unique per Region per
 	// account.
 	//
+	// The name can contain any ASCII character 33 to 126 including most punctuation
+	// characters, digits, and upper and lowercased letters.
+	//
+	// You cannot use a colon (:) in the name.
+	//
 	// AutoScalingGroupName is a required field
 	AutoScalingGroupName *string `min:"1" type:"string" required:"true"`
 
@@ -7405,7 +7423,7 @@ type CreateAutoScalingGroupInput struct {
 	// and marking it unhealthy due to a failed Elastic Load Balancing or custom
 	// health check. This is useful if your instances do not immediately pass these
 	// health checks after they enter the InService state. For more information,
-	// see Health check grace period (https://docs.aws.amazon.com/autoscaling/ec2/userguide/healthcheck.html#health-check-grace-period)
+	// see Set the health check grace period for an Auto Scaling group (https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-check-grace-period.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	//
 	// Default: 0 seconds
@@ -7480,10 +7498,8 @@ type CreateAutoScalingGroupInput struct {
 	// MinSize is a required field
 	MinSize *int64 `type:"integer" required:"true"`
 
-	// An embedded object that specifies a mixed instances policy.
-	//
-	// For more information, see Auto Scaling groups with multiple instance types
-	// and purchase options (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html)
+	// The mixed instances policy. For more information, see Auto Scaling groups
+	// with multiple instance types and purchase options (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	MixedInstancesPolicy *MixedInstancesPolicy `type:"structure"`
 
@@ -7842,21 +7858,10 @@ type CreateLaunchConfigurationInput struct {
 	// in the Amazon EC2 User Guide for Linux Instances.
 	BlockDeviceMappings []*BlockDeviceMapping `type:"list"`
 
-	// EC2-Classic retires on August 15, 2022. This property is not supported after
-	// that date.
-	//
-	// The ID of a ClassicLink-enabled VPC to link your EC2-Classic instances to.
-	// For more information, see ClassicLink (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/vpc-classiclink.html)
-	// in the Amazon EC2 User Guide for Linux Instances.
+	// Available for backward compatibility.
 	ClassicLinkVPCId *string `min:"1" type:"string"`
 
-	// EC2-Classic retires on August 15, 2022. This property is not supported after
-	// that date.
-	//
-	// The IDs of one or more security groups for the specified ClassicLink-enabled
-	// VPC.
-	//
-	// If you specify the ClassicLinkVPCId property, you must specify ClassicLinkVPCSecurityGroups.
+	// Available for backward compatibility.
 	ClassicLinkVPCSecurityGroups []*string `type:"list"`
 
 	// Specifies whether the launch configuration is optimized for EBS I/O (true)
@@ -10954,11 +10959,13 @@ type DesiredConfiguration struct {
 	// in the Amazon EC2 Auto Scaling User Guide.
 	LaunchTemplate *LaunchTemplateSpecification `type:"structure"`
 
-	// Describes a mixed instances policy. A mixed instances policy contains the
-	// instance types that Amazon EC2 Auto Scaling can launch and other information
-	// that Amazon EC2 Auto Scaling can use to launch instances and help optimize
-	// your costs. For more information, see Auto Scaling groups with multiple instance
-	// types and purchase options (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html)
+	// Use this structure to launch multiple instance types and On-Demand Instances
+	// and Spot Instances within a single Auto Scaling group.
+	//
+	// A mixed instances policy contains information that Amazon EC2 Auto Scaling
+	// can use to launch instances and help optimize your costs. For more information,
+	// see Auto Scaling groups with multiple instance types and purchase options
+	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	MixedInstancesPolicy *MixedInstancesPolicy `type:"structure"`
 }
@@ -13431,15 +13438,34 @@ func (s *InstanceRefreshWarmPoolProgress) SetPercentageComplete(v int64) *Instan
 	return s
 }
 
-// When you specify multiple parameters, you get instance types that satisfy
-// all of the specified parameters. If you specify multiple values for a parameter,
+// The attributes for the instance types for a mixed instances policy. Amazon
+// EC2 Auto Scaling uses your specified requirements to identify instance types.
+// Then, it uses your On-Demand and Spot allocation strategies to launch instances
+// from these instance types.
+//
+// When you specify multiple attributes, you get instance types that satisfy
+// all of the specified attributes. If you specify multiple values for an attribute,
 // you get instance types that satisfy any of the specified values.
 //
-// Represents requirements for the types of instances that can be launched.
-// You must specify VCpuCount and MemoryMiB, but all other parameters are optional.
+// To limit the list of instance types from which Amazon EC2 Auto Scaling can
+// identify matching instance types, you can use one of the following parameters,
+// but not both in the same request:
+//
+//   - AllowedInstanceTypes - The instance types to include in the list. All
+//     other instance types are ignored, even if they match your specified attributes.
+//
+//   - ExcludedInstanceTypes - The instance types to exclude from the list,
+//     even if they match your specified attributes.
+//
+// You must specify VCpuCount and MemoryMiB. All other attributes are optional.
+// Any unspecified optional attribute is set to its default.
+//
 // For more information, see Creating an Auto Scaling group using attribute-based
 // instance type selection (https://docs.aws.amazon.com/autoscaling/ec2/userguide/create-asg-instance-type-requirements.html)
-// in the Amazon EC2 Auto Scaling User Guide.
+// in the Amazon EC2 Auto Scaling User Guide. For help determining which instance
+// types match your attributes before you apply them to your Auto Scaling group,
+// see Preview instance types with specified attributes (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-fleet-attribute-based-instance-type-selection.html#ec2fleet-get-instance-types-from-instance-requirements)
+// in the Amazon EC2 User Guide for Linux Instances.
 type InstanceRequirements struct {
 	_ struct{} `type:"structure"`
 
@@ -13448,7 +13474,7 @@ type InstanceRequirements struct {
 	//
 	// To exclude accelerator-enabled instance types, set Max to 0.
 	//
-	// Default: No minimum or maximum
+	// Default: No minimum or maximum limits
 	AcceleratorCount *AcceleratorCountRequest `type:"structure"`
 
 	// Indicates whether instance types must have accelerators by specific manufacturers.
@@ -13486,7 +13512,7 @@ type InstanceRequirements struct {
 	// The minimum and maximum total memory size for the accelerators on an instance
 	// type, in MiB.
 	//
-	// Default: No minimum or maximum
+	// Default: No minimum or maximum limits
 	AcceleratorTotalMemoryMiB *AcceleratorTotalMemoryMiBRequest `type:"structure"`
 
 	// Lists the accelerator types that must be on an instance type.
@@ -13500,6 +13526,23 @@ type InstanceRequirements struct {
 	// Default: Any accelerator type
 	AcceleratorTypes []*string `type:"list" enum:"AcceleratorType"`
 
+	// The instance types to apply your specified attributes against. All other
+	// instance types are ignored, even if they match your specified attributes.
+	//
+	// You can use strings with one or more wild cards, represented by an asterisk
+	// (*), to allow an instance type, size, or generation. The following are examples:
+	// m5.8xlarge, c5*.*, m5a.*, r*, *3*.
+	//
+	// For example, if you specify c5*, Amazon EC2 Auto Scaling will allow the entire
+	// C5 instance family, which includes all C5a and C5n instance types. If you
+	// specify m5a.*, Amazon EC2 Auto Scaling will allow all the M5a instance types,
+	// but not the M5n instance types.
+	//
+	// If you specify AllowedInstanceTypes, you can't specify ExcludedInstanceTypes.
+	//
+	// Default: All instance types
+	AllowedInstanceTypes []*string `type:"list"`
+
 	// Indicates whether bare metal instance types are included, excluded, or required.
 	//
 	// Default: excluded
@@ -13509,7 +13552,7 @@ type InstanceRequirements struct {
 	// in Mbps. For more information, see Amazon EBS–optimized instances (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-optimized.html)
 	// in the Amazon EC2 User Guide for Linux Instances.
 	//
-	// Default: No minimum or maximum
+	// Default: No minimum or maximum limits
 	BaselineEbsBandwidthMbps *BaselineEbsBandwidthMbpsRequest `type:"structure"`
 
 	// Indicates whether burstable performance instance types are included, excluded,
@@ -13534,13 +13577,17 @@ type InstanceRequirements struct {
 	// Default: Any manufacturer
 	CpuManufacturers []*string `type:"list" enum:"CpuManufacturer"`
 
-	// Lists which instance types to exclude. You can use strings with one or more
-	// wild cards, represented by an asterisk (*). The following are examples: c5*,
-	// m5a.*, r*, *3*.
+	// The instance types to exclude. You can use strings with one or more wild
+	// cards, represented by an asterisk (*), to exclude an instance family, type,
+	// size, or generation. The following are examples: m5.8xlarge, c5*.*, m5a.*,
+	// r*, *3*.
 	//
 	// For example, if you specify c5*, you are excluding the entire C5 instance
 	// family, which includes all C5a and C5n instance types. If you specify m5a.*,
-	// you are excluding all the M5a instance types, but not the M5n instance types.
+	// Amazon EC2 Auto Scaling will exclude all the M5a instance types, but not
+	// the M5n instance types.
+	//
+	// If you specify ExcludedInstanceTypes, you can't specify AllowedInstanceTypes.
 	//
 	// Default: No excluded instance types
 	ExcludedInstanceTypes []*string `type:"list"`
@@ -13578,7 +13625,7 @@ type InstanceRequirements struct {
 	// The minimum and maximum amount of memory per vCPU for an instance type, in
 	// GiB.
 	//
-	// Default: No minimum or maximum
+	// Default: No minimum or maximum limits
 	MemoryGiBPerVCpu *MemoryGiBPerVCpuRequest `type:"structure"`
 
 	// The minimum and maximum instance memory size for an instance type, in MiB.
@@ -13586,9 +13633,15 @@ type InstanceRequirements struct {
 	// MemoryMiB is a required field
 	MemoryMiB *MemoryMiBRequest `type:"structure" required:"true"`
 
+	// The minimum and maximum amount of network bandwidth, in gigabits per second
+	// (Gbps).
+	//
+	// Default: No minimum or maximum limits
+	NetworkBandwidthGbps *NetworkBandwidthGbpsRequest `type:"structure"`
+
 	// The minimum and maximum number of network interfaces for an instance type.
 	//
-	// Default: No minimum or maximum
+	// Default: No minimum or maximum limits
 	NetworkInterfaceCount *NetworkInterfaceCountRequest `type:"structure"`
 
 	// The price protection threshold for On-Demand Instances. This is the maximum
@@ -13632,7 +13685,7 @@ type InstanceRequirements struct {
 	// The minimum and maximum total local storage size for an instance type, in
 	// GB.
 	//
-	// Default: No minimum or maximum
+	// Default: No minimum or maximum limits
 	TotalLocalStorageGB *TotalLocalStorageGBRequest `type:"structure"`
 
 	// The minimum and maximum number of vCPUs for an instance type.
@@ -13715,6 +13768,12 @@ func (s *InstanceRequirements) SetAcceleratorTypes(v []*string) *InstanceRequire
 	return s
 }
 
+// SetAllowedInstanceTypes sets the AllowedInstanceTypes field's value.
+func (s *InstanceRequirements) SetAllowedInstanceTypes(v []*string) *InstanceRequirements {
+	s.AllowedInstanceTypes = v
+	return s
+}
+
 // SetBareMetal sets the BareMetal field's value.
 func (s *InstanceRequirements) SetBareMetal(v string) *InstanceRequirements {
 	s.BareMetal = &v
@@ -13772,6 +13831,12 @@ func (s *InstanceRequirements) SetMemoryGiBPerVCpu(v *MemoryGiBPerVCpuRequest) *
 // SetMemoryMiB sets the MemoryMiB field's value.
 func (s *InstanceRequirements) SetMemoryMiB(v *MemoryMiBRequest) *InstanceRequirements {
 	s.MemoryMiB = v
+	return s
+}
+
+// SetNetworkBandwidthGbps sets the NetworkBandwidthGbps field's value.
+func (s *InstanceRequirements) SetNetworkBandwidthGbps(v *NetworkBandwidthGbpsRequest) *InstanceRequirements {
+	s.NetworkBandwidthGbps = v
 	return s
 }
 
@@ -13847,36 +13912,45 @@ func (s *InstanceReusePolicy) SetReuseOnScaleIn(v bool) *InstanceReusePolicy {
 	return s
 }
 
-// Describes an instances distribution for an Auto Scaling group.
+// Use this structure to specify the distribution of On-Demand Instances and
+// Spot Instances and the allocation strategies used to fulfill On-Demand and
+// Spot capacities for a mixed instances policy.
 type InstancesDistribution struct {
 	_ struct{} `type:"structure"`
 
-	// The order of the launch template overrides to use in fulfilling On-Demand
-	// capacity.
+	// The allocation strategy to apply to your On-Demand Instances when they are
+	// launched. Possible instance types are determined by the launch template overrides
+	// that you specify.
 	//
-	// If you specify lowest-price, Amazon EC2 Auto Scaling uses price to determine
-	// the order, launching the lowest price first.
+	// The following lists the valid values:
 	//
-	// If you specify prioritized, Amazon EC2 Auto Scaling uses the priority that
-	// you assigned to each launch template override, launching the highest priority
-	// first. If all your On-Demand capacity cannot be fulfilled using your highest
-	// priority instance, then Amazon EC2 Auto Scaling launches the remaining capacity
-	// using the second priority instance type, and so on.
+	// lowest-price
 	//
-	// Default: lowest-price for Auto Scaling groups that specify InstanceRequirements
-	// in the overrides and prioritized for Auto Scaling groups that don't.
+	// Uses price to determine which instance types are the highest priority, launching
+	// the lowest priced instance types within an Availability Zone first. This
+	// is the default value for Auto Scaling groups that specify InstanceRequirements.
 	//
-	// Valid values: lowest-price | prioritized
+	// prioritized
+	//
+	// You set the order of instance types for the launch template overrides from
+	// highest to lowest priority (from first to last in the list). Amazon EC2 Auto
+	// Scaling launches your highest priority instance types first. If all your
+	// On-Demand capacity cannot be fulfilled using your highest priority instance
+	// type, then Amazon EC2 Auto Scaling launches the remaining capacity using
+	// the second priority instance type, and so on. This is the default value for
+	// Auto Scaling groups that don't specify InstanceRequirements and cannot be
+	// used for groups that do.
 	OnDemandAllocationStrategy *string `type:"string"`
 
 	// The minimum amount of the Auto Scaling group's capacity that must be fulfilled
 	// by On-Demand Instances. This base portion is launched first as your group
 	// scales.
 	//
-	// If you specify weights for the instance types in the overrides, the base
-	// capacity is measured in the same unit of measurement as the instance types.
-	// If you specify InstanceRequirements in the overrides, the base capacity is
-	// measured in the same unit of measurement as your group's desired capacity.
+	// This number has the same unit of measurement as the group's desired capacity.
+	// If you change the default unit of measurement (number of instances) by specifying
+	// weighted capacity values in your launch template overrides list, or by changing
+	// the default desired capacity type setting of the group, you must specify
+	// this number using the same unit of measurement.
 	//
 	// Default: 0
 	OnDemandBaseCapacity *int64 `type:"integer"`
@@ -13889,41 +13963,63 @@ type InstancesDistribution struct {
 	// Default: 100
 	OnDemandPercentageAboveBaseCapacity *int64 `type:"integer"`
 
-	// Indicates how to allocate instances across Spot Instance pools.
+	// The allocation strategy to apply to your Spot Instances when they are launched.
+	// Possible instance types are determined by the launch template overrides that
+	// you specify.
 	//
-	// If the allocation strategy is lowest-price, the Auto Scaling group launches
-	// instances using the Spot pools with the lowest price, and evenly allocates
-	// your instances across the number of Spot pools that you specify.
+	// The following lists the valid values:
 	//
-	// If the allocation strategy is capacity-optimized (recommended), the Auto
-	// Scaling group launches instances using Spot pools that are optimally chosen
-	// based on the available Spot capacity. Alternatively, you can use capacity-optimized-prioritized
-	// and set the order of instance types in the list of launch template overrides
-	// from highest to lowest priority (from first to last in the list). Amazon
-	// EC2 Auto Scaling honors the instance type priorities on a best-effort basis
-	// but optimizes for capacity first.
+	// capacity-optimized
 	//
-	// Default: lowest-price
+	// Requests Spot Instances using pools that are optimally chosen based on the
+	// available Spot capacity. This strategy has the lowest risk of interruption.
+	// To give certain instance types a higher chance of launching first, use capacity-optimized-prioritized.
 	//
-	// Valid values: lowest-price | capacity-optimized | capacity-optimized-prioritized
+	// capacity-optimized-prioritized
+	//
+	// You set the order of instance types for the launch template overrides from
+	// highest to lowest priority (from first to last in the list). Amazon EC2 Auto
+	// Scaling honors the instance type priorities on a best effort basis but optimizes
+	// for capacity first. Note that if the On-Demand allocation strategy is set
+	// to prioritized, the same priority is applied when fulfilling On-Demand capacity.
+	// This is not a valid value for Auto Scaling groups that specify InstanceRequirements.
+	//
+	// lowest-price
+	//
+	// Requests Spot Instances using the lowest priced pools within an Availability
+	// Zone, across the number of Spot pools that you specify for the SpotInstancePools
+	// property. To ensure that your desired capacity is met, you might receive
+	// Spot Instances from several pools. This is the default value, but it might
+	// lead to high interruption rates because this strategy only considers instance
+	// price and not available capacity.
+	//
+	// price-capacity-optimized (recommended)
+	//
+	// Amazon EC2 Auto Scaling identifies the pools with the highest capacity availability
+	// for the number of instances that are launching. This means that we will request
+	// Spot Instances from the pools that we believe have the lowest chance of interruption
+	// in the near term. Amazon EC2 Auto Scaling then requests Spot Instances from
+	// the lowest priced of these pools.
 	SpotAllocationStrategy *string `type:"string"`
 
 	// The number of Spot Instance pools across which to allocate your Spot Instances.
 	// The Spot pools are determined from the different instance types in the overrides.
-	// Valid only when the Spot allocation strategy is lowest-price. Value must
-	// be in the range of 1–20.
+	// Valid only when the SpotAllocationStrategy is lowest-price. Value must be
+	// in the range of 1–20.
 	//
 	// Default: 2
 	SpotInstancePools *int64 `type:"integer"`
 
 	// The maximum price per unit hour that you are willing to pay for a Spot Instance.
-	// If you keep the value at its default (unspecified), Amazon EC2 Auto Scaling
-	// uses the On-Demand price as the maximum Spot price. To remove a value that
-	// you previously set, include the property but specify an empty string ("")
-	// for the value.
-	//
 	// If your maximum price is lower than the Spot price for the instance types
-	// that you selected, your Spot Instances are not launched.
+	// that you selected, your Spot Instances are not launched. We do not recommend
+	// specifying a maximum price because it can lead to increased interruptions.
+	// When Spot Instances launch, you pay the current Spot price. To remove a maximum
+	// price that you previously set, include the property but specify an empty
+	// string ("") for the value.
+	//
+	// If you specify a maximum price, your instances will be interrupted more frequently
+	// than if you do not specify one.
 	//
 	// Valid Range: Minimum value of 0.001
 	SpotMaxPrice *string `type:"string"`
@@ -14004,16 +14100,10 @@ type LaunchConfiguration struct {
 	// in the Amazon EC2 User Guide for Linux Instances.
 	BlockDeviceMappings []*BlockDeviceMapping `type:"list"`
 
-	// EC2-Classic retires on August 15, 2022. This property is not supported after
-	// that date.
-	//
-	// The ID of a ClassicLink-enabled VPC to link your EC2-Classic instances to.
+	// Available for backward compatibility.
 	ClassicLinkVPCId *string `min:"1" type:"string"`
 
-	// EC2-Classic retires on August 15, 2022. This property is not supported after
-	// that date.
-	//
-	// The IDs of one or more security groups for the VPC specified in ClassicLinkVPCId.
+	// Available for backward compatibility.
 	ClassicLinkVPCSecurityGroups []*string `type:"list"`
 
 	// The creation date and time for the launch configuration.
@@ -14250,21 +14340,16 @@ func (s *LaunchConfiguration) SetUserData(v string) *LaunchConfiguration {
 	return s
 }
 
-// Describes a launch template and overrides. You specify these properties as
-// part of a mixed instances policy.
+// Use this structure to specify the launch templates and instance types (overrides)
+// for a mixed instances policy.
 type LaunchTemplate struct {
 	_ struct{} `type:"structure"`
 
-	// The launch template to use.
+	// The launch template.
 	LaunchTemplateSpecification *LaunchTemplateSpecification `type:"structure"`
 
 	// Any properties that you specify override the same properties in the launch
-	// template. If not provided, Amazon EC2 Auto Scaling uses the instance type
-	// or instance type requirements specified in the launch template when it launches
-	// an instance.
-	//
-	// The overrides can include either one or more instance types or a set of instance
-	// requirements, but not both.
+	// template.
 	Overrides []*LaunchTemplateOverrides `type:"list"`
 }
 
@@ -14323,45 +14408,82 @@ func (s *LaunchTemplate) SetOverrides(v []*LaunchTemplateOverrides) *LaunchTempl
 	return s
 }
 
-// Describes an override for a launch template. For more information, see Configuring
-// overrides (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-configuring-overrides.html)
-// in the Amazon EC2 Auto Scaling User Guide.
+// Use this structure to let Amazon EC2 Auto Scaling do the following when the
+// Auto Scaling group has a mixed instances policy:
+//
+//   - Override the instance type that is specified in the launch template.
+//
+//   - Use multiple instance types.
+//
+// Specify the instance types that you want, or define your instance requirements
+// instead and let Amazon EC2 Auto Scaling provision the available instance
+// types that meet your requirements. This can provide Amazon EC2 Auto Scaling
+// with a larger selection of instance types to choose from when fulfilling
+// Spot and On-Demand capacities. You can view which instance types are matched
+// before you apply the instance requirements to your Auto Scaling group.
+//
+// After you define your instance requirements, you don't have to keep updating
+// these settings to get new EC2 instance types automatically. Amazon EC2 Auto
+// Scaling uses the instance requirements of the Auto Scaling group to determine
+// whether a new EC2 instance type can be used.
 type LaunchTemplateOverrides struct {
 	_ struct{} `type:"structure"`
 
-	// The instance requirements. When you specify instance requirements, Amazon
-	// EC2 Auto Scaling finds instance types that satisfy your requirements, and
-	// then uses your On-Demand and Spot allocation strategies to launch instances
-	// from these instance types, in the same way as when you specify a list of
-	// specific instance types.
+	// The instance requirements. Amazon EC2 Auto Scaling uses your specified requirements
+	// to identify instance types. Then, it uses your On-Demand and Spot allocation
+	// strategies to launch instances from these instance types.
+	//
+	// You can specify up to four separate sets of instance requirements per Auto
+	// Scaling group. This is useful for provisioning instances from different Amazon
+	// Machine Images (AMIs) in the same Auto Scaling group. To do this, create
+	// the AMIs and create a new launch template for each AMI. Then, create a compatible
+	// set of instance requirements for each launch template.
+	//
+	// If you specify InstanceRequirements, you can't specify InstanceType.
 	InstanceRequirements *InstanceRequirements `type:"structure"`
 
-	// The instance type, such as m3.xlarge. You must use an instance type that
+	// The instance type, such as m3.xlarge. You must specify an instance type that
 	// is supported in your requested Region and Availability Zones. For more information,
 	// see Instance types (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-types.html)
 	// in the Amazon Elastic Compute Cloud User Guide.
+	//
+	// You can specify up to 40 instance types per Auto Scaling group.
 	InstanceType *string `min:"1" type:"string"`
 
-	// Provides a launch template for the specified instance type or instance requirements.
-	// For example, some instance types might require a launch template with a different
-	// AMI. If not provided, Amazon EC2 Auto Scaling uses the launch template that's
-	// defined for your mixed instances policy. For more information, see Specifying
-	// a different launch template for an instance type (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups-launch-template-overrides.html)
+	// Provides a launch template for the specified instance type or set of instance
+	// requirements. For example, some instance types might require a launch template
+	// with a different AMI. If not provided, Amazon EC2 Auto Scaling uses the launch
+	// template that's specified in the LaunchTemplate definition. For more information,
+	// see Specifying a different launch template for an instance type (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups-launch-template-overrides.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
+	//
+	// You can specify up to 20 launch templates per Auto Scaling group. The launch
+	// templates specified in the overrides and in the LaunchTemplate definition
+	// count towards this limit.
 	LaunchTemplateSpecification *LaunchTemplateSpecification `type:"structure"`
 
-	// The number of capacity units provided by the instance type specified in InstanceType
-	// in terms of virtual CPUs, memory, storage, throughput, or other relative
-	// performance characteristic. When a Spot or On-Demand Instance is launched,
-	// the capacity units count toward the desired capacity. Amazon EC2 Auto Scaling
-	// launches instances until the desired capacity is totally fulfilled, even
-	// if this results in an overage. For example, if there are two units remaining
-	// to fulfill capacity, and Amazon EC2 Auto Scaling can only launch an instance
-	// with a WeightedCapacity of five units, the instance is launched, and the
-	// desired capacity is exceeded by three units. For more information, see Configuring
-	// instance weighting for Amazon EC2 Auto Scaling (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups-instance-weighting.html)
+	// If you provide a list of instance types to use, you can specify the number
+	// of capacity units provided by each instance type in terms of virtual CPUs,
+	// memory, storage, throughput, or other relative performance characteristic.
+	// When a Spot or On-Demand Instance is launched, the capacity units count toward
+	// the desired capacity. Amazon EC2 Auto Scaling launches instances until the
+	// desired capacity is totally fulfilled, even if this results in an overage.
+	// For example, if there are two units remaining to fulfill capacity, and Amazon
+	// EC2 Auto Scaling can only launch an instance with a WeightedCapacity of five
+	// units, the instance is launched, and the desired capacity is exceeded by
+	// three units. For more information, see Configuring instance weighting for
+	// Amazon EC2 Auto Scaling (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups-instance-weighting.html)
 	// in the Amazon EC2 Auto Scaling User Guide. Value must be in the range of
 	// 1–999.
+	//
+	// If you specify a value for WeightedCapacity for one instance type, you must
+	// specify a value for WeightedCapacity for all of them.
+	//
+	// Every Auto Scaling group has three size parameters (DesiredCapacity, MaxSize,
+	// and MinSize). Usually, you set these sizes based on a specific number of
+	// instances. However, if you configure a mixed instances policy that defines
+	// weights for the instance types, you must specify these sizes with the same
+	// units that you use for weighting instances.
 	WeightedCapacity *string `min:"1" type:"string"`
 }
 
@@ -15519,11 +15641,13 @@ func (s *MetricStat) SetUnit(v string) *MetricStat {
 	return s
 }
 
-// Describes a mixed instances policy. A mixed instances policy contains the
-// instance types that Amazon EC2 Auto Scaling can launch and other information
-// that Amazon EC2 Auto Scaling can use to launch instances and help optimize
-// your costs. For more information, see Auto Scaling groups with multiple instance
-// types and purchase options (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html)
+// Use this structure to launch multiple instance types and On-Demand Instances
+// and Spot Instances within a single Auto Scaling group.
+//
+// A mixed instances policy contains information that Amazon EC2 Auto Scaling
+// can use to launch instances and help optimize your costs. For more information,
+// see Auto Scaling groups with multiple instance types and purchase options
+// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html)
 // in the Amazon EC2 Auto Scaling User Guide.
 type MixedInstancesPolicy struct {
 	_ struct{} `type:"structure"`
@@ -15578,6 +15702,55 @@ func (s *MixedInstancesPolicy) SetInstancesDistribution(v *InstancesDistribution
 // SetLaunchTemplate sets the LaunchTemplate field's value.
 func (s *MixedInstancesPolicy) SetLaunchTemplate(v *LaunchTemplate) *MixedInstancesPolicy {
 	s.LaunchTemplate = v
+	return s
+}
+
+// Specifies the minimum and maximum for the NetworkBandwidthGbps object when
+// you specify InstanceRequirements for an Auto Scaling group.
+//
+// Setting the minimum bandwidth does not guarantee that your instance will
+// achieve the minimum bandwidth. Amazon EC2 will identify instance types that
+// support the specified minimum bandwidth, but the actual bandwidth of your
+// instance might go below the specified minimum at times. For more information,
+// see Available instance bandwidth (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-network-bandwidth.html#available-instance-bandwidth)
+// in the Amazon EC2 User Guide for Linux Instances.
+type NetworkBandwidthGbpsRequest struct {
+	_ struct{} `type:"structure"`
+
+	// The maximum amount of network bandwidth, in gigabits per second (Gbps).
+	Max *float64 `type:"double"`
+
+	// The minimum amount of network bandwidth, in gigabits per second (Gbps).
+	Min *float64 `type:"double"`
+}
+
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
+func (s NetworkBandwidthGbpsRequest) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
+func (s NetworkBandwidthGbpsRequest) GoString() string {
+	return s.String()
+}
+
+// SetMax sets the Max field's value.
+func (s *NetworkBandwidthGbpsRequest) SetMax(v float64) *NetworkBandwidthGbpsRequest {
+	s.Max = &v
+	return s
+}
+
+// SetMin sets the Min field's value.
+func (s *NetworkBandwidthGbpsRequest) SetMin(v float64) *NetworkBandwidthGbpsRequest {
+	s.Min = &v
 	return s
 }
 
@@ -19352,7 +19525,7 @@ type UpdateAutoScalingGroupInput struct {
 	// and marking it unhealthy due to a failed Elastic Load Balancing or custom
 	// health check. This is useful if your instances do not immediately pass these
 	// health checks after they enter the InService state. For more information,
-	// see Health check grace period (https://docs.aws.amazon.com/autoscaling/ec2/userguide/healthcheck.html#health-check-grace-period)
+	// see Set the health check grace period for an Auto Scaling group (https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-check-grace-period.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	HealthCheckGracePeriod *int64 `type:"integer"`
 
@@ -19391,9 +19564,8 @@ type UpdateAutoScalingGroupInput struct {
 	// The minimum size of the Auto Scaling group.
 	MinSize *int64 `type:"integer"`
 
-	// An embedded object that specifies a mixed instances policy. For more information,
-	// see Auto Scaling groups with multiple instance types and purchase options
-	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html)
+	// The mixed instances policy. For more information, see Auto Scaling groups
+	// with multiple instance types and purchase options (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	MixedInstancesPolicy *MixedInstancesPolicy `type:"structure"`
 

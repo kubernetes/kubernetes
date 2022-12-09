@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -276,9 +277,20 @@ func parseScalar(r reflect.Value, node *XMLNode, tag reflect.StructTag) error {
 		}
 		r.Set(reflect.ValueOf(&v))
 	case *float64:
-		v, err := strconv.ParseFloat(node.Text, 64)
-		if err != nil {
-			return err
+		var v float64
+		switch {
+		case strings.EqualFold(node.Text, floatNaN):
+			v = math.NaN()
+		case strings.EqualFold(node.Text, floatInf):
+			v = math.Inf(1)
+		case strings.EqualFold(node.Text, floatNegInf):
+			v = math.Inf(-1)
+		default:
+			var err error
+			v, err = strconv.ParseFloat(node.Text, 64)
+			if err != nil {
+				return err
+			}
 		}
 		r.Set(reflect.ValueOf(&v))
 	case *time.Time:
