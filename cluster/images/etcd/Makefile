@@ -43,7 +43,7 @@ ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 # Image should be pulled from k8s.gcr.io, which will auto-detect
 # region (us, eu, asia, ...) and pull from the closest.
-REGISTRY?=k8s.gcr.io
+REGISTRY?=registry.k8s.io
 # Images should be pushed to staging-k8s.gcr.io.
 PUSH_REGISTRY?=staging-k8s.gcr.io
 
@@ -67,19 +67,19 @@ GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:bullseye-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:bullseye-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:bullseye-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm64:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:bullseye-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-ppc64le:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:bullseye-v1.0.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-s390x:bullseye-v1.0.0
 endif
 
 RUNNERIMAGE?=gcr.io/distroless/static:latest
