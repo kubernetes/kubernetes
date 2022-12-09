@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -2817,4 +2818,133 @@ func (t *trackingWorkqueue) dequeue(item interface{}) {
 		newPendingList = append(newPendingList, p)
 	}
 	t.pendingList = newPendingList
+}
+
+func TestGarbageCollector_resyncMonitors(t *testing.T) {
+	restMapper := meta.NewDefaultRESTMapper(nil)
+	rm := &testRESTMapper{meta.MultiRESTMapper{restMapper, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
+	metadataClient := fakemetadata.NewSimpleMetadataClient(fakemetadata.NewTestScheme())
+	client := fake.NewSimpleClientset()
+
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{},
+		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 0, len(gc.dependencyGraphBuilder.monitors))
+	gc.dependencyGraphBuilder.running = true
+
+	// Make sure resource monitor syncing creates and stops resource monitors.
+	crdGVR := schema.GroupVersionResource{Group: "tgc.io", Version: "v1", Resource: "garbage"}
+	restMapper.Add(schema.GroupVersionKind{Group: "tgc.io", Version: "v1", Kind: "Garbage"}, nil)
+
+	ctx := stepContext{
+		t:              t,
+		gc:             gc,
+		metadataClient: metadataClient,
+	}
+
+	steps := []step{
+		triggerSyncMonitors(map[schema.GroupVersionResource]struct{}{crdGVR: {}}), // adding a custom type
+		{name: "clean action", check: func(ctx stepContext) {
+			ctx.metadataClient.ClearActions()
+		}},
+		confirmEventHandleCount(time.Second, 100*time.Millisecond, crdGVR, 1), // observe event handler
+		stopMonitor(crdGVR), // removing custom type, handlers stop
+		confirmEventHandleCount(time.Second, 100*time.Millisecond, crdGVR, 0),
+		triggerSyncMonitors(map[schema.GroupVersionResource]struct{}{crdGVR: {}}), // re-adding the custom type
+		confirmEventHandleCount(time.Second, 100*time.Millisecond, crdGVR, 1),     // observe event handler
+	}
+
+	for i, s := range steps {
+		ctx.t.Logf("%d: %s", i, s.name)
+		s.check(ctx)
+		if ctx.t.Failed() {
+			return
+		}
+		verifyGraphInvariants(fmt.Sprintf("after step %d", i), gc.dependencyGraphBuilder.uidToNode.uidToNode, t)
+		if ctx.t.Failed() {
+			return
+		}
+	}
+}
+
+func triggerSyncMonitors(deletableResources map[schema.GroupVersionResource]struct{}) step {
+	return step{
+		name: "triggerSyncMonitors",
+		check: func(ctx stepContext) {
+			ctx.t.Helper()
+			logger, _ := ktesting.NewTestContext(ctx.t)
+			err := ctx.gc.resyncMonitors(logger, deletableResources)
+			if err != nil {
+				ctx.t.Errorf("Failed adding a monitor: %v", err)
+			}
+			assert.Equal(ctx.t, len(deletableResources), len(ctx.gc.dependencyGraphBuilder.monitors))
+		},
+	}
+}
+
+func confirmEventHandleCount(timeout, interval time.Duration, key schema.GroupVersionResource, expectedLen int) step {
+	return step{
+		name: "confirmEventHandleCount",
+		check: func(ctx stepContext) {
+			ctx.t.Helper()
+			i, err := ctx.gc.dependencyGraphBuilder.sharedInformers.ForResource(key)
+			if err != nil {
+				ctx.t.Errorf("get expected(%s) informer error: %+v", key.String(), err)
+			}
+			timeoutContext, cancel := context.WithTimeout(context.Background(), timeout)
+			wait.UntilWithContext(timeoutContext, func(c context.Context) {
+				if i.Informer().EventHandlerCount() == expectedLen {
+					cancel()
+				}
+			}, interval)
+			if expectedLen != i.Informer().EventHandlerCount() {
+				ctx.t.Fatal("event handler not equal to expect", expectedLen)
+			}
+		},
+	}
+}
+
+func stopMonitor(key schema.GroupVersionResource) step {
+	return step{
+		name: "mockMoritorDestoryFunc",
+		check: func(ctx stepContext) {
+			monitor, exist := ctx.gc.dependencyGraphBuilder.monitors[key]
+			if !exist {
+				ctx.t.Errorf("%s not exist in graph builder", key)
+				return
+			}
+			ch := make(chan struct{})
+			fn := monitor.destroy
+			monitor.destroy = func() {
+				fn()
+				go func() {
+					ch <- struct{}{}
+				}()
+			}
+			resources := make(map[schema.GroupVersionResource]struct{})
+			for name := range ctx.gc.dependencyGraphBuilder.monitors {
+				if name == key {
+					continue
+				}
+				resources[name] = struct{}{}
+			}
+			logger, _ := ktesting.NewTestContext(ctx.t)
+			err := ctx.gc.resyncMonitors(logger, resources)
+			if err != nil {
+				ctx.t.Errorf("Failed adding a monitor: %v", err)
+			}
+			select {
+			case <-ch:
+				break
+			case <-time.After(1 * time.Second):
+				ctx.t.Fatal("monitor stop timeout")
+			}
+		},
+	}
 }

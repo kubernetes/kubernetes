@@ -173,7 +173,6 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 			logger.Error(err, "QuotaMonitor failed to add event handler to shared informer", "resource", resource.String())
 			return nil, nil, err
 		}
-		logger.V(4).Info("QuotaMonitor using a shared informer for resource %q", resource.String())
 		return shared.Informer().GetController(), func() {
 			klog.V(4).InfoS("QuotaMonitor removed resource", "resource", resource.String())
 			shared.Informer().RemoveEventHandler(registration)

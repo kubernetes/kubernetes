@@ -162,6 +162,9 @@ type SharedInformer interface {
 	// its registration handle.
 	// This function is guaranteed to be idempotent, and thread-safe.
 	RemoveEventHandler(handle ResourceEventHandlerRegistration) error
+	// EventHandlerCount reports registered event handler count.
+	// Only for test
+	EventHandlerCount() int
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
 	// GetController is deprecated, it does nothing useful
@@ -697,6 +700,12 @@ func (s *sharedIndexInformer) RemoveEventHandler(handle ResourceEventHandlerRegi
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 	return s.processor.removeListener(handle)
+}
+
+func (s *sharedIndexInformer) EventHandlerCount() int {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return len(s.processor.listeners)
 }
 
 // sharedProcessor has a collection of processorListener and can
