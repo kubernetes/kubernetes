@@ -129,27 +129,28 @@ func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recor
 		// Pod will be modified, so making copy is required.
 		pod := pods[i].DeepCopy()
 		for _, cond := range pod.Status.Conditions {
-			if cond.Type == v1.PodReady {
-				cond.Status = v1.ConditionFalse
-				if !utilpod.UpdatePodCondition(&pod.Status, &cond) {
-					break
-				}
+			if cond.Type != v1.PodReady {
+				continue
+			}
 
-				klog.V(2).InfoS("Updating ready status of pod to false", "pod", pod.Name)
-				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						// NotFound error means that pod was already deleted.
-						// There is nothing left to do with this pod.
-						continue
-					}
-					klog.InfoS("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)
-					errs = append(errs, err)
-				}
-				// record NodeNotReady event after updateStatus to make sure pod still exists
-				recorder.Event(pod, v1.EventTypeWarning, "NodeNotReady", "Node is not ready")
+			cond.Status = v1.ConditionFalse
+			if !utilpod.UpdatePodCondition(&pod.Status, &cond) {
 				break
 			}
+
+			klog.V(2).InfoS("Updating ready status of pod to false", "pod", pod.Name)
+			if _, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
+				if apierrors.IsNotFound(err) {
+					// NotFound error means that pod was already deleted.
+					// There is nothing left to do with this pod.
+					continue
+				}
+				klog.InfoS("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)
+				errs = append(errs, err)
+			}
+			// record NodeNotReady event after updateStatus to make sure pod still exists
+			recorder.Event(pod, v1.EventTypeWarning, "NodeNotReady", "Node is not ready")
+			break
 		}
 	}
 
@@ -222,8 +223,7 @@ func SwapNodeControllerTaint(ctx context.Context, kubeClient clientset.Interface
 // AddOrUpdateLabelsOnNode updates the labels on the node and returns true on
 // success and false on failure.
 func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, labelsToUpdate map[string]string, node *v1.Node) bool {
-	err := controller.AddOrUpdateLabelsOnNode(kubeClient, node.Name, labelsToUpdate)
-	if err != nil {
+	if err := controller.AddOrUpdateLabelsOnNode(kubeClient, node.Name, labelsToUpdate); err != nil {
 		utilruntime.HandleError(
 			fmt.Errorf(
 				"unable to update labels %+v for Node %q: %v",
