@@ -184,11 +184,14 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 
 	//nolint:staticcheck // SA1019 ignore deprecated httputil.NewProxyClientConn
 	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
-	_, err = proxyClientConn.Do(&proxyReq)
+	response, err := proxyClientConn.Do(&proxyReq)
 	//nolint:staticcheck // SA1019 ignore deprecated httputil.ErrPersistEOF: it might be
 	// returned from the invocation of proxyClientConn.Do
 	if err != nil && err != httputil.ErrPersistEOF {
 		return nil, err
+	}
+	if response != nil && response.StatusCode >= 300 || response.StatusCode < 200 {
+		return nil, fmt.Errorf("CONNECT request to %s returned response: %s", proxyURL.Redacted(), response.Status)
 	}
 
 	rwc, _ := proxyClientConn.Hijack()
@@ -294,9 +297,10 @@ func (s *SpdyRoundTripper) proxyAuth(proxyURL *url.URL) string {
 	if proxyURL == nil || proxyURL.User == nil {
 		return ""
 	}
-	credentials := proxyURL.User.String()
-	encodedAuth := base64.StdEncoding.EncodeToString([]byte(credentials))
-	return fmt.Sprintf("Basic %s", encodedAuth)
+	username := proxyURL.User.Username()
+	password, _ := proxyURL.User.Password()
+	auth := username + ":" + password
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
 }
 
 // RoundTrip executes the Request and upgrades it. After a successful upgrade,
