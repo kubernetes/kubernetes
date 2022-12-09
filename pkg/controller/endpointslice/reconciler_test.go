@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 var defaultMaxEndpointsPerSlice = int32(100)
@@ -125,12 +125,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						Zone:     utilpointer.StringPtr("us-central1-a"),
-						NodeName: utilpointer.StringPtr("node-1"),
+						Zone:     pointer.String("us-central1-a"),
+						NodeName: pointer.String("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -151,12 +151,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						Zone:     utilpointer.StringPtr("us-central1-a"),
-						NodeName: utilpointer.StringPtr("node-1"),
+						Zone:     pointer.String("us-central1-a"),
+						NodeName: pointer.String("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -178,12 +178,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						Zone:     utilpointer.StringPtr("us-central1-a"),
-						NodeName: utilpointer.StringPtr("node-1"),
+						Zone:     pointer.String("us-central1-a"),
+						NodeName: pointer.String("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -196,12 +196,12 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(false),
 				},
-				Zone:     utilpointer.StringPtr("us-central1-a"),
-				NodeName: utilpointer.StringPtr("node-1"),
+				Zone:     pointer.String("us-central1-a"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -220,12 +220,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						Zone:     utilpointer.StringPtr("us-central1-a"),
-						NodeName: utilpointer.StringPtr("node-1"),
+						Zone:     pointer.String("us-central1-a"),
+						NodeName: pointer.String("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -238,12 +238,12 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(false),
 				},
-				Zone:     utilpointer.StringPtr("us-central1-a"),
-				NodeName: utilpointer.StringPtr("node-1"),
+				Zone:     pointer.String("us-central1-a"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -264,12 +264,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						Zone:     utilpointer.StringPtr("us-central1-a"),
-						NodeName: utilpointer.StringPtr("node-1"),
+						Zone:     pointer.String("us-central1-a"),
+						NodeName: pointer.String("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -282,12 +282,12 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(false),
 				},
-				Zone:     utilpointer.StringPtr("us-central1-a"),
-				NodeName: utilpointer.StringPtr("node-1"),
+				Zone:     pointer.String("us-central1-a"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -308,12 +308,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						Zone:     utilpointer.StringPtr("us-central1-a"),
-						NodeName: utilpointer.StringPtr("node-1"),
+						Zone:     pointer.String("us-central1-a"),
+						NodeName: pointer.String("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -336,12 +336,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						Zone:     utilpointer.StringPtr("us-central1-a"),
-						NodeName: utilpointer.StringPtr("node-1"),
+						Zone:     pointer.String("us-central1-a"),
+						NodeName: pointer.String("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -363,12 +363,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						Zone:     utilpointer.StringPtr("us-central1-a"),
-						NodeName: utilpointer.StringPtr("node-1"),
+						Zone:     pointer.String("us-central1-a"),
+						NodeName: pointer.String("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -380,12 +380,12 @@ func TestReconcile1Pod(t *testing.T) {
 					{
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						Zone:     utilpointer.StringPtr("us-central1-a"),
-						NodeName: utilpointer.StringPtr("node-1"),
+						Zone:     pointer.String("us-central1-a"),
+						NodeName: pointer.String("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -1192,9 +1192,9 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	for i := range fetchedSlices {
 		expectedSlices = append(expectedSlices, discovery.EndpointSlice{
 			Ports: []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(""),
+				Name:     pointer.String(""),
 				Protocol: &protoTCP,
-				Port:     utilpointer.Int32Ptr(int32(8080 + i)),
+				Port:     pointer.Int32(int32(8080 + i)),
 			}},
 			AddressType: discovery.AddressTypeIPv4,
 		})

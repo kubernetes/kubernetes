@@ -27,7 +27,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func TestAddHints(t *testing.T) {
@@ -65,8 +65,8 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       utilpointer.StringPtr("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}},
 			}},
 		},
@@ -74,8 +74,8 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       utilpointer.StringPtr("zone-a"),
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Zone:       pointer.String("zone-a"),
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		}},
 		expectedSlicesToUpdate: []*discovery.EndpointSlice{},
@@ -99,12 +99,12 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       utilpointer.StringPtr("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.1.2.4"},
-					Zone:       utilpointer.StringPtr("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}},
 			}},
 		},
@@ -112,12 +112,12 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       utilpointer.StringPtr("zone-a"),
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Zone:       pointer.String("zone-a"),
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.1.2.4"},
-				Zone:       utilpointer.StringPtr("zone-b"),
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Zone:       pointer.String("zone-b"),
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		}},
 		expectedSlicesToUpdate: []*discovery.EndpointSlice{},
@@ -140,12 +140,12 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       utilpointer.StringPtr("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.1.2.4"},
-					Zone:       utilpointer.StringPtr("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}},
 			}},
 		},
@@ -158,14 +158,14 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.1.2.4"},
-				Zone:       utilpointer.StringPtr("zone-b"),
+				Zone:       pointer.String("zone-b"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		}},
 		expectedSlicesToUpdate: []*discovery.EndpointSlice{},
@@ -188,19 +188,19 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       utilpointer.StringPtr("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.1.2.4"},
-					Zone:       utilpointer.StringPtr("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.1.2.5"},
-					Zone:       utilpointer.StringPtr("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+					Zone:       pointer.String("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
 				}, {
 					Addresses: []string{"10.1.2.6"},
-					Zone:      utilpointer.StringPtr("zone-b"),
+					Zone:      pointer.String("zone-b"),
 				}},
 			}},
 		},
@@ -213,22 +213,22 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.1.2.4"},
-				Zone:       utilpointer.StringPtr("zone-b"),
+				Zone:       pointer.String("zone-b"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.1.2.5"},
-				Zone:       utilpointer.StringPtr("zone-b"),
+				Zone:       pointer.String("zone-b"),
 				Hints:      nil,
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
 			}, {
 				Addresses: []string{"10.1.2.6"},
-				Zone:      utilpointer.StringPtr("zone-b"),
+				Zone:      pointer.String("zone-b"),
 				Hints:     nil,
 			}},
 		}},
@@ -253,51 +253,51 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       utilpointer.StringPtr("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.1.2.4"},
-					Zone:       utilpointer.StringPtr("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}},
 			}, {
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.3.3"},
-					Zone:       utilpointer.StringPtr("zone-c"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-c"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.1.3.4"},
-					Zone:       utilpointer.StringPtr("zone-c"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-c"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.1.3.4"},
-					Zone:       utilpointer.StringPtr("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}},
 			}},
 			ToUpdate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.2.2.3"},
-					Zone:       utilpointer.StringPtr("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.2.2.4"},
-					Zone:       utilpointer.StringPtr("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}},
 			}, {
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.2.3.3"},
-					Zone:       utilpointer.StringPtr("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.2.3.4"},
-					Zone:       utilpointer.StringPtr("zone-c"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-c"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}, {
 					Addresses:  []string{"10.2.3.4"},
-					Zone:       utilpointer.StringPtr("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+					Zone:       pointer.String("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 				}},
 			}},
 		},
@@ -311,61 +311,61 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.1.2.4"},
-				Zone:       utilpointer.StringPtr("zone-b"),
+				Zone:       pointer.String("zone-b"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		}, {
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.3.3"},
-				Zone:       utilpointer.StringPtr("zone-c"),
+				Zone:       pointer.String("zone-c"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-c"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.1.3.4"},
-				Zone:       utilpointer.StringPtr("zone-c"),
+				Zone:       pointer.String("zone-c"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-c"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.1.3.4"},
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		}},
 		expectedSlicesToUpdate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.2.2.3"},
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.2.2.4"},
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		}, {
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.2.3.3"},
-				Zone:       utilpointer.StringPtr("zone-b"),
+				Zone:       pointer.String("zone-b"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.2.3.4"},
-				Zone:       utilpointer.StringPtr("zone-c"),
+				Zone:       pointer.String("zone-c"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-c"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}, {
 				Addresses:  []string{"10.2.3.4"},
-				Zone:       utilpointer.StringPtr("zone-a"),
+				Zone:       pointer.String("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
 			}},
 		}},
 		expectedEvents: []*EventBuilder{
