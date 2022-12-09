@@ -427,7 +427,7 @@ func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	}
 
 	scope := CleanScope(requestInfo)
-	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req)
 	resource := requestInfo.Resource
 	subresource := requestInfo.Subresource
 	group := requestInfo.APIGroup
@@ -448,7 +448,7 @@ func RecordDroppedRequest(req *http.Request, requestInfo *request.RequestInfo, c
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req)
 
 	if requestInfo.IsResourceRequest {
 		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
@@ -471,7 +471,7 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req)
 
 	if requestInfo.IsResourceRequest {
 		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
@@ -493,7 +493,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req)
 
 	if requestInfo.IsResourceRequest {
 		g = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
@@ -648,12 +648,10 @@ func cleanVerb(verb, suggestedVerb string, request *http.Request) string {
 	// deprecated path pattern for watch of:
 	//   GET /api/{version}/watch/{resource}
 	// We correct it manually based on the pass verb from the installer.
-	var reportedVerb string
 	if suggestedVerb == "WATCH" || suggestedVerb == "WATCHLIST" {
-		reportedVerb = "WATCH"
-	} else {
-		reportedVerb = CleanVerb(verb, request)
+		return "WATCH"
 	}
+	reportedVerb := CleanVerb(verb, request)
 	if validRequestMethods.Has(reportedVerb) {
 		return reportedVerb
 	}
