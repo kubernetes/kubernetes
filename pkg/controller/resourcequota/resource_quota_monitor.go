@@ -119,6 +119,7 @@ func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactor
 // monitor runs a Controller with a local stop channel.
 type monitor struct {
 	controller cache.Controller
+	destroy    func()
 
 	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
 	// not yet started.
@@ -136,7 +137,7 @@ type monitors map[schema.GroupVersionResource]*monitor
 // UpdateFilter is a function that returns true if the update event should be added to the resourceChanges queue.
 type UpdateFilter func(resource schema.GroupVersionResource, oldObj, newObj interface{}) bool
 
-func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.GroupVersionResource) (cache.Controller, error) {
+func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.GroupVersionResource) (cache.Controller, func(), error) {
 	logger := klog.FromContext(ctx)
 
 	handlers := cache.ResourceEventHandlerFuncs{
@@ -167,14 +168,22 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 	shared, err := qm.informerFactory.ForResource(resource)
 	if err == nil {
 		logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
-		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
-		return shared.Informer().GetController(), nil
+		registration, err := shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
+		if err != nil {
+			logger.Error(err, "QuotaMonitor failed to add event handler to shared informer", "resource", resource.String())
+			return nil, nil, err
+		}
+		logger.V(4).Info("QuotaMonitor using a shared informer for resource %q", resource.String())
+		return shared.Informer().GetController(), func() {
+			klog.V(4).InfoS("QuotaMonitor removed resource", "resource", resource.String())
+			shared.Informer().RemoveEventHandler(registration)
+		}, nil
 	}
 	logger.V(4).Error(err, "QuotaMonitor unable to use a shared informer", "resource", resource.String())
 
 	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
 	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
-	return nil, fmt.Errorf("unable to monitor quota for resource %q", resource.String())
+	return nil, nil, fmt.Errorf("unable to monitor quota for resource %q", resource.String())
 }
 
 // SyncMonitors rebuilds the monitor set according to the supplied resources,
@@ -207,7 +216,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 			kept++
 			continue
 		}
-		c, err := qm.controllerFor(ctx, resource)
+		c, d, err := qm.controllerFor(ctx, resource)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
@@ -224,7 +233,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 		}
 
 		// track the monitor
-		current[resource] = &monitor{controller: c}
+		current[resource] = &monitor{controller: c, destroy: d}
 		added++
 	}
 	qm.monitors = current
@@ -233,6 +242,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 		if monitor.stopCh != nil {
 			close(monitor.stopCh)
 		}
+		monitor.destroy()
 	}
 
 	logger.V(4).Info("quota synced monitors", "added", added, "kept", kept, "removed", len(toRemove))

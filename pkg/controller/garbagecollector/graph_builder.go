@@ -120,6 +120,7 @@ type GraphBuilder struct {
 type monitor struct {
 	controller cache.Controller
 	store      cache.Store
+	destroy    func()
 
 	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
 	// not yet started.
@@ -134,7 +135,7 @@ func (m *monitor) Run() {
 
 type monitors map[schema.GroupVersionResource]*monitor
 
-func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
+func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, func(), error) {
 	handlers := cache.ResourceEventHandlerFuncs{
 		// add the event to the dependencyGraphBuilder's graphChanges.
 		AddFunc: func(obj interface{}) {
@@ -173,12 +174,20 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 	shared, err := gb.sharedInformers.ForResource(resource)
 	if err != nil {
 		logger.V(4).Error(err, "unable to use a shared informer", "resource", resource, "kind", kind)
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)
 	// need to clone because it's from a shared cache
-	shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
-	return shared.Informer().GetController(), shared.Informer().GetStore(), nil
+	registration, err := shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
+	if err != nil {
+		//klog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
+		klog.ErrorS(err, "unable to register event handler to shared informer", "resource", resource.String(), "kind", kind.String())
+		return nil, nil, nil, err
+	}
+	return shared.Informer().GetController(), shared.Informer().GetStore(), func() {
+		klog.V(4).InfoS("destroy event handler", "resource", resource.String(), "kind", kind.String())
+		shared.Informer().RemoveEventHandler(registration)
+	}, nil
 }
 
 // syncMonitors rebuilds the monitor set according to the supplied resources,
@@ -214,12 +223,12 @@ func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.Gr
 			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
 			continue
 		}
-		c, s, err := gb.controllerFor(logger, resource, kind)
+		c, s, d, err := gb.controllerFor(logger, resource, kind)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
 		}
-		current[resource] = &monitor{store: s, controller: c}
+		current[resource] = &monitor{store: s, controller: c, destroy: d}
 		added++
 	}
 	gb.monitors = current
@@ -228,6 +237,7 @@ func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.Gr
 		if monitor.stopCh != nil {
 			close(monitor.stopCh)
 		}
+		monitor.destroy()
 	}
 
 	logger.V(4).Info("synced monitors", "added", added, "kept", kept, "removed", len(toRemove))
