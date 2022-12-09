@@ -54,7 +54,7 @@ type Reflector struct {
 	// will be the stringification of expectedGVK if provided, and the
 	// stringification of expectedType otherwise. It is for display
 	// only, and should not be used for parsing or comparison.
-	expectedTypeName string
+	typeDescription string
 	// An example object of the type we expect to place in the store.
 	// Only the type needs to be right, except that when that is
 	// `unstructured.Unstructured` the object's `"apiVersion"` and
@@ -131,13 +131,13 @@ func DefaultWatchErrorHandler(r *Reflector, err error) {
 		// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
 		// has a semantic that it returns data at least as fresh as provided RV.
 		// So first try to LIST with setting RV to resource version of last observed object.
-		klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
+		klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.typeDescription, err)
 	case err == io.EOF:
 		// watch closed normally
 	case err == io.ErrUnexpectedEOF:
-		klog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedTypeName, err)
+		klog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.typeDescription, err)
 	default:
-		utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedTypeName, err))
+		utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.typeDescription, err))
 	}
 }
 
@@ -155,7 +155,37 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 	return indexer, reflector
 }
 
-// NewReflector creates a new Reflector object which will keep the
+// NewReflector creates a new Reflector with its name defaulted to the closest source_file.go:line in the call stack
+// that is outside this package. See NewReflectorWithOptions for further information.
+func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+	return NewReflectorWithOptions(lw, expectedType, store, ReflectorOptions{ResyncPeriod: resyncPeriod})
+}
+
+// NewNamedReflector creates a new Reflector with the specified name. See NewReflectorWithOptions for further
+// information.
+func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+	return NewReflectorWithOptions(lw, expectedType, store, ReflectorOptions{Name: name, ResyncPeriod: resyncPeriod})
+}
+
+// ReflectorOptions configures a Reflector.
+type ReflectorOptions struct {
+	// Name is the Reflector's name. If unset/unspecified, the name defaults to the closest source_file.go:line
+	// in the call stack that is outside this package.
+	Name string
+
+	// TypeDescription is the Reflector's type description. If unset/unspecified, the type description is defaulted
+	// using the following rules: if the expectedType passed to NewReflectorWithOptions was nil, the type description is
+	// "<unspecified>". If the expectedType is an instance of *unstructured.Unstructured and its apiVersion and kind fields
+	// are set, the type description is the string encoding of those. Otherwise, the type description is set to the
+	// go type of expectedType..
+	TypeDescription string
+
+	// ResyncPeriod is the Reflector's resync period. If unset/unspecified, the resync period defaults to 0
+	// (do not resync).
+	ResyncPeriod time.Duration
+}
+
+// NewReflectorWithOptions creates a new Reflector object which will keep the
 // given store up to date with the server's contents for the given
 // resource. Reflector promises to only put things in the store that
 // have the type of expectedType, unless expectedType is nil. If
@@ -165,49 +195,71 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 // "yes".  This enables you to use reflectors to periodically process
 // everything as well as incrementally processing the things that
 // change.
-func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
-	return NewNamedReflector(naming.GetNameFromCallsite(internalPackages...), lw, expectedType, store, resyncPeriod)
-}
-
-// NewNamedReflector same as NewReflector, but with a specified name for logging
-func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store Store, options ReflectorOptions) *Reflector {
 	realClock := &clock.RealClock{}
 	r := &Reflector{
-		name:          name,
-		listerWatcher: lw,
-		store:         store,
+		name:            options.Name,
+		resyncPeriod:    options.ResyncPeriod,
+		typeDescription: options.TypeDescription,
+		listerWatcher:   lw,
+		store:           store,
 		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
 		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
 		backoffManager:         wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, realClock),
 		initConnBackoffManager: wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, realClock),
-		resyncPeriod:           resyncPeriod,
 		clock:                  realClock,
 		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+		expectedType:           reflect.TypeOf(expectedType),
 	}
-	r.setExpectedType(expectedType)
+
+	if r.name == "" {
+		r.name = naming.GetNameFromCallsite(internalPackages...)
+	}
+
+	if r.typeDescription == "" {
+		r.typeDescription = getTypeDescriptionFromObject(expectedType)
+	}
+
+	if r.expectedGVK == nil {
+		r.expectedGVK = getExpectedGVKFromObject(expectedType)
+	}
+
 	return r
 }
 
-func (r *Reflector) setExpectedType(expectedType interface{}) {
-	r.expectedType = reflect.TypeOf(expectedType)
-	if r.expectedType == nil {
-		r.expectedTypeName = defaultExpectedTypeName
-		return
+func getTypeDescriptionFromObject(expectedType interface{}) string {
+	if expectedType == nil {
+		return defaultExpectedTypeName
 	}
 
-	r.expectedTypeName = r.expectedType.String()
+	reflectDescription := reflect.TypeOf(expectedType).String()
 
-	if obj, ok := expectedType.(*unstructured.Unstructured); ok {
-		// Use gvk to check that watch event objects are of the desired type.
-		gvk := obj.GroupVersionKind()
-		if gvk.Empty() {
-			klog.V(4).Infof("Reflector from %s configured with expectedType of *unstructured.Unstructured with empty GroupVersionKind.", r.name)
-			return
-		}
-		r.expectedGVK = &gvk
-		r.expectedTypeName = gvk.String()
+	obj, ok := expectedType.(*unstructured.Unstructured)
+	if !ok {
+		return reflectDescription
 	}
+
+	gvk := obj.GroupVersionKind()
+	if gvk.Empty() {
+		return reflectDescription
+	}
+
+	return gvk.String()
+}
+
+func getExpectedGVKFromObject(expectedType interface{}) *schema.GroupVersionKind {
+	obj, ok := expectedType.(*unstructured.Unstructured)
+	if !ok {
+		return nil
+	}
+
+	gvk := obj.GroupVersionKind()
+	if gvk.Empty() {
+		return nil
+	}
+
+	return &gvk
 }
 
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
@@ -218,13 +270,13 @@ var internalPackages = []string{"client-go/tools/cache/"}
 // objects and subsequent deltas.
 // Run will exit when stopCh is closed.
 func (r *Reflector) Run(stopCh <-chan struct{}) {
-	klog.V(3).Infof("Starting reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
+	klog.V(3).Infof("Starting reflector %s (%s) from %s", r.typeDescription, r.resyncPeriod, r.name)
 	wait.BackoffUntil(func() {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			r.watchErrorHandler(r, err)
 		}
 	}, r.backoffManager, true, stopCh)
-	klog.V(3).Infof("Stopping reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
+	klog.V(3).Infof("Stopping reflector %s (%s) from %s", r.typeDescription, r.resyncPeriod, r.name)
 }
 
 var (
@@ -254,7 +306,7 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // and then use the resource version to watch.
 // It returns error if ListAndWatch didn't even try to initialize watch.
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
-	klog.V(3).Infof("Listing and watching %v from %s", r.expectedTypeName, r.name)
+	klog.V(3).Infof("Listing and watching %v from %s", r.typeDescription, r.name)
 
 	err := r.list(stopCh)
 	if err != nil {
@@ -326,7 +378,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			return err
 		}
 
-		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.expectedTypeName, r.setLastSyncResourceVersion, r.clock, resyncerrc, stopCh)
+		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, r.clock, resyncerrc, stopCh)
 		retry.After(err)
 		if err != nil {
 			if err != errorStopRequested {
@@ -335,16 +387,16 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 					// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
 					// has a semantic that it returns data at least as fresh as provided RV.
 					// So first try to LIST with setting RV to resource version of last observed object.
-					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
+					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.typeDescription, err)
 				case apierrors.IsTooManyRequests(err):
-					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.expectedTypeName)
+					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.typeDescription)
 					<-r.initConnBackoffManager.Backoff().C()
 					continue
 				case apierrors.IsInternalError(err) && retry.ShouldRetry():
-					klog.V(2).Infof("%s: retrying watch of %v internal error: %v", r.name, r.expectedTypeName, err)
+					klog.V(2).Infof("%s: retrying watch of %v internal error: %v", r.name, r.typeDescription, err)
 					continue
 				default:
-					klog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedTypeName, err)
+					klog.Warningf("%s: watch of %v ended with: %v", r.name, r.typeDescription, err)
 				}
 			}
 			return nil
@@ -421,8 +473,8 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 	}
 	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
 	if err != nil {
-		klog.Warningf("%s: failed to list %v: %v", r.name, r.expectedTypeName, err)
-		return fmt.Errorf("failed to list %v: %w", r.expectedTypeName, err)
+		klog.Warningf("%s: failed to list %v: %v", r.name, r.typeDescription, err)
+		return fmt.Errorf("failed to list %v: %w", r.typeDescription, err)
 	}
 
 	// We check if the list was paginated and if so set the paginatedResult based on that.
