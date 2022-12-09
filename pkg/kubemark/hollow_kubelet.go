@@ -131,8 +131,8 @@ func (hk *HollowKubelet) Run() {
 	select {}
 }
 
-// HollowKubletOptions contains settable parameters for hollow kubelet.
-type HollowKubletOptions struct {
+// HollowKubeletOptions contains settable parameters for hollow kubelet.
+type HollowKubeletOptions struct {
 	NodeName            string
 	KubeletPort         int
 	KubeletReadOnlyPort int
@@ -144,7 +144,7 @@ type HollowKubletOptions struct {
 
 // Builds a KubeletConfiguration for the HollowKubelet, ensuring that the
 // usual defaults are applied for fields we do not override.
-func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
+func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
 	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
