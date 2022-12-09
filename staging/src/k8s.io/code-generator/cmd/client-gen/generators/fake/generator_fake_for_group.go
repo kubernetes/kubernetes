@@ -124,7 +124,5 @@ var getRESTClient = `
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *Fake$.GroupGoName$$.Version$) RESTClient() $.RESTClientInterface|raw$ {
-	var ret *$.RESTClient|raw$
-	return ret
+	return &$.RESTClient|raw${}
 }
-`
