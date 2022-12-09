@@ -1104,27 +1104,29 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *
 
 		if shouldRun {
 			desiredNumberScheduled++
-			if scheduled {
-				currentNumberScheduled++
-				// Sort the daemon pods by creation time, so that the oldest is first.
-				daemonPods, _ := nodeToDaemonPods[node.Name]
-				sort.Sort(podByCreationTimestampAndPhase(daemonPods))
-				pod := daemonPods[0]
-				if podutil.IsPodReady(pod) {
-					numberReady++
-					if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
-						numberAvailable++
-					}
+			if !scheduled {
+				continue
+			}
+
+			currentNumberScheduled++
+			// Sort the daemon pods by creation time, so that the oldest is first.
+			daemonPods, _ := nodeToDaemonPods[node.Name]
+			sort.Sort(podByCreationTimestampAndPhase(daemonPods))
+			pod := daemonPods[0]
+			if podutil.IsPodReady(pod) {
+				numberReady++
+				if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+					numberAvailable++
 				}
-				// If the returned error is not nil we have a parse error.
-				// The controller handles this via the hash.
-				generation, err := util.GetTemplateGeneration(ds)
-				if err != nil {
-					generation = nil
-				}
-				if util.IsPodUpdated(pod, hash, generation) {
-					updatedNumberScheduled++
-				}
+			}
+			// If the returned error is not nil we have a parse error.
+			// The controller handles this via the hash.
+			generation, err := util.GetTemplateGeneration(ds)
+			if err != nil {
+				generation = nil
+			}
+			if util.IsPodUpdated(pod, hash, generation) {
+				updatedNumberScheduled++
 			}
 		} else {
 			if scheduled {
@@ -1325,14 +1327,17 @@ func getUnscheduledPodsWithoutNode(runningNodesList []*v1.Node, nodeToDaemonPods
 	for _, node := range runningNodesList {
 		isNodeRunning[node.Name] = true
 	}
+
 	for n, pods := range nodeToDaemonPods {
-		if !isNodeRunning[n] {
-			for _, pod := range pods {
-				if len(pod.Spec.NodeName) == 0 {
-					results = append(results, pod.Name)
-				}
+		if isNodeRunning[n] {
+			continue
+		}
+		for _, pod := range pods {
+			if len(pod.Spec.NodeName) == 0 {
+				results = append(results, pod.Name)
 			}
 		}
 	}
+
 	return results
 }
