@@ -30,6 +30,7 @@ var PluginsV1beta2 = &config.Plugins{
 	},
 	PreFilter: config.PluginSet{
 		Enabled: []config.Plugin{
+			{Name: names.NodeName},
 			{Name: names.NodeResourcesFit},
 			{Name: names.NodePorts},
 			{Name: names.VolumeRestrictions},
@@ -42,7 +43,6 @@ var PluginsV1beta2 = &config.Plugins{
 	Filter: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.NodeUnschedulable},
-			{Name: names.NodeName},
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
@@ -188,6 +188,7 @@ var ExpandedPluginsV1beta3 = &config.Plugins{
 	},
 	PreFilter: config.PluginSet{
 		Enabled: []config.Plugin{
+			{Name: names.NodeName},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
 			{Name: names.NodeResourcesFit},
@@ -200,7 +201,6 @@ var ExpandedPluginsV1beta3 = &config.Plugins{
 	Filter: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.NodeUnschedulable},
-			{Name: names.NodeName},
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
@@ -358,6 +358,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 	},
 	PreFilter: config.PluginSet{
 		Enabled: []config.Plugin{
+			{Name: names.NodeName},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},
 			{Name: names.NodeResourcesFit},
@@ -370,7 +371,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 	Filter: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.NodeUnschedulable},
-			{Name: names.NodeName},
 			{Name: names.TaintToleration},
 			{Name: names.NodeAffinity},
 			{Name: names.NodePorts},

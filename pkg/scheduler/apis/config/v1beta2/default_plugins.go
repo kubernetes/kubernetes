@@ -36,6 +36,7 @@ func getDefaultPlugins() *v1beta2.Plugins {
 		},
 		PreFilter: v1beta2.PluginSet{
 			Enabled: []v1beta2.Plugin{
+				{Name: names.NodeName},
 				{Name: names.NodeResourcesFit},
 				{Name: names.NodePorts},
 				{Name: names.VolumeRestrictions},
@@ -48,7 +49,6 @@ func getDefaultPlugins() *v1beta2.Plugins {
 		Filter: v1beta2.PluginSet{
 			Enabled: []v1beta2.Plugin{
 				{Name: names.NodeUnschedulable},
-				{Name: names.NodeName},
 				{Name: names.TaintToleration},
 				{Name: names.NodeAffinity},
 				{Name: names.NodePorts},

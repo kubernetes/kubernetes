@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -28,7 +29,7 @@ import (
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
 type NodeName struct{}
 
-var _ framework.FilterPlugin = &NodeName{}
+var _ framework.PreFilterPlugin = &NodeName{}
 var _ framework.EnqueueExtensions = &NodeName{}
 
 const (
@@ -53,13 +54,14 @@ func (pl *NodeName) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if nodeInfo.Node() == nil {
-		return framework.NewStatus(framework.Error, "node not found")
+func (pl *NodeName) PreFilter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	if len(pod.Spec.NodeName) != 0 {
+		return &framework.PreFilterResult{NodeNames: sets.NewString(pod.Spec.NodeName)}, nil
 	}
-	if !Fits(pod, nodeInfo) {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason)
-	}
+	return nil, nil
+}
+
+func (pl *NodeName) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
