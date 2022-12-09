@@ -18,7 +18,7 @@ package rollout
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -50,7 +50,7 @@ func TestRolloutRestartOne(t *testing.T) {
 				case p == "/namespaces/test/deployments/nginx-deployment" && (m == "GET" || m == "PATCH"):
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = deploymentName
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -88,7 +88,7 @@ func TestRolloutRestartSelectorNone(t *testing.T) {
 				case p == "/namespaces/test/deployments" && m == "GET" && q.Get("labelSelector") == labelSelector:
 					// Return an empty list
 					responseDeployments := &appsv1.DeploymentList{}
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployments))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployments))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -135,7 +135,7 @@ func TestRolloutRestartSelectorMany(t *testing.T) {
 					// Return the list of 2 deployments
 					responseDeployments := &appsv1.DeploymentList{}
 					responseDeployments.Items = []appsv1.Deployment{firstDeployment, secondDeployment}
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployments))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployments))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				case (p == "/namespaces/test/deployments/nginx-deployment-1" || p == "/namespaces/test/deployments/nginx-deployment-2") && m == "PATCH":
 					// Pick deployment based on path
@@ -143,7 +143,7 @@ func TestRolloutRestartSelectorMany(t *testing.T) {
 					if strings.HasSuffix(p, "nginx-deployment-2") {
 						responseDeployment = secondDeployment
 					}
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, &responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, &responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)

@@ -19,7 +19,6 @@ package diff
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -286,7 +285,7 @@ type Directory struct {
 // CreateDirectory does create the actual disk directory, and return a
 // new representation of it.
 func CreateDirectory(prefix string) (*Directory, error) {
-	name, err := ioutil.TempDir("", prefix+"-")
+	name, err := os.MkdirTemp("", prefix+"-")
 	if err != nil {
 		return nil, err
 	}

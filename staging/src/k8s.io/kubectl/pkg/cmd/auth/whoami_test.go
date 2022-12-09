@@ -19,7 +19,7 @@ package auth
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 
@@ -137,7 +137,7 @@ func TestWhoAmIRun(t *testing.T) {
 			var b bytes.Buffer
 
 			test.o.Out = &b
-			test.o.ErrOut = ioutil.Discard
+			test.o.ErrOut = io.Discard
 
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()

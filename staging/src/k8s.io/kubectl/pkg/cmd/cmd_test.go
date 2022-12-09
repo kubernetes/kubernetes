@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -178,7 +177,7 @@ func (h *testPluginHandler) Lookup(filename string) (string, bool) {
 		return "", false
 	}
 
-	plugins, err := ioutil.ReadDir(h.pluginsDirectory)
+	plugins, err := os.ReadDir(h.pluginsDirectory)
 	if err != nil {
 		h.err = err
 		return "", false

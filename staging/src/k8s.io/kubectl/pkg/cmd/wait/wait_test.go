@@ -17,7 +17,7 @@ limitations under the License.
 package wait
 
 import (
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -963,7 +963,7 @@ func TestWaitForCondition(t *testing.T) {
 				Timeout:        test.timeout,
 
 				Printer:     printers.NewDiscardingPrinter(),
-				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: ioutil.Discard}.IsConditionMet,
+				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
 				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()
@@ -1181,7 +1181,7 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 				ConditionFn: JSONPathWait{
 					jsonPathCondition: test.jsonPathCond,
 					jsonPathParser:    j,
-					errOut:            ioutil.Discard}.IsJSONPathConditionMet,
+					errOut:            io.Discard}.IsJSONPathConditionMet,
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			}
 
@@ -1444,7 +1444,7 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				Printer: printers.NewDiscardingPrinter(),
 				ConditionFn: JSONPathWait{
 					jsonPathCondition: test.jsonPathCond,
-					jsonPathParser:    j, errOut: ioutil.Discard}.IsJSONPathConditionMet,
+					jsonPathParser:    j, errOut: io.Discard}.IsJSONPathConditionMet,
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			}
 

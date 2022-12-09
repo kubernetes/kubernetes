@@ -18,7 +18,6 @@ package editor
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -51,7 +50,7 @@ func TestEditor(t *testing.T) {
 		t.Fatalf("no temp file: %s", path)
 	}
 	defer os.Remove(path)
-	if disk, err := ioutil.ReadFile(path); err != nil || !bytes.Equal(contents, disk) {
+	if disk, err := os.ReadFile(path); err != nil || !bytes.Equal(contents, disk) {
 		t.Errorf("unexpected file on disk: %v %s", err, string(disk))
 	}
 	if !bytes.Equal(contents, []byte(testStr)) {

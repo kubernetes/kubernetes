@@ -19,7 +19,6 @@ package create
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -352,13 +351,13 @@ func handleSecretFromFileSources(secret *corev1.Secret, fileSources []string) er
 			if strings.Contains(fileSource, "=") {
 				return fmt.Errorf("cannot give a key name for a directory path")
 			}
-			fileList, err := ioutil.ReadDir(filePath)
+			fileList, err := os.ReadDir(filePath)
 			if err != nil {
 				return fmt.Errorf("error listing files in %s: %v", filePath, err)
 			}
 			for _, item := range fileList {
 				itemPath := path.Join(filePath, item.Name())
-				if item.Mode().IsRegular() {
+				if item.Type().IsRegular() {
 					keyName = item.Name()
 					if err := addKeyFromFileToSecret(secret, keyName, itemPath); err != nil {
 						return err
@@ -407,7 +406,7 @@ func handleSecretFromEnvFileSources(secret *corev1.Secret, envFileSources []stri
 // addKeyFromFileToSecret adds a key with the given name to a Secret, populating
 // the value with the content of the given file path, or returns an error.
 func addKeyFromFileToSecret(secret *corev1.Secret, keyName, filePath string) error {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
 	}

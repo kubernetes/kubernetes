@@ -19,7 +19,6 @@ package testing
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -428,7 +427,7 @@ type TestFactory struct {
 func NewTestFactory() *TestFactory {
 	// specify an optionalClientConfig to explicitly use in testing
 	// to avoid polluting an existing user config.
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "cmdtests_temp")
+	tmpFile, err := os.CreateTemp(os.TempDir(), "cmdtests_temp")
 	if err != nil {
 		panic(fmt.Sprintf("unable to create a fake client config: %v", err))
 	}
