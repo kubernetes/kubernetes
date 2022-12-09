@@ -780,10 +780,9 @@ func (a *fakeAudit) requestAudited(auditID string) bool {
 	return exists
 }
 
-func (a *fakeAudit) EvaluatePolicyRule(attrs authorizer.Attributes) audit.RequestAuditConfigWithLevel {
-	return audit.RequestAuditConfigWithLevel{
-		Level:              auditinternal.LevelMetadata,
-		RequestAuditConfig: audit.RequestAuditConfig{},
+func (a *fakeAudit) EvaluatePolicyRule(attrs authorizer.Attributes) audit.RequestAuditConfig {
+	return audit.RequestAuditConfig{
+		Level: auditinternal.LevelMetadata,
 	}
 }
 
