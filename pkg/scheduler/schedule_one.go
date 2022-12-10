@@ -145,8 +145,9 @@ func (sched *Scheduler) schedulingCycle(
 				if status.Code() == framework.Error {
 					klog.ErrorS(nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
 				} else {
-					fitError.Diagnosis.PostFilterMsg = status.Message()
-					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
+					msg := status.Message()
+					fitError.Diagnosis.PostFilterMsg = msg
+					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
 				}
 				if result != nil {
 					nominatingInfo = result.NominatingInfo
@@ -406,8 +407,9 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 			return nil, diagnosis, s.AsError()
 		}
 		// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
-		diagnosis.PreFilterMsg = s.Message()
-		klog.V(5).InfoS("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", s)
+		msg := s.Message()
+		diagnosis.PreFilterMsg = msg
+		klog.V(5).InfoS("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
 		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
 		if s.FailedPlugin() != "" {
 			diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
