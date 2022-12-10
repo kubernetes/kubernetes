@@ -63,12 +63,12 @@ type fakeLeases struct {
 var _ Leases = &fakeLeases{}
 
 func newFakeLeases(t *testing.T, s storage.Interface) *fakeLeases {
-	// use the same base key used by the controlplane, but add a random
+	// use the same base key used by the control plane, but add a random
 	// prefix so we can reuse the etcd instance for subtests independently.
 	// pkg/controlplane/instance.go:268:
-	// masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
+	// controlPlaneLeases, err := reconcilers.NewLeases(config, "/controlplaneleases/", ttl)
 	// ref: https://issues.k8s.io/114049
-	base := "/" + uuid.New().String() + "/masterleases/"
+	base := "/" + uuid.New().String() + "/controlplaneleases/"
 	return &fakeLeases{
 		storageLeases{
 			storage:   s,
@@ -202,7 +202,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectLeases:  []string{"1.2.3.4"},
 		},
 		{
-			testName:      "existing endpoints satisfy but too many + extra masters",
+			testName:      "existing endpoints satisfy but too many + extra control plane instances",
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
@@ -212,7 +212,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectLeases:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
 		},
 		{
-			testName:      "existing endpoints satisfy but too many + extra masters + delete first",
+			testName:      "existing endpoints satisfy but too many + extra control plane instances + delete first",
 			serviceName:   "foo",
 			ip:            "4.3.2.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},

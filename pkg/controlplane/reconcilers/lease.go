@@ -42,15 +42,15 @@ import (
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
-// Leases is an interface which assists in managing the set of active masters
+// Leases is an interface which assists in managing the set of active control plane instances
 type Leases interface {
-	// ListLeases retrieves a list of the current master IPs
+	// ListLeases retrieves a list of the current control plane IPs
 	ListLeases() ([]string, error)
 
-	// UpdateLease adds or refreshes a master's lease
+	// UpdateLease adds or refreshes a control plane's lease
 	UpdateLease(ip string) error
 
-	// RemoveLease removes a master's lease
+	// RemoveLease removes a control plane's lease
 	RemoveLease(ip string) error
 
 	// Destroy cleans up everything on shutdown.
@@ -66,7 +66,7 @@ type storageLeases struct {
 
 var _ Leases = &storageLeases{}
 
-// ListLeases retrieves a list of the current master IPs from storage
+// ListLeases retrieves a list of the current control plane IPs from storage
 func (s *storageLeases) ListLeases() ([]string, error) {
 	ipInfoList := &corev1.EndpointsList{}
 	storageOpts := storage.ListOptions{
@@ -86,12 +86,12 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 		}
 	}
 
-	klog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
+	klog.V(6).Infof("Current control plane IPs listed in storage are %v", ipList)
 
 	return ipList, nil
 }
 
-// UpdateLease resets the TTL on a master IP in storage
+// UpdateLease resets the TTL on a control plane IP in storage
 func (s *storageLeases) UpdateLease(ip string) error {
 	key := path.Join(s.baseKey, ip)
 	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
@@ -112,13 +112,13 @@ func (s *storageLeases) UpdateLease(ip string) error {
 		// changing a field.
 		existing.Generation++
 
-		klog.V(6).Infof("Resetting TTL on master IP %q listed in storage to %v", ip, leaseTime)
+		klog.V(6).Infof("Resetting TTL on control plane IP %q listed in storage to %v", ip, leaseTime)
 
 		return existing, &leaseTime, nil
 	}, nil)
 }
 
-// RemoveLease removes the lease on a master IP in storage
+// RemoveLease removes the lease on a control plane IP in storage
 func (s *storageLeases) RemoveLease(ip string) error {
 	key := path.Join(s.baseKey, ip)
 	return s.storage.Delete(apirequest.NewDefaultContext(), key, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc, nil)
@@ -145,16 +145,16 @@ func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTi
 
 type leaseEndpointReconciler struct {
 	epAdapter             EndpointsAdapter
-	masterLeases          Leases
+	controlPlaneLeases    Leases
 	stopReconcilingCalled bool
 	reconcilingLock       sync.Mutex
 }
 
 // NewLeaseEndpointReconciler creates a new LeaseEndpoint reconciler
-func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases) EndpointReconciler {
+func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, controlPlaneLeases Leases) EndpointReconciler {
 	return &leaseEndpointReconciler{
 		epAdapter:             epAdapter,
-		masterLeases:          masterLeases,
+		controlPlaneLeases:    controlPlaneLeases,
 		stopReconcilingCalled: false,
 	}
 }
@@ -176,8 +176,8 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 
 	// Refresh the TTL on our key, independently of whether any error or
 	// update conflict happens below. This makes sure that at least some of
-	// the masters will add our endpoint.
-	if err := r.masterLeases.UpdateLease(ip.String()); err != nil {
+	// the control plane instances will add our endpoint.
+	if err := r.controlPlaneLeases.UpdateLease(ip.String()); err != nil {
 		return err
 	}
 
@@ -201,8 +201,8 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		}
 	}
 
-	// ... and the list of master IP keys from etcd
-	masterIPs, err := r.masterLeases.ListLeases()
+	// ... and the list of control plane IP keys from etcd
+	controlPlaneIPs, err := r.controlPlaneLeases.ListLeases()
 	if err != nil {
 		return err
 	}
@@ -210,16 +210,16 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	// Since we just refreshed our own key, assume that zero endpoints
 	// returned from storage indicates an issue or invalid state, and thus do
 	// not update the endpoints list based on the result.
-	if len(masterIPs) == 0 {
-		return fmt.Errorf("no master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
+	if len(controlPlaneIPs) == 0 {
+		return fmt.Errorf("no control plane IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
 	}
 
 	// Don't use the EndpointSliceMirroring controller to mirror this to
 	// EndpointSlices. This may change in the future.
 	skipMirrorChanged := setSkipMirrorTrue(e)
 
-	// Next, we compare the current list of endpoints with the list of master IP keys
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
+	// Next, we compare the current list of endpoints with the list of control plane IP keys
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, controlPlaneIPs, endpointPorts, reconcilePorts)
 	if !skipMirrorChanged && formatCorrect && ipCorrect && portsCorrect {
 		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
 	}
@@ -234,8 +234,8 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 
 	if !formatCorrect || !ipCorrect {
 		// repopulate the addresses according to the expected IPs from etcd
-		e.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(masterIPs))
-		for ind, ip := range masterIPs {
+		e.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(controlPlaneIPs))
+		for ind, ip := range controlPlaneIPs {
 			e.Subsets[0].Addresses[ind] = corev1.EndpointAddress{IP: ip}
 		}
 
@@ -248,7 +248,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		e.Subsets[0].Ports = endpointPorts
 	}
 
-	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
+	klog.Warningf("Resetting endpoints for control plane service %q to %v", serviceName, controlPlaneIPs)
 	if shouldCreate {
 		if _, err = r.epAdapter.Create(corev1.NamespaceDefault, e); errors.IsAlreadyExists(err) {
 			err = nil
@@ -313,7 +313,7 @@ func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []strin
 }
 
 func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
-	if err := r.masterLeases.RemoveLease(ip.String()); err != nil {
+	if err := r.controlPlaneLeases.RemoveLease(ip.String()); err != nil {
 		return err
 	}
 
@@ -327,5 +327,5 @@ func (r *leaseEndpointReconciler) StopReconciling() {
 }
 
 func (r *leaseEndpointReconciler) Destroy() {
-	r.masterLeases.Destroy()
+	r.controlPlaneLeases.Destroy()
 }

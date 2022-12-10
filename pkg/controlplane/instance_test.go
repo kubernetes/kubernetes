@@ -189,7 +189,7 @@ func newInstance(t *testing.T) (*Instance, *etcd3testing.EtcdTestServer, Config,
 
 	apiserver, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
-		t.Fatalf("Error in bringing up the master: %v", err)
+		t.Fatalf("Error in bringing up the control plane: %v", err)
 	}
 
 	return apiserver, etcdserver, config, assert

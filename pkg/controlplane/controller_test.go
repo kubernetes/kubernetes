@@ -32,7 +32,7 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-func TestCreateOrUpdateMasterService(t *testing.T) {
+func TestCreateOrUpdateControlPlaneService(t *testing.T) {
 	singleStack := corev1.IPFamilyPolicySingleStack
 	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
@@ -69,10 +69,10 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range createTests {
-		master := Controller{}
+		controller := Controller{}
 		fakeClient := fake.NewSimpleClientset()
-		master.client = fakeClient
-		master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
+		controller.client = fakeClient
+		controller.CreateOrUpdateControlPlaneServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		creates := []core.CreateAction{}
 		for _, action := range fakeClient.Actions() {
 			if action.GetVerb() == "create" {
@@ -351,10 +351,10 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range reconcileTests {
-		master := Controller{}
+		controller := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
-		master.client = fakeClient
-		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
+		controller.client = fakeClient
+		err := controller.CreateOrUpdateControlPlaneServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -410,10 +410,10 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		},
 	}
 	for _, test := range nonReconcileTests {
-		master := Controller{}
+		controller := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
-		master.client = fakeClient
-		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
+		controller.client = fakeClient
+		err := controller.CreateOrUpdateControlPlaneServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -466,7 +466,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 		wantErr     bool
 	}{
 		{
-			name: "master endpoint reconciler - IPv4 families",
+			name: "control plane endpoint reconciler - IPv4 families",
 			extraConfig: &ExtraConfig{
 				EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
 				ServiceIPRange:         *ipv4cidr,
@@ -478,7 +478,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "master endpoint reconciler - IPv6 families",
+			name: "control plane endpoint reconciler - IPv6 families",
 			extraConfig: &ExtraConfig{
 				EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
 				ServiceIPRange:         *ipv6cidr,
@@ -490,7 +490,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "master endpoint reconciler - wrong IP families",
+			name: "control plane endpoint reconciler - wrong IP families",
 			extraConfig: &ExtraConfig{
 				EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
 				ServiceIPRange:         *ipv4cidr,
@@ -502,7 +502,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "master endpoint reconciler - wrong IP families",
+			name: "control plane endpoint reconciler - wrong IP families",
 			extraConfig: &ExtraConfig{
 				EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
 				ServiceIPRange:         *ipv6cidr,

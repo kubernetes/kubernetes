@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package reconcilers provides objects for managing the list of active masters.
+// Package reconcilers provides objects for managing the list of active control plane instances.
 // NOTE: The Lease reconciler is not the intended way for any apiserver other
 // than kube-apiserver to accomplish the task of Endpoint registration. This is
 // a special case for the time being.

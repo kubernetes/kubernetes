@@ -144,7 +144,7 @@ var (
 	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
 )
 
-// ExtraConfig defines extra configuration for the master
+// ExtraConfig defines extra configuration for the control plane
 type ExtraConfig struct {
 	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
 
@@ -180,19 +180,19 @@ type ExtraConfig struct {
 	// If non-zero, the "kubernetes" services uses this port as NodePort.
 	KubernetesServiceNodePort int
 
-	// Number of masters running; all masters must be started with the
+	// Number of control plane instances running; all control plane instances must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
 	MasterCount int
 
-	// MasterEndpointReconcileTTL sets the time to live in seconds of an
-	// endpoint record recorded by each master. The endpoints are checked at an
+	// ControlPlaneEndpointReconcileTTL sets the time to live in seconds of an
+	// endpoint record recorded by each control plane. The endpoints are checked at an
 	// interval that is 2/3 of this value and this value defaults to 15s if
 	// unset. In very large clusters, this value may be increased to reduce the
-	// possibility that the master endpoint record expires (due to other load
-	// on the etcd server) and causes masters to drop in and out of the
+	// possibility that the control plane endpoint record expires (due to other load
+	// on the etcd server) and causes control plane instances to drop in and out of the
 	// kubernetes service record. It is not recommended to set this value below
 	// 15s.
-	MasterEndpointReconcileTTL time.Duration
+	ControlPlaneEndpointReconcileTTL time.Duration
 
 	// Selects which reconciler to use
 	EndpointReconcilerType reconcilers.Type
@@ -213,7 +213,7 @@ type ExtraConfig struct {
 	RepairServicesInterval time.Duration
 }
 
-// Config defines configuration for the master
+// Config defines configuration for the control plane
 type Config struct {
 	GenericConfig *genericapiserver.Config
 	ExtraConfig   ExtraConfig
@@ -230,7 +230,7 @@ type CompletedConfig struct {
 }
 
 // EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
-// used by the master.
+// used by the control plane.
 type EndpointReconcilerConfig struct {
 	Reconciler reconcilers.EndpointReconciler
 	Interval   time.Duration
@@ -260,17 +260,17 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
 
-	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
+	ttl := c.ExtraConfig.ControlPlaneEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
 		klog.Fatalf("Error creating storage factory config: %v", err)
 	}
-	masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
+	controlPlaneLeases, err := reconcilers.NewLeases(config, "/controlplaneleases/", ttl)
 	if err != nil {
 		klog.Fatalf("Error creating leases: %v", err)
 	}
 
-	return reconcilers.NewLeaseEndpointReconciler(endpointsAdapter, masterLeases)
+	return reconcilers.NewLeaseEndpointReconciler(endpointsAdapter, controlPlaneLeases)
 }
 
 func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
@@ -325,8 +325,8 @@ func (c *Config) Complete() CompletedConfig {
 		cfg.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
 	}
 
-	if cfg.ExtraConfig.MasterEndpointReconcileTTL == 0 {
-		cfg.ExtraConfig.MasterEndpointReconcileTTL = DefaultEndpointReconcilerTTL
+	if cfg.ExtraConfig.ControlPlaneEndpointReconcileTTL == 0 {
+		cfg.ExtraConfig.ControlPlaneEndpointReconcileTTL = DefaultEndpointReconcilerTTL
 	}
 
 	if cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
@@ -340,14 +340,14 @@ func (c *Config) Complete() CompletedConfig {
 	return CompletedConfig{&cfg}
 }
 
-// New returns a new instance of Master from the given config.
+// New returns a new instance of control plane from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //
 //	KubeletClientConfig
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Instance, error) {
 	if reflect.DeepEqual(c.ExtraConfig.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
-		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
+		return nil, fmt.Errorf("controlplane.New() called with empty config.KubeletClientConfig")
 	}
 
 	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)

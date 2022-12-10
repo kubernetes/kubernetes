@@ -83,7 +83,7 @@ type Controller struct {
 	runner *async.Runner
 }
 
-// NewBootstrapController returns a controller for watching the core capabilities of the master
+// NewBootstrapController returns a controller for watching the core capabilities of the control plane
 func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, client kubernetes.Interface) (*Controller, error) {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
@@ -199,7 +199,7 @@ func (c *Controller) Start() {
 	}
 }
 
-// Stop cleans up this API Servers endpoint reconciliation leases so another master can take over more quickly.
+// Stop cleans up this API Servers endpoint reconciliation leases so another control plane can take over more quickly.
 func (c *Controller) Stop() {
 	if c.runner != nil {
 		c.runner.Stop()
@@ -261,13 +261,13 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	// Update service & endpoint records.
 	// TODO: when it becomes possible to change this stuff,
 	// stop polling and start watching.
-	// TODO: add endpoints of all replicas, not just the elected master.
+	// TODO: add endpoints of all replicas, not just the elected control plane.
 	if err := createNamespaceIfNeeded(c.client.CoreV1(), metav1.NamespaceDefault); err != nil {
 		return err
 	}
 
 	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https")
-	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
+	if err := c.CreateOrUpdateControlPlaneServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
@@ -281,7 +281,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 // If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
 func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string) ([]corev1.ServicePort, corev1.ServiceType) {
 	// Use the Cluster IP type for the service port if NodePort isn't provided.
-	// Otherwise, we will be binding the master service to a NodePort.
+	// Otherwise, we will be binding the control plane service to a NodePort.
 	servicePorts := []corev1.ServicePort{{
 		Protocol:   corev1.ProtocolTCP,
 		Port:       int32(servicePort),
@@ -305,14 +305,14 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string) []corev1.
 	}}
 }
 
-// CreateOrUpdateMasterServiceIfNeeded will create the specified service if it
+// CreateOrUpdateControlPlaneServiceIfNeeded will create the specified service if it
 // doesn't already exist.
-func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType, reconcile bool) error {
+func (c *Controller) CreateOrUpdateControlPlaneServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType, reconcile bool) error {
 	if s, err := c.client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), serviceName, metav1.GetOptions{}); err == nil {
 		// The service already exists.
 		if reconcile {
-			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
-				klog.Warningf("Resetting master service %q to %#v", serviceName, svc)
+			if svc, updated := getControlPlaneServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
+				klog.Warningf("Resetting control plane service %q to %#v", serviceName, svc)
 				_, err := c.client.CoreV1().Services(metav1.NamespaceDefault).Update(context.TODO(), svc, metav1.UpdateOptions{})
 				return err
 			}
@@ -339,13 +339,13 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 
 	_, err := c.client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if errors.IsAlreadyExists(err) {
-		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
+		return c.CreateOrUpdateControlPlaneServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
 	}
 	return err
 }
 
-// getMasterServiceUpdateIfNeeded sets service attributes for the given apiserver service.
-func getMasterServiceUpdateIfNeeded(svc *corev1.Service, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType) (s *corev1.Service, updated bool) {
+// getControlPlaneServiceUpdateIfNeeded sets service attributes for the given apiserver service.
+func getControlPlaneServiceUpdateIfNeeded(svc *corev1.Service, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType) (s *corev1.Service, updated bool) {
 	// Determine if the service is in the format we expect
 	// (servicePorts are present and service type matches)
 	formatCorrect := checkServiceFormat(svc, servicePorts, serviceType)
@@ -358,7 +358,7 @@ func getMasterServiceUpdateIfNeeded(svc *corev1.Service, servicePorts []corev1.S
 }
 
 // Determine if the service is in the correct format
-// getMasterServiceUpdateIfNeeded expects (servicePorts are correct
+// getControlPlaneServiceUpdateIfNeeded expects (servicePorts are correct
 // and service type matches).
 func checkServiceFormat(s *corev1.Service, ports []corev1.ServicePort, serviceType corev1.ServiceType) (formatCorrect bool) {
 	if s.Spec.Type != serviceType {
