@@ -144,16 +144,18 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
+
+	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
 	o.PrintObj = printer.PrintObj
 
-	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
-	if err != nil {
-		return err
-	}
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return err
@@ -209,13 +211,11 @@ func (o *ScaleOptions) RunScale() error {
 		return err
 	}
 
-	infos := []*resource.Info{}
-	r.Visit(func(info *resource.Info, err error) error {
-		if err == nil {
-			infos = append(infos, info)
-		}
-		return nil
-	})
+	// We don't immediately return infoErr if it is not nil.
+	// Because we want to proceed for other valid resources and
+	// at the end of the function, we'll return this
+	// to show invalid resources to the user.
+	infos, infoErr := r.Infos()
 
 	if len(o.ResourceVersion) != 0 && len(infos) > 1 {
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
@@ -234,17 +234,19 @@ func (o *ScaleOptions) RunScale() error {
 		waitForReplicas = scale.NewRetryParams(1*time.Second, o.Timeout)
 	}
 
-	counter := 0
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-		counter++
+	if len(infos) == 0 {
+		return fmt.Errorf("no objects passed to scale")
+	}
 
+	for _, info := range infos {
 		mapping := info.ResourceMapping()
 		if o.dryRunStrategy == cmdutil.DryRunClient {
-			return o.PrintObj(info.Object, o.Out)
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
+
 		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource, o.dryRunStrategy == cmdutil.DryRunServer); err != nil {
 			return err
 		}
@@ -263,15 +265,13 @@ func (o *ScaleOptions) RunScale() error {
 			}
 		}
 
-		return o.PrintObj(info.Object, o.Out)
-	})
-	if err != nil {
-		return err
+		err := o.PrintObj(info.Object, o.Out)
+		if err != nil {
+			return err
+		}
 	}
-	if counter == 0 {
-		return fmt.Errorf("no objects passed to scale")
-	}
-	return nil
+
+	return infoErr
 }
 
 func scaler(f cmdutil.Factory) (scale.Scaler, error) {
