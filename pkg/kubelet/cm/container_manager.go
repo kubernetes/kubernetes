@@ -199,7 +199,7 @@ func ParseQOSReserved(m map[string]string) (*map[v1.ResourceName]int64, error) {
 		case v1.ResourceMemory:
 			q, err := parsePercentage(v)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse percentage %q for %q resource: %w", v, k, err)
 			}
 			reservations[v1.ResourceName(k)] = q
 		default:
