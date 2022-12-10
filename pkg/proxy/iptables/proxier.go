@@ -863,19 +863,31 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}()
 
-	// Create and link the kube chains.
-	for _, jump := range iptablesJumpChains {
-		if _, err := proxier.iptables.EnsureChain(jump.table, jump.dstChain); err != nil {
-			klog.ErrorS(err, "Failed to ensure chain exists", "table", jump.table, "chain", jump.dstChain)
-			return
-		}
-		args := append(jump.extraArgs,
-			"-m", "comment", "--comment", jump.comment,
-			"-j", string(jump.dstChain),
-		)
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jump.table, jump.srcChain, args...); err != nil {
-			klog.ErrorS(err, "Failed to ensure chain jumps", "table", jump.table, "srcChain", jump.srcChain, "dstChain", jump.dstChain)
-			return
+	if !tryPartialSync {
+		// Ensure that our jump rules (eg from PREROUTING to KUBE-SERVICES) exist.
+		// We can't do this as part of the iptables-restore because we don't want
+		// to specify/replace *all* of the rules in PREROUTING, etc.
+		//
+		// We need to create these rules when kube-proxy first starts, and we need
+		// to recreate them if the utiliptables Monitor detects that iptables has
+		// been flushed. In both of those cases, the code will force a full sync.
+		// In all other cases, it ought to be safe to assume that the rules
+		// already exist, so we'll skip this step when doing a partial sync, to
+		// save us from having to invoke /sbin/iptables 20 times on each sync
+		// (which will be very slow on hosts with lots of iptables rules).
+		for _, jump := range iptablesJumpChains {
+			if _, err := proxier.iptables.EnsureChain(jump.table, jump.dstChain); err != nil {
+				klog.ErrorS(err, "Failed to ensure chain exists", "table", jump.table, "chain", jump.dstChain)
+				return
+			}
+			args := append(jump.extraArgs,
+				"-m", "comment", "--comment", jump.comment,
+				"-j", string(jump.dstChain),
+			)
+			if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jump.table, jump.srcChain, args...); err != nil {
+				klog.ErrorS(err, "Failed to ensure chain jumps", "table", jump.table, "srcChain", jump.srcChain, "dstChain", jump.dstChain)
+				return
+			}
 		}
 	}
 
