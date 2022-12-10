@@ -319,7 +319,7 @@ func getPodDNSType(pod *v1.Pod) (podDNSType, error) {
 	}
 	// This should not happen as kube-apiserver should have rejected
 	// invalid dnsPolicy.
-	return podDNSCluster, fmt.Errorf(fmt.Sprintf("invalid DNSPolicy=%v", dnsPolicy))
+	return podDNSCluster, fmt.Errorf("invalid DNSPolicy=%v", dnsPolicy)
 }
 
 // mergeDNSOptions merges DNS options. If duplicated, entries given by PodDNSConfigOption will
