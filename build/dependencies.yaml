@@ -220,3 +220,14 @@ dependencies:
       match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
     - path: test/e2e_node/image_list.go
       mathc: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
+
+  # GCB docker gcloud image
+  - name: "gcb-docker-gcloud: dependents"
+    version: v20221007-69e0da97ef
+    refPaths:
+    - path: build/pause/cloudbuild.yaml
+      match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud
+    - path: cluster/images/etcd/cloudbuild.yaml
+      match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud
+    - path: test/images/cloudbuild.yaml
+      match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud
