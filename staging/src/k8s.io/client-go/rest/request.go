@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,8 +117,11 @@ type Request struct {
 	subresource  string
 
 	// output
-	err  error
-	body io.Reader
+	err error
+
+	// only one of body / bodyBytes may be set. requests using body are not retriable.
+	body      io.Reader
+	bodyBytes []byte
 
 	retryFn requestRetryFunc
 }
@@ -443,12 +447,15 @@ func (r *Request) Body(obj interface{}) *Request {
 			return r
 		}
 		glogBody("Request Body", data)
-		r.body = bytes.NewReader(data)
+		r.body = nil
+		r.bodyBytes = data
 	case []byte:
 		glogBody("Request Body", t)
-		r.body = bytes.NewReader(t)
+		r.body = nil
+		r.bodyBytes = t
 	case io.Reader:
 		r.body = t
+		r.bodyBytes = nil
 	case runtime.Object:
 		// callers may pass typed interface pointers, therefore we must check nil with reflection
 		if reflect.ValueOf(t).IsNil() {
@@ -465,7 +472,8 @@ func (r *Request) Body(obj interface{}) *Request {
 			return r
 		}
 		glogBody("Request Body", data)
-		r.body = bytes.NewReader(data)
+		r.body = nil
+		r.bodyBytes = data
 		r.SetHeader("Content-Type", r.c.content.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
@@ -825,9 +833,6 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 		if err != nil {
 			return nil, err
 		}
-		if r.body != nil {
-			req.Body = io.NopCloser(r.body)
-		}
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
 		retry.After(ctx, r, resp, err)
@@ -889,8 +894,20 @@ func (r *Request) requestPreflightCheck() error {
 }
 
 func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
+	var body io.Reader
+	switch {
+	case r.body != nil && r.bodyBytes != nil:
+		return nil, fmt.Errorf("cannot set both body and bodyBytes")
+	case r.body != nil:
+		body = r.body
+	case r.bodyBytes != nil:
+		// Create a new reader specifically for this request.
+		// Giving each request a dedicated reader allows retries to avoid races resetting the request body.
+		body = bytes.NewReader(r.bodyBytes)
+	}
+
 	url := r.URL().String()
-	req, err := http.NewRequest(r.verb, url, r.body)
+	req, err := http.NewRequest(r.verb, url, body)
 	if err != nil {
 		return nil, err
 	}
