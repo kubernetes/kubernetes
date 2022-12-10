@@ -46,7 +46,7 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 			Burst:              10,
 		},
 		LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-			ResourceLock:      "configmap",
+			ResourceLock:      "leases",
 			LeaderElect:       true,
 			LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 			RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
@@ -103,6 +103,9 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 
 	resourceNamespaceNotSet := validConfig.DeepCopy()
 	resourceNamespaceNotSet.LeaderElection.ResourceNamespace = ""
+
+	resourceLockNotLeases := validConfig.DeepCopy()
+	resourceLockNotLeases.LeaderElection.ResourceLock = "configmap"
 
 	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
 	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
@@ -245,6 +248,15 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "leaderElection.resourceNamespace",
+				},
+			},
+		},
+		"bad-resource-lock-not-leases": {
+			config: resourceLockNotLeases,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "leaderElection.resourceLock",
 				},
 			},
 		},
@@ -432,7 +444,7 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 			Burst:              10,
 		},
 		LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-			ResourceLock:      "configmap",
+			ResourceLock:      "leases",
 			LeaderElect:       true,
 			LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 			RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
@@ -486,6 +498,9 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 
 	resourceNameNotSet := validConfig.DeepCopy()
 	resourceNameNotSet.LeaderElection.ResourceName = ""
+
+	resourceLockNotLeases := validConfig.DeepCopy()
+	resourceLockNotLeases.LeaderElection.ResourceLock = "configmap"
 
 	resourceNamespaceNotSet := validConfig.DeepCopy()
 	resourceNamespaceNotSet.LeaderElection.ResourceNamespace = ""
@@ -628,6 +643,15 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "leaderElection.resourceName",
+				},
+			},
+		},
+		"bad-resource-lock-not-leases": {
+			config: resourceLockNotLeases,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "leaderElection.resourceLock",
 				},
 			},
 		},
@@ -824,7 +848,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			Burst:              10,
 		},
 		LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-			ResourceLock:      "configmap",
+			ResourceLock:      "leases",
 			LeaderElect:       true,
 			LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 			RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
@@ -882,6 +906,9 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 
 	resourceNamespaceNotSet := validConfig.DeepCopy()
 	resourceNamespaceNotSet.LeaderElection.ResourceNamespace = ""
+
+	resourceLockNotLeases := validConfig.DeepCopy()
+	resourceLockNotLeases.LeaderElection.ResourceLock = "configmap"
 
 	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
 	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
@@ -1027,6 +1054,15 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "leaderElection.resourceNamespace",
+				},
+			},
+		},
+		"bad-resource-lock-not-leases": {
+			config: resourceLockNotLeases,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "leaderElection.resourceLock",
 				},
 			},
 		},
