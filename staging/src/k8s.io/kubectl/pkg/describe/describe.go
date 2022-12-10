@@ -4319,7 +4319,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	}
 
 	var oldRSs, newRSs []*appsv1.ReplicaSet
-	if oldResult, _, newResult, err := deploymentutil.GetAllReplicaSetsInChunks(d, dd.client.AppsV1(), describerSettings.ChunkSize); err == nil {
+	if _, oldResult, newResult, err := deploymentutil.GetAllReplicaSetsInChunks(d, dd.client.AppsV1(), describerSettings.ChunkSize); err == nil {
 		oldRSs = oldResult
 		if newResult != nil {
 			newRSs = append(newRSs, newResult)
