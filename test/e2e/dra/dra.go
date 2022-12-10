@@ -52,7 +52,6 @@ func networkResources() app.Resources {
 
 var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", func() {
 	f := framework.NewDefaultFramework("dra")
-	ctx := context.Background()
 
 	// The driver containers have to run with sufficient privileges to
 	// modify /var/lib/kubelet/plugins.

@@ -69,9 +69,6 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		// They are required to register a node VM to VC
 		vmxFilePath := getVMXFilePath(vmObject)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		vmHost, err := vmObject.HostSystem(ctx)
 		framework.ExpectNoError(err)
 

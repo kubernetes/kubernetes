@@ -3275,7 +3275,7 @@ var _ = common.SIGDescribe("Services", func() {
 		_, err = f.ClientSet.CoreV1().Endpoints(testNamespaceName).Create(context.TODO(), &testEndpoints, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Endpoint")
 		ginkgo.By("waiting for available Endpoint")
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		_, err = watchtools.Until(ctx, endpointsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
@@ -3465,7 +3465,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to create Service")
 
 		ginkgo.By("watching for the Service to be added")
-		ctx, cancel := context.WithTimeout(context.Background(), svcReadyTimeout)
+		ctx, cancel := context.WithTimeout(ctx, svcReadyTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if svc, ok := event.Object.(*v1.Service); ok {

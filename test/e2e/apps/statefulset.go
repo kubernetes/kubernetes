@@ -796,7 +796,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(context.TODO(), options)
 				},
 			}
-			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), statefulPodTimeout)
+			ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, statefulPodTimeout)
 			defer cancel()
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod at least once
 			_, err = watchtools.Until(ctx, pl.ResourceVersion, lw, func(event watch.Event) (bool, error) {
@@ -1034,7 +1034,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("watching for the statefulset status to be updated")
 
-			ctx, cancel := context.WithTimeout(context.Background(), statefulSetTimeout)
+			ctx, cancel := context.WithTimeout(ctx, statefulSetTimeout)
 			defer cancel()
 
 			_, err = watchtools.Until(ctx, ssList.ResourceVersion, w, func(event watch.Event) (bool, error) {

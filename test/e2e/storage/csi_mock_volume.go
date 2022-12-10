@@ -961,7 +961,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Waiting for expected CSI calls")
 				// Watch for all calls up to deletePod = true
-				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
+				ctx, cancel := context.WithTimeout(ctx, csiPodRunningTimeout)
 				defer cancel()
 				for {
 					if ctx.Err() != nil {
@@ -1513,7 +1513,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					e2eskipper.Skipf("mock driver %s does not support snapshots -- skipping", m.driver.GetDriverInfo().Name)
 
 				}
-				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
+				ctx, cancel := context.WithTimeout(ctx, csiPodRunningTimeout)
 				defer cancel()
 				defer cleanup()
 

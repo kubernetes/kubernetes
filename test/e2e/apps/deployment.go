@@ -215,7 +215,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to create Deployment %v in namespace %v", testDeploymentName, testNamespaceName)
 
 		ginkgo.By("waiting for Deployment to be created")
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
@@ -542,7 +542,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
 
 		ginkgo.By("watching for the Deployment status to be updated")
-		ctx, cancel := context.WithTimeout(context.Background(), dRetryTimeout)
+		ctx, cancel := context.WithTimeout(ctx, dRetryTimeout)
 		defer cancel()
 
 		_, err = watchtools.Until(ctx, dList.ResourceVersion, w, func(event watch.Event) (bool, error) {

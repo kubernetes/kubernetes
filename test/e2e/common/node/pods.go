@@ -266,7 +266,7 @@ var _ = SIGDescribe("Pods", func() {
 		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.Pod{})
 		defer w.Stop()
 
-		ctx, cancelCtx := context.WithTimeout(context.TODO(), wait.ForeverTestTimeout)
+		ctx, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
 		defer cancelCtx()
 		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 			framework.Failf("Timeout while waiting to Pod informer to sync")
@@ -932,7 +932,7 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to create Pod %v in namespace %v", testPod.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("watching for Pod to be ready")
-		ctx, cancel := context.WithTimeout(context.Background(), f.Timeouts.PodStart)
+		ctx, cancel := context.WithTimeout(ctx, f.Timeouts.PodStart)
 		defer cancel()
 		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if pod, ok := event.Object.(*v1.Pod); ok {

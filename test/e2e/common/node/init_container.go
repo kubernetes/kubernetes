@@ -220,7 +220,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, framework.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w,
 			recordEvents(events, conditions.PodCompleted),
@@ -301,7 +301,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, framework.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w, recordEvents(events, conditions.PodRunning))
 		framework.ExpectNoError(err)
@@ -382,7 +382,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 		}
 
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, framework.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(
 			ctx,
@@ -507,7 +507,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 		}
 
 		var events []watch.Event
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, framework.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(
 			ctx, startedPod.ResourceVersion, w,

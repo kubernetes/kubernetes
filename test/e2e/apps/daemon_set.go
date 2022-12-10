@@ -919,7 +919,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
 
 		ginkgo.By("watching for the daemon set status to be updated")
-		ctx, cancel := context.WithTimeout(context.Background(), dsRetryTimeout)
+		ctx, cancel := context.WithTimeout(ctx, dsRetryTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, dsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if ds, ok := event.Object.(*appsv1.DaemonSet); ok {

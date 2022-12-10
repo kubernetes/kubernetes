@@ -1063,7 +1063,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err, "Failed to update resourceQuota")
 
 		ginkgo.By(fmt.Sprintf("Confirm /status for %q resourceQuota via watch", rqName))
-		ctx, cancel := context.WithTimeout(context.Background(), f.Timeouts.PodStartShort)
+		ctx, cancel := context.WithTimeout(ctx, f.Timeouts.PodStartShort)
 		defer cancel()
 
 		_, err = watchtools.Until(ctx, rqList.ResourceVersion, w, func(event watch.Event) (bool, error) {

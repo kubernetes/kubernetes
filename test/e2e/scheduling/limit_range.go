@@ -93,7 +93,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.LimitRange{})
 		defer w.Stop()
 
-		ctx, cancelCtx := context.WithTimeout(context.TODO(), wait.ForeverTestTimeout)
+		ctx, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
 		defer cancelCtx()
 		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 			framework.Failf("Timeout while waiting for LimitRange informer to sync")
@@ -275,7 +275,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		limitRange2 := &v1.LimitRange{}
 		*limitRange2 = *limitRange
 
-		ctx, cancelCtx := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+		ctx, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
 		defer cancelCtx()
 
 		ginkgo.By(fmt.Sprintf("Creating LimitRange %q in namespace %q", lrName, f.Namespace.Name))

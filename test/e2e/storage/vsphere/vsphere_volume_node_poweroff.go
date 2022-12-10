@@ -123,8 +123,6 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 
 		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node1)
 		vm := object.NewVirtualMachine(nodeInfo.VSphere.Client.Client, nodeInfo.VirtualMachineRef)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		_, err = vm.PowerOff(ctx)
 		framework.ExpectNoError(err)
 		defer vm.PowerOn(ctx)
