@@ -15421,7 +15421,7 @@ func schema_k8sio_api_coordination_v1_Lease(ref common.ReferenceCallback) common
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/coordination/v1.LeaseSpec"),
 						},
@@ -15464,7 +15464,7 @@ func schema_k8sio_api_coordination_v1_LeaseList(ref common.ReferenceCallback) co
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Items is a list of schema objects.",
+							Description: "items is a list of schema objects.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -15501,7 +15501,7 @@ func schema_k8sio_api_coordination_v1_LeaseSpec(ref common.ReferenceCallback) co
 					},
 					"leaseDurationSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "leaseDurationSeconds is a duration that candidates for a lease need to wait to force acquire it. This is measure against time of last observed RenewTime.",
+							Description: "leaseDurationSeconds is a duration that candidates for a lease need to wait to force acquire it. This is measure against time of last observed renewTime.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -15563,7 +15563,7 @@ func schema_k8sio_api_coordination_v1beta1_Lease(ref common.ReferenceCallback) c
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/coordination/v1beta1.LeaseSpec"),
 						},
@@ -15606,7 +15606,7 @@ func schema_k8sio_api_coordination_v1beta1_LeaseList(ref common.ReferenceCallbac
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Items is a list of schema objects.",
+							Description: "items is a list of schema objects.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -15643,7 +15643,7 @@ func schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref common.ReferenceCallbac
 					},
 					"leaseDurationSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "leaseDurationSeconds is a duration that candidates for a lease need to wait to force acquire it. This is measure against time of last observed RenewTime.",
+							Description: "leaseDurationSeconds is a duration that candidates for a lease need to wait to force acquire it. This is measure against time of last observed renewTime.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
