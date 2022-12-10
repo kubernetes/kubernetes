@@ -50,13 +50,35 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		framework.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass1.Name)
 
-		ingress, err := createBasicIngress(cs, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		lastFailure := ""
 
-		if ingress.Spec.IngressClassName == nil {
-			framework.Failf("Expected IngressClassName to be set by Admission Controller")
-		} else if *ingress.Spec.IngressClassName != ingressClass1.Name {
-			framework.Failf("Expected IngressClassName to be %s, got %s", ingressClass1.Name, *ingress.Spec.IngressClassName)
+		// the admission controller may take a few seconds to observe the ingress classes
+		if err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+			lastFailure = ""
+
+			ingress, err := createBasicIngress(cs, f.Namespace.Name)
+			if err != nil {
+				lastFailure = err.Error()
+				return false, err
+			}
+			defer func() {
+				err := cs.NetworkingV1().Ingresses(ingress.Namespace).Delete(ctx, ingress.Name, metav1.DeleteOptions{})
+				framework.Logf("%v", err)
+			}()
+
+			if ingress.Spec.IngressClassName == nil {
+				lastFailure = "Expected IngressClassName to be set by Admission Controller"
+				return false, nil
+			} else if *ingress.Spec.IngressClassName != ingressClass1.Name {
+				lastFailure = fmt.Sprintf("Expected IngressClassName to be %s, got %s", ingressClass1.Name, *ingress.Spec.IngressClassName)
+				return false, nil
+			}
+			return true, nil
+
+		}); err != nil {
+			framework.Failf("%v, final err= %v", lastFailure, err)
 		}
 	})
 
@@ -65,11 +87,32 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		framework.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass1.Name)
 
-		ingress, err := createBasicIngress(cs, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		lastFailure := ""
 
-		if ingress.Spec.IngressClassName != nil {
-			framework.Failf("Expected IngressClassName to be nil, got %s", *ingress.Spec.IngressClassName)
+		// the admission controller may take a few seconds to observe the ingress classes
+		if err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+			lastFailure = ""
+
+			ingress, err := createBasicIngress(cs, f.Namespace.Name)
+			if err != nil {
+				lastFailure = err.Error()
+				return false, err
+			}
+			defer func() {
+				err := cs.NetworkingV1().Ingresses(ingress.Namespace).Delete(ctx, ingress.Name, metav1.DeleteOptions{})
+				framework.Logf("%v", err)
+			}()
+
+			if ingress.Spec.IngressClassName != nil {
+				lastFailure = fmt.Sprintf("Expected IngressClassName to be nil, got %s", *ingress.Spec.IngressClassName)
+				return false, nil
+			}
+			return true, nil
+
+		}); err != nil {
+			framework.Failf("%v, final err= %v", lastFailure, err)
 		}
 	})
 
