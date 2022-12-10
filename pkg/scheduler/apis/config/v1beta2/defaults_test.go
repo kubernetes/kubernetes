@@ -339,6 +339,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.PodTopologySpread},
 									{Name: names.InterPodAffinity},
 									{Name: names.VolumeBinding},
+									{Name: names.VolumeZone},
 									{Name: names.NodeAffinity},
 								},
 							},
