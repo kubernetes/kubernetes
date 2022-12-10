@@ -19,6 +19,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -176,6 +178,137 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			}
 		})
 
+		ginkgo.By("mirroring deletion of a custom Endpoint", func() {
+			err := cs.CoreV1().Endpoints(f.Namespace.Name).Delete(context.TODO(), endpoints.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "Unexpected error deleting Endpoints")
+
+			// Expect mirrored EndpointSlice resource to be updated.
+			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
+				})
+				if err != nil {
+					return false, err
+				}
+				if len(esList.Items) != 0 {
+					framework.Logf("Waiting for 0 EndpointSlices to exist, got %d", len(esList.Items))
+					return false, nil
+				}
+
+				return true, nil
+			}); err != nil {
+				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
+			}
+		})
+	})
+
+	ginkgo.It("should mirror a custom Endpoint with multiple subsets and same IP address", func() {
+		ns := f.Namespace.Name
+		svc := createServiceReportErr(cs, f.Namespace.Name, &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-custom-endpoints",
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
+					{
+						Name:     "port80",
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					},
+					{
+						Name:     "port81",
+						Port:     81,
+						Protocol: v1.ProtocolTCP,
+					},
+				},
+			},
+		})
+
+		// Add a backend pod to the service in the other node
+		port8080 := []v1.ContainerPort{
+			{
+				ContainerPort: 8090,
+				Protocol:      v1.ProtocolTCP,
+			},
+		}
+		port9090 := []v1.ContainerPort{
+			{
+				ContainerPort: 9090,
+				Protocol:      v1.ProtocolTCP,
+			},
+		}
+
+		serverPod := e2epod.NewAgnhostPodFromContainers(
+			"", "pod-handle-http-request", nil,
+			e2epod.NewAgnhostContainer("container-handle-8090-request", nil, port8080, "netexec", "--http-port", "8090", "--udp-port", "-1"),
+			e2epod.NewAgnhostContainer("container-handle-9090-request", nil, port9090, "netexec", "--http-port", "9090", "--udp-port", "-1"),
+		)
+
+		pod := e2epod.NewPodClient(f).CreateSync(serverPod)
+
+		if pod.Status.PodIP == "" {
+			framework.Failf("PodIP not assigned for pod %s", pod.Name)
+		}
+
+		// create custom endpoints
+		endpoints := &v1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: svc.Name,
+			},
+			Subsets: []v1.EndpointSubset{
+				{
+					Ports: []v1.EndpointPort{{
+						Name: "port80",
+						Port: 8090,
+					}},
+					Addresses: []v1.EndpointAddress{{
+						IP: pod.Status.PodIP,
+					}},
+				},
+				{
+					Ports: []v1.EndpointPort{{
+						Name: "port81",
+						Port: 9090,
+					}},
+					Addresses: []v1.EndpointAddress{{
+						IP: pod.Status.PodIP,
+					}},
+				},
+			},
+		}
+
+		ginkgo.By("mirroring a new custom Endpoint", func() {
+			_, err := cs.CoreV1().Endpoints(f.Namespace.Name).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "Unexpected error creating Endpoints")
+
+			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
+				})
+				if err != nil {
+					framework.Logf("Error listing EndpointSlices: %v", err)
+					return false, nil
+				}
+				if len(esList.Items) == 0 {
+					framework.Logf("Waiting for at least 1 EndpointSlice to exist, got %d", len(esList.Items))
+					return false, nil
+				}
+				return true, nil
+			}); err != nil {
+				framework.Failf("Did not find matching EndpointSlice for %s/%s: %s", svc.Namespace, svc.Name, err)
+			}
+		})
+
+		// connect to the service must work
+		ginkgo.By("Creating a pause pods that will try to connect to the webservers")
+		pausePod := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
+		e2epod.NewPodClient(f).CreateSync(pausePod)
+		dest1 := net.JoinHostPort(svc.Spec.ClusterIP, "80")
+		dest2 := net.JoinHostPort(svc.Spec.ClusterIP, "81")
+		execHostnameTest(*pausePod, dest1, pod.Name)
+		execHostnameTest(*pausePod, dest2, pod.Name)
+
+		// delete custom endpoints and wait until the endpoint slices are deleted too
 		ginkgo.By("mirroring deletion of a custom Endpoint", func() {
 			err := cs.CoreV1().Endpoints(f.Namespace.Name).Delete(context.TODO(), endpoints.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Unexpected error deleting Endpoints")
