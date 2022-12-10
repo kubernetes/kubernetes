@@ -753,6 +753,15 @@ runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
 EOF
+
+    if [[ "$FEATURE_GATES" == *KubeletTracing=true* ]]; then
+        cat <<EOF >> /tmp/kubelet.yaml
+tracing:
+  endpoint: localhost:4317 # the default value
+  samplingRatePerMillion: 1000000 # sample always
+EOF
+    fi
+
     {
       # authentication
       echo "authentication:"
