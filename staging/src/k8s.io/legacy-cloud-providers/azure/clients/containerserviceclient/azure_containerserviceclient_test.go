@@ -31,7 +31,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-04-01/containerservice"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
@@ -40,6 +39,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 // 2065-01-24 05:20:00 +0000 UTC
@@ -83,9 +83,9 @@ func getTestManagedClusterClientWithRetryAfterReader(armClient armclient.Interfa
 
 func getTestManagedCluster(name string) containerservice.ManagedCluster {
 	return containerservice.ManagedCluster{
-		ID:       to.StringPtr(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/%s", name)),
-		Name:     to.StringPtr(name),
-		Location: to.StringPtr("eastus"),
+		ID:       pointer.String(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/%s", name)),
+		Name:     pointer.String(name),
+		Location: pointer.String("eastus"),
 	}
 }
 
@@ -280,7 +280,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 	}
 
 	lastResult := containerservice.ManagedClusterListResult{
-		NextLink: to.StringPtr("next"),
+		NextLink: pointer.String("next"),
 	}
 
 	for _, test := range tests {
@@ -325,7 +325,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	}
 
 	lastResult := containerservice.ManagedClusterListResult{
-		NextLink: to.StringPtr("next"),
+		NextLink: pointer.String("next"),
 	}
 
 	armClient := mockarmclient.NewMockInterface(ctrl)
@@ -476,7 +476,7 @@ func TestCreateOrUpdate(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
 	}
-	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(mc.ID), mc, gomock.Any()).Return(response, nil).Times(1)
+	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), pointer.StringDeref(mc.ID, ""), mc, gomock.Any()).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	mcClient := getTestManagedClusterClient(armClient)
@@ -493,7 +493,7 @@ func TestCreateOrUpdateWithCreateOrUpdateResponderError(t *testing.T) {
 		StatusCode: http.StatusNotFound,
 		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
 	}
-	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(mc.ID), mc, gomock.Any()).Return(response, nil).Times(1)
+	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), pointer.StringDeref(mc.ID, ""), mc, gomock.Any()).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	mcClient := getTestManagedClusterClient(armClient)
@@ -555,7 +555,7 @@ func TestCreateOrUpdateThrottle(t *testing.T) {
 
 	mc := getTestManagedCluster("cluster")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), to.String(mc.ID), mc, gomock.Any()).Return(response, throttleErr).Times(1)
+	armClient.EXPECT().PutResourceWithDecorators(gomock.Any(), pointer.StringDeref(mc.ID, ""), mc, gomock.Any()).Return(response, throttleErr).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	mcClient := getTestManagedClusterClient(armClient)
@@ -570,7 +570,7 @@ func TestDelete(t *testing.T) {
 
 	mc := getTestManagedCluster("cluster")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(mc.ID), "").Return(nil).Times(1)
+	armClient.EXPECT().DeleteResource(gomock.Any(), pointer.StringDeref(mc.ID, ""), "").Return(nil).Times(1)
 
 	mcClient := getTestManagedClusterClient(armClient)
 	rerr := mcClient.Delete(context.TODO(), "rg", "cluster")
@@ -625,7 +625,7 @@ func TestDeleteThrottle(t *testing.T) {
 
 	mc := getTestManagedCluster("cluster")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(mc.ID), "").Return(throttleErr).Times(1)
+	armClient.EXPECT().DeleteResource(gomock.Any(), pointer.StringDeref(mc.ID, ""), "").Return(throttleErr).Times(1)
 
 	mcClient := getTestManagedClusterClient(armClient)
 	rerr := mcClient.Delete(context.TODO(), "rg", "cluster")

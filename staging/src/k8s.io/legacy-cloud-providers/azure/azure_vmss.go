@@ -30,7 +30,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
-	"github.com/Azure/go-autorest/autorest/to"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +39,7 @@ import (
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/metrics"
 	utilnet "k8s.io/utils/net"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -233,7 +233,7 @@ func (ss *scaleSet) GetPowerStatusByNodeName(name string) (powerState string, er
 	if vm.InstanceView != nil && vm.InstanceView.Statuses != nil {
 		statuses := *vm.InstanceView.Statuses
 		for _, status := range statuses {
-			state := to.String(status.Code)
+			state := pointer.StringDeref(status.Code, "")
 			if strings.HasPrefix(state, vmPowerStatePrefix) {
 				return strings.TrimPrefix(state, vmPowerStatePrefix), nil
 			}
@@ -266,7 +266,7 @@ func (ss *scaleSet) GetProvisioningStateByNodeName(name string) (provisioningSta
 		return provisioningState, nil
 	}
 
-	return to.String(vm.VirtualMachineScaleSetVMProperties.ProvisioningState), nil
+	return pointer.StringDeref(vm.VirtualMachineScaleSetVMProperties.ProvisioningState, ""), nil
 }
 
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
@@ -455,7 +455,7 @@ func (ss *scaleSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
 			return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone %q: %v", zones, err)
 		}
 
-		failureDomain = ss.makeZone(to.String(vm.Location), zoneID)
+		failureDomain = ss.makeZone(pointer.StringDeref(vm.Location, ""), zoneID)
 	} else if vm.InstanceView != nil && vm.InstanceView.PlatformFaultDomain != nil {
 		// Availability zone is not used for the node, falling back to fault domain.
 		failureDomain = strconv.Itoa(int(*vm.InstanceView.PlatformFaultDomain))
@@ -468,7 +468,7 @@ func (ss *scaleSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
 
 	return cloudprovider.Zone{
 		FailureDomain: strings.ToLower(failureDomain),
-		Region:        strings.ToLower(to.String(vm.Location)),
+		Region:        strings.ToLower(pointer.StringDeref(vm.Location, "")),
 	}, nil
 }
 
@@ -565,7 +565,7 @@ func (ss *scaleSet) GetPrivateIPsByNodeName(nodeName string) ([]string, error) {
 // This returns the full identifier of the primary NIC for the given VM.
 func (ss *scaleSet) getPrimaryInterfaceID(machine compute.VirtualMachineScaleSetVM) (string, error) {
 	if machine.NetworkProfile == nil || machine.NetworkProfile.NetworkInterfaces == nil {
-		return "", fmt.Errorf("failed to find the network interfaces for vm %s", to.String(machine.Name))
+		return "", fmt.Errorf("failed to find the network interfaces for vm %s", pointer.StringDeref(machine.Name, ""))
 	}
 
 	if len(*machine.NetworkProfile.NetworkInterfaces) == 1 {
@@ -573,12 +573,12 @@ func (ss *scaleSet) getPrimaryInterfaceID(machine compute.VirtualMachineScaleSet
 	}
 
 	for _, ref := range *machine.NetworkProfile.NetworkInterfaces {
-		if to.Bool(ref.Primary) {
+		if pointer.BoolDeref(ref.Primary, false) {
 			return *ref.ID, nil
 		}
 	}
 
-	return "", fmt.Errorf("failed to find a primary nic for the vm. vmname=%q", to.String(machine.Name))
+	return "", fmt.Errorf("failed to find a primary nic for the vm. vmname=%q", pointer.StringDeref(machine.Name, ""))
 }
 
 // getVmssMachineID returns the full identifier of a vmss virtual machine.
@@ -642,7 +642,7 @@ func (ss *scaleSet) listScaleSets(resourceGroup string) ([]string, error) {
 	ssNames := make([]string, 0)
 	for _, vmss := range allScaleSets {
 		name := *vmss.Name
-		if vmss.Sku != nil && to.Int64(vmss.Sku.Capacity) == 0 {
+		if vmss.Sku != nil && pointer.Int64Deref(vmss.Sku.Capacity, 0) == 0 {
 			klog.V(3).Infof("Capacity of VMSS %q is 0, skipping", name)
 			continue
 		}
@@ -1069,7 +1069,7 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 	// Compose a new vmssVM with added backendPoolID.
 	newBackendPools = append(newBackendPools,
 		compute.SubResource{
-			ID: to.StringPtr(backendPoolID),
+			ID: pointer.String(backendPoolID),
 		})
 	primaryIPConfiguration.LoadBalancerBackendAddressPools = &newBackendPools
 	newVM := &compute.VirtualMachineScaleSetVM{
@@ -1215,7 +1215,7 @@ func (ss *scaleSet) ensureVMSSInPool(service *v1.Service, nodes []*v1.Node, back
 		// Compose a new vmss with added backendPoolID.
 		loadBalancerBackendAddressPools = append(loadBalancerBackendAddressPools,
 			compute.SubResource{
-				ID: to.StringPtr(backendPoolID),
+				ID: pointer.String(backendPoolID),
 			})
 		primaryIPConfig.LoadBalancerBackendAddressPools = &loadBalancerBackendAddressPools
 		newVMSS := compute.VirtualMachineScaleSet{

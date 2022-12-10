@@ -25,9 +25,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Azure/go-autorest/autorest/to"
-
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -135,7 +134,7 @@ func parseTags(tags string) map[string]*string {
 			klog.Warningf("parseTags: error when parsing key-value pair %s-%s, would ignore this one", k, v)
 			continue
 		}
-		formatted[strings.ToLower(k)] = to.StringPtr(v)
+		formatted[strings.ToLower(k)] = pointer.String(v)
 	}
 	return formatted
 }
@@ -156,7 +155,7 @@ func reconcileTags(currentTagsOnResource, newTags map[string]*string) (reconcile
 		if !found {
 			currentTagsOnResource[k] = v
 			changed = true
-		} else if !strings.EqualFold(to.String(v), to.String(currentTagsOnResource[key])) {
+		} else if !strings.EqualFold(pointer.StringDeref(v, ""), pointer.StringDeref(currentTagsOnResource[key], "")) {
 			currentTagsOnResource[key] = v
 			changed = true
 		}
