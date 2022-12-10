@@ -110,7 +110,6 @@ type DiffOptions struct {
 	Selector         string
 	OpenAPISchema    openapi.Resources
 	DynamicClient    dynamic.Interface
-	DryRunVerifier   *resource.QueryParamVerifier
 	CmdNamespace     string
 	EnforceNamespace bool
 	Builder          *resource.Builder
@@ -645,8 +644,6 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
-	o.DryRunVerifier = resource.NewQueryParamVerifier(o.DynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
-
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -694,10 +691,6 @@ func (o *DiffOptions) Run() error {
 
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
-			return err
-		}
-
-		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 			return err
 		}
 

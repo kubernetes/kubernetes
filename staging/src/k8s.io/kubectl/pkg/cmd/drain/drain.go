@@ -224,11 +224,6 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.drainer.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
@@ -400,12 +395,6 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 				printObj(nodeInfo.Object, o.Out)
 			} else {
 				if o.drainer.DryRunStrategy != cmdutil.DryRunClient {
-					if o.drainer.DryRunStrategy == cmdutil.DryRunServer {
-						if err := o.drainer.DryRunVerifier.HasSupport(gvk); err != nil {
-							printError(err)
-							continue
-						}
-					}
 					err, patchErr := c.PatchOrReplace(o.drainer.Client, o.drainer.DryRunStrategy == cmdutil.DryRunServer)
 					if patchErr != nil {
 						printError(patchErr)

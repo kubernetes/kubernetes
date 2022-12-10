@@ -68,7 +68,6 @@ type PatchOptions struct {
 	namespace                    string
 	enforceNamespace             bool
 	dryRunStrategy               cmdutil.DryRunStrategy
-	dryRunVerifier               *resource.QueryParamVerifier
 	outputFormat                 string
 	args                         []string
 	builder                      *resource.Builder
@@ -177,11 +176,6 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.args = args
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	return nil
 }
@@ -257,11 +251,6 @@ func (o *PatchOptions) RunPatch() error {
 
 		if !o.Local && o.dryRunStrategy != cmdutil.DryRunClient {
 			mapping := info.ResourceMapping()
-			if o.dryRunStrategy == cmdutil.DryRunServer {
-				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-					return err
-				}
-			}
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
