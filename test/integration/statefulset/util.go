@@ -204,7 +204,7 @@ func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*appsv1.
 	for _, sts := range stss {
 		createdSTS, err := clientSet.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
 		if err != nil {
-			t.Fatalf("failed to create sts %s: %v", sts.Name, err)
+			t.Fatalf("failed to create StatefulSet %s: %v", sts.Name, err)
 		}
 		createdSTSs = append(createdSTSs, createdSTS)
 	}
@@ -230,7 +230,7 @@ func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *appsv1.Stat
 		}
 		return newSTS.Status.Replicas == *newSTS.Spec.Replicas && newSTS.Status.ObservedGeneration >= desiredGeneration, nil
 	}); err != nil {
-		t.Fatalf("failed to verify .Status.Replicas is equal to .Spec.Replicas for sts %s: %v", sts.Name, err)
+		t.Fatalf("failed to verify .Status.Replicas is equal to .Spec.Replicas for StatefulSet %s: %v", sts.Name, err)
 	}
 }
 
@@ -319,7 +319,7 @@ func updateSTS(t *testing.T, stsClient typedappsv1.StatefulSetInterface, stsName
 		sts, err = stsClient.Update(context.TODO(), newSTS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
-		t.Fatalf("failed to update sts %s: %v", stsName, err)
+		t.Fatalf("failed to update StatefulSet %s: %v", stsName, err)
 	}
 	return sts
 }
@@ -336,7 +336,7 @@ func scaleSTS(t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet, repl
 		sts, err = stsClient.Update(context.TODO(), newSTS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
-		t.Fatalf("failed to update .Spec.Replicas to %d for sts %s: %v", replicas, sts.Name, err)
+		t.Fatalf("failed to update .Spec.Replicas to %d for StatefulSet %s: %v", replicas, sts.Name, err)
 	}
 	waitSTSStable(t, c, sts)
 }

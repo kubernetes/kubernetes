@@ -212,7 +212,7 @@ func TestViewHistory(t *testing.T) {
 		)
 		stsRawData, err := json.Marshal(ssStub)
 		if err != nil {
-			t.Fatalf("error creating sts raw data: %v", err)
+			t.Fatalf("error creating StatefulSet raw data: %v", err)
 		}
 		ssStub1 := &appsv1.ControllerRevision{
 			ObjectMeta: metav1.ObjectMeta{
@@ -316,7 +316,7 @@ func TestViewHistory(t *testing.T) {
 
 		daemonSetRaw, err := json.Marshal(daemonSetStub)
 		if err != nil {
-			t.Fatalf("error creating sts raw data: %v", err)
+			t.Fatalf("error creating StatefulSet raw data: %v", err)
 		}
 		daemonSetControllerRevision := &appsv1.ControllerRevision{
 			ObjectMeta: metav1.ObjectMeta{

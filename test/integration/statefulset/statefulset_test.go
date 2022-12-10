@@ -149,7 +149,7 @@ func TestSpecReplicasChange(t *testing.T) {
 	})
 	savedGeneration := newSTS.Generation
 	if savedGeneration == oldGeneration {
-		t.Fatalf("failed to verify .Generation has incremented for sts %s", sts.Name)
+		t.Fatalf("failed to verify .Generation has incremented for StatefulSet %s", sts.Name)
 	}
 
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
@@ -377,7 +377,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 	sts := newSTS("sts", ns.Name, 4)
 	_, err := c.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("Could not create statefuleSet %s: %v", sts.Name, err)
+		t.Fatalf("Could not create statefulSet %s: %v", sts.Name, err)
 	}
 
 	wantReplicas := limitedPodNumber
