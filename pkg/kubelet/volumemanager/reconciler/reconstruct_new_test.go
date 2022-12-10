@@ -19,7 +19,6 @@ package reconciler
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -48,8 +47,8 @@ func TestReconstructVolumes(t *testing.T) {
 		{
 			name: "when two pods are using same volume and both are deleted",
 			volumePaths: []string{
-				path.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
-				path.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
+				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
+				filepath.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
 			},
 			expectedVolumesNeedReportedInUse:    []string{"fake-plugin/pvc-abcdef", "fake-plugin/pvc-abcdef"},
 			expectedVolumesNeedDevicePath:       []string{"fake-plugin/pvc-abcdef", "fake-plugin/pvc-abcdef"},
@@ -77,7 +76,7 @@ func TestReconstructVolumes(t *testing.T) {
 		{
 			name: "when reconstruction fails for a volume, volumes should be cleaned up",
 			volumePaths: []string{
-				path.Join("pod1", "volumes", "missing-plugin", "pvc-abcdef"),
+				filepath.Join("pod1", "volumes", "missing-plugin", "pvc-abcdef"),
 			},
 			expectedVolumesNeedReportedInUse:    []string{},
 			expectedVolumesNeedDevicePath:       []string{},
@@ -271,14 +270,14 @@ func TestReconstructVolumesMount(t *testing.T) {
 	}{
 		{
 			name:       "reconstructed volume is mounted",
-			volumePath: path.Join("pod1uid", "volumes", "fake-plugin", "volumename"),
+			volumePath: filepath.Join("pod1uid", "volumes", "fake-plugin", "volumename"),
 
 			expectMount: true,
 		},
 		{
 			name: "reconstructed volume fails to mount",
 			// FailOnSetupVolumeName: MountDevice succeeds, SetUp fails
-			volumePath:  path.Join("pod1uid", "volumes", "fake-plugin", volumetesting.FailOnSetupVolumeName),
+			volumePath:  filepath.Join("pod1uid", "volumes", "fake-plugin", volumetesting.FailOnSetupVolumeName),
 			expectMount: false,
 		},
 	}

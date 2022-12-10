@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -123,7 +122,7 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 		}
 		// Get a symbolic link associated to a block device under pod device path
 		dirPath, volName := vol.BlockVolumeMapper.GetPodDeviceMapPath()
-		symlinkPath := path.Join(dirPath, volName)
+		symlinkPath := filepath.Join(dirPath, volName)
 		if islinkExist, checkErr := blkutil.IsSymlinkExist(symlinkPath); checkErr != nil {
 			return nil, checkErr
 		} else if islinkExist {
@@ -303,7 +302,7 @@ func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.M
 
 // getEtcHostsPath returns the full host-side path to a pod's generated /etc/hosts file
 func getEtcHostsPath(podDir string) string {
-	hostsFilePath := path.Join(podDir, "etc-hosts")
+	hostsFilePath := filepath.Join(podDir, "etc-hosts")
 	// Volume Mounts fail on Windows if it is not of the form C:/
 	return volumeutil.MakeAbsolutePath(runtime.GOOS, hostsFilePath)
 }

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 
@@ -133,16 +132,16 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			continue
 		}
 		podName := podsDirInfo[i].Name()
-		podDir := path.Join(podDir, podName)
+		podDir := filepath.Join(podDir, podName)
 
 		// Find filesystem volume information
 		// ex. filesystem volume: /pods/{podUid}/volume/{escapeQualifiedPluginName}/{volumeName}
 		volumesDirs := map[v1.PersistentVolumeMode]string{
-			v1.PersistentVolumeFilesystem: path.Join(podDir, config.DefaultKubeletVolumesDirName),
+			v1.PersistentVolumeFilesystem: filepath.Join(podDir, config.DefaultKubeletVolumesDirName),
 		}
 		// Find block volume information
 		// ex. block volume: /pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
-		volumesDirs[v1.PersistentVolumeBlock] = path.Join(podDir, config.DefaultKubeletVolumeDevicesDirName)
+		volumesDirs[v1.PersistentVolumeBlock] = filepath.Join(podDir, config.DefaultKubeletVolumeDevicesDirName)
 
 		for volumeMode, volumesDir := range volumesDirs {
 			var volumesDirInfo []fs.DirEntry
@@ -152,7 +151,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			}
 			for _, volumeDir := range volumesDirInfo {
 				pluginName := volumeDir.Name()
-				volumePluginPath := path.Join(volumesDir, pluginName)
+				volumePluginPath := filepath.Join(volumesDir, pluginName)
 				volumePluginDirs, err := utilpath.ReadDirNoStat(volumePluginPath)
 				if err != nil {
 					klog.ErrorS(err, "Could not read volume plugin directory", "volumePluginPath", volumePluginPath)
@@ -160,7 +159,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 				}
 				unescapePluginName := utilstrings.UnescapeQualifiedName(pluginName)
 				for _, volumeName := range volumePluginDirs {
-					volumePath := path.Join(volumePluginPath, volumeName)
+					volumePath := filepath.Join(volumePluginPath, volumeName)
 					klog.V(5).InfoS("Volume path from volume plugin directory", "podName", podName, "volumePath", volumePath)
 					volumes = append(volumes, podVolume{
 						podName:        volumetypes.UniquePodName(podName),
