@@ -187,6 +187,30 @@ func (c *ContainerWrapper) Resources(resMap map[v1.ResourceName]string) *Contain
 	return c
 }
 
+// ResourceRequests sets the container resources requests to the given resource map of requests.
+func (c *ContainerWrapper) ResourceRequests(reqMap map[v1.ResourceName]string) *ContainerWrapper {
+	res := v1.ResourceList{}
+	for k, v := range reqMap {
+		res[k] = resource.MustParse(v)
+	}
+	c.Container.Resources = v1.ResourceRequirements{
+		Requests: res,
+	}
+	return c
+}
+
+// ResourceLimits sets the container resource limits to the given resource map.
+func (c *ContainerWrapper) ResourceLimits(limMap map[v1.ResourceName]string) *ContainerWrapper {
+	res := v1.ResourceList{}
+	for k, v := range limMap {
+		res[k] = resource.MustParse(v)
+	}
+	c.Container.Resources = v1.ResourceRequirements{
+		Limits: res,
+	}
+	return c
+}
+
 // PodWrapper wraps a Pod inside.
 type PodWrapper struct{ v1.Pod }
 
@@ -608,14 +632,36 @@ func (p *PodWrapper) Annotations(annotations map[string]string) *PodWrapper {
 	return p
 }
 
-// Req adds a new container to the inner pod with given resource map.
-func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
+// Res adds a new container to the inner pod with given resource map.
+func (p *PodWrapper) Res(resMap map[v1.ResourceName]string) *PodWrapper {
 	if len(resMap) == 0 {
 		return p
 	}
 
 	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
 	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).Resources(resMap).Obj())
+	return p
+}
+
+// Req adds a new container to the inner pod with given resource map of requests.
+func (p *PodWrapper) Req(reqMap map[v1.ResourceName]string) *PodWrapper {
+	if len(reqMap) == 0 {
+		return p
+	}
+
+	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).ResourceRequests(reqMap).Obj())
+	return p
+}
+
+// Lim adds a new container to the inner pod with given resource map of limits.
+func (p *PodWrapper) Lim(limMap map[v1.ResourceName]string) *PodWrapper {
+	if len(limMap) == 0 {
+		return p
+	}
+
+	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).ResourceLimits(limMap).Obj())
 	return p
 }
 

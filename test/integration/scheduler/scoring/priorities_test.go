@@ -151,7 +151,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound1").Req(
+	cpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound1").Res(
 		map[v1.ResourceName]string{
 			v1.ResourceCPU:    "2",
 			v1.ResourceMemory: "4G",
@@ -161,7 +161,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("gpubound1").Req(
+	gpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("gpubound1").Res(
 		map[v1.ResourceName]string{
 			v1.ResourceCPU:    "1",
 			v1.ResourceMemory: "2G",
@@ -185,7 +185,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 
 	// The following pod is using the gpu-binpacking-scheduler profile, which gives a higher weight to
 	// GPU-based binpacking, and so it should land on the node with higher GPU utilization.
-	cpuBoundPod2, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound2").SchedulerName("gpu-binpacking-scheduler").Req(
+	cpuBoundPod2, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound2").SchedulerName("gpu-binpacking-scheduler").Res(
 		map[v1.ResourceName]string{
 			v1.ResourceCPU:    "2",
 			v1.ResourceMemory: "4G",

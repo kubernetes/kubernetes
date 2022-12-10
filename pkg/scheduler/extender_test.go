@@ -354,9 +354,17 @@ func TestIsInterested(t *testing.T) {
 			want:     false,
 		},
 		{
-			label:    "Managed memory, container memory",
+			label:    "Managed memory, container memory with Requests",
 			extender: mem,
 			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				"memory": "0",
+			}).Obj(),
+			want: true,
+		},
+		{
+			label:    "Managed memory, container memory with Limits",
+			extender: mem,
+			pod: st.MakePod().Lim(map[v1.ResourceName]string{
 				"memory": "0",
 			}).Obj(),
 			want: true,
