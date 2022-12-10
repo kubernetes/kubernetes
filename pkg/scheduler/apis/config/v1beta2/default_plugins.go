@@ -36,6 +36,7 @@ func getDefaultPlugins() *v1beta2.Plugins {
 		},
 		PreFilter: v1beta2.PluginSet{
 			Enabled: []v1beta2.Plugin{
+				{Name: names.NodeName},
 				{Name: names.NodeResourcesFit},
 				{Name: names.NodePorts},
 				{Name: names.VolumeRestrictions},
