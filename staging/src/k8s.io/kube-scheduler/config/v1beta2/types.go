@@ -318,7 +318,7 @@ type Extender struct {
 	// ManagedResources is a list of extended resources that are managed by
 	// this extender.
 	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
-	//   (if the extender is the binder) phases iff the pod requests at least
+	//   (if the extender is the binder) phases if the pod requests at least
 	//   one of the extended resources in this list. If empty or unspecified,
 	//   all pods will be sent to this extender.
 	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
