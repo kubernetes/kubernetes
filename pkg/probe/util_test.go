@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestFindPortByName(t *testing.T) {
@@ -39,5 +40,111 @@ func TestFindPortByName(t *testing.T) {
 	got, err := findPortByName(&container, "foo")
 	if got != want || err != nil {
 		t.Errorf("Expected %v, got %v, err: %v", want, got, err)
+	}
+}
+
+func TestResolveContainerPort(t *testing.T) {
+	type args struct {
+		param     intstr.IntOrString
+		container v1.Container
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			name: "get port by int val ",
+			args: args{
+				param: intstr.IntOrString{
+					Type:   0,
+					IntVal: 80,
+					StrVal: "foo",
+				},
+				container: v1.Container{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "foo",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
+			want:    80,
+			wantErr: false,
+		},
+		{
+			name: "get port by string val",
+			args: args{
+				param: intstr.IntOrString{
+					Type:   1,
+					IntVal: 80,
+					StrVal: "foo",
+				},
+				container: v1.Container{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "foo",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
+			want:    8080,
+			wantErr: false,
+		},
+		{
+			name: "get port by invalid type",
+			args: args{
+				param: intstr.IntOrString{
+					Type:   20,
+					IntVal: 80,
+					StrVal: "foo",
+				},
+				container: v1.Container{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "foo",
+							ContainerPort: 8080,
+						},
+					},
+				},
+			},
+			want:    -1,
+			wantErr: true,
+		},
+		{
+			name: "get invalid container port",
+			args: args{
+				param: intstr.IntOrString{
+					Type:   1,
+					StrVal: "foo",
+				},
+				container: v1.Container{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "foo",
+							ContainerPort: 80800,
+						},
+					},
+				},
+			},
+			want:    80800,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ResolveContainerPort(tt.args.param, &tt.args.container)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ResolveContainerPort() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ResolveContainerPort() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
