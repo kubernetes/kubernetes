@@ -49,7 +49,6 @@ import (
 //
 //
 //
-//
 // This must be line #52.
 
 var _ = ginkgo.Describe("pod", func() {

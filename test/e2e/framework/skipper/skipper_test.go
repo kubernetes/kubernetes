@@ -47,7 +47,6 @@ import (
 //
 //
 //
-//
 // This must be line #50.
 
 var _ = ginkgo.Describe("e2e", func() {
