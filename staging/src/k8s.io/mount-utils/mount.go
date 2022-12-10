@@ -65,10 +65,10 @@ type Interface interface {
 	// care about such situations, this is a faster alternative to calling List()
 	// and scanning that output.
 	IsLikelyNotMountPoint(file string) (bool, error)
-	// canSafelySkipMountPointCheck indicates whether this mounter returns errors on
+	// CanSafelySkipMountPointCheck indicates whether this mounter returns errors on
 	// operations for targets that are not mount points. If this returns true, no such
 	// errors will be returned.
-	canSafelySkipMountPointCheck() bool
+	CanSafelySkipMountPointCheck() bool
 	// IsMountPoint determines if a directory is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	// IsMountPoint is more expensive than IsLikelyNotMountPoint.

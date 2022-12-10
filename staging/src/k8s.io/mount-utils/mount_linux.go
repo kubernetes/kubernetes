@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/moby/sys/mountinfo"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -33,6 +32,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/moby/sys/mountinfo"
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
@@ -422,8 +423,8 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-// canSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
-func (mounter *Mounter) canSafelySkipMountPointCheck() bool {
+// CanSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
+func (mounter *Mounter) CanSafelySkipMountPointCheck() bool {
 	return mounter.withSafeNotMountedBehavior
 }
 
