@@ -445,11 +445,8 @@ func TestAnnotateErrors(t *testing.T) {
 			cmd.SetOut(bufOut)
 			cmd.SetErr(bufOut)
 
-			options := NewAnnotateOptions(iostreams)
-			err := options.Complete(tf, cmd, testCase.args)
-			if err == nil {
-				err = options.Validate()
-			}
+			flags := NewAnnotateFlags(iostreams)
+			_, err := flags.ToOptions(tf, cmd, testCase.args)
 			if !testCase.errFn(err) {
 				t.Errorf("%s: unexpected error: %v", k, err)
 				return
@@ -505,12 +502,11 @@ func TestAnnotateObject(t *testing.T) {
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
-	options := NewAnnotateOptions(iostreams)
+	flags := NewAnnotateFlags(iostreams)
 	args := []string{"pods/foo", "a=b", "c-"}
-	if err := options.Complete(tf, cmd, args); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := options.Validate(); err != nil {
+
+	options, err := flags.ToOptions(tf, cmd, args)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.RunAnnotate(); err != nil {
@@ -572,13 +568,13 @@ func TestAnnotateResourceVersion(t *testing.T) {
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
-	options := NewAnnotateOptions(iostreams)
-	options.resourceVersion = "10"
+	//options := NewAnnotateOptions(iostreams)
+	flags := NewAnnotateFlags(iostreams)
+	flags.resourceVersion = "10"
 	args := []string{"pods/foo", "a=b"}
-	if err := options.Complete(tf, cmd, args); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := options.Validate(); err != nil {
+
+	options, err := flags.ToOptions(tf, cmd, args)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.RunAnnotate(); err != nil {
@@ -627,15 +623,15 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
-	options := NewAnnotateOptions(iostreams)
-	options.Filenames = []string{"../../../testdata/controller.yaml"}
+	flags := NewAnnotateFlags(iostreams)
+	flags.Filenames = []string{"../../../testdata/controller.yaml"}
 	args := []string{"a=b", "c-"}
-	if err := options.Complete(tf, cmd, args); err != nil {
+
+	options, err := flags.ToOptions(tf, cmd, args)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.Validate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
 	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -657,16 +653,17 @@ func TestAnnotateLocal(t *testing.T) {
 
 	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
-	options := NewAnnotateOptions(iostreams)
-	options.local = true
-	options.Filenames = []string{"../../../testdata/controller.yaml"}
+	flags := NewAnnotateFlags(iostreams)
+	flags.Local = true
+	flags.Filenames = []string{"../../../testdata/controller.yaml"}
 	args := []string{"a=b"}
-	if err := options.Complete(tf, cmd, args); err != nil {
+
+	options, err := flags.ToOptions(tf, cmd, args)
+
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.Validate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
 	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -714,13 +711,12 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(iostreams.Out)
 	cmd.SetErr(iostreams.Out)
-	options := NewAnnotateOptions(iostreams)
-	options.all = true
+	flags := NewAnnotateFlags(iostreams)
+	flags.All = true
 	args := []string{"pods", "a=b", "c-"}
-	if err := options.Complete(tf, cmd, args); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := options.Validate(); err != nil {
+
+	options, err := flags.ToOptions(tf, cmd, args)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.RunAnnotate(); err != nil {
