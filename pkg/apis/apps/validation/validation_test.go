@@ -213,7 +213,7 @@ func TestValidateStatefulSet(t *testing.T) {
 
 	errorCases := []testCase{
 		{
-			name: "zero-length ID",
+			name: "zero-length name",
 			set: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
@@ -225,6 +225,36 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 			errs: field.ErrorList{
 				field.Required(field.NewPath("metadata", "name"), ""),
+			},
+		},
+		{
+			name: "name-with-dots",
+			set: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc.123", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), "abc.123", ""),
+			},
+		},
+		{
+			name: "long name",
+			set: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: strings.Repeat("a", 64), Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
+					Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:            validPodTemplate.Template,
+					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				},
+			},
+			errs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata", "name"), strings.Repeat("a", 64), ""),
 			},
 		},
 		{
