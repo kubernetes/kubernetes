@@ -17,7 +17,6 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -100,52 +99,5 @@ func TestRollbackFiles(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), errString) {
 		t.Fatalf("Expected error contains %q, got %v", errString, err)
-	}
-}
-
-func TestCleanupKubeletDynamicEnvFileContainerRuntime(t *testing.T) {
-	tcases := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "common flag",
-			input:    fmt.Sprintf("%s=\"--container-runtime=remote --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.9\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.9\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "missing flag of interest",
-			input:    fmt.Sprintf("%s=\"--foo=abc --bar=def --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "add missing URL scheme",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime=remote --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "add missing URL scheme if there is no '=' after the flag name",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime remote --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "empty flag of interest value following '='",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime= --container-runtime-endpoint unix:///var/run/containerd/containerd.sock --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint unix:///var/run/containerd/containerd.sock --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "empty flag of interest value without '='",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-	}
-	for _, tt := range tcases {
-		t.Run(tt.name, func(t *testing.T) {
-			output := cleanupKubeletDynamicEnvFileContainerRuntime(tt.input)
-			if output != tt.expected {
-				t.Errorf("expected output: %q, got: %q", tt.expected, output)
-			}
-		})
 	}
 }
