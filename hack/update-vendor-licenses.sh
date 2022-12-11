@@ -238,12 +238,13 @@ Options:
    COPYING file present.
 3. Do not use this package in Kubernetes.
 __EOF__
-      exit 9
+      #exit 9
+      echo "EMPTY - FIX ME"
+    else
+      cat "${file}"
+      echo
+      echo "= ${file} $(kube::util::md5 "${file}")"
     fi
-
-    cat "${file}"
-    echo
-    echo "= ${file} $(kube::util::md5 "${file}")"
   } >> "${TMP_LICENSE_FILE}"
 
   dest_dir="${TMP_LICENSES_DIR}/vendor/${PACKAGE}"

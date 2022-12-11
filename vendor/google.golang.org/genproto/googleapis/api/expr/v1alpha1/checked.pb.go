@@ -1117,7 +1117,7 @@ type Decl_FunctionDecl_Overload struct {
 	// `string.isEmpty()` would have `result_type` of `kind: BOOL`.
 	ResultType *Type `protobuf:"bytes,4,opt,name=result_type,json=resultType,proto3" json:"result_type,omitempty"`
 	// Whether the function is to be used in a method call-style `x.f(...)`
-	// of a function call-style `f(x, ...)`.
+	// or a function call-style `f(x, ...)`.
 	//
 	// For methods, the first parameter declaration, `params[0]` is the
 	// expected type of the target receiver.

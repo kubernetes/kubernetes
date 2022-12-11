@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC.
+// Copyright 2022 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -56,6 +56,7 @@ import (
 	"strings"
 
 	googleapi "google.golang.org/api/googleapi"
+	internal "google.golang.org/api/internal"
 	gensupport "google.golang.org/api/internal/gensupport"
 	option "google.golang.org/api/option"
 	internaloption "google.golang.org/api/option/internaloption"
@@ -103,7 +104,7 @@ const (
 
 // NewService creates a new Service.
 func NewService(ctx context.Context, opts ...option.ClientOption) (*Service, error) {
-	scopesOption := option.WithScopes(
+	scopesOption := internaloption.WithDefaultScopes(
 		"https://www.googleapis.com/auth/cloud-platform",
 		"https://www.googleapis.com/auth/monitoring",
 		"https://www.googleapis.com/auth/monitoring.read",
@@ -713,10 +714,9 @@ type AlertPolicy struct {
 	// Name: Required if the policy exists. The resource name for this
 	// policy. The format is:
 	// projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID]
-	// [ALERT_POLICY_ID] is assigned by Stackdriver Monitoring when the
-	// policy is created. When calling the alertPolicies.create method, do
-	// not include the name field in the alerting policy passed as part of
-	// the request.
+	// [ALERT_POLICY_ID] is assigned by Cloud Monitoring when the policy is
+	// created. When calling the alertPolicies.create method, do not include
+	// the name field in the alerting policy passed as part of the request.
 	Name string `json:"name,omitempty"`
 
 	// NotificationChannels: Identifies the notification channels to which
@@ -809,8 +809,8 @@ func (s *AlertStrategy) MarshalJSON() ([]byte, error) {
 type AppEngine struct {
 	// ModuleId: The ID of the App Engine module underlying this service.
 	// Corresponds to the module_id resource label in the gae_app monitored
-	// resource:
-	// https://cloud.google.com/monitoring/api/resources#tag_gae_app
+	// resource
+	// (https://cloud.google.com/monitoring/api/resources#tag_gae_app).
 	ModuleId string `json:"moduleId,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ModuleId") to
@@ -990,8 +990,8 @@ func (s *BucketOptions) MarshalJSON() ([]byte, error) {
 type CloudEndpoints struct {
 	// Service: The name of the Cloud Endpoints service underlying this
 	// service. Corresponds to the service resource label in the api
-	// monitored resource:
-	// https://cloud.google.com/monitoring/api/resources#tag_api
+	// monitored resource
+	// (https://cloud.google.com/monitoring/api/resources#tag_api).
 	Service string `json:"service,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Service") to
@@ -1013,6 +1013,43 @@ type CloudEndpoints struct {
 
 func (s *CloudEndpoints) MarshalJSON() ([]byte, error) {
 	type NoMethod CloudEndpoints
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// CloudRun: Cloud Run service. Learn more at
+// https://cloud.google.com/run.
+type CloudRun struct {
+	// Location: The location the service is run. Corresponds to the
+	// location resource label in the cloud_run_revision monitored resource
+	// (https://cloud.google.com/monitoring/api/resources#tag_cloud_run_revision).
+	Location string `json:"location,omitempty"`
+
+	// ServiceName: The name of the Cloud Run service. Corresponds to the
+	// service_name resource label in the cloud_run_revision monitored
+	// resource
+	// (https://cloud.google.com/monitoring/api/resources#tag_cloud_run_revision).
+	ServiceName string `json:"serviceName,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Location") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Location") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *CloudRun) MarshalJSON() ([]byte, error) {
+	type NoMethod CloudRun
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1266,19 +1303,19 @@ type Condition struct {
 	// Name: Required if the condition exists. The unique resource name for
 	// this condition. Its format is:
 	// projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[POLICY_ID]/conditions/[
-	// CONDITION_ID] [CONDITION_ID] is assigned by Stackdriver Monitoring
-	// when the condition is created as part of a new or updated alerting
-	// policy.When calling the alertPolicies.create method, do not include
-	// the name field in the conditions of the requested alerting policy.
-	// Stackdriver Monitoring creates the condition identifiers and includes
-	// them in the new policy.When calling the alertPolicies.update method
-	// to update a policy, including a condition name causes the existing
-	// condition to be updated. Conditions without names are added to the
-	// updated policy. Existing conditions are deleted if they are not
-	// updated.Best practice is to preserve [CONDITION_ID] if you make only
-	// small changes, such as those to condition thresholds, durations, or
-	// trigger values. Otherwise, treat the change as a new condition and
-	// let the existing condition be deleted.
+	// CONDITION_ID] [CONDITION_ID] is assigned by Cloud Monitoring when the
+	// condition is created as part of a new or updated alerting policy.When
+	// calling the alertPolicies.create method, do not include the name
+	// field in the conditions of the requested alerting policy. Cloud
+	// Monitoring creates the condition identifiers and includes them in the
+	// new policy.When calling the alertPolicies.update method to update a
+	// policy, including a condition name causes the existing condition to
+	// be updated. Conditions without names are added to the updated policy.
+	// Existing conditions are deleted if they are not updated.Best practice
+	// is to preserve [CONDITION_ID] if you make only small changes, such as
+	// those to condition thresholds, durations, or trigger values.
+	// Otherwise, treat the change as a new condition and let the existing
+	// condition be deleted.
 	Name string `json:"name,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ConditionAbsent") to
@@ -1311,10 +1348,14 @@ func (s *Condition) MarshalJSON() ([]byte, error) {
 // response (and the first 1 MB of a TCP check's response) are examined
 // for purposes of content matching.
 type ContentMatcher struct {
-	// Content: String or regex content to match. Maximum 1024 bytes. An
-	// empty content string indicates no content matching is to be
+	// Content: String, regex or JSON content to match. Maximum 1024 bytes.
+	// An empty content string indicates no content matching is to be
 	// performed.
 	Content string `json:"content,omitempty"`
+
+	// JsonPathMatcher: Matcher information for MATCHES_JSON_PATH and
+	// NOT_MATCHES_JSON_PATH
+	JsonPathMatcher *JsonPathMatcher `json:"jsonPathMatcher,omitempty"`
 
 	// Matcher: The type of content matcher that will be applied to the
 	// server output, compared to the content string when the check is run.
@@ -1330,13 +1371,20 @@ type ContentMatcher struct {
 	//   "NOT_CONTAINS_STRING" - Selects negation of substring matching. The
 	// match succeeds if the output does NOT contain the content string.
 	//   "MATCHES_REGEX" - Selects regular-expression matching. The match
-	// succeeds of the output matches the regular expression specified in
+	// succeeds if the output matches the regular expression specified in
 	// the content string. Regex matching is only supported for HTTP/HTTPS
 	// checks.
 	//   "NOT_MATCHES_REGEX" - Selects negation of regular-expression
 	// matching. The match succeeds if the output does NOT match the regular
 	// expression specified in the content string. Regex matching is only
 	// supported for HTTP/HTTPS checks.
+	//   "MATCHES_JSON_PATH" - Selects JSONPath matching. See
+	// JsonPathMatcher for details on when the match succeeds. JSONPath
+	// matching is only supported for HTTP/HTTPS checks.
+	//   "NOT_MATCHES_JSON_PATH" - Selects JSONPath matching. See
+	// JsonPathMatcher for details on when the match succeeds. Succeeds when
+	// output does NOT match as specified. JSONPath is only supported for
+	// HTTP/HTTPS checks.
 	Matcher string `json:"matcher,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Content") to
@@ -1659,7 +1707,8 @@ type Documentation struct {
 	// Content: The text of the documentation, interpreted according to
 	// mime_type. The content may not exceed 8,192 Unicode characters and
 	// may not exceed more than 10,240 bytes when encoded in UTF-8 format,
-	// whichever is smaller.
+	// whichever is smaller. This text can be templatized by using variables
+	// (https://cloud.google.com/monitoring/alerts/doc-variables).
 	Content string `json:"content,omitempty"`
 
 	// MimeType: The format of the content field. Presently, only the value
@@ -1736,8 +1785,7 @@ func (s *DroppedLabels) MarshalJSON() ([]byte, error) {
 // duplicated empty messages in your APIs. A typical example is to use
 // it as the request or the response type of an API method. For
 // instance: service Foo { rpc Bar(google.protobuf.Empty) returns
-// (google.protobuf.Empty); } The JSON representation for Empty is empty
-// JSON object {}.
+// (google.protobuf.Empty); }
 type Empty struct {
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.
@@ -2095,6 +2143,145 @@ func (s *GetNotificationChannelVerificationCodeResponse) MarshalJSON() ([]byte, 
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// GkeNamespace: GKE Namespace. The field names correspond to the
+// resource metadata labels on monitored resources that fall under a
+// namespace (for example, k8s_container or k8s_pod).
+type GkeNamespace struct {
+	// ClusterName: The name of the parent cluster.
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// Location: The location of the parent cluster. This may be a zone or
+	// region.
+	Location string `json:"location,omitempty"`
+
+	// NamespaceName: The name of this namespace.
+	NamespaceName string `json:"namespaceName,omitempty"`
+
+	// ProjectId: Output only. The project this resource lives in. For
+	// legacy services migrated from the Custom type, this may be a distinct
+	// project from the one parenting the service itself.
+	ProjectId string `json:"projectId,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ClusterName") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ClusterName") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GkeNamespace) MarshalJSON() ([]byte, error) {
+	type NoMethod GkeNamespace
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// GkeService: GKE Service. The "service" here represents a Kubernetes
+// service object
+// (https://kubernetes.io/docs/concepts/services-networking/service).
+// The field names correspond to the resource labels on k8s_service
+// monitored resources
+// (https://cloud.google.com/monitoring/api/resources#tag_k8s_service).
+type GkeService struct {
+	// ClusterName: The name of the parent cluster.
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// Location: The location of the parent cluster. This may be a zone or
+	// region.
+	Location string `json:"location,omitempty"`
+
+	// NamespaceName: The name of the parent namespace.
+	NamespaceName string `json:"namespaceName,omitempty"`
+
+	// ProjectId: Output only. The project this resource lives in. For
+	// legacy services migrated from the Custom type, this may be a distinct
+	// project from the one parenting the service itself.
+	ProjectId string `json:"projectId,omitempty"`
+
+	// ServiceName: The name of this service.
+	ServiceName string `json:"serviceName,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ClusterName") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ClusterName") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GkeService) MarshalJSON() ([]byte, error) {
+	type NoMethod GkeService
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// GkeWorkload: A GKE Workload (Deployment, StatefulSet, etc). The field
+// names correspond to the metadata labels on monitored resources that
+// fall under a workload (for example, k8s_container or k8s_pod).
+type GkeWorkload struct {
+	// ClusterName: The name of the parent cluster.
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// Location: The location of the parent cluster. This may be a zone or
+	// region.
+	Location string `json:"location,omitempty"`
+
+	// NamespaceName: The name of the parent namespace.
+	NamespaceName string `json:"namespaceName,omitempty"`
+
+	// ProjectId: Output only. The project this resource lives in. For
+	// legacy services migrated from the Custom type, this may be a distinct
+	// project from the one parenting the service itself.
+	ProjectId string `json:"projectId,omitempty"`
+
+	// TopLevelControllerName: The name of this workload.
+	TopLevelControllerName string `json:"topLevelControllerName,omitempty"`
+
+	// TopLevelControllerType: The type of this workload (for example,
+	// "Deployment" or "DaemonSet")
+	TopLevelControllerType string `json:"topLevelControllerType,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "ClusterName") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "ClusterName") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GkeWorkload) MarshalJSON() ([]byte, error) {
+	type NoMethod GkeWorkload
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // GoogleMonitoringV3Range: Range of numerical values within min and
 // max.
 type GoogleMonitoringV3Range struct {
@@ -2231,9 +2418,9 @@ type HttpCheck struct {
 	// Users can provide a Content-Length header via the headers field or
 	// the API will do so. If the request_method is GET and body is not
 	// empty, the API will return an error. The maximum byte size is 1
-	// megabyte. Note: As with all bytes fields, JSON representations are
-	// base64 encoded. e.g.: "foo=bar" in URL-encoded form is "foo%3Dbar"
-	// and in base64 encoding is "Zm9vJTI1M0RiYXI=".
+	// megabyte.Note: If client libraries aren't used (which performs the
+	// conversion automatically) base64 encode your body data since the
+	// field is of bytes type.
 	Body string `json:"body,omitempty"`
 
 	// ContentType: The content type header to use for the check. The
@@ -2327,8 +2514,8 @@ func (s *HttpCheck) MarshalJSON() ([]byte, error) {
 // private/internal GCP resources.
 type InternalChecker struct {
 	// DisplayName: The checker's human-readable name. The display name
-	// should be unique within a Stackdriver Workspace in order to make it
-	// easier to identify; however, uniqueness is not enforced.
+	// should be unique within a Cloud Monitoring Metrics Scope in order to
+	// make it easier to identify; however, uniqueness is not enforced.
 	DisplayName string `json:"displayName,omitempty"`
 
 	// GcpZone: The GCP zone the Uptime check should egress from. Only
@@ -2338,8 +2525,8 @@ type InternalChecker struct {
 
 	// Name: A unique resource name for this InternalChecker. The format is:
 	// projects/[PROJECT_ID_OR_NUMBER]/internalCheckers/[INTERNAL_CHECKER_ID]
-	//  [PROJECT_ID_OR_NUMBER] is the Stackdriver Workspace project for the
-	// Uptime check config associated with the internal checker.
+	//  [PROJECT_ID_OR_NUMBER] is the Cloud Monitoring Metrics Scope project
+	// for the Uptime check config associated with the internal checker.
 	Name string `json:"name,omitempty"`
 
 	// Network: The GCP VPC network (https://cloud.google.com/vpc/docs/vpc)
@@ -2347,7 +2534,7 @@ type InternalChecker struct {
 	Network string `json:"network,omitempty"`
 
 	// PeerProjectId: The GCP project ID where the internal checker lives.
-	// Not necessary the same as the Workspace project.
+	// Not necessary the same as the Metrics Scope project.
 	PeerProjectId string `json:"peerProjectId,omitempty"`
 
 	// State: The current operational state of the internal checker.
@@ -2433,6 +2620,51 @@ type IstioCanonicalService struct {
 
 func (s *IstioCanonicalService) MarshalJSON() ([]byte, error) {
 	type NoMethod IstioCanonicalService
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// JsonPathMatcher: Information needed to perform a JSONPath content
+// match. Used for ContentMatcherOption::MATCHES_JSON_PATH and
+// ContentMatcherOption::NOT_MATCHES_JSON_PATH.
+type JsonPathMatcher struct {
+	// JsonMatcher: The type of JSONPath match that will be applied to the
+	// JSON output (ContentMatcher.content)
+	//
+	// Possible values:
+	//   "JSON_PATH_MATCHER_OPTION_UNSPECIFIED" - No JSONPath matcher type
+	// specified (not valid).
+	//   "EXACT_MATCH" - Selects 'exact string' matching. The match succeeds
+	// if the content at the json_path within the output is exactly the same
+	// as the content string.
+	//   "REGEX_MATCH" - Selects regular-expression matching. The match
+	// succeeds if the content at the json_path within the output matches
+	// the regular expression specified in the content string.
+	JsonMatcher string `json:"jsonMatcher,omitempty"`
+
+	// JsonPath: JSONPath within the response output pointing to the
+	// expected ContentMatcher::content to match against.
+	JsonPath string `json:"jsonPath,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "JsonMatcher") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "JsonMatcher") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *JsonPathMatcher) MarshalJSON() ([]byte, error) {
+	type NoMethod JsonPathMatcher
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -3331,7 +3563,7 @@ type MetricDescriptor struct {
 	// issues are resolved and we are in the process of verifying
 	// functionality. Alpha customers need to apply for access, agree to
 	// applicable terms, and have their projects allowlisted. Alpha releases
-	// don’t have to be feature complete, no SLAs are provided, and there
+	// don't have to be feature complete, no SLAs are provided, and there
 	// are no technical support obligations, but they will be far enough
 	// along that customers can actually use them in test environments or
 	// for limited-use tests -- just like they would in normal production
@@ -3344,7 +3576,7 @@ type MetricDescriptor struct {
 	//   "GA" - GA features are open to all developers and are considered
 	// stable and fully qualified for production use.
 	//   "DEPRECATED" - Deprecated features are scheduled to be shut down
-	// and removed. For more information, see the “Deprecation Policy”
+	// and removed. For more information, see the "Deprecation Policy"
 	// section of our Terms of Service (https://cloud.google.com/terms/) and
 	// the Google Cloud Platform Subject to the Deprecation Policy
 	// (https://cloud.google.com/terms/deprecation) documentation.
@@ -3508,7 +3740,7 @@ type MetricDescriptorMetadata struct {
 	// issues are resolved and we are in the process of verifying
 	// functionality. Alpha customers need to apply for access, agree to
 	// applicable terms, and have their projects allowlisted. Alpha releases
-	// don’t have to be feature complete, no SLAs are provided, and there
+	// don't have to be feature complete, no SLAs are provided, and there
 	// are no technical support obligations, but they will be far enough
 	// along that customers can actually use them in test environments or
 	// for limited-use tests -- just like they would in normal production
@@ -3521,7 +3753,7 @@ type MetricDescriptorMetadata struct {
 	//   "GA" - GA features are open to all developers and are considered
 	// stable and fully qualified for production use.
 	//   "DEPRECATED" - Deprecated features are scheduled to be shut down
-	// and removed. For more information, see the “Deprecation Policy”
+	// and removed. For more information, see the "Deprecation Policy"
 	// section of our Terms of Service (https://cloud.google.com/terms/) and
 	// the Google Cloud Platform Subject to the Deprecation Policy
 	// (https://cloud.google.com/terms/deprecation) documentation.
@@ -3664,6 +3896,21 @@ type MetricThreshold struct {
 	// alerted on quickly.
 	Duration string `json:"duration,omitempty"`
 
+	// EvaluationMissingData: A condition control that determines how
+	// metric-threshold conditions are evaluated when data stops arriving.
+	//
+	// Possible values:
+	//   "EVALUATION_MISSING_DATA_UNSPECIFIED" - An unspecified evaluation
+	// missing data option. Equivalent to EVALUATION_MISSING_DATA_NO_OP.
+	//   "EVALUATION_MISSING_DATA_INACTIVE" - If there is no data to
+	// evaluate the condition, then evaluate the condition as false.
+	//   "EVALUATION_MISSING_DATA_ACTIVE" - If there is no data to evaluate
+	// the condition, then evaluate the condition as true. The default for
+	// conditions with a duration value.
+	//   "EVALUATION_MISSING_DATA_NO_OP" - Do not evaluate the condition to
+	// any value if there is no data.
+	EvaluationMissingData string `json:"evaluationMissingData,omitempty"`
+
 	// Filter: Required. A filter
 	// (https://cloud.google.com/monitoring/api/v3/filters) that identifies
 	// which time series should be compared with the threshold.The filter is
@@ -3732,8 +3979,9 @@ func (s *MetricThreshold) UnmarshalJSON(data []byte) error {
 // schema. For example, a particular Compute Engine VM instance could be
 // represented by the following object, because the
 // MonitoredResourceDescriptor for "gce_instance" has labels
-// "instance_id" and "zone": { "type": "gce_instance", "labels": {
-// "instance_id": "12345678901234", "zone": "us-central1-a" }}
+// "project_id", "instance_id" and "zone": { "type": "gce_instance",
+// "labels": { "project_id": "my-project", "instance_id":
+// "12345678901234", "zone": "us-central1-a" }}
 type MonitoredResource struct {
 	// Labels: Required. Values for all of the labels listed in the
 	// associated monitored resource descriptor. For example, Compute Engine
@@ -3816,7 +4064,7 @@ type MonitoredResourceDescriptor struct {
 	// issues are resolved and we are in the process of verifying
 	// functionality. Alpha customers need to apply for access, agree to
 	// applicable terms, and have their projects allowlisted. Alpha releases
-	// don’t have to be feature complete, no SLAs are provided, and there
+	// don't have to be feature complete, no SLAs are provided, and there
 	// are no technical support obligations, but they will be far enough
 	// along that customers can actually use them in test environments or
 	// for limited-use tests -- just like they would in normal production
@@ -3829,7 +4077,7 @@ type MonitoredResourceDescriptor struct {
 	//   "GA" - GA features are open to all developers and are considered
 	// stable and fully qualified for production use.
 	//   "DEPRECATED" - Deprecated features are scheduled to be shut down
-	// and removed. For more information, see the “Deprecation Policy”
+	// and removed. For more information, see the "Deprecation Policy"
 	// section of our Terms of Service (https://cloud.google.com/terms/) and
 	// the Google Cloud Platform Subject to the Deprecation Policy
 	// (https://cloud.google.com/terms/deprecation) documentation.
@@ -3935,6 +4183,21 @@ type MonitoringQueryLanguageCondition struct {
 	// alerts, but short enough that unhealthy states are detected and
 	// alerted on quickly.
 	Duration string `json:"duration,omitempty"`
+
+	// EvaluationMissingData: A condition control that determines how
+	// metric-threshold conditions are evaluated when data stops arriving.
+	//
+	// Possible values:
+	//   "EVALUATION_MISSING_DATA_UNSPECIFIED" - An unspecified evaluation
+	// missing data option. Equivalent to EVALUATION_MISSING_DATA_NO_OP.
+	//   "EVALUATION_MISSING_DATA_INACTIVE" - If there is no data to
+	// evaluate the condition, then evaluate the condition as false.
+	//   "EVALUATION_MISSING_DATA_ACTIVE" - If there is no data to evaluate
+	// the condition, then evaluate the condition as true. The default for
+	// conditions with a duration value.
+	//   "EVALUATION_MISSING_DATA_NO_OP" - Do not evaluate the condition to
+	// any value if there is no data.
+	EvaluationMissingData string `json:"evaluationMissingData,omitempty"`
 
 	// Query: Monitoring Query Language
 	// (https://cloud.google.com/monitoring/mql) query that outputs a
@@ -4156,7 +4419,7 @@ type NotificationChannelDescriptor struct {
 	// issues are resolved and we are in the process of verifying
 	// functionality. Alpha customers need to apply for access, agree to
 	// applicable terms, and have their projects allowlisted. Alpha releases
-	// don’t have to be feature complete, no SLAs are provided, and there
+	// don't have to be feature complete, no SLAs are provided, and there
 	// are no technical support obligations, but they will be far enough
 	// along that customers can actually use them in test environments or
 	// for limited-use tests -- just like they would in normal production
@@ -4169,7 +4432,7 @@ type NotificationChannelDescriptor struct {
 	//   "GA" - GA features are open to all developers and are considered
 	// stable and fully qualified for production use.
 	//   "DEPRECATED" - Deprecated features are scheduled to be shut down
-	// and removed. For more information, see the “Deprecation Policy”
+	// and removed. For more information, see the "Deprecation Policy"
 	// section of our Terms of Service (https://cloud.google.com/terms/) and
 	// the Google Cloud Platform Subject to the Deprecation Policy
 	// (https://cloud.google.com/terms/deprecation) documentation.
@@ -4186,16 +4449,16 @@ type NotificationChannelDescriptor struct {
 	// Possible values:
 	//   "SERVICE_TIER_UNSPECIFIED" - An invalid sentinel value, used to
 	// indicate that a tier has not been provided explicitly.
-	//   "SERVICE_TIER_BASIC" - The Stackdriver Basic tier, a free tier of
-	// service that provides basic features, a moderate allotment of logs,
-	// and access to built-in metrics. A number of features are not
+	//   "SERVICE_TIER_BASIC" - The Cloud Monitoring Basic tier, a free tier
+	// of service that provides basic features, a moderate allotment of
+	// logs, and access to built-in metrics. A number of features are not
 	// available in this tier. For more details, see the service tiers
 	// documentation (https://cloud.google.com/monitoring/workspaces/tiers).
-	//   "SERVICE_TIER_PREMIUM" - The Stackdriver Premium tier, a higher,
-	// more expensive tier of service that provides access to all
-	// Stackdriver features, lets you use Stackdriver with AWS accounts, and
-	// has a larger allotments for logs and metrics. For more details, see
-	// the service tiers documentation
+	//   "SERVICE_TIER_PREMIUM" - The Cloud Monitoring Premium tier, a
+	// higher, more expensive tier of service that provides access to all
+	// Cloud Monitoring features, lets you use Cloud Monitoring with AWS
+	// accounts, and has a larger allotments for logs and metrics. For more
+	// details, see the service tiers documentation
 	// (https://cloud.google.com/monitoring/workspaces/tiers).
 	SupportedTiers []string `json:"supportedTiers,omitempty"`
 
@@ -4694,6 +4957,9 @@ type MService struct {
 	// CloudEndpoints: Type used for Cloud Endpoints services.
 	CloudEndpoints *CloudEndpoints `json:"cloudEndpoints,omitempty"`
 
+	// CloudRun: Type used for Cloud Run services.
+	CloudRun *CloudRun `json:"cloudRun,omitempty"`
+
 	// ClusterIstio: Type used for Istio services that live in a Kubernetes
 	// cluster.
 	ClusterIstio *ClusterIstio `json:"clusterIstio,omitempty"`
@@ -4703,6 +4969,16 @@ type MService struct {
 
 	// DisplayName: Name used for UI elements listing this Service.
 	DisplayName string `json:"displayName,omitempty"`
+
+	// GkeNamespace: Type used for GKE Namespaces.
+	GkeNamespace *GkeNamespace `json:"gkeNamespace,omitempty"`
+
+	// GkeService: Type used for GKE Services (the Kubernetes concept of a
+	// service).
+	GkeService *GkeService `json:"gkeService,omitempty"`
+
+	// GkeWorkload: Type used for GKE Workloads.
+	GkeWorkload *GkeWorkload `json:"gkeWorkload,omitempty"`
 
 	// IstioCanonicalService: Type used for canonical services scoped to an
 	// Istio mesh. Metrics for Istio are documented here
@@ -5074,35 +5350,39 @@ func (s *Telemetry) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// TimeInterval: A closed time interval. It extends from the start time
-// to the end time, and includes both: [startTime, endTime]. Valid time
-// intervals depend on the MetricKind
+// TimeInterval: Describes a time interval: Reads: A half-open time
+// interval. It includes the end time but excludes the start time:
+// (startTime, endTime]. The start time must be specified, must be
+// earlier than the end time, and should be no older than the data
+// retention period for the metric. Writes: A closed time interval. It
+// extends from the start time to the end time, and includes both:
+// [startTime, endTime]. Valid time intervals depend on the MetricKind
 // (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.metricDescriptors#MetricKind)
 // of the metric value. The end time must not be earlier than the start
-// time. When writing data points, the start time must not be more than
-// 25 hours in the past and the end time must not be more than five
-// minutes in the future. For GAUGE metrics, the startTime value is
-// technically optional; if no value is specified, the start time
-// defaults to the value of the end time, and the interval represents a
-// single point in time. If both start and end times are specified, they
-// must be identical. Such an interval is valid only for GAUGE metrics,
-// which are point-in-time measurements. The end time of a new interval
-// must be at least a millisecond after the end time of the previous
-// interval. For DELTA metrics, the start time and end time must specify
-// a non-zero interval, with subsequent points specifying contiguous and
-// non-overlapping intervals. For DELTA metrics, the start time of the
-// next interval must be at least a millisecond after the end time of
-// the previous interval. For CUMULATIVE metrics, the start time and end
-// time must specify a non-zero interval, with subsequent points
-// specifying the same start time and increasing end times, until an
-// event resets the cumulative value to zero and sets a new start time
-// for the following points. The new start time must be at least a
-// millisecond after the end time of the previous interval. The start
-// time of a new interval must be at least a millisecond after the end
-// time of the previous interval because intervals are closed. If the
-// start time of a new interval is the same as the end time of the
-// previous interval, then data written at the new start time could
-// overwrite data written at the previous end time.
+// time, and the end time must not be more than 25 hours in the past or
+// more than five minutes in the future. For GAUGE metrics, the
+// startTime value is technically optional; if no value is specified,
+// the start time defaults to the value of the end time, and the
+// interval represents a single point in time. If both start and end
+// times are specified, they must be identical. Such an interval is
+// valid only for GAUGE metrics, which are point-in-time measurements.
+// The end time of a new interval must be at least a millisecond after
+// the end time of the previous interval. For DELTA metrics, the start
+// time and end time must specify a non-zero interval, with subsequent
+// points specifying contiguous and non-overlapping intervals. For DELTA
+// metrics, the start time of the next interval must be at least a
+// millisecond after the end time of the previous interval. For
+// CUMULATIVE metrics, the start time and end time must specify a
+// non-zero interval, with subsequent points specifying the same start
+// time and increasing end times, until an event resets the cumulative
+// value to zero and sets a new start time for the following points. The
+// new start time must be at least a millisecond after the end time of
+// the previous interval. The start time of a new interval must be at
+// least a millisecond after the end time of the previous interval
+// because intervals are closed. If the start time of a new interval is
+// the same as the end time of the previous interval, then data written
+// at the new start time could overwrite data written at the previous
+// end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
 	EndTime string `json:"endTime,omitempty"`
@@ -5513,6 +5793,22 @@ func (s *TypedValue) UnmarshalJSON(data []byte) error {
 // UptimeCheckConfig: This message configures which resources and
 // services to monitor for availability.
 type UptimeCheckConfig struct {
+	// CheckerType: The type of checkers to use to execute the Uptime check.
+	//
+	// Possible values:
+	//   "CHECKER_TYPE_UNSPECIFIED" - The default checker type. Currently
+	// converted to STATIC_IP_CHECKERS on creation, the default conversion
+	// behavior may change in the future.
+	//   "STATIC_IP_CHECKERS" - STATIC_IP_CHECKERS are used for uptime
+	// checks that perform egress across the public internet.
+	// STATIC_IP_CHECKERS use the static IP addresses returned by
+	// ListUptimeCheckIps.
+	//   "VPC_CHECKERS" - VPC_CHECKERS are used for uptime checks that
+	// perform egress using Service Directory and private network access.
+	// When using VPC_CHECKERS, the monitored resource type must be
+	// servicedirectory_service.
+	CheckerType string `json:"checkerType,omitempty"`
+
 	// ContentMatchers: The content that is expected to appear in the data
 	// returned by the target server against which the check is run.
 	// Currently, only the first entry in the content_matchers list is
@@ -5522,9 +5818,9 @@ type UptimeCheckConfig struct {
 	ContentMatchers []*ContentMatcher `json:"contentMatchers,omitempty"`
 
 	// DisplayName: A human-friendly name for the Uptime check
-	// configuration. The display name should be unique within a Stackdriver
-	// Workspace in order to make it easier to identify; however, uniqueness
-	// is not enforced. Required.
+	// configuration. The display name should be unique within a Cloud
+	// Monitoring Workspace in order to make it easier to identify; however,
+	// uniqueness is not enforced. Required.
 	DisplayName string `json:"displayName,omitempty"`
 
 	// HttpCheck: Contains information needed to make an HTTP or HTTPS
@@ -5548,7 +5844,7 @@ type UptimeCheckConfig struct {
 	// (https://cloud.google.com/monitoring/api/resources) associated with
 	// the configuration. The following monitored resource types are valid
 	// for this field: uptime_url, gce_instance, gae_app, aws_ec2_instance,
-	// aws_elb_load_balancer k8s_service
+	// aws_elb_load_balancer k8s_service servicedirectory_service
 	MonitoredResource *MonitoredResource `json:"monitoredResource,omitempty"`
 
 	// Name: A unique resource name for this Uptime check configuration. The
@@ -5599,7 +5895,7 @@ type UptimeCheckConfig struct {
 	// server.
 	googleapi.ServerResponse `json:"-"`
 
-	// ForceSendFields is a list of field names (e.g. "ContentMatchers") to
+	// ForceSendFields is a list of field names (e.g. "CheckerType") to
 	// unconditionally include in API requests. By default, fields with
 	// empty or default values are omitted from API requests. However, any
 	// non-pointer, non-interface field appearing in ForceSendFields will be
@@ -5607,13 +5903,12 @@ type UptimeCheckConfig struct {
 	// This may be used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "ContentMatchers") to
-	// include in API requests with the JSON null value. By default, fields
-	// with empty values are omitted from API requests. However, any field
-	// with an empty value appearing in NullFields will be sent to the
-	// server as null. It is an error if a field in this list has a
-	// non-empty value. This may be used to include null fields in Patch
-	// requests.
+	// NullFields is a list of field names (e.g. "CheckerType") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
 	NullFields []string `json:"-"`
 }
 
@@ -5836,8 +6131,7 @@ type FoldersTimeSeriesListCall struct {
 	header_      http.Header
 }
 
-// List: Lists time series that match a filter. This method does not
-// require a Workspace.
+// List: Lists time series that match a filter.
 //
 // - name: The project
 //   (https://cloud.google.com/monitoring/api/v3#project_name),
@@ -6434,7 +6728,7 @@ func (c *FoldersTimeSeriesListCall) Header() http.Header {
 
 func (c *FoldersTimeSeriesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6496,7 +6790,7 @@ func (c *FoldersTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTimeS
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists time series that match a filter. This method does not require a Workspace.",
+	//   "description": "Lists time series that match a filter.",
 	//   "flatPath": "v3/folders/{foldersId}/timeSeries",
 	//   "httpMethod": "GET",
 	//   "id": "monitoring.folders.timeSeries.list",
@@ -6795,8 +7089,7 @@ type OrganizationsTimeSeriesListCall struct {
 	header_      http.Header
 }
 
-// List: Lists time series that match a filter. This method does not
-// require a Workspace.
+// List: Lists time series that match a filter.
 //
 // - name: The project
 //   (https://cloud.google.com/monitoring/api/v3#project_name),
@@ -7393,7 +7686,7 @@ func (c *OrganizationsTimeSeriesListCall) Header() http.Header {
 
 func (c *OrganizationsTimeSeriesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7455,7 +7748,7 @@ func (c *OrganizationsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*Lis
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists time series that match a filter. This method does not require a Workspace.",
+	//   "description": "Lists time series that match a filter.",
 	//   "flatPath": "v3/organizations/{organizationsId}/timeSeries",
 	//   "httpMethod": "GET",
 	//   "id": "monitoring.organizations.timeSeries.list",
@@ -7762,7 +8055,7 @@ type ProjectsAlertPoliciesCreateCall struct {
 //   projects/[PROJECT_ID_OR_NUMBER] Note that this field names the
 //   parent container in which the alerting policy will be written, not
 //   the name of the created policy. |name| must be a host project of a
-//   workspace, otherwise INVALID_ARGUMENT error will return. The
+//   Metrics Scope, otherwise INVALID_ARGUMENT error will return. The
 //   alerting policy that is returned will have a name that contains a
 //   normalized representation of this name as a prefix but adds a
 //   suffix of the form /alertPolicies/[ALERT_POLICY_ID], identifying
@@ -7801,7 +8094,7 @@ func (c *ProjectsAlertPoliciesCreateCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7874,7 +8167,7 @@ func (c *ProjectsAlertPoliciesCreateCall) Do(opts ...googleapi.CallOption) (*Ale
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Required. The project (https://cloud.google.com/monitoring/api/v3#project_name) in which to create the alerting policy. The format is: projects/[PROJECT_ID_OR_NUMBER] Note that this field names the parent container in which the alerting policy will be written, not the name of the created policy. |name| must be a host project of a workspace, otherwise INVALID_ARGUMENT error will return. The alerting policy that is returned will have a name that contains a normalized representation of this name as a prefix but adds a suffix of the form /alertPolicies/[ALERT_POLICY_ID], identifying the policy in the container.",
+	//       "description": "Required. The project (https://cloud.google.com/monitoring/api/v3#project_name) in which to create the alerting policy. The format is: projects/[PROJECT_ID_OR_NUMBER] Note that this field names the parent container in which the alerting policy will be written, not the name of the created policy. |name| must be a host project of a Metrics Scope, otherwise INVALID_ARGUMENT error will return. The alerting policy that is returned will have a name that contains a normalized representation of this name as a prefix but adds a suffix of the form /alertPolicies/[ALERT_POLICY_ID], identifying the policy in the container.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -7944,7 +8237,7 @@ func (c *ProjectsAlertPoliciesDeleteCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8089,7 +8382,7 @@ func (c *ProjectsAlertPoliciesGetCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8279,7 +8572,7 @@ func (c *ProjectsAlertPoliciesListCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8431,10 +8724,10 @@ type ProjectsAlertPoliciesPatchCall struct {
 // - name: Required if the policy exists. The resource name for this
 //   policy. The format is:
 //   projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID]
-//   [ALERT_POLICY_ID] is assigned by Stackdriver Monitoring when the
-//   policy is created. When calling the alertPolicies.create method, do
-//   not include the name field in the alerting policy passed as part of
-//   the request.
+//   [ALERT_POLICY_ID] is assigned by Cloud Monitoring when the policy
+//   is created. When calling the alertPolicies.create method, do not
+//   include the name field in the alerting policy passed as part of the
+//   request.
 func (r *ProjectsAlertPoliciesService) Patch(name string, alertpolicy *AlertPolicy) *ProjectsAlertPoliciesPatchCall {
 	c := &ProjectsAlertPoliciesPatchCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.name = name
@@ -8492,7 +8785,7 @@ func (c *ProjectsAlertPoliciesPatchCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8565,7 +8858,7 @@ func (c *ProjectsAlertPoliciesPatchCall) Do(opts ...googleapi.CallOption) (*Aler
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Required if the policy exists. The resource name for this policy. The format is: projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID] [ALERT_POLICY_ID] is assigned by Stackdriver Monitoring when the policy is created. When calling the alertPolicies.create method, do not include the name field in the alerting policy passed as part of the request.",
+	//       "description": "Required if the policy exists. The resource name for this policy. The format is: projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID] [ALERT_POLICY_ID] is assigned by Cloud Monitoring when the policy is created. When calling the alertPolicies.create method, do not include the name field in the alerting policy passed as part of the request.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/alertPolicies/[^/]+$",
 	//       "required": true,
@@ -8604,9 +8897,9 @@ type ProjectsCollectdTimeSeriesCreateCall struct {
 	header_                         http.Header
 }
 
-// Create: Stackdriver Monitoring Agent only: Creates a new time
-// series.This method is only for use by the Stackdriver Monitoring
-// Agent. Use projects.timeSeries.create instead.
+// Create: Cloud Monitoring Agent only: Creates a new time series.This
+// method is only for use by the Cloud Monitoring Agent. Use
+// projects.timeSeries.create instead.
 //
 // - name: The project
 //   (https://cloud.google.com/monitoring/api/v3#project_name) in which
@@ -8646,7 +8939,7 @@ func (c *ProjectsCollectdTimeSeriesCreateCall) Header() http.Header {
 
 func (c *ProjectsCollectdTimeSeriesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8710,7 +9003,7 @@ func (c *ProjectsCollectdTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) 
 	}
 	return ret, nil
 	// {
-	//   "description": "Stackdriver Monitoring Agent only: Creates a new time series.This method is only for use by the Stackdriver Monitoring Agent. Use projects.timeSeries.create instead.",
+	//   "description": "Cloud Monitoring Agent only: Creates a new time series.This method is only for use by the Cloud Monitoring Agent. Use projects.timeSeries.create instead.",
 	//   "flatPath": "v3/projects/{projectsId}/collectdTimeSeries",
 	//   "httpMethod": "POST",
 	//   "id": "monitoring.projects.collectdTimeSeries.create",
@@ -8799,7 +9092,7 @@ func (c *ProjectsGroupsCreateCall) Header() http.Header {
 
 func (c *ProjectsGroupsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8955,7 +9248,7 @@ func (c *ProjectsGroupsDeleteCall) Header() http.Header {
 
 func (c *ProjectsGroupsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9105,7 +9398,7 @@ func (c *ProjectsGroupsGetCall) Header() http.Header {
 
 func (c *ProjectsGroupsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9305,7 +9598,7 @@ func (c *ProjectsGroupsListCall) Header() http.Header {
 
 func (c *ProjectsGroupsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9503,7 +9796,7 @@ func (c *ProjectsGroupsUpdateCall) Header() http.Header {
 
 func (c *ProjectsGroupsUpdateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9705,7 +9998,7 @@ func (c *ProjectsGroupsMembersListCall) Header() http.Header {
 
 func (c *ProjectsGroupsMembersListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9899,7 +10192,7 @@ func (c *ProjectsMetricDescriptorsCreateCall) Header() http.Header {
 
 func (c *ProjectsMetricDescriptorsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10045,7 +10338,7 @@ func (c *ProjectsMetricDescriptorsDeleteCall) Header() http.Header {
 
 func (c *ProjectsMetricDescriptorsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10143,8 +10436,7 @@ type ProjectsMetricDescriptorsGetCall struct {
 	header_      http.Header
 }
 
-// Get: Gets a single metric descriptor. This method does not require a
-// Workspace.
+// Get: Gets a single metric descriptor.
 //
 // - name: The metric descriptor on which to execute the request. The
 //   format is:
@@ -10194,7 +10486,7 @@ func (c *ProjectsMetricDescriptorsGetCall) Header() http.Header {
 
 func (c *ProjectsMetricDescriptorsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10256,7 +10548,7 @@ func (c *ProjectsMetricDescriptorsGetCall) Do(opts ...googleapi.CallOption) (*Me
 	}
 	return ret, nil
 	// {
-	//   "description": "Gets a single metric descriptor. This method does not require a Workspace.",
+	//   "description": "Gets a single metric descriptor.",
 	//   "flatPath": "v3/projects/{projectsId}/metricDescriptors/{metricDescriptorsId}",
 	//   "httpMethod": "GET",
 	//   "id": "monitoring.projects.metricDescriptors.get",
@@ -10297,8 +10589,7 @@ type ProjectsMetricDescriptorsListCall struct {
 	header_      http.Header
 }
 
-// List: Lists metric descriptors that match a filter. This method does
-// not require a Workspace.
+// List: Lists metric descriptors that match a filter.
 //
 // - name: The project
 //   (https://cloud.google.com/monitoring/api/v3#project_name) on which
@@ -10376,7 +10667,7 @@ func (c *ProjectsMetricDescriptorsListCall) Header() http.Header {
 
 func (c *ProjectsMetricDescriptorsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10438,7 +10729,7 @@ func (c *ProjectsMetricDescriptorsListCall) Do(opts ...googleapi.CallOption) (*L
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists metric descriptors that match a filter. This method does not require a Workspace.",
+	//   "description": "Lists metric descriptors that match a filter.",
 	//   "flatPath": "v3/projects/{projectsId}/metricDescriptors",
 	//   "httpMethod": "GET",
 	//   "id": "monitoring.projects.metricDescriptors.list",
@@ -10516,8 +10807,7 @@ type ProjectsMonitoredResourceDescriptorsGetCall struct {
 	header_      http.Header
 }
 
-// Get: Gets a single monitored resource descriptor. This method does
-// not require a Workspace.
+// Get: Gets a single monitored resource descriptor.
 //
 // - name: The monitored resource descriptor to get. The format is:
 //   projects/[PROJECT_ID_OR_NUMBER]/monitoredResourceDescriptors/[RESOUR
@@ -10566,7 +10856,7 @@ func (c *ProjectsMonitoredResourceDescriptorsGetCall) Header() http.Header {
 
 func (c *ProjectsMonitoredResourceDescriptorsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10628,7 +10918,7 @@ func (c *ProjectsMonitoredResourceDescriptorsGetCall) Do(opts ...googleapi.CallO
 	}
 	return ret, nil
 	// {
-	//   "description": "Gets a single monitored resource descriptor. This method does not require a Workspace.",
+	//   "description": "Gets a single monitored resource descriptor.",
 	//   "flatPath": "v3/projects/{projectsId}/monitoredResourceDescriptors/{monitoredResourceDescriptorsId}",
 	//   "httpMethod": "GET",
 	//   "id": "monitoring.projects.monitoredResourceDescriptors.get",
@@ -10669,8 +10959,7 @@ type ProjectsMonitoredResourceDescriptorsListCall struct {
 	header_      http.Header
 }
 
-// List: Lists monitored resource descriptors that match a filter. This
-// method does not require a Workspace.
+// List: Lists monitored resource descriptors that match a filter.
 //
 // - name: The project
 //   (https://cloud.google.com/monitoring/api/v3#project_name) on which
@@ -10746,7 +11035,7 @@ func (c *ProjectsMonitoredResourceDescriptorsListCall) Header() http.Header {
 
 func (c *ProjectsMonitoredResourceDescriptorsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10810,7 +11099,7 @@ func (c *ProjectsMonitoredResourceDescriptorsListCall) Do(opts ...googleapi.Call
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists monitored resource descriptors that match a filter. This method does not require a Workspace.",
+	//   "description": "Lists monitored resource descriptors that match a filter.",
 	//   "flatPath": "v3/projects/{projectsId}/monitoredResourceDescriptors",
 	//   "httpMethod": "GET",
 	//   "id": "monitoring.projects.monitoredResourceDescriptors.list",
@@ -10939,7 +11228,7 @@ func (c *ProjectsNotificationChannelDescriptorsGetCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelDescriptorsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11111,7 +11400,7 @@ func (c *ProjectsNotificationChannelDescriptorsListCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelDescriptorsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11293,7 +11582,7 @@ func (c *ProjectsNotificationChannelsCreateCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11445,7 +11734,7 @@ func (c *ProjectsNotificationChannelsDeleteCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11600,7 +11889,7 @@ func (c *ProjectsNotificationChannelsGetCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11762,7 +12051,7 @@ func (c *ProjectsNotificationChannelsGetVerificationCodeCall) Header() http.Head
 
 func (c *ProjectsNotificationChannelsGetVerificationCodeCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11960,7 +12249,7 @@ func (c *ProjectsNotificationChannelsListCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12152,7 +12441,7 @@ func (c *ProjectsNotificationChannelsPatchCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12304,7 +12593,7 @@ func (c *ProjectsNotificationChannelsSendVerificationCodeCall) Header() http.Hea
 
 func (c *ProjectsNotificationChannelsSendVerificationCodeCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12449,7 +12738,7 @@ func (c *ProjectsNotificationChannelsVerifyCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsVerifyCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12598,7 +12887,7 @@ func (c *ProjectsTimeSeriesCreateCall) Header() http.Header {
 
 func (c *ProjectsTimeSeriesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12752,7 +13041,7 @@ func (c *ProjectsTimeSeriesCreateServiceCall) Header() http.Header {
 
 func (c *ProjectsTimeSeriesCreateServiceCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12859,8 +13148,7 @@ type ProjectsTimeSeriesListCall struct {
 	header_      http.Header
 }
 
-// List: Lists time series that match a filter. This method does not
-// require a Workspace.
+// List: Lists time series that match a filter.
 //
 // - name: The project
 //   (https://cloud.google.com/monitoring/api/v3#project_name),
@@ -13457,7 +13745,7 @@ func (c *ProjectsTimeSeriesListCall) Header() http.Header {
 
 func (c *ProjectsTimeSeriesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -13519,7 +13807,7 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 	}
 	return ret, nil
 	// {
-	//   "description": "Lists time series that match a filter. This method does not require a Workspace.",
+	//   "description": "Lists time series that match a filter.",
 	//   "flatPath": "v3/projects/{projectsId}/timeSeries",
 	//   "httpMethod": "GET",
 	//   "id": "monitoring.projects.timeSeries.list",
@@ -13818,8 +14106,7 @@ type ProjectsTimeSeriesQueryCall struct {
 	header_                http.Header
 }
 
-// Query: Queries time series using Monitoring Query Language. This
-// method does not require a Workspace.
+// Query: Queries time series using Monitoring Query Language.
 //
 // - name: The project
 //   (https://cloud.google.com/monitoring/api/v3#project_name) on which
@@ -13859,7 +14146,7 @@ func (c *ProjectsTimeSeriesQueryCall) Header() http.Header {
 
 func (c *ProjectsTimeSeriesQueryCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -13923,7 +14210,7 @@ func (c *ProjectsTimeSeriesQueryCall) Do(opts ...googleapi.CallOption) (*QueryTi
 	}
 	return ret, nil
 	// {
-	//   "description": "Queries time series using Monitoring Query Language. This method does not require a Workspace.",
+	//   "description": "Queries time series using Monitoring Query Language.",
 	//   "flatPath": "v3/projects/{projectsId}/timeSeries:query",
 	//   "httpMethod": "POST",
 	//   "id": "monitoring.projects.timeSeries.query",
@@ -14027,7 +14314,7 @@ func (c *ProjectsUptimeCheckConfigsCreateCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -14172,7 +14459,7 @@ func (c *ProjectsUptimeCheckConfigsDeleteCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -14317,7 +14604,7 @@ func (c *ProjectsUptimeCheckConfigsGetCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -14488,7 +14775,7 @@ func (c *ProjectsUptimeCheckConfigsListCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -14678,7 +14965,7 @@ func (c *ProjectsUptimeCheckConfigsPatchCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -14794,7 +15081,8 @@ type ServicesCreateCall struct {
 //
 // - parent: Resource name
 //   (https://cloud.google.com/monitoring/api/v3#project_name) of the
-//   parent workspace. The format is: projects/[PROJECT_ID_OR_NUMBER].
+//   parent Metrics Scope. The format is:
+//   projects/[PROJECT_ID_OR_NUMBER].
 func (r *ServicesService) Create(parent string, service *MService) *ServicesCreateCall {
 	c := &ServicesCreateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.parent = parent
@@ -14837,7 +15125,7 @@ func (c *ServicesCreateCall) Header() http.Header {
 
 func (c *ServicesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -14910,7 +15198,7 @@ func (c *ServicesCreateCall) Do(opts ...googleapi.CallOption) (*MService, error)
 	//   ],
 	//   "parameters": {
 	//     "parent": {
-	//       "description": "Required. Resource name (https://cloud.google.com/monitoring/api/v3#project_name) of the parent workspace. The format is: projects/[PROJECT_ID_OR_NUMBER] ",
+	//       "description": "Required. Resource name (https://cloud.google.com/monitoring/api/v3#project_name) of the parent Metrics Scope. The format is: projects/[PROJECT_ID_OR_NUMBER] ",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+$",
 	//       "required": true,
@@ -14984,7 +15272,7 @@ func (c *ServicesDeleteCall) Header() http.Header {
 
 func (c *ServicesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -15129,7 +15417,7 @@ func (c *ServicesGetCall) Header() http.Header {
 
 func (c *ServicesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -15231,12 +15519,12 @@ type ServicesListCall struct {
 	header_      http.Header
 }
 
-// List: List Services for this workspace.
+// List: List Services for this Metrics Scope.
 //
 // - parent: Resource name of the parent containing the listed services,
 //   either a project
 //   (https://cloud.google.com/monitoring/api/v3#project_name) or a
-//   Monitoring Workspace. The formats are:
+//   Monitoring Metrics Scope. The formats are:
 //   projects/[PROJECT_ID_OR_NUMBER]
 //   workspaces/[HOST_PROJECT_ID_OR_NUMBER].
 func (r *ServicesService) List(parent string) *ServicesListCall {
@@ -15246,19 +15534,22 @@ func (r *ServicesService) List(parent string) *ServicesListCall {
 }
 
 // Filter sets the optional parameter "filter": A filter specifying what
-// Services to return. The filter currently supports the following
-// fields: - `identifier_case` - `app_engine.module_id` -
-// `cloud_endpoints.service` (reserved for future use) -
-// `mesh_istio.mesh_uid` - `mesh_istio.service_namespace` -
-// `mesh_istio.service_name` - `cluster_istio.location` (deprecated) -
-// `cluster_istio.cluster_name` (deprecated) -
-// `cluster_istio.service_namespace` (deprecated) -
-// `cluster_istio.service_name` (deprecated) identifier_case refers to
-// which option in the identifier oneof is populated. For example, the
+// Services to return. The filter supports filtering on a particular
+// service-identifier type or one of its attributes.To filter on a
+// particular service-identifier type, the identifier_case refers to
+// which option in the identifier field is populated. For example, the
 // filter identifier_case = "CUSTOM" would match all services with a
-// value for the custom field. Valid options are "CUSTOM", "APP_ENGINE",
-// "MESH_ISTIO", plus "CLUSTER_ISTIO" (deprecated) and "CLOUD_ENDPOINTS"
-// (reserved for future use).
+// value for the custom field. Valid options include "CUSTOM",
+// "APP_ENGINE", "MESH_ISTIO", and the other options listed at
+// https://cloud.google.com/monitoring/api/ref_v3/rest/v3/services#ServiceTo
+// filter on an attribute of a service-identifier type, apply the filter
+// name by using the snake case of the service-identifier type and the
+// attribute of that service-identifier type, and join the two with a
+// period. For example, to filter by the meshUid field of the MeshIstio
+// service-identifier type, you must filter on mesh_istio.mesh_uid =
+// "123" to match all services with mesh UID "123". Service-identifier
+// types and their attributes are described at
+// https://cloud.google.com/monitoring/api/ref_v3/rest/v3/services#Service
 func (c *ServicesListCall) Filter(filter string) *ServicesListCall {
 	c.urlParams_.Set("filter", filter)
 	return c
@@ -15318,7 +15609,7 @@ func (c *ServicesListCall) Header() http.Header {
 
 func (c *ServicesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -15380,7 +15671,7 @@ func (c *ServicesListCall) Do(opts ...googleapi.CallOption) (*ListServicesRespon
 	}
 	return ret, nil
 	// {
-	//   "description": "List Services for this workspace.",
+	//   "description": "List Services for this Metrics Scope.",
 	//   "flatPath": "v3/{v3Id}/{v3Id1}/services",
 	//   "httpMethod": "GET",
 	//   "id": "monitoring.services.list",
@@ -15389,7 +15680,7 @@ func (c *ServicesListCall) Do(opts ...googleapi.CallOption) (*ListServicesRespon
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "A filter specifying what Services to return. The filter currently supports the following fields: - `identifier_case` - `app_engine.module_id` - `cloud_endpoints.service` (reserved for future use) - `mesh_istio.mesh_uid` - `mesh_istio.service_namespace` - `mesh_istio.service_name` - `cluster_istio.location` (deprecated) - `cluster_istio.cluster_name` (deprecated) - `cluster_istio.service_namespace` (deprecated) - `cluster_istio.service_name` (deprecated) identifier_case refers to which option in the identifier oneof is populated. For example, the filter identifier_case = \"CUSTOM\" would match all services with a value for the custom field. Valid options are \"CUSTOM\", \"APP_ENGINE\", \"MESH_ISTIO\", plus \"CLUSTER_ISTIO\" (deprecated) and \"CLOUD_ENDPOINTS\" (reserved for future use).",
+	//       "description": "A filter specifying what Services to return. The filter supports filtering on a particular service-identifier type or one of its attributes.To filter on a particular service-identifier type, the identifier_case refers to which option in the identifier field is populated. For example, the filter identifier_case = \"CUSTOM\" would match all services with a value for the custom field. Valid options include \"CUSTOM\", \"APP_ENGINE\", \"MESH_ISTIO\", and the other options listed at https://cloud.google.com/monitoring/api/ref_v3/rest/v3/services#ServiceTo filter on an attribute of a service-identifier type, apply the filter name by using the snake case of the service-identifier type and the attribute of that service-identifier type, and join the two with a period. For example, to filter by the meshUid field of the MeshIstio service-identifier type, you must filter on mesh_istio.mesh_uid = \"123\" to match all services with mesh UID \"123\". Service-identifier types and their attributes are described at https://cloud.google.com/monitoring/api/ref_v3/rest/v3/services#Service",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
@@ -15405,7 +15696,7 @@ func (c *ServicesListCall) Do(opts ...googleapi.CallOption) (*ListServicesRespon
 	//       "type": "string"
 	//     },
 	//     "parent": {
-	//       "description": "Required. Resource name of the parent containing the listed services, either a project (https://cloud.google.com/monitoring/api/v3#project_name) or a Monitoring Workspace. The formats are: projects/[PROJECT_ID_OR_NUMBER] workspaces/[HOST_PROJECT_ID_OR_NUMBER] ",
+	//       "description": "Required. Resource name of the parent containing the listed services, either a project (https://cloud.google.com/monitoring/api/v3#project_name) or a Monitoring Metrics Scope. The formats are: projects/[PROJECT_ID_OR_NUMBER] workspaces/[HOST_PROJECT_ID_OR_NUMBER] ",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+$",
 	//       "required": true,
@@ -15502,7 +15793,7 @@ func (c *ServicesPatchCall) Header() http.Header {
 
 func (c *ServicesPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -15661,7 +15952,7 @@ func (c *ServicesServiceLevelObjectivesCreateCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -15810,7 +16101,7 @@ func (c *ServicesServiceLevelObjectivesDeleteCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -15978,7 +16269,7 @@ func (c *ServicesServiceLevelObjectivesGetCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -16098,7 +16389,7 @@ type ServicesServiceLevelObjectivesListCall struct {
 // List: List the ServiceLevelObjectives for the given Service.
 //
 // - parent: Resource name of the parent containing the listed SLOs,
-//   either a project or a Monitoring Workspace. The formats are:
+//   either a project or a Monitoring Metrics Scope. The formats are:
 //   projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]
 //   workspaces/[HOST_PROJECT_ID_OR_NUMBER]/services/-.
 func (r *ServicesServiceLevelObjectivesService) List(parent string) *ServicesServiceLevelObjectivesListCall {
@@ -16189,7 +16480,7 @@ func (c *ServicesServiceLevelObjectivesListCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -16277,7 +16568,7 @@ func (c *ServicesServiceLevelObjectivesListCall) Do(opts ...googleapi.CallOption
 	//       "type": "string"
 	//     },
 	//     "parent": {
-	//       "description": "Required. Resource name of the parent containing the listed SLOs, either a project or a Monitoring Workspace. The formats are: projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID] workspaces/[HOST_PROJECT_ID_OR_NUMBER]/services/- ",
+	//       "description": "Required. Resource name of the parent containing the listed SLOs, either a project or a Monitoring Metrics Scope. The formats are: projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID] workspaces/[HOST_PROJECT_ID_OR_NUMBER]/services/- ",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+/services/[^/]+$",
 	//       "required": true,
@@ -16390,7 +16681,7 @@ func (c *ServicesServiceLevelObjectivesPatchCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -16564,7 +16855,7 @@ func (c *UptimeCheckIpsListCall) Header() http.Header {
 
 func (c *UptimeCheckIpsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20211027")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/"+internal.Version)
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}

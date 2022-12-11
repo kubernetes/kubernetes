@@ -40,6 +40,7 @@ import (
 	"github.com/google/cadvisor/utils/cpuload"
 
 	"github.com/docker/go-units"
+
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -95,9 +96,6 @@ type containerData struct {
 
 	// Runs custom metric collectors.
 	collectorManager collector.CollectorManager
-
-	// nvidiaCollector updates stats for Nvidia GPUs attached to the container.
-	nvidiaCollector stats.Collector
 
 	// perfCollector updates stats for perf_event cgroup controller.
 	perfCollector stats.Collector
@@ -448,7 +446,6 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 		onDemandChan:             make(chan chan struct{}, 100),
 		clock:                    clock,
 		perfCollector:            &stats.NoopCollector{},
-		nvidiaCollector:          &stats.NoopCollector{},
 		resctrlCollector:         &stats.NoopCollector{},
 	}
 	cont.info.ContainerReference = ref
@@ -688,12 +685,6 @@ func (cd *containerData) updateStats() error {
 		}
 	}
 
-	var nvidiaStatsErr error
-	if cd.nvidiaCollector != nil {
-		// This updates the Accelerators field of the stats struct
-		nvidiaStatsErr = cd.nvidiaCollector.UpdateStats(stats)
-	}
-
 	perfStatsErr := cd.perfCollector.UpdateStats(stats)
 
 	resctrlStatsErr := cd.resctrlCollector.UpdateStats(stats)
@@ -717,10 +708,6 @@ func (cd *containerData) updateStats() error {
 	}
 	if statsErr != nil {
 		return statsErr
-	}
-	if nvidiaStatsErr != nil {
-		klog.Errorf("error occurred while collecting nvidia stats for container %s: %s", cInfo.Name, err)
-		return nvidiaStatsErr
 	}
 	if perfStatsErr != nil {
 		klog.Errorf("error occurred while collecting perf stats for container %s: %s", cInfo.Name, err)

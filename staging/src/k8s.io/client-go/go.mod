@@ -18,9 +18,9 @@ require (
 	github.com/imdario/mergo v0.3.6
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.0
-	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10
-	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
+	github.com/stretchr/testify v1.8.1
+	golang.org/x/net v0.4.0
+	golang.org/x/oauth2 v0.0.0-20220722155238-128564f6959c
 	golang.org/x/term v0.3.0
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	google.golang.org/protobuf v1.28.1

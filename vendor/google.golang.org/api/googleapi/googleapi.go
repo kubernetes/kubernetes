@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"google.golang.org/api/internal/third_party/uritemplates"
 )
@@ -140,6 +141,7 @@ func CheckResponse(res *http.Response) error {
 				jerr.Error.Code = res.StatusCode
 			}
 			jerr.Error.Body = string(slurp)
+			jerr.Error.Header = res.Header
 			return jerr.Error
 		}
 	}
@@ -245,12 +247,30 @@ func ChunkSize(size int) MediaOption {
 	return chunkSizeOption(size)
 }
 
+type chunkRetryDeadlineOption time.Duration
+
+func (cd chunkRetryDeadlineOption) setOptions(o *MediaOptions) {
+	o.ChunkRetryDeadline = time.Duration(cd)
+}
+
+// ChunkRetryDeadline returns a MediaOption which sets a per-chunk retry
+// deadline. If a single chunk has been attempting to upload for longer than
+// this time and the request fails, it will no longer be retried, and the error
+// will be returned to the caller.
+// This is only applicable for files which are large enough to require
+// a multi-chunk resumable upload.
+// The default value is 32s.
+// To set a deadline on the entire upload, use context timeout or cancellation.
+func ChunkRetryDeadline(deadline time.Duration) MediaOption {
+	return chunkRetryDeadlineOption(deadline)
+}
+
 // MediaOptions stores options for customizing media upload.  It is not used by developers directly.
 type MediaOptions struct {
 	ContentType           string
 	ForceEmptyContentType bool
-
-	ChunkSize int
+	ChunkSize             int
+	ChunkRetryDeadline    time.Duration
 }
 
 // ProcessMediaOptions stores options from opts in a MediaOptions.

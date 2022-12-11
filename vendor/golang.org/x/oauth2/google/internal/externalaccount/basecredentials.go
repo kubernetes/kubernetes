@@ -39,6 +39,9 @@ type Config struct {
 	// ServiceAccountImpersonationURL is the URL for the service account impersonation request. This is only
 	// required for workload identity pools when APIs to be accessed have not integrated with UberMint.
 	ServiceAccountImpersonationURL string
+	// ServiceAccountImpersonationLifetimeSeconds is the number of seconds the service account impersonation
+	// token will be valid for.
+	ServiceAccountImpersonationLifetimeSeconds int
 	// ClientSecret is currently only required if token_info endpoint also
 	// needs to be called with the generated GCP access token. When provided, STS will be
 	// called with additional basic authentication using client_id as username and client_secret as password.
@@ -141,10 +144,11 @@ func (c *Config) tokenSource(ctx context.Context, tokenURLValidPats []*regexp.Re
 	scopes := c.Scopes
 	ts.conf.Scopes = []string{"https://www.googleapis.com/auth/cloud-platform"}
 	imp := ImpersonateTokenSource{
-		Ctx:    ctx,
-		URL:    c.ServiceAccountImpersonationURL,
-		Scopes: scopes,
-		Ts:     oauth2.ReuseTokenSource(nil, ts),
+		Ctx:                  ctx,
+		URL:                  c.ServiceAccountImpersonationURL,
+		Scopes:               scopes,
+		Ts:                   oauth2.ReuseTokenSource(nil, ts),
+		TokenLifetimeSeconds: c.ServiceAccountImpersonationLifetimeSeconds,
 	}
 	return oauth2.ReuseTokenSource(nil, imp), nil
 }
@@ -163,7 +167,7 @@ type format struct {
 }
 
 // CredentialSource stores the information necessary to retrieve the credentials for the STS exchange.
-// Either the File or the URL field should be filled, depending on the kind of credential in question.
+// One field amongst File, URL, and Executable should be filled, depending on the kind of credential in question.
 // The EnvironmentID should start with AWS if being used for an AWS credential.
 type CredentialSource struct {
 	File string `json:"file"`
@@ -171,33 +175,50 @@ type CredentialSource struct {
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers"`
 
+	Executable *ExecutableConfig `json:"executable"`
+
 	EnvironmentID               string `json:"environment_id"`
 	RegionURL                   string `json:"region_url"`
 	RegionalCredVerificationURL string `json:"regional_cred_verification_url"`
 	CredVerificationURL         string `json:"cred_verification_url"`
+	IMDSv2SessionTokenURL       string `json:"imdsv2_session_token_url"`
 	Format                      format `json:"format"`
 }
 
-// parse determines the type of CredentialSource needed
+type ExecutableConfig struct {
+	Command       string `json:"command"`
+	TimeoutMillis *int   `json:"timeout_millis"`
+	OutputFile    string `json:"output_file"`
+}
+
+// parse determines the type of CredentialSource needed.
 func (c *Config) parse(ctx context.Context) (baseCredentialSource, error) {
 	if len(c.CredentialSource.EnvironmentID) > 3 && c.CredentialSource.EnvironmentID[:3] == "aws" {
 		if awsVersion, err := strconv.Atoi(c.CredentialSource.EnvironmentID[3:]); err == nil {
 			if awsVersion != 1 {
 				return nil, fmt.Errorf("oauth2/google: aws version '%d' is not supported in the current build", awsVersion)
 			}
-			return awsCredentialSource{
+
+			awsCredSource := awsCredentialSource{
 				EnvironmentID:               c.CredentialSource.EnvironmentID,
 				RegionURL:                   c.CredentialSource.RegionURL,
 				RegionalCredVerificationURL: c.CredentialSource.RegionalCredVerificationURL,
 				CredVerificationURL:         c.CredentialSource.URL,
 				TargetResource:              c.Audience,
 				ctx:                         ctx,
-			}, nil
+			}
+			if c.CredentialSource.IMDSv2SessionTokenURL != "" {
+				awsCredSource.IMDSv2SessionTokenURL = c.CredentialSource.IMDSv2SessionTokenURL
+			}
+
+			return awsCredSource, nil
 		}
 	} else if c.CredentialSource.File != "" {
 		return fileCredentialSource{File: c.CredentialSource.File, Format: c.CredentialSource.Format}, nil
 	} else if c.CredentialSource.URL != "" {
 		return urlCredentialSource{URL: c.CredentialSource.URL, Headers: c.CredentialSource.Headers, Format: c.CredentialSource.Format, ctx: ctx}, nil
+	} else if c.CredentialSource.Executable != nil {
+		return CreateExecutableCredential(ctx, c.CredentialSource.Executable, c)
 	}
 	return nil, fmt.Errorf("oauth2/google: unable to parse credential source")
 }

@@ -10,6 +10,8 @@ import (
 	"errors"
 	"net/http"
 	"time"
+
+	"github.com/googleapis/gax-go/v2"
 )
 
 // SendRequest sends a single HTTP request using the given client.
@@ -50,7 +52,7 @@ func send(ctx context.Context, client *http.Client, req *http.Request) (*http.Re
 // If ctx is non-nil, it calls all hooks, then sends the request with
 // req.WithContext, then calls any functions returned by the hooks in
 // reverse order.
-func SendRequestWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
+func SendRequestWithRetry(ctx context.Context, client *http.Client, req *http.Request, retry *RetryConfig) (*http.Response, error) {
 	// Disallow Accept-Encoding because it interferes with the automatic gzip handling
 	// done by the default http.Transport. See https://github.com/google/google-api-go-client/issues/219.
 	if _, ok := req.Header["Accept-Encoding"]; ok {
@@ -59,10 +61,10 @@ func SendRequestWithRetry(ctx context.Context, client *http.Client, req *http.Re
 	if ctx == nil {
 		return client.Do(req)
 	}
-	return sendAndRetry(ctx, client, req)
+	return sendAndRetry(ctx, client, req, retry)
 }
 
-func sendAndRetry(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
+func sendAndRetry(ctx context.Context, client *http.Client, req *http.Request, retry *RetryConfig) (*http.Response, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -72,7 +74,18 @@ func sendAndRetry(ctx context.Context, client *http.Client, req *http.Request) (
 
 	// Loop to retry the request, up to the context deadline.
 	var pause time.Duration
-	bo := backoff()
+	var bo Backoff
+	if retry != nil && retry.Backoff != nil {
+		bo = &gax.Backoff{
+			Initial:    retry.Backoff.Initial,
+			Max:        retry.Backoff.Max,
+			Multiplier: retry.Backoff.Multiplier,
+		}
+	} else {
+		bo = backoff()
+	}
+
+	var errorFunc = retry.errorFunc()
 
 	for {
 		select {
@@ -86,6 +99,17 @@ func sendAndRetry(ctx context.Context, client *http.Client, req *http.Request) (
 		case <-time.After(pause):
 		}
 
+		if ctx.Err() != nil {
+			// Check for context cancellation once more. If more than one case in a
+			// select is satisfied at the same time, Go will choose one arbitrarily.
+			// That can cause an operation to go through even if the context was
+			// canceled before.
+			if err == nil {
+				err = ctx.Err()
+			}
+			return resp, err
+		}
+
 		resp, err = client.Do(req.WithContext(ctx))
 
 		var status int
@@ -96,7 +120,7 @@ func sendAndRetry(ctx context.Context, client *http.Client, req *http.Request) (
 		// Check if we can retry the request. A retry can only be done if the error
 		// is retryable and the request body can be re-created using GetBody (this
 		// will not be possible if the body was unbuffered).
-		if req.GetBody == nil || !shouldRetry(status, err) {
+		if req.GetBody == nil || !errorFunc(status, err) {
 			break
 		}
 		var errBody error

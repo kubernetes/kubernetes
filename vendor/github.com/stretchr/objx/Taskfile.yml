@@ -25,6 +25,6 @@ tasks:
       - go test -race  ./...
 
   test-coverage:
-    desc: Runs go tests and calucates test coverage
+    desc: Runs go tests and calculates test coverage
     cmds:
       - go test -race -coverprofile=c.out ./...
