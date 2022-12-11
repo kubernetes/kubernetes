@@ -107,7 +107,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 		})
 	})
 
-	ginkgo.It("should be resizable when mounted", func() {
+	ginkgo.It("should be resizable when mounted", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		driver := "dummy-attachable"

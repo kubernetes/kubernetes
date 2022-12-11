@@ -22,6 +22,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -155,7 +156,7 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
-	ginkgo.It("should store data", func() {
+	ginkgo.It("should store data", func(ctx context.Context) {
 		init()
 		defer func() {
 			e2evolume.TestServerCleanup(f, storageframework.ConvertTestConfig(l.config))
@@ -192,7 +193,7 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 	// Exec works only on filesystem volumes
 	if pattern.VolMode != v1.PersistentVolumeBlock {
-		ginkgo.It("should allow exec of files on the volume", func() {
+		ginkgo.It("should allow exec of files on the volume", func(ctx context.Context) {
 			skipExecTest(driver)
 			init()
 			defer cleanup()

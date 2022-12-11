@@ -187,7 +187,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			}, setupDuration, runtimePollInterval).Should(gomega.BeNil())
 		})
 
-		ginkgo.It(fmt.Sprintf("Should eventually garbage collect containers when we exceed the number of dead containers per container"), func() {
+		ginkgo.It(fmt.Sprintf("Should eventually garbage collect containers when we exceed the number of dead containers per container"), func(ctx context.Context) {
 			totalContainers := 0
 			for _, pod := range test.testPods {
 				totalContainers += pod.numContainers*2 + 1

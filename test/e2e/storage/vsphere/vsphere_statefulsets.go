@@ -69,7 +69,7 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 		Bootstrap(f)
 	})
 
-	ginkgo.It("vsphere statefulset testing", func() {
+	ginkgo.It("vsphere statefulset testing", func(ctx context.Context) {
 		ginkgo.By("Creating StorageClass for Statefulset")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"

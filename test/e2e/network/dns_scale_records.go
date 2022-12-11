@@ -55,7 +55,7 @@ var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	})
 
 	// answers dns for service - creates the maximum number of services, and then check dns record for one
-	ginkgo.It("Should answer DNS query for maximum number of services per cluster", func() {
+	ginkgo.It("Should answer DNS query for maximum number of services per cluster", func(ctx context.Context) {
 		// get integer ceiling of maxServicesPerCluster / maxServicesPerNamespace
 		numNs := (maxServicesPerCluster + maxServicesPerNamespace - 1) / maxServicesPerNamespace
 

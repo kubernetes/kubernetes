@@ -121,7 +121,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 	})
 
-	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
+	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func(ctx context.Context) {
 
 		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 
@@ -205,7 +205,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNotEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
-	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
+	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func(ctx context.Context) {
 		// make the nodes have balanced cpu,mem usage ratio
 		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		defer cleanUp()
@@ -285,7 +285,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			}
 		})
 
-		ginkgo.It("validates pod should be preferably scheduled to node which makes the matching pods more evenly distributed", func() {
+		ginkgo.It("validates pod should be preferably scheduled to node which makes the matching pods more evenly distributed", func(ctx context.Context) {
 			var nodes []v1.Node
 			for _, nodeName := range nodeNames {
 				node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})

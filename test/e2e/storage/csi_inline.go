@@ -43,7 +43,7 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		Description: CSIDriver resources with ephemeral VolumeLifecycleMode
 		  should support create, get, list, and delete operations.
 	*/
-	framework.ConformanceIt("should support ephemeral VolumeLifecycleMode in CSIDriver API", func() {
+	framework.ConformanceIt("should support ephemeral VolumeLifecycleMode in CSIDriver API", func(ctx context.Context) {
 		// Create client
 		client := f.ClientSet.StorageV1().CSIDrivers()
 		defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy
@@ -128,7 +128,7 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		Description: Pod resources with CSIVolumeSource should support
 		  create, get, list, patch, and delete operations.
 	*/
-	framework.ConformanceIt("should support CSIVolumeSource in Pod API", func() {
+	framework.ConformanceIt("should support CSIVolumeSource in Pod API", func(ctx context.Context) {
 		// Create client
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 

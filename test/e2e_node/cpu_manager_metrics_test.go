@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -93,7 +94,7 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			updateKubeletConfig(f, oldCfg, true)
 		})
 
-		ginkgo.It("should report zero pinning counters after a fresh restart", func() {
+		ginkgo.It("should report zero pinning counters after a fresh restart", func(ctx context.Context) {
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
 			ginkgo.By("Checking the cpumanager metrics right after the kubelet restart, with no pods running")
@@ -113,7 +114,7 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			gomega.Consistently(getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 
-		ginkgo.It("should report pinning failures when the cpumanager allocation is known to fail", func() {
+		ginkgo.It("should report pinning failures when the cpumanager allocation is known to fail", func(ctx context.Context) {
 			ginkgo.By("Creating the test pod which will be rejected for SMTAlignmentError")
 			testPod = e2epod.NewPodClient(f).Create(makeGuaranteedCPUExclusiveSleeperPod("smt-align-err", 1))
 
@@ -136,7 +137,7 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			gomega.Consistently(getCPUManagerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 
-		ginkgo.It("should not report any pinning failures when the cpumanager allocation is expected to succeed", func() {
+		ginkgo.It("should not report any pinning failures when the cpumanager allocation is expected to succeed", func(ctx context.Context) {
 			ginkgo.By("Creating the test pod")
 			testPod = e2epod.NewPodClient(f).Create(makeGuaranteedCPUExclusiveSleeperPod("smt-align-ok", smtLevel))
 

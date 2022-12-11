@@ -523,7 +523,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 	})
 
-	ginkgo.It("should assign CPUs as expected based on the Pod spec", func() {
+	ginkgo.It("should assign CPUs as expected based on the Pod spec", func(ctx context.Context) {
 		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 
 		// Skip CPU Manager tests altogether if the CPU capacity < 2.
@@ -596,7 +596,7 @@ func runCPUManagerTests(f *framework.Framework) {
 			pod.Spec.Containers[0].Name, pod.Name)
 	})
 
-	ginkgo.It("should assign CPUs as expected with enhanced policy based on strict SMT alignment", func() {
+	ginkgo.It("should assign CPUs as expected with enhanced policy based on strict SMT alignment", func(ctx context.Context) {
 		fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
 		_, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 		smtLevel := getSMTLevel()

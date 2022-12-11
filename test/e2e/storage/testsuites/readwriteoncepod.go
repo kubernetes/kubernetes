@@ -121,7 +121,7 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 		ginkgo.DeferCleanup(cleanup)
 	})
 
-	ginkgo.It("should block a second pod from using an in-use ReadWriteOncePod volume", func() {
+	ginkgo.It("should block a second pod from using an in-use ReadWriteOncePod volume", func(ctx context.Context) {
 		// Create the ReadWriteOncePod PVC.
 		accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}
 		l.volume = storageframework.CreateVolumeResourceWithAccessModes(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes)
@@ -157,7 +157,7 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 		framework.ExpectNoError(err, "failed to wait for pod2 running status")
 	})
 
-	ginkgo.It("should block a second pod from using an in-use ReadWriteOncePod volume on the same node", func() {
+	ginkgo.It("should block a second pod from using an in-use ReadWriteOncePod volume on the same node", func(ctx context.Context) {
 		// Create the ReadWriteOncePod PVC.
 		accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}
 		l.volume = storageframework.CreateVolumeResourceWithAccessModes(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes)

@@ -49,7 +49,7 @@ var _ = SIGDescribe("NodeLease", func() {
 	})
 
 	ginkgo.Context("NodeLease", func() {
-		ginkgo.It("the kubelet should create and update a lease in the kube-node-lease namespace", func() {
+		ginkgo.It("the kubelet should create and update a lease in the kube-node-lease namespace", func(ctx context.Context) {
 			leaseClient := f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease)
 			var (
 				err   error
@@ -87,7 +87,7 @@ var _ = SIGDescribe("NodeLease", func() {
 				time.Duration(*lease.Spec.LeaseDurationSeconds/4)*time.Second)
 		})
 
-		ginkgo.It("should have OwnerReferences set", func() {
+		ginkgo.It("should have OwnerReferences set", func(ctx context.Context) {
 			leaseClient := f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease)
 			var (
 				err       error
@@ -111,7 +111,7 @@ var _ = SIGDescribe("NodeLease", func() {
 			}
 		})
 
-		ginkgo.It("the kubelet should report node status infrequently", func() {
+		ginkgo.It("the kubelet should report node status infrequently", func(ctx context.Context) {
 			ginkgo.By("wait until node is ready")
 			e2enode.WaitForNodeToBeReady(f.ClientSet, nodeName, 5*time.Minute)
 

@@ -17,6 +17,7 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 
@@ -37,7 +38,7 @@ var _ = SIGDescribe("GKE node pools [Feature:GKENodePool]", func() {
 		e2eskipper.SkipUnlessProviderIs("gke")
 	})
 
-	ginkgo.It("should create a cluster with multiple node pools [Feature:GKENodePool]", func() {
+	ginkgo.It("should create a cluster with multiple node pools [Feature:GKENodePool]", func(ctx context.Context) {
 		framework.Logf("Start create node pool test")
 		testCreateDeleteNodePool(f, "test-pool")
 	})

@@ -21,6 +21,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -79,7 +80,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	   Testname: Create Pod without fully qualified domain name (FQDN)
 	   Description: A Pod that does not define the subdomain field in it spec, does not have FQDN.
 	*/
-	ginkgo.It("a pod without subdomain field does not have FQDN", func() {
+	ginkgo.It("a pod without subdomain field does not have FQDN", func(ctx context.Context) {
 		pod := testPod("hostfqdn")
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, pod.ObjectMeta.Name)}
@@ -93,7 +94,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	   Description: A Pod that does not define the subdomain field in it spec, does not have FQDN.
 	                Hence, setHostnameAsFQDN field has no effect.
 	*/
-	ginkgo.It("a pod without FQDN is not affected by SetHostnameAsFQDN field", func() {
+	ginkgo.It("a pod without FQDN is not affected by SetHostnameAsFQDN field", func(ctx context.Context) {
 		pod := testPod("hostfqdn")
 		// Setting setHostnameAsFQDN field to true should have no effect.
 		setHostnameAsFQDN := true
@@ -110,7 +111,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	   Description: A Pod that defines the subdomain field in it spec has FQDN.
 	                hostname command returns shortname (pod name in this case), and hostname -f returns FQDN.
 	*/
-	ginkgo.It("a pod with subdomain field has FQDN, hostname is shortname", func() {
+	ginkgo.It("a pod with subdomain field has FQDN, hostname is shortname", func(ctx context.Context) {
 		pod := testPod("hostfqdn")
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
 		subdomain := "t"
@@ -129,7 +130,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	   Description: A Pod that defines the subdomain field in it spec has FQDN. When setHostnameAsFQDN: true, the
 	                hostname is set to be the FQDN. In this case, both commands hostname and hostname -f return the FQDN of the Pod.
 	*/
-	ginkgo.It("a pod with subdomain field has FQDN, when setHostnameAsFQDN is set to true, the FQDN is set as hostname", func() {
+	ginkgo.It("a pod with subdomain field has FQDN, when setHostnameAsFQDN is set to true, the FQDN is set as hostname", func(ctx context.Context) {
 		pod := testPod("hostfqdn")
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "echo $(hostname)';'$(hostname -f)';'"}
 		subdomain := "t"

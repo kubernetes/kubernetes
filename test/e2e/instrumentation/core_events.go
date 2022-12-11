@@ -54,7 +54,7 @@ var _ = common.SIGDescribe("Events", func() {
 		this update. The event is deleted and MUST NOT show up when
 		listing all events.
 	*/
-	framework.ConformanceIt("should manage the lifecycle of an event", func() {
+	framework.ConformanceIt("should manage the lifecycle of an event", func(ctx context.Context) {
 		// As per SIG-Arch meeting 14 July 2022 this e2e test now supersede
 		// e2e test "Event resource lifecycle", which has been removed.
 
@@ -172,7 +172,7 @@ var _ = common.SIGDescribe("Events", func() {
 	   Description: A set of events is created with a label selector which MUST be found when listed.
 	   The set of events is deleted and MUST NOT show up when listed by its label selector.
 	*/
-	framework.ConformanceIt("should delete a collection of events", func() {
+	framework.ConformanceIt("should delete a collection of events", func(ctx context.Context) {
 		eventTestNames := []string{"test-event-1", "test-event-2", "test-event-3"}
 
 		ginkgo.By("Create set of events")

@@ -17,6 +17,8 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
+
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -160,7 +162,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		func(t singlePodTest) {
 			if (pattern.VolMode == v1.PersistentVolumeBlock && t.runTestBlock != nil) ||
 				(pattern.VolMode == v1.PersistentVolumeFilesystem && t.runTestFile != nil) {
-				ginkgo.It(t.testItStmt, func() {
+				ginkgo.It(t.testItStmt, func(ctx context.Context) {
 					init(nil)
 					defer cleanup()
 
@@ -232,7 +234,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 	for _, test := range multiplePodTests {
 		func(t multiplePodTest) {
 			if pattern.VolMode == v1.PersistentVolumeFilesystem && t.runTestFile != nil {
-				ginkgo.It(t.testItStmt, func() {
+				ginkgo.It(t.testItStmt, func(ctx context.Context) {
 					init([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod})
 					defer cleanup()
 

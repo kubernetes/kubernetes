@@ -38,7 +38,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 
 	f := framework.NewDefaultFramework("dns")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	ginkgo.It("should support configurable pod DNS servers", func() {
+	ginkgo.It("should support configurable pod DNS servers", func(ctx context.Context) {
 
 		ginkgo.By("Getting the IP address of the internal Kubernetes service")
 

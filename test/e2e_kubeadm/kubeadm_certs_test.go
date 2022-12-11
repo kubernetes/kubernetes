@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	"context"
 	"fmt"
 
 	authv1 "k8s.io/api/authorization/v1"
@@ -61,7 +62,7 @@ var _ = Describe("kubeadm-certs [copy-certs]", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	ginkgo.It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 		s := GetSecret(f.ClientSet, kubeSystemNamespace, kubeadmCertsSecretName)
 
 		// Checks the kubeadm-certs is ownen by a time lived token
@@ -104,12 +105,12 @@ var _ = Describe("kubeadm-certs [copy-certs]", func() {
 		}
 	})
 
-	ginkgo.It("should have related Role and RoleBinding", func() {
+	ginkgo.It("should have related Role and RoleBinding", func(ctx context.Context) {
 		ExpectRole(f.ClientSet, kubeSystemNamespace, kubeadmCertsRoleName)
 		ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeadmCertsRoleBindingName)
 	})
 
-	ginkgo.It("should be accessible for bootstrap tokens", func() {
+	ginkgo.It("should be accessible for bootstrap tokens", func(ctx context.Context) {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, bootstrapTokensGroup,
 			kubeadmCertsSecretResource,

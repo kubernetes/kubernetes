@@ -71,7 +71,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 	})
 
 	// This test takes around 6 minutes to run
-	ginkgo.It("[Slow] [Serial] should create valid firewall rules for LoadBalancer type service", func() {
+	ginkgo.It("[Slow] [Serial] should create valid firewall rules for LoadBalancer type service", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		// This source ranges is just used to examine we have exact same things on LB firewall rules
 		firewallTestSourceRanges := []string{"0.0.0.0/1", "128.0.0.0/1"}
@@ -204,7 +204,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should have correct firewall rules for e2e cluster", func() {
+	ginkgo.It("should have correct firewall rules for e2e cluster", func(ctx context.Context) {
 		ginkgo.By("Checking if e2e firewall rules are correct")
 		for _, expFw := range gce.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
 			fw, err := gceCloud.GetFirewall(expFw.Name)
@@ -214,7 +214,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		}
 	})
 
-	ginkgo.It("control plane should not expose well-known ports", func() {
+	ginkgo.It("control plane should not expose well-known ports", func(ctx context.Context) {
 		nodes, err := e2enode.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
 

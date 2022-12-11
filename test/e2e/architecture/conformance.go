@@ -17,6 +17,7 @@ limitations under the License.
 package architecture
 
 import (
+	"context"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -35,7 +36,7 @@ var _ = SIGDescribe("Conformance Tests", func() {
 		Testname: Conformance tests minimum number of nodes.
 		Description: Conformance tests requires at least two untainted nodes where pods can be scheduled.
 	*/
-	framework.ConformanceIt("should have at least two untainted nodes", func() {
+	framework.ConformanceIt("should have at least two untainted nodes", func(ctx context.Context) {
 		ginkgo.By("Getting node addresses")
 		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(f.ClientSet, 10*time.Minute))
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)

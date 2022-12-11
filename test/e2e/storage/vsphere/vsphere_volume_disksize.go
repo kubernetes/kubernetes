@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		datastore = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 	})
 
-	ginkgo.It("verify dynamically provisioned pv has size rounded up correctly", func() {
+	ginkgo.It("verify dynamically provisioned pv has size rounded up correctly", func(ctx context.Context) {
 		ginkgo.By("Invoking Test disk size")
 		scParameters[Datastore] = datastore
 		scParameters[DiskFormat] = ThinDisk

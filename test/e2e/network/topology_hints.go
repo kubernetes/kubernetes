@@ -52,7 +52,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 		e2eskipper.SkipUnlessMultizone(c)
 	})
 
-	ginkgo.It("should distribute endpoints evenly", func() {
+	ginkgo.It("should distribute endpoints evenly", func(ctx context.Context) {
 		portNum := 9376
 		thLabels := map[string]string{labelKey: clientLabelValue}
 		img := imageutils.GetE2EImage(imageutils.Agnhost)

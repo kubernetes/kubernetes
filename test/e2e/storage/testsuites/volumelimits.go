@@ -244,7 +244,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify that all csinodes have volume limits", func() {
+	ginkgo.It("should verify that all csinodes have volume limits", func(ctx context.Context) {
 		driverInfo := driver.GetDriverInfo()
 		if !driverInfo.Capabilities[storageframework.CapVolumeLimits] {
 			ginkgo.Skip(fmt.Sprintf("driver %s does not support volume limits", driverInfo.Name))

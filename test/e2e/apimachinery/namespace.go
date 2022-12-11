@@ -265,7 +265,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 	   The Namespace is patched.
 	   The Namespace and MUST now include the new Label.
 	*/
-	framework.ConformanceIt("should patch a Namespace", func() {
+	framework.ConformanceIt("should patch a Namespace", func(ctx context.Context) {
 		ginkgo.By("creating a Namespace")
 		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
 		ns, err := f.CreateNamespace(namespaceName, nil)
@@ -296,7 +296,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		equal the new values. Given the updating of the namespace status, the fields MUST
 		equal the new values.
 	*/
-	framework.ConformanceIt("should apply changes to a namespace status", func() {
+	framework.ConformanceIt("should apply changes to a namespace status", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		dc := f.DynamicClient
 		nsResource := v1.SchemeGroupVersion.WithResource("namespaces")
@@ -363,7 +363,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		Description: When updating the namespace it MUST
 		succeed and the field MUST equal the new value.
 	*/
-	framework.ConformanceIt("should apply an update to a Namespace", func() {
+	framework.ConformanceIt("should apply an update to a Namespace", func(ctx context.Context) {
 		var err error
 		var updatedNamespace *v1.Namespace
 		ns := f.Namespace.Name
@@ -391,7 +391,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		fake finalizer MUST be found. Removing the fake finalizer from
 		the namespace MUST succeed and MUST NOT be found.
 	*/
-	framework.ConformanceIt("should apply a finalizer to a Namespace", func() {
+	framework.ConformanceIt("should apply a finalizer to a Namespace", func(ctx context.Context) {
 
 		fakeFinalizer := v1.FinalizerName("e2e.example.com/fakeFinalizer")
 		var updatedNamespace *v1.Namespace

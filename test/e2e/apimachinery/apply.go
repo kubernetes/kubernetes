@@ -68,7 +68,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		Testname: Server Side Apply, Create
 		Description: Apply an object. An apply on an object that does not exist MUST create the object.
 	*/
-	ginkgo.It("should create an applied object if it does not already exist", func() {
+	ginkgo.It("should create an applied object if it does not already exist", func(ctx context.Context) {
 		testCases := []struct {
 			resource      string
 			name          string
@@ -162,7 +162,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		Testname: Server Side Apply, Subresource
 		Description: Apply a resource and issue a subsequent apply on a subresource. The subresource MUST be updated with the applied object contents.
 	*/
-	ginkgo.It("should work for subresources", func() {
+	ginkgo.It("should work for subresources", func(ctx context.Context) {
 		{
 			testCases := []struct {
 				resource    string
@@ -270,7 +270,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		Testname: Server Side Apply, unset field
 		Description: Apply an object. Issue a subsequent apply that removes a field. The particular field MUST be removed.
 	*/
-	ginkgo.It("should remove a field if it is owned but removed in the apply request", func() {
+	ginkgo.It("should remove a field if it is owned but removed in the apply request", func(ctx context.Context) {
 		obj := []byte(`{
 		"apiVersion": "apps/v1",
 		"kind": "Deployment",
@@ -373,7 +373,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		Testname: Server Side Apply, unset field shared
 		Description: Apply an object. Unset ownership of a field that is also owned by other managers and make a subsequent apply request. The unset field MUST not be removed from the object.
 	*/
-	ginkgo.It("should not remove a field if an owner unsets the field but other managers still have ownership of the field", func() {
+	ginkgo.It("should not remove a field if an owner unsets the field but other managers still have ownership of the field", func(ctx context.Context) {
 		// spec.replicas is a optional, defaulted field
 		// spec.template.spec.hostname is an optional, non-defaulted field
 		apply := []byte(`{
@@ -482,7 +482,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		Testname: Server Side Apply, Force Apply
 		Description: Apply an object. Force apply a modified version of the object such that a conflict will exist in the managed fields. The force apply MUST successfully update the object.
 	*/
-	ginkgo.It("should ignore conflict errors if force apply is used", func() {
+	ginkgo.It("should ignore conflict errors if force apply is used", func(ctx context.Context) {
 		obj := []byte(`{
 		"apiVersion": "apps/v1",
 		"kind": "Deployment",
@@ -569,7 +569,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		Testname: Server Side Apply, CRD
 		Description: Create a CRD and apply a CRD resource. Subsequent apply requests that do not conflict with the previous ones should update the object. Apply requests that cause conflicts should fail.
 	*/
-	ginkgo.It("should work for CRDs", func() {
+	ginkgo.It("should work for CRDs", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		if err != nil {
 			framework.Failf("%s", err)
@@ -967,7 +967,7 @@ spec:
 		Testname: Server Side Apply, Update take ownership
 		Description: Apply an object. Send an Update request which should take ownership of a field. The field should be owned by the new manager and a subsequent apply from the original manager MUST not change the field it does not have ownership of.
 	*/
-	ginkgo.It("should give up ownership of a field if forced applied by a controller", func() {
+	ginkgo.It("should give up ownership of a field if forced applied by a controller", func(ctx context.Context) {
 		// Applier creates a deployment with replicas set to 3
 		apply := []byte(`{
 		"apiVersion": "apps/v1",

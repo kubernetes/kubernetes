@@ -463,27 +463,27 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	}
 
 	testAll := func(isEphemeral bool) {
-		ginkgo.It("should create prometheus metrics for volume provisioning and attach/detach", func() {
+		ginkgo.It("should create prometheus metrics for volume provisioning and attach/detach", func(ctx context.Context) {
 			provisioning(isEphemeral)
 		})
 		// TODO(mauriciopoppe): after CSIMigration is turned on we're no longer reporting
 		// the volume_provision metric (removed in #106609), issue to investigate the bug #106773
-		ginkgo.It("should create prometheus metrics for volume provisioning errors [Slow]", func() {
+		ginkgo.It("should create prometheus metrics for volume provisioning errors [Slow]", func(ctx context.Context) {
 			provisioningError(isEphemeral)
 		})
-		ginkgo.It("should create volume metrics with the correct FilesystemMode PVC ref", func() {
+		ginkgo.It("should create volume metrics with the correct FilesystemMode PVC ref", func(ctx context.Context) {
 			filesystemMode(isEphemeral)
 		})
-		ginkgo.It("should create volume metrics with the correct BlockMode PVC ref", func() {
+		ginkgo.It("should create volume metrics with the correct BlockMode PVC ref", func(ctx context.Context) {
 			blockmode(isEphemeral)
 		})
-		ginkgo.It("should create metrics for total time taken in volume operations in P/V Controller", func() {
+		ginkgo.It("should create metrics for total time taken in volume operations in P/V Controller", func(ctx context.Context) {
 			totalTime(isEphemeral)
 		})
-		ginkgo.It("should create volume metrics in Volume Manager", func() {
+		ginkgo.It("should create volume metrics in Volume Manager", func(ctx context.Context) {
 			volumeManager(isEphemeral)
 		})
-		ginkgo.It("should create metrics for total number of volumes in A/D Controller", func() {
+		ginkgo.It("should create metrics for total number of volumes in A/D Controller", func(ctx context.Context) {
 			adController(isEphemeral)
 		})
 	}
@@ -595,7 +595,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			originMetricValues = nil
 		})
 
-		ginkgo.It("should create none metrics for pvc controller before creating any PV or PVC", func() {
+		ginkgo.It("should create none metrics for pvc controller before creating any PV or PVC", func(ctx context.Context) {
 			validator([]map[string]int64{nil, nil, nil, nil})
 		})
 

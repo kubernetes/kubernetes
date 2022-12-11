@@ -52,7 +52,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
 		The endpointslices mirrorowing must mirror endpoint create, update, and delete actions.
 	*/
-	framework.ConformanceIt("should mirror a custom Endpoints resource through create update and delete", func() {
+	framework.ConformanceIt("should mirror a custom Endpoints resource through create update and delete", func(ctx context.Context) {
 		svc := createServiceReportErr(cs, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
@@ -202,7 +202,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 		})
 	})
 
-	ginkgo.It("should mirror a custom Endpoint with multiple subsets and same IP address", func() {
+	ginkgo.It("should mirror a custom Endpoint with multiple subsets and same IP address", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		svc := createServiceReportErr(cs, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{

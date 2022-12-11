@@ -58,7 +58,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		Testname: LimitRange, resources
 		Description: Creating a Limitrange and verifying the creation of Limitrange, updating the Limitrange and validating the Limitrange. Creating Pods with resources and validate the pod resources are applied to the Limitrange
 	*/
-	framework.ConformanceIt("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
+	framework.ConformanceIt("should create a LimitRange with defaults and ensure pod has those defaults applied.", func(ctx context.Context) {
 		ginkgo.By("Creating a LimitRange")
 		min := getResourceList("50m", "100Mi", "100Gi")
 		max := getResourceList("500m", "500Mi", "500Gi")
@@ -93,7 +93,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.LimitRange{})
 		defer w.Stop()
 
-		ctx, cancelCtx := context.WithTimeout(context.TODO(), wait.ForeverTestTimeout)
+		ctx, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
 		defer cancelCtx()
 		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 			framework.Failf("Timeout while waiting for LimitRange informer to sync")
@@ -236,7 +236,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		the limitRange by collection with a labelSelector it MUST delete only one
 		limitRange.
 	*/
-	framework.ConformanceIt("should list, patch and delete a LimitRange by collection", func() {
+	framework.ConformanceIt("should list, patch and delete a LimitRange by collection", func(ctx context.Context) {
 
 		ns := f.Namespace.Name
 		lrClient := f.ClientSet.CoreV1().LimitRanges(ns)
@@ -275,7 +275,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		limitRange2 := &v1.LimitRange{}
 		*limitRange2 = *limitRange
 
-		ctx, cancelCtx := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+		ctx, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
 		defer cancelCtx()
 
 		ginkgo.By(fmt.Sprintf("Creating LimitRange %q in namespace %q", lrName, f.Namespace.Name))

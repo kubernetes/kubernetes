@@ -160,7 +160,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
-	ginkgo.It("should provision a volume and schedule a pod with AllowedTopologies", func() {
+	ginkgo.It("should provision a volume and schedule a pod with AllowedTopologies", func(ctx context.Context) {
 		l := init()
 		defer func() {
 			cleanup(l)
@@ -188,7 +188,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		t.verifyNodeTopology(node, allowedTopologies)
 	})
 
-	ginkgo.It("should fail to schedule a pod which has topologies that conflict with AllowedTopologies", func() {
+	ginkgo.It("should fail to schedule a pod which has topologies that conflict with AllowedTopologies", func(ctx context.Context) {
 		l := init()
 		defer func() {
 			cleanup(l)

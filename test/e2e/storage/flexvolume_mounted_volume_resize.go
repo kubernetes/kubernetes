@@ -112,7 +112,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		})
 	})
 
-	ginkgo.It("Should verify mounted flex volumes can be resized", func() {
+	ginkgo.It("Should verify mounted flex volumes can be resized", func(ctx context.Context) {
 		driver := "dummy-attachable"
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driver))
 		installFlex(c, node, "k8s", driver, path.Join(driverDir, driver))

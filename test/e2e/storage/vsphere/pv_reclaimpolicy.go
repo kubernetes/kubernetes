@@ -79,7 +79,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			5. Delete PVC
 			6. Verify PV is deleted automatically.
 		*/
-		ginkgo.It("should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted", func() {
+		ginkgo.It("should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted", func(ctx context.Context) {
 			var err error
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
 			framework.ExpectNoError(err)
@@ -107,7 +107,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			8. Delete the pod.
 			9. Verify PV should be detached from the node and automatically deleted.
 		*/
-		ginkgo.It("should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod", func() {
+		ginkgo.It("should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod", func(ctx context.Context) {
 			var err error
 
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
@@ -171,7 +171,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			11. Created POD using PVC created in Step 10 and verify volume content is matching.
 		*/
 
-		ginkgo.It("should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted", func() {
+		ginkgo.It("should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted", func(ctx context.Context) {
 			var err error
 			var volumeFileContent = "hello from vsphere cloud provider, Random Content is :" + strconv.FormatInt(time.Now().UnixNano(), 10)
 

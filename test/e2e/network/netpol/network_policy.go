@@ -117,7 +117,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 	ginkgo.Context("NetworkPolicy between server and client", func() {
 		var k8s *kubeManager
 
-		ginkgo.It("should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -131,7 +131,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should support a 'default-deny-all' policy [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should support a 'default-deny-all' policy [Feature:NetworkPolicy]", func(ctx context.Context) {
 			policy := GenNetworkPolicyWithNameAndPodSelector("deny-all", metav1.LabelSelector{}, SetSpecIngressRules(), SetSpecEgressRules())
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
@@ -146,7 +146,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
 			allowedPods := metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"pod": "b",
@@ -169,7 +169,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy to allow ingress traffic for a target [Feature:NetworkPolicy] ", func() {
+		ginkgo.It("should enforce policy to allow ingress traffic for a target [Feature:NetworkPolicy] ", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -194,7 +194,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy to allow ingress traffic from pods in all namespaces [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy to allow ingress traffic from pods in all namespaces [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -208,7 +208,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -226,7 +226,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy]", func(ctx context.Context) {
 			allowedPods := metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{{
 					Key:      "pod",
@@ -251,7 +251,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy based on NamespaceSelector with MatchExpressions[Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on NamespaceSelector with MatchExpressions[Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -276,7 +276,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy based on PodSelector or NamespaceSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on PodSelector or NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -305,7 +305,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -335,7 +335,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy based on Multiple PodSelectors and NamespaceSelectors [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on Multiple PodSelectors and NamespaceSelectors [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -368,7 +368,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy based on any PodSelectors [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on any PodSelectors [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -390,7 +390,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -417,7 +417,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("Creating a network allowPort81Policy which only allows allow listed namespaces (y) to connect on exactly one port (81)")
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{81}
@@ -442,7 +442,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("Creating a network allowPort81Policy which only allows allow listed namespaces (y) to connect on exactly one port (81)")
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80, 81}
@@ -484,7 +484,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityALLOW})
 		})
 
-		ginkgo.It("should support allow-all policy [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should support allow-all policy [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("Creating a network policy which allows all traffic.")
 			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-all", map[string]string{}, SetSpecIngressRules(networkingv1.NetworkPolicyIngressRule{}))
 			protocols := []v1.Protocol{protocolTCP}
@@ -499,7 +499,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should allow ingress access on one named port [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should allow ingress access on one named port [Feature:NetworkPolicy]", func(ctx context.Context) {
 			IngressRules := networkingv1.NetworkPolicyIngressRule{}
 			IngressRules.Ports = append(IngressRules.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-81-tcp"}})
 			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-all", map[string]string{}, SetSpecIngressRules(IngressRules))
@@ -520,7 +520,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort80})
 		})
 
-		ginkgo.It("should allow ingress access from namespace on one named port [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should allow ingress access from namespace on one named port [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80, 81}
 			k8s = initializeResources(f, protocols, ports)
@@ -550,7 +550,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityFAIL})
 		})
 
-		ginkgo.It("should allow egress access on one named port [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should allow egress access on one named port [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("validating egress from port 81 to port 80")
 			egressRule := networkingv1.NetworkPolicyEgressRule{}
 			egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80-tcp"}})
@@ -571,7 +571,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort81})
 		})
 
-		ginkgo.It("should enforce updated policy [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce updated policy [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("Using the simplest possible mutation: start with allow all, then switch to deny all")
 			// part 1) allow all
 			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-all-mutate-to-deny-all", map[string]string{}, SetSpecIngressRules(networkingv1.NetworkPolicyIngressRule{}))
@@ -593,7 +593,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityDeny})
 		})
 
-		ginkgo.It("should allow ingress access from updated namespace [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should allow ingress access from updated namespace [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -624,7 +624,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityWithLabel})
 		})
 
-		ginkgo.It("should allow ingress access from updated pod [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should allow ingress access from updated pod [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -653,7 +653,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityWithLabel})
 		})
 
-		ginkgo.It("should deny ingress from pods on other namespaces [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should deny ingress from pods on other namespaces [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -670,7 +670,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should deny ingress access to updated pod [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should deny ingress access to updated pod [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -692,7 +692,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityIsolated})
 		})
 
-		ginkgo.It("should deny egress from pods based on PodSelector [Feature:NetworkPolicy] ", func() {
+		ginkgo.It("should deny egress from pods based on PodSelector [Feature:NetworkPolicy] ", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -706,7 +706,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should deny egress from all pods in a namespace [Feature:NetworkPolicy] ", func() {
+		ginkgo.It("should deny egress from all pods in a namespace [Feature:NetworkPolicy] ", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -720,7 +720,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should work with Ingress, Egress specified together [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should work with Ingress, Egress specified together [Feature:NetworkPolicy]", func(ctx context.Context) {
 			allowedPodLabels := &metav1.LabelSelector{MatchLabels: map[string]string{"pod": "b"}}
 			ingressRule := networkingv1.NetworkPolicyIngressRule{}
 			ingressRule.From = append(ingressRule.From, networkingv1.NetworkPolicyPeer{PodSelector: allowedPodLabels})
@@ -758,7 +758,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort81})
 		})
 
-		ginkgo.It("should support denying of egress traffic on the client side (even if the server explicitly allows this traffic) [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should support denying of egress traffic on the client side (even if the server explicitly allows this traffic) [Feature:NetworkPolicy]", func(ctx context.Context) {
 			// x/a --> y/a and y/b
 			// Egress allowed to y/a only. Egress to y/b should be blocked
 			// Ingress on y/a and y/b allow traffic from x/a
@@ -854,7 +854,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -880,7 +880,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce ingress policy allowing any port traffic to a server on a specific protocol [Feature:NetworkPolicy] [Feature:UDP]", func() {
+		ginkgo.It("should enforce ingress policy allowing any port traffic to a server on a specific protocol [Feature:NetworkPolicy] [Feature:UDP]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP, protocolUDP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -898,7 +898,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolUDP, Reachability: reachabilityUDP})
 		})
 
-		ginkgo.It("should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{81}
 			k8s = initializeResources(f, protocols, ports)
@@ -923,7 +923,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityAll})
 		})
 
-		ginkgo.It("should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy]", func(ctx context.Context) {
 			egressRule := networkingv1.NetworkPolicyEgressRule{}
 			egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 80}})
 			policyAllowPort80 := GenNetworkPolicyWithNameAndPodMatchLabel("allow-egress-port-80", map[string]string{}, SetSpecEgressRules(egressRule))
@@ -948,7 +948,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityAll})
 		})
 
-		ginkgo.It("should stop enforcing policies after they are deleted [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should stop enforcing policies after they are deleted [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("Creating a network policy for the server which denies all traffic.")
 
 			// Deny all traffic into and out of "x".
@@ -976,7 +976,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 		// TODO, figure out how the next 3 tests should work with dual stack : do we need a different abstraction then just "podIP"?
 
-		ginkgo.It("should allow egress access to server in CIDR block [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should allow egress access to server in CIDR block [Feature:NetworkPolicy]", func(ctx context.Context) {
 			// Getting podServer's status to get podServer's IP, to create the CIDR
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
@@ -1003,7 +1003,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy]", func(ctx context.Context) {
 			// Getting podServer's status to get podServer's IP, to create the CIDR with except clause
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
@@ -1037,7 +1037,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]", func(ctx context.Context) {
 			// Getting podServer's status to get podServer's IP, to create the CIDR with except clause
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
@@ -1086,7 +1086,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityAllow})
 		})
 
-		ginkgo.It("should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
 			/*
 					Test steps:
 					1. Verify every pod in every namespace can talk to each other
@@ -1123,7 +1123,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 		// This test *does* apply to plugins that do not implement SCTP. It is a
 		// security hole if you fail this test, because you are allowing TCP
 		// traffic that is supposed to be blocked.
-		ginkgo.It("should not mistakenly treat 'protocol: SCTP' as 'protocol: TCP', even if the plugin doesn't support SCTP [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should not mistakenly treat 'protocol: SCTP' as 'protocol: TCP', even if the plugin doesn't support SCTP [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{81}
 			k8s = initializeResources(f, protocols, ports)
@@ -1149,7 +1149,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 		// This test *does* apply to plugins that do not implement SCTP. It is a
 		// security hole if you fail this test, because you are allowing TCP
 		// traffic that is supposed to be blocked.
-		ginkgo.It("should properly isolate pods that are selected by a policy allowing SCTP, even if the plugin doesn't support SCTP [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should properly isolate pods that are selected by a policy allowing SCTP, even if the plugin doesn't support SCTP [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("Creating a network policy for the server which allows traffic only via SCTP on port 80.")
 			ingressRule := networkingv1.NetworkPolicyIngressRule{}
 			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{IntVal: 80}, Protocol: &protocolSCTP})
@@ -1166,7 +1166,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should not allow access by TCP when a policy specifies only UDP [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should not allow access by TCP when a policy specifies only UDP [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ingressRule := networkingv1.NetworkPolicyIngressRule{}
 			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{IntVal: 81}, Protocol: &protocolUDP})
 			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-only-udp-ingress-on-port-81", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
@@ -1185,7 +1185,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 		})
 
 		// Note that this default ns functionality is maintained by the APIMachinery group, but we test it here anyways because its an important feature.
-		ginkgo.It("should enforce policy to allow traffic based on NamespaceSelector with MatchLabels using default ns label [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy to allow traffic based on NamespaceSelector with MatchLabels using default ns label [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -1208,7 +1208,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 		})
 
 		// Note that this default ns functionality is maintained by the APIMachinery group, but we test it here anyways because its an important feature.
-		ginkgo.It("should enforce policy based on NamespaceSelector with MatchExpressions using default ns label [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on NamespaceSelector with MatchExpressions using default ns label [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -1244,7 +1244,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 
 	ginkgo.Context("NetworkPolicy between server and client using UDP", func() {
 
-		ginkgo.It("should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolUDP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -1258,7 +1258,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolUDP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("Creating a network policy allowPort81Policy which only allows allow listed namespaces (y) to connect on exactly one port (81)")
 			protocols := []v1.Protocol{protocolUDP}
 			ports := []int32{81}
@@ -1283,7 +1283,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolUDP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolUDP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -1324,7 +1324,7 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disrupt
 
 	ginkgo.Context("NetworkPolicy between server and client using SCTP", func() {
 
-		ginkgo.It("should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolSCTP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
@@ -1338,7 +1338,7 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disrupt
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolSCTP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy based on Ports [Feature:NetworkPolicy]", func(ctx context.Context) {
 			ginkgo.By("Creating a network allowPort81Policy which only allows allow listed namespaces (y) to connect on exactly one port (81)")
 			protocols := []v1.Protocol{protocolSCTP}
 			ports := []int32{81}
@@ -1362,7 +1362,7 @@ var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disrupt
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolSCTP, Reachability: reachability})
 		})
 
-		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
+		ginkgo.It("should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolSCTP}
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)

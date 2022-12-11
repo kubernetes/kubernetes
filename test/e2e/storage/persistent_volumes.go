@@ -169,7 +169,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Create an nfs PV, then a claim that matches the PV, and a pod that
 			// contains the claim. Verify that the PV and PVC bind correctly, and
 			// that the pod can write to the nfs volume.
-			ginkgo.It("should create a non-pre-bound PV and PVC: test write access ", func() {
+			ginkgo.It("should create a non-pre-bound PV and PVC: test write access ", func(ctx context.Context) {
 				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
@@ -178,7 +178,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Create a claim first, then a nfs PV that matches the claim, and a
 			// pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
-			ginkgo.It("create a PVC and non-pre-bound PV: test write access", func() {
+			ginkgo.It("create a PVC and non-pre-bound PV: test write access", func(ctx context.Context) {
 				pv, pvc, err = e2epv.CreatePVCPV(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
@@ -187,7 +187,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Create a claim first, then a pre-bound nfs PV that matches the claim,
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
-			ginkgo.It("create a PVC and a pre-bound PV: test write access", func() {
+			ginkgo.It("create a PVC and a pre-bound PV: test write access", func(ctx context.Context) {
 				pv, pvc, err = e2epv.CreatePVCPV(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
@@ -196,7 +196,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// Create a nfs PV first, then a pre-bound PVC that matches the PV,
 			// and a pod that contains the claim. Verify that the PV and PVC bind
 			// correctly, and that the pod can write to the nfs volume.
-			ginkgo.It("create a PV and a pre-bound PVC: test write access", func() {
+			ginkgo.It("create a PV and a pre-bound PVC: test write access", func(ctx context.Context) {
 				pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
@@ -233,7 +233,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 			// Create 2 PVs and 4 PVCs.
 			// Note: PVs are created before claims and no pre-binding
-			ginkgo.It("should create 2 PVs and 4 PVCs: test write access", func() {
+			ginkgo.It("should create 2 PVs and 4 PVCs: test write access", func(ctx context.Context) {
 				numPVs, numPVCs := 2, 4
 				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
@@ -243,7 +243,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 			// Create 3 PVs and 3 PVCs.
 			// Note: PVs are created before claims and no pre-binding
-			ginkgo.It("should create 3 PVs and 3 PVCs: test write access", func() {
+			ginkgo.It("should create 3 PVs and 3 PVCs: test write access", func(ctx context.Context) {
 				numPVs, numPVCs := 3, 3
 				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
@@ -253,7 +253,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 			// Create 4 PVs and 2 PVCs.
 			// Note: PVs are created before claims and no pre-binding.
-			ginkgo.It("should create 4 PVs and 2 PVCs: test write access [Slow]", func() {
+			ginkgo.It("should create 4 PVs and 2 PVCs: test write access [Slow]", func(ctx context.Context) {
 				numPVs, numPVCs := 4, 2
 				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
@@ -283,7 +283,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// This ginkgo.It() tests a scenario where a PV is written to by a Pod, recycled, then the volume checked
 			// for files. If files are found, the checking Pod fails, failing the test.  Otherwise, the pod
 			// (and test) succeed.
-			ginkgo.It("should test that a PV becomes Available and is clean after the PVC is deleted.", func() {
+			ginkgo.It("should test that a PV becomes Available and is clean after the PVC is deleted.", func(ctx context.Context) {
 				ginkgo.By("Writing to the volume.")
 				pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
 				pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -331,7 +331,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				e2estatefulset.DeleteAllStatefulSets(c, ns)
 			})
 
-			ginkgo.It("should be reschedulable [Slow]", func() {
+			ginkgo.It("should be reschedulable [Slow]", func(ctx context.Context) {
 				// Only run on providers with default storageclass
 				e2epv.SkipIfNoDefaultStorageClass(c)
 

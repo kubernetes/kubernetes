@@ -17,6 +17,7 @@ limitations under the License.
 package pod_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -48,15 +49,14 @@ import (
 //
 //
 //
-//
 // This must be line #52.
 
 var _ = ginkgo.Describe("pod", func() {
-	ginkgo.It("not found", func() {
+	ginkgo.It("not found", func(ctx context.Context) {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, "no-such-pod", "default", timeout /* no explanation here to cover that code path */))
 	})
 
-	ginkgo.It("not running", func() {
+	ginkgo.It("not running", func(ctx context.Context) {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, podName, podNamespace, timeout), "wait for pod %s running", podName /* tests printf formatting */)
 	})
 })

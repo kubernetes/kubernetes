@@ -88,7 +88,7 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 	})
 
-	ginkgo.It("vsphere stress tests", func() {
+	ginkgo.It("vsphere stress tests", func(ctx context.Context) {
 		scArrays := make([]*storagev1.StorageClass, len(scNames))
 		for index, scname := range scNames {
 			// Create vSphere Storage Class

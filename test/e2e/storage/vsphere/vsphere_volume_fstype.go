@@ -83,17 +83,17 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 		gomega.Expect(GetReadySchedulableNodeInfos()).NotTo(gomega.BeEmpty())
 	})
 
-	ginkgo.It("verify fstype - ext3 formatted volume", func() {
+	ginkgo.It("verify fstype - ext3 formatted volume", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for fstype: ext3")
 		invokeTestForFstype(f, client, namespace, ext3FSType, ext3FSType)
 	})
 
-	ginkgo.It("verify fstype - default value should be ext4", func() {
+	ginkgo.It("verify fstype - default value should be ext4", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for fstype: Default Value - ext4")
 		invokeTestForFstype(f, client, namespace, "", ext4FSType)
 	})
 
-	ginkgo.It("verify invalid fstype", func() {
+	ginkgo.It("verify invalid fstype", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for fstype: invalid Value")
 		invokeTestForInvalidFstype(f, client, namespace, invalidFSType)
 	})

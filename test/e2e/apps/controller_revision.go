@@ -121,7 +121,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		Listing the ControllerRevisions by label selector MUST find only one.
 		The current ControllerRevision revision MUST be 3.
 	*/
-	framework.ConformanceIt("should manage the lifecycle of a ControllerRevision", func() {
+	framework.ConformanceIt("should manage the lifecycle of a ControllerRevision", func(ctx context.Context) {
 		csAppsV1 := f.ClientSet.AppsV1()
 
 		dsLabel := map[string]string{"daemonset-name": dsName}

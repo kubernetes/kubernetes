@@ -82,7 +82,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			cleanupStorageClass(config)
 		})
 
-		ginkgo.It("should support online expansion on node", func() {
+		ginkgo.It("should support online expansion on node", func(ctx context.Context) {
 			var (
 				pod1    *v1.Pod
 				pod1Err error

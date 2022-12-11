@@ -104,7 +104,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		})
 	})
 
-	ginkgo.It("Should verify mounted devices can be resized", func() {
+	ginkgo.It("Should verify mounted devices can be resized", func(ctx context.Context) {
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 
 		// The reason we use a node selector is because we do not want pod to move to different node when pod is deleted.

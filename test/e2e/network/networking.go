@@ -82,13 +82,13 @@ var _ = common.SIGDescribe("Networking", func() {
 	f := framework.NewDefaultFramework(svcname)
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func() {
+	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func(ctx context.Context) {
 		ginkgo.By("Running container which tries to connect to 8.8.8.8")
 		framework.ExpectNoError(
 			checkConnectivityToHost(f, "", "connectivity-test", "8.8.8.8", 53, 30))
 	})
 
-	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly]", func() {
+	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly]", func(ctx context.Context) {
 		// IPv6 is not supported on Windows.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
@@ -96,14 +96,14 @@ var _ = common.SIGDescribe("Networking", func() {
 			checkConnectivityToHost(f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30))
 	})
 
-	ginkgo.It("should provider Internet connection for containers using DNS [Feature:Networking-DNS]", func() {
+	ginkgo.It("should provider Internet connection for containers using DNS [Feature:Networking-DNS]", func(ctx context.Context) {
 		ginkgo.By("Running container which tries to connect to google.com")
 		framework.ExpectNoError(
 			checkConnectivityToHost(f, "", "connectivity-test", "google.com", 80, 30))
 	})
 
 	// First test because it has no dependencies on variables created later on.
-	ginkgo.It("should provide unchanging, static URL paths for kubernetes api services", func() {
+	ginkgo.It("should provide unchanging, static URL paths for kubernetes api services", func(ctx context.Context) {
 		tests := []struct {
 			path string
 		}{
@@ -129,7 +129,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		}
 	})
 
-	ginkgo.It("should check kube-proxy urls", func() {
+	ginkgo.It("should check kube-proxy urls", func(ctx context.Context) {
 		// TODO: this is overkill we just need the host networking pod
 		// to hit kube-proxy urls.
 		config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.UseHostNetwork)
@@ -144,7 +144,7 @@ var _ = common.SIGDescribe("Networking", func() {
 
 	ginkgo.Describe("Granular Checks: Services", func() {
 
-		ginkgo.It("should function for pod-Service: http", func() {
+		ginkgo.It("should function for pod-Service: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromTestContainer("http", config.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -159,7 +159,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for pod-Service: udp", func() {
+		ginkgo.It("should function for pod-Service: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromTestContainer("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -175,7 +175,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
+		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromTestContainer("sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -189,7 +189,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for node-Service: http", func() {
+		ginkgo.It("should function for node-Service: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromNode("http", config.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -203,7 +203,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for node-Service: udp", func() {
+		ginkgo.It("should function for node-Service: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromNode("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -218,7 +218,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
+		ginkgo.It("should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
 			ginkgo.Skip("Skipping SCTP node to service test until DialFromNode supports SCTP #96482")
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, e2enetwork.ClusterSCTPPort))
@@ -233,7 +233,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for endpoint-Service: http", func() {
+		ginkgo.It("should function for endpoint-Service: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromEndpointContainer("http", config.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -247,7 +247,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for endpoint-Service: udp", func() {
+		ginkgo.It("should function for endpoint-Service: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromEndpointContainer("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -263,7 +263,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
+		ginkgo.It("should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromEndpointContainer("sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -280,7 +280,7 @@ var _ = common.SIGDescribe("Networking", func() {
 
 		// This test ensures that in a situation where multiple services exist with the same selector,
 		// deleting one of the services does not affect the connectivity of the remaining service
-		ginkgo.It("should function for multiple endpoint-Services with same selector", func() {
+		ginkgo.It("should function for multiple endpoint-Services with same selector", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By("creating a second service with same selector")
 			svc2, httpPort := createSecondNodePortService(f, config)
@@ -325,7 +325,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should update endpoints: http", func() {
+		ginkgo.It("should update endpoints: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromTestContainer("http", config.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -342,7 +342,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should update endpoints: udp", func() {
+		ginkgo.It("should update endpoints: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromTestContainer("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -360,7 +360,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
-		ginkgo.It("should update nodePort: http [Slow]", func() {
+		ginkgo.It("should update nodePort: http [Slow]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP) and getting ALL host endpoints", config.NodeIP, config.NodeIP, config.NodeHTTPPort))
 			err := config.DialFromNode("http", config.NodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -381,7 +381,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// quick validation of udp, next test confirms that this services update as well after endpoints are removed, but is slower.
-		ginkgo.It("should support basic nodePort: udp functionality", func() {
+		ginkgo.It("should support basic nodePort: udp functionality", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP) and getting ALL host endpoints", config.NodeIP, config.NodeIP, config.NodeUDPPort))
 			err := config.DialFromNode("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -391,7 +391,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
-		ginkgo.It("should update nodePort: udp [Slow]", func() {
+		ginkgo.It("should update nodePort: udp [Slow]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP) and getting ALL host endpoints", config.NodeIP, config.NodeIP, config.NodeUDPPort))
 			err := config.DialFromNode("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -413,7 +413,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func() {
+		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterHTTPPort))
 
@@ -431,7 +431,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func() {
+		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterUDPPort))
 
@@ -448,7 +448,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should be able to handle large requests: http", func() {
+		ginkgo.It("should be able to handle large requests: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
 			message := strings.Repeat("42", 1000)
@@ -458,7 +458,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should be able to handle large requests: udp", func() {
+		ginkgo.It("should be able to handle large requests: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
 			message := "n" + strings.Repeat("o", 1999)
@@ -471,7 +471,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		// if the endpoints pods use hostNetwork, several tests can't run in parallel
 		// because the pods will try to acquire the same port in the host.
 		// We run the test in serial, to avoid port conflicts.
-		ginkgo.It("should function for service endpoints using hostNetwork", func() {
+		ginkgo.It("should function for service endpoints using hostNetwork", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.UseHostNetwork, e2enetwork.EndpointsUseHostNetwork)
 
 			ginkgo.By("pod-Service(hostNetwork): http")
@@ -548,7 +548,7 @@ var _ = common.SIGDescribe("Networking", func() {
 
 	})
 
-	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func() {
+	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		e2eskipper.SkipUnlessSSHKeyPresent()
 

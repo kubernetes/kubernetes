@@ -53,7 +53,7 @@ var _ = utils.SIGDescribe("Multi-AZ Cluster Volumes", func() {
 		e2eskipper.SkipUnlessAtLeast(zoneCount, 2, msg)
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
-	ginkgo.It("should schedule pods in the same zones as statically provisioned PVs", func() {
+	ginkgo.It("should schedule pods in the same zones as statically provisioned PVs", func(ctx context.Context) {
 		PodsUseStaticPVsOrFail(f, (2*zoneCount)+1, image)
 	})
 })

@@ -54,7 +54,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var kubeClient clientset.Interface
 
-	ginkgo.It("should run Stackdriver Metadata Agent [Feature:StackdriverMetadataAgent]", func() {
+	ginkgo.It("should run Stackdriver Metadata Agent [Feature:StackdriverMetadataAgent]", func(ctx context.Context) {
 		kubeClient = f.ClientSet
 		testAgent(f, kubeClient)
 	})

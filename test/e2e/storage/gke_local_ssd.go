@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 
@@ -41,7 +42,7 @@ var _ = utils.SIGDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
 		e2eskipper.SkipUnlessProviderIs("gke")
 	})
 
-	ginkgo.It("should write and read from node local SSD [Feature:GKELocalSSD]", func() {
+	ginkgo.It("should write and read from node local SSD [Feature:GKELocalSSD]", func(ctx context.Context) {
 		framework.Logf("Start local SSD test")
 		createNodePoolWithLocalSsds("np-ssd")
 		doTestWriteAndReadToLocalSsd(f)

@@ -94,7 +94,7 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 			testRegionalAllowedTopologiesWithDelayedBinding(ctx, c, ns, 3 /* pvcCount */)
 		})
 
-		ginkgo.It("should failover to a different zone when all nodes in one zone become unreachable [Slow] [Disruptive]", func() {
+		ginkgo.It("should failover to a different zone when all nodes in one zone become unreachable [Slow] [Disruptive]", func(ctx context.Context) {
 			testZonalFailover(c, ns)
 		})
 	})

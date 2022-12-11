@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -87,7 +88,7 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *v1.Pod {
 }
 
 func runPodPidsLimitTests(f *framework.Framework) {
-	ginkgo.It("should set pids.max for Pod", func() {
+	ginkgo.It("should set pids.max for Pod", func(ctx context.Context) {
 		ginkgo.By("by creating a G pod")
 		pod := e2epod.NewPodClient(f).Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{

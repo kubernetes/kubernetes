@@ -42,7 +42,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline
 
-	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func() {
+	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
 
 		scheduling := &nodev1.Scheduling{
@@ -66,7 +66,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
 		labelFizzName := "fizz-" + string(uuid.NewUUID())
 
@@ -127,7 +127,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		gomega.Expect(pod.Spec.Tolerations).To(gomega.ContainElement(tolerations[0]))
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func(ctx context.Context) {
 		// Requires special setup of test-handler which is only done in GCE kube-up environment
 		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
 		e2eskipper.SkipUnlessProviderIs("gce")

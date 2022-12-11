@@ -65,7 +65,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			Testname: Pods, delete grace period
 			Description: Create a pod, make sure it is running. Using the http client send a 'delete' with gracePeriodSeconds=30. Pod SHOULD get terminated within gracePeriodSeconds and removed from API server within a window.
 		*/
-		ginkgo.It("should be submitted and removed", func() {
+		ginkgo.It("should be submitted and removed", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-submit-remove-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
@@ -158,7 +158,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			Testname: Pods, QOS
 			Description:  Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.
 		*/
-		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func() {
+		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-qos-class-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
@@ -205,7 +205,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			podClient = e2epod.NewPodClient(f)
 		})
 
-		ginkgo.It("should never report success for a pending container", func() {
+		ginkgo.It("should never report success for a pending container", func(ctx context.Context) {
 			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
 			createAndTestPodRepeatedly(
 				3, 15,
@@ -213,7 +213,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				podClient.PodInterface,
 			)
 		})
-		ginkgo.It("should never report container start when an init container fails", func() {
+		ginkgo.It("should never report container start when an init container fails", func(ctx context.Context) {
 			ginkgo.By("creating pods with an init container that always exit 1 and terminating the pod after a random delay")
 			createAndTestPodRepeatedly(
 				3, 15,
@@ -229,7 +229,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			podClient = e2epod.NewPodClient(f)
 		})
 
-		ginkgo.It("should not create extra sandbox if all containers are done", func() {
+		ginkgo.It("should not create extra sandbox if all containers are done", func(ctx context.Context) {
 			ginkgo.By("creating the pod that should always exit 0")
 
 			name := "pod-always-succeed" + string(uuid.NewUUID())
@@ -299,7 +299,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			}
 		})
 
-		ginkgo.It("evicted pods should be terminal", func() {
+		ginkgo.It("evicted pods should be terminal", func(ctx context.Context) {
 			ginkgo.By("creating the pod that should be evicted")
 
 			name := "pod-should-be-evicted" + string(uuid.NewUUID())

@@ -208,7 +208,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			}
 		})
 
-		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func() {
+		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func(ctx context.Context) {
 			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			ginkgo.By("Deleting PVC for volume 2")
@@ -270,7 +270,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		// Test loop executes each disruptiveTest iteratively.
 		for _, test := range disruptiveTestTable {
 			func(t disruptiveTest) {
-				ginkgo.It(t.testItStmt, func() {
+				ginkgo.It(t.testItStmt, func(ctx context.Context) {
 					ginkgo.By("Executing Spec")
 					t.runTest(c, f, clientPod, e2epod.VolumeMountPath1)
 				})

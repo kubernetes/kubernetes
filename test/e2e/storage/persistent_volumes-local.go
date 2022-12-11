@@ -232,13 +232,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					e2epod.DeletePodOrFail(config.client, config.ns, pod1.Name)
 				})
 
-				ginkgo.It("should be able to mount volume and read from pod1", func() {
+				ginkgo.It("should be able to mount volume and read from pod1", func(ctx context.Context) {
 					ginkgo.By("Reading in pod1")
 					// testFileContent was written in BeforeEach
 					testReadFileContent(f, volumeDir, testFile, testFileContent, pod1, testVolType)
 				})
 
-				ginkgo.It("should be able to mount volume and write from pod1", func() {
+				ginkgo.It("should be able to mount volume and write from pod1", func(ctx context.Context) {
 					// testFileContent was written in BeforeEach
 					testReadFileContent(f, volumeDir, testFile, testFileContent, pod1, testVolType)
 
@@ -249,13 +249,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			})
 
 			ginkgo.Context("Two pods mounting a local volume at the same time", func() {
-				ginkgo.It("should be able to write from pod1 and read from pod2", func() {
+				ginkgo.It("should be able to write from pod1 and read from pod2", func(ctx context.Context) {
 					twoPodsReadWriteTest(f, config, testVol)
 				})
 			})
 
 			ginkgo.Context("Two pods mounting a local volume one after the other", func() {
-				ginkgo.It("should be able to write from pod1 and read from pod2", func() {
+				ginkgo.It("should be able to write from pod1 and read from pod2", func(ctx context.Context) {
 					twoPodsReadWriteSerialTest(f, config, testVol)
 				})
 			})
@@ -267,14 +267,14 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					}
 				})
 
-				ginkgo.It("should set fsGroup for one pod [Slow]", func() {
+				ginkgo.It("should set fsGroup for one pod [Slow]", func(ctx context.Context) {
 					ginkgo.By("Checking fsGroup is set")
 					pod := createPodWithFsGroupTest(config, testVol, 1234, 1234)
 					ginkgo.By("Deleting pod")
 					e2epod.DeletePodOrFail(config.client, config.ns, pod.Name)
 				})
 
-				ginkgo.It("should set same fsGroup for two pods simultaneously [Slow]", func() {
+				ginkgo.It("should set same fsGroup for two pods simultaneously [Slow]", func(ctx context.Context) {
 					fsGroup := int64(1234)
 					ginkgo.By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup, fsGroup)
@@ -286,7 +286,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					e2epod.DeletePodOrFail(config.client, config.ns, pod2.Name)
 				})
 
-				ginkgo.It("should set different fsGroup for second pod if first pod is deleted [Flaky]", func() {
+				ginkgo.It("should set different fsGroup for second pod if first pod is deleted [Flaky]", func(ctx context.Context) {
 					// TODO: Disabled temporarily, remove [Flaky] tag after #73168 is fixed.
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					ginkgo.By("Create first pod and check fsGroup is set")
@@ -307,7 +307,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 	ginkgo.Context("Local volume that cannot be mounted [Slow]", func() {
 		// TODO:
 		// - check for these errors in unit tests instead
-		ginkgo.It("should fail due to non-existent path", func() {
+		ginkgo.It("should fail due to non-existent path", func(ctx context.Context) {
 			testVol := &localTestVolume{
 				ltr: &utils.LocalTestResource{
 					Node: config.randomNode,
@@ -324,7 +324,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			cleanupLocalPVCsPVs(config, []*localTestVolume{testVol})
 		})
 
-		ginkgo.It("should fail due to wrong node", func() {
+		ginkgo.It("should fail due to wrong node", func(ctx context.Context) {
 			if len(config.nodes) < 2 {
 				e2eskipper.Skipf("Runs only when number of nodes >= 2")
 			}
@@ -375,11 +375,11 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			cleanupStorageClass(config)
 		})
 
-		ginkgo.It("should fail scheduling due to different NodeAffinity", func() {
+		ginkgo.It("should fail scheduling due to different NodeAffinity", func(ctx context.Context) {
 			testPodWithNodeConflict(config, testVol, conflictNodeName, makeLocalPodWithNodeAffinity)
 		})
 
-		ginkgo.It("should fail scheduling due to different NodeSelector", func() {
+		ginkgo.It("should fail scheduling due to different NodeSelector", func(ctx context.Context) {
 			testPodWithNodeConflict(config, testVol, conflictNodeName, makeLocalPodWithNodeSelector)
 		})
 	})
@@ -410,7 +410,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			cleanupStorageClass(config)
 		})
 
-		ginkgo.It("should use volumes spread across nodes when pod has anti-affinity", func() {
+		ginkgo.It("should use volumes spread across nodes when pod has anti-affinity", func(ctx context.Context) {
 			if len(config.nodes) < ssReplicas {
 				e2eskipper.Skipf("Runs only when number of nodes >= %v", ssReplicas)
 			}
@@ -419,13 +419,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			validateStatefulSet(config, ss, true)
 		})
 
-		ginkgo.It("should use volumes on one node when pod has affinity", func() {
+		ginkgo.It("should use volumes on one node when pod has affinity", func(ctx context.Context) {
 			ginkgo.By("Creating a StatefulSet with pod affinity on nodes")
 			ss := createStatefulSet(config, ssReplicas, volsPerNode/ssReplicas, false, false)
 			validateStatefulSet(config, ss, false)
 		})
 
-		ginkgo.It("should use volumes spread across nodes when pod management is parallel and pod has anti-affinity", func() {
+		ginkgo.It("should use volumes spread across nodes when pod management is parallel and pod has anti-affinity", func(ctx context.Context) {
 			if len(config.nodes) < ssReplicas {
 				e2eskipper.Skipf("Runs only when number of nodes >= %v", ssReplicas)
 			}
@@ -434,7 +434,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			validateStatefulSet(config, ss, true)
 		})
 
-		ginkgo.It("should use volumes on one node when pod management is parallel and pod has affinity", func() {
+		ginkgo.It("should use volumes on one node when pod management is parallel and pod has affinity", func(ctx context.Context) {
 			ginkgo.By("Creating a StatefulSet with pod affinity on nodes")
 			ss := createStatefulSet(config, ssReplicas, 1, false, true)
 			validateStatefulSet(config, ss, false)
@@ -531,7 +531,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			cleanupStorageClass(config)
 		})
 
-		ginkgo.It("should be able to process many pods and reuse local volumes", func() {
+		ginkgo.It("should be able to process many pods and reuse local volumes", func(ctx context.Context) {
 			var (
 				podsLock sync.Mutex
 				// Have one extra pod pending
@@ -653,7 +653,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("all pods should be running", func() {
+		ginkgo.It("all pods should be running", func(ctx context.Context) {
 			var (
 				pvc   *v1.PersistentVolumeClaim
 				pods  = map[string]*v1.Pod{}

@@ -56,7 +56,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func() {
+	ginkgo.It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func(ctx context.Context) {
 		testStackdriverAcceleratorMonitoring(f)
 	})
 

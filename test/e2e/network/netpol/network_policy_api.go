@@ -47,7 +47,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		- The NetworkPolicies resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
 
-	ginkgo.It("should support creating NetworkPolicy API operations", func() {
+	ginkgo.It("should support creating NetworkPolicy API operations", func(ctx context.Context) {
 		// Setup
 		ns := f.Namespace.Name
 		npVersion := "v1"
@@ -219,7 +219,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		- EndPort field cannot be defined if the Port field is defined as a named (string) port.
 		- EndPort field must be equal or greater than port.
 	*/
-	ginkgo.It("should support creating NetworkPolicy API with endport field", func() {
+	ginkgo.It("should support creating NetworkPolicy API with endport field", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
 
@@ -278,7 +278,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		    - Status should support conditions
 			- Two conditions with the same type cannot exist.
 	*/
-	ginkgo.It("should support creating NetworkPolicy with Status subresource [Feature:NetworkPolicyStatus]", func() {
+	ginkgo.It("should support creating NetworkPolicy with Status subresource [Feature:NetworkPolicyStatus]", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
 

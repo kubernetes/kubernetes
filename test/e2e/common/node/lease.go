@@ -69,7 +69,7 @@ var _ = SIGDescribe("Lease", func() {
 		return just the remaining lease. Delete the lease; delete MUST be successful. Get the lease; get
 		MUST return not found error.
 	*/
-	framework.ConformanceIt("lease API should be available", func() {
+	framework.ConformanceIt("lease API should be available", func(ctx context.Context) {
 		leaseClient := f.ClientSet.CoordinationV1().Leases(f.Namespace.Name)
 
 		name := "lease"

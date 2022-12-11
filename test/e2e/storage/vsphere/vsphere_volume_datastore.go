@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		vSphereCSIMigrationEnabled = GetAndExpectBoolEnvVar(VSphereCSIMigrationEnabled)
 	})
 
-	ginkgo.It("verify dynamically provisioned pv using storageclass fails on an invalid datastore", func() {
+	ginkgo.It("verify dynamically provisioned pv using storageclass fails on an invalid datastore", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for invalid datastore")
 		scParameters[Datastore] = invalidDatastore
 		scParameters[DiskFormat] = ThinDisk

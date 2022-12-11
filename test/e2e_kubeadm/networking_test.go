@@ -77,7 +77,7 @@ var _ = Describe("networking [setup-networking]", func() {
 
 	ginkgo.Context("single-stack", func() {
 		ginkgo.Context("podSubnet", func() {
-			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
+			ginkgo.It("should be properly configured if specified in kubeadm-config", func(ctx context.Context) {
 				if dualStack {
 					e2eskipper.Skipf("Skipping because cluster is dual-stack")
 				}
@@ -101,7 +101,7 @@ var _ = Describe("networking [setup-networking]", func() {
 			})
 		})
 		ginkgo.Context("serviceSubnet", func() {
-			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
+			ginkgo.It("should be properly configured if specified in kubeadm-config", func(ctx context.Context) {
 				if dualStack {
 					e2eskipper.Skipf("Skipping because cluster is dual-stack")
 				}
@@ -126,7 +126,7 @@ var _ = Describe("networking [setup-networking]", func() {
 	})
 	ginkgo.Context("dual-stack", func() {
 		ginkgo.Context("podSubnet", func() {
-			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
+			ginkgo.It("should be properly configured if specified in kubeadm-config", func(ctx context.Context) {
 				if !dualStack {
 					e2eskipper.Skipf("Skipping because cluster is not dual-stack")
 				}

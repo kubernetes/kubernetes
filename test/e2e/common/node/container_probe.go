@@ -69,7 +69,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod readiness probe, with initial delay
 		Description: Create a Pod that is configured with a initial delay set on the readiness probe. Check the Pod Start time to compare to the initial delay. The Pod MUST be ready only after the specified initial delay.
 	*/
-	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func() {
+	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func(ctx context.Context) {
 		containerName := "test-webserver"
 		p := podClient.Create(testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
 		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
@@ -105,7 +105,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: Create a Pod with a readiness probe that fails consistently. When this Pod is created,
 			then the Pod MUST never be ready, never be running and restart count MUST be zero.
 	*/
-	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart [NodeConformance]", func() {
+	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart [NodeConformance]", func(ctx context.Context) {
 		p := podClient.Create(testWebServerPodSpec(probe.withFailing().build(), nil, "test-webserver", 80))
 		gomega.Consistently(func() (bool, error) {
 			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
@@ -132,7 +132,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using local file, restart
 		Description: Create a Pod with liveness probe that uses ExecAction handler to cat /temp/health file. The Container deletes the file /temp/health after 10 second, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
-	framework.ConformanceIt("should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; rm -rf /tmp/health; sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"cat", "/tmp/health"}),
@@ -149,7 +149,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using local file, no restart
 		Description:  Pod is created with liveness probe that uses 'exec' command to cat /temp/health file. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
-	framework.ConformanceIt("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"cat", "/tmp/health"}),
@@ -166,7 +166,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using http endpoint, restart
 		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
-	framework.ConformanceIt("should be restarted with a /healthz http liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("should be restarted with a /healthz http liveness probe [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        httpGetHandler("/healthz", 8080),
 			InitialDelaySeconds: 15,
@@ -181,7 +181,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using tcp socket, no restart
 		Description: A Pod is created with liveness probe on tcp socket 8080. The http handler on port 8080 will return http errors after 10 seconds, but the socket will remain open. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
-	framework.ConformanceIt("should *not* be restarted with a tcp:8080 liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("should *not* be restarted with a tcp:8080 liveness probe [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        tcpSocketHandler(8080),
 			InitialDelaySeconds: 15,
@@ -196,7 +196,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
 		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1. The liveness probe must fail again after restart once the http handler for /healthz enpoind on the Pod returns an http error after 10 seconds from the start. Restart counts MUST increment every time health check fails, measure up to 5 restart.
 	*/
-	framework.ConformanceIt("should have monotonically increasing restart count [NodeConformance]", func() {
+	framework.ConformanceIt("should have monotonically increasing restart count [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        httpGetHandler("/healthz", 8080),
 			InitialDelaySeconds: 5,
@@ -212,7 +212,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using http endpoint, failure
 		Description: A Pod is created with liveness probe on http endpoint '/'. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
-	framework.ConformanceIt("should *not* be restarted with a /healthz http liveness probe [NodeConformance]", func() {
+	framework.ConformanceIt("should *not* be restarted with a /healthz http liveness probe [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        httpGetHandler("/", 80),
 			InitialDelaySeconds: 15,
@@ -228,7 +228,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, container exec timeout, restart
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
-	ginkgo.It("should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance]", func() {
+	ginkgo.It("should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance]", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -245,7 +245,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod readiness probe, container exec timeout, not ready
 		Description: A Pod is created with readiness probe with a Exec action on the Pod. If the readiness probe call does not return within the timeout specified, readiness probe MUST not be Ready.
 	*/
-	ginkgo.It("should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20] [NodeConformance]", func() {
+	ginkgo.It("should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20] [NodeConformance]", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		readinessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -262,7 +262,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, container exec timeout, restart
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod. When ExecProbeTimeout feature gate is disabled and cluster is using dockershim, the timeout is ignored BUT a failing liveness probe MUST restart the Pod.
 	*/
-	ginkgo.It("should be restarted with a failing exec liveness probe that took longer than the timeout", func() {
+	ginkgo.It("should be restarted with a failing exec liveness probe that took longer than the timeout", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10 & exit 1"}),
@@ -279,7 +279,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod http liveness probe, redirected to a local address
 		Description: A Pod is created with liveness probe on http endpoint /redirect?loc=healthz. The http handler on the /redirect will redirect to the /healthz endpoint, which will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
-	ginkgo.It("should be restarted with a local redirect http liveness probe", func() {
+	ginkgo.It("should be restarted with a local redirect http liveness probe", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        httpGetHandler("/redirect?loc="+url.QueryEscape("/healthz"), 8080),
 			InitialDelaySeconds: 15,
@@ -294,7 +294,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod http liveness probe, redirected to a non-local address
 		Description: A Pod is created with liveness probe on http endpoint /redirect with a redirect to http://0.0.0.0/. The http handler on the /redirect should not follow the redirect, but instead treat it as a success and generate an event.
 	*/
-	ginkgo.It("should *not* be restarted with a non-local redirect http liveness probe", func() {
+	ginkgo.It("should *not* be restarted with a non-local redirect http liveness probe", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        httpGetHandler("/redirect?loc="+url.QueryEscape("http://0.0.0.0/"), 8080),
 			InitialDelaySeconds: 15,
@@ -318,7 +318,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod startup probe restart
 		Description: A Pod is created with a failing startup probe. The Pod MUST be killed and restarted incrementing restart count to 1, even if liveness would succeed.
 	*/
-	ginkgo.It("should be restarted startup probe fails", func() {
+	ginkgo.It("should be restarted startup probe fails", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
@@ -347,7 +347,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe delayed (long) by startup probe
 		Description: A Pod is created with failing liveness and startup probes. Liveness probe MUST NOT fail until startup probe expires.
 	*/
-	ginkgo.It("should *not* be restarted by liveness probe because startup probe delays it", func() {
+	ginkgo.It("should *not* be restarted by liveness probe because startup probe delays it", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
@@ -376,7 +376,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe fails after startup success
 		Description: A Pod is created with failing liveness probe and delayed startup probe that uses 'exec' command to cat /temp/health file. The Container is started by creating /tmp/startup after 10 seconds, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
-	ginkgo.It("should be restarted by liveness probe after startup probe enables it", func() {
+	ginkgo.It("should be restarted by liveness probe after startup probe enables it", func(ctx context.Context) {
 		cmd := []string{"/bin/sh", "-c", "sleep 10; echo ok >/tmp/startup; sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
@@ -405,7 +405,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod readiness probe, delayed by startup probe
 		Description: A Pod is created with startup and readiness probes. The Container is started by creating /tmp/startup after 45 seconds, delaying the ready state by this amount of time. This is similar to the "Pod readiness probe, with initial delay" test.
 	*/
-	ginkgo.It("should be ready immediately after startupProbe succeeds", func() {
+	ginkgo.It("should be ready immediately after startupProbe succeeds", func(ctx context.Context) {
 		// Probe workers sleep at Kubelet start for a random time which is at most PeriodSeconds
 		// this test requires both readiness and startup workers running before updating statuses
 		// to avoid flakes, ensure sleep before startup (32s) > readinessProbe.PeriodSeconds
@@ -460,7 +460,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Set terminationGracePeriodSeconds for livenessProbe
 		Description: A pod with a long terminationGracePeriod is created with a shorter livenessProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
-	ginkgo.It("should override timeoutGracePeriodSeconds when LivenessProbe field is set [Feature:ProbeTerminationGracePeriod]", func() {
+	ginkgo.It("should override timeoutGracePeriodSeconds when LivenessProbe field is set [Feature:ProbeTerminationGracePeriod]", func(ctx context.Context) {
 		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "liveness-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
 		longGracePeriod := int64(500)
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
@@ -488,7 +488,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Set terminationGracePeriodSeconds for startupProbe
 		Description: A pod with a long terminationGracePeriod is created with a shorter startupProbe-level terminationGracePeriodSeconds. We confirm the shorter termination period is used.
 	*/
-	ginkgo.It("should override timeoutGracePeriodSeconds when StartupProbe field is set [Feature:ProbeTerminationGracePeriod]", func() {
+	ginkgo.It("should override timeoutGracePeriodSeconds when StartupProbe field is set [Feature:ProbeTerminationGracePeriod]", func(ctx context.Context) {
 		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "startup-override-"+string(uuid.NewUUID()), nil, nil, nil, "/bin/sh", "-c", "sleep 1000")
 		longGracePeriod := int64(500)
 		pod.Spec.TerminationGracePeriodSeconds = &longGracePeriod
@@ -521,7 +521,7 @@ var _ = SIGDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using grpc call, success
 		Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
-	ginkgo.It("should *not* be restarted with a GRPC liveness probe [NodeConformance]", func() {
+	ginkgo.It("should *not* be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
@@ -544,7 +544,7 @@ var _ = SIGDescribe("Probing container", func() {
 			Description: A Pod is created with liveness probe on grpc service. Liveness probe on this endpoint should fail because of wrong probe port.
 		                 When liveness probe does  fail then the restart count should +1.
 	*/
-	ginkgo.It("should be restarted with a GRPC liveness probe [NodeConformance]", func() {
+	ginkgo.It("should be restarted with a GRPC liveness probe [NodeConformance]", func(ctx context.Context) {
 		livenessProbe := &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				GRPC: &v1.GRPCAction{
@@ -559,7 +559,7 @@ var _ = SIGDescribe("Probing container", func() {
 		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
-	ginkgo.It("should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe", func() {
+	ginkgo.It("should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe", func(ctx context.Context) {
 		podName := "probe-test-" + string(uuid.NewUUID())
 		podClient := e2epod.NewPodClient(f)
 		terminationGracePeriod := int64(30)
@@ -623,7 +623,7 @@ done
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating", func() {
+	ginkgo.It("should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating", func(ctx context.Context) {
 		podName := "probe-test-" + string(uuid.NewUUID())
 		podClient := e2epod.NewPodClient(f)
 		terminationGracePeriod := int64(30)

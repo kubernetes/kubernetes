@@ -129,7 +129,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 	})
 
-	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a NodePort service", func() {
+	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a NodePort service", func(ctx context.Context) {
 
 		// Create a NodePort service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -205,7 +205,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 	})
 
-	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a ClusterIP service", func() {
+	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a ClusterIP service", func(ctx context.Context) {
 
 		// Create a ClusterIP service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -292,7 +292,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	// endpoint is ready. If some traffic arrives to since kube-proxy clear the entries (see the endpoint slice) and
 	// installs the corresponding iptables rules (the endpoint is ready), a conntrack entry will be generated blackholing
 	// subsequent traffic.
-	ginkgo.It("should be able to preserve UDP traffic when initial unready endpoints get ready", func() {
+	ginkgo.It("should be able to preserve UDP traffic when initial unready endpoints get ready", func(ctx context.Context) {
 
 		// Create a ClusterIP service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -360,7 +360,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	// IP could result in the connection being closed with the error "Connection reset by
 	// peer"
 	// xref: https://kubernetes.io/blog/2019/03/29/kube-proxy-subtleties-debugging-an-intermittent-connection-reset/
-	ginkgo.It("should drop INVALID conntrack entries [Privileged]", func() {
+	ginkgo.It("should drop INVALID conntrack entries [Privileged]", func(ctx context.Context) {
 		serverLabel := map[string]string{
 			"app": "boom-server",
 		}

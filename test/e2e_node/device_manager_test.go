@@ -57,7 +57,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 	ginkgo.Context("With SRIOV devices in the system", func() {
 		// this test wants to reproduce what happened in https://github.com/kubernetes/kubernetes/issues/102880
-		ginkgo.It("should be able to recover V1 (aka pre-1.20) checkpoint data and reject pods before device re-registration", func() {
+		ginkgo.It("should be able to recover V1 (aka pre-1.20) checkpoint data and reject pods before device re-registration", func(ctx context.Context) {
 			if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount == 0 {
 				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 			}
@@ -154,7 +154,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			deletePodSyncByName(f, pod.Name)
 		})
 
-		ginkgo.It("should be able to recover V1 (aka pre-1.20) checkpoint data and update topology info on device re-registration", func() {
+		ginkgo.It("should be able to recover V1 (aka pre-1.20) checkpoint data and update topology info on device re-registration", func(ctx context.Context) {
 			if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount == 0 {
 				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 			}

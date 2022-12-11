@@ -55,7 +55,7 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 	ginkgo.Describe("When pod refers to non-existent ephemeral storage", func() {
 		for _, testSource := range invalidEphemeralSource("pod-ephm-test") {
 			testSource := testSource
-			ginkgo.It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func() {
+			ginkgo.It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func(ctx context.Context) {
 				pod := testEphemeralVolumePod(f, testSource.volumeType, testSource.source)
 				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)

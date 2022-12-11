@@ -152,7 +152,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 	}
 
 	if !pattern.AllowExpansion {
-		ginkgo.It("should not allow expansion of pvcs without AllowVolumeExpansion property", func() {
+		ginkgo.It("should not allow expansion of pvcs without AllowVolumeExpansion property", func(ctx context.Context) {
 			init()
 			defer cleanup()
 
@@ -169,7 +169,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectError(err, "While updating non-expandable PVC")
 		})
 	} else {
-		ginkgo.It("Verify if offline PVC expansion works", func() {
+		ginkgo.It("Verify if offline PVC expansion works", func(ctx context.Context) {
 			init()
 			defer cleanup()
 
@@ -245,7 +245,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 		})
 
-		ginkgo.It("should resize volume when PVC is edited while pod is using it", func() {
+		ginkgo.It("should resize volume when PVC is edited while pod is using it", func(ctx context.Context) {
 			init()
 			defer cleanup()
 

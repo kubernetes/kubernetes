@@ -50,7 +50,7 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 			initialConfig.ContainerLogMaxSize = testContainerLogMaxSize
 		})
 
-		ginkgo.It("should be rotated and limited to a fixed amount of files", func() {
+		ginkgo.It("should be rotated and limited to a fixed amount of files", func(ctx context.Context) {
 			ginkgo.By("create log container")
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

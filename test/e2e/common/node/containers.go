@@ -17,6 +17,8 @@ limitations under the License.
 package node
 
 import (
+	"context"
+
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,7 +38,7 @@ var _ = SIGDescribe("Containers", func() {
 		Testname: Containers, without command and arguments
 		Description: Default command and arguments from the container image entrypoint MUST be used when Pod does not specify the container command
 	*/
-	framework.ConformanceIt("should use the image defaults if command and args are blank [NodeConformance]", func() {
+	framework.ConformanceIt("should use the image defaults if command and args are blank [NodeConformance]", func(ctx context.Context) {
 		pod := entrypointTestPod(f.Namespace.Name)
 		pod.Spec.Containers[0].Args = nil
 		pod = e2epod.NewPodClient(f).Create(pod)
@@ -56,7 +58,7 @@ var _ = SIGDescribe("Containers", func() {
 		Testname: Containers, with arguments
 		Description: Default command and  from the container image entrypoint MUST be used when Pod does not specify the container command but the arguments from Pod spec MUST override when specified.
 	*/
-	framework.ConformanceIt("should be able to override the image's default arguments (container cmd) [NodeConformance]", func() {
+	framework.ConformanceIt("should be able to override the image's default arguments (container cmd) [NodeConformance]", func(ctx context.Context) {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")
 		e2epodoutput.TestContainerOutput(f, "override arguments", pod, 0, []string{
 			"[/agnhost entrypoint-tester override arguments]",
@@ -70,7 +72,7 @@ var _ = SIGDescribe("Containers", func() {
 		Testname: Containers, with command
 		Description: Default command from the container image entrypoint MUST NOT be used when Pod specifies the container command.  Command from Pod spec MUST override the command in the image.
 	*/
-	framework.ConformanceIt("should be able to override the image's default command (container entrypoint) [NodeConformance]", func() {
+	framework.ConformanceIt("should be able to override the image's default command (container entrypoint) [NodeConformance]", func(ctx context.Context) {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester")
 		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
 
@@ -84,7 +86,7 @@ var _ = SIGDescribe("Containers", func() {
 		Testname: Containers, with command and arguments
 		Description: Default command and arguments from the container image entrypoint MUST NOT be used when Pod specifies the container command and arguments.  Command and arguments from Pod spec MUST override the command and arguments in the image.
 	*/
-	framework.ConformanceIt("should be able to override the image's default command and arguments [NodeConformance]", func() {
+	framework.ConformanceIt("should be able to override the image's default command and arguments [NodeConformance]", func(ctx context.Context) {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")
 		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
 

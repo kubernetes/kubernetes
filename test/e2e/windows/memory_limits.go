@@ -51,13 +51,13 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 	})
 
 	ginkgo.Context("Allocatable node memory", func() {
-		ginkgo.It("should be equal to a calculated allocatable memory value", func() {
+		ginkgo.It("should be equal to a calculated allocatable memory value", func(ctx context.Context) {
 			checkNodeAllocatableTest(f)
 		})
 	})
 
 	ginkgo.Context("attempt to deploy past allocatable memory limits", func() {
-		ginkgo.It("should fail deployments of pods once there isn't enough memory", func() {
+		ginkgo.It("should fail deployments of pods once there isn't enough memory", func(ctx context.Context) {
 			overrideAllocatableMemoryTest(f, framework.TestContext.CloudConfig.NumNodes)
 		})
 	})

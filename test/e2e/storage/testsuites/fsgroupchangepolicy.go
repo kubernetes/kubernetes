@@ -17,6 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -207,7 +208,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 	for _, t := range tests {
 		test := t
 		testCaseName := fmt.Sprintf("(%s)[LinuxOnly], %s", test.podfsGroupChangePolicy, test.name)
-		ginkgo.It(testCaseName, func() {
+		ginkgo.It(testCaseName, func(ctx context.Context) {
 			dInfo := driver.GetDriverInfo()
 			policy := v1.PodFSGroupChangePolicy(test.podfsGroupChangePolicy)
 

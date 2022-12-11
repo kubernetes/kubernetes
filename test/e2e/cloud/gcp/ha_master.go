@@ -227,7 +227,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		verifyRCs(c, ns, existingRCs)
 	}
 
-	ginkgo.It("survive addition/removal replicas same zone [Serial][Disruptive]", func() {
+	ginkgo.It("survive addition/removal replicas same zone [Serial][Disruptive]", func(ctx context.Context) {
 		zone := framework.TestContext.CloudConfig.Zone
 		step(None, "")
 		numAdditionalReplicas := 2
@@ -239,7 +239,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		}
 	})
 
-	ginkgo.It("survive addition/removal replicas different zones [Serial][Disruptive]", func() {
+	ginkgo.It("survive addition/removal replicas different zones [Serial][Disruptive]", func(ctx context.Context) {
 		zone := framework.TestContext.CloudConfig.Zone
 		region := findRegionForZone(zone)
 		zones := findZonesForRegion(region)
@@ -257,7 +257,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		}
 	})
 
-	ginkgo.It("survive addition/removal replicas multizone workers [Serial][Disruptive]", func() {
+	ginkgo.It("survive addition/removal replicas multizone workers [Serial][Disruptive]", func(ctx context.Context) {
 		zone := framework.TestContext.CloudConfig.Zone
 		region := findRegionForZone(zone)
 		zones := findZonesForRegion(region)

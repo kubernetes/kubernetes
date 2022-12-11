@@ -17,6 +17,8 @@ limitations under the License.
 package kubeadm
 
 import (
+	"context"
+
 	yaml "gopkg.in/yaml.v2"
 	authv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -57,25 +59,25 @@ var _ = Describe("kubeadm-config ConfigMap", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	ginkgo.It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 		cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeadmConfigName)
 
 		gomega.Expect(cm.Data).To(gomega.HaveKey(kubeadmConfigClusterConfigurationConfigMapKey))
 	})
 
-	ginkgo.It("should have related Role and RoleBinding", func() {
+	ginkgo.It("should have related Role and RoleBinding", func(ctx context.Context) {
 		ExpectRole(f.ClientSet, kubeSystemNamespace, kubeadmConfigRoleName)
 		ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeadmConfigRoleBindingName)
 	})
 
-	ginkgo.It("should be accessible for bootstrap tokens", func() {
+	ginkgo.It("should be accessible for bootstrap tokens", func(ctx context.Context) {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, bootstrapTokensGroup,
 			kubeadmConfigConfigMapResource,
 		)
 	})
 
-	ginkgo.It("should be accessible for nodes", func() {
+	ginkgo.It("should be accessible for nodes", func(ctx context.Context) {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, nodesGroup,
 			kubeadmConfigConfigMapResource,

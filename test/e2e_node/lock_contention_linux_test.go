@@ -20,6 +20,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -38,7 +39,7 @@ const contentionLockFile = "/var/run/kubelet.lock"
 var _ = SIGDescribe("Lock contention [Slow] [Disruptive] [NodeSpecialFeature:LockContention]", func() {
 
 	// Requires `--lock-file` & `--exit-on-lock-contention` flags to be set on the Kubelet.
-	ginkgo.It("Kubelet should stop when the test acquires the lock on lock file and restart once the lock is released", func() {
+	ginkgo.It("Kubelet should stop when the test acquires the lock on lock file and restart once the lock is released", func(ctx context.Context) {
 
 		ginkgo.By("perform kubelet health check to check if kubelet is healthy and running.")
 		// Precautionary check that kubelet is healthy before running the test.

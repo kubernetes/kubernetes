@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,7 +37,7 @@ var _ = SIGDescribe("Downward API [Serial] [Disruptive] [Feature:EphemeralStorag
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for local ephemeral storage", func() {
-		ginkgo.It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func() {
+		ginkgo.It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func(ctx context.Context) {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{
 				{
@@ -64,7 +65,7 @@ var _ = SIGDescribe("Downward API [Serial] [Disruptive] [Feature:EphemeralStorag
 			testDownwardAPIForEphemeralStorage(f, podName, env, expectations)
 		})
 
-		ginkgo.It("should provide default limits.ephemeral-storage from node allocatable", func() {
+		ginkgo.It("should provide default limits.ephemeral-storage from node allocatable", func(ctx context.Context) {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{
 				{

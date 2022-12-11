@@ -20,6 +20,8 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
+
 	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -59,12 +61,12 @@ var _ = SIGDescribe("SeccompDefault [Serial] [Feature:SeccompDefault] [LinuxOnly
 			}
 		}
 
-		ginkgo.It("should use the default seccomp profile when unspecified", func() {
+		ginkgo.It("should use the default seccomp profile when unspecified", func(ctx context.Context) {
 			pod := newPod(nil)
 			e2eoutput.TestContainerOutput(f, "SeccompDefault", pod, 0, []string{"2"})
 		})
 
-		ginkgo.It("should use unconfined when specified", func() {
+		ginkgo.It("should use unconfined when specified", func(ctx context.Context) {
 			pod := newPod(&v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}})
 			e2eoutput.TestContainerOutput(f, "SeccompDefault-unconfined", pod, 0, []string{"0"})
 		})

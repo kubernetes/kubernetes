@@ -79,7 +79,7 @@ var _ = SIGDescribe("Job", func() {
 	backoffLimit := int32(6) // default value
 
 	// Simplest case: N pods succeed
-	ginkgo.It("should run a job to completion when tasks succeed", func() {
+	ginkgo.It("should run a job to completion when tasks succeed", func(ctx context.Context) {
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
@@ -101,7 +101,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectEqual(successes, completions, "expected %d successful job pods, but got  %d", completions, successes)
 	})
 
-	ginkgo.It("should allow to use the pod failure policy on exit code to fail the job early", func() {
+	ginkgo.It("should allow to use the pod failure policy on exit code to fail the job early", func(ctx context.Context) {
 
 		// We fail the Job's pod only once to ensure the backoffLimit is not
 		// reached and thus the job is failed due to the pod failure policy
@@ -134,7 +134,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to ensure job failure in namespace: %s", f.Namespace.Name)
 	})
 
-	ginkgo.It("should allow to use the pod failure policy to not count the failure towards the backoffLimit", func() {
+	ginkgo.It("should allow to use the pod failure policy to not count the failure towards the backoffLimit", func(ctx context.Context) {
 
 		// We set the backoffLimit to 0 so that any pod failure would trigger
 		// job failure if not for the pod failure policy to ignore the failed
@@ -272,7 +272,7 @@ var _ = SIGDescribe("Job", func() {
 		}),
 	)
 
-	ginkgo.It("should not create pods when created in suspend state", func() {
+	ginkgo.It("should not create pods when created in suspend state", func(ctx context.Context) {
 		ginkgo.By("Creating a job with suspend=true")
 		job := e2ejob.NewTestJob("succeed", "suspend-true-to-false", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.Suspend = pointer.BoolPtr(true)
@@ -310,7 +310,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
-	ginkgo.It("should delete pods when suspended", func() {
+	ginkgo.It("should delete pods when suspended", func(ctx context.Context) {
 		ginkgo.By("Creating a job with suspend=false")
 		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Spec.Suspend = pointer.Bool(false)
@@ -363,7 +363,7 @@ var _ = SIGDescribe("Job", func() {
 			Description: Create an Indexed job. Job MUST complete successfully.
 			Ensure that created pods have completion index annotation and environment variable.
 	*/
-	framework.ConformanceIt("should create pods for an Indexed job with completion indexes and specified hostname", func() {
+	framework.ConformanceIt("should create pods for an Indexed job with completion indexes and specified hostname", func(ctx context.Context) {
 		ginkgo.By("Creating Indexed job")
 		job := e2ejob.NewTestJob("succeed", "indexed-job", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		mode := batchv1.IndexedCompletion
@@ -398,7 +398,7 @@ var _ = SIGDescribe("Job", func() {
 		Description: Create a job and ensure the associated pod count is equal to parallelism count. Delete the
 		job and ensure if the pods associated with the job have been removed
 	*/
-	ginkgo.It("should remove pods when job is deleted", func() {
+	ginkgo.It("should remove pods when job is deleted", func(ctx context.Context) {
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("notTerminate", "all-pods-removed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
@@ -423,7 +423,7 @@ var _ = SIGDescribe("Job", func() {
 		Description: Explicitly cause the tasks to fail once initially. After restarting, the Job MUST
 		execute to completion.
 	*/
-	framework.ConformanceIt("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
+	framework.ConformanceIt("should run a job to completion when tasks sometimes fail and are locally restarted", func(ctx context.Context) {
 		ginkgo.By("Creating a job")
 		// One failure, then a success, local restarts.
 		// We can't use the random failure approach, because kubelet will
@@ -440,7 +440,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	// Pods sometimes fail, but eventually succeed, after pod restarts
-	ginkgo.It("should run a job to completion when tasks sometimes fail and are not locally restarted", func() {
+	ginkgo.It("should run a job to completion when tasks sometimes fail and are not locally restarted", func(ctx context.Context) {
 		// One failure, then a success, no local restarts.
 		// We can't use the random failure approach, because JobController
 		// will throttle frequently failing Pods of a given Job, ramping
@@ -462,7 +462,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
-	ginkgo.It("should fail when exceeds active deadline", func() {
+	ginkgo.It("should fail when exceeds active deadline", func(ctx context.Context) {
 		ginkgo.By("Creating a job")
 		var activeDeadlineSeconds int64 = 1
 		job := e2ejob.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
@@ -478,7 +478,7 @@ var _ = SIGDescribe("Job", func() {
 		Testname: Jobs, active pods, graceful termination
 		Description: Create a job. Ensure the active pods reflect parallelism in the namespace and delete the job. Job MUST be deleted successfully.
 	*/
-	framework.ConformanceIt("should delete a job", func() {
+	framework.ConformanceIt("should delete a job", func(ctx context.Context) {
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
@@ -504,7 +504,7 @@ var _ = SIGDescribe("Job", func() {
 		Orphan a Pod by modifying its owner reference. The Job MUST re-adopt the orphan pod.
 		Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
 	*/
-	framework.ConformanceIt("should adopt matching orphans and release non-matching pods", func() {
+	framework.ConformanceIt("should adopt matching orphans and release non-matching pods", func(ctx context.Context) {
 		ginkgo.By("Creating a job")
 		job := e2ejob.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		// Replace job with the one returned from Create() so it has the UID.
@@ -558,7 +558,7 @@ var _ = SIGDescribe("Job", func() {
 		)).To(gomega.Succeed(), "wait for pod %q to be released", pod.Name)
 	})
 
-	ginkgo.It("should fail to exceed backoffLimit", func() {
+	ginkgo.It("should fail to exceed backoffLimit", func(ctx context.Context) {
 		ginkgo.By("Creating a job")
 		backoff := 1
 		job := e2ejob.NewTestJob("fail", "backofflimit", v1.RestartPolicyNever, 1, 1, nil, int32(backoff))
@@ -578,7 +578,7 @@ var _ = SIGDescribe("Job", func() {
 		}
 	})
 
-	ginkgo.It("should run a job to completion with CPU requests [Serial]", func() {
+	ginkgo.It("should run a job to completion with CPU requests [Serial]", func(ctx context.Context) {
 		ginkgo.By("Creating a job that with CPU requests")
 
 		testNodeName := scheduling.GetNodeThatCanRunPod(f)
@@ -633,7 +633,7 @@ var _ = SIGDescribe("Job", func() {
 		Attempt to replace the job status with a new start time which MUST
 		succeed. Attempt to read its status sub-resource which MUST succeed
 	*/
-	framework.ConformanceIt("should apply changes to a job status", func() {
+	framework.ConformanceIt("should apply changes to a job status", func(ctx context.Context) {
 
 		ns := f.Namespace.Name
 		jClient := f.ClientSet.BatchV1().Jobs(ns)
@@ -700,7 +700,7 @@ var _ = SIGDescribe("Job", func() {
 		succeed. One list MUST be found. It MUST succeed at deleting a
 		collection of jobs via a label selector.
 	*/
-	framework.ConformanceIt("should manage the lifecycle of a job", func() {
+	framework.ConformanceIt("should manage the lifecycle of a job", func(ctx context.Context) {
 		jobName := "e2e-" + utilrand.String(5)
 		label := map[string]string{"e2e-job-label": jobName}
 		labelSelector := labels.SelectorFromSet(label).String()

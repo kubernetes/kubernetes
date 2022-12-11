@@ -180,7 +180,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	// 1. Run a pod
 	// 2. Taint the node running this pod with a no-execute taint
 	// 3. See if pod will get evicted
-	ginkgo.It("evicts pods from tainted nodes", func() {
+	ginkgo.It("evicts pods from tainted nodes", func(ctx context.Context) {
 		podName := "taint-eviction-1"
 		pod := createPodForTaintsTest(false, 0, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
@@ -212,7 +212,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	// 1. Run a pod with toleration
 	// 2. Taint the node running this pod with a no-execute taint
 	// 3. See if pod won't get evicted
-	ginkgo.It("doesn't evict pod with tolerations from tainted nodes", func() {
+	ginkgo.It("doesn't evict pod with tolerations from tainted nodes", func(ctx context.Context) {
 		podName := "taint-eviction-2"
 		pod := createPodForTaintsTest(true, 0, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
@@ -245,7 +245,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	// 2. Taint the node running this pod with a no-execute taint
 	// 3. See if pod won't get evicted before toleration time runs out
 	// 4. See if pod will get evicted after toleration time runs out
-	ginkgo.It("eventually evict pod with finite tolerations from tainted nodes", func() {
+	ginkgo.It("eventually evict pod with finite tolerations from tainted nodes", func(ctx context.Context) {
 		podName := "taint-eviction-3"
 		pod := createPodForTaintsTest(true, kubeletPodDeletionDelaySeconds+2*additionalWaitPerDeleteSeconds, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
@@ -290,7 +290,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		Description: The Pod with toleration timeout scheduled on a tainted Node MUST not be
 		evicted if the taint is removed before toleration time ends.
 	*/
-	framework.ConformanceIt("removing taint cancels eviction [Disruptive]", func() {
+	framework.ConformanceIt("removing taint cancels eviction [Disruptive]", func(ctx context.Context) {
 		podName := "taint-eviction-4"
 		pod := createPodForTaintsTest(true, 2*additionalWaitPerDeleteSeconds, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
@@ -346,7 +346,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	// 2. Taint the node running this pod with a no-execute taint
 	// 3. See if pod will get evicted and has the pod disruption condition
 	// 4. Remove the finalizer so that the pod can be deleted by GC
-	ginkgo.It("pods evicted from tainted nodes have pod disruption condition", func() {
+	ginkgo.It("pods evicted from tainted nodes have pod disruption condition", func(ctx context.Context) {
 		podName := "taint-eviction-pod-disruption"
 		pod := createPodForTaintsTest(false, 0, podName, podName, ns)
 		pod.Finalizers = append(pod.Finalizers, testFinalizer)
@@ -393,7 +393,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 	// 1. Run two pods; one with toleration, one without toleration
 	// 2. Taint the nodes running those pods with a no-execute taint
 	// 3. See if pod-without-toleration get evicted, and pod-with-toleration is kept
-	ginkgo.It("only evicts pods without tolerations from tainted nodes", func() {
+	ginkgo.It("only evicts pods without tolerations from tainted nodes", func(ctx context.Context) {
 		podGroup := "taint-eviction-a"
 		observedDeletions := make(chan string, 100)
 		stopCh := make(chan struct{})
@@ -452,7 +452,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		Description: In a multi-pods scenario with tolerationSeconds, the pods MUST be evicted as per
 		the toleration time limit.
 	*/
-	framework.ConformanceIt("evicts pods with minTolerationSeconds [Disruptive]", func() {
+	framework.ConformanceIt("evicts pods with minTolerationSeconds [Disruptive]", func(ctx context.Context) {
 		podGroup := "taint-eviction-b"
 		observedDeletions := make(chan string, 100)
 		stopCh := make(chan struct{})

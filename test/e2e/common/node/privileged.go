@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
@@ -50,7 +51,7 @@ var _ = SIGDescribe("PrivilegedPod [NodeConformance]", func() {
 		notPrivilegedContainer: "not-privileged-container",
 	}
 
-	ginkgo.It("should enable privileged commands [LinuxOnly]", func() {
+	ginkgo.It("should enable privileged commands [LinuxOnly]", func(ctx context.Context) {
 		// Windows does not support privileged containers.
 		ginkgo.By("Creating a pod with a privileged container")
 		config.createPods()

@@ -114,7 +114,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		}
 	})
 
-	ginkgo.It("Verify \"immediate\" deletion of a PVC that is not in active use by a pod", func() {
+	ginkgo.It("Verify \"immediate\" deletion of a PVC that is not in active use by a pod", func(ctx context.Context) {
 		ginkgo.By("Deleting the pod using the PVC")
 		err = e2epod.DeletePodWithWait(client, pod)
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
@@ -126,7 +126,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		pvcCreatedAndNotDeleted = false
 	})
 
-	ginkgo.It("Verify that PVC in active use by a pod is not removed immediately", func() {
+	ginkgo.It("Verify that PVC in active use by a pod is not removed immediately", func(ctx context.Context) {
 		ginkgo.By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Error deleting PVC")
@@ -145,7 +145,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		pvcCreatedAndNotDeleted = false
 	})
 
-	ginkgo.It("Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable", func() {
+	ginkgo.It("Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable", func(ctx context.Context) {
 		ginkgo.By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Error deleting PVC")

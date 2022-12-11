@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -171,7 +172,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[0]
 		})
-		ginkgo.It("NAS parallel benchmark (NPB) suite - Integer Sort (IS) workload", func() {
+		ginkgo.It("NAS parallel benchmark (NPB) suite - Integer Sort (IS) workload", func(ctx context.Context) {
 			defer cleanup()
 			runWorkload()
 		})
@@ -180,7 +181,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[1]
 		})
-		ginkgo.It("NAS parallel benchmark (NPB) suite - Embarrassingly Parallel (EP) workload", func() {
+		ginkgo.It("NAS parallel benchmark (NPB) suite - Embarrassingly Parallel (EP) workload", func(ctx context.Context) {
 			defer cleanup()
 			runWorkload()
 		})
@@ -189,7 +190,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[2]
 		})
-		ginkgo.It("TensorFlow workload", func() {
+		ginkgo.It("TensorFlow workload", func(ctx context.Context) {
 			defer cleanup()
 			runWorkload()
 		})

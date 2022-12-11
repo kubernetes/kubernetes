@@ -81,7 +81,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		11. Delete the PVC
 		12. Delete the StorageClass
 	*/
-	ginkgo.It("verify volume status after node power off", func() {
+	ginkgo.It("verify volume status after node power off", func(ctx context.Context) {
 		ginkgo.By("Creating a Storage Class")
 		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil, "")
 		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
@@ -123,8 +123,6 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 
 		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node1)
 		vm := object.NewVirtualMachine(nodeInfo.VSphere.Client.Client, nodeInfo.VirtualMachineRef)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		_, err = vm.PowerOff(ctx)
 		framework.ExpectNoError(err)
 		defer vm.PowerOn(ctx)

@@ -94,7 +94,7 @@ var _ = SIGDescribe("Deployment", func() {
 		dc = f.DynamicClient
 	})
 
-	ginkgo.It("deployment reaping should cascade to its replica sets and pods", func() {
+	ginkgo.It("deployment reaping should cascade to its replica sets and pods", func(ctx context.Context) {
 		testDeleteDeployment(f)
 	})
 	/*
@@ -102,7 +102,7 @@ var _ = SIGDescribe("Deployment", func() {
 	  Testname: Deployment RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with RollingUpdate strategy.
 	*/
-	framework.ConformanceIt("RollingUpdateDeployment should delete old pods and create new ones", func() {
+	framework.ConformanceIt("RollingUpdateDeployment should delete old pods and create new ones", func(ctx context.Context) {
 		testRollingUpdateDeployment(f)
 	})
 	/*
@@ -110,7 +110,7 @@ var _ = SIGDescribe("Deployment", func() {
 	  Testname: Deployment Recreate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with Recreate strategy.
 	*/
-	framework.ConformanceIt("RecreateDeployment should delete old pods and create new ones", func() {
+	framework.ConformanceIt("RecreateDeployment should delete old pods and create new ones", func(ctx context.Context) {
 		testRecreateDeployment(f)
 	})
 	/*
@@ -119,7 +119,7 @@ var _ = SIGDescribe("Deployment", func() {
 	  Description: A conformant Kubernetes distribution MUST clean up Deployment's ReplicaSets based on
 	  the Deployment's `.spec.revisionHistoryLimit`.
 	*/
-	framework.ConformanceIt("deployment should delete old replica sets", func() {
+	framework.ConformanceIt("deployment should delete old replica sets", func(ctx context.Context) {
 		testDeploymentCleanUpPolicy(f)
 	})
 	/*
@@ -129,13 +129,13 @@ var _ = SIGDescribe("Deployment", func() {
 	    i.e. allow arbitrary number of changes to desired state during rolling update
 	    before the rollout finishes.
 	*/
-	framework.ConformanceIt("deployment should support rollover", func() {
+	framework.ConformanceIt("deployment should support rollover", func(ctx context.Context) {
 		testRolloverDeployment(f)
 	})
-	ginkgo.It("iterative rollouts should eventually progress", func() {
+	ginkgo.It("iterative rollouts should eventually progress", func(ctx context.Context) {
 		testIterativeDeployments(f)
 	})
-	ginkgo.It("test Deployment ReplicaSet orphaning and adoption regarding controllerRef", func() {
+	ginkgo.It("test Deployment ReplicaSet orphaning and adoption regarding controllerRef", func(ctx context.Context) {
 		testDeploymentsControllerRef(f)
 	})
 
@@ -147,7 +147,7 @@ var _ = SIGDescribe("Deployment", func() {
 	   The Deployment MUST update and verify the scale subresource. The Deployment MUST patch and verify
 	   a scale subresource.
 	*/
-	framework.ConformanceIt("Deployment should have a working scale subresource", func() {
+	framework.ConformanceIt("Deployment should have a working scale subresource", func(ctx context.Context) {
 		testDeploymentSubresources(f)
 	})
 	/*
@@ -157,10 +157,10 @@ var _ = SIGDescribe("Deployment", func() {
 	    proportional scaling, i.e. proportionally scale a Deployment's ReplicaSets
 	    when a Deployment is scaled.
 	*/
-	framework.ConformanceIt("deployment should support proportional scaling", func() {
+	framework.ConformanceIt("deployment should support proportional scaling", func(ctx context.Context) {
 		testProportionalScalingDeployment(f)
 	})
-	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func() {
+	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce", "gke")
 		e2eskipper.SkipIfIPv6("aws")
 		nodes, err := e2enode.GetReadySchedulableNodes(c)
@@ -182,7 +182,7 @@ var _ = SIGDescribe("Deployment", func() {
 		When fetching and patching the DeploymentStatus it MUST succeed. It MUST succeed when deleting
 		the Deployment.
 	*/
-	framework.ConformanceIt("should run the lifecycle of a Deployment", func() {
+	framework.ConformanceIt("should run the lifecycle of a Deployment", func(ctx context.Context) {
 		one := int64(1)
 		deploymentResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 		testNamespaceName := f.Namespace.Name
@@ -215,7 +215,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to create Deployment %v in namespace %v", testDeploymentName, testNamespaceName)
 
 		ginkgo.By("waiting for Deployment to be created")
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
@@ -476,7 +476,7 @@ var _ = SIGDescribe("Deployment", func() {
 		Attempt to read, update and patch its status sub-resource; all
 		mutating sub-resource operations MUST be visible to subsequent reads.
 	*/
-	framework.ConformanceIt("should validate Deployment Status endpoints", func() {
+	framework.ConformanceIt("should validate Deployment Status endpoints", func(ctx context.Context) {
 		dClient := c.AppsV1().Deployments(ns)
 		dName := "test-deployment-" + utilrand.String(5)
 		labelSelector := "e2e=testing"
@@ -542,7 +542,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
 
 		ginkgo.By("watching for the Deployment status to be updated")
-		ctx, cancel := context.WithTimeout(context.Background(), dRetryTimeout)
+		ctx, cancel := context.WithTimeout(ctx, dRetryTimeout)
 		defer cancel()
 
 		_, err = watchtools.Until(ctx, dList.ResourceVersion, w, func(event watch.Event) (bool, error) {

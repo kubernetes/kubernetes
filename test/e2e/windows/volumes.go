@@ -17,6 +17,7 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -65,7 +66,7 @@ var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 
 	ginkgo.Context("check volume mount permissions", func() {
 
-		ginkgo.It("container should have readOnly permissions on emptyDir", func() {
+		ginkgo.It("container should have readOnly permissions on emptyDir", func(ctx context.Context) {
 
 			ginkgo.By("creating a container with readOnly permissions on emptyDir volume")
 			doReadOnlyTest(f, emptyDirSource, emptyDirVolumePath)
@@ -74,7 +75,7 @@ var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 			doReadWriteReadOnlyTest(f, emptyDirSource, emptyDirVolumePath)
 		})
 
-		ginkgo.It("container should have readOnly permissions on hostMapPath", func() {
+		ginkgo.It("container should have readOnly permissions on hostMapPath", func(ctx context.Context) {
 
 			ginkgo.By("creating a container with readOnly permissions on hostMap volume")
 			doReadOnlyTest(f, hostMapSource, hostMapPath)

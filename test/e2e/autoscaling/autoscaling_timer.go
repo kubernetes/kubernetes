@@ -86,7 +86,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				}
 			})
 
-			ginkgo.It("takes less than 15 minutes", func() {
+			ginkgo.It("takes less than 15 minutes", func(ctx context.Context) {
 				// Measured over multiple samples, scaling takes 10 +/- 2 minutes, so 15 minutes should be fully sufficient.
 				const timeToWait = 15 * time.Minute
 

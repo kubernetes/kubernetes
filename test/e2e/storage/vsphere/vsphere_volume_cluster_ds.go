@@ -72,7 +72,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		6. Delete the volume
 	*/
 
-	ginkgo.It("verify static provisioning on clustered datastore", func() {
+	ginkgo.It("verify static provisioning on clustered datastore", func(ctx context.Context) {
 		var volumePath string
 
 		ginkgo.By("creating a test vsphere volume")
@@ -119,7 +119,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		1. Create storage class parameter and specify datastore to be a clustered datastore name
 		2. invokeValidPolicyTest - util to do e2e dynamic provision test
 	*/
-	ginkgo.It("verify dynamic provision with default parameter on clustered datastore", func() {
+	ginkgo.It("verify dynamic provision with default parameter on clustered datastore", func(ctx context.Context) {
 		scParameters[Datastore] = clusterDatastore
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
@@ -129,7 +129,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		1. Create storage class parameter and specify storage policy to be a tag based spbm policy
 		2. invokeValidPolicyTest - util to do e2e dynamic provision test
 	*/
-	ginkgo.It("verify dynamic provision with spbm policy on clustered datastore", func() {
+	ginkgo.It("verify dynamic provision with spbm policy on clustered datastore", func(ctx context.Context) {
 		policyDatastoreCluster := GetAndExpectStringEnvVar(SPBMPolicyDataStoreCluster)
 		scParameters[SpbmStoragePolicy] = policyDatastoreCluster
 		invokeValidPolicyTest(f, client, namespace, scParameters)

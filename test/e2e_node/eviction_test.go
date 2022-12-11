@@ -560,7 +560,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			e2epod.NewPodClient(f).CreateBatch(pods)
 		})
 
-		ginkgo.It("should eventually evict all of the correct pods", func() {
+		ginkgo.It("should eventually evict all of the correct pods", func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("Waiting for node to have NodeCondition: %s", expectedNodeCondition))
 			gomega.Eventually(func() error {
 				logFunc()

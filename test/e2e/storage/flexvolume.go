@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"path"
@@ -187,7 +188,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		suffix = ns.Name
 	})
 
-	ginkgo.It("should be mountable when non-attachable", func() {
+	ginkgo.It("should be mountable when non-attachable", func(ctx context.Context) {
 		driver := "dummy"
 		driverInstallAs := driver + "-" + suffix
 
@@ -205,7 +206,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		uninstallFlex(cs, node, "k8s", driverInstallAs)
 	})
 
-	ginkgo.It("should be mountable when attachable [Feature:Flexvolumes]", func() {
+	ginkgo.It("should be mountable when attachable [Feature:Flexvolumes]", func(ctx context.Context) {
 		driver := "dummy-attachable"
 		driverInstallAs := driver + "-" + suffix
 

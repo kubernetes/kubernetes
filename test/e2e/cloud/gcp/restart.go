@@ -17,6 +17,7 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -87,7 +88,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		}
 	})
 
-	ginkgo.It("should restart all nodes and ensure all nodes and pods recover", func() {
+	ginkgo.It("should restart all nodes and ensure all nodes and pods recover", func(ctx context.Context) {
 		ginkgo.By("restarting all of the nodes")
 		err := common.RestartNodes(f.ClientSet, originalNodes)
 		framework.ExpectNoError(err)

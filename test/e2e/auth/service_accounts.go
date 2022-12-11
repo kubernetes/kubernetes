@@ -56,7 +56,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	ginkgo.It("no secret-based service account token should be auto-generated", func() {
+	ginkgo.It("no secret-based service account token should be auto-generated", func(ctx context.Context) {
 		{
 			ginkgo.By("ensuring no secret-based service account token exists")
 			time.Sleep(10 * time.Second)
@@ -75,7 +75,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	                Token Mount path. All these three files MUST exist and the Service
 	                Account mount path MUST be auto mounted to the Container.
 	*/
-	framework.ConformanceIt("should mount an API token into pods ", func() {
+	framework.ConformanceIt("should mount an API token into pods ", func(ctx context.Context) {
 		sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount-test"}}, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
@@ -158,7 +158,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   include test cases 1a,1b,2a,2b and 2c.
 	   In the test cases 1c,3a,3b and 3c the ServiceTokenVolume MUST not be auto mounted.
 	*/
-	framework.ConformanceIt("should allow opting out of API token automount ", func() {
+	framework.ConformanceIt("should allow opting out of API token automount ", func(ctx context.Context) {
 
 		var err error
 		trueValue := true
@@ -272,7 +272,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	  Testname: TokenRequestProjection should mount a projected volume with token using TokenRequest API.
 	  Description: Ensure that projected service account token is mounted.
 	*/
-	framework.ConformanceIt("should mount projected service account token", func() {
+	framework.ConformanceIt("should mount projected service account token", func(ctx context.Context) {
 
 		var (
 			podName         = "test-pod-" + string(uuid.NewUUID())
@@ -333,7 +333,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   Containers MUST verify that the projected service account token can be
 	   read and has correct file mode set including ownership and permission.
 	*/
-	ginkgo.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		var (
@@ -429,7 +429,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 	})
 
-	ginkgo.It("should support InClusterConfig with token rotation [Slow]", func() {
+	ginkgo.It("should support InClusterConfig with token rotation [Slow]", func(ctx context.Context) {
 		tenMin := int64(10 * 60)
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "inclusterclient"},
@@ -528,7 +528,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   endpoints by deploying a Pod that verifies its own
 	   token against these endpoints.
 	*/
-	framework.ConformanceIt("ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer", func() {
+	framework.ConformanceIt("ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer", func(ctx context.Context) {
 
 		// Allow the test pod access to the OIDC discovery non-resource URLs.
 		// The role should have already been automatically created as part of the
@@ -646,7 +646,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		                        Listing the ServiceAccounts MUST return the test ServiceAccount with it's patched values.
 		                        ServiceAccount will be deleted and MUST find a deleted watch event.
 	*/
-	framework.ConformanceIt("should run through the lifecycle of a ServiceAccount", func() {
+	framework.ConformanceIt("should run through the lifecycle of a ServiceAccount", func(ctx context.Context) {
 		testNamespaceName := f.Namespace.Name
 		testServiceAccountName := "testserviceaccount"
 		testServiceAccountStaticLabels := map[string]string{"test-serviceaccount-static": "true"}
@@ -739,7 +739,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			2. Recreated if deleted
 			3. Reconciled if modified
 	*/
-	framework.ConformanceIt("should guarantee kube-root-ca.crt exist in any namespace", func() {
+	framework.ConformanceIt("should guarantee kube-root-ca.crt exist in any namespace", func(ctx context.Context) {
 		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
 			if err == nil {
@@ -807,7 +807,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		updating the ServiceAccount it MUST succeed and the field MUST equal
 		the new value.
 	*/
-	framework.ConformanceIt("should update a ServiceAccount", func() {
+	framework.ConformanceIt("should update a ServiceAccount", func(ctx context.Context) {
 		saClient := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name)
 		saName := "e2e-sa-" + utilrand.String(5)
 
