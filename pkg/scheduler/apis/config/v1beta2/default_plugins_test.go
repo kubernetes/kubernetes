@@ -53,6 +53,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
 						{Name: names.NodeAffinity},
+						{Name: names.TaintToleration},
 					},
 				},
 				Filter: v1beta2.PluginSet{
@@ -141,6 +142,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
 						{Name: names.NodeAffinity},
+						{Name: names.TaintToleration},
 					},
 				},
 				Filter: v1beta2.PluginSet{

@@ -38,6 +38,7 @@ var PluginsV1beta2 = &config.Plugins{
 			{Name: names.VolumeBinding},
 			{Name: names.VolumeZone},
 			{Name: names.NodeAffinity},
+			{Name: names.TaintToleration},
 		},
 	},
 	Filter: config.PluginSet{
@@ -197,6 +198,7 @@ var ExpandedPluginsV1beta3 = &config.Plugins{
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.TaintToleration},
 		},
 	},
 	Filter: config.PluginSet{
@@ -368,6 +370,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.TaintToleration},
 		},
 	},
 	Filter: config.PluginSet{

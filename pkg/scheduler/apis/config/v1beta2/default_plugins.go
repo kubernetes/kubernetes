@@ -44,6 +44,7 @@ func getDefaultPlugins() *v1beta2.Plugins {
 				{Name: names.VolumeBinding},
 				{Name: names.VolumeZone},
 				{Name: names.NodeAffinity},
+				{Name: names.TaintToleration},
 			},
 		},
 		Filter: v1beta2.PluginSet{
