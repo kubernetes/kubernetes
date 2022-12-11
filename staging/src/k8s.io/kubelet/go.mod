@@ -7,7 +7,7 @@ go 1.19
 require (
 	github.com/gogo/protobuf v1.3.2
 	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10
-	google.golang.org/grpc v1.49.0
+	google.golang.org/grpc v1.51.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/component-base v0.0.0

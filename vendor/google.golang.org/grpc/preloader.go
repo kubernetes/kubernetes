@@ -25,7 +25,7 @@ import (
 
 // PreparedMsg is responsible for creating a Marshalled and Compressed object.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.

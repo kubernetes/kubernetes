@@ -886,9 +886,9 @@ func (l *loopyWriter) processData() (bool, error) {
 	dataItem := str.itl.peek().(*dataFrame) // Peek at the first data item this stream.
 	// A data item is represented by a dataFrame, since it later translates into
 	// multiple HTTP2 data frames.
-	// Every dataFrame has two buffers; h that keeps grpc-message header and d that is acutal data.
+	// Every dataFrame has two buffers; h that keeps grpc-message header and d that is actual data.
 	// As an optimization to keep wire traffic low, data from d is copied to h to make as big as the
-	// maximum possilbe HTTP2 frame size.
+	// maximum possible HTTP2 frame size.
 
 	if len(dataItem.h) == 0 && len(dataItem.d) == 0 { // Empty data frame
 		// Client sends out empty data frame with endStream = true
