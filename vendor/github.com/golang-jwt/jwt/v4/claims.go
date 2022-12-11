@@ -56,17 +56,17 @@ func (c RegisteredClaims) Valid() error {
 	// default value in Go, let's not fail the verification for them.
 	if !c.VerifyExpiresAt(now, false) {
 		delta := now.Sub(c.ExpiresAt.Time)
-		vErr.Inner = fmt.Errorf("token is expired by %v", delta)
+		vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta)
 		vErr.Errors |= ValidationErrorExpired
 	}
 
 	if !c.VerifyIssuedAt(now, false) {
-		vErr.Inner = fmt.Errorf("token used before issued")
+		vErr.Inner = ErrTokenUsedBeforeIssued
 		vErr.Errors |= ValidationErrorIssuedAt
 	}
 
 	if !c.VerifyNotBefore(now, false) {
-		vErr.Inner = fmt.Errorf("token is not valid yet")
+		vErr.Inner = ErrTokenNotValidYet
 		vErr.Errors |= ValidationErrorNotValidYet
 	}
 
@@ -149,17 +149,17 @@ func (c StandardClaims) Valid() error {
 	// default value in Go, let's not fail the verification for them.
 	if !c.VerifyExpiresAt(now, false) {
 		delta := time.Unix(now, 0).Sub(time.Unix(c.ExpiresAt, 0))
-		vErr.Inner = fmt.Errorf("token is expired by %v", delta)
+		vErr.Inner = fmt.Errorf("%s by %s", ErrTokenExpired, delta)
 		vErr.Errors |= ValidationErrorExpired
 	}
 
 	if !c.VerifyIssuedAt(now, false) {
-		vErr.Inner = fmt.Errorf("token used before issued")
+		vErr.Inner = ErrTokenUsedBeforeIssued
 		vErr.Errors |= ValidationErrorIssuedAt
 	}
 
 	if !c.VerifyNotBefore(now, false) {
-		vErr.Inner = fmt.Errorf("token is not valid yet")
+		vErr.Inner = ErrTokenNotValidYet
 		vErr.Errors |= ValidationErrorNotValidYet
 	}
 

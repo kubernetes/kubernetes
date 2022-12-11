@@ -329,10 +329,6 @@ func (t *batchTxBuffered) CommitAndStop() {
 }
 
 func (t *batchTxBuffered) commit(stop bool) {
-	if t.backend.hooks != nil {
-		t.backend.hooks.OnPreCommitUnsafe(t)
-	}
-
 	// all read txs must be closed to acquire boltdb commit rwlock
 	t.backend.readTx.Lock()
 	t.unsafeCommit(stop)
@@ -340,6 +336,9 @@ func (t *batchTxBuffered) commit(stop bool) {
 }
 
 func (t *batchTxBuffered) unsafeCommit(stop bool) {
+	if t.backend.hooks != nil {
+		t.backend.hooks.OnPreCommitUnsafe(t)
+	}
 	if t.backend.readTx.tx != nil {
 		// wait all store read transactions using the current boltdb tx to finish,
 		// then close the boltdb tx

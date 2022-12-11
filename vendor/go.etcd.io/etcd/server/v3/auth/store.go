@@ -370,6 +370,7 @@ func (as *authStore) Recover(be backend.Backend) {
 	}
 
 	as.setRevision(getRevision(tx))
+	as.refreshRangePermCache(tx)
 
 	tx.Unlock()
 

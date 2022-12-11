@@ -349,13 +349,13 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		)
 	}
 
-	if terr := fileutil.TouchDirAll(cfg.DataDir); terr != nil {
+	if terr := fileutil.TouchDirAll(cfg.Logger, cfg.DataDir); terr != nil {
 		return nil, fmt.Errorf("cannot access data directory: %v", terr)
 	}
 
 	haveWAL := wal.Exist(cfg.WALDir())
 
-	if err = fileutil.TouchDirAll(cfg.SnapDir()); err != nil {
+	if err = fileutil.TouchDirAll(cfg.Logger, cfg.SnapDir()); err != nil {
 		cfg.Logger.Fatal(
 			"failed to create snapshot directory",
 			zap.String("path", cfg.SnapDir()),
@@ -548,7 +548,7 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		return nil, fmt.Errorf("unsupported bootstrap config")
 	}
 
-	if terr := fileutil.TouchDirAll(cfg.MemberDir()); terr != nil {
+	if terr := fileutil.TouchDirAll(cfg.Logger, cfg.MemberDir()); terr != nil {
 		return nil, fmt.Errorf("cannot access member directory: %v", terr)
 	}
 

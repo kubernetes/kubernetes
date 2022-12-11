@@ -36,9 +36,23 @@ The part in the middle is the interesting bit.  It's called the Claims and conta
 
 This library supports the parsing and verification as well as the generation and signing of JWTs.  Current supported signing algorithms are HMAC SHA, RSA, RSA-PSS, and ECDSA, though hooks are present for adding your own.
 
+## Installation Guidelines
+
+1. To install the jwt package, you first need to have [Go](https://go.dev/doc/install) installed, then you can use the command below to add `jwt-go` as a dependency in your Go program.
+
+```sh
+go get -u github.com/golang-jwt/jwt/v4
+```
+
+2. Import it in your code:
+
+```go
+import "github.com/golang-jwt/jwt/v4"
+```
+
 ## Examples
 
-See [the project documentation](https://pkg.go.dev/github.com/golang-jwt/jwt) for examples of usage:
+See [the project documentation](https://pkg.go.dev/github.com/golang-jwt/jwt/v4) for examples of usage:
 
 * [Simple example of parsing and validating a token](https://pkg.go.dev/github.com/golang-jwt/jwt#example-Parse-Hmac)
 * [Simple example of building and signing a token](https://pkg.go.dev/github.com/golang-jwt/jwt#example-New-Hmac)
@@ -46,9 +60,17 @@ See [the project documentation](https://pkg.go.dev/github.com/golang-jwt/jwt) fo
 
 ## Extensions
 
-This library publishes all the necessary components for adding your own signing methods.  Simply implement the `SigningMethod` interface and register a factory method using `RegisterSigningMethod`.  
+This library publishes all the necessary components for adding your own signing methods or key functions.  Simply implement the `SigningMethod` interface and register a factory method using `RegisterSigningMethod` or provide a `jwt.Keyfunc`.
 
-Here's an example of an extension that integrates with multiple Google Cloud Platform signing tools (AppEngine, IAM API, Cloud KMS): https://github.com/someone1/gcp-jwt-go
+A common use case would be integrating with different 3rd party signature providers, like key management services from various cloud providers or Hardware Security Modules (HSMs) or to implement additional standards.
+
+| Extension | Purpose                                                                                                  | Repo                                       |
+| --------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| GCP       | Integrates with multiple Google Cloud Platform signing tools (AppEngine, IAM API, Cloud KMS)             | https://github.com/someone1/gcp-jwt-go     |
+| AWS       | Integrates with AWS Key Management Service, KMS                                                          | https://github.com/matelang/jwt-go-aws-kms |
+| JWKS      | Provides support for JWKS ([RFC 7517](https://datatracker.ietf.org/doc/html/rfc7517)) as a `jwt.Keyfunc` | https://github.com/MicahParks/keyfunc       |
+
+*Disclaimer*: Unless otherwise specified, these integrations are maintained by third parties and should not be considered as a primary offer by any of the mentioned cloud providers
 
 ## Compliance
 
@@ -112,3 +134,5 @@ This library uses descriptive error messages whenever possible. If you are not g
 Documentation can be found [on pkg.go.dev](https://pkg.go.dev/github.com/golang-jwt/jwt).
 
 The command line utility included in this project (cmd/jwt) provides a straightforward example of token creation and parsing as well as a useful tool for debugging your own integration. You'll also find several implementation examples in the documentation.
+
+[golang-jwt](https://github.com/orgs/golang-jwt) incorporates a modified version of the JWT logo, which is distributed under the terms of the [MIT License](https://github.com/jsonwebtoken/jsonwebtoken.github.io/blob/master/LICENSE.txt).

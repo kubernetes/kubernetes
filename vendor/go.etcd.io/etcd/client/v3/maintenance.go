@@ -92,6 +92,7 @@ func NewMaintenance(c *Client) Maintenance {
 			err = c.getToken(dctx)
 			cancel()
 			if err != nil {
+				conn.Close()
 				return nil, nil, fmt.Errorf("failed to getToken from endpoint %s with maintenance client: %v", endpoint, err)
 			}
 			cancel = func() { conn.Close() }

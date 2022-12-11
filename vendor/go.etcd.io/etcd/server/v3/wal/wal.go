@@ -115,7 +115,7 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 	}
 	defer os.RemoveAll(tmpdirpath)
 
-	if err := fileutil.CreateDirAll(tmpdirpath); err != nil {
+	if err := fileutil.CreateDirAll(lg, tmpdirpath); err != nil {
 		lg.Warn(
 			"failed to create a temporary WAL directory",
 			zap.String("tmp-dir-path", tmpdirpath),
