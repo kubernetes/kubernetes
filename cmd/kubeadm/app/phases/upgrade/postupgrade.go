@@ -18,11 +18,8 @@ package upgrade
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
 
@@ -64,12 +61,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// Write the new kubelet config down to disk and the env file if needed
 	if err := writeKubeletConfigFiles(client, cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
-	}
-
-	// TODO: Temporary workaround. Remove in 1.27:
-	// https://github.com/kubernetes/kubeadm/issues/2626
-	if err := CleanupKubeletDynamicEnvFileContainerRuntime(dryRun); err != nil {
-		return err
 	}
 
 	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
@@ -209,68 +200,4 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 		}
 	}
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
-}
-
-// CleanupKubeletDynamicEnvFileContainerRuntime reads the kubelet dynamic environment file
-// from disk, ensure that the container runtime flag is removed.
-// TODO: Temporary workaround. Remove in 1.27:
-// https://github.com/kubernetes/kubeadm/issues/2626
-func CleanupKubeletDynamicEnvFileContainerRuntime(dryRun bool) error {
-	filePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
-	if dryRun {
-		fmt.Printf("[dryrun] Would ensure that %q does not include a --container-runtime flag\n", filePath)
-		return nil
-	}
-	klog.V(2).Infof("Ensuring that %q does not include a --container-runtime flag", filePath)
-	bytes, err := os.ReadFile(filePath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read kubelet configuration from file %q", filePath)
-	}
-	updated := cleanupKubeletDynamicEnvFileContainerRuntime(string(bytes))
-	if err := os.WriteFile(filePath, []byte(updated), 0644); err != nil {
-		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", filePath)
-	}
-	return nil
-}
-
-func cleanupKubeletDynamicEnvFileContainerRuntime(str string) string {
-	const (
-		// `remote` is the only possible value
-		containerRuntimeFlag = "container-runtime"
-		endpointFlag         = "container-runtime-endpoint"
-	)
-	// Trim the prefix
-	str = strings.TrimLeft(str, fmt.Sprintf("%s=\"", kubeadmconstants.KubeletEnvFileVariableName))
-
-	// Flags are managed by kubeadm as pairs of key=value separated by space.
-	// Split them, find the one containing the flag of interest and update
-	// its value to have the scheme prefix.
-	split := strings.Split(str, " ")
-	for i, s := range split {
-		if !(strings.Contains(s, containerRuntimeFlag) && !strings.Contains(s, endpointFlag)) {
-			continue
-		}
-		keyValue := strings.Split(s, "=")
-		if len(keyValue) < 2 {
-			// Post init/join, the user may have edited the file and has flags that are not
-			// followed by "=". If that is the case the next argument must be the value
-			// of the endpoint flag and if its not a flag itself.
-			if i+1 < len(split) {
-				nextArg := split[i+1]
-				if strings.HasPrefix(nextArg, "-") {
-					// remove the flag only
-					split = append(split[:i], split[i+1:]...)
-				} else {
-					// remove the flag and value
-					split = append(split[:i], split[i+2:]...)
-				}
-			}
-			continue
-		}
-
-		// remove the flag and value in one
-		split = append(split[:i], split[i+1:]...)
-	}
-	str = strings.Join(split, " ")
-	return fmt.Sprintf("%s=\"%s", kubeadmconstants.KubeletEnvFileVariableName, str)
 }
