@@ -255,14 +255,25 @@ func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defa
 func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.Object, options SharedIndexInformerOptions) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 
+	// If a key function is not specified, default to MetaNamespace.
+	keyFunc := options.KeyFunc
+	if keyFunc == nil {
+		keyFunc = MetaNamespaceKeyFunc
+	}
+	// Always wrap the KeyFunc to handle DeletedFinalStateUnknown.
+	options.KeyFunc = func(obj interface{}) (string, error) {
+		return DeletionHandlingWithKeyFunc(obj, keyFunc)
+	}
+
 	return &sharedIndexInformer{
-		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
+		indexer:                         NewIndexer(options.KeyFunc, options.Indexers),
 		processor:                       &sharedProcessor{clock: realClock},
 		listerWatcher:                   lw,
 		objectType:                      exampleObject,
 		objectDescription:               options.ObjectDescription,
 		resyncCheckPeriod:               options.ResyncPeriod,
 		defaultEventHandlerResyncPeriod: options.ResyncPeriod,
+		keyfn:                           options.KeyFunc,
 		clock:                           realClock,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 	}
@@ -280,6 +291,10 @@ type SharedIndexInformerOptions struct {
 	// ObjectDescription is the sharedIndexInformer's object description. This is passed through to the
 	// underlying Reflector's type description.
 	ObjectDescription string
+
+	// KeyFunc is the key function used by the internal indexer and queue when handling objects.
+	// Defaults to MetaNamespaceKeyFunc.
+	KeyFunc KeyFunc
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -353,8 +368,15 @@ type sharedIndexInformer struct {
 
 	listerWatcher ListerWatcher
 
-	// objectType is an example object of the type this informer is expected to handle. If set, an event
-	// with an object with a mismatching type is dropped instead of being delivered to listeners.
+	// keyfn is used to store the key function associated
+	// with this shared index informer, which is then passed
+	// when creating the DeltaFIFO queue.
+	keyfn KeyFunc
+
+	// objectType is an example object of the type this informer is
+	// expected to handle.  Only the type needs to be right, except
+	// that when that is `unstructured.Unstructured` the object's
+	// `"apiVersion"` and `"kind"` must also be right.
 	objectType runtime.Object
 
 	// objectDescription is the description of this informer's objects. This typically defaults to
@@ -450,6 +472,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KnownObjects:          s.indexer,
 		EmitDeltaTypeReplaced: true,
+		KeyFunction:           s.keyfn,
 	})
 
 	cfg := &Config{

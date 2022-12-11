@@ -297,10 +297,17 @@ func (r FilteringResourceEventHandler) OnDelete(obj interface{}) {
 // DeletedFinalStateUnknown objects before calling
 // MetaNamespaceKeyFunc.
 func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
+	return DeletionHandlingWithKeyFunc(obj, MetaNamespaceKeyFunc)
+}
+
+// DeletionHandlingWithKeyFunc checks for
+// DeletedFinalStateUnknown objects before calling
+// the specified key function.
+func DeletionHandlingWithKeyFunc(obj interface{}, fn KeyFunc) (string, error) {
 	if d, ok := obj.(DeletedFinalStateUnknown); ok {
 		return d.Key, nil
 	}
-	return MetaNamespaceKeyFunc(obj)
+	return fn(obj)
 }
 
 // NewInformer returns a Store and a controller for populating the store
