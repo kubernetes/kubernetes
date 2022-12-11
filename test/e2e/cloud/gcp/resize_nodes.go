@@ -68,48 +68,40 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	// Slow issue #13323 (8 min)
 	ginkgo.Describe("Resize [Slow]", func() {
 		var originalNodeCount int32
-		var skipped bool
 
 		ginkgo.BeforeEach(func() {
-			skipped = true
 			e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 			e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
-			skipped = false
-		})
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				ginkgo.By("restoring the original node instance group size")
+				if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+					framework.Failf("Couldn't restore the original node instance group size: %v", err)
+				}
+				// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
+				// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.
+				// Most tests make use of some proxy feature to verify functionality. So, if a reboot test runs
+				// right before a test that tries to get logs, for example, we may get unlucky and try to use a
+				// closed tunnel to a node that was recently rebooted. There's no good way to framework.Poll for proxies
+				// being closed, so we sleep.
+				//
+				// TODO(cjcullen) reduce this sleep (#19314)
+				if framework.ProviderIs("gke") {
+					ginkgo.By("waiting 5 minutes for all dead tunnels to be dropped")
+					time.Sleep(5 * time.Minute)
+				}
+				if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+					framework.Failf("Couldn't restore the original node instance group size: %v", err)
+				}
 
-		ginkgo.AfterEach(func() {
-			if skipped {
-				return
-			}
-
-			ginkgo.By("restoring the original node instance group size")
-			if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
-				framework.Failf("Couldn't restore the original node instance group size: %v", err)
-			}
-			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
-			// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.
-			// Most tests make use of some proxy feature to verify functionality. So, if a reboot test runs
-			// right before a test that tries to get logs, for example, we may get unlucky and try to use a
-			// closed tunnel to a node that was recently rebooted. There's no good way to framework.Poll for proxies
-			// being closed, so we sleep.
-			//
-			// TODO(cjcullen) reduce this sleep (#19314)
-			if framework.ProviderIs("gke") {
-				ginkgo.By("waiting 5 minutes for all dead tunnels to be dropped")
-				time.Sleep(5 * time.Minute)
-			}
-			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
-				framework.Failf("Couldn't restore the original node instance group size: %v", err)
-			}
-
-			if err := e2enode.WaitForReadyNodes(c, int(originalNodeCount), 10*time.Minute); err != nil {
-				framework.Failf("Couldn't restore the original cluster size: %v", err)
-			}
-			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
-			// the cluster is restored to health.
-			ginkgo.By("waiting for system pods to successfully restart")
-			err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
-			framework.ExpectNoError(err)
+				if err := e2enode.WaitForReadyNodes(c, int(originalNodeCount), 10*time.Minute); err != nil {
+					framework.Failf("Couldn't restore the original cluster size: %v", err)
+				}
+				// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
+				// the cluster is restored to health.
+				ginkgo.By("waiting for system pods to successfully restart")
+				err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
+				framework.ExpectNoError(err)
+			})
 		})
 
 		ginkgo.It("should be able to delete nodes", func(ctx context.Context) {

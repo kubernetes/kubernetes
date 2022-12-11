@@ -518,10 +518,10 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		})
 		framework.ExpectNoError(err)
 
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			ginkgo.By("Clean up loadbalancer service")
 			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
-		}()
+		})
 
 		svc, err = jig.WaitForLoadBalancer(loadBalancerCreateTimeout)
 		framework.ExpectNoError(err)
@@ -597,10 +597,10 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		})
 		framework.ExpectNoError(err)
 
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			ginkgo.By("Clean up loadbalancer service")
 			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
-		}()
+		})
 
 		svc, err = jig.WaitForLoadBalancer(createTimeout)
 		framework.ExpectNoError(err)
@@ -720,10 +720,10 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		})
 		framework.ExpectNoError(err)
 
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			ginkgo.By("Clean up loadbalancer service")
 			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
-		}()
+		})
 
 		svc, err = jig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
 		framework.ExpectNoError(err)
@@ -824,10 +824,10 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		})
 		framework.ExpectNoError(err)
 
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			ginkgo.By("Check that service can be deleted with finalizer")
 			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
-		}()
+		})
 
 		ginkgo.By("Wait for load balancer to serve traffic")
 		svc, err = jig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
@@ -892,14 +892,14 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 			framework.ExpectNoError(err, "failed to get GCE cloud provider")
 
 			err = gceCloud.ReserveRegionAddress(&compute.Address{Name: staticIPName}, gceCloud.Region())
-			defer func() {
+			ginkgo.DeferCleanup(func(ctx context.Context) {
 				if staticIPName != "" {
 					// Release GCE static IP - this is not kube-managed and will not be automatically released.
 					if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
 						framework.Logf("failed to release static IP %s: %v", staticIPName, err)
 					}
 				}
-			}()
+			})
 			framework.ExpectNoError(err, "failed to create region address: %s", staticIPName)
 			reservedAddr, err := gceCloud.GetRegionAddress(staticIPName, gceCloud.Region())
 			framework.ExpectNoError(err, "failed to get region address: %s", staticIPName)
@@ -1274,7 +1274,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
 		}
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			framework.ExpectNoError(err)
 
@@ -1293,9 +1293,9 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 					threshold)
 				framework.ExpectNoError(err)
 			}
-			err = cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			err = cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-		}()
+		})
 
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
@@ -1318,10 +1318,10 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 		svc, err := jig.CreateOnlyLocalNodePortService(true)
 		framework.ExpectNoError(err)
-		defer func() {
-			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-		}()
+		})
 
 		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
 
@@ -1361,12 +1361,12 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 			})
 		framework.ExpectNoError(err)
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			framework.ExpectNoError(err)
 			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-		}()
+		})
 
 		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 		if healthCheckNodePort == 0 {
@@ -1427,12 +1427,12 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, true, nil)
 		framework.ExpectNoError(err)
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			framework.ExpectNoError(err)
 			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-		}()
+		})
 
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
@@ -1443,11 +1443,11 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		deployment := createPausePodDeployment(cs, "pause-pod-deployment", namespace, 1)
 		framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(cs, deployment), "Failed to complete pause pod deployment")
 
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			framework.Logf("Deleting deployment")
 			err = cs.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "Failed to delete deployment %s", deployment.Name)
-		}()
+		})
 
 		deployment, err = cs.AppsV1().Deployments(namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Error in retrieving pause pod deployment")
@@ -1490,12 +1490,12 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, true, nil)
 		framework.ExpectNoError(err)
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			framework.ExpectNoError(err)
 			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-		}()
+		})
 
 		// save the health check node port because it disappears when ESIPP is turned off.
 		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)

@@ -1039,7 +1039,7 @@ metadata:
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
-			defer crd.CleanUp()
+			ginkgo.DeferCleanup(crd.CleanUp)
 
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
@@ -1065,7 +1065,7 @@ metadata:
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
-			defer crd.CleanUp()
+			ginkgo.DeferCleanup(crd.CleanUp)
 
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
@@ -1093,7 +1093,7 @@ metadata:
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
-			defer crd.CleanUp()
+			ginkgo.DeferCleanup(crd.CleanUp)
 
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
@@ -1142,7 +1142,7 @@ metadata:
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
-			defer testCRD.CleanUp()
+			ginkgo.DeferCleanup(testCRD.CleanUp)
 
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
@@ -1853,7 +1853,7 @@ metadata:
 
 			ginkgo.By("adding the taint " + testTaint.ToString() + " to a node")
 			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, testTaint.ToString())
-			defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, testTaint)
+			ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, f.ClientSet, nodeName, testTaint)
 
 			ginkgo.By("verifying the node has the taint " + testTaint.ToString())
 			output := runKubectlRetryOrDie(ns, "describe", "node", nodeName)
@@ -1884,7 +1884,8 @@ metadata:
 
 			ginkgo.By("adding the taint " + testTaint.ToString() + " to a node")
 			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, testTaint.ToString())
-			defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, testTaint)
+			ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, f.ClientSet, nodeName,
+				testTaint)
 
 			ginkgo.By("verifying the node has the taint " + testTaint.ToString())
 			output := runKubectlRetryOrDie(ns, "describe", "node", nodeName)
@@ -1902,7 +1903,7 @@ metadata:
 			}
 			ginkgo.By("adding another taint " + newTestTaint.ToString() + " to the node")
 			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, newTestTaint.ToString())
-			defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, newTestTaint)
+			ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, f.ClientSet, nodeName, newTestTaint)
 
 			ginkgo.By("verifying the node has the taint " + newTestTaint.ToString())
 			output = runKubectlRetryOrDie(ns, "describe", "node", nodeName)
@@ -1920,7 +1921,7 @@ metadata:
 			}
 			ginkgo.By("adding NoExecute taint " + noExecuteTaint.ToString() + " to the node")
 			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, noExecuteTaint.ToString())
-			defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, noExecuteTaint)
+			ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, f.ClientSet, nodeName, noExecuteTaint)
 
 			ginkgo.By("verifying the node has the taint " + noExecuteTaint.ToString())
 			output = runKubectlRetryOrDie(ns, "describe", "node", nodeName)

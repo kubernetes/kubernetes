@@ -595,7 +595,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
@@ -638,7 +638,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))

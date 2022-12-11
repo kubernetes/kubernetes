@@ -263,10 +263,10 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			ginkgo.By("submitting the pod to kubernetes")
 			createdPod := podClient.Create(pod)
-			defer func() {
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
 				ginkgo.By("deleting the pod")
-				podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
-			}()
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
 
 			framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
@@ -328,10 +328,10 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			ginkgo.By("submitting the pod to kubernetes")
 			podClient.Create(pod)
-			defer func() {
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
 				ginkgo.By("deleting the pod")
-				podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
-			}()
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
 
 			err := e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, pod.Name, "Evicted", f.Namespace.Name)
 			if err != nil {

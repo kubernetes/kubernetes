@@ -81,7 +81,7 @@ var _ = SIGDescribe("Discovery", func() {
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
 		spec := testcrd.Crd.Spec
 		resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
 		if err != nil {

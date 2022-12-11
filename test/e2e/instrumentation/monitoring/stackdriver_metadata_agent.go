@@ -79,7 +79,7 @@ func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
 	_ = e2epod.CreateExecPodOrFail(kubeClient, f.Namespace.Name, uniqueContainerName, func(pod *v1.Pod) {
 		pod.Spec.Containers[0].Name = uniqueContainerName
 	})
-	defer kubeClient.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), uniqueContainerName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(kubeClient.CoreV1().Pods(f.Namespace.Name).Delete, uniqueContainerName, metav1.DeleteOptions{})
 
 	// Wait a short amount of time for Metadata Agent to be created and metadata to be exported
 	time.Sleep(metadataWaitTime)

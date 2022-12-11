@@ -154,7 +154,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, nodeKeyValueLabelList[i], nil)
 			pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			defer e2epod.DeletePodWithWait(client, pod)
+			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, client, pod)
 
 			ginkgo.By("Waiting for pod to be ready")
 			gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())

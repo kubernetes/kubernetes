@@ -66,13 +66,13 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(
 				rc, int32(targetCPUUtilizationPercent), 1, 5,
 				e2eautoscaling.HPABehaviorWithStabilizationWindows(upScaleStabilization, downScaleStabilization),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			// making sure HPA is ready, doing its job and already has a recommendation recorded
 			// for stabilization logic before lowering the consumption
@@ -107,13 +107,13 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(
 				rc, int32(targetCPUUtilizationPercent), 1, 10,
 				e2eautoscaling.HPABehaviorWithStabilizationWindows(upScaleStabilization, downScaleStabilization),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			// making sure HPA is ready, doing its job and already has a recommendation recorded
 			// for stabilization logic before increasing the consumption
@@ -146,12 +146,12 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(
 				rc, int32(targetCPUUtilizationPercent), 1, 10, e2eautoscaling.HPABehaviorWithScaleDisabled(e2eautoscaling.ScaleUpDirection),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
 
@@ -181,12 +181,12 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(
 				rc, int32(targetCPUUtilizationPercent), 1, 10, e2eautoscaling.HPABehaviorWithScaleDisabled(e2eautoscaling.ScaleDownDirection),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			defaultDownscaleStabilisation := 5 * time.Minute
 			waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + defaultDownscaleStabilisation
@@ -226,13 +226,13 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(
 				rc, int32(targetCPUUtilizationPercent), 1, 10,
 				e2eautoscaling.HPABehaviorWithScaleLimitedByNumberOfPods(e2eautoscaling.ScaleUpDirection, int32(podsLimitPerMinute), int32(limitWindowLength.Seconds())),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale up by increasing consumption")
 			rc.ConsumeCPU(3 * usageForSingleReplica)
@@ -268,13 +268,13 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(
 				rc, int32(targetCPUUtilizationPercent), 1, 10,
 				e2eautoscaling.HPABehaviorWithScaleLimitedByNumberOfPods(e2eautoscaling.ScaleDownDirection, int32(podsLimitPerMinute), int32(limitWindowLength.Seconds())),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale down by lowering consumption")
 			rc.ConsumeCPU(1 * usageForSingleReplica)
@@ -316,13 +316,13 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(
 				rc, int32(targetCPUUtilizationPercent), 1, 10,
 				e2eautoscaling.HPABehaviorWithScaleLimitedByPercentage(e2eautoscaling.ScaleUpDirection, int32(percentageLimitPerMinute), int32(limitWindowLength.Seconds())),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale up by increasing consumption")
 			rc.ConsumeCPU(8 * usageForSingleReplica)
@@ -359,13 +359,13 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(
 				rc, int32(targetCPUUtilizationPercent), 1, 10,
 				e2eautoscaling.HPABehaviorWithScaleLimitedByPercentage(e2eautoscaling.ScaleDownDirection, int32(percentageLimitPerMinute), int32(limitWindowLength.Seconds())),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale down by lowering consumption")
 			rc.ConsumeCPU(1 * usageForSingleReplica)
@@ -406,13 +406,13 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(
 				rc, int32(targetCPUUtilizationPercent), 2, 5,
 				e2eautoscaling.HPABehaviorWithStabilizationWindows(upScaleStabilization, downScaleStabilization),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale up by increasing consumption")
 			rc.ConsumeCPU(4 * usageForSingleReplica)
@@ -458,7 +458,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 			)
-			defer rc.CleanUp()
+			ginkgo.DeferCleanup(rc.CleanUp)
 
 			scaleUpRule := e2eautoscaling.HPAScalingRuleWithScalingPolicy(autoscalingv2.PodsScalingPolicy, int32(podsLimitPerMinute), int32(limitWindowLength.Seconds()))
 			scaleDownRule := e2eautoscaling.HPAScalingRuleWithStabilizationWindow(int32(downScaleStabilization.Seconds()))
@@ -466,7 +466,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 				rc, int32(targetCPUUtilizationPercent), 2, 5,
 				e2eautoscaling.HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule),
 			)
-			defer e2eautoscaling.DeleteHPAWithBehavior(rc, hpa.Name)
+			ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 			ginkgo.By("triggering scale up by increasing consumption")
 			rc.ConsumeCPU(4 * usageForSingleReplica)

@@ -51,10 +51,10 @@ func testPreStop(c clientset.Interface, ns string) {
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		ginkgo.By("Deleting the server pod")
-		c.CoreV1().Pods(ns).Delete(context.TODO(), podDescr.Name, metav1.DeleteOptions{})
-	}()
+		return c.CoreV1().Pods(ns).Delete(ctx, podDescr.Name, metav1.DeleteOptions{})
+	})
 
 	ginkgo.By("Waiting for pods to come up.")
 	err = e2epod.WaitForPodRunningInNamespace(c, podDescr)
@@ -97,12 +97,13 @@ func testPreStop(c clientset.Interface, ns string) {
 	deletePreStop := true
 
 	// At the end of the test, clean up by removing the pod.
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		if deletePreStop {
 			ginkgo.By("Deleting the tester pod")
-			c.CoreV1().Pods(ns).Delete(context.TODO(), preStopDescr.Name, metav1.DeleteOptions{})
+			return c.CoreV1().Pods(ns).Delete(ctx, preStopDescr.Name, metav1.DeleteOptions{})
 		}
-	}()
+		return nil
+	})
 
 	err = e2epod.WaitForPodRunningInNamespace(c, preStopDescr)
 	framework.ExpectNoError(err, "waiting for tester pod to start")

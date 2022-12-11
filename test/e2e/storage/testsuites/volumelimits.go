@@ -161,13 +161,8 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, dDriver)
 
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
-		defer func() {
-			err := l.resource.CleanupResource()
-			framework.ExpectNoError(err, "while cleaning up resource")
-		}()
-		defer func() {
-			cleanupTest(l.cs, l.ns.Name, l.podNames, l.pvcNames, l.pvNames, testSlowMultiplier*f.Timeouts.PVDelete)
-		}()
+		ginkgo.DeferCleanup(l.resource.CleanupResource)
+		ginkgo.DeferCleanup(cleanupTest, l.cs, l.ns.Name, l.podNames, l.pvcNames, l.pvNames, testSlowMultiplier*f.Timeouts.PVDelete)
 
 		selection := e2epod.NodeSelection{Name: nodeName}
 

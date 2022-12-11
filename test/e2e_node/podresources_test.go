@@ -594,7 +594,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 					configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 					sd := setupSRIOVConfigOrFail(f, configMap)
-					defer teardownSRIOVConfigOrFail(f, sd)
+					ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
 
 					waitForSRIOVResources(f, sd)
 
@@ -623,7 +623,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 				configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 				sd := setupSRIOVConfigOrFail(f, configMap)
-				defer teardownSRIOVConfigOrFail(f, sd)
+				ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
 
 				waitForSRIOVResources(f, sd)
 
@@ -762,7 +762,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 				ginkgo.It("should return proper podresources the same as before the restart of kubelet", func(ctx context.Context) {
 					dpPod := setupKubeVirtDevicePluginOrFail(f)
-					defer teardownKubeVirtDevicePluginOrFail(f, dpPod)
+					ginkgo.DeferCleanup(teardownKubeVirtDevicePluginOrFail, f, dpPod)
 
 					waitForKubeVirtResources(f, dpPod)
 

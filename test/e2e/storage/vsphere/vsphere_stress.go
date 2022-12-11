@@ -117,7 +117,7 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 			}
 			gomega.Expect(sc).NotTo(gomega.BeNil())
 			framework.ExpectNoError(err)
-			defer client.StorageV1().StorageClasses().Delete(context.TODO(), scname, metav1.DeleteOptions{})
+			ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), scname, metav1.DeleteOptions{})
 			scArrays[index] = sc
 		}
 
@@ -143,7 +143,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		ginkgo.By(fmt.Sprintf("%v Creating PVC using the Storage Class: %v", logPrefix, sc.Name))
 		pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "1Gi", sc))
 		framework.ExpectNoError(err)
-		defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+		ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 		var pvclaims []*v1.PersistentVolumeClaim
 		pvclaims = append(pvclaims, pvclaim)

@@ -78,11 +78,11 @@ var _ = SIGDescribe("Security Context", func() {
 
 			createdPod1 := podClient.Create(makePod(false))
 			createdPod2 := podClient.Create(makePod(false))
-			defer func() {
+			ginkgo.DeferCleanup(func(ctx context.Context) {
 				ginkgo.By("delete the pods")
 				podClient.DeleteSync(createdPod1.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 				podClient.DeleteSync(createdPod2.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
-			}()
+			})
 			getLogs := func(pod *v1.Pod) (string, error) {
 				err := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod1.Name, f.Namespace.Name, f.Timeouts.PodStart)
 				if err != nil {

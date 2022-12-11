@@ -190,9 +190,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		if tp.registerDriver {
 			err = waitForCSIDriver(cs, m.config.GetUniqueDriverName())
 			framework.ExpectNoError(err, "Failed to get CSIDriver %v", m.config.GetUniqueDriverName())
-			m.testCleanups = append(m.testCleanups, func() {
-				destroyCSIDriver(cs, m.config.GetUniqueDriverName())
-			})
+			ginkgo.DeferCleanup(destroyCSIDriver, cs, m.config.GetUniqueDriverName())
 		}
 
 		// Wait for the CSIDriver actually get deployed and CSINode object to be generated.
@@ -392,7 +390,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			ginkgo.It(t.name, func(ctx context.Context) {
 				var err error
 				init(testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				volumeType := test.volumeType
 				if volumeType == "" {
@@ -430,7 +428,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		ginkgo.It("should bringup pod after deploying CSIDriver attach=false [Slow]", func(ctx context.Context) {
 			var err error
 			init(testParameters{registerDriver: false, disableAttach: true})
-			defer cleanup()
+			ginkgo.DeferCleanup(cleanup)
 
 			_, claim, pod := createPod(pvcReference) // late binding as specified above
 			if pod == nil {
@@ -476,13 +474,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				NewDriverName: "csi-mock-" + f.UniqueName,
 				CanAttach:     &canAttach,
 			}
-			cleanupCSIDriver, err := utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
+			err = utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
 				return utils.PatchCSIDeployment(f, o, item)
 			}, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
 			if err != nil {
 				framework.Failf("fail to deploy CSIDriver object: %v", err)
 			}
-			m.testCleanups = append(m.testCleanups, cleanupCSIDriver)
 
 			ginkgo.By("Wait for the pod in running status")
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
@@ -550,8 +547,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(testParameters{
 					registerDriver: test.deployClusterRegistrar,
 					podInfo:        test.podInfoOnMount})
-
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				withVolume := pvcReference
 				if test.expectEphemeral {
@@ -590,7 +586,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			// define volume limit to be 2 for this test
 			var err error
 			init(testParameters{attachLimit: 2})
-			defer cleanup()
+			ginkgo.DeferCleanup(cleanup)
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
@@ -621,7 +617,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			// define volume limit to be 2 for this test
 			var err error
 			init(testParameters{attachLimit: 1})
-			defer cleanup()
+			ginkgo.DeferCleanup(cleanup)
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
@@ -646,7 +642,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			// define volume limit to be 2 for this test
 			var err error
 			init(testParameters{attachLimit: 1})
-			defer cleanup()
+			ginkgo.DeferCleanup(cleanup)
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
@@ -711,7 +707,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				init(tp)
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				sc, pvc, pod := createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
@@ -805,8 +801,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				init(params)
-
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				sc, pvc, pod := createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
@@ -949,7 +944,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					registerDriver: true,
 					hooks:          hooks,
 				})
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				_, claim, pod := createPod(pvcReference)
 				if pod == nil {
@@ -1087,7 +1082,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					registerDriver: true,
 					hooks:          hooks,
 				})
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				_, claim, pod := createPod(pvcReference)
 				if pod == nil {
@@ -1213,11 +1208,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					})
 				}
 
-				init(params)
-				defer cleanup()
-
 				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
 				defer cancel()
+				init(params)
+				ginkgo.DeferCleanup(cleanup)
 
 				// In contrast to the raw watch, RetryWatcher is expected to deliver all events even
 				// when the underlying raw watch gets closed prematurely
@@ -1418,7 +1412,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					storageCapacity: test.storageCapacity,
 					lateBinding:     true,
 				})
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				// The storage class uses a random name, therefore we have to create it first
 				// before adding CSIStorageCapacity objects for it.
@@ -1435,9 +1429,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					}
 					createdCapacity, err := f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "create CSIStorageCapacity %+v", *capacity)
-					m.testCleanups = append(m.testCleanups, func() {
-						f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
-					})
+					ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Delete), createdCapacity.Name, metav1.DeleteOptions{})
 				}
 
 				// kube-scheduler may need some time before it gets the CSIDriver and CSIStorageCapacity objects.
@@ -1515,7 +1507,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 				ctx, cancel := context.WithTimeout(ctx, csiPodRunningTimeout)
 				defer cancel()
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
 				ginkgo.By("Creating storage class")
@@ -1641,8 +1633,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					tokenRequests:     test.tokenRequests,
 					requiresRepublish: &csiServiceAccountTokenEnabled,
 				})
-
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				_, _, pod := createPod(pvcReference)
 				if pod == nil {
@@ -1702,7 +1693,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					registerDriver: true,
 					fsGroupPolicy:  &test.fsGroupPolicy,
 				})
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				// kube-scheduler may need some time before it gets the CSIDriver object.
 				// Without them, scheduling doesn't run as expected by the test.
@@ -1779,7 +1770,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					enableVolumeMountGroup: t.enableVolumeMountGroup,
 					hooks:                  createFSGroupRequestPreHook(&nodeStageFsGroup, &nodePublishFsGroup),
 				})
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				fsGroupVal := int64(rand.Int63n(20000) + 1024)
 				fsGroup := &fsGroupVal
@@ -1848,7 +1839,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				if !ok {
 					e2eskipper.Skipf("mock driver does not support snapshots -- skipping")
 				}
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				var sc *storagev1.StorageClass
 				if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
@@ -1937,7 +1928,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				if !ok {
 					e2eskipper.Skipf("mock driver does not support snapshots -- skipping")
 				}
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				metricsGrabber, err := e2emetrics.NewMetricsGrabber(m.config.Framework.ClientSet, nil, f.ClientConfig(), false, false, false, false, false, true)
 				if err != nil {
@@ -2080,7 +2071,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					enableSELinuxMount: &t.seLinuxEnabled,
 					hooks:              createSELinuxMountPreHook(&nodeStageMountOpts, &nodePublishMountOpts),
 				})
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				accessModes := []v1.PersistentVolumeAccessMode{t.volumeMode}
 				var podSELinuxOpts *v1.SELinuxOptions

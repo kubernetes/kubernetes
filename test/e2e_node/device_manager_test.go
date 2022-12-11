@@ -246,7 +246,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				serviceAccount: sd.serviceAccount,
 			}
 			sd2.pod = createSRIOVPodOrFail(f)
-			defer teardownSRIOVConfigOrFail(f, sd2)
+			ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd2)
 			waitForSRIOVResources(f, sd2)
 
 			compareSRIOVResources(sd, sd2)

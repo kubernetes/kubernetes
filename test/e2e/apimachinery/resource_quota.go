@@ -598,7 +598,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a Custom Resource Definition")
 		testcrd, err := crd.CreateTestCRD(f)
 		framework.ExpectNoError(err)
-		defer testcrd.CleanUp()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
 		countResourceName := "count/" + testcrd.Crd.Spec.Names.Plural + "." + testcrd.Crd.Spec.Group
 		// resourcequota controller needs to take 30 seconds at most to detect the new custom resource.
 		// in order to make sure the resourcequota controller knows this resource, we create one test

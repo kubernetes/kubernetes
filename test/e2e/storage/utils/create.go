@@ -23,12 +23,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onsi/ginkgo/v2"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -140,21 +141,7 @@ func PatchItems(f *framework.Framework, driverNamespace *v1.Namespace, items ...
 // PatchItems has the some limitations as LoadFromManifests:
 // - only some common items are supported, unknown ones trigger an error
 // - only the latest stable API version for each item is supported
-func CreateItems(f *framework.Framework, ns *v1.Namespace, items ...interface{}) (func(), error) {
-	var destructors []func() error
-	cleanup := func() {
-		// TODO (?): use same logic as framework.go for determining
-		// whether we are expected to clean up? This would change the
-		// meaning of the -delete-namespace and -delete-namespace-on-failure
-		// command line flags, because they would also start to apply
-		// to non-namespaced items.
-		for _, destructor := range destructors {
-			if err := destructor(); err != nil && !apierrors.IsNotFound(err) {
-				framework.Logf("deleting failed: %s", err)
-			}
-		}
-	}
-
+func CreateItems(f *framework.Framework, ns *v1.Namespace, items ...interface{}) error {
 	var result error
 	for _, item := range items {
 		// Each factory knows which item(s) it supports, so try each one.
@@ -166,10 +153,7 @@ func CreateItems(f *framework.Framework, ns *v1.Namespace, items ...interface{})
 		for _, factory := range factories {
 			destructor, err := factory.Create(f, ns, item)
 			if destructor != nil {
-				destructors = append(destructors, func() error {
-					framework.Logf("deleting %s", description)
-					return destructor()
-				})
+				ginkgo.DeferCleanup(framework.IgnoreNotFound(destructor), framework.AnnotatedLocation(fmt.Sprintf("deleting %s", description)))
 			}
 			if err == nil {
 				done = true
@@ -185,29 +169,24 @@ func CreateItems(f *framework.Framework, ns *v1.Namespace, items ...interface{})
 		}
 	}
 
-	if result != nil {
-		cleanup()
-		return nil, result
-	}
-
-	return cleanup, nil
+	return result
 }
 
 // CreateFromManifests is a combination of LoadFromManifests,
 // PatchItems, patching with an optional custom function,
 // and CreateItems.
-func CreateFromManifests(f *framework.Framework, driverNamespace *v1.Namespace, patch func(item interface{}) error, files ...string) (func(), error) {
+func CreateFromManifests(f *framework.Framework, driverNamespace *v1.Namespace, patch func(item interface{}) error, files ...string) error {
 	items, err := LoadFromManifests(files...)
 	if err != nil {
-		return nil, fmt.Errorf("CreateFromManifests: %w", err)
+		return fmt.Errorf("CreateFromManifests: %w", err)
 	}
 	if err := PatchItems(f, driverNamespace, items...); err != nil {
-		return nil, err
+		return err
 	}
 	if patch != nil {
 		for _, item := range items {
 			if err := patch(item); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}

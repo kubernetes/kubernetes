@@ -248,10 +248,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			"e2e-test-namespace": f.Namespace.Name,
 		})
 		framework.ExpectNoError(err)
-
-		defer func() {
-			f.DeleteNamespace(valNamespace.Name)
-		}()
+		ginkgo.DeferCleanup(f.DeleteNamespace, valNamespace.Name)
 
 		ginkgo.By("Deploying validator")
 		valManifests := []string{
@@ -259,12 +256,11 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/rbac-data-source-validator.yaml",
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/setup-data-source-validator.yaml",
 		}
-		valCleanup, err := storageutils.CreateFromManifests(f, valNamespace,
+		err = storageutils.CreateFromManifests(f, valNamespace,
 			func(item interface{}) error { return nil },
 			valManifests...)
 
 		framework.ExpectNoError(err)
-		defer valCleanup()
 
 		ginkgo.By("Creating populator namespace")
 		popNamespace, err := f.CreateNamespace(fmt.Sprintf("%s-pop", f.Namespace.Name), map[string]string{
@@ -272,17 +268,14 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			"e2e-test-namespace": f.Namespace.Name,
 		})
 		framework.ExpectNoError(err)
-
-		defer func() {
-			f.DeleteNamespace(popNamespace.Name)
-		}()
+		ginkgo.DeferCleanup(f.DeleteNamespace, popNamespace.Name)
 
 		ginkgo.By("Deploying hello-populator")
 		popManifests := []string{
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/crd/hello-populator-crd.yaml",
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/hello-populator-deploy.yaml",
 		}
-		popCleanup, err := storageutils.CreateFromManifests(f, popNamespace,
+		err = storageutils.CreateFromManifests(f, popNamespace,
 			func(item interface{}) error {
 				switch item := item.(type) {
 				case *appsv1.Deployment:
@@ -321,7 +314,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			popManifests...)
 
 		framework.ExpectNoError(err)
-		defer popCleanup()
 
 		dc := l.config.Framework.DynamicClient
 
@@ -725,10 +717,10 @@ func PVWriteReadSingleNodeCheck(ctx context.Context, client clientset.Interface,
 	ginkgo.By(fmt.Sprintf("checking the created volume is writable on node %+v", node))
 	command := "echo 'hello world' > /mnt/test/data"
 	pod := StartInPodWithVolume(ctx, client, claim.Namespace, claim.Name, "pvc-volume-tester-writer", command, node)
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) {
 		// pod might be nil now.
 		StopPod(ctx, client, pod)
-	}()
+	})
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(client, pod.Name, pod.Namespace, timeouts.PodStartSlow))
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
@@ -852,10 +844,10 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(ctx context.Co
 		pod, err = e2epod.CreatePod(t.Client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
 	}
 	framework.ExpectNoError(err)
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		e2epod.DeletePodOrFail(t.Client, pod.Namespace, pod.Name)
-		e2epod.WaitForPodToDisappear(t.Client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, t.Timeouts.PodDelete)
-	}()
+		return e2epod.WaitForPodToDisappear(t.Client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, t.Timeouts.PodDelete)
+	})
 	if expectUnschedulable {
 		// Verify that no claims are provisioned.
 		verifyPVCsPending(ctx, t.Client, createdClaims)

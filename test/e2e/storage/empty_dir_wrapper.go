@@ -147,8 +147,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 			},
 		}
 		pod = e2epod.NewPodClient(f).CreateSync(pod)
-
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			ginkgo.By("Cleaning up the secret")
 			if err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{}); err != nil {
 				framework.Failf("unable to delete secret %v: %v", secret.Name, err)
@@ -161,7 +160,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 			if err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("unable to delete pod %v: %v", pod.Name, err)
 			}
-		}()
+		})
 	})
 
 	// The following two tests check for the problem fixed in #29641.
@@ -188,7 +187,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	*/
 	framework.ConformanceIt("should not cause race condition when used for configmaps [Serial]", func(ctx context.Context) {
 		configMapNames := createConfigmapsForRace(f)
-		defer deleteConfigMaps(f, configMapNames)
+		ginkgo.DeferCleanup(deleteConfigMaps, f, configMapNames)
 		volumes, volumeMounts := makeConfigMapVolumes(configMapNames)
 		for i := 0; i < wrappedVolumeRaceConfigMapIterationCount; i++ {
 			testNoWrappedVolumeRace(f, volumes, volumeMounts, wrappedVolumeRaceConfigMapPodCount)
@@ -387,10 +386,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 	_, err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(context.TODO(), rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "error creating replication controller")
 
-	defer func() {
-		err := e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
-		framework.ExpectNoError(err)
-	}()
+	ginkgo.DeferCleanup(e2erc.DeleteRCAndWaitForGC, f.ClientSet, f.Namespace.Name, rcName)
 
 	pods, err := e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, rcName, podCount)
 	framework.ExpectNoError(err, "error creating pods")

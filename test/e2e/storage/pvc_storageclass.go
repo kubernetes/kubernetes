@@ -101,10 +101,7 @@ var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 			})
 			_, err = e2epv.CreatePV(client, f.Timeouts, pv)
 			framework.ExpectNoError(err, "Error creating pv %v", err)
-			defer func(c clientset.Interface, pvName string) {
-				err := e2epv.DeletePersistentVolume(c, pvName)
-				framework.ExpectNoError(err)
-			}(client, pv.Name)
+			ginkgo.DeferCleanup(e2epv.DeletePersistentVolume, client, pv.Name)
 
 			// Verify the PVC is bound and has the new default SC
 			claimNames := []string{pvc.Name}

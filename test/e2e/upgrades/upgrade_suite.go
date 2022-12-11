@@ -54,7 +54,7 @@ func (cma *chaosMonkeyAdapter) Test(sem *chaosmonkey.Semaphore) {
 		return
 	}
 
-	defer cma.test.Teardown(cma.framework)
+	ginkgo.DeferCleanup(cma.test.Teardown, cma.framework)
 	cma.test.Setup(cma.framework)
 	ready()
 	cma.test.Test(cma.framework, sem.StopCh, cma.upgradeType)

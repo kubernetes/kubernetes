@@ -198,7 +198,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
 			ginkgo.It("should fail to create pod by failing to mount volume [Slow]", func(ctx context.Context) {
 				manualInit()
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				var err error
 
@@ -259,7 +259,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
 			ginkgo.It("should fail in binding dynamic provisioned PV to PVC [Slow][LinuxOnly]", func(ctx context.Context) {
 				manualInit()
-				defer cleanup()
+				ginkgo.DeferCleanup(cleanup)
 
 				var err error
 
@@ -301,7 +301,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		init()
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		l.VolumeResource = *storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		ginkgo.By("Creating pod")
 		var err error
@@ -358,7 +358,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		init()
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		l.VolumeResource = *storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		ginkgo.By("Creating pod")
 		var err error
@@ -395,7 +395,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 
 		ginkgo.By("Listing mounted volumes in the pod")
 		hostExec := storageutils.NewHostExec(f)
-		defer hostExec.Cleanup()
+		ginkgo.DeferCleanup(hostExec.Cleanup)
 		volumePaths, devicePaths, err := listPodVolumePluginDirectory(hostExec, pod, node)
 		framework.ExpectNoError(err)
 

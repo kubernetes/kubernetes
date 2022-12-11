@@ -910,7 +910,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		framework.ExpectNoError(err)
 
 		sd := setupSRIOVConfigOrFail(f, configMap)
-		defer teardownSRIOVConfigOrFail(f, sd)
+		ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
 
 		scope := containerScopeTopology
 		for _, policy := range policies {

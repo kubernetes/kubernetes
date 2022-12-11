@@ -276,9 +276,8 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 			{numNodes: fullNodesNum, podsPerNode: fullPerNodeReplicas},
 			{numNodes: underutilizedNodesNum, podsPerNode: underutilizedPerNodeReplicas}}
 
-		cleanup := distributeLoad(f, f.Namespace.Name, "10-70", podDistribution, perPodReservation,
+		distributeLoad(f, f.Namespace.Name, "10-70", podDistribution, perPodReservation,
 			int(0.95*float64(memCapacityMb)), map[string]string{}, largeScaleUpTimeout)
-		defer cleanup()
 
 		// enable scale down again
 		framework.ExpectNoError(addAnnotation(f, nodes.Items, ScaleDownDisabledKey, "false"))
@@ -319,8 +318,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 
 		ginkgo.By("Reserving host ports on remaining nodes")
 		// run RC2 w/ host port
-		cleanup2 := createHostPortPodsWithMemory(f, "underutilizing-host-port-pod", underutilizedNodesCount, reservedPort, underutilizedNodesCount*hostPortPodReservation, largeScaleUpTimeout)
-		defer cleanup2()
+		ginkgo.DeferCleanup(createHostPortPodsWithMemory, f, "underutilizing-host-port-pod", underutilizedNodesCount, reservedPort, underutilizedNodesCount*hostPortPodReservation, largeScaleUpTimeout)
 
 		waitForAllCaPodsReadyInNamespace(f, c)
 		// wait and check scale down doesn't occur
@@ -341,7 +339,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		initialPodReplicas := nodeCount * replicasPerNode
 		initialPodsTotalMemory := nodeCount * perNodeReservation
 		reservationCleanup := ReserveMemory(f, "initial-pod", initialPodReplicas, initialPodsTotalMemory, true /* wait for pods to run */, memoryReservationTimeout)
-		defer reservationCleanup()
+		ginkgo.DeferCleanup(reservationCleanup)
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 
 		// Configure a number of unschedulable pods.
@@ -350,8 +348,8 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		totalMemReservation := unschedulableMemReservation * unschedulablePodReplicas
 		timeToWait := 5 * time.Minute
 		podsConfig := reserveMemoryRCConfig(f, "unschedulable-pod", unschedulablePodReplicas, totalMemReservation, timeToWait)
-		e2erc.RunRC(*podsConfig) // Ignore error (it will occur because pods are unschedulable)
-		defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, podsConfig.Name)
+		_ = e2erc.RunRC(*podsConfig) // Ignore error (it will occur because pods are unschedulable)
+		ginkgo.DeferCleanup(e2erc.DeleteRCAndWaitForGC, f.ClientSet, f.Namespace.Name, podsConfig.Name)
 
 		// Ensure that no new nodes have been added so far.
 		readyNodeCount, _ := e2enode.TotalReady(f.ClientSet)
@@ -367,7 +365,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 
 		// Test that scale up happens, allowing 1000 unschedulable pods not to be scheduled.
 		testCleanup := simpleScaleUpTestWithTolerance(f, config, 0, unschedulablePodReplicas)
-		defer testCleanup()
+		ginkgo.DeferCleanup(testCleanup)
 	})
 
 })
@@ -504,7 +502,7 @@ type podBatch struct {
 // 2. Create target RC that will generate the load on the cluster
 // 3. Remove the rcs created in 1.
 func distributeLoad(f *framework.Framework, namespace string, id string, podDistribution []podBatch,
-	podMemRequestMegabytes int, nodeMemCapacity int, labels map[string]string, timeout time.Duration) func() error {
+	podMemRequestMegabytes int, nodeMemCapacity int, labels map[string]string, timeout time.Duration) {
 	port := 8013
 	// Create load-distribution RCs with one pod per node, reserving all remaining
 	// memory to force the distribution of pods for the target RCs.
@@ -522,9 +520,7 @@ func distributeLoad(f *framework.Framework, namespace string, id string, podDist
 	rcConfig := reserveMemoryRCConfig(f, id, totalPods, totalPods*podMemRequestMegabytes, timeout)
 	framework.ExpectNoError(e2erc.RunRC(*rcConfig))
 	framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
-	return func() error {
-		return e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
-	}
+	ginkgo.DeferCleanup(e2erc.DeleteRCAndWaitForGC, f.ClientSet, f.Namespace.Name, id)
 }
 
 func timeTrack(start time.Time, name string) {

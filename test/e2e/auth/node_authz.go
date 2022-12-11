@@ -195,9 +195,8 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		// NOTE: If the test fails and a new node IS created, we need to delete it. If we don't, we'd have
 		// a zombie node in a NotReady state which will delay further tests since we're waiting for all
 		// tests to be in the Ready state.
-		defer func() {
-			f.ClientSet.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
-		}()
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.CoreV1().Nodes().Delete), node.Name, metav1.DeleteOptions{})
+
 		if !apierrors.IsForbidden(err) {
 			framework.Failf("should be a forbidden error, got %#v", err)
 		}

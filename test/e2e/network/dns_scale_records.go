@@ -79,7 +79,7 @@ var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 			ns: f.Namespace.Name,
 		}
 		dnsTest.createUtilPodLabel("e2e-dns-scale-records")
-		defer dnsTest.deleteUtilPod()
+		ginkgo.DeferCleanup(dnsTest.deleteUtilPod)
 		framework.Logf("Querying %v%% of service records", checkServicePercent*100)
 		for i := 0; i < len(services); i++ {
 			if i%(1/checkServicePercent) != 0 {

@@ -56,15 +56,12 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 	ginkgo.Describe("persistentvolumereclaim:vsphere [Feature:vsphere]", func() {
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipUnlessProviderIs("vsphere")
+			ginkgo.DeferCleanup(testCleanupVSpherePersistentVolumeReclaim, c, nodeInfo, ns, volumePath, pv, pvc)
 			Bootstrap(f)
 			nodeInfo = GetReadySchedulableRandomNodeInfo()
 			pv = nil
 			pvc = nil
 			volumePath = ""
-		})
-
-		ginkgo.AfterEach(func() {
-			testCleanupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, volumePath, pv, pvc)
 		})
 
 		/*

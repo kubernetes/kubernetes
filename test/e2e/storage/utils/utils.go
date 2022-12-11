@@ -157,9 +157,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	CheckWriteToPath(f, clientPod, v1.PersistentVolumeFilesystem, false, volumePath, byteLen, seed)
 
 	// This command is to make sure kubelet is started after test finishes no matter it fails or not.
-	defer func() {
-		KubeletCommand(KStart, c, clientPod)
-	}()
+	ginkgo.DeferCleanup(KubeletCommand, KStart, c, clientPod)
 	ginkgo.By("Stopping the kubelet.")
 	KubeletCommand(KStop, c, clientPod)
 
@@ -273,9 +271,7 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected find exit code of 0, got %d", result.Code))
 
 	// This command is to make sure kubelet is started after test finishes no matter it fails or not.
-	defer func() {
-		KubeletCommand(KStart, c, clientPod)
-	}()
+	ginkgo.DeferCleanup(KubeletCommand, KStart, c, clientPod)
 	ginkgo.By("Stopping the kubelet.")
 	KubeletCommand(KStop, c, clientPod)
 
@@ -364,9 +360,7 @@ func RunInPodWithVolume(c clientset.Interface, t *framework.TimeoutContext, ns, 
 	}
 	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
-	defer func() {
-		e2epod.DeletePodOrFail(c, ns, pod.Name)
-	}()
+	ginkgo.DeferCleanup(e2epod.DeletePodOrFail, c, ns, pod.Name)
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(c, pod.Name, pod.Namespace, t.PodStartSlow))
 }
 

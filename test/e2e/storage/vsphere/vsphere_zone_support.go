@@ -381,12 +381,12 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 func verifyPVCAndPodCreationSucceeds(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(client.StorageV1().StorageClasses().Delete, storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	framework.ExpectNoError(err)
-	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
@@ -423,12 +423,12 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, timeouts *frame
 func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.Interface, namespace string, scParameters map[string]string, zones []string) error {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(client.StorageV1().StorageClasses().Delete, storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	framework.ExpectNoError(err)
-	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
@@ -437,7 +437,7 @@ func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.I
 	pod := e2epod.MakePod(namespace, nil, pvclaims, false, "")
 	pod, err = client.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	defer e2epod.DeletePodWithWait(client, pod)
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, client, pod)
 
 	ginkgo.By("Waiting for claim to be in bound phase")
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
@@ -465,12 +465,12 @@ func waitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.Persist
 func verifyPodSchedulingFails(client clientset.Interface, namespace string, nodeSelector map[string]string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(client.StorageV1().StorageClasses().Delete, storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	framework.ExpectNoError(err)
-	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
@@ -478,18 +478,18 @@ func verifyPodSchedulingFails(client clientset.Interface, namespace string, node
 	ginkgo.By("Creating a pod")
 	pod, err := e2epod.CreateUnschedulablePod(client, namespace, nodeSelector, pvclaims, false, "")
 	framework.ExpectNoError(err)
-	defer e2epod.DeletePodWithWait(client, pod)
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, client, pod)
 }
 
 func verifyPVCCreationFails(client clientset.Interface, namespace string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) error {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", scParameters, zones, volumeBindingMode), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(client.StorageV1().StorageClasses().Delete, storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	framework.ExpectNoError(err)
-	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 	ginkgo.By("Waiting for claim to be in bound phase")
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
@@ -505,12 +505,12 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 func verifyPVZoneLabels(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string, zones []string) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("zone-sc", nil, zones, ""), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(client.StorageV1().StorageClasses().Delete, storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the storage class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	framework.ExpectNoError(err)
-	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)

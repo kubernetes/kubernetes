@@ -66,10 +66,10 @@ var _ = SIGDescribe("Events", func() {
 		}
 
 		ginkgo.By("submitting the pod to kubernetes")
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			ginkgo.By("deleting the pod")
-			podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
-		}()
+			return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+		})
 		if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}

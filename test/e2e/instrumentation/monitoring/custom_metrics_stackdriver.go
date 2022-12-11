@@ -114,26 +114,26 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 	if err != nil {
 		framework.Failf("Failed to create metric descriptor: %s", err)
 	}
-	defer CleanupDescriptors(gcmService, projectID)
+	ginkgo.DeferCleanup(CleanupDescriptors, gcmService, projectID)
 
 	err = CreateAdapter(adapterDeployment)
 	if err != nil {
 		framework.Failf("Failed to set up: %s", err)
 	}
-	defer CleanupAdapter(adapterDeployment)
+	ginkgo.DeferCleanup(CleanupAdapter, adapterDeployment)
 
 	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), HPAPermissions, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create ClusterRoleBindings: %v", err)
 	}
-	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), HPAPermissions.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(kubeClient.RbacV1().ClusterRoleBindings().Delete, HPAPermissions.Name, metav1.DeleteOptions{})
 
 	// Run application that exports the metric
 	_, err = createSDExporterPods(f, kubeClient)
 	if err != nil {
 		framework.Failf("Failed to create stackdriver-exporter pod: %s", err)
 	}
-	defer cleanupSDExporterPod(f, kubeClient)
+	ginkgo.DeferCleanup(cleanupSDExporterPod, f, kubeClient)
 
 	// Wait a short amount of time to create a pod and export some metrics
 	// TODO: add some events to wait for instead of fixed amount of time
@@ -161,27 +161,27 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 	if err != nil {
 		framework.Failf("Failed to create metric descriptor: %s", err)
 	}
-	defer CleanupDescriptors(gcmService, projectID)
+	ginkgo.DeferCleanup(CleanupDescriptors, gcmService, projectID)
 
 	// Both deployments - for old and new resource model - expose External Metrics API.
 	err = CreateAdapter(AdapterForOldResourceModel)
 	if err != nil {
 		framework.Failf("Failed to set up: %s", err)
 	}
-	defer CleanupAdapter(AdapterForOldResourceModel)
+	ginkgo.DeferCleanup(CleanupAdapter, AdapterForOldResourceModel)
 
 	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), HPAPermissions, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create ClusterRoleBindings: %v", err)
 	}
-	defer kubeClient.RbacV1().ClusterRoleBindings().Delete(context.TODO(), HPAPermissions.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(kubeClient.RbacV1().ClusterRoleBindings().Delete, HPAPermissions.Name, metav1.DeleteOptions{})
 
 	// Run application that exports the metric
 	pod, err := createSDExporterPods(f, kubeClient)
 	if err != nil {
 		framework.Failf("Failed to create stackdriver-exporter pod: %s", err)
 	}
-	defer cleanupSDExporterPod(f, kubeClient)
+	ginkgo.DeferCleanup(cleanupSDExporterPod, f, kubeClient)
 
 	// Wait a short amount of time to create a pod and export some metrics
 	// TODO: add some events to wait for instead of fixed amount of time

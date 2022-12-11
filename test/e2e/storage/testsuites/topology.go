@@ -46,8 +46,6 @@ type topologyTestSuite struct {
 type topologyTest struct {
 	config *storageframework.PerTestConfig
 
-	migrationCheck *migrationOpCheck
-
 	resource      storageframework.VolumeResource
 	pod           *v1.Pod
 	allTopologies []topology
@@ -124,6 +122,9 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		if len(keys) == 0 {
 			e2eskipper.Skipf("Driver didn't provide topology keys -- skipping")
 		}
+
+		ginkgo.DeferCleanup(t.CleanupResources, cs, &l)
+
 		if dInfo.NumAllowedTopologies == 0 {
 			// Any plugin that supports topology defaults to 1 topology
 			dInfo.NumAllowedTopologies = 1
@@ -149,22 +150,14 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 			StorageClassName: &(l.resource.Sc.Name),
 		}, l.config.Framework.Namespace.Name)
 
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
+		migrationCheck := newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
+		ginkgo.DeferCleanup(migrationCheck.validateMigrationVolumeOpCounts)
+
 		return l
-	}
-
-	cleanup := func(l topologyTest) {
-		t.CleanupResources(cs, &l)
-		framework.ExpectNoError(err, "while cleaning up driver")
-
-		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
 	ginkgo.It("should provision a volume and schedule a pod with AllowedTopologies", func(ctx context.Context) {
 		l := init()
-		defer func() {
-			cleanup(l)
-		}()
 
 		// If possible, exclude one topology, otherwise allow them all
 		excludedIndex := -1
@@ -190,9 +183,6 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 
 	ginkgo.It("should fail to schedule a pod which has topologies that conflict with AllowedTopologies", func(ctx context.Context) {
 		l := init()
-		defer func() {
-			cleanup(l)
-		}()
 
 		if len(l.allTopologies) < dInfo.NumAllowedTopologies+1 {
 			e2eskipper.Skipf("Not enough topologies in cluster -- skipping")

@@ -942,10 +942,10 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	containerName := pod.Spec.Containers[0].Name
 	// At the end of the test, clean up by removing the pod.
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		ginkgo.By("deleting the pod")
-		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
-	}()
+		return podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+	})
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
 	podClient.Create(pod)
 
@@ -1002,10 +1002,10 @@ func runReadinessFailTest(f *framework.Framework, pod *v1.Pod, notReadyUntil tim
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 
 	// At the end of the test, clean up by removing the pod.
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		ginkgo.By("deleting the pod")
-		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
-	}()
+		return podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+	})
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
 	podClient.Create(pod)
 

@@ -92,7 +92,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				pods := newTestPods(podCount, false, imageutils.GetPauseImageName(), "restart-container-runtime-test")
 				ginkgo.By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
 				createBatchPodWithRateControl(f, pods, podCreationInterval)
-				defer deletePodsSync(f, pods)
+				ginkgo.DeferCleanup(deletePodsSync, f, pods)
 
 				// Give the node some time to stabilize, assume pods that enter RunningReady within
 				// startTimeout fit on the node and the node is now saturated.
@@ -157,7 +157,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			ginkgo.By(fmt.Sprintf("creating %d RestartAlways pods on node", preRestartPodCount))
 			restartAlwaysPods := newTestPods(preRestartPodCount, false, imageutils.GetPauseImageName(), "restart-dbus-test")
 			createBatchPodWithRateControl(f, restartAlwaysPods, podCreationInterval)
-			defer deletePodsSync(f, restartAlwaysPods)
+			ginkgo.DeferCleanup(deletePodsSync, f, restartAlwaysPods)
 
 			allPods := waitForPodsCondition(f, preRestartPodCount, startTimeout, testutils.PodRunningReadyOrSucceeded)
 			if len(allPods) < preRestartPodCount {
@@ -188,7 +188,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			postRestartPodCount := 2
 			postRestartPods := newTestPods(postRestartPodCount, false, imageutils.GetPauseImageName(), "restart-dbus-test")
 			createBatchPodWithRateControl(f, postRestartPods, podCreationInterval)
-			defer deletePodsSync(f, postRestartPods)
+			ginkgo.DeferCleanup(deletePodsSync, f, postRestartPods)
 
 			allPods = waitForPodsCondition(f, preRestartPodCount+postRestartPodCount, startTimeout, testutils.PodRunningReadyOrSucceeded)
 			if len(allPods) < preRestartPodCount+postRestartPodCount {
@@ -224,7 +224,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				}
 			}
 			createBatchPodWithRateControl(f, restartNeverPods, podCreationInterval)
-			defer deletePodsSync(f, restartNeverPods)
+			ginkgo.DeferCleanup(deletePodsSync, f, restartNeverPods)
 			completedPods := waitForPodsCondition(f, podCountRestartNever, startTimeout, testutils.PodSucceeded)
 
 			if len(completedPods) < podCountRestartNever {
@@ -240,7 +240,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				}
 			}
 			createBatchPodWithRateControl(f, restartAlwaysPods, podCreationInterval)
-			defer deletePodsSync(f, restartAlwaysPods)
+			ginkgo.DeferCleanup(deletePodsSync, f, restartAlwaysPods)
 
 			numAllPods := podCountRestartNever + podCountRestartAlways
 			allPods := waitForPodsCondition(f, numAllPods, startTimeout, testutils.PodRunningReadyOrSucceeded)

@@ -437,7 +437,7 @@ func (tc *CustomMetricTestCase) Run() {
 	if err != nil {
 		framework.Failf("Failed to create stackdriver-exporter pod: %v", err)
 	}
-	defer cleanupDeploymentsToScale(tc.framework, tc.kubeClient, tc.deployment, tc.pod)
+	ginkgo.DeferCleanup(cleanupDeploymentsToScale, tc.framework, tc.kubeClient, tc.deployment, tc.pod)
 
 	// Wait for the deployment to run
 	waitForReplicas(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, 15*time.Minute, tc.initialReplicas)
@@ -447,7 +447,7 @@ func (tc *CustomMetricTestCase) Run() {
 	if err != nil {
 		framework.Failf("Failed to create HPA: %v", err)
 	}
-	defer tc.kubeClient.AutoscalingV2().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Delete(context.TODO(), tc.hpa.ObjectMeta.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(tc.kubeClient.AutoscalingV2().HorizontalPodAutoscalers(tc.framework.Namespace.ObjectMeta.Name).Delete), tc.hpa.ObjectMeta.Name, metav1.DeleteOptions{})
 
 	waitForReplicas(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, 15*time.Minute, tc.scaledReplicas)
 

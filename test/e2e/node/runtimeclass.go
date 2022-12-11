@@ -92,7 +92,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		for key, value := range nodeSelector {
 			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
 			e2enode.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
-			defer e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+			ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, f.ClientSet, nodeName, key)
 		}
 
 		ginkgo.By("Trying to apply taint on the found node.")
@@ -103,7 +103,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 		e2enode.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
 		e2enode.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
-		defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, f.ClientSet, nodeName, taint)
 
 		ginkgo.By("Trying to create runtimeclass and pod")
 		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
@@ -148,7 +148,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		for key, value := range nodeSelector {
 			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
 			e2enode.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
-			defer e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+			ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, f.ClientSet, nodeName, key)
 		}
 
 		ginkgo.By("Trying to create runtimeclass and pod")

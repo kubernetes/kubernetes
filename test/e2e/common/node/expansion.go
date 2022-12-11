@@ -376,9 +376,7 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 	podClient := e2epod.NewPodClient(f)
 	pod = podClient.Create(pod)
 
-	defer func() {
-		e2epod.DeletePodWithWait(f.ClientSet, pod)
-	}()
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
 
 	err := e2epod.WaitForPodContainerToFail(f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout)
 	framework.ExpectNoError(err, "while waiting for the pod container to fail")

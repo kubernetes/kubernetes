@@ -91,7 +91,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// propagated to the right places.
 
 		hostExec := utils.NewHostExec(f)
-		defer hostExec.Cleanup()
+		ginkgo.DeferCleanup(hostExec.Cleanup)
 
 		// Pick a node where all pods will run.
 		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
@@ -108,10 +108,10 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Make sure it's random enough so we don't clash with another test
 		// running in parallel.
 		hostDir := "/var/lib/kubelet/" + f.Namespace.Name
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			cleanCmd := fmt.Sprintf("rm -rf %q", hostDir)
-			hostExec.IssueCommand(cleanCmd, node)
-		}()
+			return hostExec.IssueCommand(cleanCmd, node)
+		})
 
 		podClient := e2epod.NewPodClient(f)
 		bidirectional := v1.MountPropagationBidirectional
@@ -141,7 +141,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 
 			// unmount tmpfs when the test finishes
 			cmd = fmt.Sprintf("umount /mnt/test/%s", podName)
-			defer e2epod.ExecShellInPod(f, podName, cmd)
+			ginkgo.DeferCleanup(e2epod.ExecShellInPod, f, podName, cmd)
 		}
 
 		// The host mounts one tmpfs to testdir/host and puts a file there so we
@@ -150,10 +150,10 @@ var _ = SIGDescribe("Mount propagation", func() {
 		err = hostExec.IssueCommand(cmd, node)
 		framework.ExpectNoError(err)
 
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			cmd := fmt.Sprintf("umount %q/host", hostDir)
-			hostExec.IssueCommand(cmd, node)
-		}()
+			return hostExec.IssueCommand(cmd, node)
+		})
 
 		// Now check that mounts are propagated to the right containers.
 		// expectedMounts is map of pod name -> expected mounts visible in the
