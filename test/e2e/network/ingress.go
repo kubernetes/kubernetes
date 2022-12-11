@@ -319,9 +319,13 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 			err = wait.Poll(10*time.Second, propagationTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
-				framework.ExpectNoError(err)
+				if err != nil {
+					return false, err
+				}
 				deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(context.TODO(), name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				if err != nil {
+					return false, err
+				}
 				if int(deploy.Status.UpdatedReplicas) == replicas {
 					if res.Len() == replicas {
 						return true, nil
