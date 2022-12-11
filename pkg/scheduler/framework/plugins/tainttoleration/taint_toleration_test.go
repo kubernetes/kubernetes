@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -46,6 +47,18 @@ func podWithTolerations(podName string, tolerations []v1.Toleration) *v1.Pod {
 		},
 		Spec: v1.PodSpec{
 			Tolerations: tolerations,
+		},
+	}
+}
+
+func podWithTolerationsAndNodeName(podName, nodeName string, tolerations []v1.Toleration) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Tolerations: tolerations,
+			NodeName:    nodeName,
 		},
 	}
 }
@@ -339,6 +352,48 @@ func TestTaintTolerationFilter(t *testing.T) {
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			}
+		})
+	}
+}
+
+func TestTaintTolerationPreFilter(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		wantPreFilterResult *framework.PreFilterResult
+		wantStatus          *framework.Status
+	}{
+		{
+			name:                "A pod having no tolerations is skipped by tainttoleration plugins",
+			pod:                 podWithTolerationsAndNodeName("pod1", "nodename1", []v1.Toleration{}),
+			wantPreFilterResult: nil,
+			wantStatus:          framework.NewStatus(framework.Skip, ErrReasonNoToleration),
+		},
+		{
+			name: "A pod having tolerations isn't skipped by tainttoleration plugins",
+			pod:  podWithTolerationsAndNodeName("pod1", "nodename1", []v1.Toleration{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			wantPreFilterResult: &framework.PreFilterResult{
+				NodeNames: sets.NewString("nodename1"),
+			},
+			wantStatus: nil,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p, _ := New(nil, nil)
+			state := framework.NewCycleState()
+			gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, tt.pod)
+			if !reflect.DeepEqual(gotPreFilterResult, tt.wantPreFilterResult) {
+				t.Errorf("result does not match: %v, want: %v", gotPreFilterResult, tt.wantPreFilterResult)
+				return
+			}
+			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, tt.wantStatus)
+				return
 			}
 		})
 	}

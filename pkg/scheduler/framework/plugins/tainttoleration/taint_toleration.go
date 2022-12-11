@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
@@ -37,6 +38,7 @@ var _ framework.FilterPlugin = &TaintToleration{}
 var _ framework.PreScorePlugin = &TaintToleration{}
 var _ framework.ScorePlugin = &TaintToleration{}
 var _ framework.EnqueueExtensions = &TaintToleration{}
+var _ framework.PreFilterPlugin = &TaintToleration{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -45,6 +47,8 @@ const (
 	preScoreStateKey = "PreScore" + Name
 	// ErrReasonNotMatch is the Filter reason status when not matching.
 	ErrReasonNotMatch = "node(s) had taints that the pod didn't tolerate"
+	// ErrReasonNoToleration is the PreFilter reason status when not having tolerations.
+	ErrReasonNoToleration = "pod(s) had no toleration(s)"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -58,6 +62,19 @@ func (pl *TaintToleration) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
 		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
+}
+
+// PreFilter builds and writes cycle state used by Filter.
+func (pl *TaintToleration) PreFilter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	if len(pod.Spec.Tolerations) != 0 {
+		return &framework.PreFilterResult{NodeNames: sets.NewString(pod.Spec.NodeName)}, nil
+	}
+	return nil, framework.NewStatus(framework.Skip, ErrReasonNoToleration)
+}
+
+// PreFilterExtensions not necessary for this plugin as state doesn't depend on pod additions or deletions.
+func (pl *TaintToleration) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
 }
 
 // Filter invoked at the filter extension point.
