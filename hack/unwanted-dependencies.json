@@ -10,6 +10,11 @@
       "github.com/go-openapi/validate": "use k8s.io/kube-openapi/pkg/validation/validate instead",
       "github.com/gogo/protobuf": "unmaintained",
       "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
+      "github.com/gorilla/handlers": "unmaintained, archive mode",
+      "github.com/gorilla/mux": "unmaintained, archive mode",
+      "github.com/gorilla/rpc": "unmaintained, archive mode",
+      "github.com/gorilla/schema": "unmaintained, archive mode",
+      "github.com/gorilla/websocket": "unmaintained, archive mode",
       "github.com/hashicorp/consul": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/errwrap": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/go-multierror": "MPL license not in CNCF allowlist",
@@ -49,6 +54,10 @@
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/raft/v3",
         "go.etcd.io/etcd/server/v3"
+      ],
+      "github.com/gorilla/websocket": [
+        "github.com/moby/spdystream",
+        "github.com/tmc/grpc-websocket-proxy"
       ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
