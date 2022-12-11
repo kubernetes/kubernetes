@@ -128,6 +128,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("autoscaling", "v1", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa2"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa2",
+			ExpectedGVK:      gvkP("autoscaling", "v2", "HorizontalPodAutoscaler"),
 		},
 		// --
 
@@ -135,7 +136,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("autoscaling", "v2", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa4"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa4",
-			ExpectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
 		},
 		// --
 
@@ -143,7 +143,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("autoscaling", "v2beta1", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa1"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa1",
-			ExpectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
+			ExpectedGVK:      gvkP("autoscaling", "v2", "HorizontalPodAutoscaler"),
 		},
 		// --
 
@@ -151,7 +151,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("autoscaling", "v2beta2", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa3"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa3",
-			ExpectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
+			ExpectedGVK:      gvkP("autoscaling", "v2", "HorizontalPodAutoscaler"),
 		},
 		// --
 
