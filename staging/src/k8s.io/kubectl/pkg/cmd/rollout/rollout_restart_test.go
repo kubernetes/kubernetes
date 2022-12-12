@@ -88,7 +88,7 @@ func TestRolloutRestartError(t *testing.T) {
 				case p == "/namespaces/test/deployments/nginx-deployment" && (m == "GET" || m == "PATCH"):
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = deploymentName
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
