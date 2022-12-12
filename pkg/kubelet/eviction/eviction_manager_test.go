@@ -287,8 +287,6 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 }
 
 func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
-
 	testCases := map[string]struct {
 		wantPodStatus v1.PodStatus
 	}{
@@ -652,8 +650,6 @@ func parseQuantity(value string) resource.Quantity {
 }
 
 func TestDiskPressureNodeFs(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
-
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
@@ -989,8 +985,6 @@ func TestMinReclaim(t *testing.T) {
 }
 
 func TestNodeReclaimFuncs(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
-
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
