@@ -54,7 +54,7 @@ var _ = SIGDescribe("PrivilegedPod [NodeConformance]", func() {
 	ginkgo.It("should enable privileged commands [LinuxOnly]", func(ctx context.Context) {
 		// Windows does not support privileged containers.
 		ginkgo.By("Creating a pod with a privileged container")
-		config.createPods()
+		config.createPods(ctx)
 
 		ginkgo.By("Executing in the privileged container")
 		config.run(config.privilegedContainer, true)
@@ -115,7 +115,7 @@ func (c *PrivilegedPodTestConfig) createPodsSpec() *v1.Pod {
 	}
 }
 
-func (c *PrivilegedPodTestConfig) createPods() {
+func (c *PrivilegedPodTestConfig) createPods(ctx context.Context) {
 	podSpec := c.createPodsSpec()
-	c.pod = e2epod.NewPodClient(c.f).CreateSync(podSpec)
+	c.pod = e2epod.NewPodClient(c.f).CreateSync(ctx, podSpec)
 }

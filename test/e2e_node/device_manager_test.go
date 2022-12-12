@@ -63,9 +63,9 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			}
 
 			configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
-			sd := setupSRIOVConfigOrFail(f, configMap)
+			sd := setupSRIOVConfigOrFail(ctx, f, configMap)
 
-			waitForSRIOVResources(f, sd)
+			waitForSRIOVResources(ctx, f, sd)
 
 			cntName := "gu-container"
 			// we create and delete a pod to make sure the internal device manager state contains a pod allocation
@@ -85,19 +85,19 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			podName := "gu-pod-rec-pre-1"
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-			pod = e2epod.NewPodClient(f).CreateSync(pod)
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 			// now we need to simulate a node drain, so we remove all the pods, including the sriov device plugin.
 
 			ginkgo.By("deleting the pod")
 			// note we delete right now because we know the current implementation of devicemanager will NOT
 			// clean up on pod deletion. When this changes, the deletion needs to be done after the test is done.
-			deletePodSyncByName(f, pod.Name)
-			waitForAllContainerRemoval(pod.Name, pod.Namespace)
+			deletePodSyncByName(ctx, f, pod.Name)
+			waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 
 			ginkgo.By("teardown the sriov device plugin")
 			// since we will NOT be recreating the plugin, we clean up everything now
-			teardownSRIOVConfigOrFail(f, sd)
+			teardownSRIOVConfigOrFail(ctx, f, sd)
 
 			ginkgo.By("stopping the kubelet")
 			killKubelet("SIGSTOP")
@@ -115,8 +115,8 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 			ginkgo.By("waiting for the kubelet to be ready again")
 			// Wait for the Kubelet to be ready.
-			gomega.Eventually(func() bool {
-				nodes, err := e2enode.TotalReady(f.ClientSet)
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 				framework.ExpectNoError(err)
 				return nodes == 1
 			}, time.Minute, time.Second).Should(gomega.BeTrue())
@@ -131,15 +131,15 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod = makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 
-			pod = e2epod.NewPodClient(f).Create(pod)
-			err = e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+			pod = e2epod.NewPodClient(f).Create(ctx, pod)
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 				if pod.Status.Phase != v1.PodPending {
 					return true, nil
 				}
 				return false, nil
 			})
 			framework.ExpectNoError(err)
-			pod, err = e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			if pod.Status.Phase != v1.PodFailed {
@@ -151,7 +151,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
 			}
 
-			deletePodSyncByName(f, pod.Name)
+			deletePodSyncByName(ctx, f, pod.Name)
 		})
 
 		ginkgo.It("should be able to recover V1 (aka pre-1.20) checkpoint data and update topology info on device re-registration", func(ctx context.Context) {
@@ -164,13 +164,13 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 			configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
 
-			sd := setupSRIOVConfigOrFail(f, configMap)
-			waitForSRIOVResources(f, sd)
+			sd := setupSRIOVConfigOrFail(ctx, f, configMap)
+			waitForSRIOVResources(ctx, f, sd)
 
 			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err)
 
-			resp, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
 			conn.Close()
 			framework.ExpectNoError(err)
 
@@ -183,7 +183,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				}
 			}
 			if suitableDevs == 0 {
-				teardownSRIOVConfigOrFail(f, sd)
+				teardownSRIOVConfigOrFail(ctx, f, sd)
 				e2eskipper.Skipf("no devices found on NUMA Cell other than 0")
 			}
 
@@ -205,19 +205,19 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			podName := "gu-pod-rec-pre-1"
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-			pod = e2epod.NewPodClient(f).CreateSync(pod)
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 			// now we need to simulate a node drain, so we remove all the pods, including the sriov device plugin.
 
 			ginkgo.By("deleting the pod")
 			// note we delete right now because we know the current implementation of devicemanager will NOT
 			// clean up on pod deletion. When this changes, the deletion needs to be done after the test is done.
-			deletePodSyncByName(f, pod.Name)
-			waitForAllContainerRemoval(pod.Name, pod.Namespace)
+			deletePodSyncByName(ctx, f, pod.Name)
+			waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 
 			ginkgo.By("teardown the sriov device plugin")
 			// no need to delete the config now (speed up later)
-			deleteSRIOVPodOrFail(f, sd)
+			deleteSRIOVPodOrFail(ctx, f, sd)
 
 			ginkgo.By("stopping the kubelet")
 			killKubelet("SIGSTOP")
@@ -235,8 +235,8 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 			ginkgo.By("waiting for the kubelet to be ready again")
 			// Wait for the Kubelet to be ready.
-			gomega.Eventually(func() bool {
-				nodes, err := e2enode.TotalReady(f.ClientSet)
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 				framework.ExpectNoError(err)
 				return nodes == 1
 			}, time.Minute, time.Second).Should(gomega.BeTrue())
@@ -245,9 +245,9 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				configMap:      sd.configMap,
 				serviceAccount: sd.serviceAccount,
 			}
-			sd2.pod = createSRIOVPodOrFail(f)
+			sd2.pod = createSRIOVPodOrFail(ctx, f)
 			ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd2)
-			waitForSRIOVResources(f, sd2)
+			waitForSRIOVResources(ctx, f, sd2)
 
 			compareSRIOVResources(sd, sd2)
 
@@ -255,7 +255,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			framework.ExpectNoError(err)
 			defer conn.Close()
 
-			resp2, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			resp2, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
 			framework.ExpectNoError(err)
 
 			cntDevs := stringifyContainerDevices(resp.GetDevices())

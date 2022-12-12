@@ -80,12 +80,12 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 }
 
 // WaitForNodeBootIdsToChange waits for the boot ids of the given nodes to change in order to verify the node has been recreated.
-func WaitForNodeBootIdsToChange(c clientset.Interface, nodes []v1.Node, timeout time.Duration) error {
+func WaitForNodeBootIdsToChange(ctx context.Context, c clientset.Interface, nodes []v1.Node, timeout time.Duration) error {
 	errMsg := []string{}
 	for i := range nodes {
 		node := &nodes[i]
-		if err := wait.Poll(30*time.Second, timeout, func() (bool, error) {
-			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+		if err := wait.PollWithContext(ctx, 30*time.Second, timeout, func(ctx context.Context) (bool, error) {
+			newNode, err := c.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("Could not get node info: %s. Retrying in %v.", err, 30*time.Second)
 				return false, nil

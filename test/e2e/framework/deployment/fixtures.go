@@ -71,9 +71,9 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 }
 
 // CreateDeployment creates a deployment.
-func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, command string) (*appsv1.Deployment, error) {
+func CreateDeployment(ctx context.Context, client clientset.Interface, replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, command string) (*appsv1.Deployment, error) {
 	deploymentSpec := testDeployment(replicas, podLabels, nodeSelector, namespace, pvclaims, false, command)
-	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+	deployment, err := client.AppsV1().Deployments(namespace).Create(ctx, deploymentSpec, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
 	}
@@ -86,14 +86,14 @@ func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[
 }
 
 // GetPodsForDeployment gets pods for the given deployment
-func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deployment) (*v1.PodList, error) {
+func GetPodsForDeployment(ctx context.Context, client clientset.Interface, deployment *appsv1.Deployment) (*v1.PodList, error) {
 	replicaSetSelector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 
 	replicaSetListOptions := metav1.ListOptions{LabelSelector: replicaSetSelector.String()}
-	allReplicaSets, err := client.AppsV1().ReplicaSets(deployment.Namespace).List(context.TODO(), replicaSetListOptions)
+	allReplicaSets, err := client.AppsV1().ReplicaSets(deployment.Namespace).List(ctx, replicaSetListOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 		return nil, err
 	}
 	podListOptions := metav1.ListOptions{LabelSelector: podSelector.String()}
-	allPods, err := client.CoreV1().Pods(deployment.Namespace).List(context.TODO(), podListOptions)
+	allPods, err := client.CoreV1().Pods(deployment.Namespace).List(ctx, podListOptions)
 	if err != nil {
 		return nil, err
 	}

@@ -60,7 +60,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		}
 		pod := newPod([]string{"sh", "-c", "env"}, envVars, nil, nil)
 
-		e2epodoutput.TestContainerOutput(f, "env composition", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "env composition", pod, 0, []string{
 			"FOO=foo-value",
 			"BAR=bar-value",
 			"FOOBAR=foo-value;;bar-value",
@@ -81,7 +81,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		}
 		pod := newPod([]string{"sh", "-c", "TEST_VAR=wrong echo \"$(TEST_VAR)\""}, envVars, nil, nil)
 
-		e2epodoutput.TestContainerOutput(f, "substitution in container's command", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "substitution in container's command", pod, 0, []string{
 			"test-value",
 		})
 	})
@@ -101,7 +101,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod := newPod([]string{"sh", "-c"}, envVars, nil, nil)
 		pod.Spec.Containers[0].Args = []string{"TEST_VAR=wrong echo \"$(TEST_VAR)\""}
 
-		e2epodoutput.TestContainerOutput(f, "substitution in container's args", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "substitution in container's args", pod, 0, []string{
 			"test-value",
 		})
 	})
@@ -141,7 +141,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		envVars[0].Value = pod.ObjectMeta.Name
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "test -d /testcontainer/" + pod.ObjectMeta.Name + ";echo $?"}
 
-		e2epodoutput.TestContainerOutput(f, "substitution in volume subpath", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "substitution in volume subpath", pod, 0, []string{
 			"0",
 		})
 	})
@@ -177,7 +177,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod := newPod(nil, envVars, mounts, volumes)
 
 		// Pod should fail
-		testPodFailSubpath(f, pod)
+		testPodFailSubpath(ctx, f, pod)
 	})
 
 	/*
@@ -216,7 +216,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod := newPod(nil, envVars, mounts, volumes)
 
 		// Pod should fail
-		testPodFailSubpath(f, pod)
+		testPodFailSubpath(ctx, f, pod)
 	})
 
 	/*
@@ -265,13 +265,13 @@ var _ = SIGDescribe("Variable Expansion", func() {
 
 		ginkgo.By("creating the pod with failed condition")
 		podClient := e2epod.NewPodClient(f)
-		pod = podClient.Create(pod)
+		pod = podClient.Create(ctx, pod)
 
-		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 		framework.ExpectError(err, "while waiting for pod to be running")
 
 		ginkgo.By("updating the pod")
-		podClient.Update(pod.ObjectMeta.Name, func(pod *v1.Pod) {
+		podClient.Update(ctx, pod.ObjectMeta.Name, func(pod *v1.Pod) {
 			if pod.ObjectMeta.Annotations == nil {
 				pod.ObjectMeta.Annotations = make(map[string]string)
 			}
@@ -279,11 +279,11 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		})
 
 		ginkgo.By("waiting for pod running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		ginkgo.By("deleting the pod gracefully")
-		err = e2epod.DeletePodWithWait(f.ClientSet, pod)
+		err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
@@ -337,48 +337,48 @@ var _ = SIGDescribe("Variable Expansion", func() {
 
 		ginkgo.By("creating the pod")
 		podClient := e2epod.NewPodClient(f)
-		pod = podClient.Create(pod)
+		pod = podClient.Create(ctx, pod)
 
 		ginkgo.By("waiting for pod running")
-		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		ginkgo.By("creating a file in subpath")
 		cmd := "touch /volume_mount/mypath/foo/test.log"
-		_, _, err = e2epod.ExecShellInPodWithFullOutput(f, pod.Name, cmd)
+		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 		if err != nil {
 			framework.Failf("expected to be able to write to subpath")
 		}
 
 		ginkgo.By("test for file in mounted path")
 		cmd = "test -f /subpath_mount/test.log"
-		_, _, err = e2epod.ExecShellInPodWithFullOutput(f, pod.Name, cmd)
+		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 		if err != nil {
 			framework.Failf("expected to be able to verify file")
 		}
 
 		ginkgo.By("updating the annotation value")
-		podClient.Update(pod.ObjectMeta.Name, func(pod *v1.Pod) {
+		podClient.Update(ctx, pod.ObjectMeta.Name, func(pod *v1.Pod) {
 			pod.ObjectMeta.Annotations["mysubpath"] = "mynewpath"
 		})
 
 		ginkgo.By("waiting for annotated pod running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 		framework.ExpectNoError(err, "while waiting for annotated pod to be running")
 
 		ginkgo.By("deleting the pod gracefully")
-		err = e2epod.DeletePodWithWait(f.ClientSet, pod)
+		err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 })
 
-func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
+func testPodFailSubpath(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	podClient := e2epod.NewPodClient(f)
-	pod = podClient.Create(pod)
+	pod = podClient.Create(ctx, pod)
 
 	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
 
-	err := e2epod.WaitForPodContainerToFail(f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout)
+	err := e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout)
 	framework.ExpectNoError(err, "while waiting for the pod container to fail")
 }
 

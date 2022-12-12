@@ -80,11 +80,11 @@ func newKubeManager(framework *framework.Framework, dnsDomain string) *kubeManag
 }
 
 // initializeCluster initialized the cluster, creating namespaces pods and services as needed.
-func (k *kubeManager) initializeClusterFromModel(model *Model) error {
+func (k *kubeManager) initializeClusterFromModel(ctx context.Context, model *Model) error {
 	var createdPods []*v1.Pod
 	for _, ns := range model.Namespaces {
 		// no labels needed, we just need the default kubernetes.io/metadata.name label
-		namespace, err := k.framework.CreateNamespace(ns.BaseName, nil)
+		namespace, err := k.framework.CreateNamespace(ctx, ns.BaseName, nil)
 		if err != nil {
 			return err
 		}
@@ -96,13 +96,13 @@ func (k *kubeManager) initializeClusterFromModel(model *Model) error {
 
 			// note that we defer the logic of pod (i.e. node selector) specifics to the model
 			// which is aware of linux vs windows pods
-			kubePod, err := k.createPod(pod.KubePod(namespaceName))
+			kubePod, err := k.createPod(ctx, pod.KubePod(namespaceName))
 			if err != nil {
 				return err
 			}
 
 			createdPods = append(createdPods, kubePod)
-			svc, err := k.createService(pod.Service(namespaceName))
+			svc, err := k.createService(ctx, pod.Service(namespaceName))
 			if err != nil {
 				return err
 			}
@@ -121,7 +121,7 @@ func (k *kubeManager) initializeClusterFromModel(model *Model) error {
 	}
 
 	for _, createdPod := range createdPods {
-		err := e2epod.WaitForPodRunningInNamespace(k.clientSet, createdPod)
+		err := e2epod.WaitForPodRunningInNamespace(ctx, k.clientSet, createdPod)
 		if err != nil {
 			return fmt.Errorf("unable to wait for pod %s/%s: %w", createdPod.Namespace, createdPod.Name, err)
 		}
@@ -147,8 +147,8 @@ func (k *kubeManager) NamespaceNames() []string {
 }
 
 // getPod gets a pod by namespace and name.
-func (k *kubeManager) getPod(ns string, name string) (*v1.Pod, error) {
-	kubePod, err := k.clientSet.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
+func (k *kubeManager) getPod(ctx context.Context, ns string, name string) (*v1.Pod, error) {
+	kubePod, err := k.clientSet.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to get pod %s/%s: %w", ns, name, err)
 	}
@@ -204,11 +204,11 @@ func (k *kubeManager) executeRemoteCommand(namespace string, pod string, contain
 }
 
 // createService is a convenience function for service setup.
-func (k *kubeManager) createService(service *v1.Service) (*v1.Service, error) {
+func (k *kubeManager) createService(ctx context.Context, service *v1.Service) (*v1.Service, error) {
 	ns := service.Namespace
 	name := service.Name
 
-	createdService, err := k.clientSet.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
+	createdService, err := k.clientSet.CoreV1().Services(ns).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create service %s/%s: %w", ns, name, err)
 	}
@@ -216,11 +216,11 @@ func (k *kubeManager) createService(service *v1.Service) (*v1.Service, error) {
 }
 
 // createPod is a convenience function for pod setup.
-func (k *kubeManager) createPod(pod *v1.Pod) (*v1.Pod, error) {
+func (k *kubeManager) createPod(ctx context.Context, pod *v1.Pod) (*v1.Pod, error) {
 	ns := pod.Namespace
 	framework.Logf("creating pod %s/%s", ns, pod.Name)
 
-	createdPod, err := k.clientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+	createdPod, err := k.clientSet.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create pod %s/%s: %w", ns, pod.Name, err)
 	}
@@ -228,16 +228,16 @@ func (k *kubeManager) createPod(pod *v1.Pod) (*v1.Pod, error) {
 }
 
 // cleanNetworkPolicies is a convenience function for deleting network policies before startup of any new test.
-func (k *kubeManager) cleanNetworkPolicies() error {
+func (k *kubeManager) cleanNetworkPolicies(ctx context.Context) error {
 	for _, ns := range k.namespaceNames {
 		framework.Logf("deleting policies in %s ..........", ns)
-		l, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
+		l, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("unable to list network policies in ns %s: %w", ns, err)
 		}
 		for _, np := range l.Items {
 			framework.Logf("deleting network policy %s/%s", ns, np.Name)
-			err = k.clientSet.NetworkingV1().NetworkPolicies(ns).Delete(context.TODO(), np.Name, metav1.DeleteOptions{})
+			err = k.clientSet.NetworkingV1().NetworkPolicies(ns).Delete(ctx, np.Name, metav1.DeleteOptions{})
 			if err != nil {
 				return fmt.Errorf("unable to delete network policy %s/%s: %w", ns, np.Name, err)
 			}
@@ -247,10 +247,10 @@ func (k *kubeManager) cleanNetworkPolicies() error {
 }
 
 // createNetworkPolicy is a convenience function for creating network policies.
-func (k *kubeManager) createNetworkPolicy(ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+func (k *kubeManager) createNetworkPolicy(ctx context.Context, ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 	framework.Logf("creating network policy %s/%s", ns, netpol.Name)
 	netpol.ObjectMeta.Namespace = ns
-	np, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).Create(context.TODO(), netpol, metav1.CreateOptions{})
+	np, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).Create(ctx, netpol, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create network policy %s/%s: %w", ns, netpol.Name, err)
 	}
@@ -258,10 +258,10 @@ func (k *kubeManager) createNetworkPolicy(ns string, netpol *networkingv1.Networ
 }
 
 // updateNetworkPolicy is a convenience function for updating network policies.
-func (k *kubeManager) updateNetworkPolicy(ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+func (k *kubeManager) updateNetworkPolicy(ctx context.Context, ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 	framework.Logf("updating network policy %s/%s", ns, netpol.Name)
 	netpol.ObjectMeta.Namespace = ns
-	np, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).Update(context.TODO(), netpol, metav1.UpdateOptions{})
+	np, err := k.clientSet.NetworkingV1().NetworkPolicies(ns).Update(ctx, netpol, metav1.UpdateOptions{})
 	if err != nil {
 		return np, fmt.Errorf("unable to update network policy %s/%s: %w", ns, netpol.Name, err)
 	}
@@ -269,8 +269,8 @@ func (k *kubeManager) updateNetworkPolicy(ns string, netpol *networkingv1.Networ
 }
 
 // getNamespace gets a namespace object from kubernetes.
-func (k *kubeManager) getNamespace(ns string) (*v1.Namespace, error) {
-	selectedNameSpace, err := k.clientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
+func (k *kubeManager) getNamespace(ctx context.Context, ns string) (*v1.Namespace, error) {
+	selectedNameSpace, err := k.clientSet.CoreV1().Namespaces().Get(ctx, ns, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to get namespace %s: %w", ns, err)
 	}

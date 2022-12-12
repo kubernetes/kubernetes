@@ -210,13 +210,13 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
-		startedPod := podClient.Create(pod)
+		startedPod := podClient.Create(ctx, pod)
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
 		w := &cache.ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
 				options.FieldSelector = fieldSelector
-				return podClient.Watch(context.TODO(), options)
+				return podClient.Watch(ctx, options)
 			},
 		}
 		var events []watch.Event
@@ -291,13 +291,13 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
-		startedPod := podClient.Create(pod)
+		startedPod := podClient.Create(ctx, pod)
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
 		w := &cache.ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
 				options.FieldSelector = fieldSelector
-				return podClient.Watch(context.TODO(), options)
+				return podClient.Watch(ctx, options)
 			},
 		}
 		var events []watch.Event
@@ -371,13 +371,13 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
-		startedPod := podClient.Create(pod)
+		startedPod := podClient.Create(ctx, pod)
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
 		w := &cache.ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
 				options.FieldSelector = fieldSelector
-				return podClient.Watch(context.TODO(), options)
+				return podClient.Watch(ctx, options)
 			},
 		}
 
@@ -496,13 +496,13 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 		}
 		framework.Logf("PodSpec: initContainers in spec.initContainers")
-		startedPod := podClient.Create(pod)
+		startedPod := podClient.Create(ctx, pod)
 
 		fieldSelector := fields.OneTermEqualSelector("metadata.name", startedPod.Name).String()
 		w := &cache.ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
 				options.FieldSelector = fieldSelector
-				return podClient.Watch(context.TODO(), options)
+				return podClient.Watch(ctx, options)
 			},
 		}
 

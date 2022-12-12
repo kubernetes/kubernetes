@@ -17,6 +17,7 @@ limitations under the License.
 package providers
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -58,7 +59,7 @@ func LocationParamGKE() string {
 }
 
 // MasterUpgradeGKE upgrades master node to the specified version on GKE.
-func MasterUpgradeGKE(namespace string, v string) error {
+func MasterUpgradeGKE(ctx context.Context, namespace string, v string) error {
 	framework.Logf("Upgrading master to %q", v)
 	args := []string{
 		"container",
@@ -76,7 +77,7 @@ func MasterUpgradeGKE(namespace string, v string) error {
 		return err
 	}
 
-	e2enode.WaitForSSHTunnels(namespace)
+	e2enode.WaitForSSHTunnels(ctx, namespace)
 
 	return nil
 }

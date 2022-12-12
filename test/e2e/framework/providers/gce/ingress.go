@@ -77,14 +77,14 @@ type IngressController struct {
 }
 
 // CleanupIngressController calls cont.CleanupIngressControllerWithTimeout with hard-coded timeout
-func (cont *IngressController) CleanupIngressController() error {
-	return cont.CleanupIngressControllerWithTimeout(e2eservice.LoadBalancerCleanupTimeout)
+func (cont *IngressController) CleanupIngressController(ctx context.Context) error {
+	return cont.CleanupIngressControllerWithTimeout(ctx, e2eservice.LoadBalancerCleanupTimeout)
 }
 
 // CleanupIngressControllerWithTimeout calls the IngressController.Cleanup(false)
 // followed with deleting the static ip, and then a final IngressController.Cleanup(true)
-func (cont *IngressController) CleanupIngressControllerWithTimeout(timeout time.Duration) error {
-	pollErr := wait.Poll(5*time.Second, timeout, func() (bool, error) {
+func (cont *IngressController) CleanupIngressControllerWithTimeout(ctx context.Context, timeout time.Duration) error {
+	pollErr := wait.PollWithContext(ctx, 5*time.Second, timeout, func(ctx context.Context) (bool, error) {
 		if err := cont.Cleanup(false); err != nil {
 			framework.Logf("Monitoring glbc's cleanup of gce resources:\n%v", err)
 			return false, nil
@@ -105,7 +105,7 @@ func (cont *IngressController) CleanupIngressControllerWithTimeout(timeout time.
 	// controller. Delete this IP only after the controller has had a chance
 	// to cleanup or it might interfere with the controller, causing it to
 	// throw out confusing events.
-	if ipErr := wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
+	if ipErr := wait.PollWithContext(ctx, 5*time.Second, 1*time.Minute, func(ctx context.Context) (bool, error) {
 		if err := cont.deleteStaticIPs(); err != nil {
 			framework.Logf("Failed to delete static-ip: %v\n", err)
 			return false, nil
@@ -125,9 +125,9 @@ func (cont *IngressController) CleanupIngressControllerWithTimeout(timeout time.
 	return nil
 }
 
-func (cont *IngressController) getL7AddonUID() (string, error) {
+func (cont *IngressController) getL7AddonUID(ctx context.Context) (string, error) {
 	framework.Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
-	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), uidConfigMap, metav1.GetOptions{})
+	cm, err := cont.Client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, uidConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -604,8 +604,8 @@ func (cont *IngressController) isHTTPErrorCode(err error, code int) bool {
 }
 
 // WaitForNegBackendService waits for the expected backend service to become
-func (cont *IngressController) WaitForNegBackendService(svcPorts map[string]v1.ServicePort) error {
-	return wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
+func (cont *IngressController) WaitForNegBackendService(ctx context.Context, svcPorts map[string]v1.ServicePort) error {
+	return wait.PollWithContext(ctx, 5*time.Second, 1*time.Minute, func(ctx context.Context) (bool, error) {
 		err := cont.verifyBackendMode(svcPorts, negBackend)
 		if err != nil {
 			framework.Logf("Err while checking if backend service is using NEG: %v", err)
@@ -616,8 +616,8 @@ func (cont *IngressController) WaitForNegBackendService(svcPorts map[string]v1.S
 }
 
 // WaitForIgBackendService returns true only if all global backend service with matching svcPorts pointing to IG as backend
-func (cont *IngressController) WaitForIgBackendService(svcPorts map[string]v1.ServicePort) error {
-	return wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
+func (cont *IngressController) WaitForIgBackendService(ctx context.Context, svcPorts map[string]v1.ServicePort) error {
+	return wait.PollWithContext(ctx, 5*time.Second, 1*time.Minute, func(ctx context.Context) (bool, error) {
 		err := cont.verifyBackendMode(svcPorts, igBackend)
 		if err != nil {
 			framework.Logf("Err while checking if backend service is using IG: %v", err)
@@ -745,8 +745,8 @@ func (cont *IngressController) Cleanup(del bool) error {
 }
 
 // Init initializes the IngressController with an UID
-func (cont *IngressController) Init() error {
-	uid, err := cont.getL7AddonUID()
+func (cont *IngressController) Init(ctx context.Context) error {
+	uid, err := cont.getL7AddonUID(ctx)
 	if err != nil {
 		return err
 	}

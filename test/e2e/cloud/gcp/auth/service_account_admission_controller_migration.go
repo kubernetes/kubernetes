@@ -51,7 +51,7 @@ var _ = SIGDescribe("ServiceAccount admission controller migration [Feature:Boun
 			testSuite.TestCases = append(testSuite.TestCases, serviceaccountAdmissionControllerMigrationTest)
 
 			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(ctx, upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 })

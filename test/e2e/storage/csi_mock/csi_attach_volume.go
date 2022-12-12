@@ -71,23 +71,23 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 			test := t
 			ginkgo.It(t.name, func(ctx context.Context) {
 				var err error
-				m.init(testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
+				m.init(ctx, testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
 				ginkgo.DeferCleanup(m.cleanup)
 
 				volumeType := test.volumeType
 				if volumeType == "" {
 					volumeType = pvcReference
 				}
-				_, claim, pod := m.createPod(volumeType)
+				_, claim, pod := m.createPod(ctx, volumeType)
 				if pod == nil {
 					return
 				}
-				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				ginkgo.By("Checking if VolumeAttachment was created for the pod")
 				testConfig := storageframework.ConvertTestConfig(m.config)
-				attachmentName := e2evolume.GetVolumeAttachmentName(m.cs, testConfig, m.provisioner, claim.Name, claim.Namespace)
+				attachmentName := e2evolume.GetVolumeAttachmentName(ctx, m.cs, testConfig, m.provisioner, claim.Name, claim.Namespace)
 				_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
@@ -109,10 +109,10 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 	ginkgo.Context("CSI CSIDriver deployment after pod creation using non-attachable mock driver", func() {
 		ginkgo.It("should bringup pod after deploying CSIDriver attach=false [Slow]", func(ctx context.Context) {
 			var err error
-			m.init(testParameters{registerDriver: false, disableAttach: true})
+			m.init(ctx, testParameters{registerDriver: false, disableAttach: true})
 			ginkgo.DeferCleanup(m.cleanup)
 
-			_, claim, pod := m.createPod(pvcReference) // late binding as specified above
+			_, claim, pod := m.createPod(ctx, pvcReference) // late binding as specified above
 			if pod == nil {
 				return
 			}
@@ -126,9 +126,9 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 			}.AsSelector().String()
 			msg := "AttachVolume.Attach failed for volume"
 
-			err = e2eevents.WaitTimeoutForEvent(m.cs, pod.Namespace, eventSelector, msg, f.Timeouts.PodStart)
+			err = e2eevents.WaitTimeoutForEvent(ctx, m.cs, pod.Namespace, eventSelector, msg, f.Timeouts.PodStart)
 			if err != nil {
-				podErr := e2epod.WaitTimeoutForPodRunningInNamespace(m.cs, pod.Name, pod.Namespace, 10*time.Second)
+				podErr := e2epod.WaitTimeoutForPodRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace, 10*time.Second)
 				framework.ExpectError(podErr, "Pod should not be in running status because attaching should failed")
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				framework.Logf("Attach should fail and the corresponding event should show up, error: %v", err)
@@ -137,7 +137,7 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 			// VolumeAttachment should be created because the default value for CSI attachable is true
 			ginkgo.By("Checking if VolumeAttachment was created for the pod")
 			testConfig := storageframework.ConvertTestConfig(m.config)
-			attachmentName := e2evolume.GetVolumeAttachmentName(m.cs, testConfig, m.provisioner, claim.Name, claim.Namespace)
+			attachmentName := e2evolume.GetVolumeAttachmentName(ctx, m.cs, testConfig, m.provisioner, claim.Name, claim.Namespace)
 			_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -156,7 +156,7 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 				NewDriverName: "csi-mock-" + f.UniqueName,
 				CanAttach:     &canAttach,
 			}
-			err = utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
+			err = utils.CreateFromManifests(ctx, f, driverNamespace, func(item interface{}) error {
 				return utils.PatchCSIDeployment(f, o, item)
 			}, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
 			if err != nil {
@@ -164,13 +164,13 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 			}
 
 			ginkgo.By("Wait for the pod in running status")
-			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 			ginkgo.By(fmt.Sprintf("Wait for the volumeattachment to be deleted up to %v", csiVolumeAttachmentTimeout))
 			// This step can be slow because we have to wait either a NodeUpdate event happens or
 			// the detachment for this volume timeout so that we can do a force detach.
-			err = e2evolume.WaitForVolumeAttachmentTerminated(attachmentName, m.cs, csiVolumeAttachmentTimeout)
+			err = e2evolume.WaitForVolumeAttachmentTerminated(ctx, attachmentName, m.cs, csiVolumeAttachmentTimeout)
 			framework.ExpectNoError(err, "Failed to delete VolumeAttachment: %v", err)
 		})
 	})

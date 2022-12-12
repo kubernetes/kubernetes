@@ -41,16 +41,16 @@ var _ = SIGDescribe("Containers", func() {
 	framework.ConformanceIt("should use the image defaults if command and args are blank [NodeConformance]", func(ctx context.Context) {
 		pod := entrypointTestPod(f.Namespace.Name)
 		pod.Spec.Containers[0].Args = nil
-		pod = e2epod.NewPodClient(f).Create(pod)
-		err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+		pod = e2epod.NewPodClient(f).Create(ctx, pod)
+		err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "Expected pod %q to be running, got error: %v", pod.Name, err)
 		pollLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		}
 
 		// The agnhost's image default entrypoint / args are: "/agnhost pause"
 		// which will print out "Paused".
-		gomega.Eventually(pollLogs, 3, framework.Poll).Should(gomega.ContainSubstring("Paused"))
+		gomega.Eventually(ctx, pollLogs, 3, framework.Poll).Should(gomega.ContainSubstring("Paused"))
 	})
 
 	/*
@@ -60,7 +60,7 @@ var _ = SIGDescribe("Containers", func() {
 	*/
 	framework.ConformanceIt("should be able to override the image's default arguments (container cmd) [NodeConformance]", func(ctx context.Context) {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")
-		e2epodoutput.TestContainerOutput(f, "override arguments", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "override arguments", pod, 0, []string{
 			"[/agnhost entrypoint-tester override arguments]",
 		})
 	})
@@ -76,7 +76,7 @@ var _ = SIGDescribe("Containers", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester")
 		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
 
-		e2epodoutput.TestContainerOutput(f, "override command", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "override command", pod, 0, []string{
 			"[/agnhost-2 entrypoint-tester]",
 		})
 	})
@@ -90,7 +90,7 @@ var _ = SIGDescribe("Containers", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")
 		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
 
-		e2epodoutput.TestContainerOutput(f, "override all", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "override all", pod, 0, []string{
 			"[/agnhost-2 entrypoint-tester override arguments]",
 		})
 	})

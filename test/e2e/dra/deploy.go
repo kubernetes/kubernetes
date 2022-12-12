@@ -59,7 +59,7 @@ type Nodes struct {
 // NewNodes selects nodes to run the test on.
 func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 	nodes := &Nodes{}
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		ginkgo.By("selecting nodes")
 		// The kubelet plugin is harder. We deploy the builtin manifest
 		// after patching in the driver name and all nodes on which we
@@ -67,7 +67,7 @@ func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 		//
 		// Only a subset of the nodes are picked to avoid causing
 		// unnecessary load on a big cluster.
-		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
+		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
 		framework.ExpectNoError(err, "get nodes")
 		numNodes := int32(len(nodeList.Items))
 		if int(numNodes) < minNodes {
@@ -160,7 +160,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	rsName := ""
 	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
 	numNodes := int32(len(nodes.NodeNames))
-	err := utils.CreateFromManifests(d.f, d.f.Namespace, func(item interface{}) error {
+	err := utils.CreateFromManifests(ctx, d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
 			item.Name += d.NameSuffix
@@ -197,7 +197,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	framework.ExpectNoError(err, "get replicaset")
 
 	// Wait for all pods to be running.
-	if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(d.f.ClientSet, rs, numNodes); err != nil {
+	if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, d.f.ClientSet, rs, numNodes); err != nil {
 		framework.ExpectNoError(err, "all kubelet plugin proxies running")
 	}
 	requirement, err := labels.NewRequirement(instanceKey, selection.Equals, []string{d.Name})

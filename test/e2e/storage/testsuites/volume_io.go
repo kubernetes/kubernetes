@@ -113,34 +113,34 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	f := framework.NewFrameworkWithCustomTimeouts("volumeio", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	init := func() {
+	init := func(ctx context.Context) {
 		l = local{}
 
 		// Now do the more expensive test initialization.
-		l.config = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
+		l.config = driver.PrepareTest(ctx, f)
+		l.migrationCheck = newMigrationOpCheck(ctx, f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageframework.CreateVolumeResource(ctx, driver, l.config, pattern, testVolumeSizeRange)
 		if l.resource.VolSource == nil {
 			e2eskipper.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
 
 	}
 
-	cleanup := func() {
+	cleanup := func(ctx context.Context) {
 		var errs []error
 		if l.resource != nil {
-			errs = append(errs, l.resource.CleanupResource())
+			errs = append(errs, l.resource.CleanupResource(ctx))
 			l.resource = nil
 		}
 
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
-		l.migrationCheck.validateMigrationVolumeOpCounts()
+		l.migrationCheck.validateMigrationVolumeOpCounts(ctx)
 	}
 
 	ginkgo.It("should write files of various sizes, verify size, validate content [Slow]", func(ctx context.Context) {
-		init()
+		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
 		cs := f.ClientSet
@@ -154,7 +154,7 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		podSec := v1.PodSecurityContext{
 			FSGroup: fsGroup,
 		}
-		err := testVolumeIO(f, cs, storageframework.ConvertTestConfig(l.config), *l.resource.VolSource, &podSec, testFile, fileSizes)
+		err := testVolumeIO(ctx, f, cs, storageframework.ConvertTestConfig(l.config), *l.resource.VolSource, &podSec, testFile, fileSizes)
 		framework.ExpectNoError(err)
 	})
 }
@@ -305,7 +305,7 @@ func deleteFile(f *framework.Framework, pod *v1.Pod, fpath string) {
 // Note: `fsizes` values are enforced to each be at least `MinFileSize` and a multiple of `MinFileSize`
 //
 //	bytes.
-func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolume.TestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
+func testVolumeIO(ctx context.Context, f *framework.Framework, cs clientset.Interface, config e2evolume.TestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
 	ddInput := filepath.Join(mountPath, fmt.Sprintf("%s-%s-dd_if", config.Prefix, config.Namespace))
 	writeBlk := strings.Repeat("abcdefghijklmnopqrstuvwxyz123456", 32) // 1KiB value
 	loopCnt := storageframework.MinFileSize / int64(len(writeBlk))
@@ -318,14 +318,14 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolu
 
 	ginkgo.By(fmt.Sprintf("starting %s", clientPod.Name))
 	podsNamespacer := cs.CoreV1().Pods(config.Namespace)
-	clientPod, err = podsNamespacer.Create(context.TODO(), clientPod, metav1.CreateOptions{})
+	clientPod, err = podsNamespacer.Create(ctx, clientPod, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create client pod %q: %v", clientPod.Name, err)
 	}
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		deleteFile(f, clientPod, ddInput)
 		ginkgo.By(fmt.Sprintf("deleting client pod %q...", clientPod.Name))
-		e := e2epod.DeletePodWithWait(cs, clientPod)
+		e := e2epod.DeletePodWithWait(ctx, cs, clientPod)
 		if e != nil {
 			framework.Logf("client pod failed to delete: %v", e)
 			if err == nil { // delete err is returned if err is not set
@@ -337,7 +337,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolu
 		}
 	})
 
-	err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, clientPod.Name, clientPod.Namespace, f.Timeouts.PodStart)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, clientPod.Name, clientPod.Namespace, f.Timeouts.PodStart)
 	if err != nil {
 		return fmt.Errorf("client pod %q not running: %v", clientPod.Name, err)
 	}

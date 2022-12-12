@@ -140,8 +140,8 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		}
 
 		// Now do the more expensive test initialization.
-		l.config = driver.PrepareTest(f)
-		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, e2evolume.SizeRange{})
+		l.config = driver.PrepareTest(ctx, f)
+		l.resource = storageframework.CreateVolumeResource(ctx, driver, l.config, pattern, e2evolume.SizeRange{})
 
 		switch pattern.VolType {
 		case storageframework.CSIInlineVolume:
@@ -166,9 +166,9 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		}
 	}
 
-	cleanup := func() {
+	cleanup := func(ctx context.Context) {
 		var cleanUpErrs []error
-		cleanUpErrs = append(cleanUpErrs, l.resource.CleanupResource())
+		cleanUpErrs = append(cleanUpErrs, l.resource.CleanupResource(ctx))
 		err := utilerrors.NewAggregate(cleanUpErrs)
 		framework.ExpectNoError(err, "while cleaning up")
 	}
@@ -182,7 +182,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		ginkgo.DeferCleanup(cleanup)
 
 		l.testCase.ReadOnly = true
-		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
+		l.testCase.RunningPodCheck = func(ctx context.Context, pod *v1.Pod) interface{} {
 			command := "mount | grep /mnt/test | grep ro,"
 			if framework.NodeOSDistroIs("windows") {
 				// attempt to create a dummy file and expect for it not to be created
@@ -199,7 +199,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		ginkgo.DeferCleanup(cleanup)
 
 		l.testCase.ReadOnly = false
-		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
+		l.testCase.RunningPodCheck = func(ctx context.Context, pod *v1.Pod) interface{} {
 			command := "mount | grep /mnt/test | grep rw,"
 			if framework.NodeOSDistroIs("windows") {
 				// attempt to create a dummy file and expect for it to be created
@@ -227,7 +227,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		}
 
 		l.testCase.ReadOnly = false
-		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
+		l.testCase.RunningPodCheck = func(ctx context.Context, pod *v1.Pod) interface{} {
 			podName := pod.Name
 			framework.Logf("Running volume expansion checks %s", podName)
 
@@ -249,7 +249,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			newSize.Add(resource.MustParse("1Gi"))
 			framework.Logf("currentPvcSize %s, requested new size %s", currentPvcSize.String(), newSize.String())
 
-			newPVC, err := ExpandPVCSize(pvc, newSize, f.ClientSet)
+			newPVC, err := ExpandPVCSize(ctx, pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
 			pvc = newPVC
 			gomega.Expect(pvc).NotTo(gomega.BeNil())
@@ -260,11 +260,11 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			}
 
 			ginkgo.By("Waiting for cloudprovider resize to finish")
-			err = WaitForControllerVolumeResize(pvc, f.ClientSet, totalResizeWaitPeriod)
+			err = WaitForControllerVolumeResize(ctx, pvc, f.ClientSet, totalResizeWaitPeriod)
 			framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 			ginkgo.By("Waiting for file system resize to finish")
-			pvc, err = WaitForFSResize(pvc, f.ClientSet)
+			pvc, err = WaitForFSResize(ctx, pvc, f.ClientSet)
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := pvc.Status.Conditions
@@ -287,13 +287,13 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			_, shared, readOnly = eDriver.GetVolume(l.config, 0)
 		}
 
-		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
+		l.testCase.RunningPodCheck = func(ctx context.Context, pod *v1.Pod) interface{} {
 			// Create another pod with the same inline volume attributes.
 			pod2 := StartInPodWithInlineVolume(ctx, f.ClientSet, f.Namespace.Name, "inline-volume-tester2", "sleep 100000",
 				[]v1.VolumeSource{pod.Spec.Volumes[0].VolumeSource},
 				readOnly,
 				l.testCase.Node)
-			framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod2.Name, pod2.Namespace, f.Timeouts.PodStartSlow), "waiting for second pod with inline volume")
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod2.Name, pod2.Namespace, f.Timeouts.PodStartSlow), "waiting for second pod with inline volume")
 
 			// If (and only if) we were able to mount
 			// read/write and volume data is not shared
@@ -306,7 +306,11 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 				e2evolume.VerifyExecInPodSucceed(f, pod2, "[ ! -f /mnt/test-0/hello-world ]")
 			}
 
-			defer StopPodAndDependents(ctx, f.ClientSet, f.Timeouts, pod2)
+			// TestEphemeral expects the pod to be fully deleted
+			// when this function returns, so don't delay this
+			// cleanup.
+			StopPodAndDependents(ctx, f.ClientSet, f.Timeouts, pod2)
+
 			return nil
 		}
 
@@ -353,7 +357,7 @@ type EphemeralTest struct {
 	// RunningPodCheck is invoked while a pod using an inline volume is running.
 	// It can execute additional checks on the pod and its volume(s). Any data
 	// returned by it is passed to StoppedPodCheck.
-	RunningPodCheck func(pod *v1.Pod) interface{}
+	RunningPodCheck func(ctx context.Context, pod *v1.Pod) interface{}
 
 	// StoppedPodCheck is invoked after ensuring that the pod is gone.
 	// It is passed the data gather by RunningPodCheck or nil if that
@@ -361,7 +365,7 @@ type EphemeralTest struct {
 	// like for example verifying that the ephemeral volume was really
 	// removed. How to do such a check is driver-specific and not
 	// covered by the generic storage test suite.
-	StoppedPodCheck func(nodeName string, runningPodData interface{})
+	StoppedPodCheck func(ctx context.Context, nodeName string, runningPodData interface{})
 
 	// NumInlineVolumes sets the number of ephemeral inline volumes per pod.
 	// Unset (= zero) is the same as one.
@@ -410,7 +414,7 @@ func (t EphemeralTest) TestEphemeral(ctx context.Context) {
 		// pod might be nil now.
 		StopPodAndDependents(ctx, client, t.Timeouts, pod)
 	}()
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(client, pod.Name, pod.Namespace, t.Timeouts.PodStartSlow), "waiting for pod with inline volume")
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, client, pod.Name, pod.Namespace, t.Timeouts.PodStartSlow), "waiting for pod with inline volume")
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
@@ -418,7 +422,7 @@ func (t EphemeralTest) TestEphemeral(ctx context.Context) {
 	// Run the checker of the running pod.
 	var runningPodData interface{}
 	if t.RunningPodCheck != nil {
-		runningPodData = t.RunningPodCheck(pod)
+		runningPodData = t.RunningPodCheck(ctx, pod)
 	}
 
 	StopPodAndDependents(ctx, client, t.Timeouts, pod)
@@ -431,7 +435,7 @@ func (t EphemeralTest) TestEphemeral(ctx context.Context) {
 	gomega.Expect(pvcs.Items).Should(gomega.BeEmpty(), "no dangling PVCs")
 
 	if t.StoppedPodCheck != nil {
-		t.StoppedPodCheck(actualNodeName, runningPodData)
+		t.StoppedPodCheck(ctx, actualNodeName, runningPodData)
 	}
 }
 

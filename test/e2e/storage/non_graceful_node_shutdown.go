@@ -66,11 +66,11 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 	f := framework.NewDefaultFramework("non-graceful-shutdown")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		e2eskipper.SkipUnlessProviderIs("gce")
-		nodeList, err := e2enode.GetReadySchedulableNodes(c)
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		if err != nil {
 			framework.Logf("Failed to list node: %v", err)
 		}
@@ -84,24 +84,24 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 			// Install gce pd csi driver
 			ginkgo.By("deploying csi gce-pd driver")
 			driver := drivers.InitGcePDCSIDriver()
-			config := driver.PrepareTest(f)
+			config := driver.PrepareTest(ctx, f)
 			dDriver, ok := driver.(storageframework.DynamicPVTestDriver)
 			if !ok {
 				e2eskipper.Skipf("csi driver expected DynamicPVTestDriver but got %v", driver)
 			}
 			ginkgo.By("Creating a gce-pd storage class")
-			sc := dDriver.GetDynamicProvisionStorageClass(config, "")
-			_, err := c.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
+			sc := dDriver.GetDynamicProvisionStorageClass(ctx, config, "")
+			_, err := c.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create a storageclass")
 			scName := &sc.Name
 
 			deploymentName := "sts-pod-gcepd"
 			podLabels := map[string]string{"app": deploymentName}
-			pod := createAndVerifyStatefulDeployment(scName, deploymentName, ns, podLabels, c)
+			pod := createAndVerifyStatefulDeployment(ctx, scName, deploymentName, ns, podLabels, c)
 			oldNodeName := pod.Spec.NodeName
 
 			ginkgo.By("Stopping the kubelet non gracefully for pod" + pod.Name)
-			utils.KubeletCommand(utils.KStop, c, pod)
+			utils.KubeletCommand(ctx, utils.KStop, c, pod)
 
 			ginkgo.By("Adding out of service taint on node " + oldNodeName)
 			// taint this node as out-of-service node
@@ -109,7 +109,7 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 				Key:    v1.TaintNodeOutOfService,
 				Effect: v1.TaintEffectNoExecute,
 			}
-			e2enode.AddOrUpdateTaintOnNode(c, oldNodeName, taint)
+			e2enode.AddOrUpdateTaintOnNode(ctx, c, oldNodeName, taint)
 
 			ginkgo.By(fmt.Sprintf("Checking if the pod %s got rescheduled to a new node", pod.Name))
 			labelSelectorStr := labels.SelectorFromSet(podLabels).String()
@@ -117,18 +117,18 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 				LabelSelector: labelSelectorStr,
 				FieldSelector: fields.OneTermNotEqualSelector("spec.nodeName", oldNodeName).String(),
 			}
-			_, err = e2epod.WaitForAllPodsCondition(c, ns, podListOpts, 1, "running and ready", framework.PodStartTimeout, testutils.PodRunningReady)
+			_, err = e2epod.WaitForAllPodsCondition(ctx, c, ns, podListOpts, 1, "running and ready", framework.PodStartTimeout, testutils.PodRunningReady)
 			framework.ExpectNoError(err)
 
 			// Bring the node back online and remove the taint
-			utils.KubeletCommand(utils.KStart, c, pod)
-			e2enode.RemoveTaintOffNode(c, oldNodeName, taint)
+			utils.KubeletCommand(ctx, utils.KStart, c, pod)
+			e2enode.RemoveTaintOffNode(ctx, c, oldNodeName, taint)
 
 			// Verify that a pod gets scheduled to the older node that was terminated non gracefully and now
 			// is back online
 			newDeploymentName := "sts-pod-gcepd-new"
 			newPodLabels := map[string]string{"app": newDeploymentName}
-			createAndVerifyStatefulDeployment(scName, newDeploymentName, ns, newPodLabels, c)
+			createAndVerifyStatefulDeployment(ctx, scName, newDeploymentName, ns, newPodLabels, c)
 		})
 	})
 })
@@ -137,23 +137,23 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 // i) a pvc using the provided storage class
 // ii) creates a deployment with replica count 1 using the created pvc
 // iii) finally verifies if the pod is running and ready and returns the pod object
-func createAndVerifyStatefulDeployment(scName *string, name, ns string, podLabels map[string]string,
+func createAndVerifyStatefulDeployment(ctx context.Context, scName *string, name, ns string, podLabels map[string]string,
 	c clientset.Interface) *v1.Pod {
 	ginkgo.By("Creating a pvc using the storage class " + *scName)
 	pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 		StorageClassName: scName,
 	}, ns)
-	gotPVC, err := c.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), pvc, metav1.CreateOptions{})
+	gotPVC, err := c.CoreV1().PersistentVolumeClaims(ns).Create(ctx, pvc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create a persistent volume claim")
 
 	ginkgo.By("Creating a deployment using the pvc " + pvc.Name)
 	dep := makeDeployment(ns, name, gotPVC.Name, podLabels)
-	_, err = c.AppsV1().Deployments(ns).Create(context.TODO(), dep, metav1.CreateOptions{})
+	_, err = c.AppsV1().Deployments(ns).Create(ctx, dep, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to created the deployment")
 
 	ginkgo.By(fmt.Sprintf("Ensuring that the pod of deployment %s is running and ready", dep.Name))
 	labelSelector := labels.SelectorFromSet(labels.Set(podLabels))
-	podList, err := e2epod.WaitForPodsWithLabelRunningReady(c, ns, labelSelector, 1, framework.PodStartTimeout)
+	podList, err := e2epod.WaitForPodsWithLabelRunningReady(ctx, c, ns, labelSelector, 1, framework.PodStartTimeout)
 	framework.ExpectNoError(err)
 	pod := &podList.Items[0]
 	return pod

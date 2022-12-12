@@ -44,15 +44,15 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
-		ginkgo.AfterEach(func() {
+		ginkgo.AfterEach(func(ctx context.Context) {
 			if !ginkgo.CurrentSpecReport().Failed() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+				e2ekubectl.LogFailedContainers(ctx, f.ClientSet, f.Namespace.Name, framework.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
-			recordSystemCgroupProcesses()
+			recordSystemCgroupProcesses(ctx)
 		})
 		ginkgo.It("should report resource usage through the stats api", func(ctx context.Context) {
 			const pod0 = "stats-busybox-0"
@@ -61,12 +61,12 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			ginkgo.By("Creating test pods")
 			numRestarts := int32(1)
 			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
-			e2epod.NewPodClient(f).CreateBatch(pods)
+			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
 
 			ginkgo.By("restarting the containers to ensure container metrics are still being gathered after a container is restarted")
-			gomega.Eventually(func() error {
+			gomega.Eventually(ctx, func() error {
 				for _, pod := range pods {
-					err := verifyPodRestartCount(f, pod.Name, len(pod.Spec.Containers), numRestarts)
+					err := verifyPodRestartCount(ctx, f, pod.Name, len(pod.Spec.Containers), numRestarts)
 					if err != nil {
 						return err
 					}
@@ -83,7 +83,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				maxStatsAge = time.Minute
 			)
 			ginkgo.By("Fetching node so we can match against an appropriate memory limit")
-			node := getLocalNode(f)
+			node := getLocalNode(ctx, f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
 			fsCapacityBounds := bounded(100*e2evolume.Mb, 10*e2evolume.Tb)
@@ -329,9 +329,9 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 
 			ginkgo.By("Validating /stats/summary")
 			// Give pods a minute to actually start up.
-			gomega.Eventually(getNodeSummary, 180*time.Second, 15*time.Second).Should(matchExpectations)
+			gomega.Eventually(ctx, getNodeSummary, 180*time.Second, 15*time.Second).Should(matchExpectations)
 			// Then the summary should match the expectations a few more times.
-			gomega.Consistently(getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
+			gomega.Consistently(ctx, getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
 	})
 })
@@ -419,8 +419,8 @@ func recent(d time.Duration) types.GomegaMatcher {
 		gomega.BeTemporally("<", time.Now().Add(3*time.Minute))))
 }
 
-func recordSystemCgroupProcesses() {
-	cfg, err := getCurrentKubeletConfig()
+func recordSystemCgroupProcesses(ctx context.Context) {
+	cfg, err := getCurrentKubeletConfig(ctx)
 	if err != nil {
 		framework.Logf("Failed to read kubelet config: %v", err)
 		return

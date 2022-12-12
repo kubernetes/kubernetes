@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		nodes := NewNodes(f, 1, 1)
 		driver := NewDriver(f, nodes, networkResources) // All tests get their own driver instance.
 		b := newBuilder(f, driver)
-		ginkgo.It("registers plugin", func(ctx context.Context) {
+		ginkgo.It("registers plugin", func() {
 			ginkgo.By("the driver is running")
 		})
 
@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			b.create(ctx, parameters, pod, template)
 
 			ginkgo.By("wait for NodePrepareResource call")
-			gomega.Eventually(func() error {
+			gomega.Eventually(ctx, func(ctx context.Context) error {
 				if driver.CallCount(m) == 0 {
 					return errors.New("NodePrepareResource not called yet")
 				}
@@ -89,7 +89,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			ginkgo.By("allowing container startup to succeed")
 			callCount := driver.CallCount(m)
 			driver.Fail(m, false)
-			err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
 			framework.ExpectNoError(err, "start pod with inline resource claim")
 			if driver.CallCount(m) == callCount {
 				framework.Fail("NodePrepareResource should have been called again")
@@ -127,7 +127,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 
 			b.create(ctx, parameters, claim, pod)
 
-			b.testPod(f.ClientSet, pod)
+			b.testPod(ctx, f.ClientSet, pod)
 
 			ginkgo.By(fmt.Sprintf("force delete test pod %s", pod.Name))
 			err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &zero})
@@ -157,7 +157,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 
 			b.create(ctx, classParameters, claimParameters, pod, template)
 
-			b.testPod(f.ClientSet, pod, "user_a", "b", "admin_x", "y")
+			b.testPod(ctx, f.ClientSet, pod, "user_a", "b", "admin_x", "y")
 		})
 	})
 
@@ -174,7 +174,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				pod, template := b.podInline(allocationMode)
 				b.create(ctx, parameters, pod, template)
 
-				b.testPod(f.ClientSet, pod)
+				b.testPod(ctx, f.ClientSet, pod)
 			})
 
 			ginkgo.It("supports inline claim referenced by multiple containers", func(ctx context.Context) {
@@ -182,7 +182,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				pod, template := b.podInlineMultiple(allocationMode)
 				b.create(ctx, parameters, pod, template)
 
-				b.testPod(f.ClientSet, pod)
+				b.testPod(ctx, f.ClientSet, pod)
 			})
 
 			ginkgo.It("supports simple pod referencing external resource claim", func(ctx context.Context) {
@@ -190,7 +190,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				pod := b.podExternal()
 				b.create(ctx, parameters, b.externalClaim(allocationMode), pod)
 
-				b.testPod(f.ClientSet, pod)
+				b.testPod(ctx, f.ClientSet, pod)
 			})
 
 			ginkgo.It("supports external claim referenced by multiple pods", func(ctx context.Context) {
@@ -202,7 +202,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				b.create(ctx, parameters, claim, pod1, pod2, pod3)
 
 				for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
-					b.testPod(f.ClientSet, pod)
+					b.testPod(ctx, f.ClientSet, pod)
 				}
 			})
 
@@ -215,7 +215,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				b.create(ctx, parameters, claim, pod1, pod2, pod3)
 
 				for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
-					b.testPod(f.ClientSet, pod)
+					b.testPod(ctx, f.ClientSet, pod)
 				}
 			})
 
@@ -228,7 +228,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				pod.Spec.InitContainers[0].Command = []string{"sh", "-c", "env | grep user_a=b"}
 				b.create(ctx, parameters, pod, template)
 
-				b.testPod(f.ClientSet, pod)
+				b.testPod(ctx, f.ClientSet, pod)
 			})
 		}
 
@@ -277,7 +277,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				b.create(ctx, parameters, claim, pod1, pod2)
 
 				for _, pod := range []*v1.Pod{pod1, pod2} {
-					err := e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+					err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 					framework.ExpectNoError(err, "start pod")
 				}
 			})
@@ -307,7 +307,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 					b.create(ctx, objs...)
 
 					for _, pod := range pods {
-						err := e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+						err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 						framework.ExpectNoError(err, "start pod")
 					}
 
@@ -369,7 +369,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				// To ensure the right timing, allocation of the second
 				// claim gets delayed while creating another pod
 				// that gets the remaining resource on the node.
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
 				parameters := b.parameters()
@@ -408,7 +408,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 
 				ginkgo.By("waiting for one claim to be allocated")
 				var nodeSelector *v1.NodeSelector
-				gomega.Eventually(func() (int, error) {
+				gomega.Eventually(ctx, func(ctx context.Context) (int, error) {
 					claims, err := f.ClientSet.ResourceV1alpha1().ResourceClaims(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 					if err != nil {
 						return 0, err
@@ -434,14 +434,14 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				node := req.Values[0]
 				pod2.Spec.NodeSelector = map[string]string{req.Key: node}
 				b.create(ctx, pod2, template2)
-				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod2), "start pod 2")
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2), "start pod 2")
 
 				// Allow allocation of claim2 to proceed. It should fail now
 				// and the other node must be used instead, after deallocating
 				// the first claim.
 				ginkgo.By("move first pod to other node")
 				cancelBlockClaim()
-				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod1), "start pod 1")
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod1), "start pod 1")
 				pod1, err := f.ClientSet.CoreV1().Pods(pod1.Namespace).Get(ctx, pod1.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "get first pod")
 				if pod1.Spec.NodeName == "" {
@@ -488,7 +488,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				},
 			)
 			b1.create(ctx, parameters1, parameters2, claim1, claim2, pod)
-			b1.testPod(f.ClientSet, pod)
+			b1.testPod(ctx, f.ClientSet, pod)
 		})
 	})
 })
@@ -725,12 +725,12 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) {
 }
 
 // testPod runs pod and checks if container logs contain expected environment variables
-func (b *builder) testPod(clientSet kubernetes.Interface, pod *v1.Pod, env ...string) {
-	err := e2epod.WaitForPodRunningInNamespace(clientSet, pod)
+func (b *builder) testPod(ctx context.Context, clientSet kubernetes.Interface, pod *v1.Pod, env ...string) {
+	err := e2epod.WaitForPodRunningInNamespace(ctx, clientSet, pod)
 	framework.ExpectNoError(err, "start pod")
 
 	for _, container := range pod.Spec.Containers {
-		log, err := e2epod.GetPodLogs(clientSet, pod.Namespace, pod.Name, container.Name)
+		log, err := e2epod.GetPodLogs(ctx, clientSet, pod.Namespace, pod.Name, container.Name)
 		framework.ExpectNoError(err, "get logs")
 		if len(env) == 0 {
 			for key, value := range b.parametersEnv() {
@@ -762,9 +762,7 @@ func (b *builder) setUp() {
 	ginkgo.DeferCleanup(b.tearDown)
 }
 
-func (b *builder) tearDown() {
-	ctx := context.Background()
-
+func (b *builder) tearDown(ctx context.Context) {
 	err := b.f.ClientSet.ResourceV1alpha1().ResourceClasses().Delete(ctx, b.className(), metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "delete resource class")
 

@@ -138,19 +138,19 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 				if test.nodeStageHook != nil {
 					hooks = createPreHook("NodeStageVolume", test.nodeStageHook)
 				}
-				m.init(testParameters{
+				m.init(ctx, testParameters{
 					disableAttach:  true,
 					registerDriver: true,
 					hooks:          hooks,
 				})
 				ginkgo.DeferCleanup(m.cleanup)
 
-				_, claim, pod := m.createPod(pvcReference)
+				_, claim, pod := m.createPod(ctx, pvcReference)
 				if pod == nil {
 					return
 				}
 				// Wait for PVC to get bound to make sure the CSI driver is fully started.
-				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
+				err := e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
 				framework.ExpectNoError(err, "while waiting for PVC to get provisioned")
 
 				ginkgo.By("Waiting for expected CSI calls")
@@ -162,7 +162,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 						framework.Failf("timed out waiting for the CSI call that indicates that the pod can be deleted: %v", test.expectedCalls)
 					}
 					time.Sleep(1 * time.Second)
-					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.driver.GetCalls)
+					_, index, err := compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					framework.ExpectNoError(err, "while waiting for initial CSI calls")
 					if index == 0 {
 						// No CSI call received yet
@@ -176,17 +176,17 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 
 				if test.expectPodRunning {
 					ginkgo.By("Waiting for pod to be running")
-					err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+					err := e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 					framework.ExpectNoError(err, "Failed to start pod: %v", err)
 				}
 
 				ginkgo.By("Deleting the previously created pod")
-				err = e2epod.DeletePodWithWait(m.cs, pod)
+				err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
-					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.driver.GetCalls)
+					_, index, err := compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					if err != nil {
 						return true, err
 					}
@@ -276,39 +276,39 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 						return test.nodeUnstageHook(counter, pod)
 					})
 				}
-				m.init(testParameters{
+				m.init(ctx, testParameters{
 					disableAttach:  true,
 					registerDriver: true,
 					hooks:          hooks,
 				})
 				ginkgo.DeferCleanup(m.cleanup)
 
-				_, claim, pod := m.createPod(pvcReference)
+				_, claim, pod := m.createPod(ctx, pvcReference)
 				if pod == nil {
 					return
 				}
 				// Wait for PVC to get bound to make sure the CSI driver is fully started.
-				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
+				err := e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
 				framework.ExpectNoError(err, "while waiting for PVC to get provisioned")
-				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "while waiting for the first pod to start")
-				err = e2epod.DeletePodWithWait(m.cs, pod)
+				err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
 				framework.ExpectNoError(err, "while deleting the first pod")
 
 				// Create the second pod
 				pod, err = m.createPodWithPVC(claim)
 				framework.ExpectNoError(err, "while creating the second pod")
-				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "while waiting for the second pod to start")
 				// The second pod is running and kubelet can't call NodeUnstage of the first one.
 				// Therefore incrementing the pod counter is safe here.
 				atomic.AddInt64(&deletedPodNumber, 1)
-				err = e2epod.DeletePodWithWait(m.cs, pod)
+				err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
 				framework.ExpectNoError(err, "while deleting the second pod")
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
-					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.driver.GetCalls)
+					_, index, err := compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					if err != nil {
 						return true, err
 					}

@@ -46,6 +46,7 @@ const (
 
 // ScaleResource scales resource to the given size.
 func ScaleResource(
+	ctx context.Context,
 	clientset clientset.Interface,
 	scalesGetter scaleclient.ScalesGetter,
 	ns, name string,
@@ -61,14 +62,14 @@ func ScaleResource(
 	if !wait {
 		return nil
 	}
-	return WaitForControlledPodsRunning(clientset, ns, name, kind)
+	return WaitForControlledPodsRunning(ctx, clientset, ns, name, kind)
 }
 
 // DeleteResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
-func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns, name string) error {
+func DeleteResourceAndWaitForGC(ctx context.Context, c clientset.Interface, kind schema.GroupKind, ns, name string) error {
 	ginkgo.By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", kind, name, ns))
 
-	rtObject, err := GetRuntimeObjectForKind(c, kind, ns, name)
+	rtObject, err := GetRuntimeObjectForKind(ctx, c, kind, ns, name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			framework.Logf("%v %s not found: %v", kind, name, err)
@@ -80,15 +81,15 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 		background := metav1.DeletePropagationBackground
 		return testutils.DeleteResource(c, kind, ns, name, metav1.DeleteOptions{PropagationPolicy: &background})
 	}
-	return deleteObjectAndWaitForGC(c, rtObject, deleteObject, ns, name, kind.String())
+	return deleteObjectAndWaitForGC(ctx, c, rtObject, deleteObject, ns, name, kind.String())
 }
 
 // DeleteCustomResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
 // Enables to provide a custom resourece client, e.g. to fetch a CRD object.
-func DeleteCustomResourceAndWaitForGC(c clientset.Interface, dynamicClient dynamic.Interface, scaleClient scaleclient.ScalesGetter, gvr schema.GroupVersionResource, ns, name string) error {
+func DeleteCustomResourceAndWaitForGC(ctx context.Context, c clientset.Interface, dynamicClient dynamic.Interface, scaleClient scaleclient.ScalesGetter, gvr schema.GroupVersionResource, ns, name string) error {
 	ginkgo.By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", gvr, name, ns))
 	resourceClient := dynamicClient.Resource(gvr).Namespace(ns)
-	_, err := resourceClient.Get(context.TODO(), name, metav1.GetOptions{})
+	_, err := resourceClient.Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			framework.Logf("%v %s not found: %v", gvr, name, err)
@@ -96,19 +97,19 @@ func DeleteCustomResourceAndWaitForGC(c clientset.Interface, dynamicClient dynam
 		}
 		return err
 	}
-	scaleObj, err := scaleClient.Scales(ns).Get(context.TODO(), gvr.GroupResource(), name, metav1.GetOptions{})
+	scaleObj, err := scaleClient.Scales(ns).Get(ctx, gvr.GroupResource(), name, metav1.GetOptions{})
 	if err != nil {
 		framework.Logf("error while trying to get scale subresource of kind %v with name %v: %v", gvr, name, err)
 		return nil
 	}
 	deleteObject := func() error {
 		background := metav1.DeletePropagationBackground
-		return resourceClient.Delete(context.TODO(), name, metav1.DeleteOptions{PropagationPolicy: &background})
+		return resourceClient.Delete(ctx, name, metav1.DeleteOptions{PropagationPolicy: &background})
 	}
-	return deleteObjectAndWaitForGC(c, scaleObj, deleteObject, ns, name, gvr.String())
+	return deleteObjectAndWaitForGC(ctx, c, scaleObj, deleteObject, ns, name, gvr.String())
 }
 
-func deleteObjectAndWaitForGC(c clientset.Interface, rtObject runtime.Object, deleteObject func() error, ns, name, description string) error {
+func deleteObjectAndWaitForGC(ctx context.Context, c clientset.Interface, rtObject runtime.Object, deleteObject func() error, ns, name, description string) error {
 	selector, err := GetSelectorFromRuntimeObject(rtObject)
 	if err != nil {
 		return err
@@ -154,7 +155,7 @@ func deleteObjectAndWaitForGC(c clientset.Interface, rtObject runtime.Object, de
 		timeout = timeout + 3*time.Minute
 	}
 
-	err = waitForPodsInactive(ps, interval, timeout)
+	err = waitForPodsInactive(ctx, ps, interval, timeout)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
@@ -164,7 +165,7 @@ func deleteObjectAndWaitForGC(c clientset.Interface, rtObject runtime.Object, de
 	// In gce, at any point, small percentage of nodes can disappear for
 	// ~10 minutes due to hostError. 20 minutes should be long enough to
 	// restart VM in that case and delete the pod.
-	err = waitForPodsGone(ps, interval, 20*time.Minute)
+	err = waitForPodsGone(ctx, ps, interval, 20*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
 	}
@@ -172,9 +173,9 @@ func deleteObjectAndWaitForGC(c clientset.Interface, rtObject runtime.Object, de
 }
 
 // waitForPodsGone waits until there are no pods left in the PodStore.
-func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) error {
+func waitForPodsGone(ctx context.Context, ps *testutils.PodStore, interval, timeout time.Duration) error {
 	var pods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
 		if pods = ps.List(); len(pods) == 0 {
 			return true, nil
 		}
@@ -194,9 +195,9 @@ func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) er
 // This is to make a fair comparison of deletion time between DeleteRCAndPods
 // and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
 // when the pod is inactvie.
-func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
+func waitForPodsInactive(ctx context.Context, ps *testutils.PodStore, interval, timeout time.Duration) error {
 	var activePods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
 		pods := ps.List()
 		activePods = e2epod.FilterActivePods(pods)
 		if len(activePods) != 0 {
@@ -215,8 +216,8 @@ func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration
 }
 
 // WaitForControlledPodsRunning waits up to 10 minutes for pods to become Running.
-func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind schema.GroupKind) error {
-	rtObject, err := GetRuntimeObjectForKind(c, kind, ns, name)
+func WaitForControlledPodsRunning(ctx context.Context, c clientset.Interface, ns, name string, kind schema.GroupKind) error {
+	rtObject, err := GetRuntimeObjectForKind(ctx, c, kind, ns, name)
 	if err != nil {
 		return err
 	}
@@ -236,8 +237,8 @@ func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind s
 }
 
 // WaitForControlledPods waits up to podListTimeout for getting pods of the specified controller name and return them.
-func WaitForControlledPods(c clientset.Interface, ns, name string, kind schema.GroupKind) (pods *v1.PodList, err error) {
-	rtObject, err := GetRuntimeObjectForKind(c, kind, ns, name)
+func WaitForControlledPods(ctx context.Context, c clientset.Interface, ns, name string, kind schema.GroupKind) (pods *v1.PodList, err error) {
+	rtObject, err := GetRuntimeObjectForKind(ctx, c, kind, ns, name)
 	if err != nil {
 		return nil, err
 	}
@@ -245,5 +246,5 @@ func WaitForControlledPods(c clientset.Interface, ns, name string, kind schema.G
 	if err != nil {
 		return nil, err
 	}
-	return e2epod.WaitForPodsWithLabel(c, ns, selector)
+	return e2epod.WaitForPodsWithLabel(ctx, c, ns, selector)
 }

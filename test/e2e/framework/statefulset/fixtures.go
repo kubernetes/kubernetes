@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -153,8 +154,8 @@ func PauseNewPods(ss *appsv1.StatefulSet) {
 // It fails the test if it finds any pods that are not in phase Running,
 // or if it finds more than one paused Pod existing at the same time.
 // This is a no-op if there are no paused pods.
-func ResumeNextPod(c clientset.Interface, ss *appsv1.StatefulSet) {
-	podList := GetPodList(c, ss)
+func ResumeNextPod(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) {
+	podList := GetPodList(ctx, c, ss)
 	resumedPod := ""
 	for _, pod := range podList.Items {
 		if pod.Status.Phase != v1.PodRunning {

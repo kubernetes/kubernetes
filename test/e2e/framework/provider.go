@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -100,12 +101,12 @@ type ProviderInterface interface {
 	CreateShare() (string, string, string, error)
 	DeleteShare(accountName, shareName string) error
 
-	CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error)
-	DeletePVSource(pvSource *v1.PersistentVolumeSource) error
+	CreatePVSource(ctx context.Context, zone, diskName string) (*v1.PersistentVolumeSource, error)
+	DeletePVSource(ctx context.Context, pvSource *v1.PersistentVolumeSource) error
 
-	CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string)
+	CleanupServiceResources(ctx context.Context, c clientset.Interface, loadBalancerName, region, zone string)
 
-	EnsureLoadBalancerResourcesDeleted(ip, portRange string) error
+	EnsureLoadBalancerResourcesDeleted(ctx context.Context, ip, portRange string) error
 	LoadBalancerSrcRanges() []string
 	EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service))
 }
@@ -159,21 +160,21 @@ func (n NullProvider) DeletePD(pdName string) error {
 }
 
 // CreatePVSource is a base implementation which creates PV source.
-func (n NullProvider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error) {
+func (n NullProvider) CreatePVSource(ctx context.Context, zone, diskName string) (*v1.PersistentVolumeSource, error) {
 	return nil, fmt.Errorf("Provider not supported")
 }
 
 // DeletePVSource is a base implementation which deletes PV source.
-func (n NullProvider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
+func (n NullProvider) DeletePVSource(ctx context.Context, pvSource *v1.PersistentVolumeSource) error {
 	return fmt.Errorf("Provider not supported")
 }
 
 // CleanupServiceResources is a base implementation which cleans up service resources.
-func (n NullProvider) CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
+func (n NullProvider) CleanupServiceResources(ctx context.Context, c clientset.Interface, loadBalancerName, region, zone string) {
 }
 
 // EnsureLoadBalancerResourcesDeleted is a base implementation which ensures load balancer is deleted.
-func (n NullProvider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
+func (n NullProvider) EnsureLoadBalancerResourcesDeleted(ctx context.Context, ip, portRange string) error {
 	return nil
 }
 

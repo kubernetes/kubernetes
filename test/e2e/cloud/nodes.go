@@ -47,10 +47,10 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 	ginkgo.It("should be deleted on API server if it doesn't exist in the cloud provider", func(ctx context.Context) {
 		ginkgo.By("deleting a node on the cloud provider")
 
-		nodeToDelete, err := e2enode.GetRandomReadySchedulableNode(c)
+		nodeToDelete, err := e2enode.GetRandomReadySchedulableNode(ctx, c)
 		framework.ExpectNoError(err)
 
-		origNodes, err := e2enode.GetReadyNodesIncludingTainted(c)
+		origNodes, err := e2enode.GetReadyNodesIncludingTainted(ctx, c)
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
@@ -63,11 +63,11 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 			framework.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
 		}
 
-		newNodes, err := e2enode.CheckReady(c, len(origNodes.Items)-1, 5*time.Minute)
+		newNodes, err := e2enode.CheckReady(ctx, c, len(origNodes.Items)-1, 5*time.Minute)
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
 
-		_, err = c.CoreV1().Nodes().Get(context.TODO(), nodeToDelete.Name, metav1.GetOptions{})
+		_, err = c.CoreV1().Nodes().Get(ctx, nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {
 			framework.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
 		} else if !apierrors.IsNotFound(err) {

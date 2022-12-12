@@ -49,12 +49,12 @@ var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 	var originalPodNames []string
 	var ps *testutils.PodStore
 	systemNamespace := metav1.NamespaceSystem
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		var err error
-		numNodes, err := e2enode.TotalRegistered(f.ClientSet)
+		numNodes, err := e2enode.TotalRegistered(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
-		originalNodes, err = e2enode.CheckReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
+		originalNodes, err = e2enode.CheckReady(ctx, f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 		framework.ExpectNoError(err)
 
 		framework.Logf("Got the following nodes before recreate %v", nodeNames(originalNodes))
@@ -68,18 +68,18 @@ var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 			originalPodNames[i] = p.ObjectMeta.Name
 		}
 
-		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
+		if !e2epod.CheckPodsRunningReadyOrSucceeded(ctx, f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
 
 	})
 
-	ginkgo.AfterEach(func() {
+	ginkgo.AfterEach(func(ctx context.Context) {
 		if ginkgo.CurrentSpecReport().Failed() {
 			// Make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
 			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", systemNamespace))
-			events, err := f.ClientSet.CoreV1().Events(systemNamespace).List(context.TODO(), metav1.ListOptions{})
+			events, err := f.ClientSet.CoreV1().Events(systemNamespace).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
 			for _, e := range events.Items {
@@ -92,23 +92,23 @@ var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 	})
 
 	ginkgo.It("recreate nodes and ensure they function upon restart", func(ctx context.Context) {
-		testRecreate(f.ClientSet, ps, systemNamespace, originalNodes, originalPodNames)
+		testRecreate(ctx, f.ClientSet, ps, systemNamespace, originalNodes, originalPodNames)
 	})
 })
 
 // Recreate all the nodes in the test instance group
-func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace string, nodes []v1.Node, podNames []string) {
+func testRecreate(ctx context.Context, c clientset.Interface, ps *testutils.PodStore, systemNamespace string, nodes []v1.Node, podNames []string) {
 	err := gce.RecreateNodes(c, nodes)
 	if err != nil {
 		framework.Failf("Test failed; failed to start the restart instance group command.")
 	}
 
-	err = gce.WaitForNodeBootIdsToChange(c, nodes, recreateNodeReadyAgainTimeout)
+	err = gce.WaitForNodeBootIdsToChange(ctx, c, nodes, recreateNodeReadyAgainTimeout)
 	if err != nil {
 		framework.Failf("Test failed; failed to recreate at least one node in %v.", recreateNodeReadyAgainTimeout)
 	}
 
-	nodesAfter, err := e2enode.CheckReady(c, len(nodes), framework.RestartNodeReadyAgainTimeout)
+	nodesAfter, err := e2enode.CheckReady(ctx, c, len(nodes), framework.RestartNodeReadyAgainTimeout)
 	framework.ExpectNoError(err)
 	framework.Logf("Got the following nodes after recreate: %v", nodeNames(nodesAfter))
 
@@ -119,10 +119,10 @@ func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace
 
 	// Make sure the pods from before node recreation are running/completed
 	podCheckStart := time.Now()
-	podNamesAfter, err := e2epod.WaitForNRestartablePods(ps, len(podNames), framework.RestartPodReadyAgainTimeout)
+	podNamesAfter, err := e2epod.WaitForNRestartablePods(ctx, ps, len(podNames), framework.RestartPodReadyAgainTimeout)
 	framework.ExpectNoError(err)
 	remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
-	if !e2epod.CheckPodsRunningReadyOrSucceeded(c, systemNamespace, podNamesAfter, remaining) {
+	if !e2epod.CheckPodsRunningReadyOrSucceeded(ctx, c, systemNamespace, podNamesAfter, remaining) {
 		framework.Failf("At least one pod wasn't running and ready after the restart.")
 	}
 }

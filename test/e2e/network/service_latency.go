@@ -90,7 +90,7 @@ var _ = common.SIGDescribe("Service endpoints latency", func() {
 		f.ClientSet = kubernetes.NewForConfigOrDie(cfg)
 
 		failing := sets.NewString()
-		d, err := runServiceLatencies(f, parallelTrials, totalTrials, acceptableFailureRatio)
+		d, err := runServiceLatencies(ctx, f, parallelTrials, totalTrials, acceptableFailureRatio)
 		if err != nil {
 			failing.Insert(fmt.Sprintf("Not all RC/pod/service trials succeeded: %v", err))
 		}
@@ -134,7 +134,7 @@ var _ = common.SIGDescribe("Service endpoints latency", func() {
 	})
 })
 
-func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
+func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
 	cfg := testutils.RCConfig{
 		Client:       f.ClientSet,
 		Image:        imageutils.GetPauseImageName(),
@@ -143,7 +143,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 		Replicas:     1,
 		PollInterval: time.Second,
 	}
-	if err := e2erc.RunRC(cfg); err != nil {
+	if err := e2erc.RunRC(ctx, cfg); err != nil {
 		return nil, err
 	}
 
@@ -152,12 +152,13 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 	// consumes the endpoints data, so it seems like the right thing to
 	// test.
 	endpointQueries := newQuerier()
-	startEndpointWatcher(f, endpointQueries)
+	startEndpointWatcher(ctx, f, endpointQueries)
 	defer close(endpointQueries.stop)
 
 	// run one test and throw it away-- this is to make sure that the pod's
 	// ready status has propagated.
-	singleServiceLatency(f, cfg.Name, endpointQueries)
+	_, err = singleServiceLatency(ctx, f, cfg.Name, endpointQueries)
+	framework.ExpectNoError(err)
 
 	// These channels are never closed, and each attempt sends on exactly
 	// one of these channels, so the sum of the things sent over them will
@@ -171,7 +172,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 			defer ginkgo.GinkgoRecover()
 			blocker <- struct{}{}
 			defer func() { <-blocker }()
-			if d, err := singleServiceLatency(f, cfg.Name, endpointQueries); err != nil {
+			if d, err := singleServiceLatency(ctx, f, cfg.Name, endpointQueries); err != nil {
 				errs <- err
 			} else {
 				durations <- d
@@ -295,15 +296,15 @@ func (eq *endpointQueries) added(e *v1.Endpoints) {
 }
 
 // blocks until it has finished syncing.
-func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
+func startEndpointWatcher(ctx context.Context, f *framework.Framework, q *endpointQueries) {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(context.TODO(), options)
+				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(ctx, options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(context.TODO(), options)
+				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(ctx, options)
 			},
 		},
 		&v1.Endpoints{},
@@ -334,7 +335,7 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 	}
 }
 
-func singleServiceLatency(f *framework.Framework, name string, q *endpointQueries) (time.Duration, error) {
+func singleServiceLatency(ctx context.Context, f *framework.Framework, name string, q *endpointQueries) (time.Duration, error) {
 	// Make a service that points to that pod.
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -348,7 +349,7 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 		},
 	}
 	startTime := time.Now()
-	gotSvc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
+	gotSvc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
 	if err != nil {
 		return 0, err
 	}

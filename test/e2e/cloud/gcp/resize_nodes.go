@@ -34,13 +34,13 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
-	rc, err := c.CoreV1().ReplicationControllers(ns).Get(context.TODO(), name, metav1.GetOptions{})
+func resizeRC(ctx context.Context, c clientset.Interface, ns, name string, replicas int32) error {
+	rc, err := c.CoreV1().ReplicationControllers(ns).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	*(rc.Spec.Replicas) = replicas
-	_, err = c.CoreV1().ReplicationControllers(rc.Namespace).Update(context.TODO(), rc, metav1.UpdateOptions{})
+	_, err = c.CoreV1().ReplicationControllers(rc.Namespace).Update(ctx, rc, metav1.UpdateOptions{})
 	return err
 }
 
@@ -52,10 +52,10 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	var ns string
 	var group string
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		systemPods, err := e2epod.GetPodsInNamespace(c, ns, map[string]string{})
+		systemPods, err := e2epod.GetPodsInNamespace(ctx, c, ns, map[string]string{})
 		framework.ExpectNoError(err)
 		systemPodsNo = int32(len(systemPods))
 		if strings.Contains(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
@@ -93,13 +93,13 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 					framework.Failf("Couldn't restore the original node instance group size: %v", err)
 				}
 
-				if err := e2enode.WaitForReadyNodes(c, int(originalNodeCount), 10*time.Minute); err != nil {
+				if err := e2enode.WaitForReadyNodes(ctx, c, int(originalNodeCount), 10*time.Minute); err != nil {
 					framework.Failf("Couldn't restore the original cluster size: %v", err)
 				}
 				// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 				// the cluster is restored to health.
 				ginkgo.By("waiting for system pods to successfully restart")
-				err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
+				err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
 				framework.ExpectNoError(err)
 			})
 		})
@@ -108,11 +108,11 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
-			numNodes, err := e2enode.TotalRegistered(c)
+			numNodes, err := e2enode.TotalRegistered(ctx, c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil, nil)
-			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
+			err = e2epod.VerifyPods(ctx, c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
@@ -121,7 +121,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			framework.ExpectNoError(err)
 			err = framework.WaitForGroupSize(group, targetNumNodes)
 			framework.ExpectNoError(err)
-			err = e2enode.WaitForReadyNodes(c, int(originalNodeCount-1), 10*time.Minute)
+			err = e2enode.WaitForReadyNodes(ctx, c, int(originalNodeCount-1), 10*time.Minute)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting 2 minutes for the watch in the podGC to catch up, remove any pods scheduled on " +
@@ -129,7 +129,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			time.Sleep(framework.NewTimeoutContextWithDefaults().PodStartShort)
 
 			ginkgo.By("verifying whether the pods from the removed node are recreated")
-			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
+			err = e2epod.VerifyPods(ctx, c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 		})
 
@@ -139,11 +139,11 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
 			common.NewSVCByName(c, ns, name)
-			numNodes, err := e2enode.TotalRegistered(c)
+			numNodes, err := e2enode.TotalRegistered(ctx, c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil, nil)
-			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
+			err = e2epod.VerifyPods(ctx, c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
@@ -152,13 +152,13 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			framework.ExpectNoError(err)
 			err = framework.WaitForGroupSize(group, targetNumNodes)
 			framework.ExpectNoError(err)
-			err = e2enode.WaitForReadyNodes(c, int(originalNodeCount+1), 10*time.Minute)
+			err = e2enode.WaitForReadyNodes(ctx, c, int(originalNodeCount+1), 10*time.Minute)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", originalNodeCount+1))
-			err = resizeRC(c, ns, name, originalNodeCount+1)
+			err = resizeRC(ctx, c, ns, name, originalNodeCount+1)
 			framework.ExpectNoError(err)
-			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount+1)
+			err = e2epod.VerifyPods(ctx, c, ns, name, true, originalNodeCount+1)
 			framework.ExpectNoError(err)
 		})
 	})

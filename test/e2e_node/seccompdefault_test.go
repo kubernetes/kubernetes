@@ -39,7 +39,7 @@ var _ = SIGDescribe("SeccompDefault [Serial] [Feature:SeccompDefault] [LinuxOnly
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("with SeccompDefault enabled", func() {
-		tempSetCurrentKubeletConfig(f, func(cfg *kubeletconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, cfg *kubeletconfig.KubeletConfiguration) {
 			cfg.SeccompDefault = true
 		})
 
@@ -63,12 +63,12 @@ var _ = SIGDescribe("SeccompDefault [Serial] [Feature:SeccompDefault] [LinuxOnly
 
 		ginkgo.It("should use the default seccomp profile when unspecified", func(ctx context.Context) {
 			pod := newPod(nil)
-			e2eoutput.TestContainerOutput(f, "SeccompDefault", pod, 0, []string{"2"})
+			e2eoutput.TestContainerOutput(ctx, f, "SeccompDefault", pod, 0, []string{"2"})
 		})
 
 		ginkgo.It("should use unconfined when specified", func(ctx context.Context) {
 			pod := newPod(&v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}})
-			e2eoutput.TestContainerOutput(f, "SeccompDefault-unconfined", pod, 0, []string{"0"})
+			e2eoutput.TestContainerOutput(ctx, f, "SeccompDefault-unconfined", pod, 0, []string{"0"})
 		})
 	})
 })

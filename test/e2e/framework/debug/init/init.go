@@ -19,6 +19,7 @@ limitations under the License.
 package init
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -30,28 +31,23 @@ import (
 func init() {
 	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions,
 		func(f *framework.Framework) {
-			f.DumpAllNamespaceInfo = func(f *framework.Framework, ns string) {
-				e2edebug.DumpAllNamespaceInfo(f.ClientSet, ns)
+			f.DumpAllNamespaceInfo = func(ctx context.Context, f *framework.Framework, ns string) {
+				e2edebug.DumpAllNamespaceInfo(ctx, f.ClientSet, ns)
 			}
 
 			if framework.TestContext.GatherLogsSizes {
-				var (
-					wg           sync.WaitGroup
-					closeChannel chan bool
-					verifier     *e2edebug.LogsSizeVerifier
-				)
-
 				ginkgo.BeforeEach(func() {
+					var wg sync.WaitGroup
 					wg.Add(1)
-					closeChannel = make(chan bool)
-					verifier = e2edebug.NewLogsVerifier(f.ClientSet, closeChannel)
+					ctx, cancel := context.WithCancel(context.Background())
+					verifier := e2edebug.NewLogsVerifier(ctx, f.ClientSet)
 					go func() {
 						defer wg.Done()
-						verifier.Run()
+						verifier.Run(ctx)
 					}()
 					ginkgo.DeferCleanup(func() {
 						ginkgo.By("Gathering log sizes data", func() {
-							close(closeChannel)
+							cancel()
 							wg.Wait()
 							f.TestSummaries = append(f.TestSummaries, verifier.GetSummary())
 						})
@@ -61,7 +57,7 @@ func init() {
 
 			if framework.TestContext.GatherKubeSystemResourceUsageData != "false" &&
 				framework.TestContext.GatherKubeSystemResourceUsageData != "none" {
-				ginkgo.BeforeEach(func() {
+				ginkgo.BeforeEach(func(ctx context.Context) {
 					var nodeMode e2edebug.NodesSet
 					switch framework.TestContext.GatherKubeSystemResourceUsageData {
 					case "master":
@@ -72,7 +68,7 @@ func init() {
 						nodeMode = e2edebug.AllNodes
 					}
 
-					gatherer, err := e2edebug.NewResourceUsageGatherer(f.ClientSet, e2edebug.ResourceGathererOptions{
+					gatherer, err := e2edebug.NewResourceUsageGatherer(ctx, f.ClientSet, e2edebug.ResourceGathererOptions{
 						InKubemark:                  framework.ProviderIs("kubemark"),
 						Nodes:                       nodeMode,
 						ResourceDataGatheringPeriod: 60 * time.Second,
@@ -84,7 +80,7 @@ func init() {
 						return
 					}
 
-					go gatherer.StartGatheringData()
+					go gatherer.StartGatheringData(ctx)
 					ginkgo.DeferCleanup(func() {
 						ginkgo.By("Collecting resource usage data", func() {
 							summary, resourceViolationError := gatherer.StopAndSummarize([]int{90, 99, 100}, nil /* no constraints */)

@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -36,8 +37,8 @@ import (
 )
 
 // GetCurrentKubeletConfig fetches the current Kubelet Config for the given node
-func GetCurrentKubeletConfig(nodeName, namespace string, useProxy bool) (*kubeletconfig.KubeletConfiguration, error) {
-	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName, namespace, useProxy)
+func GetCurrentKubeletConfig(ctx context.Context, nodeName, namespace string, useProxy bool) (*kubeletconfig.KubeletConfiguration, error) {
+	resp := pollConfigz(ctx, 5*time.Minute, 5*time.Second, nodeName, namespace, useProxy)
 	if len(resp) == 0 {
 		return nil, fmt.Errorf("failed to fetch /configz from %q", nodeName)
 	}
@@ -49,7 +50,7 @@ func GetCurrentKubeletConfig(nodeName, namespace string, useProxy bool) (*kubele
 }
 
 // returns a status 200 response from the /configz endpoint or nil if fails
-func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, namespace string, useProxy bool) []byte {
+func pollConfigz(ctx context.Context, timeout time.Duration, pollInterval time.Duration, nodeName, namespace string, useProxy bool) []byte {
 	endpoint := ""
 	if useProxy {
 		// start local proxy, so we can send graceful deletion over query string, rather than body parameter
@@ -89,7 +90,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	req.Header.Add("Accept", "application/json")
 
 	var respBody []byte
-	err = wait.PollImmediate(pollInterval, timeout, func() (bool, error) {
+	err = wait.PollImmediateWithContext(ctx, pollInterval, timeout, func(ctx context.Context) (bool, error) {
 		resp, err := client.Do(req)
 		if err != nil {
 			framework.Logf("Failed to get /configz, retrying. Error: %v", err)

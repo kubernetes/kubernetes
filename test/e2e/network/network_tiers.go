@@ -53,32 +53,32 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.AfterEach(func() {
+	ginkgo.AfterEach(func(ctx context.Context) {
 		if ginkgo.CurrentSpecReport().Failed() {
 			DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.TestContext.CloudConfig.Provider.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+			framework.TestContext.CloudConfig.Provider.CleanupServiceResources(ctx, cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
 	})
 	ginkgo.It("should be able to create and tear down a standard-tier load balancer [Slow]", func(ctx context.Context) {
 		lagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
-		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
+		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 
 		svcName := "net-tiers-svc"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, svcName)
 
 		ginkgo.By("creating a pod to be part of the service " + svcName)
-		_, err := jig.Run(nil)
+		_, err := jig.Run(ctx, nil)
 		framework.ExpectNoError(err)
 
 		// Test 1: create a standard tiered LB for the Service.
 		ginkgo.By("creating a Service of type LoadBalancer using the standard network tier")
-		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
+		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			setNetworkTier(svc, string(gcecloud.NetworkTierAnnotationStandard))
 		})
@@ -91,11 +91,11 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 
 		// Wait and verify the LB.
-		ingressIP := waitAndVerifyLBWithTier(jig, "", createTimeout, lagTimeout)
+		ingressIP := waitAndVerifyLBWithTier(ctx, jig, "", createTimeout, lagTimeout)
 
 		// Test 2: re-create a LB of a different tier for the updated Service.
 		ginkgo.By("updating the Service to use the premium (default) tier")
-		svc, err = jig.UpdateService(func(svc *v1.Service) {
+		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			setNetworkTier(svc, string(gcecloud.NetworkTierAnnotationPremium))
 		})
 		framework.ExpectNoError(err)
@@ -106,7 +106,7 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 
 		// Wait until the ingress IP changes. Each tier has its own pool of
 		// IPs, so changing tiers implies changing IPs.
-		ingressIP = waitAndVerifyLBWithTier(jig, ingressIP, createTimeout, lagTimeout)
+		ingressIP = waitAndVerifyLBWithTier(ctx, jig, ingressIP, createTimeout, lagTimeout)
 
 		// Test 3: create a standard-tierd LB with a user-requested IP.
 		ginkgo.By("reserving a static IP for the load balancer")
@@ -127,7 +127,7 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 		framework.Logf("Allocated static IP to be used by the load balancer: %q", requestedIP)
 
 		ginkgo.By("updating the Service to use the standard tier with a requested IP")
-		svc, err = jig.UpdateService(func(svc *v1.Service) {
+		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			svc.Spec.LoadBalancerIP = requestedIP
 			setNetworkTier(svc, string(gcecloud.NetworkTierAnnotationStandard))
 		})
@@ -139,14 +139,14 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 		framework.ExpectEqual(svcTier, cloud.NetworkTierStandard)
 
 		// Wait until the ingress IP changes and verifies the LB.
-		waitAndVerifyLBWithTier(jig, ingressIP, createTimeout, lagTimeout)
+		waitAndVerifyLBWithTier(ctx, jig, ingressIP, createTimeout, lagTimeout)
 	})
 })
 
-func waitAndVerifyLBWithTier(jig *e2eservice.TestJig, existingIP string, waitTimeout, checkTimeout time.Duration) string {
+func waitAndVerifyLBWithTier(ctx context.Context, jig *e2eservice.TestJig, existingIP string, waitTimeout, checkTimeout time.Duration) string {
 	// If existingIP is "" this will wait for any ingress IP to show up. Otherwise
 	// it will wait for the ingress IP to change to something different.
-	svc, err := jig.WaitForNewIngressIP(existingIP, waitTimeout)
+	svc, err := jig.WaitForNewIngressIP(ctx, existingIP, waitTimeout)
 	framework.ExpectNoError(err)
 
 	svcPort := int(svc.Spec.Ports[0].Port)
@@ -161,7 +161,7 @@ func waitAndVerifyLBWithTier(jig *e2eservice.TestJig, existingIP string, waitTim
 	// If the IP has been used by previous test, sometimes we get the lingering
 	// 404 errors even after the LB is long gone. Tolerate and retry until the
 	// new LB is fully established.
-	e2eservice.TestReachableHTTPWithRetriableErrorCodes(ingressIP, svcPort, []int{http.StatusNotFound}, checkTimeout)
+	e2eservice.TestReachableHTTPWithRetriableErrorCodes(ctx, ingressIP, svcPort, []int{http.StatusNotFound}, checkTimeout)
 
 	// Verify the network tier matches the desired.
 	svcNetTier, err := gcecloud.GetServiceNetworkTier(svc)

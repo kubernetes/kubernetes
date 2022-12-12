@@ -122,14 +122,14 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 	servicePort := int32(9443)
 	containerPort := int32(9444)
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		ginkgo.DeferCleanup(cleanCRDWebhookTest, f.ClientSet, f.Namespace.Name)
 
 		ginkgo.By("Setting up server cert")
 		certCtx = setupServerCert(f.Namespace.Name, serviceCRDName)
-		createAuthReaderRoleBindingForCRDConversion(f, f.Namespace.Name)
+		createAuthReaderRoleBindingForCRDConversion(ctx, f, f.Namespace.Name)
 
-		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), certCtx, servicePort, containerPort)
+		deployCustomResourceWebhookAndService(ctx, f, imageutils.GetE2EImage(imageutils.Agnhost), certCtx, servicePort, containerPort)
 	})
 
 	/*
@@ -162,8 +162,8 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 			return
 		}
 		ginkgo.DeferCleanup(testcrd.CleanUp)
-		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
-		testCustomResourceConversionWebhook(f, testcrd.Crd, testcrd.DynamicClients)
+		waitWebhookConversionReady(ctx, f, testcrd.Crd, testcrd.DynamicClients, "v2")
+		testCustomResourceConversionWebhook(ctx, f, testcrd.Crd, testcrd.DynamicClients)
 	})
 
 	/*
@@ -197,23 +197,23 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 			return
 		}
 		ginkgo.DeferCleanup(testcrd.CleanUp)
-		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
-		testCRListConversion(f, testcrd)
+		waitWebhookConversionReady(ctx, f, testcrd.Crd, testcrd.DynamicClients, "v2")
+		testCRListConversion(ctx, f, testcrd)
 	})
 })
 
-func cleanCRDWebhookTest(client clientset.Interface, namespaceName string) {
-	_ = client.CoreV1().Services(namespaceName).Delete(context.TODO(), serviceCRDName, metav1.DeleteOptions{})
-	_ = client.AppsV1().Deployments(namespaceName).Delete(context.TODO(), deploymentCRDName, metav1.DeleteOptions{})
-	_ = client.CoreV1().Secrets(namespaceName).Delete(context.TODO(), secretCRDName, metav1.DeleteOptions{})
-	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), roleBindingCRDName, metav1.DeleteOptions{})
+func cleanCRDWebhookTest(ctx context.Context, client clientset.Interface, namespaceName string) {
+	_ = client.CoreV1().Services(namespaceName).Delete(ctx, serviceCRDName, metav1.DeleteOptions{})
+	_ = client.AppsV1().Deployments(namespaceName).Delete(ctx, deploymentCRDName, metav1.DeleteOptions{})
+	_ = client.CoreV1().Secrets(namespaceName).Delete(ctx, secretCRDName, metav1.DeleteOptions{})
+	_ = client.RbacV1().RoleBindings("kube-system").Delete(ctx, roleBindingCRDName, metav1.DeleteOptions{})
 }
 
-func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespace string) {
+func createAuthReaderRoleBindingForCRDConversion(ctx context.Context, f *framework.Framework, namespace string) {
 	ginkgo.By("Create role binding to let cr conversion webhook read extension-apiserver-authentication")
 	client := f.ClientSet
 	// Create the role binding to allow the webhook read the extension-apiserver-authentication configmap
-	_, err := client.RbacV1().RoleBindings("kube-system").Create(context.TODO(), &rbacv1.RoleBinding{
+	_, err := client.RbacV1().RoleBindings("kube-system").Create(ctx, &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: roleBindingCRDName,
 		},
@@ -238,7 +238,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 	}
 }
 
-func deployCustomResourceWebhookAndService(f *framework.Framework, image string, certCtx *certContext, servicePort int32, containerPort int32) {
+func deployCustomResourceWebhookAndService(ctx context.Context, f *framework.Framework, image string, certCtx *certContext, servicePort int32, containerPort int32) {
 	ginkgo.By("Deploying the custom resource conversion webhook pod")
 	client := f.ClientSet
 
@@ -254,7 +254,7 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 		},
 	}
 	namespace := f.Namespace.Name
-	_, err := client.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	_, err := client.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating secret %q in namespace %q", secretName, namespace)
 
 	// Create the deployment of the webhook
@@ -307,7 +307,7 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 	d.Spec.Template.Spec.Containers = containers
 	d.Spec.Template.Spec.Volumes = volumes
 
-	deployment, err := client.AppsV1().Deployments(namespace).Create(context.TODO(), d, metav1.CreateOptions{})
+	deployment, err := client.AppsV1().Deployments(namespace).Create(ctx, d, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentCRDName, namespace)
 
 	ginkgo.By("Wait for the deployment to be ready")
@@ -338,11 +338,11 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 			},
 		},
 	}
-	_, err = client.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
+	_, err = client.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating service %s in namespace %s", serviceCRDName, namespace)
 
 	ginkgo.By("Verifying the service has paired with the endpoint")
-	err = framework.WaitForServiceEndpointsNum(client, namespace, serviceCRDName, 1, 1*time.Second, 30*time.Second)
+	err = framework.WaitForServiceEndpointsNum(ctx, client, namespace, serviceCRDName, 1, 1*time.Second, 30*time.Second)
 	framework.ExpectNoError(err, "waiting for service %s/%s have %d endpoint", namespace, serviceCRDName, 1)
 }
 
@@ -371,7 +371,7 @@ func verifyV2Object(crd *apiextensionsv1.CustomResourceDefinition, obj *unstruct
 	gomega.Expect(port).To(gomega.BeEquivalentTo("8080"))
 }
 
-func testCustomResourceConversionWebhook(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClients map[string]dynamic.ResourceInterface) {
+func testCustomResourceConversionWebhook(ctx context.Context, f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClients map[string]dynamic.ResourceInterface) {
 	name := "cr-instance-1"
 	ginkgo.By("Creating a v1 custom resource")
 	crInstance := &unstructured.Unstructured{
@@ -385,15 +385,15 @@ func testCustomResourceConversionWebhook(f *framework.Framework, crd *apiextensi
 			"hostPort": "localhost:8080",
 		},
 	}
-	_, err := customResourceClients["v1"].Create(context.TODO(), crInstance, metav1.CreateOptions{})
+	_, err := customResourceClients["v1"].Create(ctx, crInstance, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	ginkgo.By("v2 custom resource should be converted")
-	v2crd, err := customResourceClients["v2"].Get(context.TODO(), name, metav1.GetOptions{})
+	v2crd, err := customResourceClients["v2"].Get(ctx, name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Getting v2 of custom resource %s", name)
 	verifyV2Object(crd, v2crd)
 }
 
-func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
+func testCRListConversion(ctx context.Context, f *framework.Framework, testCrd *crd.TestCrd) {
 	crd := testCrd.Crd
 	customResourceClients := testCrd.DynamicClients
 	name1 := "cr-instance-1"
@@ -410,7 +410,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 			"hostPort": "localhost:8080",
 		},
 	}
-	_, err := customResourceClients["v1"].Create(context.TODO(), crInstance, metav1.CreateOptions{})
+	_, err := customResourceClients["v1"].Create(ctx, crInstance, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	// Now cr-instance-1 is stored as v1. lets change storage version
@@ -437,7 +437,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	//
 	// TODO: we have to wait for the storage version to become effective. Storage version changes are not instant.
 	for i := 0; i < 5; i++ {
-		_, err = customResourceClients["v1"].Create(context.TODO(), crInstance, metav1.CreateOptions{})
+		_, err = customResourceClients["v1"].Create(ctx, crInstance, metav1.CreateOptions{})
 		if err == nil {
 			break
 		}
@@ -447,7 +447,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	// Now that we have a v1 and v2 object, both list operation in v1 and v2 should work as expected.
 
 	ginkgo.By("List CRs in v1")
-	list, err := customResourceClients["v1"].List(context.TODO(), metav1.ListOptions{})
+	list, err := customResourceClients["v1"].List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
 	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
@@ -456,7 +456,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	verifyV1Object(crd, &list.Items[1])
 
 	ginkgo.By("List CRs in v2")
-	list, err = customResourceClients["v2"].List(context.TODO(), metav1.ListOptions{})
+	list, err = customResourceClients["v2"].List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
 	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
@@ -466,8 +466,8 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 }
 
 // waitWebhookConversionReady sends stub custom resource creation requests requiring conversion until one succeeds.
-func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClients map[string]dynamic.ResourceInterface, version string) {
-	framework.ExpectNoError(wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+func waitWebhookConversionReady(ctx context.Context, f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClients map[string]dynamic.ResourceInterface, version string) {
+	framework.ExpectNoError(wait.PollImmediateWithContext(ctx, 100*time.Millisecond, 30*time.Second, func(ctx context.Context) (bool, error) {
 		crInstance := &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"kind":       crd.Spec.Names.Kind,
@@ -478,7 +478,7 @@ func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.Cus
 				},
 			},
 		}
-		_, err := customResourceClients[version].Create(context.TODO(), crInstance, metav1.CreateOptions{})
+		_, err := customResourceClients[version].Create(ctx, crInstance, metav1.CreateOptions{})
 		if err != nil {
 			// tolerate clusters that do not set --enable-aggregator-routing and have to wait for kube-proxy
 			// to program the service network, during which conversion requests return errors
@@ -486,7 +486,7 @@ func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.Cus
 			return false, nil
 		}
 
-		framework.ExpectNoError(customResourceClients[version].Delete(context.TODO(), crInstance.GetName(), metav1.DeleteOptions{}), "cleaning up stub object")
+		framework.ExpectNoError(customResourceClients[version].Delete(ctx, crInstance.GetName(), metav1.DeleteOptions{}), "cleaning up stub object")
 		return true, nil
 	}))
 }

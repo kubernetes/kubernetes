@@ -60,8 +60,8 @@ func newTestEvent(namespace, name, label string) *eventsv1.Event {
 	}
 }
 
-func eventExistsInList(client typedeventsv1.EventInterface, namespace, name string) bool {
-	eventsList, err := client.List(context.TODO(), metav1.ListOptions{
+func eventExistsInList(ctx context.Context, client typedeventsv1.EventInterface, namespace, name string) bool {
+	eventsList, err := client.List(ctx, metav1.ListOptions{
 		LabelSelector: "testevent-constant=true",
 	})
 	framework.ExpectNoError(err, "failed to list events")
@@ -99,37 +99,37 @@ var _ = common.SIGDescribe("Events API", func() {
 		eventName := "event-test"
 
 		ginkgo.By("creating a test event")
-		_, err := client.Create(context.TODO(), newTestEvent(f.Namespace.Name, eventName, "testevent-constant"), metav1.CreateOptions{})
+		_, err := client.Create(ctx, newTestEvent(f.Namespace.Name, eventName, "testevent-constant"), metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create test event")
 
 		ginkgo.By("listing events in all namespaces")
-		foundCreatedEvent := eventExistsInList(clientAllNamespaces, f.Namespace.Name, eventName)
+		foundCreatedEvent := eventExistsInList(ctx, clientAllNamespaces, f.Namespace.Name, eventName)
 		if !foundCreatedEvent {
 			framework.Failf("Failed to find test event %s in namespace %s, in list with cluster scope", eventName, f.Namespace.Name)
 		}
 
 		ginkgo.By("listing events in test namespace")
-		foundCreatedEvent = eventExistsInList(client, f.Namespace.Name, eventName)
+		foundCreatedEvent = eventExistsInList(ctx, client, f.Namespace.Name, eventName)
 		if !foundCreatedEvent {
 			framework.Failf("Failed to find test event %s in namespace %s, in list with namespace scope", eventName, f.Namespace.Name)
 		}
 
 		ginkgo.By("listing events with field selection filtering on source")
-		filteredCoreV1List, err := coreClient.List(context.TODO(), metav1.ListOptions{FieldSelector: "source=test-controller"})
+		filteredCoreV1List, err := coreClient.List(ctx, metav1.ListOptions{FieldSelector: "source=test-controller"})
 		framework.ExpectNoError(err, "failed to get filtered list")
 		if len(filteredCoreV1List.Items) != 1 || filteredCoreV1List.Items[0].Name != eventName {
 			framework.Failf("expected single event, got %#v", filteredCoreV1List.Items)
 		}
 
 		ginkgo.By("listing events with field selection filtering on reportingController")
-		filteredEventsV1List, err := client.List(context.TODO(), metav1.ListOptions{FieldSelector: "reportingController=test-controller"})
+		filteredEventsV1List, err := client.List(ctx, metav1.ListOptions{FieldSelector: "reportingController=test-controller"})
 		framework.ExpectNoError(err, "failed to get filtered list")
 		if len(filteredEventsV1List.Items) != 1 || filteredEventsV1List.Items[0].Name != eventName {
 			framework.Failf("expected single event, got %#v", filteredEventsV1List.Items)
 		}
 
 		ginkgo.By("getting the test event")
-		testEvent, err := client.Get(context.TODO(), eventName, metav1.GetOptions{})
+		testEvent, err := client.Get(ctx, eventName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get test event")
 
 		ginkgo.By("patching the test event")
@@ -146,11 +146,11 @@ var _ = common.SIGDescribe("Events API", func() {
 		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, eventsv1.Event{})
 		framework.ExpectNoError(err, "failed to create two-way merge patch")
 
-		_, err = client.Patch(context.TODO(), eventName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+		_, err = client.Patch(ctx, eventName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch the test event")
 
 		ginkgo.By("getting the test event")
-		event, err := client.Get(context.TODO(), eventName, metav1.GetOptions{})
+		event, err := client.Get(ctx, eventName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get test event")
 		// clear ResourceVersion and ManagedFields which are set by control-plane
 		event.ObjectMeta.ResourceVersion = ""
@@ -168,11 +168,11 @@ var _ = common.SIGDescribe("Events API", func() {
 			Count:            100,
 			LastObservedTime: metav1.MicroTime{Time: time.Unix(1505828956, 0)},
 		}
-		_, err = client.Update(context.TODO(), testEvent, metav1.UpdateOptions{})
+		_, err = client.Update(ctx, testEvent, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "failed to update the test event")
 
 		ginkgo.By("getting the test event")
-		event, err = client.Get(context.TODO(), eventName, metav1.GetOptions{})
+		event, err = client.Get(ctx, eventName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get test event")
 		// clear ResourceVersion and ManagedFields which are set by control-plane
 		event.ObjectMeta.ResourceVersion = ""
@@ -182,17 +182,17 @@ var _ = common.SIGDescribe("Events API", func() {
 		}
 
 		ginkgo.By("deleting the test event")
-		err = client.Delete(context.TODO(), eventName, metav1.DeleteOptions{})
+		err = client.Delete(ctx, eventName, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete the test event")
 
 		ginkgo.By("listing events in all namespaces")
-		foundCreatedEvent = eventExistsInList(clientAllNamespaces, f.Namespace.Name, eventName)
+		foundCreatedEvent = eventExistsInList(ctx, clientAllNamespaces, f.Namespace.Name, eventName)
 		if foundCreatedEvent {
 			framework.Failf("Should not have found test event %s in namespace %s, in list with cluster scope after deletion", eventName, f.Namespace.Name)
 		}
 
 		ginkgo.By("listing events in test namespace")
-		foundCreatedEvent = eventExistsInList(client, f.Namespace.Name, eventName)
+		foundCreatedEvent = eventExistsInList(ctx, client, f.Namespace.Name, eventName)
 		if foundCreatedEvent {
 			framework.Failf("Should not have found test event %s in namespace %s, in list with namespace scope after deletion", eventName, f.Namespace.Name)
 		}
@@ -209,12 +209,12 @@ var _ = common.SIGDescribe("Events API", func() {
 
 		ginkgo.By("Create set of events")
 		for _, eventName := range eventNames {
-			_, err := client.Create(context.TODO(), newTestEvent(f.Namespace.Name, eventName, "testevent-set"), metav1.CreateOptions{})
+			_, err := client.Create(ctx, newTestEvent(f.Namespace.Name, eventName, "testevent-set"), metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create event")
 		}
 
 		ginkgo.By("get a list of Events with a label in the current namespace")
-		eventList, err := client.List(context.TODO(), metav1.ListOptions{
+		eventList, err := client.List(ctx, metav1.ListOptions{
 			LabelSelector: "testevent-set=true",
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
@@ -222,13 +222,13 @@ var _ = common.SIGDescribe("Events API", func() {
 
 		ginkgo.By("delete a list of events")
 		framework.Logf("requesting DeleteCollection of events")
-		err = client.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testevent-set=true",
 		})
 		framework.ExpectNoError(err, "failed to delete the test event")
 
 		ginkgo.By("check that the list of events matches the requested quantity")
-		eventList, err = client.List(context.TODO(), metav1.ListOptions{
+		eventList, err = client.List(ctx, metav1.ListOptions{
 			LabelSelector: "testevent-set=true",
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")

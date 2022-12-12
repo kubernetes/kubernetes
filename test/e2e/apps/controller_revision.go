@@ -55,29 +55,29 @@ const (
 var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 	var f *framework.Framework
 
-	ginkgo.AfterEach(func() {
+	ginkgo.AfterEach(func(ctx context.Context) {
 		// Clean up
-		daemonsets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
+		daemonsets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "unable to dump DaemonSets")
 		if daemonsets != nil && len(daemonsets.Items) > 0 {
 			for _, ds := range daemonsets.Items {
 				ginkgo.By(fmt.Sprintf("Deleting DaemonSet %q", ds.Name))
-				framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name))
-				err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, &ds))
+				framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(ctx, f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name))
+				err = wait.PollImmediateWithContext(ctx, dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, &ds))
 				framework.ExpectNoError(err, "error waiting for daemon pod to be reaped")
 			}
 		}
-		if daemonsets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{}); err == nil {
+		if daemonsets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(ctx, metav1.ListOptions{}); err == nil {
 			framework.Logf("daemonset: %s", runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...), daemonsets))
 		} else {
 			framework.Logf("unable to dump daemonsets: %v", err)
 		}
-		if pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{}); err == nil {
+		if pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{}); err == nil {
 			framework.Logf("pods: %s", runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...), pods))
 		} else {
 			framework.Logf("unable to dump pods: %v", err)
 		}
-		err = clearDaemonSetNodeLabels(f.ClientSet)
+		err = clearDaemonSetNodeLabels(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 	})
 
@@ -90,17 +90,17 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 	var ns string
 	var c clientset.Interface
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		ns = f.Namespace.Name
 
 		c = f.ClientSet
 
-		updatedNS, err := patchNamespaceAnnotations(c, ns)
+		updatedNS, err := patchNamespaceAnnotations(ctx, c, ns)
 		framework.ExpectNoError(err)
 
 		ns = updatedNS.Name
 
-		err = clearDaemonSetNodeLabels(c)
+		err = clearDaemonSetNodeLabels(ctx, c)
 		framework.ExpectNoError(err)
 	})
 
@@ -128,26 +128,26 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		dsLabelSelector := labels.SelectorFromSet(dsLabel).String()
 
 		ginkgo.By(fmt.Sprintf("Creating DaemonSet %q", dsName))
-		testDaemonset, err := csAppsV1.DaemonSets(ns).Create(context.TODO(), newDaemonSetWithLabel(dsName, image, dsLabel), metav1.CreateOptions{})
+		testDaemonset, err := csAppsV1.DaemonSets(ns).Create(ctx, newDaemonSetWithLabel(dsName, image, dsLabel), metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, testDaemonset))
+		err = wait.PollImmediateWithContext(ctx, dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, testDaemonset))
 		framework.ExpectNoError(err, "error waiting for daemon pod to start")
-		err = e2edaemonset.CheckDaemonStatus(f, dsName)
+		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("Confirm DaemonSet %q successfully created with %q label", dsName, dsLabelSelector))
-		dsList, err := csAppsV1.DaemonSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: dsLabelSelector})
+		dsList, err := csAppsV1.DaemonSets("").List(ctx, metav1.ListOptions{LabelSelector: dsLabelSelector})
 		framework.ExpectNoError(err, "failed to list Daemon Sets")
 		framework.ExpectEqual(len(dsList.Items), 1, "filtered list wasn't found")
 
-		ds, err := c.AppsV1().DaemonSets(ns).Get(context.TODO(), dsName, metav1.GetOptions{})
+		ds, err := c.AppsV1().DaemonSets(ns).Get(ctx, dsName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		// Listing across all namespaces to verify api endpoint: listAppsV1ControllerRevisionForAllNamespaces
 		ginkgo.By(fmt.Sprintf("Listing all ControllerRevisions with label %q", dsLabelSelector))
-		revs, err := csAppsV1.ControllerRevisions("").List(context.TODO(), metav1.ListOptions{LabelSelector: dsLabelSelector})
+		revs, err := csAppsV1.ControllerRevisions("").List(ctx, metav1.ListOptions{LabelSelector: dsLabelSelector})
 		framework.ExpectNoError(err, "Failed to list ControllerRevision: %v", err)
 		framework.ExpectEqual(len(revs.Items), 1, "Failed to find any controllerRevisions")
 
@@ -158,14 +158,14 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		oref := rev.OwnerReferences[0]
 		if oref.Kind == "DaemonSet" && oref.UID == ds.UID {
 			framework.Logf("Located ControllerRevision: %q", rev.Name)
-			initialRevision, err = csAppsV1.ControllerRevisions(ns).Get(context.TODO(), rev.Name, metav1.GetOptions{})
+			initialRevision, err = csAppsV1.ControllerRevisions(ns).Get(ctx, rev.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to lookup ControllerRevision: %v", err)
 			framework.ExpectNotEqual(initialRevision, nil, "failed to lookup ControllerRevision: %v", initialRevision)
 		}
 
 		ginkgo.By(fmt.Sprintf("Patching ControllerRevision %q", initialRevision.Name))
 		payload := "{\"metadata\":{\"labels\":{\"" + initialRevision.Name + "\":\"patched\"}}}"
-		patchedControllerRevision, err := csAppsV1.ControllerRevisions(ns).Patch(context.TODO(), initialRevision.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
+		patchedControllerRevision, err := csAppsV1.ControllerRevisions(ns).Patch(ctx, initialRevision.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ControllerRevision %s in namespace %s", initialRevision.Name, ns)
 		framework.ExpectEqual(patchedControllerRevision.Labels[initialRevision.Name], "patched", "Did not find 'patched' label for this ControllerRevision. Current labels: %v", patchedControllerRevision.Labels)
 		framework.Logf("%s has been patched", patchedControllerRevision.Name)
@@ -184,33 +184,33 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 			Data:     initialRevision.Data,
 			Revision: initialRevision.Revision + 1,
 		}
-		newControllerRevision, err := csAppsV1.ControllerRevisions(ns).Create(context.TODO(), newRevision, metav1.CreateOptions{})
+		newControllerRevision, err := csAppsV1.ControllerRevisions(ns).Create(ctx, newRevision, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create ControllerRevision: %v", err)
 		framework.Logf("Created ControllerRevision: %s", newControllerRevision.Name)
 
 		ginkgo.By("Confirm that there are two ControllerRevisions")
-		err = wait.PollImmediate(controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
+		err = wait.PollImmediateWithContext(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
 		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
 
 		ginkgo.By(fmt.Sprintf("Deleting ControllerRevision %q", initialRevision.Name))
-		err = csAppsV1.ControllerRevisions(ns).Delete(context.TODO(), initialRevision.Name, metav1.DeleteOptions{})
+		err = csAppsV1.ControllerRevisions(ns).Delete(ctx, initialRevision.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete ControllerRevision: %v", err)
 
 		ginkgo.By("Confirm that there is only one ControllerRevision")
-		err = wait.PollImmediate(controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
+		err = wait.PollImmediateWithContext(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
 		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
 
-		listControllerRevisions, err := csAppsV1.ControllerRevisions(ns).List(context.TODO(), metav1.ListOptions{})
+		listControllerRevisions, err := csAppsV1.ControllerRevisions(ns).List(ctx, metav1.ListOptions{})
 		currentControllerRevision := listControllerRevisions.Items[0]
 
 		ginkgo.By(fmt.Sprintf("Updating ControllerRevision %q", currentControllerRevision.Name))
 		var updatedControllerRevision *appsv1.ControllerRevision
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			updatedControllerRevision, err = csAppsV1.ControllerRevisions(ns).Get(context.TODO(), currentControllerRevision.Name, metav1.GetOptions{})
+			updatedControllerRevision, err = csAppsV1.ControllerRevisions(ns).Get(ctx, currentControllerRevision.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Unable to get ControllerRevision %s", currentControllerRevision.Name)
 			updatedControllerRevision.Labels[currentControllerRevision.Name] = "updated"
-			updatedControllerRevision, err = csAppsV1.ControllerRevisions(ns).Update(context.TODO(), updatedControllerRevision, metav1.UpdateOptions{})
+			updatedControllerRevision, err = csAppsV1.ControllerRevisions(ns).Update(ctx, updatedControllerRevision, metav1.UpdateOptions{})
 			return err
 		})
 		framework.ExpectNoError(err, "failed to update ControllerRevision in namespace: %s", ns)
@@ -220,38 +220,38 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		ginkgo.By("Generate another ControllerRevision by patching the Daemonset")
 		patch := fmt.Sprintf(`{"spec":{"template":{"spec":{"terminationGracePeriodSeconds": %d}}},"updateStrategy":{"type":"RollingUpdate"}}`, 1)
 
-		_, err = c.AppsV1().DaemonSets(ns).Patch(context.TODO(), dsName, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+		_, err = c.AppsV1().DaemonSets(ns).Patch(ctx, dsName, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "error patching daemon set")
 
 		ginkgo.By("Confirm that there are two ControllerRevisions")
-		err = wait.PollImmediate(controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
+		err = wait.PollImmediateWithContext(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 2))
 		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
 
 		updatedLabel := map[string]string{updatedControllerRevision.Name: "updated"}
 		updatedLabelSelector := labels.SelectorFromSet(updatedLabel).String()
 
 		ginkgo.By(fmt.Sprintf("Removing a ControllerRevision via 'DeleteCollection' with labelSelector: %q", updatedLabelSelector))
-		err = csAppsV1.ControllerRevisions(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: updatedLabelSelector})
+		err = csAppsV1.ControllerRevisions(ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: updatedLabelSelector})
 		framework.ExpectNoError(err, "Failed to delete ControllerRevision: %v", err)
 
 		ginkgo.By("Confirm that there is only one ControllerRevision")
-		err = wait.PollImmediate(controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
+		err = wait.PollImmediateWithContext(ctx, controllerRevisionRetryPeriod, controllerRevisionRetryTimeout, checkControllerRevisionListQuantity(f, dsLabelSelector, 1))
 		framework.ExpectNoError(err, "failed to count required ControllerRevisions")
 
-		list, err := csAppsV1.ControllerRevisions(ns).List(context.TODO(), metav1.ListOptions{})
+		list, err := csAppsV1.ControllerRevisions(ns).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list ControllerRevision")
 		framework.ExpectEqual(list.Items[0].Revision, int64(3), "failed to find the expected revision for the Controller")
 		framework.Logf("ControllerRevision %q has revision %d", list.Items[0].Name, list.Items[0].Revision)
 	})
 })
 
-func checkControllerRevisionListQuantity(f *framework.Framework, label string, quantity int) func() (bool, error) {
-	return func() (bool, error) {
+func checkControllerRevisionListQuantity(f *framework.Framework, label string, quantity int) func(ctx context.Context) (bool, error) {
+	return func(ctx context.Context) (bool, error) {
 		var err error
 
 		framework.Logf("Requesting list of ControllerRevisions to confirm quantity")
 
-		list, err := f.ClientSet.AppsV1().ControllerRevisions(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+		list, err := f.ClientSet.AppsV1().ControllerRevisions(f.Namespace.Name).List(ctx, metav1.ListOptions{
 			LabelSelector: label})
 		if err != nil {
 			return false, err

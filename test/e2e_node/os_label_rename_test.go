@@ -43,9 +43,9 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reconcile the OS and Arch labels when restarted", func(ctx context.Context) {
-			node := getLocalNode(f)
-			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
-			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
+			node := getLocalNode(ctx, f)
+			e2enode.ExpectNodeHasLabel(ctx, f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
+			e2enode.ExpectNodeHasLabel(ctx, f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
 
 			ginkgo.By("killing and restarting kubelet")
 			// Let's kill the kubelet
@@ -58,16 +58,16 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 			framework.ExpectNoError(err)
 			// Restart kubelet
 			startKubelet()
-			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(f.ClientSet, framework.RestartNodeReadyAgainTimeout))
+			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, framework.RestartNodeReadyAgainTimeout))
 			// If this happens right, node should have all the labels reset properly
-			err = waitForNodeLabels(f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
+			err = waitForNodeLabels(ctx, f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
 			framework.ExpectNoError(err)
 		})
 		ginkgo.It("should reconcile the OS and Arch labels when running", func(ctx context.Context) {
 
-			node := getLocalNode(f)
-			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
-			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
+			node := getLocalNode(ctx, f)
+			e2enode.ExpectNodeHasLabel(ctx, f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
+			e2enode.ExpectNodeHasLabel(ctx, f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
 
 			// Update labels
 			newNode := node.DeepCopy()
@@ -75,19 +75,19 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 			newNode.Labels[v1.LabelArchStable] = "dummyArch"
 			_, _, err := nodeutil.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
 			framework.ExpectNoError(err)
-			err = waitForNodeLabels(f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
+			err = waitForNodeLabels(ctx, f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
 			framework.ExpectNoError(err)
 		})
 	})
 })
 
 // waitForNodeLabels waits for the nodes to be have appropriate labels.
-func waitForNodeLabels(c v1core.CoreV1Interface, nodeName string, timeout time.Duration) error {
+func waitForNodeLabels(ctx context.Context, c v1core.CoreV1Interface, nodeName string, timeout time.Duration) error {
 	ginkgo.By(fmt.Sprintf("Waiting for node %v to have appropriate labels", nodeName))
 	// Poll until the node has desired labels
-	return wait.Poll(framework.Poll, timeout,
-		func() (bool, error) {
-			node, err := c.Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	return wait.PollWithContext(ctx, framework.Poll, timeout,
+		func(ctx context.Context) (bool, error) {
+			node, err := c.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}

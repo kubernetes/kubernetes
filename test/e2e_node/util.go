@@ -82,8 +82,8 @@ const (
 
 var kubeletHealthCheckURL = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
 
-func getNodeSummary() (*stats.Summary, error) {
-	kubeletConfig, err := getCurrentKubeletConfig()
+func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
+	kubeletConfig, err := getCurrentKubeletConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current kubelet config")
 	}
@@ -114,7 +114,7 @@ func getNodeSummary() (*stats.Summary, error) {
 	return &summary, nil
 }
 
-func getV1alpha1NodeDevices() (*kubeletpodresourcesv1alpha1.ListPodResourcesResponse, error) {
+func getV1alpha1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1alpha1.ListPodResourcesResponse, error) {
 	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting local endpoint: %v", err)
@@ -124,7 +124,7 @@ func getV1alpha1NodeDevices() (*kubeletpodresourcesv1alpha1.ListPodResourcesResp
 		return nil, fmt.Errorf("Error getting grpc client: %v", err)
 	}
 	defer conn.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	resp, err := client.List(ctx, &kubeletpodresourcesv1alpha1.ListPodResourcesRequest{})
 	if err != nil {
@@ -133,7 +133,7 @@ func getV1alpha1NodeDevices() (*kubeletpodresourcesv1alpha1.ListPodResourcesResp
 	return resp, nil
 }
 
-func getV1NodeDevices() (*kubeletpodresourcesv1.ListPodResourcesResponse, error) {
+func getV1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1.ListPodResourcesResponse, error) {
 	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting local endpoint: %v", err)
@@ -143,7 +143,7 @@ func getV1NodeDevices() (*kubeletpodresourcesv1.ListPodResourcesResponse, error)
 		return nil, fmt.Errorf("Error getting gRPC client: %v", err)
 	}
 	defer conn.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	resp, err := client.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
 	if err != nil {
@@ -153,46 +153,46 @@ func getV1NodeDevices() (*kubeletpodresourcesv1.ListPodResourcesResponse, error)
 }
 
 // Returns the current KubeletConfiguration
-func getCurrentKubeletConfig() (*kubeletconfig.KubeletConfiguration, error) {
+func getCurrentKubeletConfig(ctx context.Context) (*kubeletconfig.KubeletConfiguration, error) {
 	// namespace only relevant if useProxy==true, so we don't bother
-	return e2ekubelet.GetCurrentKubeletConfig(framework.TestContext.NodeName, "", false)
+	return e2ekubelet.GetCurrentKubeletConfig(ctx, framework.TestContext.NodeName, "", false)
 }
 
 // Must be called within a Context. Allows the function to modify the KubeletConfiguration during the BeforeEach of the context.
 // The change is reverted in the AfterEach of the context.
 // Returns true on success.
-func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *kubeletconfig.KubeletConfiguration)) {
+func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration)) {
 	var oldCfg *kubeletconfig.KubeletConfiguration
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		var err error
-		oldCfg, err = getCurrentKubeletConfig()
+		oldCfg, err = getCurrentKubeletConfig(ctx)
 		framework.ExpectNoError(err)
 
 		newCfg := oldCfg.DeepCopy()
-		updateFunction(newCfg)
+		updateFunction(ctx, newCfg)
 		if apiequality.Semantic.DeepEqual(*newCfg, *oldCfg) {
 			return
 		}
 
-		updateKubeletConfig(f, newCfg, true)
+		updateKubeletConfig(ctx, f, newCfg, true)
 	})
 
-	ginkgo.AfterEach(func() {
+	ginkgo.AfterEach(func(ctx context.Context) {
 		if oldCfg != nil {
 			// Update the Kubelet configuration.
-			updateKubeletConfig(f, oldCfg, true)
+			updateKubeletConfig(ctx, f, oldCfg, true)
 		}
 	})
 }
 
-func updateKubeletConfig(f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
+func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
 	// Update the Kubelet configuration.
 	ginkgo.By("Stopping the kubelet")
 	startKubelet := stopKubelet()
 
 	// wait until the kubelet health check will fail
-	gomega.Eventually(func() bool {
+	gomega.Eventually(ctx, func() bool {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
 	}, time.Minute, time.Second).Should(gomega.BeFalse())
 
@@ -208,13 +208,13 @@ func updateKubeletConfig(f *framework.Framework, kubeletConfig *kubeletconfig.Ku
 	startKubelet()
 
 	// wait until the kubelet health check will succeed
-	gomega.Eventually(func() bool {
+	gomega.Eventually(ctx, func() bool {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
 	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 
 	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodes, err := e2enode.TotalReady(f.ClientSet)
+	gomega.Eventually(ctx, func(ctx context.Context) bool {
+		nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
@@ -226,8 +226,8 @@ func deleteStateFile(stateFileName string) {
 }
 
 // listNamespaceEvents lists the events in the given namespace.
-func listNamespaceEvents(c clientset.Interface, ns string) error {
-	ls, err := c.CoreV1().Events(ns).List(context.TODO(), metav1.ListOptions{})
+func listNamespaceEvents(ctx context.Context, c clientset.Interface, ns string) error {
+	ls, err := c.CoreV1().Events(ns).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -237,20 +237,20 @@ func listNamespaceEvents(c clientset.Interface, ns string) error {
 	return nil
 }
 
-func logPodEvents(f *framework.Framework) {
+func logPodEvents(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Summary of pod events during the test:")
-	err := listNamespaceEvents(f.ClientSet, f.Namespace.Name)
+	err := listNamespaceEvents(ctx, f.ClientSet, f.Namespace.Name)
 	framework.ExpectNoError(err)
 }
 
-func logNodeEvents(f *framework.Framework) {
+func logNodeEvents(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Summary of node events during the test:")
-	err := listNamespaceEvents(f.ClientSet, "")
+	err := listNamespaceEvents(ctx, f.ClientSet, "")
 	framework.ExpectNoError(err)
 }
 
-func getLocalNode(f *framework.Framework) *v1.Node {
-	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+func getLocalNode(ctx context.Context, f *framework.Framework) *v1.Node {
+	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(len(nodeList.Items), 1, "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
@@ -260,8 +260,8 @@ func getLocalNode(f *framework.Framework) *v1.Node {
 // getLocalTestNode is a variant of `getLocalNode` which reports but does not set any requirement about the node readiness state, letting
 // the caller decide. The check is intentionally done like `getLocalNode` does.
 // Note `getLocalNode` aborts (as in ginkgo.Expect) the test implicitly if the worker node is not ready.
-func getLocalTestNode(f *framework.Framework) (*v1.Node, bool) {
-	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+func getLocalTestNode(ctx context.Context, f *framework.Framework) (*v1.Node, bool) {
+	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	ready := e2enode.IsNodeReady(node)
 	schedulable := e2enode.IsNodeSchedulable(node)
@@ -272,12 +272,12 @@ func getLocalTestNode(f *framework.Framework) (*v1.Node, bool) {
 // logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus
 // metrics exposed on the current node and identified by the metricNames.
 // The Kubelet subsystem prefix is automatically prepended to these metric names.
-func logKubeletLatencyMetrics(metricNames ...string) {
+func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 	metricSet := sets.NewString()
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(fmt.Sprintf("%s:%d", framework.TestContext.NodeName, ports.KubeletReadOnlyPort), "/metrics")
+	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", framework.TestContext.NodeName, ports.KubeletReadOnlyPort), "/metrics")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {

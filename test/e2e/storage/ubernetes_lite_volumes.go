@@ -42,10 +42,10 @@ var _ = utils.SIGDescribe("Multi-AZ Cluster Volumes", func() {
 	var zoneCount int
 	var err error
 	image := framework.ServeHostnameImage
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		if zoneCount <= 0 {
-			zoneCount, err = getZoneCount(f.ClientSet)
+			zoneCount, err = getZoneCount(ctx, f.ClientSet)
 			framework.ExpectNoError(err)
 		}
 		ginkgo.By(fmt.Sprintf("Checking for multi-zone cluster.  Zone count = %d", zoneCount))
@@ -54,13 +54,13 @@ var _ = utils.SIGDescribe("Multi-AZ Cluster Volumes", func() {
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	ginkgo.It("should schedule pods in the same zones as statically provisioned PVs", func(ctx context.Context) {
-		PodsUseStaticPVsOrFail(f, (2*zoneCount)+1, image)
+		PodsUseStaticPVsOrFail(ctx, f, (2*zoneCount)+1, image)
 	})
 })
 
 // Return the number of zones in which we have nodes in this cluster.
-func getZoneCount(c clientset.Interface) (int, error) {
-	zoneNames, err := e2enode.GetSchedulableClusterZones(c)
+func getZoneCount(ctx context.Context, c clientset.Interface) (int, error) {
+	zoneNames, err := e2enode.GetSchedulableClusterZones(ctx, c)
 	if err != nil {
 		return -1, err
 	}
@@ -76,12 +76,12 @@ type staticPVTestConfig struct {
 
 // PodsUseStaticPVsOrFail Check that the pods using statically
 // created PVs get scheduled to the same zone that the PV is in.
-func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) {
+func PodsUseStaticPVsOrFail(ctx context.Context, f *framework.Framework, podCount int, image string) {
 	var err error
 	c := f.ClientSet
 	ns := f.Namespace.Name
 
-	zones, err := e2enode.GetSchedulableClusterZones(c)
+	zones, err := e2enode.GetSchedulableClusterZones(ctx, c)
 	framework.ExpectNoError(err)
 	zonelist := zones.List()
 	ginkgo.By("Creating static PVs across zones")
@@ -93,7 +93,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		ginkgo.By("Cleaning up pods and PVs")
 		for _, config := range configs {
-			e2epod.DeletePodOrFail(c, ns, config.pod.Name)
+			e2epod.DeletePodOrFail(ctx, c, ns, config.pod.Name)
 		}
 		var wg sync.WaitGroup
 		wg.Add(len(configs))
@@ -101,11 +101,11 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 			go func(config *staticPVTestConfig) {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
-				err := e2epod.WaitForPodToDisappear(c, ns, config.pod.Name, labels.Everything(), framework.Poll, f.Timeouts.PodDelete)
+				err := e2epod.WaitForPodToDisappear(ctx, c, ns, config.pod.Name, labels.Everything(), framework.Poll, f.Timeouts.PodDelete)
 				framework.ExpectNoError(err, "while waiting for pod to disappear")
-				errs := e2epv.PVPVCCleanup(c, ns, config.pv, config.pvc)
+				errs := e2epv.PVPVCCleanup(ctx, c, ns, config.pv, config.pvc)
 				framework.ExpectNoError(utilerrors.NewAggregate(errs), "while cleaning up PVs and PVCs")
-				err = e2epv.DeletePVSource(config.pvSource)
+				err = e2epv.DeletePVSource(ctx, config.pvSource)
 				framework.ExpectNoError(err, "while deleting PVSource")
 			}(configs[i])
 		}
@@ -114,7 +114,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 
 	for i, config := range configs {
 		zone := zonelist[i%len(zones)]
-		config.pvSource, err = e2epv.CreatePVSource(zone)
+		config.pvSource, err = e2epv.CreatePVSource(ctx, zone)
 		framework.ExpectNoError(err)
 
 		pvConfig := e2epv.PersistentVolumeConfig{
@@ -125,25 +125,25 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 		className := ""
 		pvcConfig := e2epv.PersistentVolumeClaimConfig{StorageClassName: &className}
 
-		config.pv, config.pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, true)
+		config.pv, config.pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, true)
 		framework.ExpectNoError(err)
 	}
 
 	ginkgo.By("Waiting for all PVCs to be bound")
 	for _, config := range configs {
-		e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, config.pv, config.pvc)
+		e2epv.WaitOnPVandPVC(ctx, c, f.Timeouts, ns, config.pv, config.pvc)
 	}
 
 	ginkgo.By("Creating pods for each static PV")
 	for _, config := range configs {
 		podConfig := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
-		config.pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), podConfig, metav1.CreateOptions{})
+		config.pod, err = c.CoreV1().Pods(ns).Create(ctx, podConfig, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
 
 	ginkgo.By("Waiting for all pods to be running")
 	for _, config := range configs {
-		err = e2epod.WaitForPodRunningInNamespace(c, config.pod)
+		err = e2epod.WaitForPodRunningInNamespace(ctx, c, config.pod)
 		framework.ExpectNoError(err)
 	}
 }

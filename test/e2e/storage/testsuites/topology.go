@@ -104,12 +104,12 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	f := framework.NewFrameworkWithCustomTimeouts("topology", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	init := func() *topologyTest {
+	init := func(ctx context.Context) *topologyTest {
 		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
 		l := &topologyTest{}
 
 		// Now do the more expensive test initialization.
-		l.config = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(ctx, f)
 
 		l.resource = storageframework.VolumeResource{
 			Config:  l.config,
@@ -131,13 +131,13 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		}
 		// We collect 1 additional topology, if possible, for the conflicting topology test
 		// case, but it's not needed for the positive test
-		l.allTopologies, err = t.getCurrentTopologies(cs, keys, dInfo.NumAllowedTopologies+1)
+		l.allTopologies, err = t.getCurrentTopologies(ctx, cs, keys, dInfo.NumAllowedTopologies+1)
 		framework.ExpectNoError(err, "failed to get current driver topologies")
 		if len(l.allTopologies) < dInfo.NumAllowedTopologies {
 			e2eskipper.Skipf("Not enough topologies in cluster -- skipping")
 		}
 
-		l.resource.Sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
+		l.resource.Sc = dDriver.GetDynamicProvisionStorageClass(ctx, l.config, pattern.FsType)
 		framework.ExpectNotEqual(l.resource.Sc, nil, "driver failed to provide a StorageClass")
 		l.resource.Sc.VolumeBindingMode = &pattern.BindingMode
 
@@ -150,14 +150,14 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 			StorageClassName: &(l.resource.Sc.Name),
 		}, l.config.Framework.Namespace.Name)
 
-		migrationCheck := newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
+		migrationCheck := newMigrationOpCheck(ctx, f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 		ginkgo.DeferCleanup(migrationCheck.validateMigrationVolumeOpCounts)
 
 		return l
 	}
 
 	ginkgo.It("should provision a volume and schedule a pod with AllowedTopologies", func(ctx context.Context) {
-		l := init()
+		l := init(ctx)
 
 		// If possible, exclude one topology, otherwise allow them all
 		excludedIndex := -1
@@ -166,23 +166,23 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		}
 		allowedTopologies := t.setAllowedTopologies(l.resource.Sc, l.allTopologies, excludedIndex)
 
-		t.createResources(cs, l, nil)
+		t.createResources(ctx, cs, l, nil)
 
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying pod scheduled to correct node")
-		pod, err := cs.CoreV1().Pods(l.pod.Namespace).Get(context.TODO(), l.pod.Name, metav1.GetOptions{})
+		pod, err := cs.CoreV1().Pods(l.pod.Namespace).Get(ctx, l.pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		node, err := cs.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
+		node, err := cs.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		t.verifyNodeTopology(node, allowedTopologies)
 	})
 
 	ginkgo.It("should fail to schedule a pod which has topologies that conflict with AllowedTopologies", func(ctx context.Context) {
-		l := init()
+		l := init(ctx)
 
 		if len(l.allTopologies) < dInfo.NumAllowedTopologies+1 {
 			e2eskipper.Skipf("Not enough topologies in cluster -- skipping")
@@ -213,19 +213,19 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 				},
 			},
 		}
-		t.createResources(cs, l, affinity)
+		t.createResources(ctx, cs, l, affinity)
 
 		// Wait for pod to fail scheduling
 		// With delayed binding, the scheduler errors before provisioning
 		// With immediate binding, the volume gets provisioned but cannot be scheduled
-		err = e2epod.WaitForPodNameUnschedulableInNamespace(cs, l.pod.Name, l.pod.Namespace)
+		err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, cs, l.pod.Name, l.pod.Namespace)
 		framework.ExpectNoError(err)
 	})
 }
 
 // getCurrentTopologies() goes through all Nodes and returns up to maxCount unique driver topologies
-func (t *topologyTestSuite) getCurrentTopologies(cs clientset.Interface, keys []string, maxCount int) ([]topology, error) {
-	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+func (t *topologyTestSuite) getCurrentTopologies(ctx context.Context, cs clientset.Interface, keys []string, maxCount int) ([]topology, error) {
+	nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 	if err != nil {
 		return nil, err
 	}
@@ -309,16 +309,16 @@ func (t *topologyTestSuite) verifyNodeTopology(node *v1.Node, allowedTopos []top
 	framework.Failf("node %v topology labels %+v doesn't match allowed topologies +%v", node.Name, node.Labels, allowedTopos)
 }
 
-func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyTest, affinity *v1.Affinity) {
+func (t *topologyTestSuite) createResources(ctx context.Context, cs clientset.Interface, l *topologyTest, affinity *v1.Affinity) {
 	var err error
 	framework.Logf("Creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.resource.Sc, l.resource.Pvc)
 
 	ginkgo.By("Creating sc")
-	l.resource.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), l.resource.Sc, metav1.CreateOptions{})
+	l.resource.Sc, err = cs.StorageV1().StorageClasses().Create(ctx, l.resource.Sc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pvc")
-	l.resource.Pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Create(context.TODO(), l.resource.Pvc, metav1.CreateOptions{})
+	l.resource.Pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Create(ctx, l.resource.Pvc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pod")
@@ -331,17 +331,17 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 	}
 	l.pod, err = e2epod.MakeSecPod(&podConfig)
 	framework.ExpectNoError(err)
-	l.pod, err = cs.CoreV1().Pods(l.pod.Namespace).Create(context.TODO(), l.pod, metav1.CreateOptions{})
+	l.pod, err = cs.CoreV1().Pods(l.pod.Namespace).Create(ctx, l.pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 }
 
-func (t *topologyTestSuite) CleanupResources(cs clientset.Interface, l *topologyTest) {
+func (t *topologyTestSuite) CleanupResources(ctx context.Context, cs clientset.Interface, l *topologyTest) {
 	if l.pod != nil {
 		ginkgo.By("Deleting pod")
-		err := e2epod.DeletePodWithWait(cs, l.pod)
+		err := e2epod.DeletePodWithWait(ctx, cs, l.pod)
 		framework.ExpectNoError(err, "while deleting pod")
 	}
 
-	err := l.resource.CleanupResource()
+	err := l.resource.CleanupResource(ctx)
 	framework.ExpectNoError(err, "while clean up resource")
 }

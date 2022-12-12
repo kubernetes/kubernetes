@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -34,48 +35,48 @@ import (
 )
 
 // ControlPlaneUpgradeFunc returns a function that performs control plane upgrade.
-func ControlPlaneUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs []string) func() {
-	return func() {
+func ControlPlaneUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs []string) func(ctx context.Context) {
+	return func(ctx context.Context) {
 		target := upgCtx.Versions[1].Version.String()
-		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
-		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
+		framework.ExpectNoError(controlPlaneUpgrade(ctx, f, target, controlPlaneExtraEnvs))
+		framework.ExpectNoError(checkControlPlaneVersion(ctx, f.ClientSet, target))
 	}
 }
 
 // ClusterUpgradeFunc returns a function that performs full cluster upgrade (both control plane and nodes).
-func ClusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func() {
-	return func() {
+func ClusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func(ctx context.Context) {
+	return func(ctx context.Context) {
 		target := upgCtx.Versions[1].Version.String()
 		image := upgCtx.Versions[1].NodeImage
-		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
-		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
-		framework.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
-		framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
+		framework.ExpectNoError(controlPlaneUpgrade(ctx, f, target, controlPlaneExtraEnvs))
+		framework.ExpectNoError(checkControlPlaneVersion(ctx, f.ClientSet, target))
+		framework.ExpectNoError(nodeUpgrade(ctx, f, target, image, nodeExtraEnvs))
+		framework.ExpectNoError(checkNodesVersions(ctx, f.ClientSet, target))
 	}
 }
 
 // ClusterDowngradeFunc returns a function that performs full cluster downgrade (both nodes and control plane).
-func ClusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func() {
-	return func() {
+func ClusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func(ctx context.Context) {
+	return func(ctx context.Context) {
 		target := upgCtx.Versions[1].Version.String()
 		image := upgCtx.Versions[1].NodeImage
 		// Yes this really is a downgrade. And nodes must downgrade first.
-		framework.ExpectNoError(nodeUpgrade(f, target, image, nodeExtraEnvs))
-		framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
-		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
+		framework.ExpectNoError(nodeUpgrade(ctx, f, target, image, nodeExtraEnvs))
+		framework.ExpectNoError(checkNodesVersions(ctx, f.ClientSet, target))
+		framework.ExpectNoError(controlPlaneUpgrade(ctx, f, target, controlPlaneExtraEnvs))
+		framework.ExpectNoError(checkControlPlaneVersion(ctx, f.ClientSet, target))
 	}
 }
 
 const etcdImage = "3.4.9-1"
 
 // controlPlaneUpgrade upgrades control plane node on GCE/GKE.
-func controlPlaneUpgrade(f *framework.Framework, v string, extraEnvs []string) error {
+func controlPlaneUpgrade(ctx context.Context, f *framework.Framework, v string, extraEnvs []string) error {
 	switch framework.TestContext.Provider {
 	case "gce":
 		return controlPlaneUpgradeGCE(v, extraEnvs)
 	case "gke":
-		return e2eproviders.MasterUpgradeGKE(f.Namespace.Name, v)
+		return e2eproviders.MasterUpgradeGKE(ctx, f.Namespace.Name, v)
 	default:
 		return fmt.Errorf("controlPlaneUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
@@ -117,11 +118,11 @@ func traceRouteToControlPlane() {
 }
 
 // checkControlPlaneVersion validates the control plane version
-func checkControlPlaneVersion(c clientset.Interface, want string) error {
+func checkControlPlaneVersion(ctx context.Context, c clientset.Interface, want string) error {
 	framework.Logf("Checking control plane version")
 	var err error
 	var v *version.Info
-	waitErr := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
+	waitErr := wait.PollImmediateWithContext(ctx, 5*time.Second, 2*time.Minute, func(ctx context.Context) (bool, error) {
 		v, err = c.Discovery().ServerVersion()
 		if err != nil {
 			traceRouteToControlPlane()
@@ -144,21 +145,21 @@ func checkControlPlaneVersion(c clientset.Interface, want string) error {
 }
 
 // nodeUpgrade upgrades nodes on GCE/GKE.
-func nodeUpgrade(f *framework.Framework, v string, img string, extraEnvs []string) error {
+func nodeUpgrade(ctx context.Context, f *framework.Framework, v string, img string, extraEnvs []string) error {
 	// Perform the upgrade.
 	var err error
 	switch framework.TestContext.Provider {
 	case "gce":
 		err = nodeUpgradeGCE(v, img, extraEnvs)
 	case "gke":
-		err = nodeUpgradeGKE(f.Namespace.Name, v, img)
+		err = nodeUpgradeGKE(ctx, f.Namespace.Name, v, img)
 	default:
 		err = fmt.Errorf("nodeUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
 	if err != nil {
 		return err
 	}
-	return waitForNodesReadyAfterUpgrade(f)
+	return waitForNodesReadyAfterUpgrade(ctx, f)
 }
 
 // TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
@@ -174,7 +175,7 @@ func nodeUpgradeGCE(rawV, img string, extraEnvs []string) error {
 	return err
 }
 
-func nodeUpgradeGKE(namespace string, v string, img string) error {
+func nodeUpgradeGKE(ctx context.Context, namespace string, v string, img string) error {
 	framework.Logf("Upgrading nodes to version %q and image %q", v, img)
 	nps, err := nodePoolsGKE()
 	if err != nil {
@@ -202,7 +203,7 @@ func nodeUpgradeGKE(namespace string, v string, img string) error {
 			return err
 		}
 
-		e2enode.WaitForSSHTunnels(namespace)
+		e2enode.WaitForSSHTunnels(ctx, namespace)
 	}
 	return nil
 }
@@ -227,25 +228,25 @@ func nodePoolsGKE() ([]string, error) {
 	return strings.Fields(stdout), nil
 }
 
-func waitForNodesReadyAfterUpgrade(f *framework.Framework) error {
+func waitForNodesReadyAfterUpgrade(ctx context.Context, f *framework.Framework) error {
 	// Wait for it to complete and validate nodes are healthy.
 	//
 	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
 	// GKE; the operation shouldn't return until they all are.
-	numNodes, err := e2enode.TotalRegistered(f.ClientSet)
+	numNodes, err := e2enode.TotalRegistered(ctx, f.ClientSet)
 	if err != nil {
 		return fmt.Errorf("couldn't detect number of nodes")
 	}
 	framework.Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", framework.RestartNodeReadyAgainTimeout, numNodes)
-	if _, err := e2enode.CheckReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout); err != nil {
+	if _, err := e2enode.CheckReady(ctx, f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout); err != nil {
 		return err
 	}
 	return nil
 }
 
 // checkNodesVersions validates the nodes versions
-func checkNodesVersions(cs clientset.Interface, want string) error {
-	l, err := e2enode.GetReadySchedulableNodes(cs)
+func checkNodesVersions(ctx context.Context, cs clientset.Interface, want string) error {
+	l, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 	if err != nil {
 		return err
 	}

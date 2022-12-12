@@ -44,7 +44,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 				)
 				ginkgo.By("Creating a pod with a memory backed volume that exits success without restart", func() {
 					volumeName = "memory-volume"
-					memoryBackedPod = e2epod.NewPodClient(f).Create(&v1.Pod{
+					memoryBackedPod = e2epod.NewPodClient(f).Create(ctx, &v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "pod" + string(uuid.NewUUID()),
 							Namespace: f.Namespace.Name,
@@ -74,7 +74,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 							},
 						},
 					})
-					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
+					err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})
 				ginkgo.By("Verifying the memory backed volume was removed from node", func() {
@@ -83,7 +83,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 					for i := 0; i < 10; i++ {
 						// need to create a new verification pod on each pass since updates
 						//to the HostPath volume aren't propogated to the pod
-						pod := e2epod.NewPodClient(f).Create(&v1.Pod{
+						pod := e2epod.NewPodClient(f).Create(ctx, &v1.Pod{
 							ObjectMeta: metav1.ObjectMeta{
 								Name:      "pod" + string(uuid.NewUUID()),
 								Namespace: f.Namespace.Name,
@@ -115,9 +115,9 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 								},
 							},
 						})
-						err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+						err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 						gp := int64(1)
-						e2epod.NewPodClient(f).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
+						_ = e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 						if err == nil {
 							break
 						}

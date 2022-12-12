@@ -55,8 +55,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 		testVolType := BlockFsWithFormatLocalVolumeType
 		var testVol *localTestVolume
 		testMode := immediateMode
-		ginkgo.BeforeEach(func() {
-			nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
 			framework.ExpectNoError(err)
 
 			scName = fmt.Sprintf("%v-%v", testSCPrefix, f.Namespace.Name)
@@ -77,13 +77,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 				ltrMgr:       ltrMgr,
 			}
 
-			setupExpandableLocalStorageClass(config, &testMode)
-			testVols := setupLocalVolumesPVCsPVs(config, testVolType, config.randomNode, 1, testMode)
+			setupExpandableLocalStorageClass(ctx, config, &testMode)
+			testVols := setupLocalVolumesPVCsPVs(ctx, config, testVolType, config.randomNode, 1, testMode)
 			testVol = testVols[0]
 		})
-		ginkgo.AfterEach(func() {
-			cleanupLocalVolumes(config, []*localTestVolume{testVol})
-			cleanupStorageClass(config)
+		ginkgo.AfterEach(func(ctx context.Context) {
+			cleanupLocalVolumes(ctx, config, []*localTestVolume{testVol})
+			cleanupStorageClass(ctx, config)
 		})
 
 		ginkgo.It("should support online expansion on node", func(ctx context.Context) {
@@ -92,9 +92,9 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 				pod1Err error
 			)
 			ginkgo.By("Creating pod1")
-			pod1, pod1Err = createLocalPod(config, testVol, nil)
+			pod1, pod1Err = createLocalPod(ctx, config, testVol, nil)
 			framework.ExpectNoError(pod1Err)
-			verifyLocalPod(config, testVol, pod1, config.randomNode.Name)
+			verifyLocalPod(ctx, config, testVol, pod1, config.randomNode.Name)
 
 			// We expand the PVC while l.pod is using it for online expansion.
 			ginkgo.By("Expanding current pvc")
@@ -102,7 +102,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("10Mi"))
 			framework.Logf("currentPvcSize %s, newSize %s", currentPvcSize.String(), newSize.String())
-			newPVC, err := testsuites.ExpandPVCSize(testVol.pvc, newSize, f.ClientSet)
+			newPVC, err := testsuites.ExpandPVCSize(ctx, testVol.pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
 			testVol.pvc = newPVC
 			gomega.Expect(testVol.pvc).NotTo(gomega.BeNil())
@@ -113,17 +113,17 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			}
 
 			// Now update the underlying volume manually
-			err = config.ltrMgr.ExpandBlockDevice(testVol.ltr, 10 /*number of 1M blocks to add*/)
+			err = config.ltrMgr.ExpandBlockDevice(ctx, testVol.ltr, 10 /*number of 1M blocks to add*/)
 			framework.ExpectNoError(err, "while expanding loopback device")
 
 			// now update PV to matching size
-			pv, err := UpdatePVSize(testVol.pv, newSize, f.ClientSet)
+			pv, err := UpdatePVSize(ctx, testVol.pv, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "while updating pv to more size")
 			gomega.Expect(pv).NotTo(gomega.BeNil())
 			testVol.pv = pv
 
 			ginkgo.By("Waiting for file system resize to finish")
-			testVol.pvc, err = testsuites.WaitForFSResize(testVol.pvc, f.ClientSet)
+			testVol.pvc, err = testsuites.WaitForFSResize(ctx, testVol.pvc, f.ClientSet)
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := testVol.pvc.Status.Conditions
@@ -134,19 +134,19 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 
 })
 
-func UpdatePVSize(pv *v1.PersistentVolume, size resource.Quantity, c clientset.Interface) (*v1.PersistentVolume, error) {
+func UpdatePVSize(ctx context.Context, pv *v1.PersistentVolume, size resource.Quantity, c clientset.Interface) (*v1.PersistentVolume, error) {
 	pvName := pv.Name
 	pvToUpdate := pv.DeepCopy()
 
 	var lastError error
-	waitErr := wait.PollImmediate(5*time.Second, csiResizeWaitPeriod, func() (bool, error) {
+	waitErr := wait.PollImmediateWithContext(ctx, 5*time.Second, csiResizeWaitPeriod, func(ctx context.Context) (bool, error) {
 		var err error
-		pvToUpdate, err = c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
+		pvToUpdate, err = c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching pv %s: %v", pvName, err)
 		}
 		pvToUpdate.Spec.Capacity[v1.ResourceStorage] = size
-		pvToUpdate, err = c.CoreV1().PersistentVolumes().Update(context.TODO(), pvToUpdate, metav1.UpdateOptions{})
+		pvToUpdate, err = c.CoreV1().PersistentVolumes().Update(ctx, pvToUpdate, metav1.UpdateOptions{})
 		if err != nil {
 			framework.Logf("error updating PV %s: %v", pvName, err)
 			lastError = err
@@ -163,7 +163,7 @@ func UpdatePVSize(pv *v1.PersistentVolume, size resource.Quantity, c clientset.I
 	return pvToUpdate, nil
 }
 
-func setupExpandableLocalStorageClass(config *localTestConfig, mode *storagev1.VolumeBindingMode) {
+func setupExpandableLocalStorageClass(ctx context.Context, config *localTestConfig, mode *storagev1.VolumeBindingMode) {
 	enableExpansion := true
 	sc := &storagev1.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -174,6 +174,6 @@ func setupExpandableLocalStorageClass(config *localTestConfig, mode *storagev1.V
 		AllowVolumeExpansion: &enableExpansion,
 	}
 
-	_, err := config.client.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
+	_, err := config.client.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 }

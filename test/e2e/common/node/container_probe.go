@@ -71,10 +71,10 @@ var _ = SIGDescribe("Probing container", func() {
 	*/
 	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func(ctx context.Context) {
 		containerName := "test-webserver"
-		p := podClient.Create(testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
-		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
+		p := podClient.Create(ctx, testWebServerPodSpec(probe.withInitialDelay().build(), nil, containerName, 80))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout))
 
-		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
+		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
@@ -106,16 +106,16 @@ var _ = SIGDescribe("Probing container", func() {
 			then the Pod MUST never be ready, never be running and restart count MUST be zero.
 	*/
 	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart [NodeConformance]", func(ctx context.Context) {
-		p := podClient.Create(testWebServerPodSpec(probe.withFailing().build(), nil, "test-webserver", 80))
-		gomega.Consistently(func() (bool, error) {
-			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
+		p := podClient.Create(ctx, testWebServerPodSpec(probe.withFailing().build(), nil, "test-webserver", 80))
+		gomega.Consistently(ctx, func() (bool, error) {
+			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
 			return podutil.IsPodReady(p), nil
 		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod should not be ready")
 
-		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
+		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		isReady, _ := testutils.PodRunningReady(p)
@@ -141,7 +141,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -158,7 +158,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -173,7 +173,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -188,7 +188,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -204,7 +204,7 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
 		// ~2 minutes backoff timeouts + 4 minutes defaultObservationTimeout + 2 minutes for each pod restart
-		RunLivenessTest(f, pod, 5, 2*time.Minute+defaultObservationTimeout+4*2*time.Minute)
+		RunLivenessTest(ctx, f, pod, 5, 2*time.Minute+defaultObservationTimeout+4*2*time.Minute)
 	})
 
 	/*
@@ -220,7 +220,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    5, // to accommodate nodes which are slow in bringing up containers.
 		}
 		pod := testWebServerPodSpec(nil, livenessProbe, "test-webserver", 80)
-		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -237,7 +237,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -254,7 +254,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(readinessProbe, nil, cmd)
-		runReadinessFailTest(f, pod, time.Minute)
+		runReadinessFailTest(ctx, f, pod, time.Minute)
 	})
 
 	/*
@@ -271,7 +271,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -286,7 +286,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -301,7 +301,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
-		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
 		// Expect an event of type "ProbeWarning".
 		expectedEvent := fields.Set{
 			"involvedObject.kind":      "Pod",
@@ -310,7 +310,7 @@ var _ = SIGDescribe("Probing container", func() {
 			"reason":                   events.ContainerProbeWarning,
 		}.AsSelector().String()
 		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
-			f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", framework.PodEventTimeout))
+			ctx, f.ClientSet, f.Namespace.Name, expectedEvent, "Probe terminated redirects, Response body: <a href=\"http://0.0.0.0/\">Found</a>.", framework.PodEventTimeout))
 	})
 
 	/*
@@ -339,7 +339,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    3,
 		}
 		pod := startupPodSpec(startupProbe, nil, livenessProbe, cmd)
-		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -368,7 +368,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    60,
 		}
 		pod := startupPodSpec(startupProbe, nil, livenessProbe, cmd)
-		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -397,7 +397,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    60,
 		}
 		pod := startupPodSpec(startupProbe, nil, livenessProbe, cmd)
-		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -421,22 +421,22 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    120,
 			PeriodSeconds:       5,
 		}
-		p := podClient.Create(startupPodSpec(startupProbe, readinessProbe, nil, cmd))
+		p := podClient.Create(ctx, startupPodSpec(startupProbe, readinessProbe, nil, cmd))
 
-		p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
+		p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		err = e2epod.WaitForPodContainerStarted(f.ClientSet, f.Namespace.Name, p.Name, 0, framework.PodStartTimeout)
+		err = e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, p.Name, 0, framework.PodStartTimeout)
 		framework.ExpectNoError(err)
 		startedTime := time.Now()
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
-		err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
 		framework.ExpectNoError(err)
 		readyTime := time.Now()
 
-		p, err = podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
+		p, err = podClient.Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		isReady, err := testutils.PodRunningReady(p)
@@ -480,7 +480,7 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		RunLivenessTest(f, pod, 1, time.Second*30)
+		RunLivenessTest(ctx, f, pod, 1, time.Second*30)
 	})
 
 	/*
@@ -513,7 +513,7 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		// 10s delay + 10s period + 5s grace period = 25s < 30s << pod-level timeout 500
-		RunLivenessTest(f, pod, 1, time.Second*30)
+		RunLivenessTest(ctx, f, pod, 1, time.Second*30)
 	})
 
 	/*
@@ -535,7 +535,7 @@ var _ = SIGDescribe("Probing container", func() {
 		}
 
 		pod := gRPCServerPodSpec(nil, livenessProbe, "etcd")
-		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -556,7 +556,7 @@ var _ = SIGDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := gRPCServerPodSpec(nil, livenessProbe, "etcd")
-		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
 	})
 
 	ginkgo.It("should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe", func(ctx context.Context) {
@@ -580,7 +580,7 @@ done
 			`
 
 		// Create Pod
-		podClient.Create(&v1.Pod{
+		podClient.Create(ctx, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
 			},
@@ -608,12 +608,14 @@ done
 		})
 
 		// verify pods are running and ready
-		err := e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 1, 0, f.Timeouts.PodStart, map[string]string{})
+		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, f.Timeouts.PodStart, map[string]string{})
 		framework.ExpectNoError(err)
 
 		// Shutdown pod. Readiness should change to false
-		podClient.Delete(context.Background(), podName, metav1.DeleteOptions{})
-		err = waitForPodStatusByInformer(f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
+		err = podClient.Delete(ctx, podName, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		err = waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
 			if !podutil.IsPodReady(pod) {
 				return true, nil
 			}
@@ -646,7 +648,7 @@ done
 `
 
 		// Create Pod
-		podClient.Create(&v1.Pod{
+		podClient.Create(ctx, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
 			},
@@ -688,14 +690,15 @@ done
 		})
 
 		// verify pods are running and ready
-		err := e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 1, 0, f.Timeouts.PodStart, map[string]string{})
+		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, f.Timeouts.PodStart, map[string]string{})
 		framework.ExpectNoError(err)
 
 		// Shutdown pod. Readiness should change to false
-		podClient.Delete(context.Background(), podName, metav1.DeleteOptions{})
+		err = podClient.Delete(ctx, podName, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
 
 		// Wait for pod to go unready
-		err = waitForPodStatusByInformer(f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
+		err = waitForPodStatusByInformer(ctx, f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
 			if !podutil.IsPodReady(pod) {
 				return true, nil
 			}
@@ -706,8 +709,8 @@ done
 
 		// Verify there are zero liveness failures since they are turned off
 		// during pod termination
-		gomega.Consistently(func() (bool, error) {
-			items, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.Background(), metav1.ListOptions{})
+		gomega.Consistently(ctx, func(ctx context.Context) (bool, error) {
+			items, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, event := range items.Items {
 				// Search only for the pod we are interested in
@@ -724,37 +727,41 @@ done
 })
 
 // waitForPodStatusByInformer waits pod status change by informer
-func waitForPodStatusByInformer(c clientset.Interface, podNamespace, podName string, timeout time.Duration, condition func(pod *v1.Pod) (bool, error)) error {
+func waitForPodStatusByInformer(ctx context.Context, c clientset.Interface, podNamespace, podName string, timeout time.Duration, condition func(pod *v1.Pod) (bool, error)) error {
+	// TODO (pohly): rewrite with gomega.Eventually to get intermediate progress reports.
 	stopCh := make(chan struct{})
 	checkPodStatusFunc := func(pod *v1.Pod) {
 		if ok, _ := condition(pod); ok {
 			close(stopCh)
 		}
 	}
-	controller := newInformerWatchPod(c, podNamespace, podName, checkPodStatusFunc)
+	controller := newInformerWatchPod(ctx, c, podNamespace, podName, checkPodStatusFunc)
 	go controller.Run(stopCh)
 	after := time.After(timeout)
 	select {
 	case <-stopCh:
 		return nil
+	case <-ctx.Done():
+		close(stopCh)
+		return fmt.Errorf("timeout to wait pod status ready")
 	case <-after:
-		defer close(stopCh)
+		close(stopCh)
 		return fmt.Errorf("timeout to wait pod status ready")
 	}
 }
 
 // newInformerWatchPod creates a informer for given pod
-func newInformerWatchPod(c clientset.Interface, podNamespace, podName string, checkPodStatusFunc func(p *v1.Pod)) cache.Controller {
+func newInformerWatchPod(ctx context.Context, c clientset.Interface, podNamespace, podName string, checkPodStatusFunc func(p *v1.Pod)) cache.Controller {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
-				obj, err := c.CoreV1().Pods(podNamespace).List(context.TODO(), options)
+				obj, err := c.CoreV1().Pods(podNamespace).List(ctx, options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
-				return c.CoreV1().Pods(podNamespace).Watch(context.TODO(), options)
+				return c.CoreV1().Pods(podNamespace).Watch(ctx, options)
 			},
 		},
 		&v1.Pod{},
@@ -936,7 +943,7 @@ func (b webserverProbeBuilder) build() *v1.Probe {
 }
 
 // RunLivenessTest verifies the number of restarts for pod with given expected number of restarts
-func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
+func RunLivenessTest(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
 	podClient := e2epod.NewPodClient(f)
 	ns := f.Namespace.Name
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
@@ -947,18 +954,18 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 		return podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
 	})
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
-	podClient.Create(pod)
+	podClient.Create(ctx, pod)
 
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
+	framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, ns, pod.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
 	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
 	// Check the pod's current state and verify that restartCount is present.
 	ginkgo.By("checking the pod's current state and verifying that restartCount is present")
-	pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
 	initialRestartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
@@ -968,7 +975,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	lastRestartCount := initialRestartCount
 	observedRestarts := int32(0)
 	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
-		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {
@@ -996,7 +1003,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	}
 }
 
-func runReadinessFailTest(f *framework.Framework, pod *v1.Pod, notReadyUntil time.Duration) {
+func runReadinessFailTest(ctx context.Context, f *framework.Framework, pod *v1.Pod, notReadyUntil time.Duration) {
 	podClient := e2epod.NewPodClient(f)
 	ns := f.Namespace.Name
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
@@ -1007,11 +1014,11 @@ func runReadinessFailTest(f *framework.Framework, pod *v1.Pod, notReadyUntil tim
 		return podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
 	})
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
-	podClient.Create(pod)
+	podClient.Create(ctx, pod)
 
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending', since when failures occur, we go to 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
+	framework.ExpectNoError(e2epod.WaitForPodNotPending(ctx, f.ClientSet, ns, pod.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
 	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
 

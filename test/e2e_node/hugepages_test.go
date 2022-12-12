@@ -207,10 +207,10 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 	ginkgo.It("should remove resources for huge page sizes no longer supported", func(ctx context.Context) {
 		ginkgo.By("mimicking support for 9Mi of 3Mi huge page memory by patching the node status")
 		patch := []byte(`[{"op": "add", "path": "/status/capacity/hugepages-3Mi", "value": "9Mi"}, {"op": "add", "path": "/status/allocatable/hugepages-3Mi", "value": "9Mi"}]`)
-		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
+		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(ctx)
 		framework.ExpectNoError(result.Error(), "while patching")
 
-		node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "while getting node status")
 
 		ginkgo.By("Verifying that the node now supports huge pages with size 3Mi")
@@ -222,8 +222,8 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 		restartKubelet(true)
 
 		ginkgo.By("verifying that the hugepages-3Mi resource no longer is present")
-		gomega.Eventually(func() bool {
-			node, err = f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+		gomega.Eventually(ctx, func() bool {
+			node, err = f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-3Mi"]
 			return isPresent
@@ -235,15 +235,15 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 		startKubelet := stopKubelet()
 		ginkgo.By(`Patching away support for hugepage resource "hugepages-2Mi"`)
 		patch := []byte(`[{"op": "remove", "path": "/status/capacity/hugepages-2Mi"}, {"op": "remove", "path": "/status/allocatable/hugepages-2Mi"}]`)
-		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
+		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(ctx)
 		framework.ExpectNoError(result.Error(), "while patching")
 
 		ginkgo.By("Starting kubelet again")
 		startKubelet()
 
 		ginkgo.By("verifying that the hugepages-2Mi resource is present")
-		gomega.Eventually(func() bool {
-			node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+		gomega.Eventually(ctx, func() bool {
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-2Mi"]
 			return isPresent
@@ -259,7 +259,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			hugepages map[string]int
 		)
 
-		setHugepages := func() {
+		setHugepages := func(ctx context.Context) {
 			for hugepagesResource, count := range hugepages {
 				size := resourceToSize[hugepagesResource]
 				ginkgo.By(fmt.Sprintf("Verifying hugepages %d are supported", size))
@@ -269,7 +269,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 				}
 
 				ginkgo.By(fmt.Sprintf("Configuring the host to reserve %d of pre-allocated hugepages of size %d", count, size))
-				gomega.Eventually(func() error {
+				gomega.Eventually(ctx, func() error {
 					if err := configureHugePages(size, count, nil); err != nil {
 						return err
 					}
@@ -278,10 +278,10 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			}
 		}
 
-		waitForHugepages := func() {
+		waitForHugepages := func(ctx context.Context) {
 			ginkgo.By("Waiting for hugepages resource to become available on the local node")
-			gomega.Eventually(func() error {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -306,9 +306,9 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			}, time.Minute, framework.Poll).Should(gomega.BeNil())
 		}
 
-		releaseHugepages := func() {
+		releaseHugepages := func(ctx context.Context) {
 			ginkgo.By("Releasing hugepages")
-			gomega.Eventually(func() error {
+			gomega.Eventually(ctx, func() error {
 				for hugepagesResource := range hugepages {
 					command := fmt.Sprintf("echo 0 > %s-%dkB/%s", hugepagesDirPrefix, resourceToSize[hugepagesResource], hugepagesCapacityFile)
 					if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
@@ -337,39 +337,39 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 						resourceToCgroup[resourceName],
 					)
 					ginkgo.By("checking if the expected hugetlb settings were applied")
-					e2epod.NewPodClient(f).Create(verifyPod)
-					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
+					e2epod.NewPodClient(f).Create(ctx, verifyPod)
+					err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, verifyPod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				}
 			})
 		}
 
 		// setup
-		ginkgo.JustBeforeEach(func() {
-			setHugepages()
+		ginkgo.JustBeforeEach(func(ctx context.Context) {
+			setHugepages(ctx)
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
 			restartKubelet(true)
 
-			waitForHugepages()
+			waitForHugepages(ctx)
 
 			pod := getHugepagesTestPod(f, limits, mounts, volumes)
 
 			ginkgo.By("by running a test pod that requests hugepages")
-			testpod = e2epod.NewPodClient(f).CreateSync(pod)
+			testpod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 		})
 
 		// we should use JustAfterEach because framework will teardown the client under the AfterEach method
-		ginkgo.JustAfterEach(func() {
+		ginkgo.JustAfterEach(func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("deleting test pod %s", testpod.Name))
-			e2epod.NewPodClient(f).DeleteSync(testpod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, testpod.Name, metav1.DeleteOptions{}, 2*time.Minute)
 
-			releaseHugepages()
+			releaseHugepages(ctx)
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
 			restartKubelet(true)
 
-			waitForHugepages()
+			waitForHugepages(ctx)
 		})
 
 		ginkgo.Context("with the resources requests that contain only one hugepages resource ", func() {

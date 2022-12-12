@@ -43,10 +43,10 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 	var ns string
 	var group string
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		systemPods, err := e2epod.GetPodsInNamespace(c, ns, map[string]string{})
+		systemPods, err := e2epod.GetPodsInNamespace(ctx, c, ns, map[string]string{})
 		framework.ExpectNoError(err)
 		systemPodsNo = int32(len(systemPods))
 		if strings.Contains(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
@@ -66,7 +66,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			skipped = false
 		})
 
-		ginkgo.AfterEach(func() {
+		ginkgo.AfterEach(func(ctx context.Context) {
 			if skipped {
 				return
 			}
@@ -91,30 +91,30 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 
-			if err := e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
+			if err := e2enode.WaitForReadyNodes(ctx, c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
 				framework.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
 			ginkgo.By("waiting for system pods to successfully restart")
-			err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
+			err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
 			framework.ExpectNoError(err)
 		})
 
 		ginkgo.It("node lease should be deleted when corresponding node is deleted", func(ctx context.Context) {
 			leaseClient := c.CoordinationV1().Leases(v1.NamespaceNodeLease)
-			err := e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
+			err := e2enode.WaitForReadyNodes(ctx, c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("verify node lease exists for every nodes")
-			originalNodes, err := e2enode.GetReadySchedulableNodes(c)
+			originalNodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(originalNodes.Items), framework.TestContext.CloudConfig.NumNodes)
 
-			gomega.Eventually(func() error {
+			gomega.Eventually(ctx, func() error {
 				pass := true
 				for _, node := range originalNodes.Items {
-					if _, err := leaseClient.Get(context.TODO(), node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
+					if _, err := leaseClient.Get(ctx, node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
 						framework.Logf("Try to get lease of node %s, but got error: %v", node.ObjectMeta.Name, err)
 						pass = false
 					}
@@ -131,9 +131,9 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			framework.ExpectNoError(err)
 			err = framework.WaitForGroupSize(group, targetNumNodes)
 			framework.ExpectNoError(err)
-			err = e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
+			err = e2enode.WaitForReadyNodes(ctx, c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
 			framework.ExpectNoError(err)
-			targetNodes, err := e2enode.GetReadySchedulableNodes(c)
+			targetNodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(targetNodes.Items), int(targetNumNodes))
 
@@ -150,17 +150,17 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				break
 			}
 			framework.ExpectNotEqual(deletedNodeName, "")
-			gomega.Eventually(func() error {
-				if _, err := leaseClient.Get(context.TODO(), deletedNodeName, metav1.GetOptions{}); err == nil {
+			gomega.Eventually(ctx, func() error {
+				if _, err := leaseClient.Get(ctx, deletedNodeName, metav1.GetOptions{}); err == nil {
 					return fmt.Errorf("node lease is not deleted yet for node %q", deletedNodeName)
 				}
 				return nil
 			}, 1*time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 			ginkgo.By("verify node leases still exist for remaining nodes")
-			gomega.Eventually(func() error {
+			gomega.Eventually(ctx, func() error {
 				for _, node := range targetNodes.Items {
-					if _, err := leaseClient.Get(context.TODO(), node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
+					if _, err := leaseClient.Get(ctx, node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
 						return err
 					}
 				}

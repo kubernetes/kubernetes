@@ -67,7 +67,7 @@ var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", itArg.podsNr, itArg.interval)
 			ginkgo.It(desc, func(ctx context.Context) {
 				itArg.createMethod = "batch"
-				runDensityBatchTest(f, itArg)
+				runDensityBatchTest(ctx, f, itArg)
 			})
 		}
 	})
@@ -89,7 +89,7 @@ type densityTest struct {
 }
 
 // runDensityBatchTest runs the density batch pod creation test
-func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Duration, []e2emetrics.PodLatencyData) {
+func runDensityBatchTest(ctx context.Context, f *framework.Framework, testArg densityTest) (time.Duration, []e2emetrics.PodLatencyData) {
 	const (
 		podType = "density_test_pod"
 	)
@@ -103,17 +103,17 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	pods := newDensityTestPods(testArg.podsNr, false, imageutils.GetPauseImageName(), podType)
 
 	// the controller watches the change of pod status
-	controller := newInformerWatchPod(f, mutex, watchTimes, podType)
+	controller := newInformerWatchPod(ctx, f, mutex, watchTimes, podType)
 	go controller.Run(stopCh)
 	defer close(stopCh)
 
 	ginkgo.By("Creating a batch of pods")
 	// It returns a map['pod name']'creation time' containing the creation timestamps
-	createTimes := createBatchPodWithRateControl(f, pods, testArg.interval)
+	createTimes := createBatchPodWithRateControl(ctx, f, pods, testArg.interval)
 
 	ginkgo.By("Waiting for all Pods to be observed by the watch...")
 
-	gomega.Eventually(func() bool {
+	gomega.Eventually(ctx, func() bool {
 		return len(watchTimes) == testArg.podsNr
 	}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
@@ -154,25 +154,25 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	sort.Sort(e2emetrics.LatencySlice(e2eLags))
 	batchLag := lastRunning.Time.Sub(firstCreate.Time)
 
-	deletePodsSync(f, pods)
+	deletePodsSync(ctx, f, pods)
 
 	return batchLag, e2eLags
 }
 
 // createBatchPodWithRateControl creates a batch of pods concurrently, uses one goroutine for each creation.
 // between creations there is an interval for throughput control
-func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, interval time.Duration) map[string]metav1.Time {
+func createBatchPodWithRateControl(ctx context.Context, f *framework.Framework, pods []*v1.Pod, interval time.Duration) map[string]metav1.Time {
 	createTimes := make(map[string]metav1.Time)
 	for _, pod := range pods {
 		createTimes[pod.ObjectMeta.Name] = metav1.Now()
-		go e2epod.NewPodClient(f).Create(pod)
+		go e2epod.NewPodClient(f).Create(ctx, pod)
 		time.Sleep(interval)
 	}
 	return createTimes
 }
 
 // newInformerWatchPod creates an informer to check whether all pods are running.
-func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes map[string]metav1.Time, podType string) cache.Controller {
+func newInformerWatchPod(ctx context.Context, f *framework.Framework, mutex *sync.Mutex, watchTimes map[string]metav1.Time, podType string) cache.Controller {
 	ns := f.Namespace.Name
 	checkPodRunning := func(p *v1.Pod) {
 		mutex.Lock()
@@ -190,12 +190,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
-				obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), options)
+				obj, err := f.ClientSet.CoreV1().Pods(ns).List(ctx, options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
-				return f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), options)
+				return f.ClientSet.CoreV1().Pods(ns).Watch(ctx, options)
 			},
 		},
 		&v1.Pod{},
@@ -265,7 +265,7 @@ func newDensityTestPods(numPods int, volume bool, imageName, podType string) []*
 }
 
 // deletePodsSync deletes a list of pods and block until pods disappear.
-func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
+func deletePodsSync(ctx context.Context, f *framework.Framework, pods []*v1.Pod) {
 	var wg sync.WaitGroup
 	for _, pod := range pods {
 		wg.Add(1)
@@ -273,10 +273,10 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
-			err := e2epod.NewPodClient(f).Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
+			err := e2epod.NewPodClient(f).Delete(ctx, pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err)
 
-			err = e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+			err = e2epod.WaitForPodToDisappear(ctx, f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
 				30*time.Second, 10*time.Minute)
 			framework.ExpectNoError(err)
 		}(pod)

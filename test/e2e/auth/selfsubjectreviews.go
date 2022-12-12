@@ -69,7 +69,7 @@ var _ = SIGDescribe("SelfSubjectReview [Feature:APISelfSubjectReview]", func() {
 		ginkgo.By("getting /apis/authentication.k8s.io")
 		{
 			group := &metav1.APIGroup{}
-			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/authentication.k8s.io").Do(context.TODO()).Into(group)
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/authentication.k8s.io").Do(ctx).Into(group)
 			framework.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
@@ -112,7 +112,7 @@ var _ = SIGDescribe("SelfSubjectReview [Feature:APISelfSubjectReview]", func() {
 			}
 
 			ssrClient := kubernetes.NewForConfigOrDie(config).AuthenticationV1alpha1().SelfSubjectReviews()
-			res, err := ssrClient.Create(context.TODO(), &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
+			res, err := ssrClient.Create(ctx, &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			framework.ExpectEqual(config.Impersonate.UserName, res.Status.UserInfo.Username)

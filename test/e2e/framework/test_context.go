@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -214,8 +215,10 @@ type NodeKillerConfig struct {
 	JitterFactor float64
 	// SimulatedDowntime is a duration between node is killed and recreated.
 	SimulatedDowntime time.Duration
-	// NodeKillerStopCh is a channel that is used to notify NodeKiller to stop killing nodes.
-	NodeKillerStopCh chan struct{}
+	// NodeKillerStopCtx is a context that is used to notify NodeKiller to stop killing nodes.
+	NodeKillerStopCtx context.Context
+	// NodeKillerStop is the cancel function for NodeKillerStopCtx.
+	NodeKillerStop func()
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.

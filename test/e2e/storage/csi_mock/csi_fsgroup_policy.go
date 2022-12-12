@@ -67,7 +67,7 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
 				}
-				m.init(testParameters{
+				m.init(ctx, testParameters{
 					disableAttach:  true,
 					registerDriver: true,
 					fsGroupPolicy:  &test.fsGroupPolicy,
@@ -82,13 +82,13 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 				fsGroupVal := int64(rand.Int63n(20000) + 1024)
 				fsGroup := &fsGroupVal
 
-				_, _, pod := m.createPodWithFSGroup(fsGroup) /* persistent volume */
+				_, _, pod := m.createPodWithFSGroup(ctx, fsGroup) /* persistent volume */
 
 				mountPath := pod.Spec.Containers[0].VolumeMounts[0].MountPath
 				dirName := mountPath + "/" + f.UniqueName
 				fileName := dirName + "/" + f.UniqueName
 
-				err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "failed to start pod")
 
 				// Create the subdirectory to ensure that fsGroup propagates

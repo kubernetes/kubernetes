@@ -83,7 +83,7 @@ var _ = utils.SIGDescribe("CSI Mock workload info", func() {
 		for _, t := range tests {
 			test := t
 			ginkgo.It(t.name, func(ctx context.Context) {
-				m.init(testParameters{
+				m.init(ctx, testParameters{
 					registerDriver: test.deployClusterRegistrar,
 					podInfo:        test.podInfoOnMount})
 
@@ -93,11 +93,11 @@ var _ = utils.SIGDescribe("CSI Mock workload info", func() {
 				if test.expectEphemeral {
 					withVolume = csiEphemeral
 				}
-				_, _, pod := m.createPod(withVolume)
+				_, _, pod := m.createPod(ctx, withVolume)
 				if pod == nil {
 					return
 				}
-				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				// If we expect an ephemeral volume, the feature has to be enabled.
@@ -111,11 +111,11 @@ var _ = utils.SIGDescribe("CSI Mock workload info", func() {
 				}
 
 				ginkgo.By("Deleting the previously created pod")
-				err = e2epod.DeletePodWithWait(m.cs, pod)
+				err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Checking CSI driver logs")
-				err = checkPodLogs(m.driver.GetCalls, pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled, false, 1)
+				err = checkPodLogs(ctx, m.driver.GetCalls, pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled, false, 1)
 				framework.ExpectNoError(err)
 			})
 		}

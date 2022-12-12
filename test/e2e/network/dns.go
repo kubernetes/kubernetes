@@ -63,7 +63,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
 	// Added due to #8512. This is critical for GCE and GKE deployments.
@@ -85,7 +85,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
 	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
@@ -106,7 +106,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
 	/*
@@ -126,7 +126,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		// Run a pod which probes /etc/hosts and exposes the results by HTTP.
 		ginkgo.By("creating a pod to probe /etc/hosts")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
 	/*
@@ -142,7 +142,7 @@ var _ = common.SIGDescribe("DNS", func() {
 			"dns-test": "true",
 		}
 		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			ginkgo.By("deleting the test headless service")
@@ -151,7 +151,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 		regularServiceName := "test-service-2"
 		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
-		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), regularService, metav1.CreateOptions{})
+		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, regularService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
 
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
@@ -179,7 +179,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		pod.ObjectMeta.Labels = testServiceSelector
 
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
 	/*
@@ -195,7 +195,7 @@ var _ = common.SIGDescribe("DNS", func() {
 			"dns-test": "true",
 		}
 		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			ginkgo.By("deleting the test headless service")
@@ -204,7 +204,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 		regularServiceName := "test-service-2"
 		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
-		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), regularService, metav1.CreateOptions{})
+		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, regularService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			ginkgo.By("deleting the test service")
@@ -232,7 +232,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		pod.ObjectMeta.Labels = testServiceSelector
 
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
 	/*
@@ -250,7 +250,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
 		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
 
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
@@ -274,7 +274,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		pod1.Spec.Hostname = podHostname
 		pod1.Spec.Subdomain = serviceName
 
-		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod1, append(wheezyFileNames, jessieFileNames...))
 	})
 
 	/*
@@ -292,7 +292,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
 		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
 
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
@@ -317,7 +317,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		pod1.Spec.Hostname = podHostname
 		pod1.Spec.Subdomain = serviceName
 
-		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod1, append(wheezyFileNames, jessieFileNames...))
 	})
 
 	/*
@@ -331,7 +331,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		ginkgo.By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
 		externalNameService := e2eservice.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameService, metav1.CreateOptions{})
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, externalNameService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create ExternalName service: %s", serviceName)
 
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
@@ -349,11 +349,11 @@ var _ = common.SIGDescribe("DNS", func() {
 		ginkgo.By("creating a pod to probe DNS")
 		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 
-		validateTargetedProbeOutput(f, pod1, []string{wheezyFileName, jessieFileName}, "foo.example.com.")
+		validateTargetedProbeOutput(ctx, f, pod1, []string{wheezyFileName, jessieFileName}, "foo.example.com.")
 
 		// Test changing the externalName field
 		ginkgo.By("changing the externalName to bar.example.com")
-		_, err = e2eservice.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
+		_, err = e2eservice.UpdateService(ctx, f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.ExternalName = "bar.example.com"
 		})
 		framework.ExpectNoError(err, "failed to change externalName of service: %s", serviceName)
@@ -366,11 +366,11 @@ var _ = common.SIGDescribe("DNS", func() {
 		ginkgo.By("creating a second pod to probe DNS")
 		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 
-		validateTargetedProbeOutput(f, pod2, []string{wheezyFileName, jessieFileName}, "bar.example.com.")
+		validateTargetedProbeOutput(ctx, f, pod2, []string{wheezyFileName, jessieFileName}, "bar.example.com.")
 
 		// Test changing type from ExternalName to ClusterIP
 		ginkgo.By("changing the service to type=ClusterIP")
-		_, err = e2eservice.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
+		_, err = e2eservice.UpdateService(ctx, f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
@@ -392,10 +392,10 @@ var _ = common.SIGDescribe("DNS", func() {
 		ginkgo.By("creating a third pod to probe DNS")
 		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 
-		svc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Get(context.TODO(), externalNameService.Name, metav1.GetOptions{})
+		svc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Get(ctx, externalNameService.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get service: %s", externalNameService.Name)
 
-		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
+		validateTargetedProbeOutput(ctx, f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
 
 	/*
@@ -414,14 +414,14 @@ var _ = common.SIGDescribe("DNS", func() {
 			Nameservers: []string{testServerIP},
 			Searches:    []string{testSearchPath},
 		}
-		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testAgnhostPod, metav1.CreateOptions{})
+		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testAgnhostPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod: %s", testAgnhostPod.Name)
 		framework.Logf("Created pod %v", testAgnhostPod)
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			framework.Logf("Deleting pod %s...", testAgnhostPod.Name)
-			return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testAgnhostPod.Name, *metav1.NewDeleteOptions(0))
+			return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, testAgnhostPod.Name, *metav1.NewDeleteOptions(0))
 		})
-		err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, testAgnhostPod.Name, f.Namespace.Name, framework.PodStartTimeout)
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, testAgnhostPod.Name, f.Namespace.Name, framework.PodStartTimeout)
 		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testAgnhostPod.Name)
 
 		runCommand := func(arg string) string {
@@ -461,7 +461,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		corednsConfig := generateCoreDNSConfigmap(f.Namespace.Name, map[string]string{
 			testDNSNameFull: testInjectedIP,
 		})
-		corednsConfig, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), corednsConfig, metav1.CreateOptions{})
+		corednsConfig, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, corednsConfig, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "unable to create test configMap %s", corednsConfig.Name)
 
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
@@ -470,18 +470,18 @@ var _ = common.SIGDescribe("DNS", func() {
 		})
 
 		testServerPod := generateCoreDNSServerPod(corednsConfig)
-		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testServerPod, metav1.CreateOptions{})
+		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testServerPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod: %s", testServerPod.Name)
 		framework.Logf("Created pod %v", testServerPod)
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			framework.Logf("Deleting pod %s...", testServerPod.Name)
-			return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testServerPod.Name, *metav1.NewDeleteOptions(0))
+			return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, testServerPod.Name, *metav1.NewDeleteOptions(0))
 		})
-		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, testServerPod.Name, f.Namespace.Name)
+		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testServerPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testServerPod.Name)
 
 		// Retrieve server pod IP.
-		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), testServerPod.Name, metav1.GetOptions{})
+		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, testServerPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get pod %v", testServerPod.Name)
 		testServerIP := testServerPod.Status.PodIP
 		framework.Logf("testServerIP is %s", testServerIP)
@@ -500,14 +500,14 @@ var _ = common.SIGDescribe("DNS", func() {
 				},
 			},
 		}
-		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testUtilsPod, metav1.CreateOptions{})
+		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testUtilsPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod: %s", testUtilsPod.Name)
 		framework.Logf("Created pod %v", testUtilsPod)
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			framework.Logf("Deleting pod %s...", testUtilsPod.Name)
-			return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testUtilsPod.Name, *metav1.NewDeleteOptions(0))
+			return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, testUtilsPod.Name, *metav1.NewDeleteOptions(0))
 		})
-		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, testUtilsPod.Name, f.Namespace.Name)
+		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testUtilsPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testUtilsPod.Name)
 
 		ginkgo.By("Verifying customized DNS option is configured on pod...")
@@ -560,7 +560,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 	ginkgo.It("should work with the pod containing more than 6 DNS search paths and longer than 256 search list characters", func(ctx context.Context) {
 		ginkgo.By("Getting the kube-dns IP")
-		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(context.TODO(), "kube-dns", metav1.GetOptions{})
+		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(ctx, "kube-dns", metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get kube-dns service")
 		kubednsIP := svc.Spec.ClusterIP
 
@@ -599,7 +599,7 @@ var _ = common.SIGDescribe("DNS", func() {
 				},
 			},
 		}
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
 })
@@ -615,12 +615,12 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 			"dns-test": "true",
 		}
 		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), headlessService, metav1.CreateOptions{})
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, headlessService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
 
 		regularServiceName := "test-service-2"
 		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
-		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), regularService, metav1.CreateOptions{})
+		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, regularService, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
 
 		// All the names we need to be able to resolve.
@@ -645,7 +645,7 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 		pod.ObjectMeta.Labels = testServiceSelector
 		pod.Spec.HostNetwork = true
 		pod.Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
 })

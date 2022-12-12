@@ -41,10 +41,10 @@ import (
 )
 
 // waitForKubeletUp waits for the kubelet on the given host to be up.
-func waitForKubeletUp(host string) error {
+func waitForKubeletUp(ctx context.Context, host string) error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+		result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			e2essh.LogResult(result)
 		}
@@ -56,18 +56,18 @@ func waitForKubeletUp(host string) error {
 }
 
 // restartKubelet restarts kubelet on the given host.
-func restartKubelet(host string) error {
+func restartKubelet(ctx context.Context, host string) error {
 	var cmd string
 
 	var sudoPresent bool
-	sshResult, err := e2essh.SSH("sudo --version", host, framework.TestContext.Provider)
+	sshResult, err := e2essh.SSH(ctx, "sudo --version", host, framework.TestContext.Provider)
 	if err != nil {
 		return fmt.Errorf("Unable to ssh to host %s with error %v", host, err)
 	}
 	if !strings.Contains(sshResult.Stderr, "command not found") {
 		sudoPresent = true
 	}
-	sshResult, err = e2essh.SSH("systemctl --version", host, framework.TestContext.Provider)
+	sshResult, err = e2essh.SSH(ctx, "systemctl --version", host, framework.TestContext.Provider)
 	if err != nil {
 		return fmt.Errorf("Failed to execute command 'systemctl' on host %s with error %v", host, err)
 	}
@@ -81,7 +81,7 @@ func restartKubelet(host string) error {
 	}
 
 	framework.Logf("Restarting kubelet via ssh on host %s with command %s", host, cmd)
-	result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+	result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart kubelet: %v", err)
@@ -115,14 +115,14 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		nodeNameList          []string
 		nodeInfo              *NodeInfo
 	)
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, framework.TestContext.NodeSchedulableTimeout))
 
-		nodes, err := e2enode.GetReadySchedulableNodes(client)
+		nodes, err := e2enode.GetReadySchedulableNodes(ctx, client)
 		framework.ExpectNoError(err)
 		numNodes = len(nodes.Items)
 		if numNodes < 2 {
@@ -152,30 +152,30 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 
 			ginkgo.By(fmt.Sprintf("Creating pod %d on node %v", i, nodeNameList[i]))
 			podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, nodeKeyValueLabelList[i], nil)
-			pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), podspec, metav1.CreateOptions{})
+			pod, err := client.CoreV1().Pods(namespace).Create(ctx, podspec, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, client, pod)
 
 			ginkgo.By("Waiting for pod to be ready")
-			gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
+			gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(ctx, client, pod.Name, namespace)).To(gomega.Succeed())
 
-			pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			pod, err = client.CoreV1().Pods(namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			pods = append(pods, pod)
 
 			nodeName := pod.Spec.NodeName
 			ginkgo.By(fmt.Sprintf("Verify volume %s is attached to the node %s", volumePath, nodeName))
-			expectVolumeToBeAttached(nodeName, volumePath)
+			expectVolumeToBeAttached(ctx, nodeName, volumePath)
 		}
 
 		ginkgo.By("Restarting kubelet on instance node")
 		instanceAddress := framework.APIAddress() + ":22"
-		err := restartKubelet(instanceAddress)
+		err := restartKubelet(ctx, instanceAddress)
 		framework.ExpectNoError(err, "Unable to restart kubelet on instance node")
 
 		ginkgo.By("Verifying the kubelet on instance node is up")
-		err = waitForKubeletUp(instanceAddress)
+		err = waitForKubeletUp(ctx, instanceAddress)
 		framework.ExpectNoError(err)
 
 		for i, pod := range pods {
@@ -183,14 +183,14 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			nodeName := pod.Spec.NodeName
 
 			ginkgo.By(fmt.Sprintf("After master restart, verify volume %v is attached to the node %v", volumePath, nodeName))
-			expectVolumeToBeAttached(nodeName, volumePath)
+			expectVolumeToBeAttached(ctx, nodeName, volumePath)
 
 			ginkgo.By(fmt.Sprintf("Deleting pod on node %s", nodeName))
-			err = e2epod.DeletePodWithWait(client, pod)
+			err = e2epod.DeletePodWithWait(ctx, client, pod)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("Waiting for volume %s to be detached from the node %s", volumePath, nodeName))
-			err = waitForVSphereDiskToDetach(volumePath, nodeName)
+			err = waitForVSphereDiskToDetach(ctx, volumePath, nodeName)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("Deleting volume %s", volumePath))
