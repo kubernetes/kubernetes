@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package internal_test
 
 import (
 	"strings"
@@ -24,14 +24,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/yaml"
 )
 
 func TestNoUpdateBeforeFirstApply(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m fieldmanager.Manager) fieldmanager.Manager {
-		return fieldmanager.NewSkipNonAppliedManager(
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
+		return internal.NewSkipNonAppliedManager(
 			m,
 			fieldmanagertest.NewFakeObjectCreater(),
 			schema.FromAPIVersionAndKind("v1", "Pod"),
@@ -70,8 +70,8 @@ func TestNoUpdateBeforeFirstApply(t *testing.T) {
 }
 
 func TestUpdateBeforeFirstApply(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m fieldmanager.Manager) fieldmanager.Manager {
-		return fieldmanager.NewSkipNonAppliedManager(
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
+		return internal.NewSkipNonAppliedManager(
 			m,
 			fieldmanagertest.NewFakeObjectCreater(),
 			schema.FromAPIVersionAndKind("v1", "Pod"),

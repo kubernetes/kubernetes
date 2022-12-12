@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package internal
 
 import (
 	"fmt"
@@ -22,7 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 )
 
 type buildManagerInfoManager struct {
@@ -71,5 +70,5 @@ func (f *buildManagerInfoManager) buildManagerInfo(prefix string, operation meta
 	if managerInfo.Manager == "" {
 		managerInfo.Manager = "unknown"
 	}
-	return internal.BuildManagerIdentifier(&managerInfo)
+	return BuildManagerIdentifier(&managerInfo)
 }

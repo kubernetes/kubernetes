@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package internal
 
 import (
 	"fmt"
@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
 )
@@ -108,7 +107,7 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to update ManagedFields (%v): %v", objectGVKNN(newObjVersioned), err)
 	}
-	managed = internal.NewManaged(managedFields, managed.Times())
+	managed = NewManaged(managedFields, managed.Times())
 
 	return newObj, managed, nil
 }
@@ -151,7 +150,7 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 	if err != nil {
 		return nil, nil, err
 	}
-	managed = internal.NewManaged(managedFields, managed.Times())
+	managed = NewManaged(managedFields, managed.Times())
 
 	if newObjTyped == nil {
 		return nil, managed, nil

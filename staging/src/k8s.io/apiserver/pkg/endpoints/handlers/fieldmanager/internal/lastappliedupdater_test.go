@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package internal_test
 
 import (
 	"fmt"
@@ -25,17 +25,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/yaml"
 )
 
 func TestLastAppliedUpdater(t *testing.T) {
 	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
 		"",
-		func(m fieldmanager.Manager) fieldmanager.Manager {
-			return fieldmanager.NewLastAppliedUpdater(m)
+		func(m internal.Manager) internal.Manager {
+			return internal.NewLastAppliedUpdater(m)
 		})
 
 	originalLastApplied := `nonempty`
@@ -191,8 +192,8 @@ func TestLargeLastApplied(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"),
 				"",
-				func(m fieldmanager.Manager) fieldmanager.Manager {
-					return fieldmanager.NewLastAppliedUpdater(m)
+				func(m internal.Manager) internal.Manager {
+					return internal.NewLastAppliedUpdater(m)
 				})
 
 			if err := f.Apply(test.oldObject, "kubectl", false); err != nil {
@@ -225,4 +226,21 @@ func TestLargeLastApplied(t *testing.T) {
 			}
 		})
 	}
+}
+
+func getLastApplied(obj runtime.Object) (string, error) {
+	accessor := meta.NewAccessor()
+	annotations, err := accessor.Annotations(obj)
+	if err != nil {
+		return "", fmt.Errorf("failed to access annotations: %v", err)
+	}
+	if annotations == nil {
+		return "", fmt.Errorf("no annotations on obj: %v", obj)
+	}
+
+	lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
+	if !ok {
+		return "", fmt.Errorf("expected last applied annotation, but got none for object: %v", obj)
+	}
+	return lastApplied, nil
 }
