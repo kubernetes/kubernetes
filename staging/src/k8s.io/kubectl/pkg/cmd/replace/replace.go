@@ -76,9 +76,8 @@ type ReplaceOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	DryRunStrategy          cmdutil.DryRunStrategy
-	FieldValidationVerifier *resource.QueryParamVerifier
-	validationDirective     string
+	DryRunStrategy      cmdutil.DryRunStrategy
+	validationDirective string
 
 	PrintObj func(obj runtime.Object) error
 
@@ -164,7 +163,6 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
-	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -198,7 +196,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	schema, err := f.Validator(o.validationDirective, o.FieldValidationVerifier)
+	schema, err := f.Validator(o.validationDirective)
 	if err != nil {
 		return err
 	}

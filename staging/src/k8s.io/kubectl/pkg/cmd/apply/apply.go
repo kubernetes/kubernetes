@@ -86,18 +86,17 @@ type ApplyOptions struct {
 
 	DeleteOptions *delete.DeleteOptions
 
-	ServerSideApply         bool
-	ForceConflicts          bool
-	FieldManager            string
-	Selector                string
-	DryRunStrategy          cmdutil.DryRunStrategy
-	FieldValidationVerifier *resource.QueryParamVerifier
-	Prune                   bool
-	PruneResources          []prune.Resource
-	cmdBaseName             string
-	All                     bool
-	Overwrite               bool
-	OpenAPIPatch            bool
+	ServerSideApply bool
+	ForceConflicts  bool
+	FieldManager    string
+	Selector        string
+	DryRunStrategy  cmdutil.DryRunStrategy
+	Prune           bool
+	PruneResources  []prune.Resource
+	cmdBaseName     string
+	All             bool
+	Overwrite       bool
+	OpenAPIPatch    bool
 
 	ValidationDirective string
 	Validator           validation.Schema
@@ -255,7 +254,6 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 		return nil, err
 	}
 
-	fieldValidationVerifier := resource.NewQueryParamVerifier(dynamicClient, flags.Factory.OpenAPIGetter(), resource.QueryParamFieldValidation)
 	fieldManager := GetApplyFieldManagerFlag(cmd, serverSideApply)
 
 	// allow for a success message operation to be specified at print time
@@ -287,7 +285,7 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 	if err != nil {
 		return nil, err
 	}
-	validator, err := flags.Factory.Validator(validationDirective, fieldValidationVerifier)
+	validator, err := flags.Factory.Validator(validationDirective)
 	if err != nil {
 		return nil, err
 	}

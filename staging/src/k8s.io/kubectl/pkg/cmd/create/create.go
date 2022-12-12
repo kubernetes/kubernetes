@@ -51,8 +51,7 @@ type CreateOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DryRunStrategy          cmdutil.DryRunStrategy
-	FieldValidationVerifier *resource.QueryParamVerifier
+	DryRunStrategy cmdutil.DryRunStrategy
 
 	ValidationDirective string
 
@@ -205,11 +204,6 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	}
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
 	if err != nil {
@@ -244,7 +238,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		return RunEditOnCreate(f, o.PrintFlags, o.RecordFlags, o.IOStreams, cmd, &o.FilenameOptions, o.fieldManager)
 	}
 
-	schema, err := f.Validator(o.ValidationDirective, o.FieldValidationVerifier)
+	schema, err := f.Validator(o.ValidationDirective)
 	if err != nil {
 		return err
 	}
