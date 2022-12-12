@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -403,5 +404,271 @@ func Test_calculateRangeOffset(t *testing.T) {
 				t.Errorf("calculateRangeOffset() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNodePortMetrics(t *testing.T) {
+	clearMetrics()
+	// create node port allocator
+	portRange := "30000-32767"
+	pr, err := net.ParsePortRange(portRange)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a, err := NewInMemory(*pr)
+	if err != nil {
+		t.Fatalf("unexpected error creating nodeport allocator: %v", err)
+	}
+	a.EnableMetrics()
+
+	// Check initial state
+	em := testMetrics{
+		free:      0,
+		used:      0,
+		allocated: 0,
+		errors:    0,
+	}
+	expectMetrics(t, em)
+
+	// allocate 2 ports
+	found := sets.NewInt()
+	for i := 0; i < 2; i++ {
+		port, err := a.AllocateNext()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if found.Has(port) {
+			t.Fatalf("already reserved: %d", port)
+		}
+		found.Insert(port)
+	}
+
+	em = testMetrics{
+		free:      2768 - 2,
+		used:      2,
+		allocated: 2,
+		errors:    0,
+	}
+	expectMetrics(t, em)
+
+	// try to allocate the same ports
+	for s := range found {
+		if !a.Has(s) {
+			t.Fatalf("missing: %d", s)
+		}
+		if err := a.Allocate(s); err != ErrAllocated {
+			t.Fatal(err)
+		}
+	}
+	em = testMetrics{
+		free:      2768 - 2,
+		used:      2,
+		allocated: 2,
+		errors:    2,
+	}
+	expectMetrics(t, em)
+
+	// release the ports allocated
+	for s := range found {
+		if !a.Has(s) {
+			t.Fatalf("missing: %d", s)
+		}
+		if err := a.Release(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	em = testMetrics{
+		free:      2768,
+		used:      0,
+		allocated: 2,
+		errors:    2,
+	}
+	expectMetrics(t, em)
+
+	// allocate 3000 ports for each allocator
+	// the full range and 232 more (2768 + 232 = 3000)
+	for i := 0; i < 3000; i++ {
+		a.AllocateNext()
+	}
+	em = testMetrics{
+		free:      0,
+		used:      2768,
+		allocated: 2768 + 2, // this is a counter, we already had 2 allocations and we did 2768 more
+		errors:    232 + 2,  // this is a counter, we already had 2 errors and we did 232 more
+	}
+	expectMetrics(t, em)
+}
+
+func TestNodePortAllocatedMetrics(t *testing.T) {
+	clearMetrics()
+
+	// create NodePort allocator
+	portRange := "30000-32767"
+	pr, err := net.ParsePortRange(portRange)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a, err := NewInMemory(*pr)
+	if err != nil {
+		t.Fatalf("unexpected error creating nodeport allocator: %v", err)
+	}
+	a.EnableMetrics()
+
+	em := testMetrics{
+		free:      0,
+		used:      0,
+		allocated: 0,
+		errors:    0,
+	}
+	expectMetrics(t, em)
+
+	// allocate 2 dynamic port
+	found := sets.NewInt()
+	for i := 0; i < 2; i++ {
+		port, err := a.AllocateNext()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if found.Has(port) {
+			t.Fatalf("already reserved: %d", port)
+		}
+		found.Insert(port)
+	}
+
+	dynamicAllocated, err := testutil.GetCounterMetricValue(nodePortAllocations.WithLabelValues("dynamic"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortAllocations.Name, err)
+	}
+	if dynamicAllocated != 2 {
+		t.Fatalf("Expected 2 received %f", dynamicAllocated)
+	}
+
+	// try to allocate the same ports
+	for s := range found {
+		if !a.Has(s) {
+			t.Fatalf("missing: %d", s)
+		}
+		if err := a.Allocate(s); err != ErrAllocated {
+			t.Fatal(err)
+		}
+	}
+
+	staticErrors, err := testutil.GetCounterMetricValue(nodePortAllocationErrors.WithLabelValues("static"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortAllocationErrors.Name, err)
+	}
+	if staticErrors != 2 {
+		t.Fatalf("Expected 2 received %f", staticErrors)
+	}
+}
+
+func TestMetricsDisabled(t *testing.T) {
+	clearMetrics()
+
+	// create NodePort allocator
+	portRange := "30000-32766"
+	pr, err := net.ParsePortRange(portRange)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a, err := NewInMemory(*pr)
+	if err != nil {
+		t.Fatalf("unexpected error creating nodeport allocator: %v", err)
+	}
+	a.EnableMetrics()
+
+	// create metrics disabled allocator with same port range
+	// this metrics should be ignored
+	b, err := NewInMemory(*pr)
+	if err != nil {
+		t.Fatalf("unexpected error creating nodeport allocator: %v", err)
+	}
+
+	// Check initial state
+	em := testMetrics{
+		free:      0,
+		used:      0,
+		allocated: 0,
+		errors:    0,
+	}
+	expectMetrics(t, em)
+
+	// allocate in metrics enabled allocator
+	for i := 0; i < 100; i++ {
+		_, err := a.AllocateNext()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	em = testMetrics{
+		free:      2767 - 100,
+		used:      100,
+		allocated: 100,
+		errors:    0,
+	}
+	expectMetrics(t, em)
+
+	// allocate in metrics disabled allocator
+	for i := 0; i < 200; i++ {
+		_, err := b.AllocateNext()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// the metrics should not be changed
+	expectMetrics(t, em)
+}
+
+// Metrics helpers
+func clearMetrics() {
+	nodePortAllocated.Set(0)
+	nodePortAvailable.Set(0)
+	nodePortAllocations.Reset()
+	nodePortAllocationErrors.Reset()
+}
+
+type testMetrics struct {
+	free      float64
+	used      float64
+	allocated float64
+	errors    float64
+}
+
+func expectMetrics(t *testing.T, em testMetrics) {
+	var m testMetrics
+	var err error
+	m.free, err = testutil.GetGaugeMetricValue(nodePortAvailable)
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortAvailable.Name, err)
+	}
+	m.used, err = testutil.GetGaugeMetricValue(nodePortAllocated)
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortAllocated.Name, err)
+	}
+	staticAllocated, err := testutil.GetCounterMetricValue(nodePortAllocations.WithLabelValues("static"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortAllocations.Name, err)
+	}
+	staticErrors, err := testutil.GetCounterMetricValue(nodePortAllocationErrors.WithLabelValues("static"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortAllocationErrors.Name, err)
+	}
+	dynamicAllocated, err := testutil.GetCounterMetricValue(nodePortAllocations.WithLabelValues("dynamic"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortAllocations.Name, err)
+	}
+	dynamicErrors, err := testutil.GetCounterMetricValue(nodePortAllocationErrors.WithLabelValues("dynamic"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortAllocationErrors.Name, err)
+	}
+
+	m.allocated = staticAllocated + dynamicAllocated
+	m.errors = staticErrors + dynamicErrors
+
+	if m != em {
+		t.Fatalf("metrics error: expected %v, received %v", em, m)
 	}
 }
