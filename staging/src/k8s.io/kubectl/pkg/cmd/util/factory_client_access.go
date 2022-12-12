@@ -142,7 +142,7 @@ func (f *factoryImpl) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 	return restclient.RESTClientFor(cfg)
 }
 
-func (f *factoryImpl) Validator(validationDirective string, verifier *resource.QueryParamVerifier) (validation.Schema, error) {
+func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, error) {
 	// client-side schema validation is only performed
 	// when the validationDirective is strict.
 	// If the directive is warn, we rely on the ParamVerifyingSchema
@@ -162,6 +162,13 @@ func (f *factoryImpl) Validator(validationDirective string, verifier *resource.Q
 		openapivalidation.NewSchemaValidation(resources),
 		validation.NoDoubleKeySchema{},
 	}
+
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	// Create the FieldValidationVerifier for use in the ParamVerifyingSchema.
+	verifier := resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
 	return validation.NewParamVerifyingSchema(schema, verifier, string(validationDirective)), nil
 }
 
