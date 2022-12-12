@@ -623,11 +623,11 @@ func unorderedEqual(as, bs []Key) bool {
 	}
 	aMap := make(map[Key]int)
 	for _, a := range as {
-		aMap[a] += 1
+		aMap[a]++
 	}
 	bMap := make(map[Key]int)
 	for _, b := range bs {
-		bMap[b] += 1
+		bMap[b]++
 	}
 	if len(aMap) != len(bMap) {
 		return false
