@@ -21,10 +21,11 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/net"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
-
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )
 
 // Interface manages the allocation of ports out of a range. Interface
@@ -62,22 +63,32 @@ type PortAllocator struct {
 var _ Interface = &PortAllocator{}
 
 // New creates a PortAllocator over a net.PortRange, calling allocatorFactory to construct the backing store.
-func New(pr net.PortRange, allocatorFactory allocator.AllocatorFactory) (*PortAllocator, error) {
+func New(pr net.PortRange, allocatorFactory allocator.AllocatorWithOffsetFactory) (*PortAllocator, error) {
 	max := pr.Size
 	rangeSpec := pr.String()
 
 	a := &PortAllocator{
 		portRange: pr,
 	}
+
+	var offset = 0
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceNodePortStaticSubrange) {
+		offset = calculateRangeOffset(pr)
+	}
+
 	var err error
-	a.alloc, err = allocatorFactory(max, rangeSpec)
+	a.alloc, err = allocatorFactory(max, rangeSpec, offset)
+	if err != nil {
+		return nil, err
+	}
+
 	return a, err
 }
 
 // NewInMemory creates an in-memory allocator.
 func NewInMemory(pr net.PortRange) (*PortAllocator, error) {
-	return New(pr, func(max int, rangeSpec string) (allocator.Interface, error) {
-		return allocator.NewAllocationMap(max, rangeSpec), nil
+	return New(pr, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+		return allocator.NewAllocationMapWithOffset(max, rangeSpec, offset), nil
 	})
 }
 
@@ -212,4 +223,32 @@ func (r *PortAllocator) contains(port int) (bool, int) {
 // Destroy shuts down internal allocator.
 func (r *PortAllocator) Destroy() {
 	r.alloc.Destroy()
+}
+
+// calculateRangeOffset estimates the offset used on the range for statically allocation based on
+// the following formula `min(max($min, rangeSize/$step), $max)`, described as ~never less than
+// $min or more than $max, with a graduated step function between them~. The function returns 0
+// if any of the parameters is invalid.
+func calculateRangeOffset(pr net.PortRange) int {
+	// default values for min(max($min, rangeSize/$step), $max)
+	const (
+		min  = 16
+		max  = 128
+		step = 32
+	)
+
+	rangeSize := pr.Size
+	// offset should always be smaller than the range size
+	if rangeSize <= min {
+		return 0
+	}
+
+	offset := rangeSize / step
+	if offset < min {
+		return min
+	}
+	if offset > max {
+		return max
+	}
+	return int(offset)
 }

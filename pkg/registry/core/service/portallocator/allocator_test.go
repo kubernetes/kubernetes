@@ -17,13 +17,15 @@ limitations under the License.
 package portallocator
 
 import (
-	"testing"
-
 	"strconv"
+	"testing"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestAllocate(t *testing.T) {
@@ -115,6 +117,58 @@ func TestAllocate(t *testing.T) {
 	}
 	if f := r.Used(); f != 201 {
 		t.Errorf("unexpected used %d", f)
+	}
+}
+
+func TestAllocateReserved(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceNodePortStaticSubrange, true)()
+
+	pr, err := net.ParsePortRange("30000-30128")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewInMemory(*pr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// allocate all ports on the dynamic block
+	// dynamic block size is min(max(16,128/32),128) = 16
+	dynamicOffset := calculateRangeOffset(*pr)
+	dynamicBlockSize := pr.Size - dynamicOffset
+	for i := 0; i < dynamicBlockSize; i++ {
+		if _, err := r.AllocateNext(); err != nil {
+			t.Errorf("Unexpected error trying to allocate: %v", err)
+		}
+	}
+	for i := dynamicOffset; i < pr.Size; i++ {
+		port := i + pr.Base
+		if !r.Has(port) {
+			t.Errorf("Port %d expected to be allocated", port)
+		}
+	}
+	if f := r.Free(); f != dynamicOffset {
+		t.Errorf("expected %d free ports, got %d", dynamicOffset, f)
+	}
+	// allocate all ports on the static block
+	for i := 0; i < dynamicOffset; i++ {
+		port := i + pr.Base
+		if err := r.Allocate(port); err != nil {
+			t.Errorf("Unexpected error trying to allocate Port %d: %v", port, err)
+		}
+	}
+	if f := r.Free(); f != 0 {
+		t.Errorf("expected free equal to 0 got: %d", f)
+	}
+	// release one port in the allocated block and another a new one randomly
+	if err := r.Release(30053); err != nil {
+		t.Fatalf("Unexpected error trying to release port 30053: %v", err)
+	}
+	if _, err := r.AllocateNext(); err != nil {
+		t.Error(err)
+	}
+	if f := r.Free(); f != 0 {
+		t.Errorf("expected free equal to 0 got: %d", f)
 	}
 }
 
@@ -260,5 +314,94 @@ func TestNewFromSnapshot(t *testing.T) {
 		if !r.Has(p) {
 			t.Fatalf("expected port to be allocated, but it was not")
 		}
+	}
+}
+
+func Test_calculateRangeOffset(t *testing.T) {
+	type args struct {
+		pr net.PortRange
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "default node port range",
+			args: args{
+				pr: net.PortRange{
+					Base: 30000,
+					Size: 2768,
+				},
+			},
+			want: 86,
+		},
+		{
+			name: "very small node port range",
+			args: args{
+				pr: net.PortRange{
+					Base: 30000,
+					Size: 10,
+				},
+			},
+			want: 0,
+		},
+		{
+			name: "small node port range (lower boundary)",
+			args: args{
+				pr: net.PortRange{
+					Base: 30000,
+					Size: 16,
+				},
+			},
+			want: 0,
+		},
+		{
+			name: "small node port range",
+			args: args{
+				pr: net.PortRange{
+					Base: 30000,
+					Size: 128,
+				},
+			},
+			want: 16,
+		},
+		{
+			name: "medium node port range",
+			args: args{
+				pr: net.PortRange{
+					Base: 30000,
+					Size: 2048,
+				},
+			},
+			want: 64,
+		},
+		{
+			name: "large node port range (upper boundary)",
+			args: args{
+				pr: net.PortRange{
+					Base: 30000,
+					Size: 4096,
+				},
+			},
+			want: 128,
+		},
+		{
+			name: "large node port range",
+			args: args{
+				pr: net.PortRange{
+					Base: 30000,
+					Size: 8192,
+				},
+			},
+			want: 128,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := calculateRangeOffset(tt.args.pr); got != tt.want {
+				t.Errorf("calculateRangeOffset() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
