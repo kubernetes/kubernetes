@@ -644,15 +644,15 @@ func prioritizeNodes(
 	state *framework.CycleState,
 	pod *v1.Pod,
 	nodes []*v1.Node,
-) (framework.NodeScoreList, error) {
+) ([]framework.NodePluginScores, error) {
 	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
 	if len(extenders) == 0 && !fwk.HasScorePlugins() {
-		result := make(framework.NodeScoreList, 0, len(nodes))
+		result := make([]framework.NodePluginScores, 0, len(nodes))
 		for i := range nodes {
-			result = append(result, framework.NodeScore{
-				Name:  nodes[i].Name,
-				Score: 1,
+			result = append(result, framework.NodePluginScores{
+				Name:       nodes[i].Name,
+				TotalScore: 1,
 			})
 		}
 		return result, nil
@@ -680,16 +680,12 @@ func prioritizeNodes(
 		}
 	}
 
-	// Summarize all scores.
-	result := make(framework.NodeScoreList, len(nodes))
-	for i, pluginScores := range nodesScores {
-		result[i] = framework.NodeScore{Name: nodes[i].Name, Score: pluginScores.TotalScore}
-	}
-
 	if len(extenders) != 0 && nodes != nil {
+		// allNodeExtendersScores has all extenders scores for all nodes.
+		// It is keyed with node name.
+		allNodeExtendersScores := make(map[string]*framework.NodePluginScores, len(nodes))
 		var mu sync.Mutex
 		var wg sync.WaitGroup
-		combinedScores := make(map[string]int64, len(nodes))
 		for i := range extenders {
 			if !extenders[i].IsInterested(pod) {
 				continue
@@ -710,48 +706,65 @@ func prioritizeNodes(
 					return
 				}
 				mu.Lock()
+				defer mu.Unlock()
 				for i := range *prioritizedList {
-					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
+					nodename := (*prioritizedList)[i].Host
+					score := (*prioritizedList)[i].Score
 					if klogV.Enabled() {
-						klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
+						klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", nodename, "score", score)
 					}
-					combinedScores[host] += score * weight
+
+					// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
+					// therefore we need to scale the score returned by extenders to the score range used by the scheduler.
+					finalscore := score * weight * (framework.MaxNodeScore / extenderv1.MaxExtenderPriority)
+
+					if allNodeExtendersScores[nodename] == nil {
+						allNodeExtendersScores[nodename] = &framework.NodePluginScores{
+							Name:   nodename,
+							Scores: make([]framework.PluginScore, 0, len(extenders)),
+						}
+					}
+					allNodeExtendersScores[nodename].Scores = append(allNodeExtendersScores[nodename].Scores, framework.PluginScore{
+						Name:  extenders[extIndex].Name(),
+						Score: finalscore,
+					})
+					allNodeExtendersScores[nodename].TotalScore += finalscore
 				}
-				mu.Unlock()
 			}(i)
 		}
 		// wait for all go routines to finish
 		wg.Wait()
-		for i := range result {
-			// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
-			// therefore we need to scale the score returned by extenders to the score range used by the scheduler.
-			result[i].Score += combinedScores[result[i].Name] * (framework.MaxNodeScore / extenderv1.MaxExtenderPriority)
+		for i := range nodesScores {
+			if score, ok := allNodeExtendersScores[nodes[i].Name]; ok {
+				nodesScores[i].Scores = append(nodesScores[i].Scores, score.Scores...)
+				nodesScores[i].TotalScore += score.TotalScore
+			}
 		}
 	}
 
 	if klogV.Enabled() {
-		for i := range result {
-			klogV.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", result[i].Name, "score", result[i].Score)
+		for i := range nodesScores {
+			klogV.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", nodesScores[i].Name, "score", nodesScores[i].TotalScore)
 		}
 	}
-	return result, nil
+	return nodesScores, nil
 }
 
 // selectHost takes a prioritized list of nodes and then picks one
 // in a reservoir sampling manner from the nodes that had the highest score.
-func selectHost(nodeScoreList framework.NodeScoreList) (string, error) {
-	if len(nodeScoreList) == 0 {
+func selectHost(nodeScores []framework.NodePluginScores) (string, error) {
+	if len(nodeScores) == 0 {
 		return "", fmt.Errorf("empty priorityList")
 	}
-	maxScore := nodeScoreList[0].Score
-	selected := nodeScoreList[0].Name
+	maxScore := nodeScores[0].TotalScore
+	selected := nodeScores[0].Name
 	cntOfMaxScore := 1
-	for _, ns := range nodeScoreList[1:] {
-		if ns.Score > maxScore {
-			maxScore = ns.Score
+	for _, ns := range nodeScores[1:] {
+		if ns.TotalScore > maxScore {
+			maxScore = ns.TotalScore
 			selected = ns.Name
 			cntOfMaxScore = 1
-		} else if ns.Score == maxScore {
+		} else if ns.TotalScore == maxScore {
 			cntOfMaxScore++
 			if rand.Intn(cntOfMaxScore) == 0 {
 				// Replace the candidate with probability of 1/cntOfMaxScore
