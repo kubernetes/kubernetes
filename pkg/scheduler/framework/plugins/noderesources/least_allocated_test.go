@@ -40,6 +40,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 		expectedScores framework.NodeScoreList
 		resources      []config.ResourceSpec
 		wantErrs       field.ErrorList
+		wantStatusCode framework.Code
 	}{
 		{
 			// Node1 scores (remaining resources) on 0-MaxNodeScore scale
@@ -83,7 +84,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			resources:      defaultResources,
 		},
 		{
-			name: "Resources not set, nothing scheduled, resources requested, differently sized nodes",
+			name: "Resources not set, pods scheduled with error",
 			requestedPod: st.MakePod().
 				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
 				Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "3000"}).
@@ -95,6 +96,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			existingPods:   nil,
 			expectedScores: []framework.NodeScore{{Name: "node1", Score: framework.MinNodeScore}, {Name: "node2", Score: framework.MinNodeScore}},
 			resources:      nil,
+			wantStatusCode: framework.Error,
 		},
 		{
 			// Node1 scores on 0-MaxNodeScore scale
@@ -387,8 +389,8 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
-				if !status.IsSuccess() {
-					t.Errorf("unexpected error: %v", status)
+				if status.Code() != test.wantStatusCode {
+					t.Errorf("unexpected status code, want: %v, got: %v", test.wantStatusCode, status)
 				}
 				gotScores = append(gotScores, framework.NodeScore{Name: n.Name, Score: score})
 			}
