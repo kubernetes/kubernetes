@@ -47,9 +47,3 @@ func ValidateStorageStrategies(storageMap map[string]rest.Storage) []error {
 
 	return errs
 }
-
-// StrategyExceptions carries information on what exceptions to default strategy expectations are expected.
-type StrategyExceptions struct {
-	// HasExportStrategy is a list of the resource keys whose store should have a custom export strategy.
-	HasExportStrategy []string
-}
