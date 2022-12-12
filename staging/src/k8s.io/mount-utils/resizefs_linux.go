@@ -115,6 +115,7 @@ func (resizefs *ResizeFs) NeedResize(devicePath string, deviceMountPath string) 
 	}
 
 	if readonly {
+		klog.V(3).Infof("ResizeFs.needResize - no resize possible since filesystem %s is readonly", devicePath)
 		return false, nil
 	}
 

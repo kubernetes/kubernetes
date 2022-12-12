@@ -500,7 +500,7 @@ func TestNeedResize(t *testing.T) {
 		deviceMountPath string
 		readonly        string
 		deviceSize      string
-		extSize 				string
+		extSize         string
 		cmdOutputFsType string
 		expectError     bool
 		expectResult    bool
@@ -544,7 +544,7 @@ func TestNeedResize(t *testing.T) {
 			deviceMountPath: "/mnt/test1",
 			readonly:        "0",
 			deviceSize:      "2048",
-			extSize:				 "1",
+			extSize:         "1",
 			cmdOutputFsType: "TYPE=ntfs",
 			expectError:     true,
 			expectResult:    false,
@@ -558,7 +558,9 @@ func TestNeedResize(t *testing.T) {
 					func() ([]byte, []byte, error) { return []byte(test.readonly), nil, nil },
 					func() ([]byte, []byte, error) { return []byte(test.deviceSize), nil, nil },
 					func() ([]byte, []byte, error) { return []byte(test.cmdOutputFsType), nil, nil },
-					func() ([]byte, []byte, error) { return []byte(fmt.Sprintf("block size: %s\nblock count: 1", test.extSize)), nil, nil },
+					func() ([]byte, []byte, error) {
+						return []byte(fmt.Sprintf("block size: %s\nblock count: 1", test.extSize)), nil, nil
+					},
 				},
 			}
 			fexec := fakeexec.FakeExec{
