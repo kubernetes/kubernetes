@@ -48,9 +48,7 @@ type volumeStressTest struct {
 	volumes []*storageframework.VolumeResource
 	pods    []*v1.Pod
 	// stop and wait for any async routines
-	wg     sync.WaitGroup
-	ctx    context.Context
-	cancel context.CancelFunc
+	wg sync.WaitGroup
 
 	testOptions storageframework.StressTestOptions
 }
@@ -124,7 +122,6 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.volumes = []*storageframework.VolumeResource{}
 		l.pods = []*v1.Pod{}
 		l.testOptions = *dInfo.StressTestOptions
-		l.ctx, l.cancel = context.WithCancel(context.Background())
 	}
 
 	createPodsAndVolumes := func() {
@@ -146,7 +143,6 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 	cleanup := func() {
 		framework.Logf("Stopping and waiting for all test routines to finish")
-		l.cancel()
 		l.wg.Wait()
 
 		var (
@@ -189,13 +185,10 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func(ctx context.Context) {
 		init()
 		ginkgo.DeferCleanup(cleanup)
 		createPodsAndVolumes()
-	})
-
-	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func(ctx context.Context) {
 		// Restart pod repeatedly
 		for i := 0; i < l.testOptions.NumPods; i++ {
 			podIndex := i
@@ -205,20 +198,26 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 				defer l.wg.Done()
 				for j := 0; j < l.testOptions.NumRestarts; j++ {
 					select {
-					case <-l.ctx.Done():
+					case <-ctx.Done():
+						// This looks like a in the
+						// original test
+						// (https://github.com/kubernetes/kubernetes/blob/21049c2a1234ae3eea57357ed4329ed567a2dab3/test/e2e/storage/testsuites/volume_stress.go#L212):
+						// This early return will never
+						// get reached even if some
+						// other goroutine fails
+						// because the context doesn't
+						// get cancelled.
 						return
 					default:
 						pod := l.pods[podIndex]
 						framework.Logf("Pod-%v [%v], Iteration %v/%v", podIndex, pod.Name, j, l.testOptions.NumRestarts-1)
 						_, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 						if err != nil {
-							l.cancel()
 							framework.Failf("Failed to create pod-%v [%+v]. Error: %v", podIndex, pod, err)
 						}
 
 						err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 						if err != nil {
-							l.cancel()
 							framework.Failf("Failed to wait for pod-%v [%+v] turn into running status. Error: %v", podIndex, pod, err)
 						}
 
@@ -226,7 +225,6 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 						err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 						if err != nil {
-							l.cancel()
 							framework.Failf("Failed to delete pod-%v [%+v]. Error: %v", podIndex, pod, err)
 						}
 					}

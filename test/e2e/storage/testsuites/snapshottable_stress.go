@@ -54,9 +54,7 @@ type snapshottableStressTest struct {
 	snapshotsMutex sync.Mutex
 
 	// Stop and wait for any async routines.
-	ctx    context.Context
-	wg     sync.WaitGroup
-	cancel context.CancelFunc
+	wg sync.WaitGroup
 }
 
 // InitCustomSnapshottableStressTestSuite returns snapshottableStressTestSuite that implements TestSuite interface
@@ -129,7 +127,6 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 		snapshottableDriver, _ = driver.(storageframework.SnapshottableTestDriver)
 		cs = f.ClientSet
 		config := driver.PrepareTest(f)
-		ctx, cancel := context.WithCancel(context.Background())
 
 		stressTest = &snapshottableStressTest{
 			config:      config,
@@ -137,8 +134,6 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 			snapshots:   []*storageframework.SnapshotResource{},
 			pods:        []*v1.Pod{},
 			testOptions: *driverInfo.VolumeSnapshotStressTestOptions,
-			ctx:         ctx,
-			cancel:      cancel,
 		}
 	}
 
@@ -169,7 +164,6 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 				defer wg.Done()
 
 				if _, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
-					stressTest.cancel()
 					framework.Failf("Failed to create pod-%d [%+v]. Error: %v", i, pod, err)
 				}
 			}(i, pod)
@@ -178,7 +172,6 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 
 		for i, pod := range stressTest.pods {
 			if err := e2epod.WaitForPodRunningInNamespace(cs, pod); err != nil {
-				stressTest.cancel()
 				framework.Failf("Failed to wait for pod-%d [%+v] turn into running status. Error: %v", i, pod, err)
 			}
 		}
@@ -186,7 +179,6 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 
 	cleanup := func() {
 		framework.Logf("Stopping and waiting for all test routines to finish")
-		stressTest.cancel()
 		stressTest.wg.Wait()
 
 		var (
@@ -265,7 +257,15 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 					volume := stressTest.volumes[podIndex]
 
 					select {
-					case <-stressTest.ctx.Done():
+					case <-ctx.Done():
+						// This looks like a in the
+						// original test
+						// (https://github.com/kubernetes/kubernetes/blob/21049c2a1234ae3eea57357ed4329ed567a2dab3/test/e2e/storage/testsuites/snapshottable_stress.go#L269):
+						// This early return will never
+						// get reached even if some
+						// other goroutine fails
+						// because the context doesn't
+						// get cancelled.
 						return
 					default:
 						framework.Logf("Pod-%d [%s], Iteration %d/%d", podIndex, pod.Name, snapshotIndex, stressTest.testOptions.NumSnapshots-1)
