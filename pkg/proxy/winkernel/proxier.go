@@ -1139,6 +1139,13 @@ func (proxier *Proxier) isAllEndpointsNonServing(svcName proxy.ServicePortName, 
 	return true
 }
 
+// updateQueriedEndpoints updates the queriedEndpoints map with newly created endpoint details
+func updateQueriedEndpoints(newHnsEndpoint *endpointsInfo, queriedEndpoints map[string]*endpointsInfo) {
+	// store newly created endpoints in queriedEndpoints
+	queriedEndpoints[newHnsEndpoint.hnsID] = newHnsEndpoint
+	queriedEndpoints[newHnsEndpoint.ip] = newHnsEndpoint
+}
+
 // This is where all of the hns save/restore calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
@@ -1255,9 +1262,7 @@ func (proxier *Proxier) syncProxyRules() {
 				newHnsEndpoint.refCount = proxier.endPointsRefCount.getRefCount(newHnsEndpoint.hnsID)
 				*newHnsEndpoint.refCount++
 				svcInfo.remoteEndpoint = newHnsEndpoint
-				// store newly created endpoints in queriedEndpoints
-				queriedEndpoints[newHnsEndpoint.hnsID] = newHnsEndpoint
-				queriedEndpoints[newHnsEndpoint.ip] = newHnsEndpoint
+				updateQueriedEndpoints(newHnsEndpoint, queriedEndpoints)
 			}
 		}
 
@@ -1364,6 +1369,7 @@ func (proxier *Proxier) syncProxyRules() {
 						klog.ErrorS(err, "Remote endpoint creation failed", "endpointsInfo", hnsEndpoint)
 						continue
 					}
+					updateQueriedEndpoints(newHnsEndpoint, queriedEndpoints)
 				} else {
 
 					hnsEndpoint := &endpointsInfo{
@@ -1377,6 +1383,7 @@ func (proxier *Proxier) syncProxyRules() {
 						klog.ErrorS(err, "Remote endpoint creation failed")
 						continue
 					}
+					updateQueriedEndpoints(newHnsEndpoint, queriedEndpoints)
 				}
 			}
 			// For Overlay networks 'SourceVIP' on an Load balancer Policy can either be chosen as
