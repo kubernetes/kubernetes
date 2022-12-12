@@ -57,9 +57,9 @@ func (pl *NodeName) Name() string {
 // PreFilter builds and writes cycle state used by Filter.
 func (pl *NodeName) PreFilter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	if len(pod.Spec.NodeName) != 0 {
-		return &framework.PreFilterResult{NodeNames: sets.NewString(pod.Spec.NodeName)}, nil
+		return &framework.PreFilterResult{NodeNames: sets.NewString(pod.Spec.NodeName)}, framework.NewStatus(framework.Skip)
 	}
-	return nil, nil
+	return nil, framework.NewStatus(framework.Skip)
 }
 
 // PreFilterExtensions not necessary for this plugin as state doesn't depend on pod additions or deletions.
