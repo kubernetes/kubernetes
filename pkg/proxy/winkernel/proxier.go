@@ -544,7 +544,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	info.internalTrafficLocal = internalTrafficLocal
 	info.winProxyOptimization = winProxyOptimization
 
-	klog.V(3).InfoS("Flags enabled for service", "service", service.Name, "localTrafficDSR", localTrafficDSR, "preserveDIP", preserveDIP, "winProxyOptimization", winProxyOptimization)
+	klog.V(3).InfoS("Flags enabled for service", "service", service.Name, "localTrafficDSR", localTrafficDSR, "internalTrafficLocal", internalTrafficLocal, "preserveDIP", preserveDIP, "winProxyOptimization", winProxyOptimization)
 
 	for _, eip := range service.Spec.ExternalIPs {
 		info.externalIPs = append(info.externalIPs, &externalIPInfo{ip: eip})
@@ -1453,9 +1453,17 @@ func (proxier *Proxier) syncProxyRules() {
 
 		if endpointsAvailableForLB {
 			// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
+
+			// clusterIPEndpoints is the endpoint list used for creating ClusterIP loadbalancer.
+			clusterIPEndpoints := hnsEndpoints
+			if svcInfo.internalTrafficLocal {
+				// Take local endpoints for clusterip loadbalancer when internal traffic policy is local.
+				clusterIPEndpoints = hnsLocalEndpoints
+			}
+
 			// Cluster IP LoadBalancer creation
 			hnsLoadBalancer, err := hns.getLoadBalancer(
-				hnsEndpoints,
+				clusterIPEndpoints,
 				loadBalancerFlags{isDSR: proxier.isDSR, isIPv6: proxier.isIPv6Mode, sessionAffinity: sessionAffinityClientIP},
 				sourceVip,
 				svcInfo.ClusterIP().String(),
