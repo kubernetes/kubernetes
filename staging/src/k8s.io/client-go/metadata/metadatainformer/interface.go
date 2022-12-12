@@ -27,6 +27,7 @@ type SharedInformerFactory interface {
 	Start(stopCh <-chan struct{})
 	ForResource(gvr schema.GroupVersionResource) informers.GenericInformer
 	WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool
+	Shutdown()
 }
 
 // TweakListOptionsFunc defines the signature of a helper function
