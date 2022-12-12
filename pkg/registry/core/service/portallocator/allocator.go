@@ -37,6 +37,7 @@ type Interface interface {
 	ForEach(func(int))
 	Has(int) bool
 	Destroy()
+	EnableMetrics()
 }
 
 var (
@@ -57,6 +58,9 @@ type PortAllocator struct {
 	portRange net.PortRange
 
 	alloc allocator.Interface
+
+	// metrics is a metrics recorder that can be disabled
+	metrics metricsRecorderInterface
 }
 
 // PortAllocator implements Interface and Snapshottable
@@ -69,6 +73,7 @@ func New(pr net.PortRange, allocatorFactory allocator.AllocatorWithOffsetFactory
 
 	a := &PortAllocator{
 		portRange: pr,
+		metrics:   &emptyMetricsRecorder{},
 	}
 
 	var offset = 0
@@ -125,6 +130,9 @@ func (r *PortAllocator) Used() int {
 func (r *PortAllocator) Allocate(port int) error {
 	ok, offset := r.contains(port)
 	if !ok {
+		// update metrics
+		r.metrics.incrementAllocationErrors("static")
+
 		// include valid port range in error
 		validPorts := r.portRange.String()
 		return &ErrNotInRange{validPorts}
@@ -132,11 +140,21 @@ func (r *PortAllocator) Allocate(port int) error {
 
 	allocated, err := r.alloc.Allocate(offset)
 	if err != nil {
+		// update metrics
+		r.metrics.incrementAllocationErrors("static")
 		return err
 	}
 	if !allocated {
+		// update metrics
+		r.metrics.incrementAllocationErrors("static")
 		return ErrAllocated
 	}
+
+	// update metrics
+	r.metrics.incrementAllocations("static")
+	r.metrics.setAllocated(r.Used())
+	r.metrics.setAvailable(r.Free())
+
 	return nil
 }
 
@@ -145,11 +163,19 @@ func (r *PortAllocator) Allocate(port int) error {
 func (r *PortAllocator) AllocateNext() (int, error) {
 	offset, ok, err := r.alloc.AllocateNext()
 	if err != nil {
+		r.metrics.incrementAllocationErrors("dynamic")
 		return 0, err
 	}
 	if !ok {
+		r.metrics.incrementAllocationErrors("dynamic")
 		return 0, ErrFull
 	}
+
+	// update metrics
+	r.metrics.incrementAllocations("dynamic")
+	r.metrics.setAllocated(r.Used())
+	r.metrics.setAvailable(r.Free())
+
 	return r.portRange.Base + offset, nil
 }
 
@@ -170,7 +196,13 @@ func (r *PortAllocator) Release(port int) error {
 		return nil
 	}
 
-	return r.alloc.Release(offset)
+	err := r.alloc.Release(offset)
+	if err == nil {
+		// update metrics
+		r.metrics.setAllocated(r.Used())
+		r.metrics.setAvailable(r.Free())
+	}
+	return err
 }
 
 // Has returns true if the provided port is already allocated and a call
@@ -223,6 +255,12 @@ func (r *PortAllocator) contains(port int) (bool, int) {
 // Destroy shuts down internal allocator.
 func (r *PortAllocator) Destroy() {
 	r.alloc.Destroy()
+}
+
+// EnableMetrics enables metrics recording.
+func (r *PortAllocator) EnableMetrics() {
+	registerMetrics()
+	r.metrics = &metricsRecorder{}
 }
 
 // calculateRangeOffset estimates the offset used on the range for statically allocation based on

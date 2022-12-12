@@ -250,6 +250,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster port allocator: %v", err)
 	}
+	serviceNodePortAllocator.EnableMetrics()
 	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
 
 	controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)

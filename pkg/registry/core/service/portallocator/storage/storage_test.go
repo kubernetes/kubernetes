@@ -216,7 +216,7 @@ func TestAllocateReserved(t *testing.T) {
 	for i := 0; i < dynamicOffset; i++ {
 		port := i + basePortRange
 		if err := storage.Allocate(port); err != nil {
-			t.Errorf("Unexpected error trying to allocate IP %d: %v", port, err)
+			t.Errorf("Unexpected error trying to allocate Port %d: %v", port, err)
 		}
 	}
 	if _, err := storage.AllocateNext(); err == nil {
@@ -224,7 +224,7 @@ func TestAllocateReserved(t *testing.T) {
 	}
 	// release one port in the allocated block and another a new one randomly
 	if err := storage.Release(basePortRange + 53); err != nil {
-		t.Fatalf("Unexpected error trying to release ip 30053: %v", err)
+		t.Fatalf("Unexpected error trying to release port 30053: %v", err)
 	}
 	if _, err := storage.AllocateNext(); err != nil {
 		t.Error(err)
