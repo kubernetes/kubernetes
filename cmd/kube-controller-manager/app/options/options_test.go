@@ -19,13 +19,16 @@ package options
 import (
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
+
 	eventv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cpconfig "k8s.io/cloud-provider/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
@@ -648,13 +651,15 @@ func TestApplyTo(t *testing.T) {
 
 func TestValidateControllersOptions(t *testing.T) {
 	testCases := []struct {
-		name         string
-		expectErrors bool
-		validate     func() []error
+		name                   string
+		expectErrors           bool
+		expectedErrorSubString string
+		validate               func() []error
 	}{
 		{
-			name:         "AttachDetachControllerOptions reconciler sync loop period less than one second",
-			expectErrors: true,
+			name:                   "AttachDetachControllerOptions reconciler sync loop period less than one second",
+			expectErrors:           true,
+			expectedErrorSubString: "duration time must be greater than one second",
 			validate: (&AttachDetachControllerOptions{
 				&attachdetachconfig.AttachDetachControllerConfiguration{
 					ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: time.Second / 2},
@@ -663,8 +668,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "CSRSigningControllerOptions KubeletServingSignerConfiguration no cert file",
-			expectErrors: true,
+			name:                   "CSRSigningControllerOptions KubeletServingSignerConfiguration no cert file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify key without cert",
 			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
@@ -690,8 +696,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "CSRSigningControllerOptions KubeletServingSignerConfiguration no key file",
-			expectErrors: true,
+			name:                   "CSRSigningControllerOptions KubeletServingSignerConfiguration no key file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify cert without key",
 			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
@@ -717,8 +724,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "CSRSigningControllerOptions KubeletClientSignerConfiguration no cert file",
-			expectErrors: true,
+			name:                   "CSRSigningControllerOptions KubeletClientSignerConfiguration no cert file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify key without cert",
 			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
@@ -744,8 +752,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "CSRSigningControllerOptions KubeletClientSignerConfiguration no key file",
-			expectErrors: true,
+			name:                   "CSRSigningControllerOptions KubeletClientSignerConfiguration no key file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify cert without key",
 			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
@@ -771,8 +780,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "CSRSigningControllerOptions KubeAPIServerClientSignerConfiguration no cert file",
-			expectErrors: true,
+			name:                   "CSRSigningControllerOptions KubeAPIServerClientSignerConfiguration no cert file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify key without cert",
 			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
@@ -798,8 +808,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "CSRSigningControllerOptions KubeAPIServerClientSignerConfiguration no key file",
-			expectErrors: true,
+			name:                   "CSRSigningControllerOptions KubeAPIServerClientSignerConfiguration no key file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify cert without key",
 			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
@@ -825,8 +836,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "CSRSigningControllerOptions LegacyUnknownSignerConfiguration no cert file",
-			expectErrors: true,
+			name:                   "CSRSigningControllerOptions LegacyUnknownSignerConfiguration no cert file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify key without cert",
 			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
@@ -852,8 +864,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "CSRSigningControllerOptions LegacyUnknownSignerConfiguration no key file",
-			expectErrors: true,
+			name:                   "CSRSigningControllerOptions LegacyUnknownSignerConfiguration no key file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify cert without key",
 			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "",
@@ -879,8 +892,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "CSRSigningControllerOptions specific file set along with cluster single signing file",
-			expectErrors: true,
+			name:                   "CSRSigningControllerOptions specific file set along with cluster single signing file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify --cluster-signing-{cert,key}-file and other --cluster-signing-*-file flags at the same time",
 			validate: (&CSRSigningControllerOptions{
 				&csrsigningconfig.CSRSigningControllerConfiguration{
 					ClusterSigningCertFile: "/cluster-signing-cert-file",
@@ -906,8 +920,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "EndpointSliceControllerOptions ConcurrentServiceEndpointSyncs lower than minConcurrentServiceEndpointSyncs (1)",
-			expectErrors: true,
+			name:                   "EndpointSliceControllerOptions ConcurrentServiceEndpointSyncs lower than minConcurrentServiceEndpointSyncs (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-service-endpoint-syncs must not be less than 1",
 			validate: (&EndpointSliceControllerOptions{
 				&endpointsliceconfig.EndpointSliceControllerConfiguration{
 					ConcurrentServiceEndpointSyncs: 0,
@@ -916,8 +931,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "EndpointSliceControllerOptions ConcurrentServiceEndpointSyncs greater than maxConcurrentServiceEndpointSyncs (50)",
-			expectErrors: true,
+			name:                   "EndpointSliceControllerOptions ConcurrentServiceEndpointSyncs greater than maxConcurrentServiceEndpointSyncs (50)",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-service-endpoint-syncs must not be more than 50",
 			validate: (&EndpointSliceControllerOptions{
 				&endpointsliceconfig.EndpointSliceControllerConfiguration{
 					ConcurrentServiceEndpointSyncs: 51,
@@ -926,8 +942,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "EndpointSliceControllerOptions MaxEndpointsPerSlice lower than minMaxEndpointsPerSlice (1)",
-			expectErrors: true,
+			name:                   "EndpointSliceControllerOptions MaxEndpointsPerSlice lower than minMaxEndpointsPerSlice (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "max-endpoints-per-slice must not be less than 1",
 			validate: (&EndpointSliceControllerOptions{
 				&endpointsliceconfig.EndpointSliceControllerConfiguration{
 					ConcurrentServiceEndpointSyncs: 10,
@@ -936,8 +953,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "EndpointSliceControllerOptions MaxEndpointsPerSlice greater than maxMaxEndpointsPerSlice (1000)",
-			expectErrors: true,
+			name:                   "EndpointSliceControllerOptions MaxEndpointsPerSlice greater than maxMaxEndpointsPerSlice (1000)",
+			expectErrors:           true,
+			expectedErrorSubString: "max-endpoints-per-slice must not be more than 1000",
 			validate: (&EndpointSliceControllerOptions{
 				&endpointsliceconfig.EndpointSliceControllerConfiguration{
 					ConcurrentServiceEndpointSyncs: 10,
@@ -946,8 +964,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "EndpointSliceMirroringControllerOptions MirroringConcurrentServiceEndpointSyncs lower than mirroringMinConcurrentServiceEndpointSyncs (1)",
-			expectErrors: true,
+			name:                   "EndpointSliceMirroringControllerOptions MirroringConcurrentServiceEndpointSyncs lower than mirroringMinConcurrentServiceEndpointSyncs (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "mirroring-concurrent-service-endpoint-syncs must not be less than 1",
 			validate: (&EndpointSliceMirroringControllerOptions{
 				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 					MirroringConcurrentServiceEndpointSyncs: 0,
@@ -956,8 +975,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "EndpointSliceMirroringControllerOptions MirroringConcurrentServiceEndpointSyncs greater than mirroringMaxConcurrentServiceEndpointSyncs (50)",
-			expectErrors: true,
+			name:                   "EndpointSliceMirroringControllerOptions MirroringConcurrentServiceEndpointSyncs greater than mirroringMaxConcurrentServiceEndpointSyncs (50)",
+			expectErrors:           true,
+			expectedErrorSubString: "mirroring-concurrent-service-endpoint-syncs must not be more than 50",
 			validate: (&EndpointSliceMirroringControllerOptions{
 				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 					MirroringConcurrentServiceEndpointSyncs: 51,
@@ -966,8 +986,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "EndpointSliceMirroringControllerOptions MirroringMaxEndpointsPerSubset lower than mirroringMinMaxEndpointsPerSubset (1)",
-			expectErrors: true,
+			name:                   "EndpointSliceMirroringControllerOptions MirroringMaxEndpointsPerSubset lower than mirroringMinMaxEndpointsPerSubset (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "mirroring-max-endpoints-per-subset must not be less than 1",
 			validate: (&EndpointSliceMirroringControllerOptions{
 				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 					MirroringConcurrentServiceEndpointSyncs: 10,
@@ -976,8 +997,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "EndpointSliceMirroringControllerOptions MirroringMaxEndpointsPerSubset greater than mirroringMaxMaxEndpointsPerSubset (1000)",
-			expectErrors: true,
+			name:                   "EndpointSliceMirroringControllerOptions MirroringMaxEndpointsPerSubset greater than mirroringMaxMaxEndpointsPerSubset (1000)",
+			expectErrors:           true,
+			expectedErrorSubString: "mirroring-max-endpoints-per-subset must not be more than 1000",
 			validate: (&EndpointSliceMirroringControllerOptions{
 				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
 					MirroringConcurrentServiceEndpointSyncs: 10,
@@ -986,8 +1008,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "EphemeralVolumeControllerOptions ConcurrentEphemeralVolumeSyncs equal 0",
-			expectErrors: true,
+			name:                   "EphemeralVolumeControllerOptions ConcurrentEphemeralVolumeSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-ephemeralvolume-syncs must be greater than 0",
 			validate: (&EphemeralVolumeControllerOptions{
 				&ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 					ConcurrentEphemeralVolumeSyncs: 0,
@@ -995,8 +1018,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "HPAControllerOptions ConcurrentHorizontalPodAutoscalerSyncs equal 0",
-			expectErrors: true,
+			name:                   "HPAControllerOptions ConcurrentHorizontalPodAutoscalerSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-horizontal-pod-autoscaler-syncs must be greater than 0",
 			validate: (&HPAControllerOptions{
 				&poautosclerconfig.HPAControllerConfiguration{
 					ConcurrentHorizontalPodAutoscalerSyncs:              0,
@@ -1011,8 +1035,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "NodeIPAMControllerOptions service cluster ip range more than two entries",
-			expectErrors: true,
+			name:                   "NodeIPAMControllerOptions service cluster ip range more than two entries",
+			expectErrors:           true,
+			expectedErrorSubString: "--service-cluster-ip-range can not contain more than two entries",
 			validate: (&NodeIPAMControllerOptions{
 				&nodeipamconfig.NodeIPAMControllerConfiguration{
 					ServiceCIDR:          "10.0.0.0/16,244.0.0.0/16,3000::/108",
@@ -1023,8 +1048,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "PersistentVolumeBinderControllerOptions bad cidr deny list",
-			expectErrors: true,
+			name:                   "PersistentVolumeBinderControllerOptions bad cidr deny list",
+			expectErrors:           true,
+			expectedErrorSubString: "bad --volume-host-ip-denylist/--volume-host-allow-local-loopback failed to parse cidr",
 			validate: (&PersistentVolumeBinderControllerOptions{
 				&persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
 					PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
@@ -1046,8 +1072,9 @@ func TestValidateControllersOptions(t *testing.T) {
 			}).Validate,
 		},
 		{
-			name:         "StatefulSetControllerOptions ConcurrentStatefulSetSyncs equal 0",
-			expectErrors: true,
+			name:                   "StatefulSetControllerOptions ConcurrentStatefulSetSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-statefulset-syncs must be greater than 0",
 			validate: (&StatefulSetControllerOptions{
 				&statefulsetconfig.StatefulSetControllerConfiguration{
 					ConcurrentStatefulSetSyncs: 0,
@@ -1214,6 +1241,12 @@ func TestValidateControllersOptions(t *testing.T) {
 
 			if len(errs) == 0 && tc.expectErrors {
 				t.Errorf("expected errors, no errors found")
+			}
+
+			if len(errs) > 0 && tc.expectErrors {
+				if !strings.Contains(utilerrors.NewAggregate(errs).Error(), tc.expectedErrorSubString) {
+					t.Errorf("expected error: %s, but no error found", tc.expectedErrorSubString)
+				}
 			}
 		})
 	}
