@@ -1308,7 +1308,7 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 					minQueueExpected = test.queues[queueIdx]
 				}
 
-				minQueueGot, reqGot := qs.findDispatchQueueLocked()
+				minQueueGot, reqGot := qs.findDispatchQueueToBoundLocked()
 				if minQueueExpected != minQueueGot {
 					t.Errorf("Expected queue: %#v, but got: %#v", minQueueExpected, minQueueGot)
 				}
