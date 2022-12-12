@@ -12,7 +12,7 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
+	k8s.io/kube-openapi v0.0.0-20221212230849-3cd90730fb74
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
 )
 
@@ -112,5 +112,6 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
 	k8s.io/kms => ../kms
+	k8s.io/kube-openapi => github.com/alexzielenski/kube-openapi v0.0.0-20221212230849-3cd90730fb74
 	k8s.io/sample-apiserver => ../sample-apiserver
 )
