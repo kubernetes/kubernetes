@@ -197,8 +197,12 @@ func generateBuilder(crd *apiextensionsv1.CustomResourceDefinition, version stri
 
 func BuildOpenAPIV3Definitions(crd *apiextensionsv1.CustomResourceDefinition, structuralSchemas map[string]*structuralschema.Structural) map[string]*spec.Schema {
 	result := map[string]*spec.Schema{}
-	for version, ss := range structuralSchemas {
-		b := newBuilder(crd, version, ss, Options{})
+
+	for _, versionInfo := range crd.Spec.Versions {
+		// If ss is nil it will be interpreted as a schema {Type: "object"}
+		ss := structuralSchemas[versionInfo.Name]
+
+		b := newBuilder(crd, versionInfo.Name, ss, Options{})
 		sample := &CRDCanonicalTypeNamer{
 			group:   b.group,
 			version: b.version,
