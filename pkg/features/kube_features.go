@@ -712,6 +712,13 @@ const (
 	// Subdivide the ClusterIP range for dynamic and static IP allocation.
 	ServiceIPStaticSubrange featuregate.Feature = "ServiceIPStaticSubrange"
 
+	// owner: @xuzhenglun
+	// kep: http://kep.k8s.io/3682
+	// alpha: v1.27
+	//
+	// Subdivide the NodePort range for dynamic and static port allocation.
+	ServiceNodePortStaticSubrange featuregate.Feature = "ServiceNodePortStaticSubrange"
+
 	// owner: @derekwaynecarr
 	// alpha: v1.20
 	// beta: v1.22
@@ -1023,6 +1030,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
+
+	ServiceNodePortStaticSubrange: {Default: false, PreRelease: featuregate.Alpha},
 
 	SizeMemoryBackedVolumes: {Default: true, PreRelease: featuregate.Beta},
 
