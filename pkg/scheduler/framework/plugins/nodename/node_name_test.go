@@ -18,36 +18,44 @@ package nodename
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestNodeName(t *testing.T) {
 	tests := []struct {
-		pod        *v1.Pod
-		node       *v1.Node
-		name       string
-		wantStatus *framework.Status
+		pod                 *v1.Pod
+		node                *v1.Node
+		name                string
+		wantStatus          *framework.Status
+		wantPreFilterStatus *framework.Status
+		wantPreFilterResult *framework.PreFilterResult
 	}{
 		{
-			pod:  &v1.Pod{},
-			node: &v1.Node{},
-			name: "no host specified",
+			pod:                 &v1.Pod{},
+			node:                &v1.Node{},
+			name:                "no host specified",
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 		},
 		{
-			pod:  st.MakePod().Node("foo").Obj(),
-			node: st.MakeNode().Name("foo").Obj(),
-			name: "host matches",
+			pod:                 st.MakePod().Node("foo").Obj(),
+			node:                st.MakeNode().Name("foo").Obj(),
+			name:                "host matches",
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("foo")},
 		},
 		{
-			pod:        st.MakePod().Node("bar").Obj(),
-			node:       st.MakeNode().Name("foo").Obj(),
-			name:       "host doesn't match",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			pod:                 st.MakePod().Node("bar").Obj(),
+			node:                st.MakeNode().Name("foo").Obj(),
+			name:                "host doesn't match",
+			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("bar")},
 		},
 	}
 
@@ -57,9 +65,16 @@ func TestNodeName(t *testing.T) {
 			nodeInfo.SetNode(test.node)
 
 			p, _ := New(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), nil, test.pod)
+			if diff := cmp.Diff(test.wantPreFilterStatus, gotStatus); diff != "" {
+				t.Errorf("unexpected PreFilter Status (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.wantPreFilterResult, gotPreFilterResult); diff != "" {
+				t.Errorf("unexpected PreFilterResult (-want,+got):\n%s", diff)
+			}
+			gotStatus = p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
+			if diff := cmp.Diff(test.wantPreFilterStatus, gotStatus); diff != "" {
+				t.Errorf("unexpected Filter Status (-want,+got):\n%s", diff)
 			}
 		})
 	}
