@@ -31,6 +31,7 @@ import (
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
@@ -1366,11 +1367,7 @@ func buildOpenAPIModelsForApply(staticTypeConverter fieldmanager.TypeConverter, 
 func structuralSchemasFromCRD(crd *apiextensionsv1.CustomResourceDefinition) (map[string]*structuralschema.Structural, error) {
 	structuralSchemas := map[string]*structuralschema.Structural{}
 	for _, v := range crd.Spec.Versions {
-		val, err := apiextensionshelpers.GetSchemaForVersion(crd, v.Name)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return nil, fmt.Errorf("the server could not properly serve the CR schema")
-		}
+		val := v.Schema
 		if val == nil {
 			continue
 		}
@@ -1378,14 +1375,19 @@ func structuralSchemasFromCRD(crd *apiextensionsv1.CustomResourceDefinition) (ma
 		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(val, internalValidation, nil); err != nil {
 			return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
 		}
+
+		if validation.SchemaHasInvalidTypes(internalValidation.OpenAPIV3Schema) {
+			return nil, fmt.Errorf("schema for CRD %v has invalid types", crd.Name)
+		}
+
 		s, err := structuralschema.NewStructural(internalValidation.OpenAPIV3Schema)
-		if crd.Spec.PreserveUnknownFields == false && err != nil {
+		if !crd.Spec.PreserveUnknownFields && err != nil {
 			// This should never happen. If it does, it is a programming error.
 			utilruntime.HandleError(fmt.Errorf("failed to convert schema to structural: %v", err))
 			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
 		}
 
-		if crd.Spec.PreserveUnknownFields == false {
+		if !crd.Spec.PreserveUnknownFields {
 			// we don't own s completely, e.g. defaults are not deep-copied. So better make a copy here.
 			s = s.DeepCopy()
 
