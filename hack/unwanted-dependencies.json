@@ -23,13 +23,14 @@
       "github.com/influxdata/influxdb1-client": "",
       "github.com/json-iterator/go": "refer to #105030",
       "github.com/miekg/dns": "no dns client/server should be required",
+      "github.com/mindprince/gonvml": "depends on nvml.h that does not appear to permit modification, redistribution",
+      "github.com/mndrix/tap-go": "unmaintained",
       "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
       "github.com/spf13/viper": "refer to #102598",
+      "github.com/xeipuuv/gojsonschema": "unmaintained",
       "go.mongodb.org/mongo-driver": "",
       "gopkg.in/fsnotify.v1": "obsolete, use github.com/fsnotify/fsnotify",
       "k8s.io/klog": "we have switched to klog v2, so avoid klog v1",
-      "github.com/mndrix/tap-go": "unmaintained",
-      "github.com/xeipuuv/gojsonschema": "unmaintained",
       "rsc.io/quote": "refer to #102833",
       "rsc.io/sampler": "refer to #102833"
     }
@@ -65,6 +66,9 @@
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v4"
+      ],
+      "github.com/mindprince/gonvml": [
+        "github.com/google/cadvisor"
       ]
     }
   }
