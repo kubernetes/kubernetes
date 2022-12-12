@@ -74,12 +74,7 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 				},
 			}
 			logRotationPod = e2epod.NewPodClient(f).CreateSync(pod)
-		})
-
-		ginkgo.AfterEach(func() {
-			ginkgo.By("Deleting the log-rotation pod")
-			framework.Logf("Deleting pod: %s", logRotationPod.Name)
-			e2epod.NewPodClient(f).DeleteSync(logRotationPod.Name, metav1.DeleteOptions{}, time.Minute)
+			ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, logRotationPod.Name, metav1.DeleteOptions{}, time.Minute)
 		})
 
 		ginkgo.It("should be rotated and limited to a fixed amount of files", func(ctx context.Context) {
