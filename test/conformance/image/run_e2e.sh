@@ -68,6 +68,7 @@ ginkgo_args+=(
     "--focus=${E2E_FOCUS}"
     "--skip=${E2E_SKIP}"
     "--noColor=true"
+    "--json-report=e2e.json"
 )
 
 set -x
