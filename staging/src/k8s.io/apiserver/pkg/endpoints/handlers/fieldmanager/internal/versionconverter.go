@@ -14,9 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package internal
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -98,4 +100,24 @@ func (v *versionConverter) Convert(object *typed.TypedValue, version fieldpath.A
 // IsMissingVersionError
 func (v *versionConverter) IsMissingVersionError(err error) bool {
 	return runtime.IsNotRegisteredError(err) || isNoCorrespondingTypeError(err)
+}
+
+type noCorrespondingTypeErr struct {
+	gvk schema.GroupVersionKind
+}
+
+func NewNoCorrespondingTypeError(gvk schema.GroupVersionKind) error {
+	return &noCorrespondingTypeErr{gvk: gvk}
+}
+
+func (k *noCorrespondingTypeErr) Error() string {
+	return fmt.Sprintf("no corresponding type for %v", k.gvk)
+}
+
+func isNoCorrespondingTypeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*noCorrespondingTypeErr)
+	return ok
 }

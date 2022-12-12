@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package internal
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-var testSchema = func() *spec.Swagger {
+var testTypeConverter = func() TypeConverter {
 	data, err := ioutil.ReadFile(filepath.Join("testdata", "swagger.json"))
 	if err != nil {
 		panic(err)
@@ -40,22 +40,22 @@ var testSchema = func() *spec.Swagger {
 	if err := json.Unmarshal(data, &spec); err != nil {
 		panic(err)
 	}
-	return &spec
+	typeConverter, err := NewTypeConverter(&spec, false)
+	if err != nil {
+		panic(err)
+	}
+	return typeConverter
 }()
 
 // TestVersionConverter tests the version converter
 func TestVersionConverter(t *testing.T) {
-	tc, err := NewTypeConverter(testSchema, false)
-	if err != nil {
-		t.Fatalf("Failed to build TypeConverter: %v", err)
-	}
 	oc := fakeObjectConvertorForTestSchema{
 		gvkForVersion("v1beta1"): objForGroupVersion("apps/v1beta1"),
 		gvkForVersion("v1"):      objForGroupVersion("apps/v1"),
 	}
-	vc := newVersionConverter(tc, oc, schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal})
+	vc := newVersionConverter(testTypeConverter, oc, schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal})
 
-	input, err := tc.ObjectToTyped(objForGroupVersion("apps/v1beta1"))
+	input, err := testTypeConverter.ObjectToTyped(objForGroupVersion("apps/v1beta1"))
 	if err != nil {
 		t.Fatalf("error creating converting input object to a typed value: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestVersionConverter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected err to be nil but got %v", err)
 	}
-	actual, err := tc.TypedToObject(output)
+	actual, err := testTypeConverter.TypedToObject(output)
 	if err != nil {
 		t.Fatalf("error converting output typed value to an object %v", err)
 	}

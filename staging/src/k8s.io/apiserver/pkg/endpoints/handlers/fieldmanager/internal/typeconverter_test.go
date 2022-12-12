@@ -14,13 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package internal_test
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -28,28 +25,11 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 )
 
-var testTypeConverter = func() fieldmanager.TypeConverter {
-	data, err := ioutil.ReadFile(filepath.Join("testdata", "swagger.json"))
-	if err != nil {
-		panic(err)
-	}
-	spec := spec.Swagger{}
-	if err := json.Unmarshal(data, &spec); err != nil {
-		panic(err)
-	}
-	typeConverter, err := fieldmanager.NewTypeConverter(&spec, false)
-	if err != nil {
-		panic(err)
-	}
-	return typeConverter
-}()
-
 func TestTypeConverter(t *testing.T) {
-	dtc := fieldmanager.DeducedTypeConverter{}
+	dtc := internal.NewDeducedTypeConverter()
 
 	testCases := []struct {
 		name string
@@ -126,7 +106,7 @@ spec:
 	}
 }
 
-func testObjectToTyped(t *testing.T, tc fieldmanager.TypeConverter, y string) {
+func testObjectToTyped(t *testing.T, tc internal.TypeConverter, y string) {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(y), &obj.Object); err != nil {
 		t.Fatalf("Failed to parse yaml object: %v", err)
