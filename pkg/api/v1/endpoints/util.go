@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"hash"
 	"sort"
 
@@ -72,13 +73,30 @@ func RepackSubsets(subsets []v1.EndpointSubset) []v1.EndpointSubset {
 	final := []v1.EndpointSubset{}
 	for key, ports := range addrReadyMapKeyToPorts {
 		var readyAddrs, notReadyAddrs []v1.EndpointAddress
+		validIP := make(map[string]struct{}, len(keyToAddrReadyMap))
 		for addr, ready := range keyToAddrReadyMap[key] {
 			if ready {
 				readyAddrs = append(readyAddrs, *addr)
+				validIP[fmt.Sprintf("%s-%s", addr.IP, addr.TargetRef.Namespace)] = struct{}{}
 			} else {
 				notReadyAddrs = append(notReadyAddrs, *addr)
 			}
 		}
+		// Check: if an ipaddr is both in readyAddrs and notReadyAddrs, remove them from notReadyAddrs to make sure that
+		// valid IP addresses are not masked by invalid IP addresses。
+		// Details in https://github.com/kubernetes/kubernetes/issues/114440
+		j := 0
+		for _, addr := range notReadyAddrs {
+			// some cni plugin will allocated same addrs between two namespace, ensure the notReadAddr which we remove
+			// is in the same namespace.
+			_, ok := validIP[fmt.Sprintf("%s-%s", addr.IP, addr.TargetRef.Namespace)]
+			if ok {
+				continue
+			}
+			notReadyAddrs[j] = addr
+			j++
+		}
+		notReadyAddrs = notReadyAddrs[:j]
 		final = append(final, v1.EndpointSubset{Addresses: readyAddrs, NotReadyAddresses: notReadyAddrs, Ports: ports})
 	}
 
