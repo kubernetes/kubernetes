@@ -230,8 +230,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 					Name: "test-k8s",
 				},
 			},
-			err:           "",
-			failureReason: metav1.StatusReasonInvalid,
+			err: "",
 		},
 		{
 			name: "with check against null params and default check",
@@ -246,8 +245,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 					Name: "test-k8s",
 				},
 			},
-			err:           "",
-			failureReason: metav1.StatusReasonInvalid,
+			err: "",
 		},
 	}
 
@@ -277,28 +275,8 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 			}
 
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
-			if err == nil && testcase.err == "" {
-				return
-			}
 
-			if err == nil && testcase.err != "" {
-				t.Logf("actual error: %v", err)
-				t.Logf("expected error: %v", testcase.err)
-				t.Fatal("got nil error but expected an error")
-			}
-
-			if err != nil && testcase.err == "" {
-				t.Logf("actual error: %v", err)
-				t.Logf("expected error: %v", testcase.err)
-				t.Fatal("got error but expected none")
-			}
-
-			if err.Error() != testcase.err {
-				t.Logf("actual validation error: %v", err)
-				t.Logf("expected validation error: %v", testcase.err)
-				t.Error("unexpected validation error")
-			}
-
+			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)
 		})
 	}
@@ -386,28 +364,8 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 			}
 
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
-			if err == nil && testcase.err == "" {
-				return
-			}
 
-			if err == nil && testcase.err != "" {
-				t.Logf("actual error: %v", err)
-				t.Logf("expected error: %v", testcase.err)
-				t.Fatal("got nil error but expected an error")
-			}
-
-			if err != nil && testcase.err == "" {
-				t.Logf("actual error: %v", err)
-				t.Logf("expected error: %v", testcase.err)
-				t.Fatal("got error but expected none")
-			}
-
-			if err.Error() != testcase.err {
-				t.Logf("actual validation error: %v", err)
-				t.Logf("expected validation error: %v", testcase.err)
-				t.Error("unexpected validation error")
-			}
-
+			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)
 		})
 	}
@@ -1883,6 +1841,215 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 	}
 }
 
+// TestCRDParams tests that a CustomResource can be used as a param resource for a ValidatingAdmissionPolicy.
+func TestCRDParams(t *testing.T) {
+	testcases := []struct {
+		name          string
+		resource      *unstructured.Unstructured
+		policy        *admissionregistrationv1alpha1.ValidatingAdmissionPolicy
+		policyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding
+		namespace     *v1.Namespace
+		err           string
+		failureReason metav1.StatusReason
+	}{
+		{
+			name: "a rule that uses data from a CRD param resource does NOT pass",
+			resource: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "awesome.bears.com/v1",
+				"kind":       "Panda",
+				"metadata": map[string]interface{}{
+					"name": "config-obj",
+				},
+				"spec": map[string]interface{}{
+					"nameCheck": "crd-test-k8s",
+				},
+			}},
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "params.spec.nameCheck == object.metadata.name",
+				},
+			}, withNamespaceMatch(withParams(withCRDParamKind("Panda", "awesome.bears.com", "v1"), withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))),
+			policyBinding: makeBinding("crd-policy-binding", "test-policy", "config-obj"),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "incorrect-name",
+				},
+			},
+			err:           `namespaces "incorrect-name" is forbidden: ValidatingAdmissionPolicy 'test-policy' with binding 'crd-policy-binding' denied request: failed expression: params.spec.nameCheck == object.metadata.name`,
+			failureReason: metav1.StatusReasonInvalid,
+		},
+		{
+			name: "a rule that uses data from a CRD param resource that does pass",
+			resource: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "awesome.bears.com/v1",
+				"kind":       "Panda",
+				"metadata": map[string]interface{}{
+					"name": "config-obj",
+				},
+				"spec": map[string]interface{}{
+					"nameCheck": "crd-test-k8s",
+				},
+			}},
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "params.spec.nameCheck == object.metadata.name",
+				},
+			}, withNamespaceMatch(withParams(withCRDParamKind("Panda", "awesome.bears.com", "v1"), withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))),
+			policyBinding: makeBinding("crd-policy-binding", "test-policy", "config-obj"),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "crd-test-k8s",
+				},
+			},
+			err: ``,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+			server, err := apiservertesting.StartTestServer(t, nil, []string{
+				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+			}, framework.SharedEtcd())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer server.TearDownFn()
+
+			config := server.ClientConfig
+
+			client, err := clientset.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			crd := versionedCustomResourceDefinition()
+			etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, crd)
+			dynamicClient, err := dynamic.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gvr := schema.GroupVersionResource{
+				Group:    crd.Spec.Group,
+				Version:  crd.Spec.Versions[0].Name,
+				Resource: crd.Spec.Names.Plural,
+			}
+			crClient := dynamicClient.Resource(gvr)
+			_, err = crClient.Create(context.TODO(), testcase.resource, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("error creating %s: %s", gvr, err)
+			}
+
+			policy := withWaitReadyConstraintAndExpression(testcase.policy)
+			if _, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			// remove default namespace since the CRD is cluster-scoped
+			testcase.policyBinding.Spec.ParamRef.Namespace = ""
+			if err := createAndWaitReady(t, client, testcase.policyBinding, nil); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
+
+			checkExpectedError(t, err, testcase.err)
+			checkFailureReason(t, err, testcase.failureReason)
+		})
+	}
+}
+
+func TestBindingRemoval(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "false",
+			Message:    "policy still in effect",
+		},
+	}, withNamespaceMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))
+	policy = withWaitReadyConstraintAndExpression(policy)
+	if _, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	binding := makeBinding("test-binding", "test-policy", "test-params")
+	if err := createAndWaitReady(t, client, binding, nil); err != nil {
+		t.Fatal(err)
+	}
+	// check that the policy is active
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		namespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "check-namespace",
+			},
+		}
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1.CreateOptions{})
+		if err != nil {
+			if strings.Contains(err.Error(), "policy still in effect") {
+				return true, nil
+			} else {
+				// unexpected error while attempting namespace creation
+				return true, err
+			}
+		}
+		return false, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", waitErr)
+	}
+	if err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Delete(context.TODO(), "test-binding", metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for binding to be deleted
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+
+		_, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Get(context.TODO(), "test-binding", metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			} else {
+				return true, err
+			}
+		}
+
+		return false, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", waitErr)
+	}
+
+	// policy should be considered in an invalid state and namespace creation should be allowed
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		namespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-namespace",
+			},
+		}
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1.CreateOptions{})
+		if err != nil {
+			t.Logf("namespace creation failed: %s", err)
+			return false, nil
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("expected namespace creation to succeed but timed out waiting: %v", waitErr)
+	}
+}
+
 func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
 	policy = policy.DeepCopy()
 	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, admissionregistrationv1alpha1.NamedRuleWithOperations{
@@ -2109,11 +2276,45 @@ func checkForFailedRule(t *testing.T, err error) {
 }
 
 func checkFailureReason(t *testing.T, err error, expectedReason metav1.StatusReason) {
+	if err == nil && expectedReason == "" {
+		// no reason was given, no error was passed - early exit
+		return
+	}
 	reason := err.(apierrors.APIStatus).Status().Reason
 	if reason != expectedReason {
 		t.Logf("actual error reason: %v", reason)
 		t.Logf("expected failure reason: %v", expectedReason)
 		t.Error("unexpected error reason")
+	}
+}
+
+func withCRDParamKind(kind, crdGroup, crdVersion string) *admissionregistrationv1alpha1.ParamKind {
+	return &admissionregistrationv1alpha1.ParamKind{
+		APIVersion: crdGroup + "/" + crdVersion,
+		Kind:       kind,
+	}
+}
+
+func checkExpectedError(t *testing.T, err error, expectedErr string) {
+	if err == nil && expectedErr == "" {
+		return
+	}
+	if err == nil && expectedErr != "" {
+		t.Logf("actual error: %v", err)
+		t.Logf("expected error: %v", expectedErr)
+		t.Fatal("got nil error but expected an error")
+	}
+
+	if err != nil && expectedErr == "" {
+		t.Logf("actual error: %v", err)
+		t.Logf("expected error: %v", expectedErr)
+		t.Fatal("got error but expected none")
+	}
+
+	if err.Error() != expectedErr {
+		t.Logf("actual validation error: %v", err)
+		t.Logf("expected validation error: %v", expectedErr)
+		t.Error("unexpected validation error")
 	}
 }
 
