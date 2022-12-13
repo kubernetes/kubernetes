@@ -104,7 +104,7 @@ var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:d
 var elapsedSuffix = regexp.MustCompile(`Elapsed: [[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m)`)
 
 // timeSuffix matches "09/06/22 15:36:43.445" as printed by Ginkgo v2 for log output.
-var timeSuffix = regexp.MustCompile(`(?m)[[:space:]][[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}\.[[:digit:]]{1,3}$`)
+var timeSuffix = regexp.MustCompile(`(?m)[[:space:]][[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}(\.[[:digit:]]{1,3})?$`)
 
 func stripTimes(in string) string {
 	out := timePrefix.ReplaceAllString(in, "")
