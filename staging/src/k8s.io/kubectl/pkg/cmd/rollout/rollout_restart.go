@@ -18,7 +18,6 @@ package rollout
 
 import (
 	"fmt"
-
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -183,7 +182,8 @@ func (o RestartOptions) RunRestart() error {
 		}
 
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			allErrs = append(allErrs, fmt.Errorf("failed to create patch for %v: empty patch", info.Name))
+			allErrs = append(allErrs, fmt.Errorf("failed to create patch for %v: if restart has already been triggered within the past second, please wait before attempting to trigger another", info.Name))
+			continue
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).
