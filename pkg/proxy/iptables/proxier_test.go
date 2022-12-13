@@ -1062,6 +1062,7 @@ func TestSortIPTablesRules(t *testing.T) {
 				-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -s 10.180.0.2 -j KUBE-MARK-MASQ
 				-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
 				-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
+				-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "other traffic to s2/svc2:p80 will be dropped by KUBE-PROXY-FIREWALL"
 				-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
 				-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 				-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
@@ -1136,6 +1137,7 @@ func TestSortIPTablesRules(t *testing.T) {
 				-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 				-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -j KUBE-SVL-GNZBNJ2PO5MGZ6GT
 				-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
+				-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "other traffic to s2/svc2:p80 will be dropped by KUBE-PROXY-FIREWALL"
 				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -1511,9 +1513,7 @@ func (tracer *iptablesTracer) runChain(table utiliptables.Table, chain utiliptab
 
 	for _, rule := range c.Rules {
 		if rule.Jump == nil {
-			// You _can_ have rules that don't end in `-j`, but we don't currently
-			// do that.
-			tracer.t.Errorf("Could not find jump target in rule %q", rule.Raw)
+			continue
 		}
 
 		if !tracer.ruleMatches(rule, sourceIP, destIP, destPort) {
@@ -1705,6 +1705,7 @@ func TestTracePackets(t *testing.T) {
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -m comment --comment "masquerade traffic for ns3/svc3:p80 external destinations" -j KUBE-MARK-MASQ
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -j KUBE-SVC-X27LE4BHSL4DOUIK
 		-A KUBE-FW-NUKIZ6OKUXPJNT4C -m comment --comment "ns5/svc5:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-NUKIZ6OKUXPJNT4C
+		-A KUBE-FW-NUKIZ6OKUXPJNT4C -m comment --comment "other traffic to ns5/svc5:p80 will be dropped by KUBE-PROXY-FIREWALL"
 		-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -s 10.180.0.5 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.5:80
 		-A KUBE-SEP-I77PXRDZVX7PMWMN -m comment --comment ns5/svc5:p80 -s 10.180.0.3 -j KUBE-MARK-MASQ
@@ -2012,6 +2013,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -m comment --comment "masquerade traffic for ns3/svc3:p80 external destinations" -j KUBE-MARK-MASQ
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -j KUBE-SVC-X27LE4BHSL4DOUIK
 		-A KUBE-FW-NUKIZ6OKUXPJNT4C -m comment --comment "ns5/svc5:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-NUKIZ6OKUXPJNT4C
+		-A KUBE-FW-NUKIZ6OKUXPJNT4C -m comment --comment "other traffic to ns5/svc5:p80 will be dropped by KUBE-PROXY-FIREWALL"
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -2297,6 +2299,7 @@ func TestLoadBalancer(t *testing.T) {
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 1.2.3.4 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 5.6.7.8 -j KUBE-EXT-XPGD46QRK7WJZT7O
+		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "other traffic to ns1/svc1:p80 will be dropped by KUBE-PROXY-FIREWALL"
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000

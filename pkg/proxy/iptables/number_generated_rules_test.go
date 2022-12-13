@@ -159,7 +159,7 @@ func TestNumberIptablesRules(t *testing.T) {
 			services:            1,
 			epPerService:        1,
 			expectedFilterRules: 4,
-			expectedNatRules:    16,
+			expectedNatRules:    17,
 		},
 		{
 			name: "1 Services 2 EndpointPerService - LoadBalancer",
@@ -174,7 +174,7 @@ func TestNumberIptablesRules(t *testing.T) {
 			services:            1,
 			epPerService:        2,
 			expectedFilterRules: 4,
-			expectedNatRules:    19,
+			expectedNatRules:    20,
 		},
 		{
 			name: "1 Services 10 EndpointPerService - LoadBalancer",
@@ -189,7 +189,7 @@ func TestNumberIptablesRules(t *testing.T) {
 			services:            1,
 			epPerService:        10,
 			expectedFilterRules: 4,
-			expectedNatRules:    43,
+			expectedNatRules:    44,
 		},
 		{
 			name: "10 Services 0 EndpointsPerService - LoadBalancer",
@@ -219,7 +219,7 @@ func TestNumberIptablesRules(t *testing.T) {
 			services:            10,
 			epPerService:        1,
 			expectedFilterRules: 13,
-			expectedNatRules:    115,
+			expectedNatRules:    125,
 		},
 		{
 			name: "10 Services 2 EndpointPerService - LoadBalancer",
@@ -234,7 +234,7 @@ func TestNumberIptablesRules(t *testing.T) {
 			services:            10,
 			epPerService:        2,
 			expectedFilterRules: 13,
-			expectedNatRules:    145,
+			expectedNatRules:    155,
 		},
 		{
 			name: "10 Services 10 EndpointPerService - LoadBalancer",
@@ -249,7 +249,7 @@ func TestNumberIptablesRules(t *testing.T) {
 			services:            10,
 			epPerService:        10,
 			expectedFilterRules: 13,
-			expectedNatRules:    385,
+			expectedNatRules:    395,
 		},
 	}
 

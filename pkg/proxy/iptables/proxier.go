@@ -1360,8 +1360,12 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 			// If the packet was able to reach the end of firewall chain,
-			// then it did not get DNATed and will be dropped later by the
+			// then it did not get DNATed, so it will match the
 			// corresponding KUBE-PROXY-FIREWALL rule.
+			proxier.natRules.Write(
+				"-A", string(fwChain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"other traffic to %s will be dropped by KUBE-PROXY-FIREWALL"`, svcPortNameString),
+			)
 		}
 
 		// If Cluster policy is in use, create the chain and create rules jumping
