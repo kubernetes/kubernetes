@@ -159,6 +159,11 @@ type Status struct {
 	failedPlugin string
 }
 
+func (s *Status) WithError(err error) *Status {
+	s.err = err
+	return s
+}
+
 // Code returns code of the Status.
 func (s *Status) Code() Code {
 	if s == nil {

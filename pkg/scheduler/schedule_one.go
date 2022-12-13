@@ -92,9 +92,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	scheduleResult, assumedPodInfo, err := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
-	if err != nil {
-		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, err, scheduleResult.reason, scheduleResult.nominatingInfo, start)
+	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
+	if !status.IsSuccess() {
+		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (sched *Scheduler) schedulingCycle(
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
-) (ScheduleResult, *framework.QueuedPodInfo, error) {
+) (ScheduleResult, *framework.QueuedPodInfo, *framework.Status) {
 
 	pod := podInfo.Pod
 	scheduleResult, err := sched.SchedulePod(ctx, fwk, state, pod)
@@ -134,8 +134,10 @@ func (sched *Scheduler) schedulingCycle(
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
 		// will fit due to the preemption. It is also possible that a different pod will schedule
 		// into the resources that were preempted, but this is harmless.
-		var nominatingInfo *framework.NominatingInfo
-		reason := v1.PodReasonUnschedulable
+		var (
+			nominatingInfo *framework.NominatingInfo
+			status         *framework.Status
+		)
 		if fitError, ok := err.(*framework.FitError); ok {
 			if !fwk.HasPostFilterPlugins() {
 				klog.V(3).InfoS("No PostFilter plugins are registered, so no preemption will be performed")
@@ -153,15 +155,19 @@ func (sched *Scheduler) schedulingCycle(
 					nominatingInfo = result.NominatingInfo
 				}
 			}
+			status = framework.NewStatus(framework.Unschedulable).WithError(err)
 		} else if err == ErrNoNodesAvailable {
 			nominatingInfo = clearNominatedNode
+			status = framework.NewStatus(framework.UnschedulableAndUnresolvable).WithError(err)
 		} else {
 			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			nominatingInfo = clearNominatedNode
-			reason = v1.PodReasonSchedulerError
+			status = framework.AsStatus(err)
 		}
-		return ScheduleResult{nominatingInfo: nominatingInfo, reason: reason}, podInfo, err
+
+		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, status
 	}
+
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
@@ -175,9 +181,9 @@ func (sched *Scheduler) schedulingCycle(
 		// This relies on the fact that Error will check if the pod has been bound
 		// to a node and if so will not add it back to the unscheduled pods queue
 		// (otherwise this would cause an infinite loop).
-		return ScheduleResult{nominatingInfo: clearNominatedNode, reason: v1.PodReasonSchedulerError},
+		return ScheduleResult{nominatingInfo: clearNominatedNode},
 			assumedPodInfo,
-			err
+			framework.AsStatus(err)
 	}
 
 	// Run the Reserve method of reserve plugins.
@@ -188,9 +194,9 @@ func (sched *Scheduler) schedulingCycle(
 			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
-		return ScheduleResult{nominatingInfo: clearNominatedNode, reason: v1.PodReasonSchedulerError},
+		return ScheduleResult{nominatingInfo: clearNominatedNode},
 			assumedPodInfo,
-			sts.AsError()
+			sts
 	}
 
 	// Run "permit" plugins.
@@ -202,14 +208,9 @@ func (sched *Scheduler) schedulingCycle(
 			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
-		reason := v1.PodReasonSchedulerError
-		if runPermitStatus.IsUnschedulable() {
-			reason = v1.PodReasonUnschedulable
-		}
-
-		return ScheduleResult{nominatingInfo: clearNominatedNode, reason: reason},
+		return ScheduleResult{nominatingInfo: clearNominatedNode},
 			assumedPodInfo,
-			runPermitStatus.AsError()
+			runPermitStatus
 	}
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
@@ -298,12 +299,7 @@ func (sched *Scheduler) handleBindingCycleError(
 		}
 	}
 
-	reason := v1.PodReasonSchedulerError
-	if status.IsUnschedulable() {
-		reason = v1.PodReasonUnschedulable
-	}
-
-	sched.FailureHandler(ctx, fwk, podInfo, status.AsError(), reason, clearNominatedNode, start)
+	sched.FailureHandler(ctx, fwk, podInfo, status, clearNominatedNode, start)
 }
 
 func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error) {
@@ -848,7 +844,12 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
-func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo, start time.Time) {
+func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time) {
+	reason := v1.PodReasonSchedulerError
+	if status.IsUnschedulable() {
+		reason = v1.PodReasonUnschedulable
+	}
+
 	switch reason {
 	case v1.PodReasonUnschedulable:
 		metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
@@ -857,12 +858,14 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	}
 
 	pod := podInfo.Pod
+	err := status.AsError()
 	var errMsg string
 	if err != nil {
 		errMsg = err.Error()
 	}
+
 	if err == ErrNoNodesAvailable {
-		klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
+		klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod), "err", err)
 	} else if fitError, ok := err.(*framework.FitError); ok {
 		// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
