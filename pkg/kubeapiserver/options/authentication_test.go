@@ -221,7 +221,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 			ClientCA: "testdata/root.pem",
 		},
 		WebHook: &WebHookAuthenticationOptions{
-			CacheTTL:   1 * time.Second,
+			CacheTTL:   180000000000,
 			ConfigFile: "/token-webhook-config",
 		},
 		BootstrapToken: &BootstrapTokenAuthenticationOptions{
@@ -249,7 +249,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 			TokenFile: "/testTokenFile",
 		},
 		TokenSuccessCacheTTL: 10 * time.Second,
-		TokenFailureCacheTTL: 2 * time.Second,
+		TokenFailureCacheTTL: 0,
 	}
 
 	expectConfig := kubeauthenticator.Config{
@@ -266,10 +266,10 @@ func TestToAuthenticationConfig(t *testing.T) {
 		ServiceAccountLookup:        true,
 		ServiceAccountIssuers:       []string{"http://foo.bar.com"},
 		WebhookTokenAuthnConfigFile: "/token-webhook-config",
-		WebhookTokenAuthnCacheTTL:   1 * time.Second, // trigger warning webhook cache ttl shorter than overall cache ttl for successful token authentication attempts
+		WebhookTokenAuthnCacheTTL:   180000000000,
 
 		TokenSuccessCacheTTL: 10 * time.Second,
-		TokenFailureCacheTTL: 2 * time.Second, // trigger warning webhook cache ttl shorter than overall cache ttl for failed token authentication attempts
+		TokenFailureCacheTTL: 0,
 
 		RequestHeaderConfig: &authenticatorfactory.RequestHeaderConfig{
 			UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},

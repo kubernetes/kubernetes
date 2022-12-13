@@ -19,11 +19,14 @@ package options
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
@@ -32,26 +35,31 @@ func TestAuthzValidate(t *testing.T) {
 	examplePolicyFile := "../../auth/authorizer/abac/example_policy_file.jsonl"
 
 	testCases := []struct {
-		name              string
-		modes             []string
-		policyFile        string
-		webhookConfigFile string
-		expectErr         bool
+		name                 string
+		modes                []string
+		policyFile           string
+		webhookConfigFile    string
+		webhookRetryBackoff  *wait.Backoff
+		expectErr            bool
+		expectErrorSubString string
 	}{
 		{
-			name:      "Unknown modes should return errors",
-			modes:     []string{"DoesNotExist"},
-			expectErr: true,
+			name:                 "Unknown modes should return errors",
+			modes:                []string{"DoesNotExist"},
+			expectErr:            true,
+			expectErrorSubString: "is not a valid mode",
 		},
 		{
-			name:      "At least one authorizationMode is necessary",
-			modes:     []string{},
-			expectErr: true,
+			name:                 "At least one authorizationMode is necessary",
+			modes:                []string{},
+			expectErr:            true,
+			expectErrorSubString: "at least one authorization-mode must be passed",
 		},
 		{
-			name:      "ModeAlwaysAllow specified more than once",
-			modes:     []string{modes.ModeAlwaysAllow, modes.ModeAlwaysAllow},
-			expectErr: true,
+			name:                 "ModeAlwaysAllow specified more than once",
+			modes:                []string{modes.ModeAlwaysAllow, modes.ModeAlwaysAllow},
+			expectErr:            true,
+			expectErrorSubString: "has mode specified more than once",
 		},
 		{
 			name:      "ModeAlwaysAllow and ModeAlwaysDeny should return without authorizationPolicyFile",
@@ -59,16 +67,18 @@ func TestAuthzValidate(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name:      "ModeABAC requires a policy file",
-			modes:     []string{modes.ModeAlwaysAllow, modes.ModeAlwaysDeny, modes.ModeABAC},
-			expectErr: true,
+			name:                 "ModeABAC requires a policy file",
+			modes:                []string{modes.ModeAlwaysAllow, modes.ModeAlwaysDeny, modes.ModeABAC},
+			expectErr:            true,
+			expectErrorSubString: "authorization-mode ABAC's authorization policy file not passed",
 		},
 		{
-			name:              "Authorization Policy file cannot be used without ModeABAC",
-			modes:             []string{modes.ModeAlwaysAllow, modes.ModeAlwaysDeny},
-			policyFile:        examplePolicyFile,
-			webhookConfigFile: "",
-			expectErr:         true,
+			name:                 "Authorization Policy file cannot be used without ModeABAC",
+			modes:                []string{modes.ModeAlwaysAllow, modes.ModeAlwaysDeny},
+			policyFile:           examplePolicyFile,
+			webhookConfigFile:    "",
+			expectErr:            true,
+			expectErrorSubString: "cannot specify --authorization-policy-file without mode ABAC",
 		},
 		{
 			name:              "ModeABAC should not error if a valid policy path is provided",
@@ -78,21 +88,31 @@ func TestAuthzValidate(t *testing.T) {
 			expectErr:         false,
 		},
 		{
-			name:      "ModeWebhook requires a config file",
-			modes:     []string{modes.ModeWebhook},
-			expectErr: true,
+			name:                 "ModeWebhook requires a config file",
+			modes:                []string{modes.ModeWebhook},
+			expectErr:            true,
+			expectErrorSubString: "authorization-mode Webhook's authorization config file not passed",
 		},
 		{
-			name:              "Cannot provide webhook config file without ModeWebhook",
-			modes:             []string{modes.ModeAlwaysAllow},
-			webhookConfigFile: "authz_webhook_config.yaml",
-			expectErr:         true,
+			name:                 "Cannot provide webhook config file without ModeWebhook",
+			modes:                []string{modes.ModeAlwaysAllow},
+			webhookConfigFile:    "authz_webhook_config.yaml",
+			expectErr:            true,
+			expectErrorSubString: "cannot specify --authorization-webhook-config-file without mode Webhook",
 		},
 		{
 			name:              "ModeWebhook should not error if a valid config file is provided",
 			modes:             []string{modes.ModeWebhook},
 			webhookConfigFile: "authz_webhook_config.yaml",
 			expectErr:         false,
+		},
+		{
+			name:                 "ModeWebhook should error if an invalid number of webhook retry attempts is provided",
+			modes:                []string{modes.ModeWebhook},
+			webhookConfigFile:    "authz_webhook_config.yaml",
+			webhookRetryBackoff:  &wait.Backoff{Steps: 0},
+			expectErr:            true,
+			expectErrorSubString: "number of webhook retry attempts must be greater than 0",
 		},
 	}
 
@@ -101,6 +121,7 @@ func TestAuthzValidate(t *testing.T) {
 			options := NewBuiltInAuthorizationOptions()
 			options.Modes = testcase.modes
 			options.WebhookConfigFile = testcase.webhookConfigFile
+			options.WebhookRetryBackoff = testcase.webhookRetryBackoff
 			options.PolicyFile = testcase.policyFile
 
 			errs := options.Validate()
@@ -110,22 +131,12 @@ func TestAuthzValidate(t *testing.T) {
 			if testcase.expectErr && len(errs) == 0 {
 				t.Errorf("should return an error")
 			}
+			if len(errs) > 0 && testcase.expectErr {
+				if !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErrorSubString) {
+					t.Errorf("exepected to found error: %s, but no error found", testcase.expectErrorSubString)
+				}
+			}
 		})
-	}
-
-	// invalid number of webhook retry attempts
-	opts := NewBuiltInAuthorizationOptions()
-	opts.WebhookRetryBackoff = &wait.Backoff{
-		Steps: 0,
-	}
-	if errs := opts.Validate(); len(errs) == 0 {
-		t.Error("expected errors, no errors found")
-	}
-
-	// nil pointer
-	opts = nil
-	if errs := opts.Validate(); errs != nil {
-		t.Errorf("expected no errors, error found %+v", errs)
 	}
 }
 
