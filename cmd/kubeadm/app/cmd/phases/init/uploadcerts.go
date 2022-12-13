@@ -36,6 +36,7 @@ func NewUploadCertsPhase() workflow.Phase {
 		Run:   runUploadCerts,
 		InheritFlags: []string{
 			options.CfgPath,
+			options.NodeCRISocket,
 			options.KubeconfigPath,
 			options.UploadCerts,
 			options.CertificateKey,
