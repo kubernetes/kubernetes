@@ -100,17 +100,16 @@ type testParameters struct {
 }
 
 type mockDriverSetup struct {
-	cs           clientset.Interface
-	config       *storageframework.PerTestConfig
-	testCleanups []func()
-	pods         []*v1.Pod
-	pvcs         []*v1.PersistentVolumeClaim
-	sc           map[string]*storagev1.StorageClass
-	vsc          map[string]*unstructured.Unstructured
-	driver       drivers.MockCSITestDriver
-	provisioner  string
-	tp           testParameters
-	f            *framework.Framework
+	cs          clientset.Interface
+	config      *storageframework.PerTestConfig
+	pods        []*v1.Pod
+	pvcs        []*v1.PersistentVolumeClaim
+	sc          map[string]*storagev1.StorageClass
+	vsc         map[string]*unstructured.Unstructured
+	driver      drivers.MockCSITestDriver
+	provisioner string
+	tp          testParameters
+	f           *framework.Framework
 }
 
 type volumeType string
@@ -235,10 +234,6 @@ func (m *mockDriverSetup) cleanup() {
 	for _, vsc := range m.vsc {
 		ginkgo.By(fmt.Sprintf("Deleting volumesnapshotclass %s", vsc.GetName()))
 		m.config.Framework.DynamicClient.Resource(utils.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
-	}
-	ginkgo.By("Cleaning up resources")
-	for _, cleanupFunc := range m.testCleanups {
-		cleanupFunc()
 	}
 
 	err := utilerrors.NewAggregate(errs)
