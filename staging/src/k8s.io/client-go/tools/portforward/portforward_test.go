@@ -567,3 +567,33 @@ func TestWaitForConnectionExitsOnStreamConnClosed(t *testing.T) {
 	port := ForwardedPort{}
 	pf.waitForConnection(&listener, port)
 }
+
+func TestForwardPortsReturnsErrorWhenConnectionIsLost(t *testing.T) {
+	dialer := &fakeDialer{
+		conn: newFakeConnection(),
+	}
+
+	stopChan := make(chan struct{})
+	readyChan := make(chan struct{})
+	errChan := make(chan error)
+
+	pf, err := New(dialer, []string{":5000"}, stopChan, readyChan, os.Stdout, os.Stderr)
+	if err != nil {
+		t.Fatalf("faile to create new PortForwarder: %s", err)
+	}
+
+	go func() {
+		errChan <- pf.ForwardPorts()
+	}()
+
+	<-pf.Ready
+
+	pf.streamConn.Close()
+
+	err = <-errChan
+	if err == nil {
+		t.Fatalf("unexpected non-error from pf.ForwardPorts()")
+	} else if err != ErrLostConnectionToPod {
+		t.Fatalf("unexpected error from pf.ForwardPorts(): %s", err)
+	}
+}
