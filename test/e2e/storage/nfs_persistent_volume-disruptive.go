@@ -127,7 +127,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {
 					clientNode = &node
-					clientNodeIP, err = e2enode.GetExternalIP(clientNode)
+					clientNodeIP, err = e2enode.GetSSHExternalIP(clientNode)
 					framework.ExpectNoError(err)
 					break
 				}

@@ -78,9 +78,9 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 	host := ""
 	var err error
 	if node != nil {
-		host, err = e2enode.GetExternalIP(node)
+		host, err = e2enode.GetSSHExternalIP(node)
 		if err != nil {
-			host, err = e2enode.GetInternalIP(node)
+			host, err = e2enode.GetSSHInternalIP(node)
 		}
 	} else {
 		instanceWithPort := framework.APIAddress()
@@ -110,9 +110,9 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 	host := ""
 	var err error
 	if node != nil {
-		host, err = e2enode.GetExternalIP(node)
+		host, err = e2enode.GetSSHExternalIP(node)
 		if err != nil {
-			host, err = e2enode.GetInternalIP(node)
+			host, err = e2enode.GetSSHInternalIP(node)
 		}
 	} else {
 		instanceWithPort := framework.APIAddress()

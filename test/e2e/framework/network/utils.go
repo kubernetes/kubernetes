@@ -1070,7 +1070,7 @@ func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Re
 // This function executes commands on a node so it will work only for some
 // environments.
 func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
-	host, err := e2enode.GetExternalIP(node)
+	host, err := e2enode.GetSSHExternalIP(node)
 	if err != nil {
 		framework.Failf("Error getting node external ip : %v", err)
 	}
