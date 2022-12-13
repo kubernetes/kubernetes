@@ -470,7 +470,8 @@ func bindRBACRoleToServiceAccount(f *framework.Framework, serviceAccountName, rb
 			Name:     rbacRoleName,
 		},
 	}
-	f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(context.TODO(), binding, metav1.CreateOptions{})
+	_, err := f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(context.TODO(), binding, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
 }
 
 func bindClusterRBACRoleToServiceAccount(f *framework.Framework, serviceAccountName, rbacRoleName string) {
@@ -492,7 +493,8 @@ func bindClusterRBACRoleToServiceAccount(f *framework.Framework, serviceAccountN
 			Name:     rbacRoleName,
 		},
 	}
-	f.ClientSet.RbacV1().ClusterRoleBindings().Create(context.TODO(), binding, metav1.CreateOptions{})
+	_, err := f.ClientSet.RbacV1().ClusterRoleBindings().Create(context.TODO(), binding, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
 }
 
 // createPodWithGmsa creates a pod using the test GMSA cred spec, and returns its name.
