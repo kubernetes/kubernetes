@@ -18,6 +18,7 @@ package apiserver_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
@@ -85,10 +87,11 @@ func TestBasic(t *testing.T) {
 		}
 	}
 
-	testCtx, _ := context.WithCancel(context.Background())
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go aggregatedManager.Run(testCtx.Done())
 
-	cache.WaitForCacheSync(testCtx.Done(), aggregatedManager.ExternalServicesSynced)
+	require.True(t, cache.WaitForCacheSync(testCtx.Done(), aggregatedManager.ExternalServicesSynced))
 
 	response, _, parsed := fetchPath(aggregatedResourceManager, "")
 	if response.StatusCode != 200 {
@@ -180,26 +183,38 @@ func TestRemoveAPIService(t *testing.T) {
 		}
 	}
 
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	aggregatedManager := apiserver.NewDiscoveryManager(aggyService)
+	go aggregatedManager.Run(testCtx.Done())
 
 	for _, s := range apiServices {
 		aggregatedManager.AddAPIService(s, service)
 	}
 
-	testCtx, _ := context.WithCancel(context.Background())
-	go aggregatedManager.Run(testCtx.Done())
+	require.True(t, cache.WaitForCacheSync(testCtx.Done(), aggregatedManager.ExternalServicesSynced))
+
+	// check apiservices added
+	response, _, parsed := fetchPath(aggyService, "")
+	if response.StatusCode != 200 {
+		t.Fatalf("unexpected status code %d", response.StatusCode)
+	}
+	checkAPIGroups(t, apiGroup, parsed)
 
 	for _, s := range apiServices {
 		aggregatedManager.RemoveAPIService(s.Name)
 	}
 
-	cache.WaitForCacheSync(testCtx.Done(), aggregatedManager.ExternalServicesSynced)
-
-	response, _, parsed := fetchPath(aggyService, "")
-	if response.StatusCode != 200 {
-		t.Fatalf("unexpected status code %d", response.StatusCode)
-	}
-	if len(parsed.Items) > 0 {
+	// wait apiservices deleted
+	err := wait.PollImmediate(100*time.Millisecond, 1*time.Second, func() (bool, error) {
+		response, _, parsed = fetchPath(aggyService, "")
+		if response.StatusCode != 200 {
+			return false, fmt.Errorf("unexpected status code %d", response.StatusCode)
+		}
+		return len(parsed.Items) == 0, nil
+	})
+	if err != nil {
 		t.Errorf("expected to find no groups after service deletion (got %d groups)", len(parsed.Items))
 	}
 }
