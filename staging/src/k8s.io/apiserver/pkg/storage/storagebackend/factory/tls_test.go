@@ -81,7 +81,7 @@ func TestTLSConnection(t *testing.T) {
 		},
 		Codec: codec,
 	}
-	if err := cfg.Transport.Complete(); err != nil {
+	if err := cfg.Transport.Complete(testContext(t)); err != nil {
 		t.Fatal(err)
 	}
 	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil)
@@ -114,4 +114,10 @@ func configureTLSCerts(t *testing.T) (certFile, keyFile, caFile string) {
 		t.Fatal(err)
 	}
 	return certFile, keyFile, caFile
+}
+
+func testContext(t *testing.T) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	return ctx
 }

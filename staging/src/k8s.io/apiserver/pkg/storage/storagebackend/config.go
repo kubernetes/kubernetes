@@ -178,7 +178,7 @@ func etcdClientDebugLevel() zapcore.Level {
 	return l
 }
 
-func (c *TransportConfig) Complete() error {
+func (c *TransportConfig) Complete(ctx context.Context) error {
 	if c.complete {
 		return fmt.Errorf("TransportConfig.Complete called more than once")
 	}
