@@ -60,7 +60,7 @@ require (
 	github.com/openshift/api v0.0.0-20221116145627-676ae1a3836c
 	github.com/openshift/apiserver-library-go v0.0.0-20221118165437-6006085c7412
 	github.com/openshift/client-go v0.0.0-20220831193253-4950ae70c8ea
-	github.com/openshift/library-go v0.0.0-20221101142545-76526edf66e8
+	github.com/openshift/library-go v0.0.0-20221201214333-d679fe6f8248
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.12.1
@@ -497,7 +497,7 @@ replace (
 	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20221118165437-6006085c7412
 	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20220720161851-9b4f0386f6b0
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20220831193253-4950ae70c8ea
-	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20221101142545-76526edf66e8
+	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20221201214333-d679fe6f8248
 	github.com/opentracing/opentracing-go => github.com/opentracing/opentracing-go v1.1.0
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/pkg/errors => github.com/pkg/errors v0.9.1
