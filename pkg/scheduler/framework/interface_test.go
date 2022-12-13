@@ -26,6 +26,7 @@ import (
 )
 
 var errorStatus = NewStatus(Error, "internal error")
+var statusWithErr = AsStatus(errors.New("internal error"))
 
 func TestStatus(t *testing.T) {
 	tests := []struct {
@@ -273,10 +274,10 @@ func TestIsStatusEqual(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "error statuses with same message should not be equal",
+			name: "error statuses with same message should be equal",
 			x:    NewStatus(Error, "error"),
 			y:    NewStatus(Error, "error"),
-			want: false,
+			want: true,
 		},
 		{
 			name: "statuses with different reasons should not be equal",
@@ -292,14 +293,20 @@ func TestIsStatusEqual(t *testing.T) {
 		},
 		{
 			name: "wrap error status should be equal with original one",
-			x:    errorStatus,
-			y:    AsStatus(fmt.Errorf("error: %w", errorStatus.AsError())),
+			x:    statusWithErr,
+			y:    AsStatus(fmt.Errorf("error: %w", statusWithErr.AsError())),
 			want: true,
+		},
+		{
+			name: "statues with different errors that have the same message shouldn't be equal",
+			x:    AsStatus(errors.New("error")),
+			y:    AsStatus(errors.New("error")),
+			want: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := cmp.Equal(tt.x, tt.y); got != tt.want {
+			if got := tt.x.Equal(tt.y); got != tt.want {
 				t.Errorf("cmp.Equal() = %v, want %v", got, tt.want)
 			}
 		})
