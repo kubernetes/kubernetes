@@ -17,16 +17,35 @@ limitations under the License.
 package storagebackend
 
 import (
+	"context"
+	"fmt"
+	"log"
+	"net"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 
+	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"go.etcd.io/etcd/client/pkg/v3/logutil"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
+	"k8s.io/component-base/tracing"
 )
 
 const (
@@ -52,6 +71,9 @@ type TransportConfig struct {
 	EgressLookup egressselector.Lookup
 	// The TracerProvider can add tracing the connection
 	TracerProvider oteltrace.TracerProvider
+
+	complete bool
+	client   *clientv3.Client
 }
 
 // Config is configuration for creating a storage backend.
@@ -125,4 +147,129 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		LeaseManagerConfig:   etcd3.NewDefaultLeaseManagerConfig(),
 		Transport:            TransportConfig{TracerProvider: oteltrace.NewNoopTracerProvider()},
 	}
+}
+
+const (
+	// The short keepalive timeout and interval have been chosen to aggressively
+	// detect a failed etcd server without introducing much overhead.
+	keepaliveTime    = 30 * time.Second
+	keepaliveTimeout = 10 * time.Second
+
+	// dialTimeout is the timeout for failing to establish a connection.
+	// It is set to 20 seconds as times shorter than that will cause TLS connections to fail
+	// on heavily loaded arm64 CPUs (issue #64649)
+	dialTimeout = 20 * time.Second
+)
+
+// etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.
+// NOTE(negz): This is a copy of a private etcd client function:
+// https://github.com/etcd-io/etcd/blob/v3.5.4/client/v3/logger.go#L47
+func etcdClientDebugLevel() zapcore.Level {
+	envLevel := os.Getenv("ETCD_CLIENT_DEBUG")
+	if envLevel == "" || envLevel == "true" {
+		return zapcore.InfoLevel
+	}
+	var l zapcore.Level
+	if err := l.Set(envLevel); err == nil {
+		log.Printf("Deprecated env ETCD_CLIENT_DEBUG value. Using default level: 'info'")
+		return zapcore.InfoLevel
+	}
+	return l
+}
+
+func (c *TransportConfig) Complete() error {
+	if c.complete {
+		return fmt.Errorf("TransportConfig.Complete called more than once")
+	}
+
+	tlsInfo := transport.TLSInfo{
+		CertFile:      c.CertFile,
+		KeyFile:       c.KeyFile,
+		TrustedCAFile: c.TrustedCAFile,
+	}
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		return err
+	}
+	// NOTE: Client relies on nil tlsConfig
+	// for non-secure connections, update the implicit variable
+	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.TrustedCAFile) == 0 {
+		tlsConfig = nil
+	}
+	networkContext := egressselector.Etcd.AsNetworkContext()
+	var egressDialer utilnet.DialFunc
+	if c.EgressLookup != nil {
+		egressDialer, err = c.EgressLookup(networkContext)
+		if err != nil {
+			return err
+		}
+	}
+	dialOptions := []grpc.DialOption{
+		grpc.WithBlock(), // block until the underlying connection is up
+		// use chained interceptors so that the default (retry and backoff) interceptors are added.
+		// otherwise they will be overwritten by the metric interceptor.
+		//
+		// these optional interceptors will be placed after the default ones.
+		// which seems to be what we want as the metrics will be collected on each attempt (retry)
+		grpc.WithChainUnaryInterceptor(grpcprom.UnaryClientInterceptor),
+		grpc.WithChainStreamInterceptor(grpcprom.StreamClientInterceptor),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
+		tracingOpts := []otelgrpc.Option{
+			otelgrpc.WithPropagators(tracing.Propagators()),
+			otelgrpc.WithTracerProvider(c.TracerProvider),
+		}
+		// Even with Noop  TracerProvider, the otelgrpc still handles context propagation.
+		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
+		dialOptions = append(dialOptions,
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
+			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+	}
+	if egressDialer != nil {
+		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
+			if strings.Contains(addr, "//") {
+				// etcd client prior to 3.5 passed URLs to dialer, normalize to address
+				u, err := url.Parse(addr)
+				if err != nil {
+					return nil, err
+				}
+				addr = u.Host
+			}
+			return egressDialer(ctx, "tcp", addr)
+		}
+		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
+	}
+
+	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
+	if err != nil {
+		l = zap.NewNop()
+	}
+	etcd3ClientLogger := l.Named("etcd-client")
+
+	cfg := clientv3.Config{
+		DialTimeout:          dialTimeout,
+		DialKeepAliveTime:    keepaliveTime,
+		DialKeepAliveTimeout: keepaliveTimeout,
+		DialOptions:          dialOptions,
+		Endpoints:            c.ServerList,
+		TLS:                  tlsConfig,
+		Logger:               etcd3ClientLogger,
+	}
+
+	client, err := clientv3.New(cfg)
+	if err != nil {
+		return err
+	}
+
+	c.client = client
+	c.complete = true
+	return nil
+}
+
+func (c *TransportConfig) Client() (*clientv3.Client, error) {
+	if !c.complete {
+		return nil, fmt.Errorf("TransportConfig.Client called without completion")
+	}
+
+	return c.client, nil
 }

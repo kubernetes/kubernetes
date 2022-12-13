@@ -46,5 +46,8 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 		},
 		Paging: true,
 	}
+	if err := config.Transport.Complete(); err != nil {
+		t.Fatal(err)
+	}
 	return server, config
 }

@@ -283,6 +283,12 @@ func (s *EtcdOptions) Complete(
 
 	s.StorageConfig.StorageObjectCountTracker = storageObjectCountTracker
 
+	if len(s.StorageConfig.Transport.ServerList) > 0 {
+		if err := s.StorageConfig.Transport.Complete(); err != nil {
+			return fmt.Errorf("failed to complete storage config transport: %w", err)
+		}
+	}
+
 	s.complete = true
 
 	return nil

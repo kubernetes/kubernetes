@@ -19,63 +19,29 @@ package factory
 import (
 	"context"
 	"fmt"
-	"log"
-	"net"
-	"net/url"
-	"os"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"go.etcd.io/etcd/client/pkg/v3/logutil"
-	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
-	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/legacyregistry"
-	tracing "k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
 
 const (
-	// The short keepalive timeout and interval have been chosen to aggressively
-	// detect a failed etcd server without introducing much overhead.
-	keepaliveTime    = 30 * time.Second
-	keepaliveTimeout = 10 * time.Second
-
-	// dialTimeout is the timeout for failing to establish a connection.
-	// It is set to 20 seconds as times shorter than that will cause TLS connections to fail
-	// on heavily loaded arm64 CPUs (issue #64649)
-	dialTimeout = 20 * time.Second
-
 	dbMetricsMonitorJitter = 0.5
 )
-
-// TODO(negz): Stop using a package scoped logger. At the time of writing we're
-// creating an etcd client for each CRD. We need to pass each etcd client a
-// logger or each client will create its own, which comes with a significant
-// memory cost (around 20% of the API server's memory when hundreds of CRDs are
-// present). The correct fix here is to not create a client per CRD. See
-// https://github.com/kubernetes/kubernetes/issues/111476 for more.
-var etcd3ClientLogger *zap.Logger
 
 func init() {
 	// grpcprom auto-registers (via an init function) their client metrics, since we are opting out of
@@ -84,28 +50,6 @@ func init() {
 	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
 	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
 	dbMetricsMonitors = make(map[string]struct{})
-
-	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
-	if err != nil {
-		l = zap.NewNop()
-	}
-	etcd3ClientLogger = l.Named("etcd-client")
-}
-
-// etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.
-// NOTE(negz): This is a copy of a private etcd client function:
-// https://github.com/etcd-io/etcd/blob/v3.5.4/client/v3/logger.go#L47
-func etcdClientDebugLevel() zapcore.Level {
-	envLevel := os.Getenv("ETCD_CLIENT_DEBUG")
-	if envLevel == "" || envLevel == "true" {
-		return zapcore.InfoLevel
-	}
-	var l zapcore.Level
-	if err := l.Set(envLevel); err == nil {
-		log.Printf("Deprecated env ETCD_CLIENT_DEBUG value. Using default level: 'info'")
-		return zapcore.InfoLevel
-	}
-	return l
 }
 
 func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
@@ -226,75 +170,7 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 }
 
 var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
-	tlsInfo := transport.TLSInfo{
-		CertFile:      c.CertFile,
-		KeyFile:       c.KeyFile,
-		TrustedCAFile: c.TrustedCAFile,
-	}
-	tlsConfig, err := tlsInfo.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	// NOTE: Client relies on nil tlsConfig
-	// for non-secure connections, update the implicit variable
-	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.TrustedCAFile) == 0 {
-		tlsConfig = nil
-	}
-	networkContext := egressselector.Etcd.AsNetworkContext()
-	var egressDialer utilnet.DialFunc
-	if c.EgressLookup != nil {
-		egressDialer, err = c.EgressLookup(networkContext)
-		if err != nil {
-			return nil, err
-		}
-	}
-	dialOptions := []grpc.DialOption{
-		grpc.WithBlock(), // block until the underlying connection is up
-		// use chained interceptors so that the default (retry and backoff) interceptors are added.
-		// otherwise they will be overwritten by the metric interceptor.
-		//
-		// these optional interceptors will be placed after the default ones.
-		// which seems to be what we want as the metrics will be collected on each attempt (retry)
-		grpc.WithChainUnaryInterceptor(grpcprom.UnaryClientInterceptor),
-		grpc.WithChainStreamInterceptor(grpcprom.StreamClientInterceptor),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		tracingOpts := []otelgrpc.Option{
-			otelgrpc.WithPropagators(tracing.Propagators()),
-			otelgrpc.WithTracerProvider(c.TracerProvider),
-		}
-		// Even with Noop  TracerProvider, the otelgrpc still handles context propagation.
-		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
-		dialOptions = append(dialOptions,
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
-			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
-	}
-	if egressDialer != nil {
-		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
-			if strings.Contains(addr, "//") {
-				// etcd client prior to 3.5 passed URLs to dialer, normalize to address
-				u, err := url.Parse(addr)
-				if err != nil {
-					return nil, err
-				}
-				addr = u.Host
-			}
-			return egressDialer(ctx, "tcp", addr)
-		}
-		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
-	}
-
-	cfg := clientv3.Config{
-		DialTimeout:          dialTimeout,
-		DialKeepAliveTime:    keepaliveTime,
-		DialKeepAliveTimeout: keepaliveTimeout,
-		DialOptions:          dialOptions,
-		Endpoints:            c.ServerList,
-		TLS:                  tlsConfig,
-		Logger:               etcd3ClientLogger,
-	}
-
-	return clientv3.New(cfg)
+	return c.Client()
 }
 
 type runningCompactor struct {
