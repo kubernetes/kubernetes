@@ -273,6 +273,7 @@ replace (
 	k8s.io/legacy-cloud-providers => ./staging/src/k8s.io/legacy-cloud-providers
 	k8s.io/metrics => ./staging/src/k8s.io/metrics
 	k8s.io/mount-utils => ./staging/src/k8s.io/mount-utils
+	k8s.io/noderesourcetopology-api => ./staging/src/k8s.io/noderesourcetopology-api
 	k8s.io/pod-security-admission => ./staging/src/k8s.io/pod-security-admission
 	k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
