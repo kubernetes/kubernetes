@@ -174,7 +174,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		// Create Pod
 		launchedPod := e2epod.NewPodClient(f).Create(pod)
 		// Ensure we delete pod
-		defer e2epod.NewPodClient(f).DeleteSync(launchedPod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+		ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, launchedPod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 
 		// Pod should remain in the pending state generating events with reason FailedCreatePodSandBox
 		// Expected Message Error Event

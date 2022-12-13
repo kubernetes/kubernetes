@@ -168,10 +168,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) *storageframework.PerTes
 	err := e2eauth.BindClusterRole(cs.RbacV1(), "cluster-admin", ns.Name,
 		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
 	framework.ExpectNoError(err)
-	ginkgo.DeferCleanup(func(ctx context.Context) {
-		clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-		cs.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleBindingName, *metav1.NewDeleteOptions(0))
-	})
+	ginkgo.DeferCleanup(cs.RbacV1().ClusterRoleBindings().Delete, ns.Name+"--"+"cluster-admin", *metav1.NewDeleteOptions(0))
 
 	err = e2eauth.WaitForAuthorizationUpdate(cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
@@ -180,9 +177,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) *storageframework.PerTes
 
 	ginkgo.By("creating an external dynamic provisioner pod")
 	n.externalProvisionerPod = utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName)
-	ginkgo.DeferCleanup(func() {
-		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
-	})
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, cs, n.externalProvisionerPod)
 
 	return &storageframework.PerTestConfig{
 		Driver:    n,
@@ -1286,7 +1281,7 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *storageframework
 }
 
 func (v *vSphereDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
-	ginkgo.DeferCleanup(func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) {
 		// Driver Cleanup function
 		// Logout each vSphere client connection to prevent session leakage
 		nodes := vspheretest.GetReadySchedulableNodeInfos()

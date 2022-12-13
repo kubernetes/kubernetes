@@ -598,7 +598,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
 			nsX, nsY, _ := getK8sNamespaces(k8s)
-			defer DeleteNamespaceLabel(k8s, nsY, "ns2")
+			ginkgo.DeferCleanup(DeleteNamespaceLabel, k8s, nsY, "ns2")
 
 			allowedLabels := &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -629,7 +629,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
 			nsX, _, _ := getK8sNamespaces(k8s)
-			defer ResetPodLabels(k8s, nsX, "b")
+			ginkgo.DeferCleanup(ResetPodLabels, k8s, nsX, "b")
 
 			// add a new label, we'll remove it after this test is done
 			matchLabels := map[string]string{"pod": "b", "pod2": "updated"}
@@ -675,7 +675,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			k8s = initializeResources(f, protocols, ports)
 			nsX, _, _ := getK8sNamespaces(k8s)
-			defer ResetPodLabels(k8s, nsX, "a")
+			ginkgo.DeferCleanup(ResetPodLabels, k8s, nsX, "a")
 
 			policy := GenNetworkPolicyWithNameAndPodSelector("deny-ingress-via-label-selector",
 				metav1.LabelSelector{MatchLabels: map[string]string{"target": "isolated"}}, SetSpecIngressRules())

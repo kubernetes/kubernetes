@@ -178,7 +178,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			}
 			err = e2erc.RunRC(cfg)
 			framework.ExpectNoError(err)
-			defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
+			ginkgo.DeferCleanup(e2erc.DeleteRCAndWaitForGC, f.ClientSet, f.Namespace.Name, cfg.Name)
 
 			err = waitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
 			framework.ExpectNoError(err)

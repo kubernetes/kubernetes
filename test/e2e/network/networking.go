@@ -563,9 +563,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		numPods, servicePort := 3, defaultServeHostnameServicePort
 		svc := "iptables-flush-test"
 
-		defer func() {
-			framework.ExpectNoError(StopServeHostnameService(f.ClientSet, ns, svc))
-		}()
+		ginkgo.DeferCleanup(StopServeHostnameService, f.ClientSet, ns, svc)
 		podNames, svcIP, err := StartServeHostnameService(f.ClientSet, getServeHostnameService(svc), ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc, ns)
 

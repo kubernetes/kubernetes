@@ -99,11 +99,9 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 
 	ginkgo.It("vcp performance tests", func(ctx context.Context) {
 		scList := getTestStorageClasses(client, policyName, datastoreName)
-		defer func(scList []*storagev1.StorageClass) {
-			for _, sc := range scList {
-				client.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, metav1.DeleteOptions{})
-			}
-		}(scList)
+		for _, sc := range scList {
+			ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), sc.Name, metav1.DeleteOptions{})
+		}
 
 		sumLatency := make(map[string]float64)
 		for i := 0; i < iterations; i++ {
@@ -203,7 +201,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 		framework.ExpectNoError(err)
 		totalpods = append(totalpods, pod)
 
-		defer e2epod.DeletePodWithWait(client, pod)
+		ginkgo.DeferCleanup(e2epod.DeletePodWithWait, client, pod)
 	}
 	elapsed = time.Since(start)
 	latency[AttachOp] = elapsed.Seconds()

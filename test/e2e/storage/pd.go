@@ -360,7 +360,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 				host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)
 				containerName := "mycontainer"
 
-				defer func() {
+				ginkgo.DeferCleanup(func(ctx context.Context) {
 					ginkgo.By("defer: cleaning up PD-RW test env")
 					framework.Logf("defer cleanup errors can usually be ignored")
 					ginkgo.By("defer: delete host0Pod")
@@ -383,7 +383,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 							framework.Failf("defer: Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt)
 						}
 					}
-				}()
+				})
 
 				ginkgo.By("creating host0Pod on node0")
 				_, err = podClient.Create(context.TODO(), host0Pod, metav1.CreateOptions{})
@@ -466,9 +466,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 
 		// this should be safe to do because if attach fails then detach will be considered
 		// successful and we will delete the volume.
-		defer func() {
-			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
-		}()
+		ginkgo.DeferCleanup(detachAndDeletePDs, diskName, []types.NodeName{host0Name})
 
 		ginkgo.By("Attaching volume to a node")
 		err = attachPD(host0Name, diskName)

@@ -45,9 +45,9 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
 	t.init()
 
 	t.createUtilPodLabel("e2e-dns-configmap")
-	defer t.deleteUtilPod()
+	ginkgo.DeferCleanup(t.deleteUtilPod)
 	originalConfigMapData := t.fetchDNSConfigMapData()
-	defer t.restoreDNSConfigMap(originalConfigMapData)
+	ginkgo.DeferCleanup(t.restoreDNSConfigMap, originalConfigMapData)
 
 	if isIPv6 {
 		t.createDNSServer(t.f.Namespace.Name, map[string]string{
@@ -62,7 +62,7 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
 			"widget.local":   "3.3.3.3",
 		})
 	}
-	defer t.deleteDNSServerPod()
+	ginkgo.DeferCleanup(t.deleteDNSServerPod)
 
 	if t.name == "coredns" {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
@@ -141,12 +141,12 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
 	t.init()
 
 	t.createUtilPodLabel("e2e-dns-configmap")
-	defer t.deleteUtilPod()
+	ginkgo.DeferCleanup(t.deleteUtilPod)
 	originalConfigMapData := t.fetchDNSConfigMapData()
-	defer t.restoreDNSConfigMap(originalConfigMapData)
+	ginkgo.DeferCleanup(t.restoreDNSConfigMap, originalConfigMapData)
 
 	t.createDNSServerWithPtrRecord(t.f.Namespace.Name, isIPv6)
-	defer t.deleteDNSServerPod()
+	ginkgo.DeferCleanup(t.deleteDNSServerPod)
 
 	// Should still be able to lookup public nameserver without explicit upstream nameserver set.
 	if isIPv6 {
@@ -222,9 +222,9 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	t.init()
 
 	t.createUtilPodLabel("e2e-dns-configmap")
-	defer t.deleteUtilPod()
+	ginkgo.DeferCleanup(t.deleteUtilPod)
 	originalConfigMapData := t.fetchDNSConfigMapData()
-	defer t.restoreDNSConfigMap(originalConfigMapData)
+	ginkgo.DeferCleanup(t.restoreDNSConfigMap, originalConfigMapData)
 
 	fooHostname := "foo.example.com"
 	if isIPv6 {
@@ -236,7 +236,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 			fooHostname: "192.0.2.123",
 		})
 	}
-	defer t.deleteDNSServerPod()
+	ginkgo.DeferCleanup(t.deleteDNSServerPod)
 
 	f := t.f
 	serviceName := "dns-externalname-upstream-test"
@@ -244,17 +244,13 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameService, metav1.CreateOptions{}); err != nil {
 		ginkgo.Fail(fmt.Sprintf("ginkgo.Failed when creating service: %v", err))
 	}
+	ginkgo.DeferCleanup(f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete, externalNameService.Name, metav1.DeleteOptions{})
 	serviceNameLocal := "dns-externalname-upstream-local"
 	externalNameServiceLocal := e2eservice.CreateServiceSpec(serviceNameLocal, fooHostname, false, nil)
 	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), externalNameServiceLocal, metav1.CreateOptions{}); err != nil {
 		ginkgo.Fail(fmt.Sprintf("ginkgo.Failed when creating service: %v", err))
 	}
-	defer func() {
-		ginkgo.By("deleting the test externalName service")
-		defer ginkgo.GinkgoRecover()
-		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameService.Name, metav1.DeleteOptions{})
-		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(context.TODO(), externalNameServiceLocal.Name, metav1.DeleteOptions{})
-	}()
+	ginkgo.DeferCleanup(f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete, externalNameServiceLocal.Name, metav1.DeleteOptions{})
 
 	if isIPv6 {
 		t.checkDNSRecordFrom(

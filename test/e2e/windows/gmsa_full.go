@@ -109,22 +109,19 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			crdManifestContents := retrieveCRDManifestFileContents(f, node)
 
 			ginkgo.By("deploying the GMSA webhook")
-			webhookCleanUp, err := deployGmsaWebhook(f)
-			defer webhookCleanUp()
+			err := deployGmsaWebhook(f)
 			if err != nil {
 				framework.Failf(err.Error())
 			}
 
 			ginkgo.By("creating the GMSA custom resource")
-			customResourceCleanup, err := createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
-			defer customResourceCleanup()
+			err = createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
 			if err != nil {
 				framework.Failf(err.Error())
 			}
 
 			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
-			rbacRoleName, rbacRoleCleanup, err := createRBACRoleForGmsa(f)
-			defer rbacRoleCleanup()
+			rbacRoleName, err := createRBACRoleForGmsa(f)
 			if err != nil {
 				framework.Failf(err.Error())
 			}
@@ -179,22 +176,19 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			crdManifestContents := retrieveCRDManifestFileContents(f, node)
 
 			ginkgo.By("deploying the GMSA webhook")
-			webhookCleanUp, err := deployGmsaWebhook(f)
-			defer webhookCleanUp()
+			err := deployGmsaWebhook(f)
 			if err != nil {
 				framework.Failf(err.Error())
 			}
 
 			ginkgo.By("creating the GMSA custom resource")
-			customResourceCleanup, err := createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
-			defer customResourceCleanup()
+			err = createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
 			if err != nil {
 				framework.Failf(err.Error())
 			}
 
 			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
-			rbacRoleName, rbacRoleCleanup, err := createRBACRoleForGmsa(f)
-			defer rbacRoleCleanup()
+			rbacRoleName, err := createRBACRoleForGmsa(f)
 			if err != nil {
 				framework.Failf(err.Error())
 			}
@@ -303,14 +297,14 @@ func retrieveCRDManifestFileContents(f *framework.Framework, node v1.Node) strin
 // deployGmsaWebhook deploys the GMSA webhook, and returns a cleanup function
 // to be called when done with testing, that removes the temp files it's created
 // on disks as well as the API resources it's created.
-func deployGmsaWebhook(f *framework.Framework) (func(), error) {
+func deployGmsaWebhook(f *framework.Framework) error {
 	deployerName := "webhook-deployer"
 	deployerNamespace := f.Namespace.Name
 	webHookName := "gmsa-webhook"
 	webHookNamespace := deployerNamespace + "-webhook"
 
 	// regardless of whether the deployment succeeded, let's do a best effort at cleanup
-	cleanUpFunc := func() {
+	ginkgo.DeferCleanup(func() {
 		framework.Logf("Best effort clean up of the webhook:\n")
 		stdout, err := e2ekubectl.RunKubectl("", "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
 		framework.Logf("stdout:%s\nerror:%s", stdout, err)
@@ -320,7 +314,7 @@ func deployGmsaWebhook(f *framework.Framework) (func(), error) {
 
 		stdout, err = runKubectlExecInNamespace(deployerNamespace, deployerName, "--", "kubectl", "delete", "-f", "/manifests.yml")
 		framework.Logf("stdout:%s\nerror:%s", stdout, err)
-	}
+	})
 
 	// ensure the deployer has ability to approve certificatesigningrequests to install the webhook
 	s := createServiceAccount(f)
@@ -379,31 +373,29 @@ func deployGmsaWebhook(f *framework.Framework) (func(), error) {
 	logs, _ := e2epod.GetPodLogs(f.ClientSet, deployerNamespace, deployerName, deployerName)
 	framework.Logf("GMSA deployment logs:\n%s", logs)
 
-	return cleanUpFunc, err
+	return err
 }
 
 // createGmsaCustomResource creates the GMSA API object from the contents
 // of the manifest file retrieved from the worker node.
 // It returns a function to clean up both the temp file it creates and
 // the API object it creates when done with testing.
-func createGmsaCustomResource(ns string, crdManifestContents string) (func(), error) {
-	cleanUpFunc := func() {}
-
+func createGmsaCustomResource(ns string, crdManifestContents string) error {
 	tempFile, err := os.CreateTemp("", "")
 	if err != nil {
-		return cleanUpFunc, fmt.Errorf("unable to create temp file: %w", err)
+		return fmt.Errorf("unable to create temp file: %w", err)
 	}
 	defer tempFile.Close()
 
-	cleanUpFunc = func() {
+	ginkgo.DeferCleanup(func() {
 		e2ekubectl.RunKubectl(ns, "delete", "--filename", tempFile.Name())
 		os.Remove(tempFile.Name())
-	}
+	})
 
 	_, err = tempFile.WriteString(crdManifestContents)
 	if err != nil {
 		err = fmt.Errorf("unable to write GMSA contents to %q: %w", tempFile.Name(), err)
-		return cleanUpFunc, err
+		return err
 	}
 
 	output, err := e2ekubectl.RunKubectl(ns, "apply", "--filename", tempFile.Name())
@@ -411,13 +403,13 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 		err = fmt.Errorf("unable to create custom resource, output:\n%s: %w", output, err)
 	}
 
-	return cleanUpFunc, err
+	return err
 }
 
 // createRBACRoleForGmsa creates an RBAC cluster role to grant use
 // access to our test credential spec.
 // It returns the role's name, as well as a function to delete it when done.
-func createRBACRoleForGmsa(f *framework.Framework) (string, func(), error) {
+func createRBACRoleForGmsa(f *framework.Framework) (string, error) {
 	roleName := f.Namespace.Name + "-rbac-role"
 
 	role := &rbacv1.ClusterRole{
@@ -434,16 +426,13 @@ func createRBACRoleForGmsa(f *framework.Framework) (string, func(), error) {
 		},
 	}
 
-	cleanUpFunc := func() {
-		f.ClientSet.RbacV1().ClusterRoles().Delete(context.TODO(), roleName, metav1.DeleteOptions{})
-	}
-
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.RbacV1().ClusterRoles().Delete), roleName, metav1.DeleteOptions{})
 	_, err := f.ClientSet.RbacV1().ClusterRoles().Create(context.TODO(), role, metav1.CreateOptions{})
 	if err != nil {
 		err = fmt.Errorf("unable to create RBAC cluster role %q: %w", roleName, err)
 	}
 
-	return roleName, cleanUpFunc, err
+	return roleName, err
 }
 
 // createServiceAccount creates a service account, and returns its name.

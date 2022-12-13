@@ -154,7 +154,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 	if !pattern.AllowExpansion {
 		ginkgo.It("should not allow expansion of pvcs without AllowVolumeExpansion property", func(ctx context.Context) {
 			init()
-			defer cleanup()
+			ginkgo.DeferCleanup(cleanup)
 
 			var err error
 			gomega.Expect(l.resource.Sc.AllowVolumeExpansion).NotTo(gomega.BeNil())
@@ -171,7 +171,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 	} else {
 		ginkgo.It("Verify if offline PVC expansion works", func(ctx context.Context) {
 			init()
-			defer cleanup()
+			ginkgo.DeferCleanup(cleanup)
 
 			if !driver.GetDriverInfo().Capabilities[storageframework.CapOfflineExpansion] {
 				e2eskipper.Skipf("Driver %q does not support offline volume expansion - skipping", driver.GetDriverInfo().Name)
@@ -187,10 +187,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 				ImageID:       e2epod.GetDefaultTestImageID(),
 			}
 			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, f.Timeouts.PodStart)
-			defer func() {
-				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
-				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
-			}()
+			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, l.pod)
 			framework.ExpectNoError(err, "While creating pods for resizing")
 
 			ginkgo.By("Deleting the previously created pod")
@@ -231,10 +228,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 				ImageID:       e2epod.GetDefaultTestImageID(),
 			}
 			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, resizedPodStartupTimeout)
-			defer func() {
-				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod2)
-				framework.ExpectNoError(err, "while cleaning up pod before exiting resizing test")
-			}()
+			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, l.pod2)
 			framework.ExpectNoError(err, "while recreating pod for resizing")
 
 			ginkgo.By("Waiting for file system resize to finish")
@@ -247,7 +241,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		ginkgo.It("should resize volume when PVC is edited while pod is using it", func(ctx context.Context) {
 			init()
-			defer cleanup()
+			ginkgo.DeferCleanup(cleanup)
 
 			if !driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion] {
 				e2eskipper.Skipf("Driver %q does not support online volume expansion - skipping", driver.GetDriverInfo().Name)
@@ -263,10 +257,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 				ImageID:       e2epod.GetDefaultTestImageID(),
 			}
 			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, f.Timeouts.PodStart)
-			defer func() {
-				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
-				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
-			}()
+			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, l.pod)
 			framework.ExpectNoError(err, "While creating pods for resizing")
 
 			// We expand the PVC while l.pod is using it for online expansion.

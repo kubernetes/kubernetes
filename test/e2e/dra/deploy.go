@@ -160,7 +160,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	rsName := ""
 	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
 	numNodes := int32(len(nodes.NodeNames))
-	undeploy, err := utils.CreateFromManifests(d.f, d.f.Namespace, func(item interface{}) error {
+	err := utils.CreateFromManifests(d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
 			item.Name += d.NameSuffix
@@ -192,7 +192,6 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		return nil
 	}, manifests...)
 	framework.ExpectNoError(err, "deploy kubelet plugin replicaset")
-	d.cleanup = append(d.cleanup, undeploy)
 
 	rs, err := d.f.ClientSet.AppsV1().ReplicaSets(d.f.Namespace.Name).Get(ctx, rsName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get replicaset")

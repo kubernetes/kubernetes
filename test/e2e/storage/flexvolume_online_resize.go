@@ -99,7 +99,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 		}, ns)
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating pvc: %v", err)
-		ginkgo.DeferCleanup(func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
 			if errs := e2epv.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
 				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
@@ -142,7 +142,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 		ginkgo.By("Creating pod")
 		pod, err = createNginxPod(c, ns, nodeKeyValueLabel, pvcClaims)
 		framework.ExpectNoError(err, "Failed to create pod %v", err)
-		defer e2epod.DeletePodWithWait(c, pod)
+		ginkgo.DeferCleanup(e2epod.DeletePodWithWait, c, pod)
 
 		ginkgo.By("Waiting for pod to go to 'running' state")
 		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.ObjectMeta.Name, f.Namespace.Name)

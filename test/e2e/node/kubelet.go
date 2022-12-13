@@ -311,6 +311,7 @@ var _ = SIGDescribe("kubelet", func() {
 			for nodeName := range nodeNames {
 				for k, v := range nodeLabels {
 					e2enode.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+					ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, c, nodeName, k)
 				}
 			}
 
@@ -324,18 +325,7 @@ var _ = SIGDescribe("kubelet", func() {
 			if len(actualNodes.Items) <= maxNodesToCheck {
 				resourceMonitor = e2ekubelet.NewResourceMonitor(f.ClientSet, e2ekubelet.TargetContainers(), containerStatsPollingInterval)
 				resourceMonitor.Start()
-			}
-		})
-
-		ginkgo.AfterEach(func() {
-			if resourceMonitor != nil {
-				resourceMonitor.Stop()
-			}
-			// If we added labels to nodes in this test, remove them now.
-			for nodeName := range nodeNames {
-				for k := range nodeLabels {
-					e2enode.RemoveLabelOffNode(c, nodeName, k)
-				}
+				ginkgo.DeferCleanup(resourceMonitor.Stop)
 			}
 		})
 

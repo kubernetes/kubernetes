@@ -105,7 +105,7 @@ while true; do sleep 1; done
 						Volumes:       testVolumes,
 					}
 					terminateContainer.Create()
-					defer terminateContainer.Delete()
+					ginkgo.DeferCleanup(framework.IgnoreNotFound(terminateContainer.Delete))
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'RestartCount'", testContainer.Name))
 					gomega.Eventually(func() (int32, error) {
@@ -151,7 +151,7 @@ while true; do sleep 1; done
 
 				ginkgo.By("create the container")
 				c.Create()
-				defer c.Delete()
+				ginkgo.DeferCleanup(framework.IgnoreNotFound(c.Delete))
 
 				ginkgo.By(fmt.Sprintf("wait for the container to reach %s", expectedPhase))
 				gomega.Eventually(c.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(expectedPhase))
@@ -303,7 +303,7 @@ while true; do sleep 1; done
 					ginkgo.By("create image pull secret")
 					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
 					framework.ExpectNoError(err)
-					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
+					ginkgo.DeferCleanup(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete, secret.Name, metav1.DeleteOptions{})
 					container.ImagePullSecrets = []string{secret.Name}
 				}
 				// checkContainerStatus checks whether the container status matches expectation.

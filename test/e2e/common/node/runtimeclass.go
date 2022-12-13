@@ -61,7 +61,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]", func(ctx context.Context) {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler, nil)
-		defer deleteRuntimeClass(f, rcName)
+		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
 		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
 		eventSelector := fields.Set{
 			"involvedObject.kind":      "Pod",
@@ -88,7 +88,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		e2eskipper.SkipUnlessProviderIs("gce")
 
 		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
-		defer deleteRuntimeClass(f, rcName)
+		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
 		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
 		expectPodSuccess(f, pod)
 	})
@@ -103,7 +103,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	*/
 	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass without PodOverhead [NodeConformance]", func(ctx context.Context) {
 		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
-		defer deleteRuntimeClass(f, rcName)
+		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
 		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
 		// there is only one pod in the namespace
 		label := labels.SelectorFromSet(labels.Set(map[string]string{}))
@@ -133,7 +133,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 				v1.ResourceName(v1.ResourceMemory): resource.MustParse("1Mi"),
 			},
 		})
-		defer deleteRuntimeClass(f, rcName)
+		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
 		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
 		// there is only one pod in the namespace
 		label := labels.SelectorFromSet(labels.Set(map[string]string{}))

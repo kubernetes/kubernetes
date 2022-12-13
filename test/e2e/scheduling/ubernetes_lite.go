@@ -46,7 +46,6 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var zoneCount int
 	var err error
-	var cleanUp func()
 	var zoneNames sets.String
 	ginkgo.BeforeEach(func() {
 		cs := f.ClientSet
@@ -66,13 +65,8 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 		framework.ExpectNoError(err)
 
 		// make the nodes have balanced cpu,mem usage
-		cleanUp, err = createBalancedPodForNodes(f, cs, f.Namespace.Name, nodeList.Items, podRequestedResource, 0.0)
+		err = createBalancedPodForNodes(f, cs, f.Namespace.Name, nodeList.Items, podRequestedResource, 0.0)
 		framework.ExpectNoError(err)
-	})
-	ginkgo.AfterEach(func() {
-		if cleanUp != nil {
-			cleanUp()
-		}
 	})
 	ginkgo.It("should spread the pods of a service across zones [Serial]", func(ctx context.Context) {
 		SpreadServiceOrFail(f, 5*zoneCount, zoneNames, imageutils.GetPauseImageName())

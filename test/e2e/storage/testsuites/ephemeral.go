@@ -179,7 +179,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		}
 
 		init(ctx)
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		l.testCase.ReadOnly = true
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
@@ -196,7 +196,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 
 	ginkgo.It("should create read/write inline ephemeral volume", func(ctx context.Context) {
 		init(ctx)
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		l.testCase.ReadOnly = false
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
@@ -220,7 +220,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		}
 
 		init(ctx)
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		if !driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion] {
 			e2eskipper.Skipf("Driver %q does not support online volume expansion - skipping", driver.GetDriverInfo().Name)
@@ -277,7 +277,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 
 	ginkgo.It("should support two pods which have the same volume definition", func(ctx context.Context) {
 		init(ctx)
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// We test in read-only mode if that is all that the driver supports,
 		// otherwise read/write. For PVC, both are assumed to be false.
@@ -320,7 +320,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		}
 
 		init(ctx)
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		l.testCase.NumInlineVolumes = 2
 		l.testCase.TestEphemeral(ctx)

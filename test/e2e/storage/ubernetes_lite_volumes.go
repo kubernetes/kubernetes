@@ -90,7 +90,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 		configs[i] = &staticPVTestConfig{}
 	}
 
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) {
 		ginkgo.By("Cleaning up pods and PVs")
 		for _, config := range configs {
 			e2epod.DeletePodOrFail(c, ns, config.pod.Name)
@@ -110,7 +110,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 			}(configs[i])
 		}
 		wg.Wait()
-	}()
+	})
 
 	for i, config := range configs {
 		zone := zonelist[i%len(zones)]

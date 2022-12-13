@@ -153,8 +153,8 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 
 	rc.Start()
 	// Explicitly delete pods to prevent namespace controller cleanning up timeout
-	defer deletePodsSync(f, append(pods, getCadvisorPod()))
-	defer rc.Stop()
+	ginkgo.DeferCleanup(deletePodsSync, f, append(pods, getCadvisorPod()))
+	ginkgo.DeferCleanup(rc.Stop)
 
 	ginkgo.By("Creating a batch of Pods")
 	e2epod.NewPodClient(f).CreateBatch(pods)

@@ -141,7 +141,7 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 
 	ginkgo.It("should write files of various sizes, verify size, validate content [Slow]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		cs := f.ClientSet
 		fileSizes := createFileSizes(dInfo.MaxFileSize)
@@ -322,7 +322,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolu
 	if err != nil {
 		return fmt.Errorf("failed to create client pod %q: %v", clientPod.Name, err)
 	}
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) {
 		deleteFile(f, clientPod, ddInput)
 		ginkgo.By(fmt.Sprintf("deleting client pod %q...", clientPod.Name))
 		e := e2epod.DeletePodWithWait(cs, clientPod)
@@ -335,7 +335,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolu
 			framework.Logf("sleeping a bit so kubelet can unmount and detach the volume")
 			time.Sleep(e2evolume.PodCleanupTimeout)
 		}
-	}()
+	})
 
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, clientPod.Name, clientPod.Namespace, f.Timeouts.PodStart)
 	if err != nil {

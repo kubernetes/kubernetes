@@ -408,7 +408,7 @@ func prepullImages(c clientset.Interface) {
 	})
 	framework.ExpectNoError(err)
 	ns := namespace.Name
-	defer c.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(c.CoreV1().Namespaces().Delete, ns, metav1.DeleteOptions{})
 
 	images := commontest.PrePulledImages
 	if framework.NodeOSDistroIs("windows") {

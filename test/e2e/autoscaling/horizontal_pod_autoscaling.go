@@ -203,9 +203,9 @@ func (st *HPAScaleTest) run(name string, kind schema.GroupVersionKind, f *framew
 		initMemTotal = st.initMemTotal
 	}
 	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perPodCPURequest, st.perPodMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
-	defer rc.CleanUp()
+	ginkgo.DeferCleanup(rc.CleanUp)
 	hpa := e2eautoscaling.CreateResourceHorizontalPodAutoscaler(rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
-	defer e2eautoscaling.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
+	ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
 
 	rc.WaitForReplicas(st.firstScale, timeToWait)
 	if st.firstScaleStasis > 0 {
@@ -311,9 +311,9 @@ func (st *HPAContainerResourceScaleTest) run(name string, kind schema.GroupVersi
 		initMemTotal = st.initMemTotal
 	}
 	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perContainerCPURequest, st.perContainerMemRequest, f.ClientSet, f.ScalesGetter, st.sidecarStatus, st.sidecarType)
-	defer rc.CleanUp()
+	ginkgo.DeferCleanup(rc.CleanUp)
 	hpa := e2eautoscaling.CreateContainerResourceHorizontalPodAutoscaler(rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
-	defer e2eautoscaling.DeleteContainerResourceHPA(rc, hpa.Name)
+	ginkgo.DeferCleanup(e2eautoscaling.DeleteContainerResourceHPA, rc, hpa.Name)
 
 	if st.noScale {
 		if st.noScaleStasis > 0 {

@@ -195,8 +195,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		namespace based on the webhook namespace selector MUST be allowed.
 	*/
 	framework.ConformanceIt("should be able to deny pod and configmap creation", func(ctx context.Context) {
-		webhookCleanup := registerWebhook(f, f.UniqueName, certCtx, servicePort)
-		defer webhookCleanup()
+		registerWebhook(f, f.UniqueName, certCtx, servicePort)
 		testWebhook(f)
 	})
 
@@ -207,8 +206,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Attempts to attach MUST be denied.
 	*/
 	framework.ConformanceIt("should be able to deny attaching pod", func(ctx context.Context) {
-		webhookCleanup := registerWebhookForAttachingPod(f, f.UniqueName, certCtx, servicePort)
-		defer webhookCleanup()
+		registerWebhookForAttachingPod(f, f.UniqueName, certCtx, servicePort)
 		testAttachingPodWebhook(f)
 	})
 
@@ -223,9 +221,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
-		webhookCleanup := registerWebhookForCustomResource(f, f.UniqueName, certCtx, testcrd, servicePort)
-		defer webhookCleanup()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
+		registerWebhookForCustomResource(f, f.UniqueName, certCtx, testcrd, servicePort)
 		testCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"])
 		testBlockingCustomResourceUpdateDeletion(f, testcrd.Crd, testcrd.DynamicClients["v1"])
 	})
@@ -237,8 +234,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Attempt operations that require the admission webhook; all MUST be denied.
 	*/
 	framework.ConformanceIt("should unconditionally reject operations on fail closed webhook", func(ctx context.Context) {
-		webhookCleanup := registerFailClosedWebhook(f, f.UniqueName, certCtx, servicePort)
-		defer webhookCleanup()
+		registerFailClosedWebhook(f, f.UniqueName, certCtx, servicePort)
 		testFailClosedWebhook(f)
 	})
 
@@ -250,8 +246,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		the first webhook is present. Attempt to create a config map; both keys MUST be added to the config map.
 	*/
 	framework.ConformanceIt("should mutate configmap", func(ctx context.Context) {
-		webhookCleanup := registerMutatingWebhookForConfigMap(f, f.UniqueName, certCtx, servicePort)
-		defer webhookCleanup()
+		registerMutatingWebhookForConfigMap(f, f.UniqueName, certCtx, servicePort)
 		testMutatingConfigMapWebhook(f)
 	})
 
@@ -262,8 +257,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		the InitContainer MUST be added the TerminationMessagePolicy MUST be defaulted.
 	*/
 	framework.ConformanceIt("should mutate pod and apply defaults after mutation", func(ctx context.Context) {
-		webhookCleanup := registerMutatingWebhookForPod(f, f.UniqueName, certCtx, servicePort)
-		defer webhookCleanup()
+		registerMutatingWebhookForPod(f, f.UniqueName, certCtx, servicePort)
 		testMutatingPodWebhook(f)
 	})
 
@@ -275,10 +269,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		MUST NOT be mutated the webhooks.
 	*/
 	framework.ConformanceIt("should not be able to mutate or prevent deletion of webhook configuration objects", func(ctx context.Context) {
-		validatingWebhookCleanup := registerValidatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", certCtx, servicePort)
-		defer validatingWebhookCleanup()
-		mutatingWebhookCleanup := registerMutatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", certCtx, servicePort)
-		defer mutatingWebhookCleanup()
+		registerValidatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", certCtx, servicePort)
+		registerMutatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", certCtx, servicePort)
 		testWebhooksForWebhookConfigurations(f, f.UniqueName, certCtx, servicePort)
 	})
 
@@ -293,9 +285,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
-		webhookCleanup := registerMutatingWebhookForCustomResource(f, f.UniqueName, certCtx, testcrd, servicePort)
-		defer webhookCleanup()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
+		registerMutatingWebhookForCustomResource(f, f.UniqueName, certCtx, testcrd, servicePort)
 		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], false)
 	})
 
@@ -306,8 +297,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		custom resource definition; the create request MUST be denied.
 	*/
 	framework.ConformanceIt("should deny crd creation", func(ctx context.Context) {
-		crdWebhookCleanup := registerValidatingWebhookForCRD(f, f.UniqueName, certCtx, servicePort)
-		defer crdWebhookCleanup()
+		registerValidatingWebhookForCRD(f, f.UniqueName, certCtx, servicePort)
 
 		testCRDDenyWebhook(f)
 	})
@@ -325,9 +315,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
-		webhookCleanup := registerMutatingWebhookForCustomResource(f, f.UniqueName, certCtx, testcrd, servicePort)
-		defer webhookCleanup()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
+		registerMutatingWebhookForCustomResource(f, f.UniqueName, certCtx, testcrd, servicePort)
 		testMultiVersionCustomResourceWebhook(f, testcrd)
 	})
 
@@ -363,9 +352,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
-		webhookCleanup := registerMutatingWebhookForCustomResource(f, f.UniqueName, certCtx, testcrd, servicePort)
-		defer webhookCleanup()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
+		registerMutatingWebhookForCustomResource(f, f.UniqueName, certCtx, testcrd, servicePort)
 		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], prune)
 	})
 
@@ -855,7 +843,7 @@ func deployWebhookAndService(f *framework.Framework, image string, certCtx *cert
 
 func strPtr(s string) *string { return &s }
 
-func registerWebhook(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) func() {
+func registerWebhook(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) {
 	client := f.ClientSet
 	ginkgo.By("Registering the webhook via the AdmissionRegistration API")
 
@@ -888,12 +876,10 @@ func registerWebhook(f *framework.Framework, configName string, certCtx *certCon
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
-	return func() {
-		client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
-func registerWebhookForAttachingPod(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) func() {
+func registerWebhookForAttachingPod(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) {
 	client := f.ClientSet
 	ginkgo.By("Registering the webhook via the AdmissionRegistration API")
 
@@ -940,12 +926,10 @@ func registerWebhookForAttachingPod(f *framework.Framework, configName string, c
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
-	return func() {
-		client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
-func registerMutatingWebhookForConfigMap(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) func() {
+func registerMutatingWebhookForConfigMap(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) {
 	client := f.ClientSet
 	ginkgo.By("Registering the mutating configmap webhook via the AdmissionRegistration API")
 
@@ -966,9 +950,7 @@ func registerMutatingWebhookForConfigMap(f *framework.Framework, configName stri
 
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-	return func() {
-		client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
 func testMutatingConfigMapWebhook(f *framework.Framework) {
@@ -987,7 +969,7 @@ func testMutatingConfigMapWebhook(f *framework.Framework) {
 	}
 }
 
-func registerMutatingWebhookForPod(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) func() {
+func registerMutatingWebhookForPod(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) {
 	client := f.ClientSet
 	ginkgo.By("Registering the mutating pod webhook via the AdmissionRegistration API")
 
@@ -1034,9 +1016,7 @@ func registerMutatingWebhookForPod(f *framework.Framework, configName string, ce
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
-	return func() {
-		client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
 func testMutatingPodWebhook(f *framework.Framework) {
@@ -1163,7 +1143,7 @@ func testWebhook(f *framework.Framework) {
 	}})
 	framework.ExpectNoError(err, "creating namespace %q", skippedNamespaceName)
 	// clean up the namespace
-	defer client.CoreV1().Namespaces().Delete(context.TODO(), skippedNamespaceName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(client.CoreV1().Namespaces().Delete, skippedNamespaceName, metav1.DeleteOptions{})
 
 	ginkgo.By("create a configmap that violates the webhook policy but is in a whitelisted namespace")
 	configmap = nonCompliantConfigMap(f)
@@ -1220,7 +1200,7 @@ func failingWebhook(namespace, name string, servicePort int32) admissionregistra
 	}
 }
 
-func registerFailClosedWebhook(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) func() {
+func registerFailClosedWebhook(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) {
 	ginkgo.By("Registering a webhook that server cannot talk to, with fail closed policy, via the AdmissionRegistration API")
 
 	namespace := f.Namespace.Name
@@ -1255,9 +1235,7 @@ func registerFailClosedWebhook(f *framework.Framework, configName string, certCt
 
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-	return func() {
-		f.ClientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
 func testFailClosedWebhook(f *framework.Framework) {
@@ -1271,7 +1249,7 @@ func testFailClosedWebhook(f *framework.Framework) {
 		},
 	}})
 	framework.ExpectNoError(err, "creating namespace %q", failNamespaceName)
-	defer client.CoreV1().Namespaces().Delete(context.TODO(), failNamespaceName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(client.CoreV1().Namespaces().Delete, failNamespaceName, metav1.DeleteOptions{})
 
 	ginkgo.By("create a configmap should be unconditionally rejected by the webhook")
 	configmap := &v1.ConfigMap{
@@ -1286,7 +1264,7 @@ func testFailClosedWebhook(f *framework.Framework) {
 	}
 }
 
-func registerValidatingWebhookForWebhookConfigurations(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) func() {
+func registerValidatingWebhookForWebhookConfigurations(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) {
 	var err error
 	client := f.ClientSet
 	ginkgo.By("Registering a validating webhook on ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects, via the AdmissionRegistration API")
@@ -1341,13 +1319,10 @@ func registerValidatingWebhookForWebhookConfigurations(f *framework.Framework, c
 
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-	return func() {
-		err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", configName, namespace)
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
-func registerMutatingWebhookForWebhookConfigurations(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) func() {
+func registerMutatingWebhookForWebhookConfigurations(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) {
 	var err error
 	client := f.ClientSet
 	ginkgo.By("Registering a mutating webhook on ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects, via the AdmissionRegistration API")
@@ -1402,10 +1377,7 @@ func registerMutatingWebhookForWebhookConfigurations(f *framework.Framework, con
 
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-	return func() {
-		err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", configName, namespace)
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
 // This test assumes that the deletion-rejecting webhook defined in
@@ -1683,7 +1655,7 @@ func cleanWebhookTest(client clientset.Interface, namespaceName string) {
 	_ = client.RbacV1().RoleBindings("kube-system").Delete(context.TODO(), roleBindingName, metav1.DeleteOptions{})
 }
 
-func registerWebhookForCustomResource(f *framework.Framework, configName string, certCtx *certContext, testcrd *crd.TestCrd, servicePort int32) func() {
+func registerWebhookForCustomResource(f *framework.Framework, configName string, certCtx *certContext, testcrd *crd.TestCrd, servicePort int32) {
 	client := f.ClientSet
 	ginkgo.By("Registering the custom resource webhook via the AdmissionRegistration API")
 
@@ -1729,12 +1701,10 @@ func registerWebhookForCustomResource(f *framework.Framework, configName string,
 
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-	return func() {
-		client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
-func registerMutatingWebhookForCustomResource(f *framework.Framework, configName string, certCtx *certContext, testcrd *crd.TestCrd, servicePort int32) func() {
+func registerMutatingWebhookForCustomResource(f *framework.Framework, configName string, certCtx *certContext, testcrd *crd.TestCrd, servicePort int32) {
 	client := f.ClientSet
 	ginkgo.By(fmt.Sprintf("Registering the mutating webhook for custom resource %s via the AdmissionRegistration API", testcrd.Crd.Name))
 
@@ -1807,9 +1777,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, configName
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
-	return func() {
-		client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
 func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
@@ -1989,7 +1957,7 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 	}
 }
 
-func registerValidatingWebhookForCRD(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) func() {
+func registerValidatingWebhookForCRD(f *framework.Framework, configName string, certCtx *certContext, servicePort int32) {
 	client := f.ClientSet
 	ginkgo.By("Registering the crd webhook via the AdmissionRegistration API")
 
@@ -2039,9 +2007,7 @@ func registerValidatingWebhookForCRD(f *framework.Framework, configName string, 
 
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
-	return func() {
-		client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
-	}
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete), configName, metav1.DeleteOptions{})
 }
 
 func testCRDDenyWebhook(f *framework.Framework) {
@@ -2169,9 +2135,14 @@ func registerSlowWebhook(f *framework.Framework, configName string, certCtx *cer
 	err = waitWebhookConfigurationReady(f)
 	framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
-	return func() {
-		client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
+	cleanup := func() {
+		err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), configName, metav1.DeleteOptions{})
+		if !apierrors.IsNotFound(err) {
+			framework.ExpectNoError(err)
+		}
 	}
+
+	return cleanup
 }
 
 func testSlowWebhookTimeoutFailEarly(f *framework.Framework) {

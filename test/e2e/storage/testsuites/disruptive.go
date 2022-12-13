@@ -164,7 +164,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				(pattern.VolMode == v1.PersistentVolumeFilesystem && t.runTestFile != nil) {
 				ginkgo.It(t.testItStmt, func(ctx context.Context) {
 					init(nil)
-					defer cleanup()
+					ginkgo.DeferCleanup(cleanup)
 
 					var err error
 					var pvcs []*v1.PersistentVolumeClaim
@@ -236,7 +236,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 			if pattern.VolMode == v1.PersistentVolumeFilesystem && t.runTestFile != nil {
 				ginkgo.It(t.testItStmt, func(ctx context.Context) {
 					init([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod})
-					defer cleanup()
+					ginkgo.DeferCleanup(cleanup)
 
 					var err error
 					var pvcs []*v1.PersistentVolumeClaim

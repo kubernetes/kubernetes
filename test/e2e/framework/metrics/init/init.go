@@ -30,9 +30,7 @@ func init() {
 		func(f *framework.Framework) {
 			ginkgo.BeforeEach(func() {
 				metrics := e2emetrics.GrabBeforeEach(f)
-				ginkgo.DeferCleanup(func() {
-					e2emetrics.GrabAfterEach(f, metrics)
-				})
+				ginkgo.DeferCleanup(e2emetrics.GrabAfterEach, f, metrics)
 			})
 		},
 	)

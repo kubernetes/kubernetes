@@ -196,7 +196,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName, testTaint)
 
 		// Wait a bit
 		ginkgo.By("Waiting for Pod to be deleted")
@@ -228,7 +228,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName, testTaint)
 
 		// Wait a bit
 		ginkgo.By("Waiting for Pod to be deleted")
@@ -261,7 +261,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName, testTaint)
 
 		// Wait a bit
 		ginkgo.By("Waiting to see if a Pod won't be deleted")
@@ -309,11 +309,11 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		taintRemoved := false
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			if !taintRemoved {
 				e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 			}
-		}()
+		})
 
 		// 3. Wait some time
 		ginkgo.By("Waiting short time to make sure Pod is queued for deletion")
@@ -356,13 +356,13 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
 
-		defer e2epod.NewPodClient(f).RemoveFinalizer(pod.Name, testFinalizer)
+		ginkgo.DeferCleanup(e2epod.NewPodClient(f).RemoveFinalizer, pod.Name, testFinalizer)
 
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName, testTaint)
 
 		ginkgo.By("Waiting for Pod to be terminating")
 		timeout := time.Duration(kubeletPodDeletionDelaySeconds+3*additionalWaitPerDeleteSeconds) * time.Second
@@ -414,11 +414,11 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName1, testTaint)
 		e2enode.ExpectNodeHasTaint(cs, nodeName1, &testTaint)
-		defer e2enode.RemoveTaintOffNode(cs, nodeName1, testTaint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName1, testTaint)
 		if nodeName2 != nodeName1 {
 			e2enode.AddOrUpdateTaintOnNode(cs, nodeName2, testTaint)
 			e2enode.ExpectNodeHasTaint(cs, nodeName2, &testTaint)
-			defer e2enode.RemoveTaintOffNode(cs, nodeName2, testTaint)
+			ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName2, testTaint)
 		}
 
 		// Wait a bit
@@ -487,7 +487,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
-		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, cs, nodeName, testTaint)
 
 		// 3. Wait to see if both pods get evicted in between [5, 25] seconds
 		ginkgo.By("Waiting for Pod1 and Pod2 to be deleted")

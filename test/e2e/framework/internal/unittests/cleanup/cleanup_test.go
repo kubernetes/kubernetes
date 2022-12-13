@@ -24,11 +24,13 @@ package cleanup
 import (
 	"context"
 	"flag"
+	"fmt"
 	"regexp"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -45,9 +47,17 @@ import (
 //
 //
 //
-//
-//
 // This must be line #50.
+
+func init() {
+	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions,
+		// This callback runs directly after NewDefaultFramework is done.
+		func(f *framework.Framework) {
+			ginkgo.BeforeEach(func() { framework.Logf("extension before") })
+			ginkgo.AfterEach(func() { framework.Logf("extension after") })
+		},
+	)
+}
 
 var _ = ginkgo.Describe("e2e", func() {
 	ginkgo.BeforeEach(func() {
@@ -85,22 +95,21 @@ var _ = ginkgo.Describe("e2e", func() {
 		ginkgo.DeferCleanup(func() {
 			framework.Logf("cleanup first")
 		})
+
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.CoreV1().PersistentVolumes().Delete), "simple", metav1.DeleteOptions{})
+		fail := func(ctx context.Context, name string) error {
+			return fmt.Errorf("fake error for %q", name)
+		}
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(fail), "failure")
+
+		// More test cases can be added here without affeccting line numbering
+		// of existing tests.
 	})
 })
 
-func init() {
-	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions,
-		// This callback runs directly after NewDefaultFramework is done.
-		func(f *framework.Framework) {
-			ginkgo.BeforeEach(func() { framework.Logf("extension before") })
-			ginkgo.AfterEach(func() { framework.Logf("extension after") })
-		},
-	)
-}
-
 const (
 	ginkgoOutput = `[BeforeEach] e2e
-  cleanup_test.go:53
+  cleanup_test.go:63
 INFO: before
 [BeforeEach] e2e
   set up framework | framework.go:xxx
@@ -109,30 +118,34 @@ INFO: >>> kubeConfig: yyy/kube.config
 STEP: Building a namespace api object, basename test-namespace
 INFO: Skipping waiting for service account
 [BeforeEach] e2e
-  cleanup_test.go:95
+  cleanup_test.go:56
 INFO: extension before
 [BeforeEach] e2e
-  cleanup_test.go:61
+  cleanup_test.go:71
 INFO: before #1
 [BeforeEach] e2e
-  cleanup_test.go:65
+  cleanup_test.go:75
 INFO: before #2
 [It] works
-  cleanup_test.go:80
+  cleanup_test.go:90
 [AfterEach] e2e
-  cleanup_test.go:96
+  cleanup_test.go:57
 INFO: extension after
 [AfterEach] e2e
-  cleanup_test.go:69
+  cleanup_test.go:79
 INFO: after #1
 [AfterEach] e2e
-  cleanup_test.go:76
+  cleanup_test.go:86
 INFO: after #2
 [DeferCleanup (Each)] e2e
-  cleanup_test.go:85
+  cleanup_test.go:103
+[DeferCleanup (Each)] e2e
+  cleanup_test.go:99
+[DeferCleanup (Each)] e2e
+  cleanup_test.go:95
 INFO: cleanup first
 [DeferCleanup (Each)] e2e
-  cleanup_test.go:82
+  cleanup_test.go:92
 INFO: cleanup last
 [DeferCleanup (Each)] e2e
   dump namespaces | framework.go:xxx
@@ -187,6 +200,10 @@ func TestCleanup(t *testing.T) {
 			Name:            "e2e works",
 			NormalizeOutput: normalizeOutput,
 			Output:          ginkgoOutput,
+			// It would be nice to get the cleanup failure into the
+			// output, but that depends on Ginkgo enhancements:
+			// https://github.com/onsi/ginkgo/issues/1041#issuecomment-1274611444
+			Failure: `DeferCleanup callback returned error: fake error for "failure"`,
 		},
 	}
 

@@ -122,22 +122,14 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 	servicePort := int32(9443)
 	containerPort := int32(9444)
 
-	var client clientset.Interface
-	var namespaceName string
-
 	ginkgo.BeforeEach(func() {
-		client = f.ClientSet
-		namespaceName = f.Namespace.Name
+		ginkgo.DeferCleanup(cleanCRDWebhookTest, f.ClientSet, f.Namespace.Name)
 
 		ginkgo.By("Setting up server cert")
 		certCtx = setupServerCert(f.Namespace.Name, serviceCRDName)
 		createAuthReaderRoleBindingForCRDConversion(f, f.Namespace.Name)
 
 		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), certCtx, servicePort, containerPort)
-	})
-
-	ginkgo.AfterEach(func() {
-		cleanCRDWebhookTest(client, namespaceName)
 	})
 
 	/*
@@ -169,7 +161,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
 		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
 		testCustomResourceConversionWebhook(f, testcrd.Crd, testcrd.DynamicClients)
 	})
@@ -204,7 +196,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
 		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
 		testCRListConversion(f, testcrd)
 	})

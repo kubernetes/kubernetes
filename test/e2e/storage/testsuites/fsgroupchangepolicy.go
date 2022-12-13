@@ -218,7 +218,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			}
 
 			init()
-			defer cleanup()
+			ginkgo.DeferCleanup(cleanup)
 			podConfig := e2epod.Config{
 				NS:                     f.Namespace.Name,
 				NodeSelection:          l.config.ClientNodeSelection,

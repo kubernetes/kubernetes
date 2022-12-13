@@ -207,15 +207,15 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	_, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), statefulSet, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) {
 		framework.Logf("deleting statefulset%q/%q", statefulSet.Namespace, statefulSet.Name)
 		// typically this claim has already been deleted
-		framework.ExpectNoError(c.AppsV1().StatefulSets(ns).Delete(context.TODO(), statefulSet.Name, metav1.DeleteOptions{}),
+		framework.ExpectNoError(c.AppsV1().StatefulSets(ns).Delete(ctx, statefulSet.Name, metav1.DeleteOptions{}),
 			"Error deleting StatefulSet %s", statefulSet.Name)
 
 		framework.Logf("deleting claims in namespace %s", ns)
 		pvc := getPVC(c, ns, regionalPDLabels)
-		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{}),
+		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{}),
 			"Error deleting claim %s.", pvc.Name)
 		if pvc.Spec.VolumeName != "" {
 			err = e2epv.WaitForPersistentVolumeDeleted(c, pvc.Spec.VolumeName, framework.Poll, pvDeletionTimeout)
@@ -223,7 +223,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 				framework.Logf("WARNING: PV %s is not yet deleted, and subsequent tests may be affected.", pvc.Spec.VolumeName)
 			}
 		}
-	}()
+	})
 
 	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, framework.Poll, statefulSetReadyTimeout)
 	if err != nil {
@@ -247,12 +247,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{v1.LabelTopologyZone: podZone}))
 	nodesInZone, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err)
-	removeTaintFunc := addTaint(c, ns, nodesInZone.Items, podZone)
-
-	defer func() {
-		framework.Logf("removing previously added node taints")
-		removeTaintFunc()
-	}()
+	addTaint(c, ns, nodesInZone.Items, podZone)
 
 	ginkgo.By("deleting StatefulSet pod")
 	err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
@@ -299,8 +294,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 
 }
 
-func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string) (removeTaint func()) {
-	reversePatches := make(map[string][]byte)
+func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string) {
 	for _, node := range nodes {
 		oldData, err := json.Marshal(node)
 		framework.ExpectNoError(err)
@@ -319,17 +313,16 @@ func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string)
 
 		reversePatchBytes, err := strategicpatch.CreateTwoWayMergePatch(newData, oldData, v1.Node{})
 		framework.ExpectNoError(err)
-		reversePatches[node.Name] = reversePatchBytes
 
 		_, err = c.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-	}
 
-	return func() {
-		for nodeName, reversePatch := range reversePatches {
-			_, err := c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, reversePatch, metav1.PatchOptions{})
+		nodeName := node.Name
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			framework.Logf("removing taint for node %q", nodeName)
+			_, err := c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, reversePatchBytes, metav1.PatchOptions{})
 			framework.ExpectNoError(err)
-		}
+		})
 	}
 }
 

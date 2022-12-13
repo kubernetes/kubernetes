@@ -183,8 +183,8 @@ func runTest(f *framework.Framework) error {
 	// Create a cgroup manager object for manipulating cgroups.
 	cgroupManager := cm.NewCgroupManager(subsystems, oldCfg.CgroupDriver)
 
-	defer destroyTemporaryCgroupsForReservation(cgroupManager)
-	defer func() {
+	ginkgo.DeferCleanup(destroyTemporaryCgroupsForReservation, cgroupManager)
+	ginkgo.DeferCleanup(func(ctx context.Context) {
 		if oldCfg != nil {
 			// Update the Kubelet configuration.
 			ginkgo.By("Stopping the kubelet")
@@ -205,7 +205,7 @@ func runTest(f *framework.Framework) error {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
 			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 		}
-	}()
+	})
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
 		return err
 	}
