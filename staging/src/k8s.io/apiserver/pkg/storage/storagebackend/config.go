@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -260,6 +261,16 @@ func (c *TransportConfig) Complete() error {
 	if err != nil {
 		return err
 	}
+
+	// decorate the KV instance so we can track etcd latency per request.
+	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
+
+	go func() {
+		defer utilruntime.HandleCrash()
+
+		<-ctx.Done()
+		_ = client.Close()
+	}()
 
 	c.client = client
 	c.complete = true

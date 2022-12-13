@@ -69,7 +69,7 @@ import (
 
 // setUp is a convenience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertions) {
-	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServerWithoutComplete(t)
 
 	config := &Config{
 		GenericConfig: genericapiserver.NewConfig(legacyscheme.Codecs),
@@ -82,16 +82,17 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 		},
 	}
 
-	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
-	resourceEncoding := resourceconfig.MergeResourceEncodingConfigs(storageFactoryConfig.DefaultResourceEncoding, storageFactoryConfig.ResourceEncodingOverrides)
-	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
-
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
 	etcdOptions.EnableWatchCache = false
 	if err := etcdOptions.Complete(config.GenericConfig.StorageObjectCountTracker, config.GenericConfig.DrainedNotify(), config.GenericConfig.AddPostStartHook); err != nil {
 		t.Fatal(err)
 	}
+
+	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
+	resourceEncoding := resourceconfig.MergeResourceEncodingConfigs(storageFactoryConfig.DefaultResourceEncoding, storageFactoryConfig.ResourceEncodingOverrides)
+	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
+
 	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
 	if err != nil {
 		t.Fatal(err)

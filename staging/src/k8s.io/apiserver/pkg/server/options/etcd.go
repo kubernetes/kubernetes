@@ -227,9 +227,10 @@ func (s *EtcdOptions) Complete(
 		return fmt.Errorf("EtcdOptions.Complete called more than once")
 	}
 
+	ctxServer, _ := wait.ContextForChannel(stopCh) // explicitly ignore cancel here because we do not own the server's lifecycle
+
 	if len(s.EncryptionProviderConfigFilepath) != 0 {
 		ctxTransformers, closeTransformers := wait.ContextForChannel(stopCh)
-		ctxServer, _ := wait.ContextForChannel(stopCh) // explicitly ignore cancel here because we do not own the server's lifecycle
 
 		encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload, ctxTransformers.Done())
 		if err != nil {

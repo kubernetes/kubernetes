@@ -107,9 +107,6 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 		// Ensure that server is already not shutting down.
 		select {
 		case <-stopCh:
-			if err == nil {
-				newClient.Close()
-			}
 			return true, nil
 		default:
 		}
@@ -130,7 +127,6 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 		lock.Lock()
 		defer lock.Unlock()
 		if client != nil {
-			client.Close()
 			clientErr = fmt.Errorf("server is shutting down")
 		}
 	}()
@@ -206,7 +202,6 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 		if foundBefore {
 			// replace compactor
 			compactor.cancel()
-			compactor.client.Close()
 		} else {
 			// start new compactor
 			compactor = &runningCompactor{}
@@ -232,7 +227,6 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 		compactor.refs--
 		if compactor.refs == 0 {
 			compactor.cancel()
-			compactor.client.Close()
 			delete(compactors, key)
 		}
 	}, nil
@@ -250,9 +244,6 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 		return nil, nil, err
 	}
 
-	// decorate the KV instance so we can track etcd latency per request.
-	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
-
 	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client, c.DBMetricPollInterval)
 	if err != nil {
 		return nil, nil, err
@@ -266,7 +257,6 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 		once.Do(func() {
 			stopCompactor()
 			stopDBSizeMonitor()
-			client.Close()
 		})
 	}
 	transformer := c.Transformer

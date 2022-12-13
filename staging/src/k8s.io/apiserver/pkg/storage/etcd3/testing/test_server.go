@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"testing"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -50,4 +51,25 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 		t.Fatal(err)
 	}
 	return server, config
+}
+
+// NewUnsecuredEtcd3TestClientServerWithoutComplete creates a new client and server for testing
+func NewUnsecuredEtcd3TestClientServerWithoutComplete(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
+	server := &EtcdTestServer{}
+	server.V3Client = testserver.RunEtcd(t, nil)
+	config := &storagebackend.Config{
+		Type:   "etcd3",
+		Prefix: PathPrefix(),
+		Transport: storagebackend.TransportConfig{
+			ServerList: server.V3Client.Endpoints(),
+		},
+		Paging: true,
+	}
+	return server, config
+}
+
+func testContext(t *testing.T) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	return ctx
 }
