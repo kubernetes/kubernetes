@@ -409,7 +409,7 @@ func buildGenericConfig(
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
 	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig
-	storageFactory, lastErr = storageFactoryConfig.Complete(s.Etcd).New()
+	storageFactory, lastErr = storageFactoryConfig.Complete(s.Etcd).New(genericConfig.DrainedNotify())
 	if lastErr != nil {
 		return
 	}

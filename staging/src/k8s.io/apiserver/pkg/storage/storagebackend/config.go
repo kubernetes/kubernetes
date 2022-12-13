@@ -284,3 +284,10 @@ func (c *TransportConfig) Client() (*clientv3.Client, error) {
 
 	return c.client, nil
 }
+
+func (c *TransportConfig) ShallowCopyAndResetComplete() TransportConfig {
+	out := *c
+	out.complete = false
+	out.client = nil
+	return out
+}

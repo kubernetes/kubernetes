@@ -17,12 +17,11 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
 	"strings"
-
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 )
 
 // Backend describes the storage servers, the information here should be enough
@@ -89,6 +89,7 @@ type DefaultStorageFactory struct {
 }
 
 type groupResourceOverrides struct {
+	etcdCtx context.Context
 	// etcdLocation contains the list of "special" locations that are used for particular GroupResources
 	// These are merged on top of the StorageConfig when requesting the storage.Interface for a given GroupResource
 	etcdLocation []string
@@ -116,9 +117,13 @@ type groupResourceOverrides struct {
 }
 
 // Apply overrides the provided config and options if the override has a value in that position
-func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *StorageCodecConfig) {
+func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *StorageCodecConfig) error {
 	if len(o.etcdLocation) > 0 {
+		config.Transport = config.Transport.ShallowCopyAndResetComplete()
 		config.Transport.ServerList = o.etcdLocation
+		if err := config.Transport.Complete(o.etcdCtx); err != nil {
+			return err
+		}
 	}
 	if len(o.etcdPrefix) > 0 {
 		config.Prefix = o.etcdPrefix
@@ -139,6 +144,7 @@ func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *St
 	if o.disablePaging {
 		config.Paging = false
 	}
+	return nil
 }
 
 var _ StorageFactory = &DefaultStorageFactory{}
@@ -170,9 +176,10 @@ func NewDefaultStorageFactory(
 	}
 }
 
-func (s *DefaultStorageFactory) SetEtcdLocation(groupResource schema.GroupResource, location []string) {
+func (s *DefaultStorageFactory) SetEtcdLocation(ctx context.Context, groupResource schema.GroupResource, location []string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdLocation = location
+	overrides.etcdCtx = ctx
 	s.Overrides[groupResource] = overrides
 }
 
@@ -250,10 +257,14 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	}
 
 	if override, ok := s.Overrides[getAllResourcesAlias(chosenStorageResource)]; ok {
-		override.Apply(&storageConfig, &codecConfig)
+		if err := override.Apply(&storageConfig, &codecConfig); err != nil {
+			return nil, err
+		}
 	}
 	if override, ok := s.Overrides[chosenStorageResource]; ok {
-		override.Apply(&storageConfig, &codecConfig)
+		if err := override.Apply(&storageConfig, &codecConfig); err != nil {
+			return nil, err
+		}
 	}
 
 	var err error
