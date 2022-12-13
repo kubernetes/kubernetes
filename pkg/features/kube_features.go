@@ -997,7 +997,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MemoryQoS: {Default: false, PreRelease: featuregate.Alpha},
 
-	MinDomainsInPodTopologySpread: {Default: false, PreRelease: featuregate.Beta},
+	MinDomainsInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
 	MinimizeIPTablesRestore: {Default: false, PreRelease: featuregate.Alpha},
 
