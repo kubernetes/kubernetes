@@ -293,12 +293,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			selected := types[c.Rand.Intn(len(types))]
 			*p = selected
 		},
-		func(p *core.ServiceExternalTrafficPolicyType, c fuzz.Continue) {
-			types := []core.ServiceExternalTrafficPolicyType{core.ServiceExternalTrafficPolicyTypeCluster, core.ServiceExternalTrafficPolicyTypeLocal}
+		func(p *core.ServiceExternalTrafficPolicy, c fuzz.Continue) {
+			types := []core.ServiceExternalTrafficPolicy{core.ServiceExternalTrafficPolicyCluster, core.ServiceExternalTrafficPolicyLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
-		func(p *core.ServiceInternalTrafficPolicyType, c fuzz.Continue) {
-			types := []core.ServiceInternalTrafficPolicyType{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
+		func(p *core.ServiceInternalTrafficPolicy, c fuzz.Continue) {
+			types := []core.ServiceInternalTrafficPolicy{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *core.Container, c fuzz.Continue) {

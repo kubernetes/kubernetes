@@ -158,7 +158,7 @@ func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
 					Port:     tc.svcPort,
 					Protocol: tc.protocol,
 				}}
-				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			}),
 		)
 
@@ -301,7 +301,7 @@ func TestDeleteEndpointConnectionsIPv6(t *testing.T) {
 					Port:     tc.svcPort,
 					Protocol: tc.protocol,
 				}}
-				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			}),
 		)
 
@@ -1814,7 +1814,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		// create LoadBalancer service with Local traffic policy
 		makeTestService("ns2", "svc2", func(svc *v1.Service) {
 			svc.Spec.Type = "LoadBalancer"
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.ClusterIP = "172.30.0.42"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
@@ -1854,7 +1854,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		// create LoadBalancer service with Cluster traffic policy and source ranges
 		makeTestService("ns5", "svc5", func(svc *v1.Service) {
 			svc.Spec.Type = "LoadBalancer"
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
 			svc.Spec.ClusterIP = "172.30.0.45"
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     "p80",
@@ -2559,7 +2559,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 			NodePort: int32(svcNodePort),
 		}}
 		svc.Spec.HealthCheckNodePort = int32(svcHealthCheckNodePort)
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 	})
 	makeServiceMap(fp, svc)
 	fp.syncProxyRules()
@@ -2743,7 +2743,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	makeServiceMap(fp,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
 			svc.Spec.Type = "NodePort"
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.ClusterIP = svcIP
 			svc.Spec.ExternalIPs = []string{svcExternalIPs}
 			svc.Spec.Ports = []v1.ServicePort{{
@@ -3054,7 +3054,7 @@ func TestLoadBalancerReject(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 				ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
@@ -3147,7 +3147,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 				ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
@@ -3319,7 +3319,7 @@ func TestEnableLocalhostNodePortsIPv4(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -3413,7 +3413,7 @@ func TestDisableLocalhostNodePortsIPv4(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -3508,7 +3508,7 @@ func TestDisableLocalhostNodePortsIPv4WithNodeAddress(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -3602,7 +3602,7 @@ func TestEnableLocalhostNodePortsIPv6(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -3696,7 +3696,7 @@ func TestDisableLocalhostNodePortsIPv6(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -3844,7 +3844,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 				Protocol: v1.ProtocolTCP,
 				NodePort: int32(svcNodePort),
 			}}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		}),
 	)
 
@@ -4026,7 +4026,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 					{IP: "5.6.7.8"},
 				},
 			}
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.HealthCheckNodePort = 345
 		}),
 	}
@@ -4169,7 +4169,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 				{IP: "1.2.3.4"},
 			},
 		}
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		svc.Spec.HealthCheckNodePort = 345
 	})
 
@@ -5620,7 +5620,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 	testCases := []struct {
 		name                      string
 		line                      int
-		internalTrafficPolicy     *v1.ServiceInternalTrafficPolicyType
+		internalTrafficPolicy     *v1.ServiceInternalTrafficPolicy
 		featureGateOn             bool
 		endpoints                 []endpoint
 		expectEndpointRule        bool
@@ -5830,7 +5830,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			ClusterIP:             "172.30.1.1",
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			Selector:              map[string]string{"foo": "bar"},
 			Ports: []v1.ServicePort{
 				{
@@ -6615,7 +6615,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 		Spec: v1.ServiceSpec{
 			ClusterIP:             "172.30.1.1",
 			Type:                  v1.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
 			Selector:              map[string]string{"foo": "bar"},
 			Ports: []v1.ServicePort{
 				{
@@ -7383,7 +7383,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 					NodePort: int32(3002),
 				}}
 				svc.Spec.HealthCheckNodePort = 30002
-				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 					IP: "5.6.7.8",
 				}}
@@ -8637,13 +8637,13 @@ func TestNoEndpointsMetric(t *testing.T) {
 	}
 
 	internalTrafficPolicyLocal := v1.ServiceInternalTrafficPolicyLocal
-	externalTrafficPolicyLocal := v1.ServiceExternalTrafficPolicyTypeLocal
+	externalTrafficPolicyLocal := v1.ServiceExternalTrafficPolicyLocal
 
 	metrics.RegisterMetrics()
 	testCases := []struct {
 		name                                                string
-		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicyType
-		externalTrafficPolicy                               v1.ServiceExternalTrafficPolicyType
+		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicy
+		externalTrafficPolicy                               v1.ServiceExternalTrafficPolicy
 		endpoints                                           []endpoint
 		expectedSyncProxyRulesNoLocalEndpointsTotalInternal int
 		expectedSyncProxyRulesNoLocalEndpointsTotalExternal int

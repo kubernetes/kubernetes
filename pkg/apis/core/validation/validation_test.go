@@ -13060,7 +13060,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid load balancer protocol UDP 1",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports[0].Protocol = "UDP"
 			},
@@ -13070,7 +13070,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid load balancer protocol UDP 2",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports[0] = core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)}
 			},
@@ -13080,7 +13080,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "load balancer with mix protocol",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -13135,7 +13135,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type - loadbalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 0,
@@ -13144,7 +13144,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type - loadbalancer with allocateLoadBalancerNodePorts=false",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
 			},
 			numErrs: 0,
@@ -13153,7 +13153,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid type - missing AllocateLoadBalancerNodePorts for loadbalancer type",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			},
 			numErrs: 1,
 		},
@@ -13161,7 +13161,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type loadbalancer 2 ports",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -13171,7 +13171,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid external load balancer 2 ports",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -13181,7 +13181,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "duplicate nodeports",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(2)})
 			},
@@ -13191,7 +13191,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "duplicate nodeports (different protocols)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "UDP", NodePort: 1, TargetPort: intstr.FromInt(2)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "s", Port: 3, Protocol: "SCTP", NodePort: 1, TargetPort: intstr.FromInt(3)})
@@ -13228,7 +13228,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type - nodeport",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			},
 			numErrs: 0,
 		},
@@ -13236,7 +13236,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type - loadbalancer with allocateLoadBalancerNodePorts=true",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 0,
@@ -13245,7 +13245,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type loadbalancer 2 ports",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -13255,7 +13255,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type loadbalancer with NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt(12345)})
 			},
@@ -13265,7 +13265,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type=NodePort service with NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt(12345)})
 			},
 			numErrs: 0,
@@ -13274,7 +13274,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type=NodePort service without NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
 			numErrs: 0,
@@ -13299,7 +13299,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid public service with duplicate NodePort",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p1", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "p2", Port: 2, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(2)})
 			},
@@ -13309,7 +13309,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid type=LoadBalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -13321,7 +13321,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid port type=LoadBalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: intstr.FromInt(12345)})
 			},
@@ -13331,7 +13331,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid LoadBalancer source range annotation",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/8,  5.6.7.8/16"
 			},
@@ -13341,7 +13341,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "empty LoadBalancer source range annotation",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = ""
 			},
@@ -13358,7 +13358,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid LoadBalancer source range annotation (invalid CIDR)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/33"
 			},
@@ -13375,7 +13375,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid LoadBalancer source range",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.4/8", "5.6.7.8/16"}
 			},
@@ -13385,7 +13385,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "empty LoadBalancer source range",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerSourceRanges = []string{"   "}
 			},
@@ -13395,7 +13395,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid LoadBalancer source range",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerSourceRanges = []string{"foo.bar"}
 			},
@@ -13451,7 +13451,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.ClusterIP = "None"
 				s.Spec.ClusterIPs = []string{"None"}
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 1,
@@ -13460,7 +13460,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid node port with clusterIP None",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.ClusterIP = "None"
 				s.Spec.ClusterIPs = []string{"None"}
@@ -13510,7 +13510,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		{
 			name: "invalid internalTraffic field",
 			tweakSvc: func(s *core.Service) {
-				invalid := core.ServiceInternalTrafficPolicyType("invalid")
+				invalid := core.ServiceInternalTrafficPolicy("invalid")
 				s.Spec.InternalTrafficPolicy = &invalid
 			},
 			numErrs: 1,
@@ -13536,7 +13536,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 				s.Spec.HealthCheckNodePort = -1
 			},
 			numErrs: 1,
@@ -13546,7 +13546,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 				s.Spec.HealthCheckNodePort = 31100
 			},
 			numErrs: 0,
@@ -13569,7 +13569,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "sessionAffinityConfig can't be set when session affinity is None",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.SessionAffinity = core.ServiceAffinityNone
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
@@ -14023,7 +14023,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid LoadBalancerClass when type is LoadBalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 			},
@@ -14033,7 +14033,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid LoadBalancerClass",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				s.Spec.LoadBalancerClass = utilpointer.StringPtr("Bad/LoadBalancerClass")
 			},
@@ -14075,7 +14075,7 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 				s.Spec.HealthCheckNodePort = 34567
 			},
 			numErrs: 0,
@@ -14084,7 +14084,7 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 			name: "valid nodePort service with externalTrafficPolicy set",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 			},
 			numErrs: 0,
 		},
@@ -14100,7 +14100,7 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				s.Spec.HealthCheckNodePort = 34567
 			},
 			numErrs: 1,
@@ -14109,7 +14109,7 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 			name: "cannot set healthCheckNodePort field on nodePort service",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeNodePort
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 				s.Spec.HealthCheckNodePort = 34567
 			},
 			numErrs: 1,
@@ -14118,7 +14118,7 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 			name: "cannot set externalTrafficPolicy or healthCheckNodePort fields on clusterIP service",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 				s.Spec.HealthCheckNodePort = 34567
 			},
 			numErrs: 2,
@@ -15633,7 +15633,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "change type",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 0,
@@ -15649,7 +15649,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "change type -> nodeport",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			},
 			numErrs: 0,
 		},
@@ -15659,7 +15659,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 			},
@@ -15672,7 +15672,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				oldSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.100.0.0/16"}
 			},
@@ -15684,7 +15684,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.ClusterIP = "None"
 				newSvc.Spec.ClusterIPs = []string{"None"}
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 1,
@@ -15758,7 +15758,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -15773,7 +15773,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -15788,7 +15788,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
@@ -15804,7 +15804,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = ""
@@ -15821,7 +15821,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
 			},
 			numErrs: 0,
@@ -15832,7 +15832,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 0,
@@ -15842,7 +15842,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -15857,7 +15857,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -15900,7 +15900,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
@@ -15916,7 +15916,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = ""
@@ -15933,7 +15933,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
@@ -15950,7 +15950,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 
 				oldSvc.Spec.ClusterIP = ""
@@ -15997,7 +15997,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -16013,7 +16013,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -16056,7 +16056,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
 				oldSvc.Spec.Ports = append(oldSvc.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				newSvc.Spec.Ports = append(newSvc.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
@@ -16509,7 +16509,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
 			},
@@ -16523,7 +16523,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-new")
 			},
@@ -16537,7 +16537,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = nil
 			},
@@ -16551,7 +16551,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = nil
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-new")
 			},
@@ -16563,7 +16563,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 			},
@@ -16575,7 +16575,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = nil
 			},
@@ -16587,7 +16587,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("Bad/LoadBalancerclass")
 			},
@@ -16619,7 +16619,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
@@ -16656,7 +16656,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 
 				newSvc.Spec.Type = core.ServiceTypeNodePort
-				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyTypeCluster
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 				newSvc.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,

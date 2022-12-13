@@ -835,7 +835,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		svc := getServeHostnameService("affinity-lb-esipp")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		execAffinityTestForLBService(f, cs, svc)
 	})
 
@@ -846,7 +846,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		svc := getServeHostnameService("affinity-lb-esipp-transition")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		execAffinityTestForLBServiceWithTransition(f, cs, svc)
 	})
 
@@ -857,7 +857,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		svc := getServeHostnameService("affinity-lb")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
 		execAffinityTestForLBService(f, cs, svc)
 	})
 
@@ -868,7 +868,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		svc := getServeHostnameService("affinity-lb-transition")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
 		execAffinityTestForLBServiceWithTransition(f, cs, svc)
 	})
 
@@ -1574,7 +1574,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 		ginkgo.By("turning ESIPP off")
 		svc, err = jig.UpdateService(func(svc *v1.Service) {
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
 		})
 		framework.ExpectNoError(err)
 		if svc.Spec.HealthCheckNodePort > 0 {
@@ -1685,7 +1685,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 		ginkgo.By("setting ExternalTraffic field back to OnlyLocal")
 		svc, err = jig.UpdateService(func(svc *v1.Service) {
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
 			svc.Spec.HealthCheckNodePort = int32(healthCheckNodePort)
 		})

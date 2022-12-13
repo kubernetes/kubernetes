@@ -7850,7 +7850,7 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.LoadBalancerIP = in.LoadBalancerIP
 	out.LoadBalancerSourceRanges = *(*[]string)(unsafe.Pointer(&in.LoadBalancerSourceRanges))
 	out.ExternalName = in.ExternalName
-	out.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyType(in.ExternalTrafficPolicy)
+	out.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicy(in.ExternalTrafficPolicy)
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.SessionAffinityConfig = (*core.SessionAffinityConfig)(unsafe.Pointer(in.SessionAffinityConfig))
@@ -7858,7 +7858,7 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.IPFamilyPolicy = (*core.IPFamilyPolicy)(unsafe.Pointer(in.IPFamilyPolicy))
 	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
 	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
-	out.InternalTrafficPolicy = (*core.ServiceInternalTrafficPolicyType)(unsafe.Pointer(in.InternalTrafficPolicy))
+	out.InternalTrafficPolicy = (*core.ServiceInternalTrafficPolicy)(unsafe.Pointer(in.InternalTrafficPolicy))
 	return nil
 }
 
@@ -7881,12 +7881,12 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.SessionAffinity = v1.ServiceAffinity(in.SessionAffinity)
 	out.SessionAffinityConfig = (*v1.SessionAffinityConfig)(unsafe.Pointer(in.SessionAffinityConfig))
 	out.LoadBalancerSourceRanges = *(*[]string)(unsafe.Pointer(&in.LoadBalancerSourceRanges))
-	out.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(in.ExternalTrafficPolicy)
+	out.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicy(in.ExternalTrafficPolicy)
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
 	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
-	out.InternalTrafficPolicy = (*v1.ServiceInternalTrafficPolicyType)(unsafe.Pointer(in.InternalTrafficPolicy))
+	out.InternalTrafficPolicy = (*v1.ServiceInternalTrafficPolicy)(unsafe.Pointer(in.InternalTrafficPolicy))
 	return nil
 }
 

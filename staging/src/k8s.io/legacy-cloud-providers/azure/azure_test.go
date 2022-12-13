@@ -783,7 +783,7 @@ func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 	setMockEnv(az, ctrl, expectedInterfaces, expectedVirtualMachines, 1)
 
 	svc := getTestService("service1", v1.ProtocolTCP, nil, false, 80)
-	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 	svc.Spec.HealthCheckNodePort = int32(32456)
 
 	expectedLBs := make([]network.LoadBalancer, 0)
