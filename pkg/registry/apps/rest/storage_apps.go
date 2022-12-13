@@ -76,12 +76,13 @@ func (p StorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIReso
 
 	// daemonsets
 	if resource := "daemonsets"; apiResourceConfigSource.ResourceEnabled(appsapiv1.SchemeGroupVersion.WithResource(resource)) {
-		daemonSetStorage, daemonSetStatusStorage, err := daemonsetstore.NewREST(restOptionsGetter)
+		daemonSetStorage, err := daemonsetstore.NewStorage(restOptionsGetter)
 		if err != nil {
 			return storage, err
 		}
-		storage[resource] = daemonSetStorage
-		storage[resource+"/status"] = daemonSetStatusStorage
+		storage[resource] = daemonSetStorage.DaemonSet
+		storage[resource+"/status"] = daemonSetStorage.Status
+		storage[resource+"/scale"] = daemonSetStorage.Scale
 	}
 
 	// replicasets

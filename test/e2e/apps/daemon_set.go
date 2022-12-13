@@ -993,6 +993,76 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.ExpectNoError(err, "failed to locate daemon set %v in namespace %v", testDaemonset.ObjectMeta.Name, ns)
 		framework.Logf("Daemon set %s has a patched status", dsName)
 	})
+
+	ginkgo.Context("Scale subresource", func() {
+		gr := schema.GroupResource{Group: "apps", Resource: "daemonsets"}
+		scaleGR := schema.GroupResource{Group: "apps", Resource: "daemonsets/scale"}
+		var desiredReplicas int32
+
+		// Create daemonset and ensure it is up
+		ginkgo.BeforeEach(func() {
+			ginkgo.By(fmt.Sprintf("Create a DaemonSet %q.", defaultName))
+			ds, err := c.AppsV1().DaemonSets(ns).Create(context.TODO(), newDaemonSet(defaultName, WebserverImage, defaultLabels), metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
+			err = e2edaemonset.CheckDaemonStatus(f, defaultName)
+			framework.ExpectNoError(err)
+			err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Get the DaemonSet to find the number of replicas.")
+			ds, err = c.AppsV1().DaemonSets(ns).Get(context.TODO(), defaultName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			desiredReplicas = ds.Status.DesiredNumberScheduled
+		})
+
+		// Delete daemonset
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Clean up.")
+			err := c.AppsV1().DaemonSets(ns).Delete(context.TODO(), defaultName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("can be obtained", func() {
+			scale, err := f.ScalesGetter.Scales(ns).Get(context.TODO(), gr, defaultName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "unexpected error getting daemonsets/scale")
+			framework.ExpectNotEqual(scale, nil, "expected to have non-nil value")
+			framework.ExpectEqual(scale.Status.Replicas, desiredReplicas, "replicas should equal the desired number of pods")
+
+		})
+
+		ginkgo.It("cannot be obtained for inexisting daemonset", func() {
+			name := "some-other-name"
+			_, err := f.ScalesGetter.Scales(ns).Get(context.TODO(), gr, name, metav1.GetOptions{})
+			framework.ExpectError(err, "should fail for non-existing daemonset")
+			framework.ExpectEqual(err, apierrors.NewNotFound(scaleGR, name))
+		})
+
+		ginkgo.It("cannot be updated as a whole", func() {
+			scale, err := f.ScalesGetter.Scales(ns).Get(context.TODO(), gr, defaultName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "error getting daemonset scale")
+			framework.ExpectNotEqual(scale.Spec.Replicas, 0, "unexpected to have zero replicas")
+
+			scale.Spec.Replicas += 1
+			_, err = f.ScalesGetter.Scales(ns).Update(context.TODO(), gr, scale, metav1.UpdateOptions{})
+
+			framework.ExpectError(err, "should be error on scale update")
+			framework.ExpectEqual(err.Error(), "the server does not allow this method on the requested resource")
+		})
+
+		ginkgo.It("cannot be updated with patch", func() {
+			scale, err := f.ScalesGetter.Scales(ns).Get(context.TODO(), gr, defaultName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "error getting daemonset scale")
+			framework.ExpectNotEqual(scale.Spec.Replicas, 0, "unexpected to have zero replicas")
+
+			data := []byte(fmt.Sprintf(`{ "spec": { "replicas": %d } }`, scale.Spec.Replicas+1))
+			_, err = f.ScalesGetter.Scales(ns).Patch(context.TODO(), gr.WithVersion("v1"), defaultName, types.JSONPatchType, data, metav1.PatchOptions{})
+
+			framework.ExpectError(err, "should be error on scale update")
+			framework.ExpectEqual(err.Error(), "the server does not allow this method on the requested resource")
+		})
+	})
 })
 
 // randomPod selects a random pod within pods that causes fn to return true, or nil

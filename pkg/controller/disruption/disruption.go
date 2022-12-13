@@ -234,8 +234,13 @@ func NewDisruptionControllerInternal(
 // way to take advantage of listers with scale subresources, we use the workload
 // resources directly and only fall back to the scale subresource when needed.
 func (dc *DisruptionController) finders() []podControllerFinder {
-	return []podControllerFinder{dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
-		dc.getPodStatefulSet, dc.getScaleController}
+	return []podControllerFinder{
+		dc.getPodReplicationController,
+		dc.getPodDeployment,
+		dc.getPodReplicaSet,
+		dc.getPodStatefulSet,
+		dc.getScaleController,
+	}
 }
 
 var (

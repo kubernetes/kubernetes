@@ -31,8 +31,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/kubernetes"
 	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	daemonStorage "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
+	deployStorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
+	repSetStorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
+	statSetStorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
+	repContStorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -65,6 +71,7 @@ func TestScaleSubresources(t *testing.T) {
 		makeGVR("apps", "v1", "deployments/scale"):  makeGVK("autoscaling", "v1", "Scale"),
 		makeGVR("apps", "v1", "replicasets/scale"):  makeGVK("autoscaling", "v1", "Scale"),
 		makeGVR("apps", "v1", "statefulsets/scale"): makeGVK("autoscaling", "v1", "Scale"),
+		makeGVR("apps", "v1", "daemonsets/scale"):   makeGVK("autoscaling", "v1", "Scale"),
 	}
 
 	autoscalingGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}
@@ -133,6 +140,17 @@ func TestScaleSubresources(t *testing.T) {
 	if _, err := clientSet.AppsV1().StatefulSets("default").Create(context.TODO(), ssStub, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := clientSet.AppsV1().DaemonSets("default").Create(context.TODO(), daemonsetStub, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	kindRestMapping := map[string]interface{}{
+		"replicationcontrollers": &repContStorage.ScaleREST{},
+		"replicasets":            &repSetStorage.ScaleREST{},
+		"deployments":            &deployStorage.ScaleREST{},
+		"statefulsets":           &statSetStorage.ScaleREST{},
+		"daemonsets":             &daemonStorage.ScaleREST{},
+	}
 
 	// Ensure scale subresources return and accept expected kinds
 	for gvr, gvk := range discoveredScaleSubresources {
@@ -160,6 +178,14 @@ func TestScaleSubresources(t *testing.T) {
 		if obj.GetObjectKind().GroupVersionKind() != gvk {
 			t.Errorf("expected %#v, got %#v from %s", gvk, obj.GetObjectKind().GroupVersionKind(), urlPath)
 			t.Log(string(getData))
+			continue
+		}
+
+		restObj, ok := kindRestMapping[resourceParts[0]]
+		if !ok {
+			t.Fatalf("error finding REST object for %s", resourceParts[0])
+		}
+		if _, ok := restObj.(rest.Updater); !ok {
 			continue
 		}
 
@@ -199,6 +225,11 @@ var (
 	ssStub = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		Spec:       appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
+	}
+
+	daemonsetStub = &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+		Spec:       appsv1.DaemonSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Template: podStub},
 	}
 )
 

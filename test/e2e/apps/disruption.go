@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,6 +46,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -417,6 +419,78 @@ var _ = SIGDescribe("DisruptionController", func() {
 		framework.ExpectNoError(err) // the eviction is now allowed
 	})
 
+	ginkgo.Context("Reacting to DaemonSet pods", func() {
+		ginkgo.BeforeEach(func() {
+			ginkgo.By(fmt.Sprintf("Create a DaemonSet %q.", defaultName))
+			ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), newDaemonSet(defaultName, WebserverImage, defaultLabels), metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
+			err = e2edaemonset.CheckDaemonStatus(f, defaultName)
+			framework.ExpectNoError(err)
+			err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Clean up.")
+			err := cs.AppsV1().DaemonSets(ns).Delete(context.TODO(), defaultName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		// Test PDB reacting to daemonset pod conditions
+		pdbCases := []struct {
+			createPDB func(int)
+			name      string
+		}{
+			{
+				name: "minAvailable",
+				createPDB: func(Npods int) {
+					createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(Npods-1), defaultLabels)
+				},
+			},
+
+			{
+				name: "maxUnavailable",
+				createPDB: func(_ int) {
+					createPDBMaxUnavailableOrDie(cs, ns, defaultName, intstr.FromString("10%"))
+				},
+			},
+		}
+
+		for _, pdbCase := range pdbCases {
+			ginkgo.It("should account pods of a DaemonSet in case of "+pdbCase.name,
+				func() {
+					podList := listDaemonPods(cs, ns, defaultLabels)
+					Npods := len(podList.Items)
+
+					ginkgo.By("Creating PDB for " + strconv.Itoa(Npods) + " pods.")
+					pdbCase.createPDB(Npods)
+
+					ginkgo.By("Set a daemon pod's phase to 'Failed'.")
+					pod := podList.Items[0]
+					pod.ResourceVersion = ""
+					pod.Status.Phase = v1.PodFailed
+					_, err := cs.CoreV1().Pods(ns).UpdateStatus(context.TODO(), &pod, metav1.UpdateOptions{})
+					framework.ExpectNoError(err, "error failing a daemon pod")
+
+					ginkgo.By("Verify PDB status forbids disruptions.")
+					gomega.Eventually(func() (bool, error) {
+						pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), defaultName, metav1.GetOptions{})
+						if err != nil {
+							return false, err
+						}
+						disruptionForbidden := pdb.Status.DisruptionsAllowed == 0
+						return disruptionForbidden, nil
+					}, timeout, timeout/100).Should(gomega.BeTrue(), "PDB shouldn't allow disruptions")
+
+					ginkgo.By("Deleting PDB.")
+					deletePDBOrDie(cs, ns, defaultName)
+				})
+
+		}
+
+	})
 })
 
 func createPDBMinAvailableOrDie(ctx context.Context, cs kubernetes.Interface, ns string, name string, minAvailable intstr.IntOrString, labels map[string]string) {

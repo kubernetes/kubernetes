@@ -160,7 +160,7 @@ func (r *REST) ShortNames() []string {
 	return []string{"sts"}
 }
 
-// ScaleREST implements a Scale for Deployment.
+// ScaleREST implements a Scale for StatefulSet.
 type ScaleREST struct {
 	store *genericregistry.Store
 }

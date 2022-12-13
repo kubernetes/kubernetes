@@ -29,12 +29,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	daemonStorage "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
+	deployStorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
+	repSetStorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
+	statSetStorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
+	repContStorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -241,6 +247,14 @@ func TestDryRun(t *testing.T) {
 
 	dryrunData := etcd.GetEtcdStorageData()
 
+	scaleRestMapping := map[string]interface{}{
+		"ReplicationController": &repContStorage.ScaleREST{},
+		"ReplicaSet":            &repSetStorage.ScaleREST{},
+		"Deployment":            &deployStorage.ScaleREST{},
+		"StatefulSet":           &statSetStorage.ScaleREST{},
+		"DaemonSet":             &daemonStorage.ScaleREST{},
+	}
+
 	// dry run specific stub overrides
 	for resource, stub := range map[schema.GroupVersionResource]string{
 		// need to change event's namespace field to match dry run test
@@ -289,8 +303,16 @@ func TestDryRun(t *testing.T) {
 
 			DryRunUpdateTest(t, rsc, name)
 			DryRunPatchTest(t, rsc, name)
-			DryRunScalePatchTest(t, rsc, name)
-			DryRunScaleUpdateTest(t, rsc, name)
+
+			runScaleTest := true
+			if restObj, ok := scaleRestMapping[kind]; ok {
+				_, runScaleTest = restObj.(rest.Updater)
+			}
+			if runScaleTest {
+				DryRunScalePatchTest(t, rsc, name)
+				DryRunScaleUpdateTest(t, rsc, name)
+			}
+
 			if resourceToTest.HasDeleteCollection {
 				DryRunDeleteCollectionTest(t, rsc, name)
 			}
