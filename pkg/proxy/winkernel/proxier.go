@@ -128,6 +128,7 @@ type serviceInfo struct {
 	hns                    HostNetworkService
 	preserveDIP            bool
 	localTrafficDSR        bool
+	internalTrafficLocal   bool
 	winProxyOptimization   bool
 }
 
@@ -531,6 +532,10 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	// Annotation introduced to enable optimized loadbalancing
 	winProxyOptimization := !(strings.ToUpper(service.Annotations["winProxyOptimization"]) == "DISABLED")
 	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal
+	var internalTrafficLocal bool
+	if service.Spec.InternalTrafficPolicy != nil {
+		internalTrafficLocal = *service.Spec.InternalTrafficPolicy == v1.ServiceInternalTrafficPolicyLocal
+	}
 	err := hcn.DSRSupported()
 	if err != nil {
 		preserveDIP = false
@@ -547,9 +552,9 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	info.targetPort = targetPort
 	info.hns = proxier.hns
 	info.localTrafficDSR = localTrafficDSR
+	info.internalTrafficLocal = internalTrafficLocal
 	info.winProxyOptimization = winProxyOptimization
-
-	klog.V(3).InfoS("Flags enabled for service", "service", service.Name, "localTrafficDSR", localTrafficDSR, "preserveDIP", preserveDIP, "winProxyOptimization", winProxyOptimization)
+	klog.V(3).InfoS("Flags enabled for service", "service", service.Name, "localTrafficDSR", localTrafficDSR, "internalTrafficLocal", internalTrafficLocal, "preserveDIP", preserveDIP, "winProxyOptimization", winProxyOptimization)
 
 	for _, eip := range service.Spec.ExternalIPs {
 		info.externalIPs = append(info.externalIPs, &externalIPInfo{ip: eip})
@@ -1296,6 +1301,12 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
+			if svcInfo.internalTrafficLocal && svcInfo.localTrafficDSR && !ep.GetIsLocal() {
+				// No need to use or create remote endpoint when internal and external traffic policy is remote
+				klog.V(3).InfoS("Skipping the endpoint. Both internalTraffic and external traffic policies are local", "EpIP", ep.ip, " EpPort", ep.port)
+				continue
+			}
+
 			if someEndpointsServing {
 
 				if !allEndpointsTerminating && !ep.IsReady() {
@@ -1457,10 +1468,18 @@ func (proxier *Proxier) syncProxyRules() {
 		proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, sourceVip, Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
 
 		if endpointsAvailableForLB {
+
+			// clusterIPEndpoints is the endpoint list used for creating ClusterIP loadbalancer.
+			clusterIPEndpoints := hnsEndpoints
+			if svcInfo.internalTrafficLocal {
+				// Take local endpoints for clusterip loadbalancer when internal traffic policy is local.
+				clusterIPEndpoints = hnsLocalEndpoints
+			}
+
 			// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
 			// Cluster IP LoadBalancer creation
 			hnsLoadBalancer, err := hns.getLoadBalancer(
-				hnsEndpoints,
+				clusterIPEndpoints,
 				loadBalancerFlags{isDSR: proxier.isDSR, isIPv6: proxier.isIPv6Mode, sessionAffinity: sessionAffinityClientIP},
 				sourceVip,
 				svcInfo.ClusterIP().String(),
