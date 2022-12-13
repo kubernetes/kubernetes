@@ -145,7 +145,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			// return 1 if there was a problem.
 			if err := options.Run(); err != nil {
 				if exitErr := diffError(err); exitErr != nil {
-					os.Exit(exitErr.ExitStatus())
+					cmdutil.CheckErr(cmdutil.ErrExit)
 				}
 				cmdutil.CheckDiffErr(err)
 			}
