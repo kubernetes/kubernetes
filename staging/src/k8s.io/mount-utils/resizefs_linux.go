@@ -178,7 +178,7 @@ func (resizefs *ResizeFs) getDeviceRO(devicePath string) (bool, error) {
 	output, err := resizefs.exec.Command(blockDev, "--getro", devicePath).CombinedOutput()
 	outStr := strings.TrimSpace(string(output))
 	if err != nil {
-		return false, fmt.Errorf("failed to read size of device %s: %s: %s", devicePath, err, outStr)
+		return false, fmt.Errorf("failed to get readonly bit from device %s: %s: %s", devicePath, err, outStr)
 	}
 	switch outStr {
 	case "0":
