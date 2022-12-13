@@ -238,6 +238,9 @@ func BuildGenericConfig(
 	// on a fast local network
 	genericConfig.LoopbackClientConfig.DisableCompression = true
 
+	// Accept both protobuf and application/json for loopback client.``
+	genericConfig.LoopbackClientConfig.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientgoExternalClient, err = kcpkubernetesclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
