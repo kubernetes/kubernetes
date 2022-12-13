@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/require"
@@ -298,6 +299,66 @@ func TestLegacyFallback(t *testing.T) {
 	}, doc.Items)
 }
 
+// Exercises the 304 Not Modified Path of the aggregator
+// This path in 1.26.0 would result in a deadlock if an aggregated APIService
+// returned a 304 Not Modified response for its own aggregated discovery document.
+func TestNotModified(t *testing.T) {
+	aggyService := discoveryendpoint.NewResourceManager()
+	service := discoveryendpoint.NewResourceManager()
+	apiGroup := fuzzAPIGroups(2, 3, 10)
+	service.SetGroups(apiGroup.Items)
+
+	var apiServices []*apiregistrationv1.APIService
+	for _, g := range apiGroup.Items {
+		for _, v := range g.Versions {
+			apiservice := &apiregistrationv1.APIService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: v.Version + "." + g.Name,
+				},
+				Spec: apiregistrationv1.APIServiceSpec{
+					Group:   g.Name,
+					Version: v.Version,
+					Service: &apiregistrationv1.ServiceReference{
+						Namespace: "serviceNamespace",
+						Name:      "serviceName",
+					},
+				},
+			}
+
+			apiServices = append(apiServices, apiservice)
+		}
+	}
+
+	aggregatedManager := apiserver.NewDiscoveryManager(aggyService)
+
+	// Add all except the last group.
+	// Ensure this is done BEFORE the call to run, so they are included in initial
+	// list to keep test focused
+	for _, s := range apiServices[:len(apiServices)-1] {
+		aggregatedManager.AddAPIService(s, service)
+	}
+
+	testCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go aggregatedManager.Run(testCtx.Done())
+
+	// Important to wait here to ensure we prime the cache with the initial list
+	// of documents in order to exercise 304 Not Modified
+	require.True(t, cache.WaitForCacheSync(testCtx.Done(), aggregatedManager.ExternalServicesSynced))
+
+	// Now add all groups. We excluded one group before so that ExternalServicesSynced
+	// could include it in this round. Now, if ExternalServicesSynced ever returns
+	// true, it must have synced all the pre-existing groups before, which would
+	// return 304 Not Modified
+	for _, s := range apiServices {
+		aggregatedManager.AddAPIService(s, service)
+	}
+
+	// This would wait the full timeout on 1.26.0.
+	require.True(t, cache.WaitForCacheSync(testCtx.Done(), aggregatedManager.ExternalServicesSynced))
+}
+
 // copied from staging/src/k8s.io/apiserver/pkg/endpoints/discovery/v2/handler_test.go
 func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv2beta1.APIGroupDiscoveryList {
 	fuzzer := fuzz.NewWithSeed(seed)
@@ -306,7 +367,7 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv
 	fuzzer.Funcs(func(o *apidiscoveryv2beta1.APIGroupDiscovery, c fuzz.Continue) {
 		c.FuzzNoCustom(o)
 
-		// The ResourceManager will just not serve the grouop if its versions
+		// The ResourceManager will just not serve the group if its versions
 		// list is empty
 		atLeastOne := apidiscoveryv2beta1.APIVersionDiscovery{}
 		c.Fuzz(&atLeastOne)
