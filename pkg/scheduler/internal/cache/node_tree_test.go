@@ -166,6 +166,11 @@ func TestNodeTree_AddNode(t *testing.T) {
 			expectedTree: map[string][]string{"": {"node-0"}},
 		},
 		{
+			name:         "same node specified twice",
+			nodesToAdd:   []*v1.Node{allNodes[0], allNodes[0]},
+			expectedTree: map[string][]string{"": {"node-0"}},
+		},
+		{
 			name:       "mix of nodes with and without proper labels",
 			nodesToAdd: allNodes[:4],
 			expectedTree: map[string][]string{
