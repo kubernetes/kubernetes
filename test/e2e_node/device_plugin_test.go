@@ -106,16 +106,16 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 			v1alphaPodResources, err = getV1alpha1NodeDevices()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "should get node local podresources by accessing the (v1alpha) podresources API endpoint")
 
 			v1PodResources, err = getV1NodeDevices()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "should get node local podresources by accessing the (v1) podresources API endpoint")
 
 			// Before we run the device plugin test, we need to ensure
 			// that the cluster is in a clean state and there are no
 			// pods running on this node.
-			framework.ExpectEqual(len(v1alphaPodResources.PodResources), 0)
-			framework.ExpectEqual(len(v1PodResources.PodResources), 0)
+			gomega.Expect(v1alphaPodResources.PodResources).To(gomega.BeEmpty(), "should have no pod resources")
+			gomega.Expect(v1PodResources.PodResources).To(gomega.BeEmpty(), "should have no pod resources")
 
 			ginkgo.By("Scheduling a sample device plugin pod")
 			data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
