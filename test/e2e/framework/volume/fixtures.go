@@ -539,6 +539,8 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 		framework.Failf("Failed to create client pod: %v", err)
 	}
 	defer func() {
+		// testVolumeClient might get used more than once per test, therefore
+		// we have to clean up before returning.
 		e2epod.DeletePodOrFail(f.ClientSet, clientPod.Namespace, clientPod.Name)
 		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
@@ -572,6 +574,8 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 		return
 	}
 	defer func() {
+		// This pod must get deleted before the function returns becaue the test relies on
+		// the volume not being in use.
 		e2epod.DeletePodOrFail(f.ClientSet, injectorPod.Namespace, injectorPod.Name)
 		e2epod.WaitForPodToDisappear(f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
