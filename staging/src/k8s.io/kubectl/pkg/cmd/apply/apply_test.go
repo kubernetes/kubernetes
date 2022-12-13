@@ -28,7 +28,6 @@ import (
 	"strings"
 	"testing"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
@@ -44,7 +43,6 @@ import (
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/discovery"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -60,12 +58,11 @@ import (
 
 var (
 	fakeSchema                = sptest.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
-	testingOpenAPISchemas     = []testOpenAPISchema{{OpenAPIGetter: &fakeSchema}, AlwaysErrorsOpenAPISchema, FakeOpenAPISchema}
+	testingOpenAPISchemas     = []testOpenAPISchema{AlwaysErrorsOpenAPISchema, FakeOpenAPISchema}
 	AlwaysErrorsOpenAPISchema = testOpenAPISchema{
 		OpenAPISchemaFn: func() (openapi.Resources, error) {
 			return nil, errors.New("cannot get openapi spec")
 		},
-		OpenAPIGetter: &alwaysErrorsOpenAPISchema{},
 	}
 	FakeOpenAPISchema = testOpenAPISchema{
 		OpenAPISchemaFn: func() (openapi.Resources, error) {
@@ -75,20 +72,12 @@ var (
 			}
 			return openapi.NewOpenAPIData(s)
 		},
-		OpenAPIGetter: &fakeSchema,
 	}
 	codec = scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 )
 
 type testOpenAPISchema struct {
 	OpenAPISchemaFn func() (openapi.Resources, error)
-	OpenAPIGetter   discovery.OpenAPISchemaInterface
-}
-
-type alwaysErrorsOpenAPISchema struct{}
-
-func (o *alwaysErrorsOpenAPISchema) OpenAPISchema() (*openapi_v2.Document, error) {
-	return nil, errors.New("cannot get openapi schema")
 }
 
 func TestApplyExtraArgsFail(t *testing.T) {
@@ -644,7 +633,6 @@ func TestApplyObject(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-			tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -693,7 +681,6 @@ func TestApplyPruneObjects(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-			tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -930,7 +917,6 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 					}),
 				}
 				tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-				tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 				tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 				for _, resource := range tc.currentResources {
@@ -1109,7 +1095,6 @@ func TestApplyCSAMigration(t *testing.T) {
 		}),
 	}
 	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
-	tf.FakeOpenAPIGetter = FakeOpenAPISchema.OpenAPIGetter
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -1198,7 +1183,6 @@ func TestApplyObjectOutput(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-			tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -1260,7 +1244,6 @@ func TestApplyRetry(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-			tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -1436,7 +1419,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-			tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -1532,7 +1514,6 @@ func TestApplyNULLPreservation(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-			tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -1595,7 +1576,6 @@ func TestUnstructuredApply(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-			tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -1660,7 +1640,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 				}),
 			}
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-			tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
@@ -1903,7 +1882,6 @@ func TestForceApply(t *testing.T) {
 			fakeDynamicClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
 			tf.FakeDynamicClient = fakeDynamicClient
 			tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
-			tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
 			tf.Client = tf.UnstructuredClient
 			tf.ClientConfigVal = &restclient.Config{}
 

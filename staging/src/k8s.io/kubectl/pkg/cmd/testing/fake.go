@@ -49,8 +49,6 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 	"k8s.io/kubectl/pkg/validation"
-
-	openapi_v2 "github.com/google/gnostic/openapiv2"
 )
 
 // InternalType is the schema for internal type
@@ -420,7 +418,6 @@ type TestFactory struct {
 
 	UnstructuredClientForMappingFunc resource.FakeClientFunc
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
-	FakeOpenAPIGetter                discovery.OpenAPISchemaInterface
 }
 
 // NewTestFactory returns an initialized TestFactory instance
@@ -534,23 +531,6 @@ func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 		return f.OpenAPISchemaFunc()
 	}
 	return openapitesting.EmptyResources{}, nil
-}
-
-type EmptyOpenAPI struct{}
-
-func (EmptyOpenAPI) OpenAPISchema() (*openapi_v2.Document, error) {
-	return &openapi_v2.Document{}, nil
-}
-
-func (f *TestFactory) OpenAPIGetter() discovery.OpenAPISchemaInterface {
-	if f.FakeOpenAPIGetter != nil {
-		return f.FakeOpenAPIGetter
-	}
-	client, err := f.ToDiscoveryClient()
-	if err != nil {
-		return EmptyOpenAPI{}
-	}
-	return client
 }
 
 // NewBuilder returns an initialized resource.Builder instance
