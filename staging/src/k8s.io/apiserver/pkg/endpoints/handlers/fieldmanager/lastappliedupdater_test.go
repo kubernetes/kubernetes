@@ -32,7 +32,7 @@ import (
 )
 
 func TestLastAppliedUpdater(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
 		"",
 		func(m fieldmanager.Manager) fieldmanager.Manager {
 			return fieldmanager.NewLastAppliedUpdater(m)
@@ -189,7 +189,7 @@ func TestLargeLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f := fieldmanagertest.NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"),
+			f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"),
 				"",
 				func(m fieldmanager.Manager) fieldmanager.Manager {
 					return fieldmanager.NewLastAppliedUpdater(m)

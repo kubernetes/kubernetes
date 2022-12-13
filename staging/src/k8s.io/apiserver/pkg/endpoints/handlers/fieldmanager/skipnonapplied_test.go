@@ -30,7 +30,7 @@ import (
 )
 
 func TestNoUpdateBeforeFirstApply(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m fieldmanager.Manager) fieldmanager.Manager {
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m fieldmanager.Manager) fieldmanager.Manager {
 		return fieldmanager.NewSkipNonAppliedManager(
 			m,
 			fieldmanagertest.NewFakeObjectCreater(),
@@ -70,7 +70,7 @@ func TestNoUpdateBeforeFirstApply(t *testing.T) {
 }
 
 func TestUpdateBeforeFirstApply(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m fieldmanager.Manager) fieldmanager.Manager {
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m fieldmanager.Manager) fieldmanager.Manager {
 		return fieldmanager.NewSkipNonAppliedManager(
 			m,
 			fieldmanagertest.NewFakeObjectCreater(),
