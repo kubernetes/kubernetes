@@ -46,8 +46,10 @@ run_kubectl_diff_tests() {
     # Make sure that:
     # 1. the exit code for diff is 1 because it found a difference
     # 2. the difference contains the changed image
-    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml || test $? -eq 1)
+    # 3. the output doesn't indicate this is an error
+    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml 2>&1 || test $? -eq 1)
     kube::test::if_has_string "${output_message}" 'registry.k8s.io/pause:3.4'
+    kube::test::if_has_not_string "${output_message}" 'exit status 1'
 
     # Ensure diff only dry-runs and doesn't persist change
     resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
