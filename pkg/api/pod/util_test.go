@@ -2176,3 +2176,63 @@ func TestDropSchedulingGates(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
+	testCases := []struct {
+		name       string
+		oldPodSpec *api.PodSpec
+		wantOption bool
+	}{
+		{
+			name:       "Create",
+			wantOption: false,
+		},
+		{
+			name: "UpdateInvalidLabelSelector",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"},
+						},
+					},
+				},
+			},
+			wantOption: true,
+		},
+		{
+			name: "UpdateValidLabelSelector",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"foo": "foo"},
+						},
+					},
+				},
+			},
+			wantOption: false,
+		},
+		{
+			name: "UpdateEmptyLabelSelector",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						LabelSelector: nil,
+					},
+				},
+			},
+			wantOption: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Pod meta doesn't impact the outcome.
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowInvalidTopologySpreadConstraintLabelSelector {
+				t.Errorf("Got AllowInvalidLabelValueInSelector=%t, want %t", gotOptions.AllowInvalidTopologySpreadConstraintLabelSelector, tc.wantOption)
+			}
+		})
+	}
+}

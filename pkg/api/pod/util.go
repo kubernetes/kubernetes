@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -402,6 +403,17 @@ func haveSameExpandedDNSConfig(podSpec, oldPodSpec *api.PodSpec) bool {
 	return true
 }
 
+// hasInvalidTopologySpreadConstraintLabelSelector return true if spec.TopologySpreadConstraints have any entry with invalid labelSelector
+func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
+	for _, constraint := range spec.TopologySpreadConstraints {
+		errs := metavalidation.ValidateLabelSelector(constraint.LabelSelector, metavalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, nil)
+		if len(errs) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // GetValidationOptionsFromPodSpecAndMeta returns validation options based on pod specs and metadata
 func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) apivalidation.PodValidationOptions {
 	// default pod validation options based on feature gate
@@ -412,8 +424,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
 		AllowIndivisibleHugePagesValues: false,
 		// Allow pod spec with expanded DNS configuration
-		AllowExpandedDNSConfig:           utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
-		AllowInvalidLabelValueInSelector: false,
+		AllowExpandedDNSConfig:                            utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
+		AllowInvalidLabelValueInSelector:                  false,
+		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 	}
 
 	if oldPodSpec != nil {
@@ -431,7 +444,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
 
 		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
-
+		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
+		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
