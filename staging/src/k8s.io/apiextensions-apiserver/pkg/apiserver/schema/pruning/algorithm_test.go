@@ -22,10 +22,12 @@ import (
 	"strings"
 	"testing"
 
-	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
+
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 func TestPrune(t *testing.T) {
@@ -383,6 +385,8 @@ func TestPrune(t *testing.T) {
   "kind": "Foo",
   "metadata": {
     "name": "instance",
+    "namespace": "myns",
+    "labels":{"foo":"bar"},
     "unspecified": "bar"
   },
   "unspecified":"bar",
@@ -392,6 +396,8 @@ func TestPrune(t *testing.T) {
     "unspecified": "bar",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels":{"foo":"bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -404,6 +410,8 @@ func TestPrune(t *testing.T) {
     "unspecified": "bar",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels":{"foo":"bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -416,6 +424,8 @@ func TestPrune(t *testing.T) {
     "unspecified": "bar",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels":{"foo":"bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -426,6 +436,8 @@ func TestPrune(t *testing.T) {
         "unspecified": "bar",
         "metadata": {
           "name": "instance",
+          "namespace": "myns",
+          "labels":{"foo":"bar"},
           "unspecified": "bar"
         },
         "spec": {
@@ -438,12 +450,18 @@ func TestPrune(t *testing.T) {
 `, isResourceRoot: true, schema: &structuralschema.Structural{
 			Generic: structuralschema.Generic{Type: "object"},
 			Properties: map[string]structuralschema.Structural{
+				"metadata": {
+					Generic: structuralschema.Generic{Type: "object"},
+				},
 				"pruned": {
 					Generic: structuralschema.Generic{Type: "object"},
 					Extensions: structuralschema.Extensions{
 						XEmbeddedResource: true,
 					},
 					Properties: map[string]structuralschema.Structural{
+						"metadata": {
+							Generic: structuralschema.Generic{Type: "object"},
+						},
 						"spec": {
 							Generic: structuralschema.Generic{Type: "object"},
 						},
@@ -471,6 +489,9 @@ func TestPrune(t *testing.T) {
 										XEmbeddedResource: true,
 									},
 									Properties: map[string]structuralschema.Structural{
+										"metadata": {
+											Generic: structuralschema.Generic{Type: "object"},
+										},
 										"spec": {
 											Generic: structuralschema.Generic{Type: "object"},
 										},
@@ -487,6 +508,8 @@ func TestPrune(t *testing.T) {
   "kind": "Foo",
   "metadata": {
     "name": "instance",
+    "namespace": "myns",
+    "labels": {"foo": "bar"},
     "unspecified": "bar"
   },
   "pruned": {
@@ -494,6 +517,8 @@ func TestPrune(t *testing.T) {
     "kind": "Foo",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels": {"foo": "bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -505,6 +530,8 @@ func TestPrune(t *testing.T) {
     "unspecified": "bar",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels": {"foo": "bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -516,6 +543,8 @@ func TestPrune(t *testing.T) {
     "kind": "Foo",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels": {"foo": "bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -524,6 +553,8 @@ func TestPrune(t *testing.T) {
         "kind": "Foo",
         "metadata": {
           "name": "instance",
+          "namespace": "myns",
+          "labels": {"foo": "bar"},
           "unspecified": "bar"
         },
         "spec": {
@@ -546,8 +577,8 @@ func TestPrune(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			pruned := PruneWithOptions(in, tt.schema, tt.isResourceRoot, PruneOptions{
-				ReturnPruned: true,
+			pruned := PruneWithOptions(in, tt.schema, tt.isResourceRoot, structuralschema.UnknownFieldPathOptions{
+				TrackUnknownFieldPaths: true,
 			})
 			if !reflect.DeepEqual(in, expectedObject) {
 				var buf bytes.Buffer
@@ -557,14 +588,14 @@ func TestPrune(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected result mashalling error: %v", err)
 				}
-				t.Errorf("expected object: %s\ngot: %s\ndiff: %s", tt.expectedObject, buf.String(), diff.ObjectDiff(expectedObject, in))
+				t.Errorf("expected object: %s\ngot: %s\ndiff: %s", tt.expectedObject, buf.String(), cmp.Diff(expectedObject, in))
 			}
 			if !reflect.DeepEqual(pruned, tt.expectedPruned) {
 				t.Errorf("expected pruned:\n\t%v\ngot:\n\t%v\n", strings.Join(tt.expectedPruned, "\n\t"), strings.Join(pruned, "\n\t"))
 			}
 
-			// now check that pruned is empty when ReturnPruned is false
-			emptyPruned := PruneWithOptions(in, tt.schema, tt.isResourceRoot, PruneOptions{})
+			// now check that pruned is empty when TrackUnknownFieldPaths is false
+			emptyPruned := PruneWithOptions(in, tt.schema, tt.isResourceRoot, structuralschema.UnknownFieldPathOptions{})
 			if !reflect.DeepEqual(in, expectedObject) {
 				var buf bytes.Buffer
 				enc := json.NewEncoder(&buf)
@@ -573,7 +604,7 @@ func TestPrune(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected result mashalling error: %v", err)
 				}
-				t.Errorf("expected object: %s\ngot: %s\ndiff: %s", tt.expectedObject, buf.String(), diff.ObjectDiff(expectedObject, in))
+				t.Errorf("expected object: %s\ngot: %s\ndiff: %s", tt.expectedObject, buf.String(), cmp.Diff(expectedObject, in))
 			}
 			if len(emptyPruned) > 0 {
 				t.Errorf("unexpectedly returned pruned fields: %v", emptyPruned)

@@ -15,7 +15,7 @@ spec:
     spec:
       initContainers:
       - name: install
-        image: k8s.gcr.io/e2e-test-images/pets/redis-installer:1.5
+        image: registry.k8s.io/e2e-test-images/pets/redis-installer:1.5
         imagePullPolicy: Always
         args:
         - "--install-into=/opt"

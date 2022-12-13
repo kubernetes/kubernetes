@@ -24,7 +24,7 @@ import (
 )
 
 func TestCSIImageConfigs(t *testing.T) {
-	configs := map[int]Config{}
+	configs := map[ImageID]Config{}
 	appendCSIImageConfigs(configs)
 
 	// We expect at least one entry for each of these images. There may be

@@ -30,6 +30,8 @@ const (
 	// ForceActivate is the event when a pod is moved from unschedulablePods/backoffQ
 	// to activeQ. Usually it's triggered by plugin implementations.
 	ForceActivate = "ForceActivate"
+	// PodUpdate is the event when a pod is updated
+	PodUpdate = "PodUpdate"
 )
 
 var (
@@ -78,12 +80,6 @@ var (
 	CSIStorageCapacityAdd = framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add, Label: "CSIStorageCapacityAdd"}
 	// CSIStorageCapacityUpdate is the event when a CSI storage capacity is updated in the cluster.
 	CSIStorageCapacityUpdate = framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Update, Label: "CSIStorageCapacityUpdate"}
-	// ServiceAdd is the event when a service is added in the cluster.
-	ServiceAdd = framework.ClusterEvent{Resource: framework.Service, ActionType: framework.Add, Label: "ServiceAdd"}
-	// ServiceUpdate is the event when a service is updated in the cluster.
-	ServiceUpdate = framework.ClusterEvent{Resource: framework.Service, ActionType: framework.Update, Label: "ServiceUpdate"}
-	// ServiceDelete is the event when a service is deleted in the cluster.
-	ServiceDelete = framework.ClusterEvent{Resource: framework.Service, ActionType: framework.Delete, Label: "ServiceDelete"}
 	// WildCardEvent semantically matches all resources on all actions.
 	WildCardEvent = framework.ClusterEvent{Resource: framework.WildCard, ActionType: framework.All, Label: "WildCardEvent"}
 	// UnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.

@@ -65,6 +65,7 @@ export KUBE_OUTPUT_HOSTBIN
 KUBE_AVAILABLE_GROUP_VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS:-\
 v1 \
 admissionregistration.k8s.io/v1 \
+admissionregistration.k8s.io/v1alpha1 \
 admissionregistration.k8s.io/v1beta1 \
 admission.k8s.io/v1 \
 admission.k8s.io/v1beta1 \
@@ -72,6 +73,7 @@ apps/v1 \
 apps/v1beta1 \
 apps/v1beta2 \
 authentication.k8s.io/v1 \
+authentication.k8s.io/v1alpha1 \
 authentication.k8s.io/v1beta1 \
 authorization.k8s.io/v1 \
 authorization.k8s.io/v1beta1 \
@@ -87,11 +89,13 @@ coordination.k8s.io/v1beta1 \
 coordination.k8s.io/v1 \
 discovery.k8s.io/v1 \
 discovery.k8s.io/v1beta1 \
+resource.k8s.io/v1alpha1 \
 extensions/v1beta1 \
 events.k8s.io/v1 \
 events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
+networking.k8s.io/v1alpha1 \
 networking.k8s.io/v1beta1 \
 node.k8s.io/v1 \
 node.k8s.io/v1alpha1 \
@@ -110,6 +114,7 @@ storage.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1beta1 \
 flowcontrol.apiserver.k8s.io/v1beta2 \
+flowcontrol.apiserver.k8s.io/v1beta3 \
 internal.apiserver.k8s.io/v1alpha1 \
 }"
 
@@ -118,6 +123,7 @@ internal.apiserver.k8s.io/v1alpha1 \
 KUBE_NONSERVER_GROUP_VERSIONS="
  abac.authorization.kubernetes.io/v0 \
  abac.authorization.kubernetes.io/v1beta1 \
+ apidiscovery.k8s.io/v2beta1 \
  componentconfig/v1alpha1 \
  imagepolicy.k8s.io/v1alpha1\
  admission.k8s.io/v1\

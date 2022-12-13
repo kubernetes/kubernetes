@@ -10,18 +10,17 @@
 // and provides the user with the best experience
 // (see https://blog.golang.org/matchlang).
 //
-//
-// Matching preferred against supported languages
+// # Matching preferred against supported languages
 //
 // A Matcher for an application that supports English, Australian English,
 // Danish, and standard Mandarin can be created as follows:
 //
-//    var matcher = language.NewMatcher([]language.Tag{
-//        language.English,   // The first language is used as fallback.
-//        language.MustParse("en-AU"),
-//        language.Danish,
-//        language.Chinese,
-//    })
+//	var matcher = language.NewMatcher([]language.Tag{
+//	    language.English,   // The first language is used as fallback.
+//	    language.MustParse("en-AU"),
+//	    language.Danish,
+//	    language.Chinese,
+//	})
 //
 // This list of supported languages is typically implied by the languages for
 // which there exists translations of the user interface.
@@ -30,14 +29,14 @@
 // language tags.
 // The MatchString finds best matches for such strings:
 //
-//    handler(w http.ResponseWriter, r *http.Request) {
-//        lang, _ := r.Cookie("lang")
-//        accept := r.Header.Get("Accept-Language")
-//        tag, _ := language.MatchStrings(matcher, lang.String(), accept)
+//	handler(w http.ResponseWriter, r *http.Request) {
+//	    lang, _ := r.Cookie("lang")
+//	    accept := r.Header.Get("Accept-Language")
+//	    tag, _ := language.MatchStrings(matcher, lang.String(), accept)
 //
-//        // tag should now be used for the initialization of any
-//        // locale-specific service.
-//    }
+//	    // tag should now be used for the initialization of any
+//	    // locale-specific service.
+//	}
 //
 // The Matcher's Match method can be used to match Tags directly.
 //
@@ -48,8 +47,7 @@
 // For instance, it will know that a reader of Bokmål Danish can read Norwegian
 // and will know that Cantonese ("yue") is a good match for "zh-HK".
 //
-//
-// Using match results
+// # Using match results
 //
 // To guarantee a consistent user experience to the user it is important to
 // use the same language tag for the selection of any locale-specific services.
@@ -58,9 +56,9 @@
 // More subtly confusing is using the wrong sorting order or casing
 // algorithm for a certain language.
 //
-//    All the packages in x/text that provide locale-specific services
-//    (e.g. collate, cases) should be initialized with the tag that was
-//    obtained at the start of an interaction with the user.
+// All the packages in x/text that provide locale-specific services
+// (e.g. collate, cases) should be initialized with the tag that was
+// obtained at the start of an interaction with the user.
 //
 // Note that Tag that is returned by Match and MatchString may differ from any
 // of the supported languages, as it may contain carried over settings from
@@ -70,8 +68,7 @@
 // Match and MatchString both return the index of the matched supported tag
 // to simplify associating such data with the matched tag.
 //
-//
-// Canonicalization
+// # Canonicalization
 //
 // If one uses the Matcher to compare languages one does not need to
 // worry about canonicalization.
@@ -92,10 +89,9 @@
 // equivalence relations. The CanonType type can be used to alter the
 // canonicalization form.
 //
-// References
+// # References
 //
 // BCP 47 - Tags for Identifying Languages http://tools.ietf.org/html/bcp47
-//
 package language // import "golang.org/x/text/language"
 
 // TODO: explanation on how to match languages for your own locale-specific

@@ -31,7 +31,6 @@
     "finalizers": [
       "finalizersValue"
     ],
-    "clusterName": "clusterNameValue",
     "managedFields": [
       {
         "manager": "managerValue",
@@ -75,7 +74,6 @@
       "finalizers": [
         "finalizersValue"
       ],
-      "clusterName": "clusterNameValue",
       "managedFields": [
         {
           "manager": "managerValue",
@@ -403,7 +401,6 @@
                 "finalizers": [
                   "finalizersValue"
                 ],
-                "clusterName": "clusterNameValue",
                 "managedFields": [
                   {
                     "manager": "managerValue",
@@ -440,7 +437,12 @@
                   },
                   "requests": {
                     "requestsKey": "0"
-                  }
+                  },
+                  "claims": [
+                    {
+                      "name": "nameValue"
+                    }
+                  ]
                 },
                 "volumeName": "volumeNameValue",
                 "storageClassName": "storageClassNameValue",
@@ -453,7 +455,8 @@
                 "dataSourceRef": {
                   "apiGroup": "apiGroupValue",
                   "kind": "kindValue",
-                  "name": "nameValue"
+                  "name": "nameValue",
+                  "namespace": "namespaceValue"
                 }
               }
             }
@@ -526,7 +529,12 @@
             },
             "requests": {
               "requestsKey": "0"
-            }
+            },
+            "claims": [
+              {
+                "name": "nameValue"
+              }
+            ]
           },
           "volumeMounts": [
             {
@@ -798,7 +806,12 @@
             },
             "requests": {
               "requestsKey": "0"
-            }
+            },
+            "claims": [
+              {
+                "name": "nameValue"
+              }
+            ]
           },
           "volumeMounts": [
             {
@@ -1070,7 +1083,12 @@
             },
             "requests": {
               "requestsKey": "0"
-            }
+            },
+            "claims": [
+              {
+                "name": "nameValue"
+              }
+            ]
           },
           "volumeMounts": [
             {
@@ -1602,13 +1620,33 @@
               }
             ]
           },
-          "minDomains": 5
+          "minDomains": 5,
+          "nodeAffinityPolicy": "nodeAffinityPolicyValue",
+          "nodeTaintsPolicy": "nodeTaintsPolicyValue",
+          "matchLabelKeys": [
+            "matchLabelKeysValue"
+          ]
         }
       ],
       "setHostnameAsFQDN": true,
       "os": {
         "name": "nameValue"
-      }
+      },
+      "hostUsers": true,
+      "schedulingGates": [
+        {
+          "name": "nameValue"
+        }
+      ],
+      "resourceClaims": [
+        {
+          "name": "nameValue",
+          "source": {
+            "resourceClaimName": "resourceClaimNameValue",
+            "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+          }
+        }
+      ]
     }
   }
 }

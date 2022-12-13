@@ -73,8 +73,7 @@ message Endpoint {
   map<string, string> topology = 5;
 
   // nodeName represents the name of the Node hosting this endpoint. This can
-  // be used to determine endpoints local to a Node. This field can be enabled
-  // with the EndpointSliceNodeName feature gate.
+  // be used to determine endpoints local to a Node.
   // +optional
   optional string nodeName = 6;
 
@@ -98,15 +97,13 @@ message EndpointConditions {
   // serving is identical to ready except that it is set regardless of the
   // terminating state of endpoints. This condition should be set to true for
   // a ready endpoint that is terminating. If nil, consumers should defer to
-  // the ready condition. This field can be enabled with the
-  // EndpointSliceTerminatingCondition feature gate.
+  // the ready condition.
   // +optional
   optional bool serving = 2;
 
   // terminating indicates that this endpoint is terminating. A nil value
   // indicates an unknown state. Consumers should interpret this unknown state
-  // to mean that the endpoint is not terminating. This field can be enabled
-  // with the EndpointSliceTerminatingCondition feature gate.
+  // to mean that the endpoint is not terminating.
   // +optional
   optional bool terminating = 3;
 }
@@ -121,9 +118,8 @@ message EndpointHints {
 
 // EndpointPort represents a Port used by an EndpointSlice
 message EndpointPort {
-  // The name of this port. All ports in an EndpointSlice must have a unique
-  // name. If the EndpointSlice is dervied from a Kubernetes service, this
-  // corresponds to the Service.ports[].name.
+  // name represents the name of this port. All ports in an EndpointSlice must have a unique name.
+  // If the EndpointSlice is dervied from a Kubernetes service, this corresponds to the Service.ports[].name.
   // Name must either be an empty string or pass DNS_LABEL validation:
   // * must be no more than 63 characters long.
   // * must consist of lower case alphanumeric characters or '-'.
@@ -131,17 +127,17 @@ message EndpointPort {
   // Default is empty string.
   optional string name = 1;
 
-  // The IP protocol for this port.
+  // protocol represents the IP protocol for this port.
   // Must be UDP, TCP, or SCTP.
   // Default is TCP.
   optional string protocol = 2;
 
-  // The port number of the endpoint.
+  // port represents the port number of the endpoint.
   // If this is not specified, ports are not restricted and must be
   // interpreted in the context of the specific consumer.
   optional int32 port = 3;
 
-  // The application protocol for this port.
+  // appProtocol represents the application protocol for this port.
   // This field follows standard Kubernetes label syntax.
   // Un-prefixed names are reserved for IANA standard service names (as per
   // RFC-6335 and https://www.iana.org/assignments/service-names).
@@ -189,7 +185,7 @@ message EndpointSliceList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // List of endpoint slices
+  // items is the list of endpoint slices
   repeated EndpointSlice items = 2;
 }
 

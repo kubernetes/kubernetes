@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -37,6 +38,7 @@ type Manager interface {
 
 // Config represents Manager configuration
 type Config struct {
+	Logger                           klog.Logger
 	ProbeManager                     prober.Manager
 	Recorder                         record.EventRecorder
 	NodeRef                          *v1.ObjectReference

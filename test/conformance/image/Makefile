@@ -15,9 +15,9 @@
 # Build the conformance image.
 #
 # Usage:
-#   [ARCH=amd64] [REGISTRY="k8s.gcr.io"] make (build|push) VERSION={some_released_version_of_kubernetes}
+#   [ARCH=amd64] [REGISTRY="registry.k8s.io"] make (build|push) VERSION={some_released_version_of_kubernetes}
 
-REGISTRY?=k8s.gcr.io
+REGISTRY?=registry.k8s.io
 ARCH?=amd64
 OUT_DIR?=_output
 
@@ -32,8 +32,8 @@ E2E_GO_RUNNER_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/go-runner && echo $(LOCA
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
 # This is defined in root Makefile, but some build contexts do not refer to them
-KUBE_BASE_IMAGE_REGISTRY?=k8s.gcr.io
-BASE_IMAGE_VERSION?=bullseye-v1.2.0
+KUBE_BASE_IMAGE_REGISTRY?=registry.k8s.io
+BASE_IMAGE_VERSION?=bullseye-v1.3.0
 BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base-${ARCH}:${BASE_IMAGE_VERSION}
 
 # Keep debian releases (e.g. debian 11 == bullseye) consistent 

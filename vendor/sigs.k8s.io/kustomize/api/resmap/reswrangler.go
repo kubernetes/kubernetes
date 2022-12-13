@@ -429,7 +429,6 @@ func getNamespacesForRoleBinding(r *resource.Resource) (map[string]bool, error) 
 	if r.GetKind() != "RoleBinding" {
 		return result, nil
 	}
-	//nolint staticcheck
 	subjects, err := r.GetSlice("subjects")
 	if err != nil || subjects == nil {
 		return result, nil
@@ -442,7 +441,7 @@ func getNamespacesForRoleBinding(r *resource.Resource) (map[string]bool, error) 
 					if n, ok3 := ns.(string); ok3 {
 						result[n] = true
 					} else {
-						return nil, errors.New(fmt.Sprintf("Invalid Input: namespace is blank for resource %q\n", r.CurId()))
+						return nil, errors.Errorf("Invalid Input: namespace is blank for resource %q\n", r.CurId())
 					}
 				}
 			}

@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", func() {
@@ -48,7 +48,7 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 			Description: Create a Custom Resource Definition. Attempt to watch it; the watch MUST observe create,
 			modify and delete events.
 		*/
-		framework.ConformanceIt("watch on custom resource definition objects", func() {
+		framework.ConformanceIt("watch on custom resource definition objects", func(ctx context.Context) {
 
 			const (
 				watchCRNameA = "name1"

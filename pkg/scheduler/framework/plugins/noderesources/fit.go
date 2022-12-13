@@ -135,25 +135,26 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 // the max in each dimension iteratively. In contrast, we sum the resource vectors for
 // regular containers since they run simultaneously.
 //
-// The resources defined for Overhead should be added to the calculated Resource request sum
+// # The resources defined for Overhead should be added to the calculated Resource request sum
 //
 // Example:
 //
 // Pod:
-//   InitContainers
-//     IC1:
-//       CPU: 2
-//       Memory: 1G
-//     IC2:
-//       CPU: 2
-//       Memory: 3G
-//   Containers
-//     C1:
-//       CPU: 2
-//       Memory: 1G
-//     C2:
-//       CPU: 1
-//       Memory: 1G
+//
+//	InitContainers
+//	  IC1:
+//	    CPU: 2
+//	    Memory: 1G
+//	  IC2:
+//	    CPU: 2
+//	    Memory: 3G
+//	Containers
+//	  C1:
+//	    CPU: 2
+//	    Memory: 1G
+//	  C2:
+//	    CPU: 1
+//	    Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
 func computePodResourceRequest(pod *v1.Pod) *preFilterState {
@@ -299,6 +300,11 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 	}
 
 	for rName, rQuant := range podRequest.ScalarResources {
+		// Skip in case request quantity is zero
+		if rQuant == 0 {
+			continue
+		}
+
 		if v1helper.IsExtendedResourceName(rName) {
 			// If this resource is one of the extended resources that should be ignored, we will skip checking it.
 			// rName is guaranteed to have a slash due to API validation.
@@ -310,6 +316,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 				continue
 			}
 		}
+
 		if rQuant > (nodeInfo.Allocatable.ScalarResources[rName] - nodeInfo.Requested.ScalarResources[rName]) {
 			insufficientResources = append(insufficientResources, InsufficientResource{
 				ResourceName: rName,

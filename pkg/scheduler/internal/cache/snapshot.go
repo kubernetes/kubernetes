@@ -36,7 +36,10 @@ type Snapshot struct {
 	// havePodsWithRequiredAntiAffinityNodeInfoList is the list of nodes with at least one pod declaring
 	// required anti-affinity terms.
 	havePodsWithRequiredAntiAffinityNodeInfoList []*framework.NodeInfo
-	generation                                   int64
+	// usedPVCSet contains a set of PVC names that have one or more scheduled pods using them,
+	// keyed in the format "namespace/name".
+	usedPVCSet sets.String
+	generation int64
 }
 
 var _ framework.SharedLister = &Snapshot{}
@@ -45,6 +48,7 @@ var _ framework.SharedLister = &Snapshot{}
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
 		nodeInfoMap: make(map[string]*framework.NodeInfo),
+		usedPVCSet:  sets.NewString(),
 	}
 }
 
@@ -69,6 +73,7 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	s.nodeInfoList = nodeInfoList
 	s.havePodsWithAffinityNodeInfoList = havePodsWithAffinityNodeInfoList
 	s.havePodsWithRequiredAntiAffinityNodeInfoList = havePodsWithRequiredAntiAffinityNodeInfoList
+	s.usedPVCSet = createUsedPVCSet(pods)
 
 	return s
 }
@@ -96,6 +101,25 @@ func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.N
 		nodeInfo.ImageStates = getNodeImageStates(node, imageExistenceMap)
 	}
 	return nodeNameToInfo
+}
+
+func createUsedPVCSet(pods []*v1.Pod) sets.String {
+	usedPVCSet := sets.NewString()
+	for _, pod := range pods {
+		if pod.Spec.NodeName == "" {
+			continue
+		}
+
+		for _, v := range pod.Spec.Volumes {
+			if v.PersistentVolumeClaim == nil {
+				continue
+			}
+
+			key := framework.GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+			usedPVCSet.Insert(key)
+		}
+	}
+	return usedPVCSet
 }
 
 // getNodeImageStates returns the given node's image states based on the given imageExistence map.
@@ -135,6 +159,11 @@ func (s *Snapshot) NodeInfos() framework.NodeInfoLister {
 	return s
 }
 
+// StorageInfos returns a StorageInfoLister.
+func (s *Snapshot) StorageInfos() framework.StorageInfoLister {
+	return s
+}
+
 // NumNodes returns the number of nodes in the snapshot.
 func (s *Snapshot) NumNodes() int {
 	return len(s.nodeInfoList)
@@ -162,4 +191,8 @@ func (s *Snapshot) Get(nodeName string) (*framework.NodeInfo, error) {
 		return v, nil
 	}
 	return nil, fmt.Errorf("nodeinfo not found for node name %q", nodeName)
+}
+
+func (s *Snapshot) IsPVCUsedByPods(key string) bool {
+	return s.usedPVCSet.Has(key)
 }

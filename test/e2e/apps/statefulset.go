@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,8 +45,10 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
@@ -120,8 +122,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
+			if ginkgo.CurrentSpecReport().Failed() {
+				e2eoutput.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
 			e2estatefulset.DeleteAllStatefulSets(c, ns)
@@ -129,7 +131,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
-		ginkgo.It("should provide basic identity", func() {
+		ginkgo.It("should provide basic identity", func(ctx context.Context) {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 3
@@ -168,7 +170,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
-		ginkgo.It("should adopt matching orphans and release non-matching pods", func() {
+		ginkgo.It("should adopt matching orphans and release non-matching pods", func(ctx context.Context) {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 1
@@ -195,7 +197,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectEqual(controllerRef.UID, ss.UID)
 
 			ginkgo.By("Orphaning one of the stateful set's pods")
-			f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+			e2epod.NewPodClient(f).Update(pod.Name, func(pod *v1.Pod) {
 				pod.OwnerReferences = nil
 			})
 
@@ -215,7 +217,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Removing the labels from one of the stateful set's pods")
 			prevLabels := pod.Labels
-			f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+			e2epod.NewPodClient(f).Update(pod.Name, func(pod *v1.Pod) {
 				pod.Labels = nil
 			})
 
@@ -232,7 +234,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			// If we don't do this, the test leaks the Pod and PVC.
 			ginkgo.By("Readding labels to the stateful set's pod")
-			f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+			e2epod.NewPodClient(f).Update(pod.Name, func(pod *v1.Pod) {
 				pod.Labels = prevLabels
 			})
 
@@ -253,7 +255,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
-		ginkgo.It("should not deadlock when a pod's predecessor fails", func() {
+		ginkgo.It("should not deadlock when a pod's predecessor fails", func(ctx context.Context) {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 2
@@ -289,7 +291,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
-		ginkgo.It("should perform rolling updates and roll backs of template modifications with PVCs", func() {
+		ginkgo.It("should perform rolling updates and roll backs of template modifications with PVCs", func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet with PVCs")
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 3
@@ -301,7 +303,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Rolling Update
 		   Description: StatefulSet MUST support the RollingUpdate strategy to automatically replace Pods one at a time when the Pod template changes. The StatefulSet's status MUST indicate the CurrentRevision and UpdateRevision. If the template is changed to match a prior revision, StatefulSet MUST detect this as a rollback instead of creating a new revision. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("should perform rolling updates and roll backs of template modifications", func() {
+		framework.ConformanceIt("should perform rolling updates and roll backs of template modifications", func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			rollbackTest(c, ns, ss)
@@ -312,7 +314,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Rolling Update with Partition
 		   Description: StatefulSet's RollingUpdate strategy MUST support the Partition parameter for canaries and phased rollouts. If a Pod is deleted while a rolling update is in progress, StatefulSet MUST restore the Pod without violating the Partition. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications", func() {
+		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications", func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			setHTTPProbe(ss)
@@ -504,7 +506,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// Do not mark this as Conformance.
 		// The legacy OnDelete strategy only exists for backward compatibility with pre-v1 APIs.
-		ginkgo.It("should implement legacy replacement when the update strategy is OnDelete", func() {
+		ginkgo.It("should implement legacy replacement when the update strategy is OnDelete", func(ctx context.Context) {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := e2estatefulset.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			setHTTPProbe(ss)
@@ -582,7 +584,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Scaling
 		   Description: StatefulSet MUST create Pods in ascending order by ordinal index when scaling up, and delete Pods in descending order when scaling down. Scaling up or down MUST pause if any Pods belonging to the StatefulSet are unhealthy. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow]", func() {
+		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow]", func(ctx context.Context) {
 			psLabels := klabels.Set(labels)
 			w := &cache.ListWatch{
 				WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
@@ -692,7 +694,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Burst Scaling
 		   Description: StatefulSet MUST support the Parallel PodManagementPolicy for burst scaling. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Burst scaling should run to completion even with unhealthy pods [Slow]", func() {
+		framework.ConformanceIt("Burst scaling should run to completion even with unhealthy pods [Slow]", func(ctx context.Context) {
 			psLabels := klabels.Set(labels)
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
@@ -734,7 +736,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Recreate Failed Pod
 		   Description: StatefulSet MUST delete and recreate Pods it owns that go into a Failed state, such as when they are rejected or evicted by a Node. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Should recreate evicted statefulset", func() {
+		framework.ConformanceIt("Should recreate evicted statefulset", func(ctx context.Context) {
 			podName := "test-pod"
 			statefulPodName := ssName + "-0"
 			ginkgo.By("Looking for a node to schedule stateful set and pod")
@@ -794,7 +796,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(context.TODO(), options)
 				},
 			}
-			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), statefulPodTimeout)
+			ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, statefulPodTimeout)
 			defer cancel()
 			// we need to get UID from pod in any state and wait until stateful set controller will remove pod at least once
 			_, err = watchtools.Until(ctx, pl.ResourceVersion, lw, func(event watch.Event) (bool, error) {
@@ -843,7 +845,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Newly created StatefulSet resource MUST have a scale of one.
 			Bring the scale of the StatefulSet resource up to two. StatefulSet scale MUST be at two replicas.
 		*/
-		framework.ConformanceIt("should have a working scale subresource", func() {
+		framework.ConformanceIt("should have a working scale subresource", func(ctx context.Context) {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			setHTTPProbe(ss)
@@ -903,7 +905,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			MUST succeed when patching a StatefulSet. It MUST succeed when
 			deleting the StatefulSet via deleteCollection.
 		*/
-		framework.ConformanceIt("should list, patch and delete a collection of StatefulSets", func() {
+		framework.ConformanceIt("should list, patch and delete a collection of StatefulSets", func(ctx context.Context) {
 
 			ssPatchReplicas := int32(2)
 			ssPatchImage := imageutils.GetE2EImage(imageutils.Pause)
@@ -972,7 +974,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Attempt to read, update and patch its status sub-resource; all
 			mutating sub-resource operations MUST be visible to subsequent reads.
 		*/
-		framework.ConformanceIt("should validate Statefulset Status endpoints", func() {
+		framework.ConformanceIt("should validate Statefulset Status endpoints", func(ctx context.Context) {
 			ssClient := c.AppsV1().StatefulSets(ns)
 			labelSelector := "e2e=testing"
 
@@ -1032,7 +1034,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("watching for the statefulset status to be updated")
 
-			ctx, cancel := context.WithTimeout(context.Background(), statefulSetTimeout)
+			ctx, cancel := context.WithTimeout(ctx, statefulSetTimeout)
 			defer cancel()
 
 			_, err = watchtools.Until(ctx, ssList.ResourceVersion, w, func(event watch.Event) (bool, error) {
@@ -1107,8 +1109,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
+			if ginkgo.CurrentSpecReport().Failed() {
+				e2eoutput.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
 			e2estatefulset.DeleteAllStatefulSets(c, ns)
@@ -1116,7 +1118,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working zookeeper cluster", func() {
+		ginkgo.It("should creating a working zookeeper cluster", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &zookeeperTester{client: c}
 			appTester.run()
@@ -1124,7 +1126,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working redis cluster", func() {
+		ginkgo.It("should creating a working redis cluster", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &redisTester{client: c}
 			appTester.run()
@@ -1132,7 +1134,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working mysql cluster", func() {
+		ginkgo.It("should creating a working mysql cluster", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &mysqlGaleraTester{client: c}
 			appTester.run()
@@ -1140,7 +1142,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working CockroachDB cluster", func() {
+		ginkgo.It("should creating a working CockroachDB cluster", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &cockroachDBTester{client: c}
 			appTester.run()
@@ -1149,7 +1151,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 	// Make sure minReadySeconds is honored
 	// Don't mark it as conformance yet
-	ginkgo.It("MinReadySeconds should be honored when enabled", func() {
+	ginkgo.It("MinReadySeconds should be honored when enabled", func(ctx context.Context) {
 		ssName := "test-ss"
 		headlessSvcName := "test"
 		// Define StatefulSet Labels
@@ -1164,7 +1166,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 1)
 	})
 
-	ginkgo.It("AvailableReplicas should get updated accordingly when MinReadySeconds is enabled", func() {
+	ginkgo.It("AvailableReplicas should get updated accordingly when MinReadySeconds is enabled", func(ctx context.Context) {
 		ssName := "test-ss"
 		headlessSvcName := "test"
 		// Define StatefulSet Labels
@@ -1201,7 +1203,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		e2estatefulset.WaitForStatusAvailableReplicas(c, ss, 2)
 
 		ginkgo.By("check availableReplicas are shown in status")
-		out, err := framework.RunKubectl(ns, "get", "statefulset", ss.Name, "-o=yaml")
+		out, err := e2ekubectl.RunKubectl(ns, "get", "statefulset", ss.Name, "-o=yaml")
 		framework.ExpectNoError(err)
 		if !strings.Contains(out, "availableReplicas: 2") {
 			framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 2, out)
@@ -1230,14 +1232,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
+			if ginkgo.CurrentSpecReport().Failed() {
+				e2eoutput.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
 			e2estatefulset.DeleteAllStatefulSets(c, ns)
 		})
 
-		ginkgo.It("should delete PVCs with a WhenDeleted policy", func() {
+		ginkgo.It("should delete PVCs with a WhenDeleted policy", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 3
@@ -1260,7 +1262,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should delete PVCs with a OnScaledown policy", func() {
+		ginkgo.It("should delete PVCs with a OnScaledown policy", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 3
@@ -1283,7 +1285,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should delete PVCs after adopting pod (WhenDeleted)", func() {
+		ginkgo.It("should delete PVCs after adopting pod (WhenDeleted)", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 3
@@ -1314,7 +1316,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC]", func() {
+		ginkgo.It("should delete PVCs after adopting pod (WhenScaled) [Feature:StatefulSetAutoDeletePVC]", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(c)
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 3
@@ -1350,7 +1352,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 func kubectlExecWithRetries(ns string, args ...string) (out string) {
 	var err error
 	for i := 0; i < 3; i++ {
-		if out, err = framework.RunKubectl(ns, args...); err == nil {
+		if out, err = e2ekubectl.RunKubectl(ns, args...); err == nil {
 			return
 		}
 		framework.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
@@ -1414,14 +1416,14 @@ func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(framework.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
+		framework.Logf(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
 func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
-	return lastLine(framework.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
+	return lastLine(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
 }
 
 type mysqlGaleraTester struct {
@@ -1478,7 +1480,7 @@ func (m *redisTester) name() string {
 
 func (m *redisTester) redisExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-	return framework.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return e2ekubectl.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (m *redisTester) deploy(ns string) *appsv1.StatefulSet {
@@ -1509,7 +1511,7 @@ func (c *cockroachDBTester) name() string {
 
 func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
-	return framework.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return e2ekubectl.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (c *cockroachDBTester) deploy(ns string) *appsv1.StatefulSet {
@@ -1710,7 +1712,7 @@ func breakPodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	}
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
-	stdout, err := framework.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
+	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
@@ -1734,7 +1736,7 @@ func restorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	}
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
-	stdout, err := framework.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
+	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
@@ -1838,7 +1840,7 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(c clientset.Interface, ss *appsv1.S
 	set := getStatefulSet(c, ss.Namespace, ss.Name)
 	setUID := set.GetUID()
 	if setUID == "" {
-		framework.Failf("Statefulset %s mising UID", ss.Name)
+		framework.Failf("Statefulset %s missing UID", ss.Name)
 	}
 	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})

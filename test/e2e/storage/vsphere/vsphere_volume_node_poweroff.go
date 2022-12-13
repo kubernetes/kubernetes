@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/vmware/govmomi/object"
 	vimtypes "github.com/vmware/govmomi/vim25/types"
@@ -41,9 +41,9 @@ import (
 )
 
 /*
-	Test to verify volume status after node power off:
-	1. Verify the pod got provisioned on a different node with volume attached to it
-	2. Verify the volume is detached from the powered off node
+Test to verify volume status after node power off:
+1. Verify the pod got provisioned on a different node with volume attached to it
+2. Verify the volume is detached from the powered off node
 */
 var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-poweroff")
@@ -58,10 +58,12 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nodeList.Items) > 1, true, "At least 2 nodes are required for this test")
+		if len(nodeList.Items) < 2 {
+			framework.Failf("At least 2 nodes are required for this test, got instead: %v", len(nodeList.Items))
+		}
 	})
 
 	/*
@@ -79,7 +81,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		11. Delete the PVC
 		12. Delete the StorageClass
 	*/
-	ginkgo.It("verify volume status after node power off", func() {
+	ginkgo.It("verify volume status after node power off", func(ctx context.Context) {
 		ginkgo.By("Creating a Storage Class")
 		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil, "")
 		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
@@ -113,14 +115,14 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		ginkgo.By(fmt.Sprintf("Verify disk is attached to the node: %v", node1))
 		isAttached, err := diskIsAttached(volumePath, node1)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isAttached, true, "Disk is not attached to the node")
+		if !isAttached {
+			framework.Failf("Volume: %s is not attached to the node: %v", volumePath, node1)
+		}
 
 		ginkgo.By(fmt.Sprintf("Power off the node: %v", node1))
 
 		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node1)
 		vm := object.NewVirtualMachine(nodeInfo.VSphere.Client.Client, nodeInfo.VirtualMachineRef)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		_, err = vm.PowerOff(ctx)
 		framework.ExpectNoError(err)
 		defer vm.PowerOn(ctx)

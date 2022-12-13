@@ -53,7 +53,7 @@ EOF
 
   if ! which genswaggertypedocs >/dev/null; then
     # build if needed
-    go install k8s.io/kubernetes/cmd/genswaggertypedocs
+    GO111MODULE=on GOPROXY=off go install k8s.io/kubernetes/cmd/genswaggertypedocs
   fi
 
   genswaggertypedocs -s \

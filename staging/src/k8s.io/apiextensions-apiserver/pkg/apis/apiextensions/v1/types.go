@@ -66,7 +66,7 @@ type CustomResourceDefinitionSpec struct {
 	// in the OpenAPI schema should be preserved when persisting to storage.
 	// apiVersion, kind, metadata and known fields inside metadata are always preserved.
 	// This field is deprecated in favor of setting `x-preserve-unknown-fields` to true in `spec.versions[*].schema.openAPIV3Schema`.
-	// See https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#pruning-versus-preserving-unknown-fields for details.
+	// See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#field-pruning for details.
 	// +optional
 	PreserveUnknownFields bool `json:"preserveUnknownFields,omitempty" protobuf:"varint,10,opt,name=preserveUnknownFields"`
 }

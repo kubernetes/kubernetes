@@ -40,7 +40,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -67,7 +67,7 @@ var _ = SIGDescribe("Node Container Manager [Serial]", func() {
 	f := framework.NewDefaultFramework("node-container-manager")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Validate Node Allocatable [NodeFeature:NodeAllocatable]", func() {
-		ginkgo.It("sets up the node and runs the test", func() {
+		ginkgo.It("sets up the node and runs the test", func(ctx context.Context) {
 			framework.ExpectNoError(runTest(f))
 		})
 	})

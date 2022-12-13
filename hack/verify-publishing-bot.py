@@ -81,6 +81,10 @@ def main():
             # And skip validation of publishing rules for it
             continue
 
+        for item in rule["branches"]:
+            if not item["source"]["dir"].endswith(rule["destination"]):
+                raise Exception("copy/paste error `%s` refers to `%s`" % (rule["destination"],item["source"]["dir"]))
+
         if branch["name"] != "master":
             raise Exception("cannot find master branch for destination %s" % rule["destination"])
         if branch["source"]["branch"] != "master":

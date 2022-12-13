@@ -17,10 +17,11 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	errors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -96,10 +97,9 @@ func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver storageframew
 
 func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
-		driver        storageframework.TestDriver
-		resource      *storageframework.VolumeResource
+		config   *storageframework.PerTestConfig
+		driver   storageframework.TestDriver
+		resource *storageframework.VolumeResource
 	}
 	var l local
 
@@ -112,7 +112,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		l = local{}
 		l.driver = driver
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 	}
@@ -126,11 +126,6 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			l.resource = nil
 		}
 
-		if l.driverCleanup != nil {
-			errs = append(errs, storageutils.TryFunc(l.driverCleanup))
-			l.driverCleanup = nil
-		}
-
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
 	}
 
@@ -141,8 +136,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		changedRootDirFileOwnership       int    // Change the ownership of the file in the root directory (/mnt/volume1/file1), as part of the initial pod
 		changedSubDirFileOwnership        int    // Change the ownership of the file in the sub directory (/mnt/volume1/subdir/file2), as part of the initial pod
 		secondPodFsGroup                  int    // FsGroup of the second pod
-		finalExpectedRootDirFileOwnership int    // Final expcted ownership of the file in the root directory (/mnt/volume1/file1), as part of the second pod
-		finalExpectedSubDirFileOwnership  int    // Final expcted ownership of the file in the sub directory (/mnt/volume1/subdir/file2), as part of the second pod
+		finalExpectedRootDirFileOwnership int    // Final expected ownership of the file in the root directory (/mnt/volume1/file1), as part of the second pod
+		finalExpectedSubDirFileOwnership  int    // Final expected ownership of the file in the sub directory (/mnt/volume1/subdir/file2), as part of the second pod
 		// Whether the test can run for drivers that support volumeMountGroup capability.
 		// For CSI drivers that support volumeMountGroup:
 		// * OnRootMismatch policy is not supported.
@@ -213,7 +208,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 	for _, t := range tests {
 		test := t
 		testCaseName := fmt.Sprintf("(%s)[LinuxOnly], %s", test.podfsGroupChangePolicy, test.name)
-		ginkgo.It(testCaseName, func() {
+		ginkgo.It(testCaseName, func(ctx context.Context) {
 			dInfo := driver.GetDriverInfo()
 			policy := v1.PodFSGroupChangePolicy(test.podfsGroupChangePolicy)
 

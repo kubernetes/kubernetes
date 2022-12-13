@@ -29,7 +29,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
@@ -44,7 +44,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		c = f.ClientSet
 	})
 
-	ginkgo.It("should be deleted on API server if it doesn't exist in the cloud provider", func() {
+	ginkgo.It("should be deleted on API server if it doesn't exist in the cloud provider", func(ctx context.Context) {
 		ginkgo.By("deleting a node on the cloud provider")
 
 		nodeToDelete, err := e2enode.GetRandomReadySchedulableNode(c)

@@ -36,7 +36,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -65,7 +65,7 @@ var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", itArg.podsNr, itArg.interval)
-			ginkgo.It(desc, func() {
+			ginkgo.It(desc, func(ctx context.Context) {
 				itArg.createMethod = "batch"
 				runDensityBatchTest(f, itArg)
 			})
@@ -131,7 +131,9 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 
 	for name, create := range createTimes {
 		watch, ok := watchTimes[name]
-		framework.ExpectEqual(ok, true)
+		if !ok {
+			framework.Failf("pod %s failed to be observed by the watch", name)
+		}
 
 		e2eLags = append(e2eLags,
 			e2emetrics.PodLatencyData{Name: name, Latency: watch.Time.Sub(create.Time)})
@@ -163,7 +165,7 @@ func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, inter
 	createTimes := make(map[string]metav1.Time)
 	for _, pod := range pods {
 		createTimes[pod.ObjectMeta.Name] = metav1.Now()
-		go f.PodClient().Create(pod)
+		go e2epod.NewPodClient(f).Create(pod)
 		time.Sleep(interval)
 	}
 	return createTimes
@@ -201,12 +203,16 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				p, ok := obj.(*v1.Pod)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("expected Pod, got %T", obj)
+				}
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				p, ok := newObj.(*v1.Pod)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("expected Pod, got %T", newObj)
+				}
 				go checkPodRunning(p)
 			},
 		},
@@ -267,7 +273,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
-			err := f.PodClient().Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
+			err := e2epod.NewPodClient(f).Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err)
 
 			err = e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),

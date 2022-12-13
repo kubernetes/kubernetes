@@ -24,6 +24,12 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
+var (
+	transformer      = identityTransformer{}
+	encryptedPrefix  = []byte("k8s:enc:")
+	errEncryptedData = fmt.Errorf("identity transformer tried to read encrypted data")
+)
+
 // identityTransformer performs no transformation on provided data, but validates
 // that the data is not encrypted data during TransformFromStorage
 type identityTransformer struct{}
@@ -31,7 +37,7 @@ type identityTransformer struct{}
 // NewEncryptCheckTransformer returns an identityTransformer which returns an error
 // on attempts to read encrypted data
 func NewEncryptCheckTransformer() value.Transformer {
-	return identityTransformer{}
+	return transformer
 }
 
 // TransformFromStorage returns the input bytes if the data is not encrypted
@@ -39,8 +45,8 @@ func (identityTransformer) TransformFromStorage(ctx context.Context, data []byte
 	// identityTransformer has to return an error if the data is encoded using another transformer.
 	// JSON data starts with '{'. Protobuf data has a prefix 'k8s[\x00-\xFF]'.
 	// Prefix 'k8s:enc:' is reserved for encrypted data on disk.
-	if bytes.HasPrefix(data, []byte("k8s:enc:")) {
-		return []byte{}, false, fmt.Errorf("identity transformer tried to read encrypted data")
+	if bytes.HasPrefix(data, encryptedPrefix) {
+		return nil, false, errEncryptedData
 	}
 	return data, false, nil
 }

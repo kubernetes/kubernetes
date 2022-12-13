@@ -89,7 +89,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), "usages must be provided"),
+				field.Required(specPath.Child("usages"), ""),
 			},
 		},
 		"CSR with no signerName set should fail": {
@@ -101,7 +101,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("signerName"), "signerName must be provided"),
+				field.Required(specPath.Child("signerName"), ""),
 			},
 		},
 		"signerName contains no '/'": {
@@ -337,7 +337,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), "usages must be provided"),
+				field.Required(specPath.Child("usages"), ""),
 			},
 		},
 		"unknown and duplicate usages": {

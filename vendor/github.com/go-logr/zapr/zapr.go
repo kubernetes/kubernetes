@@ -54,6 +54,8 @@ limitations under the License.
 package zapr
 
 import (
+	"fmt"
+
 	"github.com/go-logr/logr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -170,9 +172,19 @@ func zapIt(field string, val interface{}) zap.Field {
 	// Handle types that implement logr.Marshaler: log the replacement
 	// object instead of the original one.
 	if marshaler, ok := val.(logr.Marshaler); ok {
-		val = marshaler.MarshalLog()
+		field, val = invokeMarshaler(field, marshaler)
 	}
 	return zap.Any(field, val)
+}
+
+func invokeMarshaler(field string, m logr.Marshaler) (f string, ret interface{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			ret = fmt.Sprintf("PANIC=%s", r)
+			f = field + "Error"
+		}
+	}()
+	return field, m.MarshalLog()
 }
 
 func (zl *zapLogger) Init(ri logr.RuntimeInfo) {

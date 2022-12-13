@@ -128,20 +128,12 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 		if err != nil {
 			return nil, err
 		}
-		dynamicClient, err := f.DynamicClient()
-		if err != nil {
-			return nil, err
-		}
-		verifier := resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
-		return f.Validator(directive, verifier)
+		return f.Validator(directive)
 	}
 
 	// build the printer
 	o.Printer, err = o.PrintFlags.ToPrinter()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // RunConvert implements the generic Convert command

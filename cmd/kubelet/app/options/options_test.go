@@ -168,6 +168,13 @@ func TestValidateKubeletFlags(t *testing.T) {
 			error:  false,
 			labels: map[string]string{},
 		},
+		{
+			name:  "Invalid label",
+			error: true,
+			labels: map[string]string{
+				"cloud.google.com/repository": "kubernetes/kubernetes",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -176,7 +183,8 @@ func TestValidateKubeletFlags(t *testing.T) {
 				ContainerRuntimeOptions: config.ContainerRuntimeOptions{
 					ContainerRuntime: kubetypes.RemoteContainerRuntime,
 				},
-				NodeLabels: tt.labels,
+				RemoteRuntimeEndpoint: "unix:///run/containerd/containerd.sock",
+				NodeLabels:            tt.labels,
 			})
 
 			if tt.error && err == nil {

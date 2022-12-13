@@ -19,7 +19,6 @@ package delete
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -104,7 +103,7 @@ func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPro
 		return body == nil && policy == nil
 	}
 	var parsedBody metav1.DeleteOptions
-	rawBody, _ := ioutil.ReadAll(body)
+	rawBody, _ := io.ReadAll(body)
 	json.Unmarshal(rawBody, &parsedBody)
 	if parsedBody.PropagationPolicy == nil {
 		return false
@@ -290,7 +289,7 @@ func TestGracePeriodScenarios(t *testing.T) {
 			forceFlag:                 true,
 			expectedGracePeriod:       "0",
 			expectedOut:               "pod/foo\n",
-			expectedErrOut:            "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n",
+			expectedErrOut:            "Warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n",
 			expectedDeleteRequestPath: "/namespaces/test/pods/foo",
 		},
 		{
@@ -300,7 +299,7 @@ func TestGracePeriodScenarios(t *testing.T) {
 			gracePeriodFlag:           "0",
 			expectedGracePeriod:       "0",
 			expectedOut:               "pod/foo\n",
-			expectedErrOut:            "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n",
+			expectedErrOut:            "Warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.\n",
 			expectedDeleteRequestPath: "/namespaces/test/pods/foo",
 		},
 		{

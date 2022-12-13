@@ -18,11 +18,16 @@ package controlplane
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base32"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -40,6 +45,11 @@ const (
 	testLeaseName = "apiserver-lease-test"
 )
 
+func expectedAPIServerIdentity(hostname string) string {
+	hash := sha256.Sum256([]byte(hostname))
+	return "kube-apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
+}
+
 func TestCreateLeaseOnStart(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
@@ -48,6 +58,11 @@ func TestCreateLeaseOnStart(t *testing.T) {
 	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Fatalf("Unexpected error getting apiserver hostname: %v", err)
 	}
 
 	t.Logf(`Waiting the kube-apiserver Lease to be created`)
@@ -59,23 +74,48 @@ func TestCreateLeaseOnStart(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		if leases != nil && len(leases.Items) == 1 && strings.HasPrefix(leases.Items[0].Name, "kube-apiserver-") {
-			return true, nil
+
+		if leases == nil {
+			return false, nil
 		}
-		return false, nil
+
+		if len(leases.Items) != 1 {
+			return false, nil
+		}
+
+		lease := leases.Items[0]
+		if lease.Name != expectedAPIServerIdentity(hostname) {
+			return false, fmt.Errorf("unexpected apiserver identity, got: %v, expected: %v", lease.Name, expectedAPIServerIdentity(hostname))
+		}
+
+		if lease.Labels[corev1.LabelHostname] != hostname {
+			return false, fmt.Errorf("unexpected hostname label, got: %v, expected: %v", lease.Labels[corev1.LabelHostname], hostname)
+		}
+
+		return true, nil
 	}); err != nil {
 		t.Fatalf("Failed to see the kube-apiserver lease: %v", err)
 	}
 }
 
 func TestLeaseGarbageCollection(t *testing.T) {
+	oldIdentityLeaseDurationSeconds := controlplane.IdentityLeaseDurationSeconds
+	oldIdentityLeaseGCPeriod := controlplane.IdentityLeaseGCPeriod
+	oldIdentityLeaseRenewIntervalPeriod := controlplane.IdentityLeaseRenewIntervalPeriod
+	defer func() {
+		// reset the default values for leases after this test
+		controlplane.IdentityLeaseDurationSeconds = oldIdentityLeaseDurationSeconds
+		controlplane.IdentityLeaseGCPeriod = oldIdentityLeaseGCPeriod
+		controlplane.IdentityLeaseRenewIntervalPeriod = oldIdentityLeaseRenewIntervalPeriod
+	}()
+
+	// Shorten lease parameters so GC behavior can be exercised in integration tests
+	controlplane.IdentityLeaseDurationSeconds = 1
+	controlplane.IdentityLeaseGCPeriod = time.Second
+	controlplane.IdentityLeaseRenewIntervalPeriod = time.Second
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil,
-		// This shorten the GC check period to make the test run faster.
-		// Since we are testing GC behavior on leases we create, what happens to
-		// the real apiserver lease doesn't matter.
-		[]string{"--identity-lease-duration-seconds=1"},
-		framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)

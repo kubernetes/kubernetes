@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var (
@@ -119,7 +119,7 @@ var _ = SIGDescribe("health handlers", func() {
 	f := framework.NewDefaultFramework("health")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should contain necessary checks", func() {
+	ginkgo.It("should contain necessary checks", func(ctx context.Context) {
 		ginkgo.By("/health")
 		err := testPath(f.ClientSet, "/healthz?verbose=1", requiredHealthzChecks)
 		framework.ExpectNoError(err)

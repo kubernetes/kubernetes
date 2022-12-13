@@ -63,3 +63,11 @@ rules:
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingressclasses"]
   verbs: ["get", "list", "watch", "update", "create", "patch"]
+# GLBC uses leases for leader election
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get","create","update"]
+ # GLBC uses endpoint slices
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get","list", "watch"]

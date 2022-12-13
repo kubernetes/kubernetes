@@ -31,7 +31,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -101,7 +101,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("node lease should be deleted when corresponding node is deleted", func() {
+		ginkgo.It("node lease should be deleted when corresponding node is deleted", func(ctx context.Context) {
 			leaseClient := c.CoordinationV1().Leases(v1.NamespaceNodeLease)
 			err := e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
 			framework.ExpectNoError(err)

@@ -395,17 +395,6 @@ func (o *cachingObject) SetOwnerReferences(references []metav1.OwnerReference) {
 		func() { o.object.SetOwnerReferences(references) },
 	)
 }
-func (o *cachingObject) GetZZZ_DeprecatedClusterName() string {
-	o.lock.RLock()
-	defer o.lock.RUnlock()
-	return o.object.GetZZZ_DeprecatedClusterName()
-}
-func (o *cachingObject) SetZZZ_DeprecatedClusterName(clusterName string) {
-	o.conditionalSet(
-		func() bool { return o.object.GetZZZ_DeprecatedClusterName() == clusterName },
-		func() { o.object.SetZZZ_DeprecatedClusterName(clusterName) },
-	)
-}
 func (o *cachingObject) GetManagedFields() []metav1.ManagedFieldsEntry {
 	o.lock.RLock()
 	defer o.lock.RUnlock()

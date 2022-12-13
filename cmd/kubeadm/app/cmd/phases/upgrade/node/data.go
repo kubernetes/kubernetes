@@ -17,6 +17,8 @@ limitations under the License.
 package node
 
 import (
+	"io"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 
@@ -35,4 +37,5 @@ type Data interface {
 	IgnorePreflightErrors() sets.String
 	PatchesDir() string
 	KubeConfigPath() string
+	OutputWriter() io.Writer
 }

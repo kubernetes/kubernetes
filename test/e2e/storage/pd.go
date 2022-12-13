@@ -28,7 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -134,7 +134,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 			readOnly := t.readOnly
 			readOnlyTxt := readOnlyMap[readOnly]
 
-			ginkgo.It(fmt.Sprintf("for %s PD with pod delete grace period of %q", readOnlyTxt, t.descr), func() {
+			ginkgo.It(fmt.Sprintf("for %s PD with pod delete grace period of %q", readOnlyTxt, t.descr), func(ctx context.Context) {
 				e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 				if readOnly {
 					e2eskipper.SkipIfProviderIs("aws")
@@ -196,7 +196,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 					ginkgo.By("deleting host0Pod") // delete this pod before creating next pod
 					framework.ExpectNoError(podClient.Delete(context.TODO(), host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
 					framework.Logf("deleted host0Pod %q", host0Pod.Name)
-					e2epod.WaitForPodToDisappear(cs, host0Pod.Namespace, host0Pod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+					e2epod.WaitForPodToDisappear(cs, host0Pod.Namespace, host0Pod.Name, labels.Everything(), framework.Poll, f.Timeouts.PodDelete)
 					framework.Logf("deleted host0Pod %q disappeared", host0Pod.Name)
 				}
 
@@ -252,8 +252,9 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 		for _, t := range tests {
 			numPDs := t.numPDs
 			numContainers := t.numContainers
+			t := t
 
-			ginkgo.It(fmt.Sprintf("using %d containers and %d PDs", numContainers, numPDs), func() {
+			ginkgo.It(fmt.Sprintf("using %d containers and %d PDs", numContainers, numPDs), func(ctx context.Context) {
 				e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 				var host0Pod *v1.Pod
 				var err error
@@ -347,7 +348,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 
 		for _, t := range tests {
 			disruptOp := t.disruptOp
-			ginkgo.It(fmt.Sprintf("when %s", t.descr), func() {
+			ginkgo.It(fmt.Sprintf("when %s", t.descr), func(ctx context.Context) {
 				e2eskipper.SkipUnlessProviderIs("gce")
 				origNodeCnt := len(nodes.Items) // healhy nodes running kubelet
 
@@ -448,7 +449,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 		}
 	})
 
-	ginkgo.It("should be able to delete a non-existent PD without error", func() {
+	ginkgo.It("should be able to delete a non-existent PD without error", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce")
 
 		ginkgo.By("delete a PD")
@@ -457,7 +458,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 
 	// This test is marked to run as serial so as device selection on AWS does not
 	// conflict with other concurrent attach operations.
-	ginkgo.It("[Serial] attach on previously attached volumes should work", func() {
+	ginkgo.It("[Serial] attach on previously attached volumes should work", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		ginkgo.By("creating PD")
 		diskName, err := e2epv.CreatePDWithRetry()
@@ -489,7 +490,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 
 func countReadyNodes(c clientset.Interface, hostName types.NodeName) int {
 	e2enode.WaitForNodeToBeReady(c, string(hostName), nodeStatusTimeout)
-	framework.WaitForAllNodesSchedulable(c, nodeStatusTimeout)
+	e2enode.WaitForAllNodesSchedulable(c, nodeStatusTimeout)
 	nodes, err := e2enode.GetReadySchedulableNodes(c)
 	framework.ExpectNoError(err)
 	return len(nodes.Items)

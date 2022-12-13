@@ -93,6 +93,10 @@ func (plugin *secretPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *secretPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &secretVolumeMounter{
 		secretVolume: &secretVolume{
@@ -121,7 +125,7 @@ func (plugin *secretPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 	}, nil
 }
 
-func (plugin *secretPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+func (plugin *secretPlugin) ConstructVolumeSpec(volName, mountPath string) (volume.ReconstructedVolume, error) {
 	secretVolume := &v1.Volume{
 		Name: volName,
 		VolumeSource: v1.VolumeSource{
@@ -130,7 +134,9 @@ func (plugin *secretPlugin) ConstructVolumeSpec(volName, mountPath string) (*vol
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(secretVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(secretVolume),
+	}, nil
 }
 
 type secretVolume struct {

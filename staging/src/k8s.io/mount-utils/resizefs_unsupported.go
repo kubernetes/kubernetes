@@ -39,3 +39,8 @@ func NewResizeFs(exec utilexec.Interface) *ResizeFs {
 func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (bool, error) {
 	return false, fmt.Errorf("Resize is not supported for this build")
 }
+
+// NeedResize check whether mounted volume needs resize
+func (resizefs *ResizeFs) NeedResize(devicePath string, deviceMountPath string) (bool, error) {
+	return false, fmt.Errorf("NeedResize is not supported for this build")
+}

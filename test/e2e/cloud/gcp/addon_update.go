@@ -37,7 +37,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // TODO: it would probably be slightly better to build up the objects
@@ -241,7 +241,7 @@ var _ = SIGDescribe("Addon update", func() {
 	})
 
 	// WARNING: the test is not parallel-friendly!
-	ginkgo.It("should propagate add-on file changes [Slow]", func() {
+	ginkgo.It("should propagate add-on file changes [Slow]", func(ctx context.Context) {
 		// This test requires:
 		// - SSH
 		// - master access

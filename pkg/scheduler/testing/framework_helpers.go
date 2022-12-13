@@ -28,7 +28,7 @@ import (
 var configDecoder = scheme.Codecs.UniversalDecoder()
 
 // NewFramework creates a Framework from the register functions and options.
-func NewFramework(fns []RegisterPluginFunc, profileName string, opts ...runtime.Option) (framework.Framework, error) {
+func NewFramework(fns []RegisterPluginFunc, profileName string, stopCh <-chan struct{}, opts ...runtime.Option) (framework.Framework, error) {
 	registry := runtime.Registry{}
 	profile := &schedulerapi.KubeSchedulerProfile{
 		SchedulerName: profileName,
@@ -37,7 +37,7 @@ func NewFramework(fns []RegisterPluginFunc, profileName string, opts ...runtime.
 	for _, f := range fns {
 		f(&registry, profile)
 	}
-	return runtime.NewFramework(registry, profile, opts...)
+	return runtime.NewFramework(registry, profile, stopCh, opts...)
 }
 
 // RegisterPluginFunc is a function signature used in method RegisterFilterPlugin()

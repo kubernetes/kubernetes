@@ -48,6 +48,7 @@ func (u union) ProcessEvents(events ...*auditinternal.Event) bool {
 func (u union) Run(stopCh <-chan struct{}) error {
 	var funcs []func() error
 	for _, backend := range u.backends {
+		backend := backend
 		funcs = append(funcs, func() error {
 			return backend.Run(stopCh)
 		})

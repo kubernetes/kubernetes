@@ -18,14 +18,16 @@ package patch
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,7 +68,6 @@ type PatchOptions struct {
 	namespace                    string
 	enforceNamespace             bool
 	dryRunStrategy               cmdutil.DryRunStrategy
-	dryRunVerifier               *resource.QueryParamVerifier
 	outputFormat                 string
 	args                         []string
 	builder                      *resource.Builder
@@ -80,7 +81,9 @@ var (
 	patchLong = templates.LongDesc(i18n.T(`
 		Update fields of a resource using strategic merge patch, a JSON merge patch, or a JSON patch.
 
-		JSON and YAML formats are accepted.`))
+		JSON and YAML formats are accepted.
+
+		Note: Strategic merge patch is not supported for custom resources.`))
 
 	patchExample = templates.Examples(i18n.T(`
 		# Partially update a node using a strategic merge patch, specifying the patch as JSON
@@ -173,11 +176,6 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.args = args
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	return nil
 }
@@ -215,7 +213,7 @@ func (o *PatchOptions) RunPatch() error {
 	var patchBytes []byte
 	if len(o.PatchFile) > 0 {
 		var err error
-		patchBytes, err = ioutil.ReadFile(o.PatchFile)
+		patchBytes, err = os.ReadFile(o.PatchFile)
 		if err != nil {
 			return fmt.Errorf("unable to read patch file: %v", err)
 		}
@@ -253,11 +251,6 @@ func (o *PatchOptions) RunPatch() error {
 
 		if !o.Local && o.dryRunStrategy != cmdutil.DryRunClient {
 			mapping := info.ResourceMapping()
-			if o.dryRunStrategy == cmdutil.DryRunServer {
-				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-					return err
-				}
-			}
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
@@ -270,6 +263,9 @@ func (o *PatchOptions) RunPatch() error {
 				WithSubresource(o.Subresource)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
+				if apierrors.IsUnsupportedMediaType(err) {
+					return errors.Wrap(err, fmt.Sprintf("%s is not supported by %s", patchType, mapping.GroupVersionKind))
+				}
 				return err
 			}
 

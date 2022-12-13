@@ -22,13 +22,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -42,7 +43,7 @@ var _ = SIGDescribe("Secrets", func() {
 		Testname: Secrets, pod environment field
 		Description: Create a secret. Create a Pod with Container that declares a environment variable which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
-	framework.ConformanceIt("should be consumable from pods in env vars [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in env vars [NodeConformance]", func(ctx context.Context) {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Secrets", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume secrets", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "consume secrets", pod, 0, []string{
 			"SECRET_DATA=value-1",
 		})
 	})
@@ -91,7 +92,7 @@ var _ = SIGDescribe("Secrets", func() {
 		Testname: Secrets, pod environment from source
 		Description: Create a secret. Create a Pod with Container that declares a environment variable using 'EnvFrom' which references the secret created to extract a key value from the secret. Pod MUST have the environment variable that contains proper value for the key to the secret.
 	*/
-	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func(ctx context.Context) {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 		ginkgo.By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
@@ -125,7 +126,7 @@ var _ = SIGDescribe("Secrets", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume secrets", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "consume secrets", pod, 0, []string{
 			"data-1=value-1", "data-2=value-2", "data-3=value-3",
 			"p-data-1=value-1", "p-data-2=value-2", "p-data-3=value-3",
 		})
@@ -136,7 +137,7 @@ var _ = SIGDescribe("Secrets", func() {
 	   Testname: Secrets, with empty-key
 	   Description: Attempt to create a Secret with an empty key. The creation MUST fail.
 	*/
-	framework.ConformanceIt("should fail to create secret due to empty secret key", func() {
+	framework.ConformanceIt("should fail to create secret due to empty secret key", func(ctx context.Context) {
 		secret, err := createEmptyKeySecretForTest(f)
 		framework.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
 	})
@@ -150,7 +151,7 @@ var _ = SIGDescribe("Secrets", func() {
 		           The Secret is deleted by it's static Label.
 		           Secrets are listed finally, the list MUST NOT include the originally created Secret.
 	*/
-	framework.ConformanceIt("should patch a secret", func() {
+	framework.ConformanceIt("should patch a secret", func(ctx context.Context) {
 		ginkgo.By("creating a secret")
 
 		secretTestName := "test-secret-" + string(uuid.NewUUID())
@@ -187,7 +188,9 @@ var _ = SIGDescribe("Secrets", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedSecret, true, "unable to find secret by its value")
+		if !foundCreatedSecret {
+			framework.Failf("unable to find secret %s/%s by name", f.Namespace.Name, secretTestName)
+		}
 
 		ginkgo.By("patching the secret")
 		// patch the secret in the test namespace
@@ -230,7 +233,9 @@ var _ = SIGDescribe("Secrets", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedSecret, false, "secret was not deleted successfully")
+		if foundCreatedSecret {
+			framework.Failf("secret %s/%s was not deleted successfully", f.Namespace.Name, secretTestName)
+		}
 	})
 })
 

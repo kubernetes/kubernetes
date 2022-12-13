@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +89,7 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 
 	dc := r.Config.Framework.DynamicClient
 
-	r.Vscontent = utils.GetSnapshotContentFromSnapshot(dc, r.Vs)
+	r.Vscontent = utils.GetSnapshotContentFromSnapshot(dc, r.Vs, timeouts.SnapshotCreate)
 
 	if pattern.SnapshotType == PreprovisionedCreatedSnapshot {
 		// prepare a pre-provisioned VolumeSnapshotContent with certain data

@@ -33,7 +33,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
@@ -44,7 +44,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 
 		ginkgo.Context("when running 10 pods", func() {
 			// 10 seconds is the default scrape timeout for metrics-server and kube-prometheus
-			ginkgo.It("should return within 10 seconds", func() {
+			ginkgo.It("should return within 10 seconds", func(ctx context.Context) {
 
 				ginkgo.By("Selecting a Windows node")
 				targetNode, err := findWindowsNode(f)
@@ -54,7 +54,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 				ginkgo.By("Scheduling 10 pods")
 				powershellImage := imageutils.GetConfig(imageutils.BusyBox)
 				pods := newKubeletStatsTestPods(10, powershellImage, targetNode.Name)
-				f.PodClient().CreateBatch(pods)
+				e2epod.NewPodClient(f).CreateBatch(pods)
 
 				ginkgo.By("Waiting up to 3 minutes for pods to be running")
 				timeout := 3 * time.Minute
@@ -119,20 +119,22 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
 
 		ginkgo.Context("when windows is booted", func() {
-			ginkgo.It("should return bootid within 10 seconds", func() {
+			ginkgo.It("should return bootid within 10 seconds", func(ctx context.Context) {
 				ginkgo.By("Selecting a Windows node")
 				targetNode, err := findWindowsNode(f)
 				framework.ExpectNoError(err, "Error finding Windows node")
 				framework.Logf("Using node: %v", targetNode.Name)
 
 				ginkgo.By("Getting bootid")
-				framework.ExpectEqual(len(targetNode.Status.NodeInfo.BootID) != 0, true, "Should find bootId in kubelet stats")
+				if len(targetNode.Status.NodeInfo.BootID) == 0 {
+					framework.Failf("expected bootId in kubelet stats, got none")
+				}
 			})
 		})
 
 		ginkgo.Context("when running 3 pods", func() {
 			// 10 seconds is the default scrape timeout for metrics-server and kube-prometheus
-			ginkgo.It("should return within 10 seconds", func() {
+			ginkgo.It("should return within 10 seconds", func(ctx context.Context) {
 
 				ginkgo.By("Selecting a Windows node")
 				targetNode, err := findWindowsNode(f)
@@ -142,7 +144,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 				ginkgo.By("Scheduling 3 pods")
 				powershellImage := imageutils.GetConfig(imageutils.BusyBox)
 				pods := newKubeletStatsTestPods(3, powershellImage, targetNode.Name)
-				f.PodClient().CreateBatch(pods)
+				e2epod.NewPodClient(f).CreateBatch(pods)
 
 				ginkgo.By("Waiting up to 3 minutes for pods to be running")
 				timeout := 3 * time.Minute

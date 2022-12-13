@@ -211,23 +211,22 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 	mounter := attacher.host.GetMounter(awsElasticBlockStorePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			dir := deviceMountPath
-			if runtime.GOOS == "windows" {
-				// On Windows, FormatAndMount will mklink (create a symbolic link) at deviceMountPath later, so don't create a
-				// directory at deviceMountPath now. Otherwise mklink will error: "Cannot create a file when that file already exists".
-				// Instead, create the parent of deviceMountPath. For example when deviceMountPath is:
-				// C:\var\lib\kubelet\plugins\kubernetes.io\aws-ebs\mounts\aws\us-west-2b\vol-xxx
-				// create us-west-2b. FormatAndMount will make vol-xxx a symlink to the drive (e.g. D:\)
-				dir = filepath.Dir(deviceMountPath)
-			}
-			if err := os.MkdirAll(dir, 0750); err != nil {
-				return fmt.Errorf("making dir %s failed with %s", dir, err)
-			}
-			notMnt = true
-		} else {
+		if !os.IsNotExist(err) {
 			return err
 		}
+		dir := deviceMountPath
+		if runtime.GOOS == "windows" {
+			// On Windows, FormatAndMount will mklink (create a symbolic link) at deviceMountPath later, so don't create a
+			// directory at deviceMountPath now. Otherwise mklink will error: "Cannot create a file when that file already exists".
+			// Instead, create the parent of deviceMountPath. For example when deviceMountPath is:
+			// C:\var\lib\kubelet\plugins\kubernetes.io\aws-ebs\mounts\aws\us-west-2b\vol-xxx
+			// create us-west-2b. FormatAndMount will make vol-xxx a symlink to the drive (e.g. D:\)
+			dir = filepath.Dir(deviceMountPath)
+		}
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			return fmt.Errorf("making dir %s failed with %s", dir, err)
+		}
+		notMnt = true
 	}
 
 	volumeSource, readOnly, err := getVolumeSource(spec)
@@ -235,7 +234,7 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 		return err
 	}
 
-	options := []string{}
+	var options []string
 	if readOnly {
 		options = append(options, "ro")
 	}

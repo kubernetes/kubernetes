@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package perf
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ import (
 )
 
 // CurrentKubeletPerfMetricsVersion is the current kubelet performance metrics
-// version. This is used by mutiple perf related data structures. We should
+// version. This is used by multiple perf related data structures. We should
 // bump up the version each time we make an incompatible change to the metrics.
 const CurrentKubeletPerfMetricsVersion = "v2"
 

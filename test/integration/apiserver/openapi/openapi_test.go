@@ -28,6 +28,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kubernetes/pkg/controlplane"
 	generated "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -55,9 +56,7 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.featureEnabled)()
 
-			controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
-			controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-			controlPlaneConfig.GenericConfig.OpenAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
+			getDefinitionsFn := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 				defs := generated.GetOpenAPIDefinitions(ref)
 				def := defs[typeToAddEnum]
 				// replace protocol to add the would-be enum field.
@@ -74,15 +73,20 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 				return defs
 			})
 
-			instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-			defer closeFn()
+			_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+				ModifyServerConfig: func(config *controlplane.Config) {
+					config.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+					config.GenericConfig.OpenAPIConfig.GetDefinitions = getDefinitionsFn
+				},
+			})
+			defer tearDownFn()
 
-			rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+			rt, err := restclient.TransportFor(kubeConfig)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+"/openapi/v2", nil)
+			req, err := http.NewRequest("GET", kubeConfig.Host+"/openapi/v2", nil)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -20,7 +20,6 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -102,7 +101,7 @@ func TestIsUnixDomainSocket(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, err := ioutil.TempFile("", "test-domain-socket")
+		f, err := os.CreateTemp("", "test-domain-socket")
 		require.NoErrorf(t, err, "Failed to create file for test purposes: %v while setting up: %s", err, test.label)
 		addr := f.Name()
 		f.Close()
@@ -178,5 +177,30 @@ func TestGetAddressAndDialer(t *testing.T) {
 		}
 		assert.Nil(t, err, "expected no error during parsing %s", test.endpoint)
 		assert.Equal(t, test.expectedAddr, addr)
+	}
+}
+
+func TestLocalEndpoint(t *testing.T) {
+	tests := []struct {
+		path             string
+		file             string
+		expectError      bool
+		expectedFullPath string
+	}{
+		{
+			path:             "path",
+			file:             "file",
+			expectError:      false,
+			expectedFullPath: "unix:/path/file.sock",
+		},
+	}
+	for _, test := range tests {
+		fullPath, err := LocalEndpoint(test.path, test.file)
+		if test.expectError {
+			assert.NotNil(t, err, "expected error")
+			continue
+		}
+		assert.Nil(t, err, "expected no error")
+		assert.Equal(t, test.expectedFullPath, fullPath)
 	}
 }

@@ -32,12 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	"k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	"k8s.io/client-go/util/retry"
 	pdbhelper "k8s.io/component-helpers/apps/poddisruptionbudget"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -95,6 +97,12 @@ func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *EvictionREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Propagate dry-run takes the dry-run option from the request and pushes it into the eviction object.
 // It returns an error if they have non-matching dry-run options.
 func propagateDryRun(eviction *policy.Eviction, options *metav1.CreateOptions) (*metav1.DeleteOptions, error) {
@@ -147,11 +155,10 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	}
 
 	err = retry.OnError(EvictionsRetry, shouldRetry, func() error {
-		obj, err = r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
+		pod, err = getPod(r, ctx, eviction.Name)
 		if err != nil {
 			return err
 		}
-		pod = obj.(*api.Pod)
 
 		// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
 		// There is no need to check for pdb.
@@ -172,7 +179,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 			deleteOptions = deleteOptions.DeepCopy()
 			setPreconditionsResourceVersion(deleteOptions, &pod.ResourceVersion)
 		}
-		_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
+		err = addConditionAndDeletePod(r, ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
 		if err != nil {
 			return err
 		}
@@ -219,10 +226,24 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		pdb := &pdbs[0]
 		pdbName = pdb.Name
 
-		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-		if !podutil.IsPodReady(pod) && pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
-			updateDeletionOptions = true
-			return nil
+		// IsPodReady is the current implementation of IsHealthy
+		// If the pod is healthy, it should be guarded by the PDB.
+		if !podutil.IsPodReady(pod) {
+			if feature.DefaultFeatureGate.Enabled(features.PDBUnhealthyPodEvictionPolicy) {
+				if pdb.Spec.UnhealthyPodEvictionPolicy != nil && *pdb.Spec.UnhealthyPodEvictionPolicy == policyv1.AlwaysAllow {
+					// Delete the unhealthy pod, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed.
+					updateDeletionOptions = true
+					return nil
+				}
+			}
+			// default nil and IfHealthyBudget policy
+			if pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
+				// Delete the unhealthy pod, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed.
+				// Application guarded by the PDB is not disrupted at the moment and deleting unhealthy (unready) pod will not disrupt it.
+				updateDeletionOptions = true
+				return nil
+			}
+			// confirm no disruptions allowed in checkAndDecrement
 		}
 
 		refresh := false
@@ -257,12 +278,12 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	}
 
 	// At this point there was either no PDB or we succeeded in decrementing or
-	// the pod was unready and we have enough healthy replicas
+	// the pod was unhealthy (unready) and we have enough healthy replicas
 
 	deleteOptions := originalDeleteOptions
 
 	// Set deleteOptions.Preconditions.ResourceVersion to ensure
-	// the pod hasn't been considered ready since we calculated
+	// the pod hasn't been considered healthy (ready) since we calculated
 	if updateDeletionOptions {
 		// Take a copy so we can compare to client-provied Options later.
 		deleteOptions = deleteOptions.DeepCopy()
@@ -270,7 +291,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	}
 
 	// Try the delete
-	_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
+	err = addConditionAndDeletePod(r, ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
 	if err != nil {
 		if errors.IsConflict(err) && updateDeletionOptions &&
 			(originalDeleteOptions.Preconditions == nil || originalDeleteOptions.Preconditions.ResourceVersion == nil) {
@@ -284,6 +305,41 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 
 	// Success!
 	return &metav1.Status{Status: metav1.StatusSuccess}, nil
+}
+
+func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string, validation rest.ValidateObjectFunc, options *metav1.DeleteOptions) error {
+	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		pod, err := getPod(r, ctx, name)
+		if err != nil {
+			return err
+		}
+		conditionAppender := func(_ context.Context, newObj, _ runtime.Object) (runtime.Object, error) {
+			podObj := newObj.(*api.Pod)
+			podutil.UpdatePodCondition(&podObj.Status, &api.PodCondition{
+				Type:    api.DisruptionTarget,
+				Status:  api.ConditionTrue,
+				Reason:  "EvictionByEvictionAPI",
+				Message: "Eviction API: evicting",
+			})
+			return podObj, nil
+		}
+
+		podCopyUpdated := rest.DefaultUpdatedObjectInfo(pod, conditionAppender)
+
+		if _, _, err = r.store.Update(ctx, name, podCopyUpdated, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+	}
+	_, _, err := r.store.Delete(ctx, name, rest.ValidateAllObjectFunc, options)
+	return err
+}
+
+func getPod(r *EvictionREST, ctx context.Context, name string) (*api.Pod, error) {
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.Pod), nil
 }
 
 func setPreconditionsResourceVersion(deleteOptions *metav1.DeleteOptions, resourceVersion *string) {
@@ -309,7 +365,7 @@ func shouldEnforceResourceVersion(pod *api.Pod) bool {
 		return false
 	}
 	// Return true for all other pods to ensure we don't race against a pod becoming
-	// ready and violating PDBs.
+	// healthy (ready) and violating PDBs.
 	return true
 }
 
@@ -351,7 +407,7 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	}
 
 	// If this is a dry-run, we don't need to go any further than that.
-	if dryRun == true {
+	if dryRun {
 		return nil
 	}
 

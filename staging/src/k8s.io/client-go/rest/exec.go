@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"k8s.io/client-go/pkg/apis/clientauthentication"
 	clientauthenticationapi "k8s.io/client-go/pkg/apis/clientauthentication"
 )
 
@@ -50,12 +49,13 @@ func ConfigToExecCluster(config *Config) (*clientauthenticationapi.Cluster, erro
 		}
 	}
 
-	return &clientauthentication.Cluster{
+	return &clientauthenticationapi.Cluster{
 		Server:                   config.Host,
 		TLSServerName:            config.ServerName,
 		InsecureSkipTLSVerify:    config.Insecure,
 		CertificateAuthorityData: caData,
 		ProxyURL:                 proxyURL,
+		DisableCompression:       config.DisableCompression,
 		Config:                   config.ExecProvider.Config,
 	}, nil
 }
@@ -63,7 +63,7 @@ func ConfigToExecCluster(config *Config) (*clientauthenticationapi.Cluster, erro
 // ExecClusterToConfig creates a Config with the corresponding fields from the provided
 // clientauthenticationapi.Cluster. The returned Config will be anonymous (i.e., it will not have
 // any authentication-related fields set).
-func ExecClusterToConfig(cluster *clientauthentication.Cluster) (*Config, error) {
+func ExecClusterToConfig(cluster *clientauthenticationapi.Cluster) (*Config, error) {
 	var proxy func(*http.Request) (*url.URL, error)
 	if cluster.ProxyURL != "" {
 		proxyURL, err := url.Parse(cluster.ProxyURL)
@@ -80,6 +80,7 @@ func ExecClusterToConfig(cluster *clientauthentication.Cluster) (*Config, error)
 			ServerName: cluster.TLSServerName,
 			CAData:     cluster.CertificateAuthorityData,
 		},
-		Proxy: proxy,
+		Proxy:              proxy,
+		DisableCompression: cluster.DisableCompression,
 	}, nil
 }

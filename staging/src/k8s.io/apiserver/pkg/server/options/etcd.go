@@ -27,23 +27,26 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
+	kmsconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	"k8s.io/apiserver/pkg/storage/value"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/klog/v2"
 )
 
 type EtcdOptions struct {
 	// The value of Paging on StorageConfig will be overridden by the
 	// calculated feature gate value.
-	StorageConfig                    storagebackend.Config
-	EncryptionProviderConfigFilepath string
+	StorageConfig                           storagebackend.Config
+	EncryptionProviderConfigFilepath        string
+	EncryptionProviderConfigAutomaticReload bool
 
 	EtcdServersOverrides []string
 
@@ -59,6 +62,15 @@ type EtcdOptions struct {
 	DefaultWatchCacheSize int
 	// WatchCacheSizes represents override to a given resource
 	WatchCacheSizes []string
+
+	// complete guards fields that must be initialized via Complete before the Apply methods can be used.
+	complete               bool
+	resourceTransformers   encryptionconfig.ResourceTransformers
+	kmsPluginHealthzChecks []healthz.HealthChecker
+
+	// SkipHealthEndpoints, when true, causes the Apply methods to not set up health endpoints.
+	// This allows multiple invocations of the Apply methods without duplication of said endpoints.
+	SkipHealthEndpoints bool
 }
 
 var storageTypes = sets.NewString(
@@ -107,10 +119,14 @@ func (s *EtcdOptions) Validate() []error {
 
 	}
 
+	if len(s.EncryptionProviderConfigFilepath) == 0 && s.EncryptionProviderConfigAutomaticReload {
+		allErrors = append(allErrors, fmt.Errorf("--encryption-provider-config-automatic-reload must be set with --encryption-provider-config"))
+	}
+
 	return allErrors
 }
 
-// AddEtcdFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
+// AddFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
 func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	if s == nil {
 		return
@@ -123,7 +139,8 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
 		"The media type to use to store objects in storage. "+
-		"Some resources or storage backends may only support a specific media type and will ignore this setting.")
+		"Some resources or storage backends may only support a specific media type and will ignore this setting. "+
+		"Supported media types: [application/json, application/yaml, application/vnd.kubernetes.protobuf]")
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
 
@@ -137,13 +154,18 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.DefaultWatchCacheSize, "default-watch-cache-size", s.DefaultWatchCacheSize,
 		"Default watch cache size. If zero, watch cache will be disabled for resources that do not have a default watch size set.")
 
+	fs.MarkDeprecated("default-watch-cache-size",
+		"watch caches are sized automatically and this flag will be removed in a future version")
+
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"Watch cache size settings for some resources (pods, nodes, etc.), comma separated. "+
 		"The individual setting format: resource[.group]#size, where resource is lowercase plural (no version), "+
 		"group is omitted for resources of apiVersion v1 (the legacy core API) and included for others, "+
-		"and size is a number. It takes effect when watch-cache is enabled. "+
-		"Some resources (replicationcontrollers, endpoints, nodes, pods, services, apiservices.apiregistration.k8s.io) "+
-		"have system defaults set by heuristics, others default to default-watch-cache-size")
+		"and size is a number. This option is only meaningful for resources built into the apiserver, "+
+		"not ones defined by CRDs or aggregated from external servers, and is only consulted if the "+
+		"watch-cache is enabled. The only meaningful size setting to supply here is zero, which means to "+
+		"disable watch caching for the associated resource; all non-zero values are equivalent and mean "+
+		"to not disable watch caching for that resource")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
@@ -166,6 +188,10 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.EncryptionProviderConfigFilepath, "encryption-provider-config", s.EncryptionProviderConfigFilepath,
 		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
 
+	fs.BoolVar(&s.EncryptionProviderConfigAutomaticReload, "encryption-provider-config-automatic-reload", s.EncryptionProviderConfigAutomaticReload,
+		"Determines if the file set by --encryption-provider-config should be automatically reloaded if the disk contents change. "+
+			"Setting this to true disables the ability to uniquely identify distinct KMS plugins via the API server healthz endpoints.")
+
 	fs.DurationVar(&s.StorageConfig.CompactionInterval, "etcd-compaction-interval", s.StorageConfig.CompactionInterval,
 		"The interval of compaction requests. If 0, the compaction request from apiserver is disabled.")
 
@@ -178,50 +204,128 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.StorageConfig.HealthcheckTimeout, "etcd-healthcheck-timeout", s.StorageConfig.HealthcheckTimeout,
 		"The timeout to use when checking etcd health.")
 
+	fs.DurationVar(&s.StorageConfig.ReadycheckTimeout, "etcd-readycheck-timeout", s.StorageConfig.ReadycheckTimeout,
+		"The timeout to use when checking etcd readiness")
+
 	fs.Int64Var(&s.StorageConfig.LeaseManagerConfig.ReuseDurationSeconds, "lease-reuse-duration-seconds", s.StorageConfig.LeaseManagerConfig.ReuseDurationSeconds,
 		"The time in seconds that each lease is reused. A lower value could avoid large number of objects reusing the same lease. Notice that a too small value may cause performance problems at storage layer.")
 }
 
+// Complete must be called exactly once before using any of the Apply methods.  It is responsible for setting
+// up objects that must be created once and reused across multiple invocations such as storage transformers.
+// This method mutates the receiver (EtcdOptions).  It must never mutate the inputs.
+func (s *EtcdOptions) Complete(
+	storageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker,
+	stopCh <-chan struct{},
+	addPostStartHook func(name string, hook server.PostStartHookFunc) error,
+) error {
+	if s == nil {
+		return nil
+	}
+
+	if s.complete {
+		return fmt.Errorf("EtcdOptions.Complete called more than once")
+	}
+
+	if len(s.EncryptionProviderConfigFilepath) != 0 {
+		ctxTransformers, closeTransformers := wait.ContextForChannel(stopCh)
+		ctxServer, _ := wait.ContextForChannel(stopCh) // explicitly ignore cancel here because we do not own the server's lifecycle
+
+		encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload, ctxTransformers.Done())
+		if err != nil {
+			// in case of error, we want to close partially initialized (if any) transformers
+			closeTransformers()
+			return err
+		}
+
+		// enable kms hot reload controller only if the config file is set to be automatically reloaded
+		if s.EncryptionProviderConfigAutomaticReload {
+			// with reload=true we will always have 1 health check
+			if len(encryptionConfiguration.HealthChecks) != 1 {
+				// in case of error, we want to close partially initialized (if any) transformers
+				closeTransformers()
+				return fmt.Errorf("failed to start kms encryption config hot reload controller. only 1 health check should be available when reload is enabled")
+			}
+
+			dynamicTransformers := encryptionconfig.NewDynamicTransformers(encryptionConfiguration.Transformers, encryptionConfiguration.HealthChecks[0], closeTransformers, encryptionConfiguration.KMSCloseGracePeriod)
+
+			s.resourceTransformers = dynamicTransformers
+			s.kmsPluginHealthzChecks = []healthz.HealthChecker{dynamicTransformers}
+
+			// add post start hook to start hot reload controller
+			// adding this hook here will ensure that it gets configured exactly once
+			err = addPostStartHook(
+				"start-encryption-provider-config-automatic-reload",
+				func(hookContext server.PostStartHookContext) error {
+					kmsConfigController := kmsconfigcontroller.NewDynamicKMSEncryptionConfiguration(
+						"kms-encryption-config",
+						s.EncryptionProviderConfigFilepath,
+						dynamicTransformers,
+						encryptionConfiguration.EncryptionFileContentHash,
+						ctxServer.Done(),
+					)
+
+					go kmsConfigController.Run(ctxServer)
+
+					return nil
+				},
+			)
+			if err != nil {
+				// in case of error, we want to close partially initialized (if any) transformers
+				closeTransformers()
+				return fmt.Errorf("failed to add post start hook for kms encryption config hot reload controller: %w", err)
+			}
+		} else {
+			s.resourceTransformers = encryptionconfig.StaticTransformers(encryptionConfiguration.Transformers)
+			s.kmsPluginHealthzChecks = encryptionConfiguration.HealthChecks
+		}
+	}
+
+	s.StorageConfig.StorageObjectCountTracker = storageObjectCountTracker
+
+	s.complete = true
+
+	return nil
+}
+
+// ApplyTo mutates the provided server.Config.  It must never mutate the receiver (EtcdOptions).
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 	if s == nil {
 		return nil
 	}
-	if err := s.addEtcdHealthEndpoint(c); err != nil {
-		return err
+
+	return s.ApplyWithStorageFactoryTo(&SimpleStorageFactory{StorageConfig: s.StorageConfig}, c)
+}
+
+// ApplyWithStorageFactoryTo mutates the provided server.Config.  It must never mutate the receiver (EtcdOptions).
+func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFactory, c *server.Config) error {
+	if s == nil {
+		return nil
 	}
-	transformerOverrides := make(map[schema.GroupResource]value.Transformer)
-	if len(s.EncryptionProviderConfigFilepath) > 0 {
-		var err error
-		transformerOverrides, err = encryptionconfig.GetTransformerOverrides(s.EncryptionProviderConfigFilepath)
-		if err != nil {
+
+	if !s.complete {
+		return fmt.Errorf("EtcdOptions.Apply called without completion")
+	}
+
+	if !s.SkipHealthEndpoints {
+		if err := s.addEtcdHealthEndpoint(c); err != nil {
 			return err
 		}
 	}
 
-	// use the StorageObjectCountTracker interface instance from server.Config
-	s.StorageConfig.StorageObjectCountTracker = c.StorageObjectCountTracker
-
-	c.RESTOptionsGetter = &SimpleRestOptionsFactory{
-		Options:              *s,
-		TransformerOverrides: transformerOverrides,
+	if s.resourceTransformers != nil {
+		factory = &transformerStorageFactory{
+			delegate:             factory,
+			resourceTransformers: s.resourceTransformers,
+		}
 	}
-	return nil
-}
-
-func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFactory, c *server.Config) error {
-	if err := s.addEtcdHealthEndpoint(c); err != nil {
-		return err
-	}
-
-	// use the StorageObjectCountTracker interface instance from server.Config
-	s.StorageConfig.StorageObjectCountTracker = c.StorageObjectCountTracker
 
 	c.RESTOptionsGetter = &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
 	return nil
 }
 
 func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
-	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig)
+	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig, c.DrainedNotify())
 	if err != nil {
 		return err
 	}
@@ -229,53 +333,17 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 		return healthCheck()
 	}))
 
-	if s.EncryptionProviderConfigFilepath != "" {
-		kmsPluginHealthzChecks, err := encryptionconfig.GetKMSPluginHealthzCheckers(s.EncryptionProviderConfigFilepath)
-		if err != nil {
-			return err
-		}
-		c.AddHealthChecks(kmsPluginHealthzChecks...)
+	readyCheck, err := storagefactory.CreateReadyCheck(s.StorageConfig, c.DrainedNotify())
+	if err != nil {
+		return err
 	}
+	c.AddReadyzChecks(healthz.NamedCheck("etcd-readiness", func(r *http.Request) error {
+		return readyCheck()
+	}))
+
+	c.AddHealthChecks(s.kmsPluginHealthzChecks...)
 
 	return nil
-}
-
-type SimpleRestOptionsFactory struct {
-	Options              EtcdOptions
-	TransformerOverrides map[schema.GroupResource]value.Transformer
-}
-
-func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	ret := generic.RESTOptions{
-		StorageConfig:             f.Options.StorageConfig.ForResource(resource),
-		Decorator:                 generic.UndecoratedStorage,
-		EnableGarbageCollection:   f.Options.EnableGarbageCollection,
-		DeleteCollectionWorkers:   f.Options.DeleteCollectionWorkers,
-		ResourcePrefix:            resource.Group + "/" + resource.Resource,
-		CountMetricPollPeriod:     f.Options.StorageConfig.CountMetricPollPeriod,
-		StorageObjectCountTracker: f.Options.StorageConfig.StorageObjectCountTracker,
-	}
-	if f.TransformerOverrides != nil {
-		if transformer, ok := f.TransformerOverrides[resource]; ok {
-			ret.StorageConfig.Transformer = transformer
-		}
-	}
-	if f.Options.EnableWatchCache {
-		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
-		if err != nil {
-			return generic.RESTOptions{}, err
-		}
-		size, ok := sizes[resource]
-		if ok && size > 0 {
-			klog.Warningf("Dropping watch-cache-size for %v - watchCache size is now dynamic", resource)
-		}
-		if ok && size <= 0 {
-			ret.Decorator = generic.UndecoratedStorage
-		} else {
-			ret.Decorator = genericregistry.StorageWithCacher()
-		}
-	}
-	return ret, nil
 }
 
 type StorageFactoryRestOptionsFactory struct {
@@ -298,6 +366,7 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		CountMetricPollPeriod:     f.Options.StorageConfig.CountMetricPollPeriod,
 		StorageObjectCountTracker: f.Options.StorageConfig.StorageObjectCountTracker,
 	}
+
 	if f.Options.EnableWatchCache {
 		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
 		if err != nil {
@@ -308,8 +377,10 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 			klog.Warningf("Dropping watch-cache-size for %v - watchCache size is now dynamic", resource)
 		}
 		if ok && size <= 0 {
+			klog.V(3).InfoS("Not using watch cache", "resource", resource)
 			ret.Decorator = generic.UndecoratedStorage
 		} else {
+			klog.V(3).InfoS("Using watch cache", "resource", resource)
 			ret.Decorator = genericregistry.StorageWithCacher()
 		}
 	}
@@ -350,4 +421,56 @@ func WriteWatchCacheSizes(watchCacheSizes map[schema.GroupResource]int) ([]strin
 		cacheSizes = append(cacheSizes, fmt.Sprintf("%s#%d", resource.String(), size))
 	}
 	return cacheSizes, nil
+}
+
+var _ serverstorage.StorageFactory = &SimpleStorageFactory{}
+
+// SimpleStorageFactory provides a StorageFactory implementation that should be used when different
+// resources essentially share the same storage config (as defined by the given storagebackend.Config).
+// It assumes the resources are stored at a path that is purely based on the schema.GroupResource.
+// Users that need flexibility and per resource overrides should use DefaultStorageFactory instead.
+type SimpleStorageFactory struct {
+	StorageConfig storagebackend.Config
+}
+
+func (s *SimpleStorageFactory) NewConfig(resource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
+	return s.StorageConfig.ForResource(resource), nil
+}
+
+func (s *SimpleStorageFactory) ResourcePrefix(resource schema.GroupResource) string {
+	return resource.Group + "/" + resource.Resource
+}
+
+func (s *SimpleStorageFactory) Backends() []serverstorage.Backend {
+	// nothing should ever call this method but we still provide a functional implementation
+	return serverstorage.Backends(s.StorageConfig)
+}
+
+var _ serverstorage.StorageFactory = &transformerStorageFactory{}
+
+type transformerStorageFactory struct {
+	delegate             serverstorage.StorageFactory
+	resourceTransformers encryptionconfig.ResourceTransformers
+}
+
+func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
+	config, err := t.delegate.NewConfig(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	configCopy := *config
+	resourceConfig := configCopy.Config
+	resourceConfig.Transformer = t.resourceTransformers.TransformerForResource(resource)
+	configCopy.Config = resourceConfig
+
+	return &configCopy, nil
+}
+
+func (t *transformerStorageFactory) ResourcePrefix(resource schema.GroupResource) string {
+	return t.delegate.ResourcePrefix(resource)
+}
+
+func (t *transformerStorageFactory) Backends() []serverstorage.Backend {
+	return t.delegate.Backends()
 }

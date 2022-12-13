@@ -167,11 +167,8 @@ func TestRemoveContainers(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
 			fakeOK, fakeOK, fakeOK, fakeOK, fakeOK, fakeOK, // Test case 1
-			fakeOK, fakeOK, fakeOK, fakeErr, fakeOK, fakeOK,
-			fakeErr, fakeOK, fakeOK, fakeErr, fakeOK,
-			fakeOK, fakeOK, fakeOK, fakeOK, fakeOK, fakeOK,
-			fakeOK, fakeOK, fakeOK, fakeErr, fakeOK, fakeOK,
-			fakeErr, fakeOK, fakeOK, fakeErr, fakeOK,
+			fakeOK, fakeOK, fakeOK, fakeErr, fakeOK, fakeErr, fakeOK, fakeErr, fakeOK, fakeErr, fakeOK, fakeErr, fakeOK, fakeOK, // Test case 2
+			fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeOK, fakeOK, fakeOK, fakeOK, // Test case 3
 		},
 	}
 	execer := fakeexec.FakeExec{
@@ -186,8 +183,8 @@ func TestRemoveContainers(t *testing.T) {
 		isError    bool
 	}{
 		{"valid: remove containers using CRI", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, false}, // Test case 1
-		{"invalid: CRI rmp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
-		{"invalid: CRI stopp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
+		{"invalid: CRI rmp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},            // Test case 2
+		{"invalid: CRI stopp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},          // Test case 3
 	}
 
 	for _, tc := range cases {

@@ -110,6 +110,9 @@ func (r removedInStorage) New() runtime.Object {
 	return removedInObj{major: r.major, minor: r.minor}
 }
 
+func (r removedInStorage) Destroy() {
+}
+
 type neverRemovedObj struct {
 }
 

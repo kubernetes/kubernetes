@@ -35,12 +35,16 @@ type Activation interface {
 	Parent() Activation
 }
 
-// EmptyActivation returns a variable free activation.
+// EmptyActivation returns a variable-free activation.
 func EmptyActivation() Activation {
-	// This call cannot fail.
-	a, _ := NewActivation(map[string]interface{}{})
-	return a
+	return emptyActivation{}
 }
+
+// emptyActivation is a variable-free activation.
+type emptyActivation struct{}
+
+func (emptyActivation) ResolveName(string) (interface{}, bool) { return nil, false }
+func (emptyActivation) Parent() Activation                     { return nil }
 
 // NewActivation returns an activation based on a map-based binding where the map keys are
 // expected to be qualified names used with ResolveName calls.

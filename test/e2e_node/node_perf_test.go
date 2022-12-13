@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -33,7 +34,7 @@ import (
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e_node/perf/workloads"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -103,7 +104,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		delOpts := metav1.DeleteOptions{
 			GracePeriodSeconds: &gp,
 		}
-		f.PodClient().DeleteSync(pod.Name, delOpts, framework.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(f).DeleteSync(pod.Name, delOpts, e2epod.DefaultPodDeletionTimeout)
 
 		// We are going to give some more time for the CPU manager to do any clean
 		// up it needs to do now that the pod has been deleted. Otherwise we may
@@ -124,14 +125,32 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		// Make the pod for the workload.
 		pod = makeNodePerfPod(wl)
 		// Create the pod.
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2epod.NewPodClient(f).CreateSync(pod)
 		// Wait for pod success.
-		f.PodClient().WaitForSuccess(pod.Name, wl.Timeout())
+		// but avoid using WaitForSuccess because we want the container logs upon failure #109295
+		podErr := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), wl.Timeout(),
+			func(pod *v1.Pod) (bool, error) {
+				switch pod.Status.Phase {
+				case v1.PodFailed:
+					return true, fmt.Errorf("pod %q failed with reason: %q, message: %q", pod.Name, pod.Status.Reason, pod.Status.Message)
+				case v1.PodSucceeded:
+					return true, nil
+				default:
+					return false, nil
+				}
+			},
+		)
 		podLogs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		framework.ExpectNoError(err)
+		if podErr != nil {
+			framework.Logf("dumping pod logs due to pod error detected: \n%s", podLogs)
+			framework.Failf("pod error: %v", podErr)
+		}
 		perf, err := wl.ExtractPerformanceFromLogs(podLogs)
 		framework.ExpectNoError(err)
 		framework.Logf("Time to complete workload %s: %v", wl.Name(), perf)
+		// using framework.ExpectNoError for consistency would cause changes the output format
+		gomega.Expect(podErr).To(gomega.Succeed(), "wait for pod %q to succeed", pod.Name)
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -153,7 +172,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[0]
 		})
-		ginkgo.It("NAS parallel benchmark (NPB) suite - Integer Sort (IS) workload", func() {
+		ginkgo.It("NAS parallel benchmark (NPB) suite - Integer Sort (IS) workload", func(ctx context.Context) {
 			defer cleanup()
 			runWorkload()
 		})
@@ -162,7 +181,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[1]
 		})
-		ginkgo.It("NAS parallel benchmark (NPB) suite - Embarrassingly Parallel (EP) workload", func() {
+		ginkgo.It("NAS parallel benchmark (NPB) suite - Embarrassingly Parallel (EP) workload", func(ctx context.Context) {
 			defer cleanup()
 			runWorkload()
 		})
@@ -171,7 +190,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		ginkgo.BeforeEach(func() {
 			wl = workloads.NodePerfWorkloads[2]
 		})
-		ginkgo.It("TensorFlow workload", func() {
+		ginkgo.It("TensorFlow workload", func(ctx context.Context) {
 			defer cleanup()
 			runWorkload()
 		})

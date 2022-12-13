@@ -31,14 +31,14 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	ginkgo.It("should be sent by kubelets and the scheduler about pods scheduling and running ", func() {
+	ginkgo.It("should be sent by kubelets and the scheduler about pods scheduling and running ", func(ctx context.Context) {
 
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 

@@ -33,7 +33,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -64,7 +64,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 		Testname: EmptyDir Wrapper Volume, Secret and ConfigMap volumes, no conflict
 		Description: Secret volume and ConfigMap volume is created with data. Pod MUST be able to start with Secret and ConfigMap volumes mounted into the container.
 	*/
-	framework.ConformanceIt("should not conflict", func() {
+	framework.ConformanceIt("should not conflict", func(ctx context.Context) {
 		name := "emptydir-wrapper-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
@@ -146,7 +146,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 				},
 			},
 		}
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 		defer func() {
 			ginkgo.By("Cleaning up the secret")
@@ -186,7 +186,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 		Testname: EmptyDir Wrapper Volume, ConfigMap volumes, no race
 		Description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes mounted. Pod MUST NOT fail waiting for Volumes.
 	*/
-	framework.ConformanceIt("should not cause race condition when used for configmaps [Serial]", func() {
+	framework.ConformanceIt("should not cause race condition when used for configmaps [Serial]", func(ctx context.Context) {
 		configMapNames := createConfigmapsForRace(f)
 		defer deleteConfigMaps(f, configMapNames)
 		volumes, volumeMounts := makeConfigMapVolumes(configMapNames)
@@ -199,7 +199,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	// This test uses deprecated GitRepo VolumeSource so it MUST not be promoted to Conformance.
 	// To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.
 	// This projected volume maps approach can also be tested with secrets and downwardapi VolumeSource but are less prone to the race problem.
-	ginkgo.It("should not cause race condition when used for git_repo [Serial] [Slow]", func() {
+	ginkgo.It("should not cause race condition when used for git_repo [Serial] [Slow]", func(ctx context.Context) {
 		gitURL, gitRepo, cleanup := createGitServer(f)
 		defer cleanup()
 		volumes, volumeMounts := makeGitRepoVolumes(gitURL, gitRepo)
@@ -218,7 +218,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 
 	gitServerPod := e2epod.NewAgnhostPod(f.Namespace.Name, gitServerPodName, nil, nil, []v1.ContainerPort{{ContainerPort: int32(containerPort)}}, "fake-gitserver")
 	gitServerPod.ObjectMeta.Labels = labels
-	f.PodClient().CreateSync(gitServerPod)
+	e2epod.NewPodClient(f).CreateSync(gitServerPod)
 
 	// Portal IP and port
 	httpPort := 2345

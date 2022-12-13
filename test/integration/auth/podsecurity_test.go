@@ -53,10 +53,7 @@ import (
 func TestPodSecurity(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)()
-	// Ensure the PodSecurity feature is enabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSecurity, true)()
 	// Start server
 	server := startPodSecurityServer(t)
 	opts := podsecuritytest.Options{
@@ -82,8 +79,6 @@ func TestPodSecurityGAOnly(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, k, false)()
 		}
 	}
-	// Ensure PodSecurity feature is enabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSecurity, true)()
 	// Start server
 	server := startPodSecurityServer(t)
 
@@ -100,7 +95,6 @@ func TestPodSecurityGAOnly(t *testing.T) {
 func TestPodSecurityWebhook(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)()
 
 	// Start test API server.
@@ -203,6 +197,7 @@ func startPodSecurityWebhook(t *testing.T, testServer *kubeapiservertesting.Test
 		if err != nil {
 			return false, err
 		}
+		defer resp.Body.Close()
 		return resp.StatusCode == 200, nil
 	}); err != nil {
 		return "", err

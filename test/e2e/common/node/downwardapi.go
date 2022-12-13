@@ -17,20 +17,20 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Downward API", func() {
@@ -42,7 +42,7 @@ var _ = SIGDescribe("Downward API", func() {
 	   Testname: DownwardAPI, environment for name, namespace and ip
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify Pod Name, namespace and IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide pod name, namespace and IP address as env vars [NodeConformance]", func() {
+	framework.ConformanceIt("should provide pod name, namespace and IP address as env vars [NodeConformance]", func(ctx context.Context) {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -88,7 +88,7 @@ var _ = SIGDescribe("Downward API", func() {
 	   Testname: DownwardAPI, environment for host ip
 	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify host IP as environment variable in the Pod Spec are visible at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide host IP as an env var [NodeConformance]", func() {
+	framework.ConformanceIt("should provide host IP as an env var [NodeConformance]", func(ctx context.Context) {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -109,7 +109,7 @@ var _ = SIGDescribe("Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	ginkgo.It("should provide host IP and pod IP as an env var if pod uses host network [LinuxOnly]", func() {
+	ginkgo.It("should provide host IP and pod IP as an env var if pod uses host network [LinuxOnly]", func(ctx context.Context) {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -164,7 +164,7 @@ var _ = SIGDescribe("Downward API", func() {
 	   Testname: DownwardAPI, environment for CPU and memory limits and requests
 	   Description: Downward API MUST expose CPU request and Memory request set through environment variables at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance]", func() {
+	framework.ConformanceIt("should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance]", func(ctx context.Context) {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -215,7 +215,7 @@ var _ = SIGDescribe("Downward API", func() {
 	   Testname: DownwardAPI, environment for default CPU and memory limits and requests
 	   Description: Downward API MUST expose CPU request and Memory limits set through environment variables at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide default limits.cpu/memory from node allocatable [NodeConformance]", func() {
+	framework.ConformanceIt("should provide default limits.cpu/memory from node allocatable [NodeConformance]", func(ctx context.Context) {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -265,7 +265,7 @@ var _ = SIGDescribe("Downward API", func() {
 	   Testname: DownwardAPI, environment for Pod UID
 	   Description: Downward API MUST expose Pod UID set through environment variables at runtime in the container.
 	*/
-	framework.ConformanceIt("should provide pod UID as env vars [NodeConformance]", func() {
+	framework.ConformanceIt("should provide pod UID as env vars [NodeConformance]", func(ctx context.Context) {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -292,11 +292,7 @@ var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPI
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for hugepages", func() {
-		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.DownwardAPIHugePages)
-		})
-
-		ginkgo.It("should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars", func() {
+		ginkgo.It("should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars", func(ctx context.Context) {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{
 				{
@@ -351,7 +347,7 @@ var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPI
 			testDownwardAPIUsingPod(f, pod, env, expectations)
 		})
 
-		ginkgo.It("should provide default limits.hugepages-<pagesize> from node allocatable", func() {
+		ginkgo.It("should provide default limits.hugepages-<pagesize> from node allocatable", func(ctx context.Context) {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{
 				{
@@ -424,5 +420,5 @@ func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, ex
 }
 
 func testDownwardAPIUsingPod(f *framework.Framework, pod *v1.Pod, env []v1.EnvVar, expectations []string) {
-	f.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
+	e2epodoutput.TestContainerOutputRegexp(f, "downward api env vars", pod, 0, expectations)
 }

@@ -108,8 +108,7 @@ var (
 		{sizeMin: 90, sizeMax: 500, ttlSeconds: 15},
 		{sizeMin: 450, sizeMax: 1000, ttlSeconds: 30},
 		{sizeMin: 900, sizeMax: 2000, ttlSeconds: 60},
-		{sizeMin: 1800, sizeMax: 10000, ttlSeconds: 300},
-		{sizeMin: 9000, sizeMax: math.MaxInt32, ttlSeconds: 600},
+		{sizeMin: 1800, sizeMax: math.MaxInt32, ttlSeconds: 300},
 	}
 )
 

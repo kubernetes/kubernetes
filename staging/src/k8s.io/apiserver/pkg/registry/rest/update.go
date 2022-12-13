@@ -29,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 )
 
@@ -128,19 +126,8 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
 
-	// Ensure managedFields state is removed unless ServerSideApply is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		oldMeta.SetManagedFields(nil)
-		objectMeta.SetManagedFields(nil)
-	}
-
 	strategy.PrepareForUpdate(ctx, obj, old)
 
-	// ZZZ_DeprecatedClusterName is ignored and should not be saved
-	if len(objectMeta.GetZZZ_DeprecatedClusterName()) > 0 {
-		objectMeta.SetZZZ_DeprecatedClusterName("")
-		warning.AddWarning(ctx, "", "metadata.clusterName was specified. This field is not preserved and will be removed from the schema in 1.25")
-	}
 	// Use the existing UID if none is provided
 	if len(objectMeta.GetUID()) == 0 {
 		objectMeta.SetUID(oldMeta.GetUID())

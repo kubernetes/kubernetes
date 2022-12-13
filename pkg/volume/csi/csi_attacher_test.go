@@ -25,6 +25,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"sync"
 	"testing"
 	"time"
@@ -36,12 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -248,7 +246,6 @@ func TestAttacherAttach(t *testing.T) {
 }
 
 func TestAttacherAttachWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	testCases := []struct {
 		name                string
 		nodeName            string
@@ -573,8 +570,6 @@ func TestAttacherWaitForAttach(t *testing.T) {
 }
 
 func TestAttacherWaitForAttachWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-
 	tests := []struct {
 		name             string
 		driver           string
@@ -861,7 +856,6 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 }
 
 func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	type attachedSpec struct {
 		volName  string
 		spec     *volume.Spec
@@ -1095,8 +1089,6 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 }
 
 func TestAttacherMountDevice(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, true)()
-
 	pvName := "test-pv"
 	var testFSGroup int64 = 3000
 	nonFinalError := volumetypes.NewUncertainProgressError("")
@@ -1110,9 +1102,9 @@ func TestAttacherMountDevice(t *testing.T) {
 		stageUnstageSet                bool
 		fsGroup                        *int64
 		expectedVolumeMountGroup       string
-		delegateFSGroupFeatureGate     bool
 		driverSupportsVolumeMountGroup bool
 		shouldFail                     bool
+		skipOnWindows                  bool
 		createAttachment               bool
 		populateDeviceMountPath        bool
 		exitError                      error
@@ -1216,15 +1208,19 @@ func TestAttacherMountDevice(t *testing.T) {
 			createAttachment:        true,
 			populateDeviceMountPath: true,
 			shouldFail:              true,
-			spec:                    volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), true),
+			// NOTE: We're skipping this test on Windows because os.Chmod is not working as intended, which means that
+			// this test won't fail on Windows due to permission denied errors.
+			// TODO: Remove the skip once Windows file permissions support is added.
+			// https://github.com/kubernetes/kubernetes/pull/110921
+			skipOnWindows: true,
+			spec:          volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), true),
 		},
 		{
-			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup to be passed to NodeStageVolume",
+			testName:                       "fsgroup provided, driver supports volume mount group; expect fsgroup to be passed to NodeStageVolume",
 			volName:                        "test-vol1",
 			devicePath:                     "path1",
 			deviceMountPath:                "path2",
 			fsGroup:                        &testFSGroup,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: true,
 			expectedVolumeMountGroup:       "3000",
 			stageUnstageSet:                true,
@@ -1232,11 +1228,10 @@ func TestAttacherMountDevice(t *testing.T) {
 			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
-			testName:                       "fsgroup not provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
+			testName:                       "fsgroup not provided, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
 			volName:                        "test-vol1",
 			devicePath:                     "path1",
 			deviceMountPath:                "path2",
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: true,
 			expectedVolumeMountGroup:       "",
 			stageUnstageSet:                true,
@@ -1244,26 +1239,12 @@ func TestAttacherMountDevice(t *testing.T) {
 			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
-			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver does not support volume mount group; expect fsgroup not to be passed to NodeStageVolume",
+			testName:                       "fsgroup provided, driver does not support volume mount group; expect fsgroup not to be passed to NodeStageVolume",
 			volName:                        "test-vol1",
 			devicePath:                     "path1",
 			deviceMountPath:                "path2",
 			fsGroup:                        &testFSGroup,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: false,
-			expectedVolumeMountGroup:       "",
-			stageUnstageSet:                true,
-			createAttachment:               true,
-			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
-		},
-		{
-			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature disabled, driver supports volume mount group; expect fsgroup not to be passed to NodeStageVolume",
-			volName:                        "test-vol1",
-			devicePath:                     "path1",
-			deviceMountPath:                "path2",
-			fsGroup:                        &testFSGroup,
-			delegateFSGroupFeatureGate:     false,
-			driverSupportsVolumeMountGroup: true,
 			expectedVolumeMountGroup:       "",
 			stageUnstageSet:                true,
 			createAttachment:               true,
@@ -1281,9 +1262,10 @@ func TestAttacherMountDevice(t *testing.T) {
 			}
 		}
 		t.Run(tc.testName, func(t *testing.T) {
+			if tc.skipOnWindows && goruntime.GOOS == "windows" {
+				t.Skipf("Skipping test case on Windows: %s", tc.testName)
+			}
 			t.Logf("Running test case: %s", tc.testName)
-
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
 
 			// Setup
 			// Create a new attacher
@@ -1348,7 +1330,7 @@ func TestAttacherMountDevice(t *testing.T) {
 				if tc.populateDeviceMountPath {
 					// We're expecting saveVolumeData to fail, which is responsible
 					// for creating this file. It shouldn't exist.
-					_, err := os.Stat(parent + "/" + volDataFileName)
+					_, err := os.Stat(filepath.Join(parent, volDataFileName))
 					if !os.IsNotExist(err) {
 						t.Errorf("vol_data.json should not exist: %v", err)
 					}
@@ -1414,8 +1396,6 @@ func TestAttacherMountDevice(t *testing.T) {
 }
 
 func TestAttacherMountDeviceWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, true)()
 	pvName := "test-pv"
 	var testFSGroup int64 = 3000
 	testCases := []struct {

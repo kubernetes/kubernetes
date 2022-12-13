@@ -17,6 +17,7 @@ package containerd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -101,10 +102,14 @@ func newContainerdContainerHandler(
 		if err == nil {
 			break
 		}
-		retry--
-		if !errdefs.IsNotFound(err) || retry == 0 {
+
+		// Retry when task is not created yet or task is in unknown state (likely in process of initializing)
+		isRetriableError := errdefs.IsNotFound(err) || errors.Is(err, ErrTaskIsInUnknownState)
+		if !isRetriableError || retry == 0 {
 			return nil, err
 		}
+
+		retry--
 		time.Sleep(backoff)
 		backoff *= 2
 	}

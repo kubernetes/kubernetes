@@ -800,6 +800,9 @@ function create-master-auth {
   if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "gcp:kube-bootstrap,uid:gcp:kube-bootstrap,system:masters"
   fi
+  if [[ -n "${CLOUD_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${CLOUD_CONTROLLER_MANAGER_TOKEN}," "system:cloud-controller-manager,uid:system:cloud-controller-manager"
+  fi
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
   fi
@@ -1161,6 +1164,7 @@ rules:
   - level: None
     users:
       - system:kube-controller-manager
+      - system:cloud-controller-manager
       - system:kube-scheduler
       - system:serviceaccount:kube-system:endpoint-controller
     verbs: ["get", "update"]
@@ -1185,6 +1189,7 @@ rules:
   - level: None
     users:
       - system:kube-controller-manager
+      - system:cloud-controller-manager
     verbs: ["get", "list"]
     resources:
       - group: "metrics.k8s.io"
@@ -1621,7 +1626,13 @@ function start-kubelet {
   echo "Using kubelet binary at ${kubelet_bin}"
 
   local -r kubelet_env_file="/etc/default/kubelet"
-  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-}"
+
+  local kubelet_cgroup_driver=""
+  if [[ "${CGROUP_CONFIG-}" == "cgroup2fs" ]]; then
+    kubelet_cgroup_driver="--cgroup-driver=systemd"
+  fi
+
+  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-} ${kubelet_cgroup_driver:-}"
   echo "KUBELET_OPTS=\"${kubelet_opts}\"" > "${kubelet_env_file}"
   echo "KUBE_COVERAGE_FILE=\"/var/log/kubelet.cov\"" >> "${kubelet_env_file}"
 
@@ -1720,7 +1731,7 @@ function prepare-kube-proxy-manifest-variables {
   local -r src_file=$1;
 
   local -r kubeconfig="--kubeconfig=/var/lib/kube-proxy/kubeconfig"
-  local kube_docker_registry="k8s.gcr.io"
+  local kube_docker_registry="registry.k8s.io"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     kube_docker_registry=${KUBE_DOCKER_REGISTRY}
   fi
@@ -1747,7 +1758,7 @@ function prepare-kube-proxy-manifest-variables {
       exit 1
     fi
   fi
-  params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
+  params+=" --iptables-sync-period=1m --iptables-min-sync-period=1s --ipvs-sync-period=1m --ipvs-min-sync-period=1s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
@@ -2057,7 +2068,7 @@ function compute-master-manifest-variables {
     CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\", \"type\": \"FileOrCreate\"}},"
     CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
   fi
-  DOCKER_REGISTRY="k8s.gcr.io"
+  DOCKER_REGISTRY="registry.k8s.io"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
   fi
@@ -2235,6 +2246,112 @@ function start-kube-controller-manager {
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
+# (TODO/cloud-provider-gcp): Figure out how to inject
+# Starts cloud controller manager.
+# It prepares the log file, loads the docker image, calculates variables, sets them
+# in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
+#
+# Assumed vars (which are calculated in function compute-master-manifest-variables)
+#   CLOUD_CONFIG_OPT
+#   CLOUD_CONFIG_VOLUME
+#   CLOUD_CONFIG_MOUNT
+#   DOCKER_REGISTRY
+function start-cloud-controller-manager {
+  echo "Start cloud provider controller-manager"
+  setup-addon-manifests "addons" "cloud-controller-manager"
+
+  create-kubeconfig "cloud-controller-manager" "${CLOUD_CONTROLLER_MANAGER_TOKEN}"
+  echo "Preparing cloud provider controller-manager log file"
+  prepare-log-file /var/log/cloud-controller-manager.log "${CLOUD_CONTROLLER_MANAGER_RUNASUSER:-0}"
+  # Calculate variables and assemble the command line.
+  local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=4"}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
+  params+=("--secure-port=10258")
+  params+=("--use-service-account-credentials")
+  params+=("--cloud-provider=gce")
+  params+=("--kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
+  params+=("--authorization-kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
+  params+=("--authentication-kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
+  if [[ -n "${INSTANCE_PREFIX:-}" ]]; then
+    params+=("--cluster-name=${INSTANCE_PREFIX}")
+  fi
+  if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
+    params+=("--cluster-cidr=${CLUSTER_IP_RANGE}")
+  fi
+  if [[ -n "${CONCURRENT_SERVICE_SYNCS:-}" ]]; then
+    params+=("--concurrent-service-syncs=${CONCURRENT_SERVICE_SYNCS}")
+  fi
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
+    params+=("--allocate-node-cidrs=true")
+  elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
+    params+=("--allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}")
+  fi
+  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
+    params+=("--cidr-allocator-type=${NODE_IPAM_MODE}")
+    params+=("--configure-cloud-routes=false")
+  fi
+  if [[ -n "${FEATURE_GATES:-}" ]]; then
+    # remove non-GCP feature gates, since the CCM will early exit
+    # if given a feature gate it doesn't recognize
+    echo "Setting feature gates for cloud provider controller-manager from ${CCM_FEATURE_GATES}"
+    local CCM_FEATURE_GATES_FILTER
+    CCM_FEATURE_GATES_FILTER=$(echo "${CCM_FEATURE_GATES}" | sed "s/^/(/" | sed "s/,/=[^,]*|/g" | sed "s/$/=[^,]*)/")
+    echo "Computing safe feature gates for cloud provider controller-manager from ${FEATURE_GATES} and filter ${CCM_FEATURE_GATES_FILTER}"
+    local safe_feature_gates
+    safe_feature_gates=$(echo "${FEATURE_GATES}" | { grep -E -o "(${CCM_FEATURE_GATES_FILTER})" || true; } | tr "\n" "," | sed "s/,$//")
+    echo "Setting safe feature gates for cloud provider controller-manager with ${safe_feature_gates}"
+    if [[ -n "${safe_feature_gates:-}" ]]; then
+      params+=("--feature-gates=${safe_feature_gates}")
+      echo "Computing unsafe feature gates for cloud provider controller-manager from ${CCM_FEATURE_GATES_FILTER}"
+      local filtered_feature_gates
+      filtered_feature_gates=$(echo "${FEATURE_GATES}" | sed "s/,/\n/g" | { grep -E -v "(${CCM_FEATURE_GATES_FILTER})" || true; } | sed -z "s/\n/,/g;s/,$/\n/")
+      echo "Feature gates that did not pass through the GCP filter:" "${filtered_feature_gates}"
+    else
+      echo "None of the given feature gates (${FEATURE_GATES}) were found to be safe to pass to the CCM"
+    fi
+  fi
+  if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
+    params+=("--controllers=${RUN_CONTROLLERS}")
+  fi
+
+  echo "Converting manifest for cloud provider controller-manager"
+  local paramstring
+  paramstring="$(convert-manifest-params "${params[*]}")"
+  local container_env=""
+  if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
+    container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
+  fi
+
+  echo "Applying over-rides for manifest for cloud provider controller-manager"
+  local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cloud-controller-manager.manifest"
+  # Evaluate variables.
+  sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
+  sed -i -e "s@{{params}}@${paramstring}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
+  sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
+  sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
+  sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
+  sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
+  sed -i -e "s@{{pv_recycler_mount}}@${PV_RECYCLER_MOUNT}@g" "${src_file}"
+  sed -i -e "s@{{pv_recycler_volume}}@${PV_RECYCLER_VOLUME}@g" "${src_file}"
+  sed -i -e "s@{{flexvolume_hostpath_mount}}@${FLEXVOLUME_HOSTPATH_MOUNT}@g" "${src_file}"
+  sed -i -e "s@{{flexvolume_hostpath}}@${FLEXVOLUME_HOSTPATH_VOLUME}@g" "${src_file}"
+  sed -i -e "s@{{cpurequest}}@${CLOUD_CONTROLLER_MANAGER_CPU_REQUEST}@g" "${src_file}"
+
+  if [[ -n "${CLOUD_CONTROLLER_MANAGER_RUNASUSER:-}" && -n "${CLOUD_CONTROLLER_MANAGER_RUNASGROUP:-}" ]]; then
+    #run-cloud-controller-manager-as-non-root
+    sed -i -e "s@{{runAsUser}}@\"runAsUser\": ${CLOUD_CONTROLLER_MANAGER_RUNASUSER},@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@\"runAsGroup\":${CLOUD_CONTROLLER_MANAGER_RUNASGROUP},@g" "${src_file}"
+    sed -i -e "s@{{supplementalGroups}}@\"supplementalGroups\": [ ${KUBE_PKI_READERS_GROUP} ],@g" "${src_file}"
+  else
+    sed -i -e "s@{{runAsUser}}@@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@@g" "${src_file}"
+    sed -i -e "s@{{supplementalGroups}}@@g" "${src_file}"
+  fi
+
+  echo "Writing manifest for cloud provider controller-manager"
+  cp "${src_file}" /etc/kubernetes/manifests
+}
+
 # Starts kubernetes scheduler.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -2337,15 +2454,6 @@ function setup-addon-manifests {
   local -r dst_dir="/etc/kubernetes/$1/$2"
 
   copy-manifests "${src_dir}/$2" "${dst_dir}"
-
-  # If the PodSecurityPolicy admission controller is enabled,
-  # set up the corresponding addon policies.
-  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
-    local -r psp_dir="${src_dir}/${3:-$2}/podsecuritypolicies"
-    if [[ -d "${psp_dir}" ]]; then
-      copy-manifests "${psp_dir}" "${dst_dir}"
-    fi
-  fi
 }
 
 # A function that downloads extra addons from a URL and puts them in the GCI
@@ -2695,10 +2803,6 @@ function start-kube-addons {
     setup-addon-manifests "addons" "rbac/legacy-kubelet-user-disable"
   fi
 
-  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "podsecuritypolicies"
-  fi
-
   # Set up manifests of other addons.
   if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
     if [ -n "${CUSTOM_KUBE_PROXY_YAML:-}" ]; then
@@ -2980,6 +3084,11 @@ function override-kubectl {
     fi
 }
 
+function detect-cgroup-config {
+  CGROUP_CONFIG=$(stat -fc %T /sys/fs/cgroup/)
+  echo "Detected cgroup config as ${CGROUP_CONFIG}"
+}
+
 function override-pv-recycler {
   if [[ -z "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
     echo "PV_RECYCLER_OVERRIDE_TEMPLATE is not set"
@@ -3002,7 +3111,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: k8s.gcr.io/debian-base:v2.0.0
+    image: registry.k8s.io/debian-base:v2.0.0
     command:
     - /bin/sh
     args:
@@ -3015,7 +3124,7 @@ EOF
 
 # fixup the alternate registry if specified
 if [[ -n "${KUBE_ADDON_REGISTRY:-}" ]]; then
-  sed -i -e "s@k8s.gcr.io@${KUBE_ADDON_REGISTRY}@g" "${PV_RECYCLER_OVERRIDE_TEMPLATE}"
+  sed -i -e "s@registry.k8s.io@${KUBE_ADDON_REGISTRY}@g" "${PV_RECYCLER_OVERRIDE_TEMPLATE}"
 fi
 }
 
@@ -3073,6 +3182,13 @@ EOF
       cni_template_path=""
     fi
   fi
+
+   # Use systemd cgroup driver when running on cgroupv2
+  local systemdCgroup="false"
+  if [[ "${CGROUP_CONFIG-}" == "cgroup2fs" ]]; then
+    systemdCgroup="true"
+  fi
+
   cat > "${config_path}" <<EOF
 version = 2
 # Kubernetes requires the cri plugin.
@@ -3087,7 +3203,7 @@ oom_score = -999
 [plugins."io.containerd.grpc.v1.cri"]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
-  sandbox_image = "${CONTAINERD_INFRA_CONTAINER:-"k8s.gcr.io/pause:3.7"}"
+  sandbox_image = "${CONTAINERD_INFRA_CONTAINER:-"registry.k8s.io/pause:3.9"}"
 [plugins."io.containerd.grpc.v1.cri".cni]
   bin_dir = "${KUBE_HOME}/bin"
   conf_dir = "/etc/cni/net.d"
@@ -3102,6 +3218,8 @@ oom_score = -999
 # See: https://github.com/kubernetes/k8s.io/issues/3411
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
   endpoint = ["https://registry.k8s.io", "https://k8s.gcr.io",]
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+  SystemdCgroup = ${systemdCgroup}
 EOF
 
   if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then
@@ -3322,6 +3440,7 @@ function main() {
   readonly KUBEDNS_AUTOSCALER="Deployment/kube-dns"
 
   # Resource requests of master components.
+  CLOUD_CONTROLLER_MANAGER_CPU_REQUEST="${KUBE_CONTROLLER_MANAGER_CPU_REQUEST:-50m}"
   KUBE_CONTROLLER_MANAGER_CPU_REQUEST="${KUBE_CONTROLLER_MANAGER_CPU_REQUEST:-200m}"
   KUBE_SCHEDULER_CPU_REQUEST="${KUBE_SCHEDULER_CPU_REQUEST:-75m}"
 
@@ -3358,6 +3477,7 @@ function main() {
 
   log-start 'GenerateTokens'
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
+  CLOUD_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
@@ -3411,6 +3531,7 @@ function main() {
     fi
   fi
 
+  log-wrap 'DetectCgroupConfig' detect-cgroup-config
   log-wrap 'OverrideKubectl' override-kubectl
   if docker-installed; then
     # We still need to configure docker so it wouldn't reserver the 172.17.0/16 subnet
@@ -3434,6 +3555,10 @@ function main() {
   fi
   log-end 'SetupKubePodLogReadersGroupDir'
 
+  # Note prepare-mounter-rootfs must be called before the kubelet starts, as
+  # kubelet startup updates its nameserver.
+  log-wrap 'PrepareMounterRootfs' prepare-mounter-rootfs
+
   log-wrap 'StartKubelet' start-kubelet
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
@@ -3447,6 +3572,10 @@ function main() {
       log-wrap 'StartKonnectivityServer' start-konnectivity-server
     fi
     log-wrap 'StartKubeControllerManager' start-kube-controller-manager
+    # (TODO/cloud-provider-gcp): Figure out how to inject
+    if [[ "${CLOUD_PROVIDER_FLAG:-gce}" == "external" ]]; then
+      log-wrap 'StartCloudControllerManager' start-cloud-controller-manager
+    fi
     log-wrap 'StartKubeScheduler' start-kube-scheduler
     log-wrap 'WaitTillApiserverReady' wait-till-apiserver-ready
     log-wrap 'StartKubeAddons' start-kube-addons
@@ -3462,7 +3591,6 @@ function main() {
     fi
   fi
   log-wrap 'ResetMotd' reset-motd
-  log-wrap 'PrepareMounterRootfs' prepare-mounter-rootfs
 
   # Wait for all background jobs to finish.
   wait

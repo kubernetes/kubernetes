@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 const (
@@ -44,7 +44,7 @@ type ConformanceContainer struct {
 	Volumes          []v1.Volume
 	ImagePullSecrets []string
 
-	PodClient          *framework.PodClient
+	PodClient          *e2epod.PodClient
 	podName            string
 	PodSecurityContext *v1.PodSecurityContext
 }
@@ -136,7 +136,7 @@ const (
 	ContainerStateUnknown ContainerState = "Unknown"
 )
 
-// GetContainerState returns current state the container represents among its lifecyle
+// GetContainerState returns current state the container represents among its lifecycle
 func GetContainerState(state v1.ContainerState) ContainerState {
 	if state.Waiting != nil {
 		return ContainerStateWaiting

@@ -3,9 +3,11 @@
 approvers:
   - feiskyer
   - sbangari
+  - daschott
 reviewers:
   - feiskyer
   - sbangari
+  - daschott
 labels:
   - sig/network
 emeritus_approvers:

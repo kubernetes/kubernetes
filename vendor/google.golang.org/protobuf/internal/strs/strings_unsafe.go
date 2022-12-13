@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !purego && !appengine
 // +build !purego,!appengine
 
 package strs
@@ -9,7 +10,7 @@ package strs
 import (
 	"unsafe"
 
-	pref "google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type (
@@ -58,7 +59,7 @@ type Builder struct {
 
 // AppendFullName is equivalent to protoreflect.FullName.Append,
 // but optimized for large batches where each name has a shared lifetime.
-func (sb *Builder) AppendFullName(prefix pref.FullName, name pref.Name) pref.FullName {
+func (sb *Builder) AppendFullName(prefix protoreflect.FullName, name protoreflect.Name) protoreflect.FullName {
 	n := len(prefix) + len(".") + len(name)
 	if len(prefix) == 0 {
 		n -= len(".")
@@ -67,7 +68,7 @@ func (sb *Builder) AppendFullName(prefix pref.FullName, name pref.Name) pref.Ful
 	sb.buf = append(sb.buf, prefix...)
 	sb.buf = append(sb.buf, '.')
 	sb.buf = append(sb.buf, name...)
-	return pref.FullName(sb.last(n))
+	return protoreflect.FullName(sb.last(n))
 }
 
 // MakeString is equivalent to string(b), but optimized for large batches

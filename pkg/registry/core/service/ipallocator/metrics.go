@@ -85,3 +85,38 @@ func registerMetrics() {
 		legacyregistry.MustRegister(clusterIPAllocationErrors)
 	})
 }
+
+// metricsRecorderInterface is the interface to record metrics.
+type metricsRecorderInterface interface {
+	setAllocated(cidr string, allocated int)
+	setAvailable(cidr string, available int)
+	incrementAllocations(cidr, scope string)
+	incrementAllocationErrors(cidr, scope string)
+}
+
+// metricsRecorder implements metricsRecorderInterface.
+type metricsRecorder struct{}
+
+func (m *metricsRecorder) setAllocated(cidr string, allocated int) {
+	clusterIPAllocated.WithLabelValues(cidr).Set(float64(allocated))
+}
+
+func (m *metricsRecorder) setAvailable(cidr string, available int) {
+	clusterIPAvailable.WithLabelValues(cidr).Set(float64(available))
+}
+
+func (m *metricsRecorder) incrementAllocations(cidr, scope string) {
+	clusterIPAllocations.WithLabelValues(cidr, scope).Inc()
+}
+
+func (m *metricsRecorder) incrementAllocationErrors(cidr, scope string) {
+	clusterIPAllocationErrors.WithLabelValues(cidr, scope).Inc()
+}
+
+// emptyMetricsRecorder is a null object implements metricsRecorderInterface.
+type emptyMetricsRecorder struct{}
+
+func (*emptyMetricsRecorder) setAllocated(cidr string, allocated int)      {}
+func (*emptyMetricsRecorder) setAvailable(cidr string, available int)      {}
+func (*emptyMetricsRecorder) incrementAllocations(cidr, scope string)      {}
+func (*emptyMetricsRecorder) incrementAllocationErrors(cidr, scope string) {}

@@ -17,7 +17,6 @@ limitations under the License.
 package clusterinfo
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -41,7 +40,6 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			_, _, buf, _ := genericclioptions.NewTestIOStreams()
 			f := cmdtesting.NewTestFactory()
@@ -58,7 +56,7 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 func TestSetupOutputWriterFile(t *testing.T) {
 	file := "output"
 	extension := ".json"
-	dir, err := ioutil.TempDir(os.TempDir(), "out")
+	dir, err := os.MkdirTemp(os.TempDir(), "out")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -76,7 +74,7 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	output := "some data here"
 	writer.Write([]byte(output))
 
-	data, err := ioutil.ReadFile(fullPath)
+	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

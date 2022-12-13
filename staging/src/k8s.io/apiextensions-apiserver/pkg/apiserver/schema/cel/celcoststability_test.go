@@ -608,7 +608,7 @@ func TestCelCostStability(t *testing.T) {
 			}),
 			expectCost: map[string]int64{
 				// 'kind', 'apiVersion', 'metadata.name' and 'metadata.generateName' are always accessible
-				// even if not specified in the schema, regardless of if x-preserve-unknown-fields is set.
+				// even if not specified in the schema, regardless of if x-kubernetes-preserve-unknown-fields is set.
 				"self.embedded.kind == 'Pod'":                          4,
 				"self.embedded.apiVersion == 'v1'":                     4,
 				"self.embedded.metadata.name == 'foo'":                 5,
@@ -1087,28 +1087,27 @@ func TestCelCostStability(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for validRule, expectedCost := range tt.expectCost {
-				t.Run(validRule, func(t *testing.T) {
-					validRule := validRule
-					expectedCost := expectedCost
-					t.Run(validRule, func(t *testing.T) {
-						t.Parallel()
-						s := withRule(*tt.schema, validRule)
-						celValidator := NewValidator(&s, PerCallLimit)
-						if celValidator == nil {
-							t.Fatal("expected non nil validator")
-						}
-						ctx := context.TODO()
-						errs, remainingBudegt := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
-						for _, err := range errs {
-							t.Errorf("unexpected error: %v", err)
-						}
-						rtCost := RuntimeCELCostBudget - remainingBudegt
-						if rtCost != expectedCost {
-							t.Fatalf("runtime cost %d does not match expected runtime cost %d", rtCost, expectedCost)
-						}
-					})
+				testName := validRule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
+					t.Parallel()
+					s := withRule(*tt.schema, validRule)
+					celValidator := NewValidator(&s, true, PerCallLimit)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					ctx := context.TODO()
+					errs, remainingBudegt := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+					for _, err := range errs {
+						t.Errorf("unexpected error: %v", err)
+					}
+					rtCost := RuntimeCELCostBudget - remainingBudegt
+					if rtCost != expectedCost {
+						t.Fatalf("runtime cost %d does not match expected runtime cost %d", rtCost, expectedCost)
+					}
 				})
-
 			}
 		})
 	}

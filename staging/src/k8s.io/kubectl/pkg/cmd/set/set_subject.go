@@ -66,7 +66,6 @@ type SubjectOptions struct {
 	Output            string
 	All               bool
 	DryRunStrategy    cmdutil.DryRunStrategy
-	DryRunVerifier    *resource.QueryParamVerifier
 	Local             bool
 	fieldManager      string
 
@@ -128,11 +127,6 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -270,12 +264,6 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				allErrs = append(allErrs, err)
-				continue
-			}
-		}
 		actual, err := resource.
 			NewHelper(info.Client, info.Mapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
@@ -293,7 +281,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 	return utilerrors.NewAggregate(allErrs)
 }
 
-//Note: the obj mutates in the function
+// Note: the obj mutates in the function
 func updateSubjectForObject(obj runtime.Object, subjects []rbacv1.Subject, fn updateSubjects) (bool, error) {
 	switch t := obj.(type) {
 	case *rbacv1.RoleBinding:

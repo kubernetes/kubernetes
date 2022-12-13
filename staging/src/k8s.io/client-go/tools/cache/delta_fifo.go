@@ -74,11 +74,11 @@ type DeltaFIFOOptions struct {
 // the Pop() method.
 //
 // DeltaFIFO solves this use case:
-//  * You want to process every object change (delta) at most once.
-//  * When you process an object, you want to see everything
-//    that's happened to it since you last processed it.
-//  * You want to process the deletion of some of the objects.
-//  * You might want to periodically reprocess objects.
+//   - You want to process every object change (delta) at most once.
+//   - When you process an object, you want to see everything
+//     that's happened to it since you last processed it.
+//   - You want to process the deletion of some of the objects.
+//   - You might want to periodically reprocess objects.
 //
 // DeltaFIFO's Pop(), Get(), and GetByKey() methods return
 // interface{} to satisfy the Store/Queue interfaces, but they
@@ -179,21 +179,21 @@ type Deltas []Delta
 // "known" keys when Pop() is called. Have to think about how that
 // affects error retrying.
 //
-//       NOTE: It is possible to misuse this and cause a race when using an
-//       external known object source.
-//       Whether there is a potential race depends on how the consumer
-//       modifies knownObjects. In Pop(), process function is called under
-//       lock, so it is safe to update data structures in it that need to be
-//       in sync with the queue (e.g. knownObjects).
+//	NOTE: It is possible to misuse this and cause a race when using an
+//	external known object source.
+//	Whether there is a potential race depends on how the consumer
+//	modifies knownObjects. In Pop(), process function is called under
+//	lock, so it is safe to update data structures in it that need to be
+//	in sync with the queue (e.g. knownObjects).
 //
-//       Example:
-//       In case of sharedIndexInformer being a consumer
-//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
-//       there is no race as knownObjects (s.indexer) is modified safely
-//       under DeltaFIFO's lock. The only exceptions are GetStore() and
-//       GetIndexer() methods, which expose ways to modify the underlying
-//       storage. Currently these two methods are used for creating Lister
-//       and internal tests.
+//	Example:
+//	In case of sharedIndexInformer being a consumer
+//	(https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
+//	there is no race as knownObjects (s.indexer) is modified safely
+//	under DeltaFIFO's lock. The only exceptions are GetStore() and
+//	GetIndexer() methods, which expose ways to modify the underlying
+//	storage. Currently these two methods are used for creating Lister
+//	and internal tests.
 //
 // Also see the comment on DeltaFIFO.
 //

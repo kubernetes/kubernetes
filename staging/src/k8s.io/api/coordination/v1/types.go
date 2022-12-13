@@ -30,7 +30,7 @@ type Lease struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the Lease.
+	// spec contains the specification of the Lease.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec LeaseSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
@@ -43,7 +43,7 @@ type LeaseSpec struct {
 	HolderIdentity *string `json:"holderIdentity,omitempty" protobuf:"bytes,1,opt,name=holderIdentity"`
 	// leaseDurationSeconds is a duration that candidates for a lease need
 	// to wait to force acquire it. This is measure against time of last
-	// observed RenewTime.
+	// observed renewTime.
 	// +optional
 	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty" protobuf:"varint,2,opt,name=leaseDurationSeconds"`
 	// acquireTime is a time when the current lease was acquired.
@@ -69,6 +69,6 @@ type LeaseList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is a list of schema objects.
+	// items is a list of schema objects.
 	Items []Lease `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

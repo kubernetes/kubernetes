@@ -189,11 +189,7 @@ const (
 	// system:nodes group subject is removed if present.
 	NodesClusterRoleBinding = "system:node"
 
-	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
-	// TODO: Remove once UnversionedKubeletConfigMap graduates to GA:
-	// https://github.com/kubernetes/kubeadm/issues/1582
-	KubeletBaseConfigMapRolePrefix = "kubeadm:kubelet-config-"
-	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	// KubeletBaseConfigMapRole defines the base kubelet configuration ConfigMap.
 	KubeletBaseConfigMapRole = "kubeadm:kubelet-config"
 	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
 	KubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
@@ -215,13 +211,15 @@ const (
 	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
 	TLSBootstrapTimeout = 5 * time.Minute
 	// TLSBootstrapRetryInterval specifies how long kubeadm should wait before retrying the TLS Bootstrap check
-	TLSBootstrapRetryInterval = 5 * time.Second
+	TLSBootstrapRetryInterval = 1 * time.Second
 	// APICallWithWriteTimeout specifies how long kubeadm should wait for api calls with at least one write
 	APICallWithWriteTimeout = 40 * time.Second
 	// APICallWithReadTimeout specifies how long kubeadm should wait for api calls with only reads
 	APICallWithReadTimeout = 15 * time.Second
 	// PullImageRetry specifies how many times ContainerRuntime retries when pulling image failed
 	PullImageRetry = 5
+	// RemoveContainerRetry specifies how many times ContainerRuntime retries when removing container failed
+	RemoveContainerRetry = 5
 
 	// DefaultControlPlaneTimeout specifies the default control plane (actually API Server) timeout for use by kubeadm
 	DefaultControlPlaneTimeout = 4 * time.Minute
@@ -256,10 +254,6 @@ const (
 	// CertificateKeySize specifies the size of the key used to encrypt certificates on uploadcerts phase
 	CertificateKeySize = 32
 
-	// LabelNodeRoleOldControlPlane specifies that a node hosts control-plane components
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	LabelNodeRoleOldControlPlane = "node-role.kubernetes.io/master"
-
 	// LabelNodeRoleControlPlane specifies that a node hosts control-plane components
 	LabelNodeRoleControlPlane = "node-role.kubernetes.io/control-plane"
 
@@ -285,11 +279,6 @@ const (
 
 	// KubeProxyConfigMapKey specifies in what ConfigMap key the component config of kube-proxy should be stored
 	KubeProxyConfigMapKey = "config.conf"
-
-	// KubeletBaseConfigurationConfigMapPrefix specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
-	// TODO: Remove once UnversionedKubeletConfigMap graduates to GA:
-	// https://github.com/kubernetes/kubeadm/issues/1582
-	KubeletBaseConfigurationConfigMapPrefix = "kubelet-config-"
 
 	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
 	KubeletBaseConfigurationConfigMap = "kubelet-config"
@@ -320,7 +309,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.3-0"
+	DefaultEtcdVersion = "3.5.6-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -356,7 +345,7 @@ const (
 	CoreDNSImageName = "coredns"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "v1.8.6"
+	CoreDNSVersion = "v1.10.0"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -370,6 +359,9 @@ const (
 	// YAMLDocumentSeparator is the separator for YAML documents
 	// TODO: Find a better place for this constant
 	YAMLDocumentSeparator = "---\n"
+
+	// CIKubernetesVersionPrefix is the prefix for CI Kubernetes version
+	CIKubernetesVersionPrefix = "ci/"
 
 	// DefaultAPIServerBindAddress is the default bind address for the API Server
 	DefaultAPIServerBindAddress = "0.0.0.0"
@@ -425,7 +417,7 @@ const (
 	ModeNode string = "Node"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.7"
+	PauseVersion = "3.9"
 
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
@@ -443,20 +435,6 @@ const (
 )
 
 var (
-	// OldControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	OldControlPlaneTaint = v1.Taint{
-		Key:    LabelNodeRoleOldControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
-	// OldControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	OldControlPlaneToleration = v1.Toleration{
-		Key:    LabelNodeRoleOldControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
 	// ControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
 	ControlPlaneTaint = v1.Taint{
 		Key:    LabelNodeRoleControlPlane,
@@ -498,9 +476,11 @@ var (
 		19: "3.4.13-0",
 		20: "3.4.13-0",
 		21: "3.4.13-0",
-		22: "3.5.3-0",
-		23: "3.5.3-0",
-		24: "3.5.3-0",
+		22: "3.5.6-0",
+		23: "3.5.6-0",
+		24: "3.5.6-0",
+		25: "3.5.6-0",
+		26: "3.5.6-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
@@ -576,7 +556,7 @@ func EtcdSupportedVersion(supportedEtcdVersion map[uint8]string, versionString s
 		if desiredVersion > max {
 			etcdStringVersion = supportedEtcdVersion[max]
 		}
-		warning = fmt.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
+		warning = errors.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
 			versionString, etcdStringVersion)
 	}
 
@@ -696,14 +676,4 @@ func GetAPIServerVirtualIP(svcSubnetList string) (net.IP, error) {
 		return nil, errors.Wrapf(err, "unable to get the first IP address from the given CIDR: %s", svcSubnet.String())
 	}
 	return internalAPIServerVirtualIP, nil
-}
-
-// GetKubeletConfigMapName returns the right ConfigMap name for the right branch of k8s
-// TODO: Remove the legacy arg once UnversionedKubeletConfigMap graduates to GA:
-// https://github.com/kubernetes/kubeadm/issues/1582
-func GetKubeletConfigMapName(k8sVersion *version.Version, legacy bool) string {
-	if !legacy {
-		return KubeletBaseConfigurationConfigMap
-	}
-	return fmt.Sprintf("%s%d.%d", KubeletBaseConfigurationConfigMapPrefix, k8sVersion.Major(), k8sVersion.Minor())
 }

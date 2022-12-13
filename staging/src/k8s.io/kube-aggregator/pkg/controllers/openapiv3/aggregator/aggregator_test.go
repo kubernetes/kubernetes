@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/mux"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -117,6 +119,9 @@ func TestV2APIService(t *testing.T) {
 	if bytes.Compare(gotSpecJSON, expectedV3Bytes) != 0 {
 		t.Errorf("Spec mismatch, expected %s, got %s", expectedV3Bytes, gotSpecJSON)
 	}
+
+	apiServiceNames := specProxier.GetAPIServiceNames()
+	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
 }
 
 func TestV3APIService(t *testing.T) {
@@ -156,6 +161,9 @@ func TestV3APIService(t *testing.T) {
 	if bytes.Compare(gotSpecJSON, specJSON) != 0 {
 		t.Errorf("Spec mismatch, expected %s, got %s", specJSON, gotSpecJSON)
 	}
+
+	apiServiceNames := specProxier.GetAPIServiceNames()
+	assert.ElementsMatch(t, []string{openAPIV2Converter, apiService.Name}, apiServiceNames)
 }
 
 func sendReq(t *testing.T, handler http.Handler, path string) []byte {

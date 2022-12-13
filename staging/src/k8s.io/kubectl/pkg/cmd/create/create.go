@@ -51,9 +51,7 @@ type CreateOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DryRunStrategy          cmdutil.DryRunStrategy
-	DryRunVerifier          *resource.QueryParamVerifier
-	FieldValidationVerifier *resource.QueryParamVerifier
+	DryRunStrategy cmdutil.DryRunStrategy
 
 	ValidationDirective string
 
@@ -116,8 +114,8 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 				defaultRunFunc(cmd, args)
 				return
 			}
-			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.ValidateArgs(cmd, args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunCreate(f, cmd))
 		},
 	}
@@ -160,32 +158,29 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	return cmd
 }
 
-// ValidateArgs makes sure there is no discrepency in command options
-func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
-	}
+// Validate makes sure there is no discrepency in command options
+func (o *CreateOptions) Validate() error {
 	if len(o.Raw) > 0 {
 		if o.EditBeforeCreate {
-			return cmdutil.UsageErrorf(cmd, "--raw and --edit are mutually exclusive")
+			return fmt.Errorf("--raw and --edit are mutually exclusive")
 		}
 		if len(o.FilenameOptions.Filenames) != 1 {
-			return cmdutil.UsageErrorf(cmd, "--raw can only use a single local file or stdin")
+			return fmt.Errorf("--raw can only use a single local file or stdin")
 		}
 		if strings.Index(o.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.FilenameOptions.Filenames[0], "https://") == 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw cannot read from a url")
+			return fmt.Errorf("--raw cannot read from a url")
 		}
 		if o.FilenameOptions.Recursive {
-			return cmdutil.UsageErrorf(cmd, "--raw and --recursive are mutually exclusive")
+			return fmt.Errorf("--raw and --recursive are mutually exclusive")
 		}
 		if len(o.Selector) > 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw and --selector (-l) are mutually exclusive")
+			return fmt.Errorf("--raw and --selector (-l) are mutually exclusive")
 		}
-		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw and --output are mutually exclusive")
+		if o.PrintFlags.OutputFormat != nil && len(*o.PrintFlags.OutputFormat) > 0 {
+			return fmt.Errorf("--raw and --output are mutually exclusive")
 		}
 		if _, err := url.ParseRequestURI(o.Raw); err != nil {
-			return cmdutil.UsageErrorf(cmd, "--raw must be a valid URL path: %v", err)
+			return fmt.Errorf("--raw must be a valid URL path: %v", err)
 		}
 	}
 
@@ -193,7 +188,10 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 }
 
 // Complete completes all the required options
-func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+	}
 	var err error
 	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
@@ -206,12 +204,6 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
-	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
 	if err != nil {
@@ -246,7 +238,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		return RunEditOnCreate(f, o.PrintFlags, o.RecordFlags, o.IOStreams, cmd, &o.FilenameOptions, o.fieldManager)
 	}
 
-	schema, err := f.Validator(o.ValidationDirective, o.FieldValidationVerifier)
+	schema, err := f.Validator(o.ValidationDirective)
 	if err != nil {
 		return err
 	}
@@ -284,11 +276,6 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 
 		if o.DryRunStrategy != cmdutil.DryRunClient {
-			if o.DryRunStrategy == cmdutil.DryRunServer {
-				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-					return cmdutil.AddSourceToErr("creating", info.Source, err)
-				}
-			}
 			obj, err := resource.
 				NewHelper(info.Client, info.Mapping).
 				DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
@@ -359,7 +346,6 @@ type CreateSubcommandOptions struct {
 	// StructuredGenerator is the resource generator for the object being created
 	StructuredGenerator generate.StructuredGenerator
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resource.QueryParamVerifier
 	CreateAnnotation    bool
 	FieldManager        string
 	ValidationDirective string
@@ -396,11 +382,6 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
@@ -471,9 +452,6 @@ func (o *CreateSubcommandOptions) Run() error {
 		createOptions.FieldValidation = o.ValidationDirective
 
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(context.TODO(), asUnstructured, createOptions)

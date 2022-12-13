@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -129,7 +129,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 	})
 
-	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a NodePort service", func() {
+	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a NodePort service", func(ctx context.Context) {
 
 		// Create a NodePort service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -150,7 +150,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
-		fr.PodClient().CreateSync(clientPod)
+		e2epod.NewPodClient(fr).CreateSync(clientPod)
 
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
@@ -163,7 +163,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		serverPod1.Labels = udpJig.Labels
 		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
-		fr.PodClient().CreateSync(serverPod1)
+		e2epod.NewPodClient(fr).CreateSync(serverPod1)
 
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
 
@@ -186,11 +186,11 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		serverPod2.Labels = udpJig.Labels
 		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
 		e2epod.SetNodeSelection(&serverPod2.Spec, nodeSelection)
-		fr.PodClient().CreateSync(serverPod2)
+		e2epod.NewPodClient(fr).CreateSync(serverPod2)
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
-		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(fr).DeleteSync(podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
@@ -205,7 +205,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 	})
 
-	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a ClusterIP service", func() {
+	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a ClusterIP service", func(ctx context.Context) {
 
 		// Create a ClusterIP service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -226,7 +226,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
-		fr.PodClient().CreateSync(clientPod)
+		e2epod.NewPodClient(fr).CreateSync(clientPod)
 
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
@@ -239,7 +239,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		serverPod1.Labels = udpJig.Labels
 		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
-		fr.PodClient().CreateSync(serverPod1)
+		e2epod.NewPodClient(fr).CreateSync(serverPod1)
 
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
 
@@ -262,11 +262,11 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		serverPod2.Labels = udpJig.Labels
 		nodeSelection = e2epod.NodeSelection{Name: serverNodeInfo.name}
 		e2epod.SetNodeSelection(&serverPod2.Spec, nodeSelection)
-		fr.PodClient().CreateSync(serverPod2)
+		e2epod.NewPodClient(fr).CreateSync(serverPod2)
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
-		fr.PodClient().DeleteSync(podBackend1, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(fr).DeleteSync(podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
@@ -292,7 +292,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	// endpoint is ready. If some traffic arrives to since kube-proxy clear the entries (see the endpoint slice) and
 	// installs the corresponding iptables rules (the endpoint is ready), a conntrack entry will be generated blackholing
 	// subsequent traffic.
-	ginkgo.It("should be able to preserve UDP traffic when initial unready endpoints get ready", func() {
+	ginkgo.It("should be able to preserve UDP traffic when initial unready endpoints get ready", func(ctx context.Context) {
 
 		// Create a ClusterIP service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -313,7 +313,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
-		fr.PodClient().CreateSync(clientPod)
+		e2epod.NewPodClient(fr).CreateSync(clientPod)
 
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
@@ -334,7 +334,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 			},
 		}
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
-		fr.PodClient().CreateSync(serverPod1)
+		e2epod.NewPodClient(fr).CreateSync(serverPod1)
 
 		// wait until the endpoints are ready
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
@@ -360,7 +360,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	// IP could result in the connection being closed with the error "Connection reset by
 	// peer"
 	// xref: https://kubernetes.io/blog/2019/03/29/kube-proxy-subtleties-debugging-an-intermittent-connection-reset/
-	ginkgo.It("should drop INVALID conntrack entries [Privileged]", func() {
+	ginkgo.It("should drop INVALID conntrack entries [Privileged]", func(ctx context.Context) {
 		serverLabel := map[string]string{
 			"app": "boom-server",
 		}
@@ -411,7 +411,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 		nodeSelection := e2epod.NodeSelection{Name: serverNodeInfo.name}
 		e2epod.SetNodeSelection(&serverPod.Spec, nodeSelection)
-		fr.PodClient().CreateSync(serverPod)
+		e2epod.NewPodClient(fr).CreateSync(serverPod)
 		ginkgo.By("Server pod created on node " + serverNodeInfo.name)
 
 		svc := &v1.Service{
@@ -453,7 +453,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		nodeSelection = e2epod.NodeSelection{Name: clientNodeInfo.name}
 		e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 
-		fr.PodClient().CreateSync(pod)
+		e2epod.NewPodClient(fr).CreateSync(pod)
 		ginkgo.By("Client pod created")
 
 		// The client will open connections against the server

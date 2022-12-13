@@ -58,7 +58,9 @@ func deleteFromActiveList(cj *batchv1.CronJob, uid types.UID) {
 }
 
 // getNextScheduleTime gets the time of next schedule after last scheduled and before now
-//  it returns nil if no unmet schedule times.
+//
+//	it returns nil if no unmet schedule times.
+//
 // If there are too many (>100) unstarted times, it will raise a warning and but still return
 // the list of missed times.
 func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {

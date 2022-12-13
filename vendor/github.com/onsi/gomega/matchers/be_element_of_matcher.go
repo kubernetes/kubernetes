@@ -18,23 +18,9 @@ func (matcher *BeElementOfMatcher) Match(actual interface{}) (success bool, err 
 		return false, fmt.Errorf("BeElement matcher expects actual to be typed")
 	}
 
-	length := len(matcher.Elements)
-	valueAt := func(i int) interface{} {
-		return matcher.Elements[i]
-	}
-	// Special handling of a single element of type Array or Slice
-	if length == 1 && isArrayOrSlice(valueAt(0)) {
-		element := valueAt(0)
-		value := reflect.ValueOf(element)
-		length = value.Len()
-		valueAt = func(i int) interface{} {
-			return value.Index(i).Interface()
-		}
-	}
-
 	var lastError error
-	for i := 0; i < length; i++ {
-		matcher := &EqualMatcher{Expected: valueAt(i)}
+	for _, m := range flatten(matcher.Elements) {
+		matcher := &EqualMatcher{Expected: m}
 		success, err := matcher.Match(actual)
 		if err != nil {
 			lastError = err
@@ -49,9 +35,9 @@ func (matcher *BeElementOfMatcher) Match(actual interface{}) (success bool, err 
 }
 
 func (matcher *BeElementOfMatcher) FailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "to be an element of", matcher.Elements)
+	return format.Message(actual, "to be an element of", presentable(matcher.Elements))
 }
 
 func (matcher *BeElementOfMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "not to be an element of", matcher.Elements)
+	return format.Message(actual, "not to be an element of", presentable(matcher.Elements))
 }

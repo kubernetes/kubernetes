@@ -18,7 +18,6 @@ package replace
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -77,10 +76,8 @@ type ReplaceOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	DryRunStrategy          cmdutil.DryRunStrategy
-	DryRunVerifier          *resource.QueryParamVerifier
-	FieldValidationVerifier *resource.QueryParamVerifier
-	validationDirective     string
+	DryRunStrategy      cmdutil.DryRunStrategy
+	validationDirective string
 
 	PrintObj func(obj runtime.Object) error
 
@@ -106,7 +103,7 @@ type ReplaceOptions struct {
 func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
 	return &ReplaceOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("replaced"),
-		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
+		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to replace."),
 
 		IOStreams: streams,
 	}
@@ -123,7 +120,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example:               replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run(f))
 		},
 	}
@@ -166,8 +163,6 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
-	o.FieldValidationVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -201,7 +196,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	schema, err := f.Validator(o.validationDirective, o.FieldValidationVerifier)
+	schema, err := f.Validator(o.validationDirective)
 	if err != nil {
 		return err
 	}
@@ -218,7 +213,7 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	return nil
 }
 
-func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
+func (o *ReplaceOptions) Validate() error {
 	if o.DeleteOptions.GracePeriod >= 0 && !o.DeleteOptions.ForceDeletion {
 		return fmt.Errorf("--grace-period must have --force specified")
 	}
@@ -227,25 +222,29 @@ func (o *ReplaceOptions) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
+	if o.DeleteOptions.ForceDeletion && o.DryRunStrategy != cmdutil.DryRunNone {
+		return fmt.Errorf("--dry-run can not be used when --force is set")
+	}
+
 	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames, o.DeleteOptions.FilenameOptions.Kustomize) {
-		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
+		return fmt.Errorf("must specify --filename to replace")
 	}
 
 	if len(o.Raw) > 0 {
 		if len(o.DeleteOptions.FilenameOptions.Filenames) != 1 {
-			return cmdutil.UsageErrorf(cmd, "--raw can only use a single local file or stdin")
+			return fmt.Errorf("--raw can only use a single local file or stdin")
 		}
 		if strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.DeleteOptions.FilenameOptions.Filenames[0], "https://") == 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw cannot read from a url")
+			return fmt.Errorf("--raw cannot read from a url")
 		}
 		if o.DeleteOptions.FilenameOptions.Recursive {
-			return cmdutil.UsageErrorf(cmd, "--raw and --recursive are mutually exclusive")
+			return fmt.Errorf("--raw and --recursive are mutually exclusive")
 		}
-		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw and --output are mutually exclusive")
+		if o.PrintFlags.OutputFormat != nil && len(*o.PrintFlags.OutputFormat) > 0 {
+			return fmt.Errorf("--raw and --output are mutually exclusive")
 		}
 		if _, err := url.ParseRequestURI(o.Raw); err != nil {
-			return cmdutil.UsageErrorf(cmd, "--raw must be a valid URL path: %v", err)
+			return fmt.Errorf("--raw must be a valid URL path: %v", err)
 		}
 	}
 
@@ -300,11 +299,6 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		if o.DryRunStrategy == cmdutil.DryRunClient {
 			return o.PrintObj(info.Object)
 		}
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
-		}
 
 		// Serialize the object with the annotation applied.
 		obj, err := resource.
@@ -327,7 +321,7 @@ func (o *ReplaceOptions) forceReplace() error {
 	stdinInUse := false
 	for i, filename := range o.DeleteOptions.FilenameOptions.Filenames {
 		if filename == "-" {
-			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
+			tempDir, err := os.MkdirTemp("", "kubectl_replace_")
 			if err != nil {
 				return err
 			}

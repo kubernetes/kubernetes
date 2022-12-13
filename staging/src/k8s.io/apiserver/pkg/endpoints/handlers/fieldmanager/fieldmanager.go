@@ -202,8 +202,7 @@ func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager st
 	if err != nil {
 		atMostEverySecond.Do(func() {
 			ns, name := "unknown", "unknown"
-			accessor, err := meta.Accessor(newObj)
-			if err == nil {
+			if accessor, err := meta.Accessor(newObj); err == nil {
 				ns = accessor.GetNamespace()
 				name = accessor.GetName()
 			}

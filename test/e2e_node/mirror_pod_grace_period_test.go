@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +56,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 
-		ginkgo.It("mirror pod termination should satisfy grace period when static pod is deleted [NodeConformance]", func() {
+		ginkgo.It("mirror pod termination should satisfy grace period when static pod is deleted [NodeConformance]", func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -74,7 +74,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
 		})
 
-		ginkgo.It("mirror pod termination should satisfy grace period when static pod is updated [NodeConformance]", func() {
+		ginkgo.It("mirror pod termination should satisfy grace period when static pod is updated [NodeConformance]", func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -102,7 +102,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
 		})
 
-		ginkgo.It("should update a static pod when the static pod is updated multiple times during the graceful termination period [NodeConformance]", func() {
+		ginkgo.It("should update a static pod when the static pod is updated multiple times during the graceful termination period [NodeConformance]", func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)

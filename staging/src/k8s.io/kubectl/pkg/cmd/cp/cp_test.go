@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -309,15 +308,15 @@ func checkErr(t *testing.T, err error) {
 }
 
 func TestTarUntar(t *testing.T) {
-	dir, err := ioutil.TempDir("", "input")
+	dir, err := os.MkdirTemp("", "input")
 	checkErr(t, err)
 	dir = dir + "/"
 
-	dir2, err := ioutil.TempDir("", "output")
+	dir2, err := os.MkdirTemp("", "output")
 	checkErr(t, err)
 	dir2 = dir2 + "/"
 
-	dir3, err := ioutil.TempDir("", "dir")
+	dir3, err := os.MkdirTemp("", "dir")
 	checkErr(t, err)
 
 	defer func() {
@@ -450,11 +449,11 @@ func TestTarUntar(t *testing.T) {
 }
 
 func TestTarUntarWrongPrefix(t *testing.T) {
-	dir, err := ioutil.TempDir("", "input")
+	dir, err := os.MkdirTemp("", "input")
 	checkErr(t, err)
 	dir = dir + "/"
 
-	dir2, err := ioutil.TempDir("", "output")
+	dir2, err := os.MkdirTemp("", "output")
 	checkErr(t, err)
 
 	defer func() {
@@ -483,8 +482,8 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 }
 
 func TestTarDestinationName(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "input")
-	dir2, err2 := ioutil.TempDir(os.TempDir(), "output")
+	dir, err := os.MkdirTemp(os.TempDir(), "input")
+	dir2, err2 := os.MkdirTemp(os.TempDir(), "output")
 	if err != nil || err2 != nil {
 		t.Errorf("unexpected error: %v | %v", err, err2)
 		t.FailNow()
@@ -554,7 +553,7 @@ func TestTarDestinationName(t *testing.T) {
 }
 
 func TestBadTar(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "dest")
+	dir, err := os.MkdirTemp(os.TempDir(), "dest")
 	if err != nil {
 		t.Errorf("unexpected error: %v ", err)
 		t.FailNow()
@@ -614,7 +613,7 @@ func TestCopyToPod(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			responsePod := &v1.Pod{}
-			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, responsePod))))}, nil
+			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, responsePod))))}, nil
 		}),
 	}
 
@@ -623,7 +622,7 @@ func TestCopyToPod(t *testing.T) {
 
 	cmd := NewCmdCp(tf, ioStreams)
 
-	srcFile, err := ioutil.TempDir("", "test")
+	srcFile, err := os.MkdirTemp("", "test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
@@ -659,9 +658,9 @@ func TestCopyToPod(t *testing.T) {
 
 	for name, test := range tests {
 		opts := NewCopyOptions(ioStreams)
-		opts.Complete(tf, cmd)
+		opts.Complete(tf, cmd, []string{test.src, fmt.Sprintf("pod-ns/pod-name:%s", test.dest)})
 		t.Run(name, func(t *testing.T) {
-			err = opts.Run([]string{test.src, fmt.Sprintf("pod-ns/pod-name:%s", test.dest)})
+			err = opts.Run()
 			//If error is NotFound error , it indicates that the
 			//request has been sent correctly.
 			//Treat this as no error.
@@ -685,7 +684,7 @@ func TestCopyToPodNoPreserve(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			responsePod := &v1.Pod{}
-			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, responsePod))))}, nil
+			return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, responsePod))))}, nil
 		}),
 	}
 
@@ -694,7 +693,7 @@ func TestCopyToPodNoPreserve(t *testing.T) {
 
 	cmd := NewCmdCp(tf, ioStreams)
 
-	srcFile, err := ioutil.TempDir("", "test")
+	srcFile, err := os.MkdirTemp("", "test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
@@ -723,7 +722,7 @@ func TestCopyToPodNoPreserve(t *testing.T) {
 		PodName:      "pod-name",
 		File:         newRemotePath("foo"),
 	}
-	opts.Complete(tf, cmd)
+	opts.Complete(tf, cmd, nil)
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -754,14 +753,13 @@ func TestValidate(t *testing.T) {
 			expectedErr: true,
 		},
 	}
-	tf := cmdtesting.NewTestFactory()
 	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	opts := NewCopyOptions(ioStreams)
-	cmd := NewCmdCp(tf, ioStreams)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := opts.Validate(cmd, test.args)
+			opts.args = test.args
+			err := opts.Validate()
 			if (err != nil) != test.expectedErr {
 				t.Errorf("expected error: %v, saw: %v, error: %v", test.expectedErr, err != nil, err)
 			}
@@ -770,7 +768,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestUntar(t *testing.T) {
-	testdir, err := ioutil.TempDir("", "test-untar")
+	testdir, err := os.MkdirTemp("", "test-untar")
 	require.NoError(t, err)
 	defer os.RemoveAll(testdir)
 	t.Logf("Test base: %s", testdir)
@@ -936,7 +934,7 @@ func TestUntar(t *testing.T) {
 }
 
 func TestUntar_SingleFile(t *testing.T) {
-	testdir, err := ioutil.TempDir("", "test-untar")
+	testdir, err := os.MkdirTemp("", "test-untar")
 	require.NoError(t, err)
 	defer os.RemoveAll(testdir)
 
@@ -982,7 +980,7 @@ func createTmpFile(t *testing.T, filepath, data string) {
 }
 
 func cmpFileData(t *testing.T, filePath, data string) {
-	actual, err := ioutil.ReadFile(filePath)
+	actual, err := os.ReadFile(filePath)
 	require.NoError(t, err)
 	assert.EqualValues(t, data, actual)
 }

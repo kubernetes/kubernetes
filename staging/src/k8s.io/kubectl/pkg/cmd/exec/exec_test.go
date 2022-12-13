@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -373,7 +372,7 @@ func TestSetupTTY(t *testing.T) {
 	stderr.Reset()
 	o.TTY = true
 
-	overrideStdin := ioutil.NopCloser(&bytes.Buffer{})
+	overrideStdin := io.NopCloser(&bytes.Buffer{})
 	overrideStdout := &bytes.Buffer{}
 	overrideStderr := &bytes.Buffer{}
 	o.overrideStreams = func() (io.ReadCloser, io.Writer, io.Writer) {

@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +42,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
+type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string)
 type disruptiveTest struct {
 	testItStmt string
 	runTest    testBody
@@ -208,7 +208,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			}
 		})
 
-		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func() {
+		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func(ctx context.Context) {
 			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			ginkgo.By("Deleting PVC for volume 2")
@@ -270,9 +270,9 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		// Test loop executes each disruptiveTest iteratively.
 		for _, test := range disruptiveTestTable {
 			func(t disruptiveTest) {
-				ginkgo.It(t.testItStmt, func() {
+				ginkgo.It(t.testItStmt, func(ctx context.Context) {
 					ginkgo.By("Executing Spec")
-					t.runTest(c, f, clientPod)
+					t.runTest(c, f, clientPod, e2epod.VolumeMountPath1)
 				})
 			}(test)
 		}

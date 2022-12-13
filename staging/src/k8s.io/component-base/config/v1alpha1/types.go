@@ -17,9 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"time"
-
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -82,62 +79,4 @@ type ClientConnectionConfiguration struct {
 	QPS float32 `json:"qps"`
 	// burst allows extra queries to accumulate when a client is exceeding its rate.
 	Burst int32 `json:"burst"`
-}
-
-// LoggingConfiguration contains logging options
-// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
-type LoggingConfiguration struct {
-	// Format Flag specifies the structure of log messages.
-	// default value of format is `text`
-	Format string `json:"format,omitempty"`
-	// Maximum number of nanoseconds (i.e. 1s = 1000000000) between log
-	// flushes.  Ignored if the selected logging backend writes log
-	// messages without buffering.
-	FlushFrequency time.Duration `json:"flushFrequency"`
-	// Verbosity is the threshold that determines which log messages are
-	// logged. Default is zero which logs only the most important
-	// messages. Higher values enable additional messages. Error messages
-	// are always logged.
-	Verbosity uint32 `json:"verbosity"`
-	// VModule overrides the verbosity threshold for individual files.
-	// Only supported for "text" log format.
-	VModule VModuleConfiguration `json:"vmodule,omitempty"`
-	// [Experimental] Options holds additional parameters that are specific
-	// to the different logging formats. Only the options for the selected
-	// format get used, but all of them get validated.
-	Options FormatOptions `json:"options,omitempty"`
-}
-
-// FormatOptions contains options for the different logging formats.
-type FormatOptions struct {
-	// [Experimental] JSON contains options for logging format "json".
-	JSON JSONOptions `json:"json,omitempty"`
-}
-
-// JSONOptions contains options for logging format "json".
-type JSONOptions struct {
-	// [Experimental] SplitStream redirects error messages to stderr while
-	// info messages go to stdout, with buffering. The default is to write
-	// both to stdout, without buffering.
-	SplitStream bool `json:"splitStream,omitempty"`
-	// [Experimental] InfoBufferSize sets the size of the info stream when
-	// using split streams. The default is zero, which disables buffering.
-	InfoBufferSize resource.QuantityValue `json:"infoBufferSize,omitempty"`
-}
-
-// VModuleConfiguration is a collection of individual file names or patterns
-// and the corresponding verbosity threshold.
-type VModuleConfiguration []VModuleItem
-
-// VModuleItem defines verbosity for one or more files which match a certain
-// glob pattern.
-type VModuleItem struct {
-	// FilePattern is a base file name (i.e. minus the ".go" suffix and
-	// directory) or a "glob" pattern for such a name. It must not contain
-	// comma and equal signs because those are separators for the
-	// corresponding klog command line argument.
-	FilePattern string `json:"filePattern"`
-	// Verbosity is the threshold for log messages emitted inside files
-	// that match the pattern.
-	Verbosity uint32 `json:"verbosity"`
 }

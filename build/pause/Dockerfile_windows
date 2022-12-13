@@ -18,11 +18,6 @@ ARG ARCH
 ADD bin/pause-windows-${ARCH}.exe /pause.exe
 ADD bin/wincat-windows-amd64 /Windows/System32/wincat.exe
 
-# NOTE(claudiub): We're replacing the diagtrack.dll as a means to disable the
-# DiagTrack service (it cannot run without this DLL). We do not need this
-# service in the pause image and there's no reason for it to have any CPU usage.
-ADD windows/pause.c /Windows/System32/diagtrack.dll
-
 # NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH,
 # which is not desirable. See: https://github.com/moby/buildkit/issues/1560
 # TODO(claudiub): remove this once the issue has been resolved.

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -42,13 +43,14 @@ import (
 	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/controller/util/selectors"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
 
@@ -145,6 +147,7 @@ type testCase struct {
 	testScaleClient   *scalefake.FakeScaleClient
 
 	recommendations []timestampedRecommendation
+	hpaSelectors    *selectors.BiMultimap
 }
 
 // Needs to be called under a lock.
@@ -740,6 +743,9 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	if tc.recommendations != nil {
 		hpaController.recommendations["test-namespace/test-hpa"] = tc.recommendations
 	}
+	if tc.hpaSelectors != nil {
+		hpaController.hpaSelectors = tc.hpaSelectors
+	}
 
 	return hpaController, informerFactory
 }
@@ -756,7 +762,7 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informerFactory.Start(ctx.Done())
-	go hpaController.Run(ctx)
+	go hpaController.Run(ctx, 5)
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents
@@ -815,7 +821,7 @@ func TestScaleUpContainer(t *testing.T) {
 				Name: v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: utilpointer.Int32Ptr(30),
+					AverageUtilization: pointer.Int32(30),
 				},
 				Container: "container1",
 			},
@@ -1349,7 +1355,7 @@ func TestScaleDownContainerResource(t *testing.T) {
 				Name:      v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: utilpointer.Int32Ptr(50),
+					AverageUtilization: pointer.Int32(50),
 				},
 			},
 		}},
@@ -2386,6 +2392,112 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestConditionNoAmbiguousSelectorWhenNoSelectorOverlapBetweenHPAs(t *testing.T) {
+	hpaSelectors := selectors.NewBiMultimap()
+	hpaSelectors.PutSelector(selectors.Key{Name: "test-hpa-2", Namespace: testNamespace}, labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}))
+
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 5,
+		CPUTarget:               30,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		hpaSelectors:            hpaSelectors,
+	}
+	tc.runTest(t)
+}
+
+func TestConditionAmbiguousSelectorWhenFullSelectorOverlapBetweenHPAs(t *testing.T) {
+	hpaSelectors := selectors.NewBiMultimap()
+	hpaSelectors.PutSelector(selectors.Key{Name: "test-hpa-2", Namespace: testNamespace}, labels.SelectorFromSet(labels.Set{"name": podNamePrefix}))
+
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               30,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{
+				Type:   autoscalingv2.AbleToScale,
+				Status: v1.ConditionTrue,
+				Reason: "SucceededGetScale",
+			},
+			{
+				Type:   autoscalingv2.ScalingActive,
+				Status: v1.ConditionFalse,
+				Reason: "AmbiguousSelector",
+			},
+		},
+		hpaSelectors: hpaSelectors,
+	}
+	tc.runTest(t)
+}
+
+func TestConditionAmbiguousSelectorWhenPartialSelectorOverlapBetweenHPAs(t *testing.T) {
+	hpaSelectors := selectors.NewBiMultimap()
+	hpaSelectors.PutSelector(selectors.Key{Name: "test-hpa-2", Namespace: testNamespace}, labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}))
+
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               30,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{
+				Type:   autoscalingv2.AbleToScale,
+				Status: v1.ConditionTrue,
+				Reason: "SucceededGetScale",
+			},
+			{
+				Type:   autoscalingv2.ScalingActive,
+				Status: v1.ConditionFalse,
+				Reason: "AmbiguousSelector",
+			},
+		},
+		hpaSelectors: hpaSelectors,
+	}
+
+	testClient, _, _, _, _ := tc.prepareTestClient(t)
+	tc.testClient = testClient
+
+	testClient.PrependReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		tc.Lock()
+		defer tc.Unlock()
+
+		obj := &v1.PodList{}
+		for i := range tc.reportedCPURequests {
+			pod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
+					Namespace: testNamespace,
+					Labels: map[string]string{
+						"name":    podNamePrefix, // selected by the original HPA
+						"cheddar": "cheese",      // selected by test-hpa-2
+					},
+				},
+			}
+			obj.Items = append(obj.Items, pod)
+		}
+		return true, obj, nil
+	})
+
+	tc.runTest(t)
+}
+
 func TestConditionFailedGetMetrics(t *testing.T) {
 	targetValue := resource.MustParse("15.0")
 	averageValue := resource.MustParse("15.0")
@@ -3029,8 +3141,8 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
-	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
+		StabilizationWindowSeconds: pointer.Int32(300),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3051,8 +3163,8 @@ func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
-	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
+		StabilizationWindowSeconds: pointer.Int32(300),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3073,7 +3185,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
 	policy := autoscalingv2.MaxChangePolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: utilpointer.Int32Ptr(stabilizationWindow),
+		StabilizationWindowSeconds: pointer.Int32(stabilizationWindow),
 		SelectPolicy:               &policy,
 	}
 	if pods != 0 {
@@ -3088,18 +3200,23 @@ func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizatio
 }
 
 // generateEventsUniformDistribution generates events that uniformly spread in the time window
-//    time.Now()-periodSeconds  ; time.Now()
+//
+//	time.Now()-periodSeconds  ; time.Now()
+//
 // It split the time window into several segments (by the number of events) and put the event in the center of the segment
 // it is needed if you want to create events for several policies (to check how "outdated" flag is set).
 // E.g. generateEventsUniformDistribution([]int{1,2,3,4}, 120) will spread events uniformly for the last 120 seconds:
 //
-//       1          2          3          4
+//	1          2          3          4
+//
 // -----------------------------------------------
-//  ^          ^          ^          ^          ^
+//
+//	^          ^          ^          ^          ^
+//
 // -120s      -90s       -60s       -30s       now()
 // And we can safely have two different stabilizationWindows:
-//  - 60s (guaranteed to have last half of events)
-//  - 120s (guaranteed to have all events)
+//   - 60s (guaranteed to have last half of events)
+//   - 120s (guaranteed to have all events)
 func generateEventsUniformDistribution(rawEvents []int, periodSeconds int) []timestampedScaleEvent {
 	events := make([]timestampedScaleEvent, len(rawEvents))
 	segmentDuration := float64(periodSeconds) / float64(len(rawEvents))
@@ -3480,6 +3597,18 @@ func TestScalingWithRules(t *testing.T) {
 			expectedReplicas:             255, // (100 - 15) + 200%
 			expectedCondition:            "ScaleUpLimit",
 		},
+		{
+			name:                         "scaleUp with percent policy and previous scale up and down events",
+			scaleUpEvents:                generateEventsUniformDistribution([]int{4}, 120),
+			scaleDownEvents:              generateEventsUniformDistribution([]int{2}, 120),
+			specMinReplicas:              1,
+			specMaxReplicas:              1000,
+			scaleUpRules:                 generateScalingRules(0, 0, 300, 300, 0),
+			currentReplicas:              6,
+			prenormalizedDesiredReplicas: 24,
+			expectedReplicas:             16,
+			expectedCondition:            "ScaleUpLimit",
+		},
 		// ScaleDown with PeriodSeconds usage
 		{
 			name:                         "scaleDown with default policy and previous events",
@@ -3544,6 +3673,18 @@ func TestScalingWithRules(t *testing.T) {
 			currentReplicas:              100,
 			prenormalizedDesiredReplicas: 0,
 			expectedReplicas:             56, // (100 + 12) - 50%
+			expectedCondition:            "ScaleDownLimit",
+		},
+		{
+			name:                         "scaleDown with percent policy and previous scale up and down events",
+			scaleUpEvents:                generateEventsUniformDistribution([]int{2}, 120),
+			scaleDownEvents:              generateEventsUniformDistribution([]int{4}, 120),
+			specMinReplicas:              1,
+			specMaxReplicas:              1000,
+			scaleDownRules:               generateScalingRules(0, 0, 50, 180, 0),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 1,
+			expectedReplicas:             6,
 			expectedCondition:            "ScaleDownLimit",
 		},
 		{
@@ -4150,4 +4291,271 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 	})
 	tc.testEMClient = testEMClient
 	tc.runTest(t)
+}
+
+func TestMultipleHPAs(t *testing.T) {
+	const hpaCount = 1000
+	const testNamespace = "dummy-namespace"
+
+	processed := make(chan string, hpaCount)
+
+	testClient := &fake.Clientset{}
+	testScaleClient := &scalefake.FakeScaleClient{}
+	testMetricsClient := &metricsfake.Clientset{}
+
+	hpaList := [hpaCount]autoscalingv2.HorizontalPodAutoscaler{}
+	scaleUpEventsMap := map[string][]timestampedScaleEvent{}
+	scaleDownEventsMap := map[string][]timestampedScaleEvent{}
+	scaleList := map[string]*autoscalingv1.Scale{}
+	podList := map[string]*v1.Pod{}
+
+	var minReplicas int32 = 1
+	var cpuTarget int32 = 10
+
+	// generate resources (HPAs, Scales, Pods...)
+	for i := 0; i < hpaCount; i++ {
+		hpaName := fmt.Sprintf("dummy-hpa-%v", i)
+		deploymentName := fmt.Sprintf("dummy-target-%v", i)
+		labelSet := map[string]string{"name": deploymentName}
+		selector := labels.SelectorFromSet(labelSet).String()
+
+		// generate HPAs
+		h := autoscalingv2.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      hpaName,
+				Namespace: testNamespace,
+			},
+			Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+				ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       deploymentName,
+				},
+				MinReplicas: &minReplicas,
+				MaxReplicas: 10,
+				Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+					ScaleUp:   generateScalingRules(100, 60, 0, 0, 0),
+					ScaleDown: generateScalingRules(2, 60, 1, 60, 300),
+				},
+				Metrics: []autoscalingv2.MetricSpec{
+					{
+						Type: autoscalingv2.ResourceMetricSourceType,
+						Resource: &autoscalingv2.ResourceMetricSource{
+							Name: v1.ResourceCPU,
+							Target: autoscalingv2.MetricTarget{
+								Type:               autoscalingv2.UtilizationMetricType,
+								AverageUtilization: &cpuTarget,
+							},
+						},
+					},
+				},
+			},
+			Status: autoscalingv2.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 1,
+				DesiredReplicas: 5,
+				LastScaleTime:   &metav1.Time{Time: time.Now()},
+			},
+		}
+		hpaList[i] = h
+
+		// generate Scale
+		scaleList[deploymentName] = &autoscalingv1.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      deploymentName,
+				Namespace: testNamespace,
+			},
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: 1,
+			},
+			Status: autoscalingv1.ScaleStatus{
+				Replicas: 1,
+				Selector: selector,
+			},
+		}
+
+		// generate Pods
+		cpuRequest := resource.MustParse("1.0")
+		pod := v1.Pod{
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+				},
+				StartTime: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-0", deploymentName),
+				Namespace: testNamespace,
+				Labels:    labelSet,
+			},
+
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: *resource.NewMilliQuantity(cpuRequest.MilliValue()/2, resource.DecimalSI),
+							},
+						},
+					},
+					{
+						Name: "container2",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: *resource.NewMilliQuantity(cpuRequest.MilliValue()/2, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+		}
+		podList[deploymentName] = &pod
+
+		scaleUpEventsMap[fmt.Sprintf("%s/%s", testNamespace, hpaName)] = generateEventsUniformDistribution([]int{8, 12, 9, 11}, 120)
+		scaleDownEventsMap[fmt.Sprintf("%s/%s", testNamespace, hpaName)] = generateEventsUniformDistribution([]int{10, 10, 10}, 120)
+	}
+
+	testMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		podNamePrefix := ""
+		labelSet := map[string]string{}
+
+		// selector should be in form: "name=dummy-target-X" where X is the number of resource
+		selector := action.(core.ListAction).GetListRestrictions().Labels
+		parsedSelector := strings.Split(selector.String(), "=")
+		if len(parsedSelector) > 1 {
+			labelSet[parsedSelector[0]] = parsedSelector[1]
+			podNamePrefix = parsedSelector[1]
+		}
+
+		podMetric := metricsapi.PodMetrics{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-0", podNamePrefix),
+				Namespace: testNamespace,
+				Labels:    labelSet,
+			},
+			Timestamp: metav1.Time{Time: time.Now()},
+			Window:    metav1.Duration{Duration: time.Minute},
+			Containers: []metricsapi.ContainerMetrics{
+				{
+					Name: "container1",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(
+							int64(200),
+							resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(
+							int64(1024*1024/2),
+							resource.BinarySI),
+					},
+				},
+				{
+					Name: "container2",
+					Usage: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(
+							int64(300),
+							resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(
+							int64(1024*1024/2),
+							resource.BinarySI),
+					},
+				},
+			},
+		}
+		metrics := &metricsapi.PodMetricsList{}
+		metrics.Items = append(metrics.Items, podMetric)
+
+		return true, metrics, nil
+	})
+
+	metricsClient := metrics.NewRESTMetricsClient(
+		testMetricsClient.MetricsV1beta1(),
+		&cmfake.FakeCustomMetricsClient{},
+		&emfake.FakeExternalMetricsClient{},
+	)
+
+	testScaleClient.AddReactor("get", "deployments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		deploymentName := action.(core.GetAction).GetName()
+		obj := scaleList[deploymentName]
+		return true, obj, nil
+	})
+
+	testClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &v1.PodList{}
+
+		// selector should be in form: "name=dummy-target-X" where X is the number of resource
+		selector := action.(core.ListAction).GetListRestrictions().Labels
+		parsedSelector := strings.Split(selector.String(), "=")
+
+		// list with filter
+		if len(parsedSelector) > 1 {
+			obj.Items = append(obj.Items, *podList[parsedSelector[1]])
+		} else {
+			// no filter - return all pods
+			for _, p := range podList {
+				obj.Items = append(obj.Items, *p)
+			}
+		}
+
+		return true, obj, nil
+	})
+
+	testClient.AddReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &autoscalingv2.HorizontalPodAutoscalerList{
+			Items: hpaList[:],
+		}
+		return true, obj, nil
+	})
+
+	testClient.AddReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		handled, obj, err := func() (handled bool, ret *autoscalingv2.HorizontalPodAutoscaler, err error) {
+			obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+			assert.Equal(t, testNamespace, obj.Namespace, "the HPA namespace should be as expected")
+
+			return true, obj, nil
+		}()
+		processed <- obj.Name
+
+		return handled, obj, err
+	})
+
+	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
+
+	hpaController := NewHorizontalController(
+		testClient.CoreV1(),
+		testScaleClient,
+		testClient.AutoscalingV2(),
+		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
+		metricsClient,
+		informerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
+		informerFactory.Core().V1().Pods(),
+		100*time.Millisecond,
+		5*time.Minute,
+		defaultTestingTolerance,
+		defaultTestingCPUInitializationPeriod,
+		defaultTestingDelayOfInitialReadinessStatus,
+	)
+	hpaController.scaleUpEvents = scaleUpEventsMap
+	hpaController.scaleDownEvents = scaleDownEventsMap
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informerFactory.Start(ctx.Done())
+	go hpaController.Run(ctx, 5)
+
+	timeoutTime := time.After(15 * time.Second)
+	timeout := false
+	processedHPA := make(map[string]bool)
+	for timeout == false && len(processedHPA) < hpaCount {
+		select {
+		case hpaName := <-processed:
+			processedHPA[hpaName] = true
+		case <-timeoutTime:
+			timeout = true
+		}
+	}
+
+	assert.Equal(t, hpaCount, len(processedHPA), "Expected to process all HPAs")
 }

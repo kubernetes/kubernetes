@@ -17,11 +17,12 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
@@ -30,7 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -81,7 +82,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 				}, time.Minute, time.Second*2).Should(gomega.BeNil())
 			})
 
-			ginkgo.It("should not be evicted upon DiskPressure", func() {
+			ginkgo.It("should not be evicted upon DiskPressure", func(ctx context.Context) {
 				ginkgo.By("wait for the node to have DiskPressure condition")
 				gomega.Eventually(func() error {
 					if hasNodeCondition(f, v1.NodeDiskPressure) {

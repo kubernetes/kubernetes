@@ -26,6 +26,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
@@ -37,28 +39,23 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/finisher"
+	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
-	utiltrace "k8s.io/utils/trace"
 )
 
 var namespaceGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
 
 func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		// For performance tracking purposes.
-		trace := utiltrace.New("Create", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
-
-		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("the dryRun feature is disabled"), w, req)
-			return
-		}
+		ctx, span := tracing.Start(ctx, "Create", traceFields(req)...)
+		defer span.End(500 * time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -78,7 +75,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
 		// timeout inside the parent context is lower than requestTimeoutUpperBound.
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
+		ctx, cancel := context.WithTimeout(ctx, requestTimeoutUpperBound)
 		defer cancel()
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -93,11 +90,13 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			return
 		}
 
-		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
+		body, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Create)
 		if err != nil {
+			span.AddEvent("limitedReadBody failed", attribute.Int("len", len(body)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
 			return
 		}
+		span.AddEvent("limitedReadBody succeeded", attribute.Int("len", len(body)))
 
 		options := &metav1.CreateOptions{}
 		values := req.URL.Query()
@@ -123,7 +122,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 
 		decoder := scope.Serializer.DecoderToVersion(decodeSerializer, scope.HubGroupVersion)
-		trace.Step("About to convert to expected version")
+		span.AddEvent("About to convert to expected version")
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
 			strictError, isStrictError := runtime.AsStrictDecodingError(err)
@@ -146,7 +145,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Conversion done")
+		span.AddEvent("Conversion done")
 
 		// On create, get name from new object if unset
 		if len(name) == 0 {
@@ -162,8 +161,10 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		userInfo, _ := request.UserFrom(ctx)
 
-		// if this object supports namespace info
 		if objectMeta, err := meta.Accessor(obj); err == nil {
+			// Wipe fields which cannot take user-provided values
+			rest.WipeObjectMetaSystemFields(objectMeta)
+
 			// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
 			if err := rest.EnsureObjectNamespaceMatchesRequestNamespace(rest.ExpectedNamespaceForResource(namespace, scope.Resource), objectMeta); err != nil {
 				scope.err(err, w, req)
@@ -171,7 +172,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			}
 		}
 
-		trace.Step("About to store object in database")
+		span.AddEvent("About to store object in database")
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
 		requestFunc := func() (runtime.Object, error) {
 			return r.Create(
@@ -212,10 +213,11 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			return result, err
 		})
 		if err != nil {
+			span.AddEvent("Write to database call failed", attribute.Int("len", len(body)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object stored in database")
+		span.AddEvent("Write to database call succeeded", attribute.Int("len", len(body)))
 
 		code := http.StatusCreated
 		status, ok := result.(*metav1.Status)
@@ -223,9 +225,9 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			status.Code = int32(code)
 		}
 
-		trace.Step("About to write a response")
-		defer trace.Step("Writing http response done")
-		transformResponseObject(ctx, scope, trace, req, w, code, outputMediaType, result)
+		span.AddEvent("About to write a response")
+		defer span.AddEvent("Writing http response done")
+		transformResponseObject(ctx, scope, req, w, code, outputMediaType, result)
 	}
 }
 

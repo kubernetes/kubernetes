@@ -48,8 +48,8 @@ func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, cust
 }
 
 // restMetricsClient is a client which supports fetching
-// metrics from both the resource metrics API and the
-// custom metrics API.
+// metrics from the resource metrics API, the
+// custom metrics API and the external metrics API.
 type restMetricsClient struct {
 	*resourceMetricsClient
 	*customMetricsClient

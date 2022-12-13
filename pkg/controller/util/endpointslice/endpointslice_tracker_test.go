@@ -124,6 +124,10 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 	epSlice1NewerGen := epSlice1.DeepCopy()
 	epSlice1NewerGen.Generation = 2
 
+	epTerminatingSlice := epSlice1.DeepCopy()
+	now := metav1.Now()
+	epTerminatingSlice.DeletionTimestamp = &now
+
 	testCases := []struct {
 		name         string
 		tracker      *EndpointSliceTracker

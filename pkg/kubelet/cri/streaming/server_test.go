@@ -17,6 +17,7 @@ limitations under the License.
 package streaming
 
 import (
+	"context"
 	"crypto/tls"
 	"io"
 	"net/http"
@@ -304,7 +305,6 @@ func TestServePortForward(t *testing.T) {
 	doClientStreams(t, "portforward", stream, stream, nil)
 }
 
-//
 // Run the remote command test.
 // commandType is either "exec" or "attach".
 func runRemoteCommandTest(t *testing.T, commandType string) {
@@ -356,7 +356,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 			Stderr: stderrW,
 			Tty:    false,
 		}
-		require.NoError(t, exec.Stream(opts))
+		require.NoError(t, exec.StreamWithContext(context.Background(), opts))
 	}()
 
 	go func() {
@@ -414,19 +414,19 @@ type fakeRuntime struct {
 	t *testing.T
 }
 
-func (f *fakeRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	assert.Equal(f.t, testContainerID, containerID)
 	doServerStreams(f.t, "exec", stdin, stdout, stderr)
 	return nil
 }
 
-func (f *fakeRuntime) Attach(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+func (f *fakeRuntime) Attach(_ context.Context, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	assert.Equal(f.t, testContainerID, containerID)
 	doServerStreams(f.t, "attach", stdin, stdout, stderr)
 	return nil
 }
 
-func (f *fakeRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+func (f *fakeRuntime) PortForward(_ context.Context, podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 	assert.Equal(f.t, testPodSandboxID, podSandboxID)
 	assert.EqualValues(f.t, testPort, port)
 	doServerStreams(f.t, "portforward", stream, stream, nil)

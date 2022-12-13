@@ -26,9 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	netutils "k8s.io/utils/net"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/controlplane"
 
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -38,26 +37,23 @@ import (
 // mistakenly, repair the ClusterIP assigned to the Service that is being deleted.
 // https://issues.k8s.io/87603
 func TestServicesFinalizersRepairLoop(t *testing.T) {
-
 	serviceCIDR := "10.0.0.0/16"
 	clusterIP := "10.0.0.20"
 	interval := 5 * time.Second
 
-	cfg := framework.NewIntegrationTestControlPlaneConfig()
-	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
-	if err != nil {
-		t.Fatalf("bad cidr: %v", err)
-	}
-	cfg.ExtraConfig.ServiceIPRange = *cidr
-	cfg.ExtraConfig.RepairServicesInterval = interval
-	_, s, closeFn := framework.RunAnAPIServer(cfg)
-	defer closeFn()
-
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.ServiceClusterIPRanges = serviceCIDR
+		},
+		ModifyServerConfig: func(cfg *controlplane.Config) {
+			cfg.ExtraConfig.RepairServicesInterval = interval
+		},
+	})
+	defer tearDownFn()
 
 	// verify client is working
 	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-		_, err = client.CoreV1().Endpoints(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil

@@ -24,11 +24,11 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
+	"k8s.io/utils/pointer"
 )
 
 // AttachDisk attaches a vhd to vm
@@ -71,7 +71,7 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 				Caching:                 compute.CachingTypes(cachingMode),
 				CreateOption:            "attach",
 				ManagedDisk:             managedDisk,
-				WriteAcceleratorEnabled: to.BoolPtr(writeAcceleratorEnabled),
+				WriteAcceleratorEnabled: pointer.Bool(writeAcceleratorEnabled),
 			})
 	} else {
 		disks = append(disks,
@@ -147,7 +147,7 @@ func (ss *scaleSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 			if strings.EqualFold(ss.cloud.Environment.Name, AzureStackCloudName) {
 				disks = append(disks[:i], disks[i+1:]...)
 			} else {
-				disks[i].ToBeDetached = to.BoolPtr(true)
+				disks[i].ToBeDetached = pointer.Bool(true)
 			}
 			bFoundDisk = true
 			break

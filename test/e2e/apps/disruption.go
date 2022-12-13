@@ -19,12 +19,13 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/onsi/gomega"
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -83,7 +84,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		   Testname: PodDisruptionBudget: list and delete collection
 		   Description: PodDisruptionBudget API must support list and deletecollection operations.
 		*/
-		framework.ConformanceIt("should list and delete a collection of PodDisruptionBudgets", func() {
+		framework.ConformanceIt("should list and delete a collection of PodDisruptionBudgets", func(ctx context.Context) {
 			specialLabels := map[string]string{"foo_pdb": "bar_pdb"}
 			labelSelector := labels.SelectorFromSet(specialLabels).String()
 			createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(2), specialLabels)
@@ -104,7 +105,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		Testname: PodDisruptionBudget: create, update, patch, and delete object
 		Description: PodDisruptionBudget API must support create, update, patch, and delete operations.
 	*/
-	framework.ConformanceIt("should create a PodDisruptionBudget", func() {
+	framework.ConformanceIt("should create a PodDisruptionBudget", func(ctx context.Context) {
 		ginkgo.By("creating the pdb")
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromString("1%"), defaultLabels)
 
@@ -137,7 +138,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 	   Description: Disruption controller MUST update the PDB status with
 	   how many disruptions are allowed.
 	*/
-	framework.ConformanceIt("should observe PodDisruptionBudget status updated", func() {
+	framework.ConformanceIt("should observe PodDisruptionBudget status updated", func(ctx context.Context) {
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
 
 		createPodsOrDie(cs, ns, 3)
@@ -160,7 +161,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		Testname: PodDisruptionBudget: update and patch status
 		Description: PodDisruptionBudget API must support update and patch operations on status subresource.
 	*/
-	framework.ConformanceIt("should update/patch PodDisruptionBudget status", func() {
+	framework.ConformanceIt("should update/patch PodDisruptionBudget status", func(ctx context.Context) {
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(1), defaultLabels)
 
 		ginkgo.By("Updating PodDisruptionBudget status")
@@ -286,7 +287,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		if c.exclusive {
 			serial = " [Serial]"
 		}
-		ginkgo.It(fmt.Sprintf("evictions: %s => %s%s", c.description, expectation, serial), func() {
+		ginkgo.It(fmt.Sprintf("evictions: %s => %s%s", c.description, expectation, serial), func(ctx context.Context) {
 			if c.skipForBigClusters {
 				e2eskipper.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
 			}
@@ -343,7 +344,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		Testname: PodDisruptionBudget: block an eviction until the PDB is updated to allow it
 		Description: Eviction API must block an eviction until the PDB is updated to allow it
 	*/
-	framework.ConformanceIt("should block an eviction until the PDB is updated to allow it", func() {
+	framework.ConformanceIt("should block an eviction until the PDB is updated to allow it", func(ctx context.Context) {
 		ginkgo.By("Creating a pdb that targets all three pods in a test replica set")
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(3), defaultLabels)
 		createReplicaSetOrDie(cs, ns, 3, false)

@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		datastore = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 	})
 
-	ginkgo.It("verify dynamically provisioned pv has size rounded up correctly", func() {
+	ginkgo.It("verify dynamically provisioned pv has size rounded up correctly", func(ctx context.Context) {
 		ginkgo.By("Invoking Test disk size")
 		scParameters[Datastore] = datastore
 		scParameters[DiskFormat] = ThinDisk

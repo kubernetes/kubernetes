@@ -142,12 +142,8 @@ func validateStorageVersionCondition(conditions []apiserverinternal.StorageVersi
 				fmt.Sprintf("the type of the condition is not unique, it also appears in conditions[%d]", ii)))
 		}
 		seenType[condition.Type] = i
-		for _, msg := range utilvalidation.IsQualifiedName(string(condition.Type)) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("type"), string(condition.Type), msg))
-		}
-		for _, msg := range utilvalidation.IsQualifiedName(string(condition.Status)) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("status"), string(condition.Type), msg))
-		}
+		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(string(condition.Type), fldPath.Index(i).Child("type"))...)
+		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(string(condition.Status), fldPath.Index(i).Child("status"))...)
 		if condition.Reason == "" {
 			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("reason"), "reason cannot be empty"))
 		}

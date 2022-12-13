@@ -82,45 +82,46 @@ function ensure_require_replace_directives_for_all_dependencies() {
       | jq -r ".Replace // [] | sort | .[] | select(${replace_filter})" \
       > "${replace_json}"
 
-  # 1a. Ensure replace directives have an explicit require directive
-  jq -r '"-require \(.Old.Path)@\(.New.Version)"' < "${replace_json}" \
-      | xargs -L 100 go mod edit -fmt
-  # 1b. Ensure require directives have a corresponding replace directive pinning a version
-  jq -r '"-replace \(.Path)=\(.Path)@\(.Version)"' < "${require_json}" \
-      | xargs -L 100 go mod edit -fmt
-  jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"' < "${replace_json}" \
-      | xargs -L 100 go mod edit -fmt
-
-  # 2. Propagate root replace/require directives into staging modules, in case we are downgrading, so they don't bump the root required version back up
+  # Propagate root replace/require directives into staging modules, in case we are downgrading, so they don't bump the root required version back up
   for repo in $(kube::util::list_staging_repos); do
     pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
       jq -r '"-require \(.Path)@\(.Version)"' < "${require_json}" \
-          | xargs -L 100 go mod edit -fmt
-      jq -r '"-replace \(.Path)=\(.Path)@\(.Version)"' < "${require_json}" \
           | xargs -L 100 go mod edit -fmt
       jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"' < "${replace_json}" \
           | xargs -L 100 go mod edit -fmt
     popd >/dev/null 2>&1
   done
 
-  # 3. Add explicit require directives for indirect dependencies
-  go list -m -json all \
-      | jq -r 'select(.Main != true) | select(.Indirect == true) | "-require \(.Path)@\(.Version)"' \
-      | xargs -L 100 go mod edit -fmt
-
-  # 4. Add explicit replace directives pinning dependencies that aren't pinned yet
-  go list -m -json all \
-      | jq -r 'select(.Main != true) | select(.Replace == null)  | "-replace \(.Path)=\(.Path)@\(.Version)"' \
-      | xargs -L 100 go mod edit -fmt
+  # tidy to ensure require directives are added for indirect dependencies
+  go mod tidy
 }
 
-function group_replace_directives() {
+function print_go_mod_section() {
+  local directive="$1"
+  local file="$2"
+
+  if [ -s "${file}" ]; then
+      echo "${directive} ("
+      cat "$file"
+      echo ")"
+  fi
+}
+
+function group_directives() {
   local local_tmp_dir
   local_tmp_dir=$(mktemp -d "${TMP_DIR}/group_replace.XXXX")
+  local go_mod_require_direct="${local_tmp_dir}/go.mod.require_direct.tmp"
+  local go_mod_require_indirect="${local_tmp_dir}/go.mod.require_indirect.tmp"
   local go_mod_replace="${local_tmp_dir}/go.mod.replace.tmp"
-  local go_mod_noreplace="${local_tmp_dir}/go.mod.noreplace.tmp"
+  local go_mod_other="${local_tmp_dir}/go.mod.other.tmp"
   # separate replace and non-replace directives
   awk "
+     # print lines between 'require (' ... ')' lines
+     /^require [(]/          { inrequire=1; next                            }
+     inrequire && /^[)]/     { inrequire=0; next                            }
+     inrequire && /\/\/ indirect/ { print > \"${go_mod_require_indirect}\"; next }
+     inrequire               { print > \"${go_mod_require_direct}\";   next }
+
      # print lines between 'replace (' ... ')' lines
      /^replace [(]/      { inreplace=1; next                   }
      inreplace && /^[)]/ { inreplace=0; next                   }
@@ -129,14 +130,18 @@ function group_replace_directives() {
      # print ungrouped replace directives with the replace directive trimmed
      /^replace [^(]/ { sub(/^replace /,\"\"); print > \"${go_mod_replace}\"; next }
 
-     # otherwise print to the noreplace file
-     { print > \"${go_mod_noreplace}\" }
+     # print ungrouped require directives with the require directive trimmed
+     /^require [^(].*\/\/ indirect/ { sub(/^require /,\"\"); print > \"${go_mod_require_indirect}\"; next }
+     /^require [^(]/ { sub(/^require /,\"\"); print > \"${go_mod_require_direct}\"; next }
+
+     # otherwise print to the other file
+     { print > \"${go_mod_other}\" }
   " < go.mod
   {
-    cat "${go_mod_noreplace}";
-    echo "replace (";
-    cat "${go_mod_replace}";
-    echo ")";
+    cat "${go_mod_other}";
+    print_go_mod_section "require" "${go_mod_require_direct}"
+    print_go_mod_section "require" "${go_mod_require_indirect}"
+    print_go_mod_section "replace" "${go_mod_replace}"
   } > go.mod
 
   go mod edit -fmt
@@ -215,8 +220,8 @@ ensure_require_replace_directives_for_all_dependencies
 go mod tidy >>"${LOG_FILE}" 2>&1
 # pin expanded versions
 ensure_require_replace_directives_for_all_dependencies
-# group replace directives
-group_replace_directives
+# group require/replace directives
+group_directives
 
 # Phase 4: copy root go.mod to staging dirs and rewrite
 
@@ -332,10 +337,20 @@ $(go mod why "${loopback_deps[@]}")"
              "-dropreplace \(.Replace.Path)"' |
     xargs -L 100 go mod edit -fmt
 
+    # group require/replace directives
+    group_directives
+
   popd >/dev/null 2>&1
 done
 echo "=== tidying root" >> "${LOG_FILE}"
 go mod tidy >>"${LOG_FILE}" 2>&1
+
+# prune unused pinned non-local replace directives
+comm -23 \
+  <(go mod edit -json | jq -r '.Replace[] | select(.New.Path | startswith("./") | not) | .Old.Path' | sort) \
+  <(go list -m -json all | jq -r .Path | sort) |
+while read -r X; do echo "-dropreplace=${X}"; done |
+xargs -L 100 go mod edit -fmt
 
 # disallow transitive dependencies on k8s.io/kubernetes
 loopback_deps=()
@@ -386,10 +401,13 @@ rm -f "vendor/OWNERS"
 cat <<__EOF__ > "vendor/OWNERS"
 # See the OWNERS docs at https://go.k8s.io/owners
 
+options:
+  # make root approval non-recursive
+  no_parent_owners: true
 approvers:
 - dep-approvers
 reviewers:
 - dep-reviewers
 __EOF__
 
-kube::log::status "NOTE: don't forget to handle vendor/* files that were added or removed"
+kube::log::status "NOTE: don't forget to handle vendor/* and LICENSE/* files that were added or removed"

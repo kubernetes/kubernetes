@@ -17,6 +17,7 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/component-base/metrics"
@@ -116,11 +117,12 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 // leak metric collectors for containers or pods that no longer exist.  Instead, implement
 // custom collector in a way that only collects metrics for active containers.
 func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	ctx := context.Background()
 	var errorCount float64
 	defer func() {
 		ch <- metrics.NewLazyConstMetric(resourceScrapeResultDesc, metrics.GaugeValue, errorCount)
 	}()
-	statsSummary, err := rc.provider.GetCPUAndMemoryStats()
+	statsSummary, err := rc.provider.GetCPUAndMemoryStats(ctx)
 	if err != nil {
 		errorCount = 1
 		klog.ErrorS(err, "Error getting summary for resourceMetric prometheus endpoint")
@@ -142,7 +144,7 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 }
 
 func (rc *resourceMetricsCollector) collectNodeCPUMetrics(ch chan<- metrics.Metric, s summary.NodeStats) {
-	if s.CPU == nil {
+	if s.CPU == nil || s.CPU.UsageCoreNanoSeconds == nil {
 		return
 	}
 
@@ -151,7 +153,7 @@ func (rc *resourceMetricsCollector) collectNodeCPUMetrics(ch chan<- metrics.Metr
 }
 
 func (rc *resourceMetricsCollector) collectNodeMemoryMetrics(ch chan<- metrics.Metric, s summary.NodeStats) {
-	if s.Memory == nil {
+	if s.Memory == nil || s.Memory.WorkingSetBytes == nil {
 		return
 	}
 
@@ -160,7 +162,7 @@ func (rc *resourceMetricsCollector) collectNodeMemoryMetrics(ch chan<- metrics.M
 }
 
 func (rc *resourceMetricsCollector) collectContainerStartTime(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
-	if s.StartTime.Unix() == 0 {
+	if s.StartTime.Unix() <= 0 {
 		return
 	}
 
@@ -169,7 +171,7 @@ func (rc *resourceMetricsCollector) collectContainerStartTime(ch chan<- metrics.
 }
 
 func (rc *resourceMetricsCollector) collectContainerCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
-	if s.CPU == nil {
+	if s.CPU == nil || s.CPU.UsageCoreNanoSeconds == nil {
 		return
 	}
 
@@ -179,7 +181,7 @@ func (rc *resourceMetricsCollector) collectContainerCPUMetrics(ch chan<- metrics
 }
 
 func (rc *resourceMetricsCollector) collectContainerMemoryMetrics(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
-	if s.Memory == nil {
+	if s.Memory == nil || s.Memory.WorkingSetBytes == nil {
 		return
 	}
 
@@ -189,7 +191,7 @@ func (rc *resourceMetricsCollector) collectContainerMemoryMetrics(ch chan<- metr
 }
 
 func (rc *resourceMetricsCollector) collectPodCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
-	if pod.CPU == nil {
+	if pod.CPU == nil || pod.CPU.UsageCoreNanoSeconds == nil {
 		return
 	}
 
@@ -199,7 +201,7 @@ func (rc *resourceMetricsCollector) collectPodCPUMetrics(ch chan<- metrics.Metri
 }
 
 func (rc *resourceMetricsCollector) collectPodMemoryMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
-	if pod.Memory == nil {
+	if pod.Memory == nil || pod.Memory.WorkingSetBytes == nil {
 		return
 	}
 

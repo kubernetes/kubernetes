@@ -135,23 +135,23 @@ func DeepHashObjectToString(objectToWrite interface{}) string {
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
 
-// ShouldPodBeInEndpointSlice returns true if a specified pod should be in an EndpointSlice object.
-// Terminating pods are only included if includeTerminating is true
-func ShouldPodBeInEndpointSlice(pod *v1.Pod, includeTerminating bool) bool {
+// ShouldPodBeInEndpoints returns true if a specified pod should be in an
+// Endpoints or EndpointSlice resource. Terminating pods are only included if
+// includeTerminating is true.
+func ShouldPodBeInEndpoints(pod *v1.Pod, includeTerminating bool) bool {
+	// "Terminal" describes when a Pod is complete (in a succeeded or failed phase).
+	// This is distinct from the "Terminating" condition which represents when a Pod
+	// is being terminated (metadata.deletionTimestamp is non nil).
+	if podutil.IsPodTerminal(pod) {
+		return false
+	}
+
 	if len(pod.Status.PodIP) == 0 && len(pod.Status.PodIPs) == 0 {
 		return false
 	}
 
 	if !includeTerminating && pod.DeletionTimestamp != nil {
 		return false
-	}
-
-	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		return pod.Status.Phase != v1.PodFailed && pod.Status.Phase != v1.PodSucceeded
-	}
-
-	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
-		return pod.Status.Phase != v1.PodSucceeded
 	}
 
 	return true
@@ -306,16 +306,11 @@ func EndpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
 		return false
 	}
 
-	// Serving and Terminating will only be set when the EndpointSliceTerminatingCondition feature is on.
-	// Ignore their difference if the expected or actual value is nil, which means the feature enablement is changed.
-	// Otherwise all EndpointSlices in the system would be updated on the first controller-manager restart even without
-	// actual changes, leading to delay in processing legitimate updates.
-	// Its value will be set to the expected one when there is an actual change triggering update of this EndpointSlice.
-	if ep1.Conditions.Serving != nil && ep2.Conditions.Serving != nil && *ep1.Conditions.Serving != *ep2.Conditions.Serving {
+	if boolPtrChanged(ep1.Conditions.Serving, ep2.Conditions.Serving) {
 		return false
 	}
 
-	if ep1.Conditions.Terminating != nil && ep2.Conditions.Terminating != nil && *ep1.Conditions.Terminating != *ep2.Conditions.Terminating {
+	if boolPtrChanged(ep1.Conditions.Terminating, ep2.Conditions.Terminating) {
 		return false
 	}
 

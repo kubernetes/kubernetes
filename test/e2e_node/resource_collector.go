@@ -50,7 +50,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -379,7 +379,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
-			err := f.PodClient().Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
+			err := e2epod.NewPodClient(f).Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
 			if apierrors.IsNotFound(err) {
 				framework.Failf("Unexpected error trying to delete pod %s: %v", pod.Name, err)
 			}

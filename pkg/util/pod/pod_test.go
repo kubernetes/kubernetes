@@ -23,6 +23,7 @@ import (
 
 	"reflect"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,7 +89,7 @@ func TestPatchPodStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			_, patchBytes, unchanged, err := PatchPodStatus(client, ns, name, uid, getPodStatus(), tc.mutate(getPodStatus()))
+			_, patchBytes, unchanged, err := PatchPodStatus(context.TODO(), client, ns, name, uid, getPodStatus(), tc.mutate(getPodStatus()))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -126,5 +127,57 @@ func getPodStatus() v1.PodStatus {
 			},
 		},
 		Message: "Message",
+	}
+}
+
+func TestReplaceOrAppendPodCondition(t *testing.T) {
+	cType := v1.PodConditionType("ExampleType")
+	testCases := []struct {
+		description    string
+		conditions     []v1.PodCondition
+		condition      v1.PodCondition
+		wantConditions []v1.PodCondition
+	}{
+		{
+			description: "append",
+			conditions:  []v1.PodCondition{},
+			condition: v1.PodCondition{
+				Type:   cType,
+				Status: v1.ConditionTrue,
+			},
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   cType,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		{
+			description: "replace",
+			conditions: []v1.PodCondition{
+				{
+					Type:   cType,
+					Status: v1.ConditionTrue,
+				},
+			},
+			condition: v1.PodCondition{
+				Type:   cType,
+				Status: v1.ConditionFalse,
+			},
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   cType,
+					Status: v1.ConditionFalse,
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			gotConditions := ReplaceOrAppendPodCondition(tc.conditions, &tc.condition)
+			if diff := cmp.Diff(tc.wantConditions, gotConditions); diff != "" {
+				t.Errorf("Unexpected conditions: %s", diff)
+			}
+		})
 	}
 }

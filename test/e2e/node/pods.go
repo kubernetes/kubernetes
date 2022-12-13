@@ -45,7 +45,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
 )
@@ -55,9 +55,9 @@ var _ = SIGDescribe("Pods Extended", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("Delete Grace Period", func() {
-		var podClient *framework.PodClient
+		var podClient *e2epod.PodClient
 		ginkgo.BeforeEach(func() {
-			podClient = f.PodClient()
+			podClient = e2epod.NewPodClient(f)
 		})
 
 		/*
@@ -65,7 +65,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			Testname: Pods, delete grace period
 			Description: Create a pod, make sure it is running. Using the http client send a 'delete' with gracePeriodSeconds=30. Pod SHOULD get terminated within gracePeriodSeconds and removed from API server within a window.
 		*/
-		ginkgo.It("should be submitted and removed", func() {
+		ginkgo.It("should be submitted and removed", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-submit-remove-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
@@ -148,9 +148,9 @@ var _ = SIGDescribe("Pods Extended", func() {
 	})
 
 	ginkgo.Describe("Pods Set QOS Class", func() {
-		var podClient *framework.PodClient
+		var podClient *e2epod.PodClient
 		ginkgo.BeforeEach(func() {
-			podClient = f.PodClient()
+			podClient = e2epod.NewPodClient(f)
 		})
 
 		/*
@@ -158,7 +158,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			Testname: Pods, QOS
 			Description:  Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.
 		*/
-		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func() {
+		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-qos-class-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
@@ -200,12 +200,12 @@ var _ = SIGDescribe("Pods Extended", func() {
 	})
 
 	ginkgo.Describe("Pod Container Status", func() {
-		var podClient *framework.PodClient
+		var podClient *e2epod.PodClient
 		ginkgo.BeforeEach(func() {
-			podClient = f.PodClient()
+			podClient = e2epod.NewPodClient(f)
 		})
 
-		ginkgo.It("should never report success for a pending container", func() {
+		ginkgo.It("should never report success for a pending container", func(ctx context.Context) {
 			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
 			createAndTestPodRepeatedly(
 				3, 15,
@@ -213,7 +213,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				podClient.PodInterface,
 			)
 		})
-		ginkgo.It("should never report container start when an init container fails", func() {
+		ginkgo.It("should never report container start when an init container fails", func(ctx context.Context) {
 			ginkgo.By("creating pods with an init container that always exit 1 and terminating the pod after a random delay")
 			createAndTestPodRepeatedly(
 				3, 15,
@@ -224,12 +224,12 @@ var _ = SIGDescribe("Pods Extended", func() {
 	})
 
 	ginkgo.Describe("Pod Container lifecycle", func() {
-		var podClient *framework.PodClient
+		var podClient *e2epod.PodClient
 		ginkgo.BeforeEach(func() {
-			podClient = f.PodClient()
+			podClient = e2epod.NewPodClient(f)
 		})
 
-		ginkgo.It("should not create extra sandbox if all containers are done", func() {
+		ginkgo.It("should not create extra sandbox if all containers are done", func(ctx context.Context) {
 			ginkgo.By("creating the pod that should always exit 0")
 
 			name := "pod-always-succeed" + string(uuid.NewUUID())
@@ -298,7 +298,49 @@ var _ = SIGDescribe("Pods Extended", func() {
 				}
 			}
 		})
+
+		ginkgo.It("evicted pods should be terminal", func(ctx context.Context) {
+			ginkgo.By("creating the pod that should be evicted")
+
+			name := "pod-should-be-evicted" + string(uuid.NewUUID())
+			image := imageutils.GetE2EImage(imageutils.BusyBox)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyOnFailure,
+					Containers: []v1.Container{
+						{
+							Name:  "bar",
+							Image: image,
+							Command: []string{
+								"/bin/sh", "-c", "sleep 10; dd if=/dev/zero of=file bs=1M count=10; sleep 10000",
+							},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									"ephemeral-storage": resource.MustParse("5Mi"),
+								},
+							}},
+					},
+				},
+			}
+
+			ginkgo.By("submitting the pod to kubernetes")
+			podClient.Create(pod)
+			defer func() {
+				ginkgo.By("deleting the pod")
+				podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+			}()
+
+			err := e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, pod.Name, "Evicted", f.Namespace.Name)
+			if err != nil {
+				framework.Failf("error waiting for pod to be evicted: %v", err)
+			}
+
+		})
 	})
+
 })
 
 func createAndTestPodRepeatedly(workers, iterations int, scenario podScenario, podClient v1core.PodInterface) {

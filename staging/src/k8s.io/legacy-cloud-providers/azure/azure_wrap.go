@@ -28,13 +28,13 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
-	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -62,9 +62,9 @@ func checkResourceExistsFromError(err *retry.Error) (bool, *retry.Error) {
 	return false, err
 }
 
-/// getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
-/// The service side has throttling control that delays responses if there are multiple requests onto certain vm
-/// resource request in short period.
+// / getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
+// / The service side has throttling control that delays responses if there are multiple requests onto certain vm
+// / resource request in short period.
 func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt azcache.AzureCacheReadType) (vm compute.VirtualMachine, err error) {
 	vmName := string(nodeName)
 	cachedVM, err := az.vmCache.Get(vmName, crt)
@@ -197,7 +197,7 @@ func (az *Cloud) newVMCache() (*azcache.TimedCache, error) {
 		}
 
 		if vm.VirtualMachineProperties != nil &&
-			strings.EqualFold(to.String(vm.VirtualMachineProperties.ProvisioningState), string(compute.ProvisioningStateDeleting)) {
+			strings.EqualFold(pointer.StringDeref(vm.VirtualMachineProperties.ProvisioningState, ""), string(compute.ProvisioningStateDeleting)) {
 			klog.V(2).Infof("Virtual machine %q is under deleting", key)
 			return nil, nil
 		}

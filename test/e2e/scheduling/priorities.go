@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -121,7 +121,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 	})
 
-	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
+	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func(ctx context.Context) {
 
 		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 
@@ -142,17 +142,17 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			ginkgo.By("Trying to apply a label on the found node.")
 			k = "kubernetes.io/e2e-node-topologyKey"
 			v := "topologyvalue1"
-			framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-			framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-			defer framework.RemoveLabelOffNode(cs, nodeName, k)
+			e2enode.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+			e2enode.ExpectNodeHasLabel(cs, nodeName, k, v)
+			defer e2enode.RemoveLabelOffNode(cs, nodeName, k)
 
 			ginkgo.By("Trying to apply a label on other nodes.")
 			v = "topologyvalue2"
 			for _, node := range nodeList.Items {
 				if node.Name != nodeName {
-					framework.AddOrUpdateLabelOnNode(cs, node.Name, k, v)
-					framework.ExpectNodeHasLabel(cs, node.Name, k, v)
-					defer framework.RemoveLabelOffNode(cs, node.Name, k)
+					e2enode.AddOrUpdateLabelOnNode(cs, node.Name, k, v)
+					e2enode.ExpectNodeHasLabel(cs, node.Name, k, v)
+					defer e2enode.RemoveLabelOffNode(cs, node.Name, k)
 				}
 			}
 		}
@@ -205,7 +205,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNotEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
-	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
+	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func(ctx context.Context) {
 		// make the nodes have balanced cpu,mem usage ratio
 		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		defer cleanUp()
@@ -276,16 +276,16 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
 			for _, nodeName := range nodeNames {
-				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+				e2enode.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
 			}
 		})
 		ginkgo.AfterEach(func() {
 			for _, nodeName := range nodeNames {
-				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+				e2enode.RemoveLabelOffNode(cs, nodeName, topologyKey)
 			}
 		})
 
-		ginkgo.It("validates pod should be preferably scheduled to node which makes the matching pods more evenly distributed", func() {
+		ginkgo.It("validates pod should be preferably scheduled to node which makes the matching pods more evenly distributed", func(ctx context.Context) {
 			var nodes []v1.Node
 			for _, nodeName := range nodeNames {
 				node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
@@ -561,5 +561,5 @@ func getRandomTaint() v1.Taint {
 
 func addTaintToNode(cs clientset.Interface, nodeName string, testTaint v1.Taint) {
 	e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-	framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+	e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 }

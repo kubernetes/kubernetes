@@ -48,7 +48,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -57,6 +57,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -94,7 +95,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("GMSA support", func() {
-		ginkgo.It("works end to end", func() {
+		ginkgo.It("works end to end", func(ctx context.Context) {
 			defer ginkgo.GinkgoRecover()
 
 			ginkgo.By("finding the worker node that fulfills this test's assumptions")
@@ -164,7 +165,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 		})
 
-		ginkgo.It("can read and write file to remote SMB folder", func() {
+		ginkgo.It("can read and write file to remote SMB folder", func(ctx context.Context) {
 			defer ginkgo.GinkgoRecover()
 
 			ginkgo.By("finding the worker node that fulfills this test's assumptions")
@@ -288,7 +289,7 @@ func retrieveCRDManifestFileContents(f *framework.Framework, node v1.Node) strin
 			},
 		},
 	}
-	f.PodClient().CreateSync(pod)
+	e2epod.NewPodClient(f).CreateSync(pod)
 
 	output, err := runKubectlExecInNamespace(f.Namespace.Name, podName, "cmd", "/S", "/C", fmt.Sprintf("type %s", gmsaCrdManifestPath))
 	if err != nil {
@@ -311,10 +312,10 @@ func deployGmsaWebhook(f *framework.Framework) (func(), error) {
 	// regardless of whether the deployment succeeded, let's do a best effort at cleanup
 	cleanUpFunc := func() {
 		framework.Logf("Best effort clean up of the webhook:\n")
-		stdout, err := framework.RunKubectl("", "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
+		stdout, err := e2ekubectl.RunKubectl("", "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
 		framework.Logf("stdout:%s\nerror:%s", stdout, err)
 
-		stdout, err = framework.RunKubectl("", "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", webHookName, webHookNamespace))
+		stdout, err = e2ekubectl.RunKubectl("", "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", webHookName, webHookNamespace))
 		framework.Logf("stdout:%s\nerror:%s", stdout, err)
 
 		stdout, err = runKubectlExecInNamespace(deployerNamespace, deployerName, "--", "kubectl", "delete", "-f", "/manifests.yml")
@@ -362,7 +363,7 @@ func deployGmsaWebhook(f *framework.Framework) (func(), error) {
 			},
 		},
 	}
-	f.PodClient().CreateSync(pod)
+	e2epod.NewPodClient(f).CreateSync(pod)
 
 	// Wait for the Webhook deployment to become ready. The deployer pod takes a few seconds to initialize and create resources
 	err := waitForDeployment(func() (*appsv1.Deployment, error) {
@@ -395,7 +396,7 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 	defer tempFile.Close()
 
 	cleanUpFunc = func() {
-		framework.RunKubectl(ns, "delete", "--filename", tempFile.Name())
+		e2ekubectl.RunKubectl(ns, "delete", "--filename", tempFile.Name())
 		os.Remove(tempFile.Name())
 	}
 
@@ -405,7 +406,7 @@ func createGmsaCustomResource(ns string, crdManifestContents string) (func(), er
 		return cleanUpFunc, err
 	}
 
-	output, err := framework.RunKubectl(ns, "apply", "--filename", tempFile.Name())
+	output, err := e2ekubectl.RunKubectl(ns, "apply", "--filename", tempFile.Name())
 	if err != nil {
 		err = fmt.Errorf("unable to create custom resource, output:\n%s: %w", output, err)
 	}
@@ -535,14 +536,14 @@ func createPodWithGmsa(f *framework.Framework, serviceAccountName string) string
 			},
 		},
 	}
-	f.PodClient().CreateSync(pod)
+	e2epod.NewPodClient(f).CreateSync(pod)
 
 	return podName
 }
 
 func runKubectlExecInNamespace(namespace string, args ...string) (string, error) {
 	namespaceOption := fmt.Sprintf("--namespace=%s", namespace)
-	return framework.RunKubectl(namespace, append([]string{"exec", namespaceOption}, args...)...)
+	return e2ekubectl.RunKubectl(namespace, append([]string{"exec", namespaceOption}, args...)...)
 }
 
 func getGmsaDomainIP(f *framework.Framework, podName string) string {

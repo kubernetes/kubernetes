@@ -258,11 +258,12 @@ func TestSync(t *testing.T) {
 	tests := []struct {
 		name string
 
-		apiServiceName     string
-		apiServices        []*apiregistration.APIService
-		services           []*v1.Service
-		endpoints          []*v1.Endpoints
-		forceDiscoveryFail bool
+		apiServiceName  string
+		apiServices     []*apiregistration.APIService
+		services        []*v1.Service
+		endpoints       []*v1.Endpoints
+		backendStatus   int
+		backendLocation string
 
 		expectedAvailability apiregistration.APIServiceCondition
 	}{
@@ -270,6 +271,7 @@ func TestSync(t *testing.T) {
 			name:           "local",
 			apiServiceName: "local.group",
 			apiServices:    []*apiregistration.APIService{newLocalAPIService("local.group")},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionTrue,
@@ -282,6 +284,7 @@ func TestSync(t *testing.T) {
 			apiServiceName: "remote.group",
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "not-bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -302,7 +305,8 @@ func TestSync(t *testing.T) {
 					},
 				},
 			}},
-			endpoints: []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:     []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus: http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -315,6 +319,7 @@ func TestSync(t *testing.T) {
 			apiServiceName: "remote.group",
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -328,6 +333,7 @@ func TestSync(t *testing.T) {
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
 			endpoints:      []*v1.Endpoints{newEndpoints("foo", "bar")},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -341,6 +347,7 @@ func TestSync(t *testing.T) {
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
 			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, "wrongName")},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -354,6 +361,7 @@ func TestSync(t *testing.T) {
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
 			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionTrue,
@@ -362,12 +370,41 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:               "remote-bad-return",
-			apiServiceName:     "remote.group",
-			apiServices:        []*apiregistration.APIService{newRemoteAPIService("remote.group")},
-			services:           []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
-			endpoints:          []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
-			forceDiscoveryFail: true,
+			name:           "remote-bad-return",
+			apiServiceName: "remote.group",
+			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusForbidden,
+			expectedAvailability: apiregistration.APIServiceCondition{
+				Type:    apiregistration.Available,
+				Status:  apiregistration.ConditionFalse,
+				Reason:  "FailedDiscoveryCheck",
+				Message: `failing or missing response from`,
+			},
+		},
+		{
+			name:            "remote-redirect",
+			apiServiceName:  "remote.group",
+			apiServices:     []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services:        []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:       []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:   http.StatusFound,
+			backendLocation: "/test",
+			expectedAvailability: apiregistration.APIServiceCondition{
+				Type:    apiregistration.Available,
+				Status:  apiregistration.ConditionFalse,
+				Reason:  "FailedDiscoveryCheck",
+				Message: `failing or missing response from`,
+			},
+		},
+		{
+			name:           "remote-304",
+			apiServiceName: "remote.group",
+			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusNotModified,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -394,10 +431,10 @@ func TestSync(t *testing.T) {
 			}
 
 			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !tc.forceDiscoveryFail {
-					w.WriteHeader(http.StatusOK)
+				if tc.backendLocation != "" {
+					w.Header().Set("Location", tc.backendLocation)
 				}
-				w.WriteHeader(http.StatusForbidden)
+				w.WriteHeader(tc.backendStatus)
 			}))
 			defer testServer.Close()
 

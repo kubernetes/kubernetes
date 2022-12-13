@@ -182,7 +182,7 @@ func isLess(i, j reflect.Value) (bool, error) {
 		return i.Float() < j.Float(), nil
 	case reflect.String:
 		return sortorder.NaturalLess(i.String(), j.String()), nil
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return isLess(i.Elem(), j.Elem())
 	case reflect.Struct:
 		// sort metav1.Time
@@ -336,7 +336,7 @@ func (r *RuntimeSort) Less(i, j int) bool {
 
 // OriginalPosition returns the starting (original) position of a particular index.
 // e.g. If OriginalPosition(0) returns 5 than the
-// the item currently at position 0 was at position 5 in the original unsorted array.
+// item currently at position 0 was at position 5 in the original unsorted array.
 func (r *RuntimeSort) OriginalPosition(ix int) int {
 	if ix < 0 || ix > len(r.origPosition) {
 		return -1

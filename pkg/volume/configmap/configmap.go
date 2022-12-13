@@ -90,6 +90,10 @@ func (plugin *configMapPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *configMapPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &configMapVolumeMounter{
 		configMapVolume: &configMapVolume{
@@ -118,14 +122,16 @@ func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (v
 	}, nil
 }
 
-func (plugin *configMapPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *configMapPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	configMapVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			ConfigMap: &v1.ConfigMapVolumeSource{},
 		},
 	}
-	return volume.NewSpecFromVolume(configMapVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(configMapVolume),
+	}, nil
 }
 
 type configMapVolume struct {

@@ -34,6 +34,9 @@ func TestGetKubeletVersion(t *testing.T) {
 	}{
 		{"Kubernetes v1.7.0", "1.7.0", nil, true},
 		{"Kubernetes v1.8.0-alpha.2.1231+afabd012389d53a", "1.8.0-alpha.2.1231+afabd012389d53a", nil, true},
+		{"Kubernetes v1.8.0-alpha.2.1231+afabd012389d53a ", "1.8.0-alpha.2.1231+afabd012389d53a", nil, true},
+		{" Kubernetes v1.8.0-alpha.2.1231+afabd012389d53a", "1.8.0-alpha.2.1231+afabd012389d53a", nil, true},
+		{"Kubernetes  v1.8.0-alpha.2.1231+afabd012389d53a", "", nil, false},
 		{"something-invalid", "", nil, false},
 		{"command not found", "", errors.New("kubelet not found"), false},
 		{"", "", nil, false},

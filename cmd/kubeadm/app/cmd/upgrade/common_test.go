@@ -23,6 +23,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 func TestEnforceRequirements(t *testing.T) {
@@ -54,7 +55,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false)
+			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
 
 			if err == nil && tt.expectedErr {
 				t.Error("Expected error, but got success")
@@ -138,7 +139,7 @@ func TestPrintConfiguration(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			rt.buf = bytes.NewBufferString("")
-			printConfiguration(rt.cfg, rt.buf)
+			printConfiguration(rt.cfg, rt.buf, &output.TextPrinter{})
 			actualBytes := rt.buf.Bytes()
 			if !bytes.Equal(actualBytes, rt.expectedBytes) {
 				t.Errorf(
@@ -146,6 +147,55 @@ func TestPrintConfiguration(t *testing.T) {
 					string(rt.expectedBytes),
 					string(actualBytes),
 				)
+			}
+		})
+	}
+}
+
+func TestIsKubeadmConfigPresent(t *testing.T) {
+	var tcases = []struct {
+		name     string
+		gvkmap   kubeadmapi.DocumentMap
+		expected bool
+	}{
+		{
+			name: " Wrong Group value",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: []byte(`kind: Foo`),
+			},
+			expected: false,
+		},
+		{
+			name: "Empty Group value",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: false,
+		},
+		{
+			name:     "Nil value",
+			gvkmap:   nil,
+			expected: false,
+		},
+		{
+			name: "Correct Group value 1",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "kubeadm.k8s.io", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: true,
+		},
+		{
+			name: "Correct Group value 2",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: kubeadmapi.GroupName, Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: true,
+		},
+	}
+	for _, tt := range tcases {
+		t.Run(tt.name, func(t *testing.T) {
+			if isKubeadmConfigPresent(tt.gvkmap) != tt.expected {
+				t.Error("unexpected result")
 			}
 		})
 	}

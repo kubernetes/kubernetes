@@ -178,6 +178,15 @@ func TestCleanScope(t *testing.T) {
 			expectedScope: "resource",
 		},
 		{
+			name: "POST resource scope",
+			requestInfo: &request.RequestInfo{
+				Verb:              "create",
+				Namespace:         "my-namespace",
+				IsResourceRequest: false,
+			},
+			expectedScope: "resource",
+		},
+		{
 			name: "namespace scope",
 			requestInfo: &request.RequestInfo{
 				Namespace:         "my-namespace",
@@ -274,7 +283,6 @@ func TestResponseWriterDecorator(t *testing.T) {
 func TestRecordDroppedRequests(t *testing.T) {
 	testedMetrics := []string{
 		"apiserver_request_total",
-		"apiserver_dropped_requests_total",
 	}
 
 	testCases := []struct {
@@ -293,6 +301,7 @@ func TestRecordDroppedRequests(t *testing.T) {
 				},
 			},
 			requestInfo: &request.RequestInfo{
+				Verb:              "list",
 				APIGroup:          "",
 				APIVersion:        "v1",
 				Resource:          "pods",
@@ -300,9 +309,6 @@ func TestRecordDroppedRequests(t *testing.T) {
 			},
 			isMutating: false,
 			want: `
-			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.
-			            # TYPE apiserver_dropped_requests_total counter
-			            apiserver_dropped_requests_total{request_kind="readOnly"} 1
 			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
 			            # TYPE apiserver_request_total counter
 			            apiserver_request_total{code="429",component="apiserver",dry_run="",group="",resource="pods",scope="cluster",subresource="",verb="LIST",version="v1"} 1
@@ -317,6 +323,7 @@ func TestRecordDroppedRequests(t *testing.T) {
 				},
 			},
 			requestInfo: &request.RequestInfo{
+				Verb:              "create",
 				APIGroup:          "",
 				APIVersion:        "v1",
 				Resource:          "pods",
@@ -324,12 +331,9 @@ func TestRecordDroppedRequests(t *testing.T) {
 			},
 			isMutating: true,
 			want: `
-			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.
-			            # TYPE apiserver_dropped_requests_total counter
-			            apiserver_dropped_requests_total{request_kind="mutating"} 1
 			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
 			            # TYPE apiserver_request_total counter
-			            apiserver_request_total{code="429",component="apiserver",dry_run="",group="",resource="pods",scope="cluster",subresource="",verb="POST",version="v1"} 1
+			            apiserver_request_total{code="429",component="apiserver",dry_run="",group="",resource="pods",scope="resource",subresource="",verb="POST",version="v1"} 1
 				`,
 		},
 		{
@@ -337,25 +341,24 @@ func TestRecordDroppedRequests(t *testing.T) {
 			request: &http.Request{
 				Method: "PATCH",
 				URL: &url.URL{
-					RawPath:  "/apis/batch/v1/namespaces/foo/pods/status",
+					RawPath:  "/apis/batch/v1/namespaces/foo/jobs/bar/status",
 					RawQuery: "dryRun=All",
 				},
 			},
 			requestInfo: &request.RequestInfo{
+				Verb:              "patch",
 				APIGroup:          "batch",
 				APIVersion:        "v1",
 				Resource:          "jobs",
+				Name:              "bar",
 				Subresource:       "status",
 				IsResourceRequest: true,
 			},
 			isMutating: true,
 			want: `
-			            # HELP apiserver_dropped_requests_total [ALPHA] Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.
-			            # TYPE apiserver_dropped_requests_total counter
-			            apiserver_dropped_requests_total{request_kind="mutating"} 1
 			            # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
 			            # TYPE apiserver_request_total counter
-			            apiserver_request_total{code="429",component="apiserver",dry_run="All",group="batch",resource="jobs",scope="cluster",subresource="status",verb="PATCH",version="v1"} 1
+			            apiserver_request_total{code="429",component="apiserver",dry_run="All",group="batch",resource="jobs",scope="resource",subresource="status",verb="PATCH",version="v1"} 1
 				`,
 		},
 	}
@@ -365,12 +368,10 @@ func TestRecordDroppedRequests(t *testing.T) {
 	// This also implies that we can't run this test in parallel with other tests.
 	Register()
 	requestCounter.Reset()
-	droppedRequests.Reset()
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			defer requestCounter.Reset()
-			defer droppedRequests.Reset()
 
 			RecordDroppedRequest(test.request, test.requestInfo, APIServerComponent, test.isMutating)
 

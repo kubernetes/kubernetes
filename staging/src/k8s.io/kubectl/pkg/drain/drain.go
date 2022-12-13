@@ -83,7 +83,6 @@ type Helper struct {
 	ErrOut io.Writer
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
 
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
@@ -135,22 +134,11 @@ func (d *Helper) makeDeleteOptions() metav1.DeleteOptions {
 
 // DeletePod will delete the given pod, or return an error if it couldn't
 func (d *Helper) DeletePod(pod corev1.Pod) error {
-	if d.DryRunStrategy == cmdutil.DryRunServer {
-		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
-			return err
-		}
-	}
 	return d.Client.CoreV1().Pods(pod.Namespace).Delete(d.getContext(), pod.Name, d.makeDeleteOptions())
 }
 
 // EvictPod will evict the given pod, or return an error if it couldn't
 func (d *Helper) EvictPod(pod corev1.Pod, evictionGroupVersion schema.GroupVersion) error {
-	if d.DryRunStrategy == cmdutil.DryRunServer {
-		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
-			return err
-		}
-	}
-
 	delOpts := d.makeDeleteOptions()
 
 	switch evictionGroupVersion {

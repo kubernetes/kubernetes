@@ -69,7 +69,7 @@ func allPrimitiveFieldPaths(t *testing.T, skipRecurseList sets.String, tp reflec
 
 	paths := sets.NewString()
 	switch tp.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		paths.Insert(allPrimitiveFieldPaths(t, skipRecurseList, tp.Elem(), path).List()...)
 	case reflect.Struct:
 		for i := 0; i < tp.NumField(); i++ {
@@ -175,6 +175,7 @@ var (
 		"CPUManagerReconcilePeriod.Duration",
 		"TopologyManagerPolicy",
 		"TopologyManagerScope",
+		"TopologyManagerPolicyOptions[*]",
 		"QOSReserved[*]",
 		"CgroupDriver",
 		"CgroupRoot",
@@ -280,5 +281,8 @@ var (
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
 		"MemoryThrottlingFactor",
+		"Tracing.Endpoint",
+		"Tracing.SamplingRatePerMillion",
+		"LocalStorageCapacityIsolation",
 	)
 )

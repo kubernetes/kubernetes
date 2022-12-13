@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -55,15 +54,15 @@ func DefaultClientConfig() *restclient.Config {
 }
 
 func ObjBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
+	return io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
 }
 
 func BytesBody(bodyBytes []byte) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader(bodyBytes))
+	return io.NopCloser(bytes.NewReader(bodyBytes))
 }
 
 func StringBody(body string) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
+	return io.NopCloser(bytes.NewReader([]byte(body)))
 }
 
 func TestData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationControllerList) {

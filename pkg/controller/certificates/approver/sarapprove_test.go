@@ -211,6 +211,28 @@ func testRecognizer(t *testing.T, cases []func(b *csrBuilder), recognizeFunc fun
 				t.Errorf("expected recognized to be %v", shouldRecognize)
 			}
 		})
+		// reset the builder to run testcase without usage key encipherment
+		d := csrBuilder{
+			signerName: capi.KubeAPIServerClientKubeletSignerName,
+			cn:         "system:node:foo",
+			orgs:       []string{"system:nodes"},
+			requestor:  "system:node:foo",
+			usages: []capi.KeyUsage{
+				capi.UsageDigitalSignature,
+				capi.UsageClientAuth,
+			},
+		}
+		c(&d)
+		t.Run(fmt.Sprintf("csr:%#v", d), func(t *testing.T) {
+			csr := makeFancyTestCsr(d)
+			x509cr, err := k8s_certificates_v1.ParseCSR(csr.Spec.Request)
+			if err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+			if recognizeFunc(csr, x509cr) != shouldRecognize {
+				t.Errorf("expected recognized to be %v", shouldRecognize)
+			}
+		})
 	}
 }
 

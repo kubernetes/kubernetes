@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -264,7 +264,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
 			found := findVolumeStatMetric(kubeletKeyName, pvcNamespace, pvcName, kubeMetrics)
-			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			if !found {
+				framework.Failf("PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			}
 		}
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -328,7 +330,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
 			found := findVolumeStatMetric(kubeletKeyName, pvcNamespace, pvcName, kubeMetrics)
-			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			if !found {
+				framework.Failf("PVC %s, Namespace %s not found for %s", pvcName, pvcNamespace, kubeletKeyName)
+			}
 		}
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -428,7 +432,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Forced detach metric should be present
 		forceDetachKey := "attachdetach_controller_forced_detaches"
 		_, ok := updatedControllerMetrics[forceDetachKey]
-		framework.ExpectEqual(ok, true, "Key %q not found in A/D Controller metrics", forceDetachKey)
+		if !ok {
+			framework.Failf("Key %q not found in A/D Controller metrics", forceDetachKey)
+		}
 
 		// Wait and validate
 		totalVolumesKey := "attachdetach_controller_total_volumes"
@@ -457,27 +463,27 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	}
 
 	testAll := func(isEphemeral bool) {
-		ginkgo.It("should create prometheus metrics for volume provisioning and attach/detach", func() {
+		ginkgo.It("should create prometheus metrics for volume provisioning and attach/detach", func(ctx context.Context) {
 			provisioning(isEphemeral)
 		})
 		// TODO(mauriciopoppe): after CSIMigration is turned on we're no longer reporting
 		// the volume_provision metric (removed in #106609), issue to investigate the bug #106773
-		ginkgo.It("should create prometheus metrics for volume provisioning errors [Slow]", func() {
+		ginkgo.It("should create prometheus metrics for volume provisioning errors [Slow]", func(ctx context.Context) {
 			provisioningError(isEphemeral)
 		})
-		ginkgo.It("should create volume metrics with the correct FilesystemMode PVC ref", func() {
+		ginkgo.It("should create volume metrics with the correct FilesystemMode PVC ref", func(ctx context.Context) {
 			filesystemMode(isEphemeral)
 		})
-		ginkgo.It("should create volume metrics with the correct BlockMode PVC ref", func() {
+		ginkgo.It("should create volume metrics with the correct BlockMode PVC ref", func(ctx context.Context) {
 			blockmode(isEphemeral)
 		})
-		ginkgo.It("should create metrics for total time taken in volume operations in P/V Controller", func() {
+		ginkgo.It("should create metrics for total time taken in volume operations in P/V Controller", func(ctx context.Context) {
 			totalTime(isEphemeral)
 		})
-		ginkgo.It("should create volume metrics in Volume Manager", func() {
+		ginkgo.It("should create volume metrics in Volume Manager", func(ctx context.Context) {
 			volumeManager(isEphemeral)
 		})
-		ginkgo.It("should create metrics for total number of volumes in A/D Controller", func() {
+		ginkgo.It("should create metrics for total number of volumes in A/D Controller", func(ctx context.Context) {
 			adController(isEphemeral)
 		})
 	}
@@ -589,7 +595,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			originMetricValues = nil
 		})
 
-		ginkgo.It("should create none metrics for pvc controller before creating any PV or PVC", func() {
+		ginkgo.It("should create none metrics for pvc controller before creating any PV or PVC", func(ctx context.Context) {
 			validator([]map[string]int64{nil, nil, nil, nil})
 		})
 
@@ -715,10 +721,14 @@ func verifyMetricCount(oldMetrics, newMetrics *storageControllerMetrics, metricN
 
 	newLatencyCount, ok := newMetrics.latencyMetrics[metricName]
 	if !expectFailure {
-		framework.ExpectEqual(ok, true, "Error getting updated latency metrics for %s", metricName)
+		if !ok {
+			framework.Failf("Error getting updated latency metrics for %s", metricName)
+		}
 	}
 	newStatusCounts, ok := newMetrics.statusMetrics[metricName]
-	framework.ExpectEqual(ok, true, "Error getting updated status metrics for %s", metricName)
+	if !ok {
+		framework.Failf("Error getting updated status metrics for %s", metricName)
+	}
 
 	newStatusCount := int64(0)
 	if expectFailure {

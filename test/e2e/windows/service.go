@@ -17,17 +17,22 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
+	"net"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Services", func() {
@@ -41,7 +46,7 @@ var _ = SIGDescribe("Services", func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		cs = f.ClientSet
 	})
-	ginkgo.It("should be able to create a functioning NodePort service for Windows", func() {
+	ginkgo.It("should be able to create a functioning NodePort service for Windows", func(ctx context.Context) {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
@@ -70,14 +75,14 @@ var _ = SIGDescribe("Services", func() {
 		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")
 		testPod := createTestPod(f, windowsBusyBoximage, windowsOS)
-		testPod = f.PodClient().CreateSync(testPod)
+		testPod = e2epod.NewPodClient(f).CreateSync(testPod)
 
 		ginkgo.By("verifying that pod has the correct nodeSelector")
 		// Admission controllers may sometimes do the wrong thing
 		framework.ExpectEqual(testPod.Spec.NodeSelector["kubernetes.io/os"], "windows")
 
 		ginkgo.By(fmt.Sprintf("checking connectivity Pod to curl http://%s:%d", nodeIP, nodePort))
-		assertConsistentConnectivity(f, testPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s:%d", nodeIP, nodePort)))
+		assertConsistentConnectivity(f, testPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s", net.JoinHostPort(nodeIP, strconv.Itoa(nodePort)))))
 
 	})
 

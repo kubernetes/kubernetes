@@ -32,8 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/restmapper"
@@ -45,6 +47,9 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
+	"k8s.io/component-base/metrics/features"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -56,6 +61,10 @@ import (
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
 )
+
+func init() {
+	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
 
 const (
 	// ControllerStartJitter is the jitter value used when starting controller managers.
@@ -142,6 +151,11 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
+	// Start events processing pipeline.
+	c.EventBroadcaster.StartStructuredLogging(0)
+	c.EventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.Client.CoreV1().Events("")})
+	defer c.EventBroadcaster.Shutdown()
+
 	// setup /configz endpoint
 	if cz, err := configz.New(ConfigzName); err == nil {
 		cz.Set(c.ComponentConfig)
@@ -161,6 +175,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	// Start the controller manager HTTP server
 	if c.SecureServing != nil {
 		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
+		if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
+			slis.SLIMetricsWithReset{}.Install(unsecuredMux)
+		}
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
 		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
@@ -182,8 +199,10 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO(), controllerInitializers)
-		panic("unreachable")
+		ctx, _ := wait.ContextForChannel(stopCh)
+		run(ctx, controllerInitializers)
+		<-stopCh
+		return nil
 	}
 
 	// Identity used to distinguish between multiple cloud controller manager instances
@@ -251,7 +270,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 			})
 	}
 
-	select {}
+	<-stopCh
+	return nil
 }
 
 // startControllers starts the cloud specific controller loops.
@@ -304,7 +324,8 @@ func startControllers(ctx context.Context, cloud cloudprovider.Interface, contro
 	c.SharedInformers.Start(stopCh)
 	controllerContext.InformerFactory.Start(controllerContext.Stop)
 
-	select {}
+	<-stopCh
+	return nil
 }
 
 // InitCloudFunc is used to initialize cloud
@@ -353,28 +374,28 @@ type ControllerInitContext struct {
 // StartCloudNodeControllerWrapper is used to take cloud config as input and start cloud node controller
 func StartCloudNodeControllerWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startCloudNodeController(ctx, initContext, completedConfig, cloud)
+		return startCloudNodeController(ctx, initContext, controllerContext, completedConfig, cloud)
 	}
 }
 
 // StartCloudNodeLifecycleControllerWrapper is used to take cloud config as input and start cloud node lifecycle controller
 func StartCloudNodeLifecycleControllerWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startCloudNodeLifecycleController(ctx, initContext, completedConfig, cloud)
+		return startCloudNodeLifecycleController(ctx, initContext, controllerContext, completedConfig, cloud)
 	}
 }
 
 // StartServiceControllerWrapper is used to take cloud config as input and start service controller
 func StartServiceControllerWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startServiceController(ctx, initContext, completedConfig, cloud)
+		return startServiceController(ctx, initContext, controllerContext, completedConfig, cloud)
 	}
 }
 
 // StartRouteControllerWrapper is used to take cloud config as input and start route controller
 func StartRouteControllerWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startRouteController(ctx, initContext, completedConfig, cloud)
+		return startRouteController(ctx, initContext, controllerContext, completedConfig, cloud)
 	}
 }
 
@@ -447,7 +468,9 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 		Stop:                            stop,
 		InformersStarted:                make(chan struct{}),
 		ResyncPeriod:                    ResyncPeriod(s),
+		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("cloud-controller-manager"),
 	}
+	controllersmetrics.Register()
 	return ctx, nil
 }
 

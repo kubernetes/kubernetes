@@ -21,7 +21,7 @@ package storage
 import (
 	"context"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -47,7 +47,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	})
 
 	ginkgo.Describe("ConfigMap", func() {
-		ginkgo.It("should be mountable", func() {
+		ginkgo.It("should be mountable", func(ctx context.Context) {
 			config := e2evolume.TestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "configmap",

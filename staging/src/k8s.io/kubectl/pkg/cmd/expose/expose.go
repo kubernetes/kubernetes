@@ -115,7 +115,6 @@ type ExposeServiceOptions struct {
 	ClusterIP       string
 
 	DryRunStrategy   cmdutil.DryRunStrategy
-	DryRunVerifier   *resource.QueryParamVerifier
 	EnforceNamespace bool
 
 	fieldManager string
@@ -201,11 +200,6 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -360,11 +354,6 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		if err != nil {
 			return err
 		}
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(objMapping.GroupVersionKind); err != nil {
-				return err
-			}
-		}
 		// Serialize the object with the annotation applied.
 		client, err := o.ClientForMapping(objMapping)
 		if err != nil {
@@ -381,10 +370,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 
 		return o.PrintObj(actualObject, o.Out)
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {

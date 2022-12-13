@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,7 +69,7 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 		Bootstrap(f)
 	})
 
-	ginkgo.It("vsphere statefulset testing", func() {
+	ginkgo.It("vsphere statefulset testing", func(ctx context.Context) {
 		ginkgo.By("Creating StorageClass for Statefulset")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
@@ -113,7 +113,9 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 		for _, sspod := range ssPodsBeforeScaleDown.Items {
 			_, err := client.CoreV1().Pods(namespace).Get(context.TODO(), sspod.Name, metav1.GetOptions{})
 			if err != nil {
-				framework.ExpectEqual(apierrors.IsNotFound(err), true)
+				if !apierrors.IsNotFound(err) {
+					framework.Failf("Error in getting Pod %s: %v", sspod.Name, err)
+				}
 				for _, volumespec := range sspod.Spec.Volumes {
 					if volumespec.PersistentVolumeClaim != nil {
 						vSpherediskPath := getvSphereVolumePathFromClaim(client, statefulset.Namespace, volumespec.PersistentVolumeClaim.ClaimName)
@@ -146,9 +148,13 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 					vSpherediskPath := getvSphereVolumePathFromClaim(client, statefulset.Namespace, volumespec.PersistentVolumeClaim.ClaimName)
 					framework.Logf("Verify Volume: %q is attached to the Node: %q", vSpherediskPath, sspod.Spec.NodeName)
 					// Verify scale up has re-attached the same volumes and not introduced new volume
-					framework.ExpectEqual(volumesBeforeScaleDown[vSpherediskPath] == "", false)
+					if volumesBeforeScaleDown[vSpherediskPath] == "" {
+						framework.Failf("Volume: %q was not attached to the Node: %q before scale down", vSpherediskPath, sspod.Spec.NodeName)
+					}
 					isVolumeAttached, verifyDiskAttachedError := diskIsAttached(vSpherediskPath, sspod.Spec.NodeName)
-					framework.ExpectEqual(isVolumeAttached, true)
+					if !isVolumeAttached {
+						framework.Failf("Volume: %q is not attached to the Node: %q", vSpherediskPath, sspod.Spec.NodeName)
+					}
 					framework.ExpectNoError(verifyDiskAttachedError)
 				}
 			}

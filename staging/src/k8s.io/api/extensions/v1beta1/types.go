@@ -683,7 +683,54 @@ type IngressTLS struct {
 type IngressStatus struct {
 	// LoadBalancer contains the current status of the load-balancer.
 	// +optional
-	LoadBalancer v1.LoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
+	LoadBalancer IngressLoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
+}
+
+// LoadBalancerStatus represents the status of a load-balancer.
+type IngressLoadBalancerStatus struct {
+	// Ingress is a list containing ingress points for the load-balancer.
+	// +optional
+	Ingress []IngressLoadBalancerIngress `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
+}
+
+// IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
+type IngressLoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based.
+	// +optional
+	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+
+	// Hostname is set for load-balancer ingress points that are DNS based.
+	// +optional
+	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
+
+	// Ports provides information about the ports exposed by this LoadBalancer.
+	// +listType=atomic
+	// +optional
+	Ports []IngressPortStatus `json:"ports,omitempty" protobuf:"bytes,4,rep,name=ports"`
+}
+
+// IngressPortStatus represents the error condition of a service port
+type IngressPortStatus struct {
+	// Port is the port number of the ingress port.
+	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
+
+	// Protocol is the protocol of the ingress port.
+	// The supported values are: "TCP", "UDP", "SCTP"
+	Protocol v1.Protocol `json:"protocol" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
+
+	// Error is to record the problem with the service port
+	// The format of the error shall comply with the following rules:
+	// - built-in error values shall be specified in this file and those shall use
+	//   CamelCase names
+	// - cloud provider specific error values must have names that comply with the
+	//   format foo.example.com/CamelCase.
+	// ---
+	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+	// +optional
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
+	// +kubebuilder:validation:MaxLength=316
+	Error *string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to
@@ -920,7 +967,7 @@ type ReplicaSetSpec struct {
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
-	// Replicas is the most recently oberved number of replicas.
+	// Replicas is the most recently observed number of replicas.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
@@ -1498,22 +1545,20 @@ type NetworkPolicyPort struct {
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
-	// This feature is in Beta state and is enabled by default.
-	// It can be disabled using the Feature Gate "NetworkPolicyEndPort".
 	// +optional
 	EndPort *int32 `json:"endPort,omitempty" protobuf:"bytes,3,opt,name=endPort"`
 }
 
 // DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock.
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// IPBlock describes a particular CIDR (Ex. "192.168.1.0/24","2001:db8::/64") that is allowed
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
 type IPBlock struct {
 	// CIDR is a string representing the IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 	// Except is a slice of CIDRs that should not be included within an IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// Except values will be rejected if they are outside the CIDR range
 	// +optional
 	Except []string `json:"except,omitempty" protobuf:"bytes,2,rep,name=except"`

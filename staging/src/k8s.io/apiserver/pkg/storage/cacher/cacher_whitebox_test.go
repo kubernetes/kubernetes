@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -47,10 +48,6 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 )
 
-var (
-	objectType = reflect.TypeOf(&v1.Pod{})
-)
-
 // verifies the cacheWatcher.process goroutine is properly cleaned up even if
 // the writes to cacheWatcher.result channel is blocked.
 func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
@@ -58,13 +55,14 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	var w *cacheWatcher
 	count := 0
 	filter := func(string, labels.Set, fields.Set) bool { return true }
-	forget := func() {
+	forget := func(drainWatcher bool) {
 		lock.Lock()
 		defer lock.Unlock()
 		count++
 		// forget() has to stop the watcher, as only stopping the watcher
 		// triggers stopping the process() goroutine which we are in the
 		// end waiting for in this test.
+		w.setDrainInputBufferLocked(drainWatcher)
 		w.stopLocked()
 	}
 	initEvents := []*watchCacheEvent{
@@ -73,7 +71,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
-	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
+	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, "")
 	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 0)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
@@ -89,7 +87,7 @@ func TestCacheWatcherHandlesFiltering(t *testing.T) {
 	filter := func(_ string, _ labels.Set, field fields.Set) bool {
 		return field["spec.nodeName"] == "host"
 	}
-	forget := func() {}
+	forget := func(bool) {}
 
 	testCases := []struct {
 		events   []*watchCacheEvent
@@ -193,7 +191,7 @@ TestCase:
 			testCase.events[j].ResourceVersion = uint64(j) + 1
 		}
 
-		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
+		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, "")
 		go w.processInterval(context.Background(), intervalFromEvents(testCase.events), 0)
 
 		ch := w.ResultChan()
@@ -210,6 +208,7 @@ TestCase:
 			break TestCase
 		default:
 		}
+		w.setDrainInputBufferLocked(false)
 		w.stopLocked()
 	}
 }
@@ -264,6 +263,7 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 	config := Config{
 		Storage:        s,
 		Versioner:      testVersioner{},
+		GroupResource:  schema.GroupResource{Resource: "pods"},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		GetAttrsFunc:   storage.DefaultNamespaceScopedAttr,
@@ -337,7 +337,9 @@ func TestGetListCacheBypass(t *testing.T) {
 	result := &example.PodList{}
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.err = errDummy
@@ -374,7 +376,9 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 	result := &example.PodList{}
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.err = errDummy
@@ -406,7 +410,9 @@ func TestGetCacheBypass(t *testing.T) {
 	result := &example.Pod{}
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.err = errDummy
@@ -436,7 +442,9 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	// Ensure there is some budget for slowing down processing.
 	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
@@ -516,7 +524,8 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	var w *cacheWatcher
 	done := make(chan struct{})
 	filter := func(string, labels.Set, fields.Set) bool { return true }
-	forget := func() {
+	forget := func(drainWatcher bool) {
+		w.setDrainInputBufferLocked(drainWatcher)
 		w.stopLocked()
 		done <- struct{}{}
 	}
@@ -526,7 +535,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	// timeout to zero and run the Stop goroutine concurrently.
 	// May sure that the watch will not be blocked on Stop.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
+		w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, "")
 		go w.Stop()
 		select {
 		case <-done:
@@ -538,7 +547,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	deadline := time.Now().Add(time.Hour)
 	// After that, verifies the cacheWatcher.process goroutine works correctly.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false, objectType, "")
+		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false, schema.GroupResource{Resource: "pods"}, "")
 		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		defer cancel()
@@ -548,6 +557,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("expected received a event on ResultChan")
 		}
+		w.setDrainInputBufferLocked(false)
 		w.stopLocked()
 	}
 }
@@ -561,7 +571,9 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	w, err := cacher.Watch(context.Background(), "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
@@ -591,14 +603,76 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 
 }
 
+func TestCacheDontAcceptRequestsStopped(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+
+	// Wait until cacher is initialized.
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
+
+	w, err := cacher.Watch(context.Background(), "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+
+	watchClosed := make(chan struct{})
+	go func() {
+		defer close(watchClosed)
+		for event := range w.ResultChan() {
+			switch event.Type {
+			case watch.Added, watch.Modified, watch.Deleted:
+				// ok
+			default:
+				t.Errorf("unexpected event %#v", event)
+			}
+		}
+	}()
+
+	cacher.Stop()
+
+	_, err = cacher.Watch(context.Background(), "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	if err == nil {
+		t.Fatalf("Success to create Watch: %v", err)
+	}
+
+	result := &example.Pod{}
+	err = cacher.Get(context.TODO(), "pods/ns/pod-0", storage.GetOptions{
+		IgnoreNotFound:  true,
+		ResourceVersion: "1",
+	}, result)
+	if err == nil {
+		t.Fatalf("Success to create Get: %v", err)
+	}
+
+	listResult := &example.PodList{}
+	err = cacher.GetList(context.TODO(), "pods/ns", storage.ListOptions{
+		ResourceVersion: "1",
+		Recursive:       true,
+	}, listResult)
+	if err == nil {
+		t.Fatalf("Success to create GetList: %v", err)
+	}
+
+	select {
+	case <-watchClosed:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timed out waiting for watch to close")
+	}
+}
+
 func TestTimeBucketWatchersBasic(t *testing.T) {
 	filter := func(_ string, _ labels.Set, _ fields.Set) bool {
 		return true
 	}
-	forget := func() {}
+	forget := func(bool) {}
 
 	newWatcher := func(deadline time.Time) *cacheWatcher {
-		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, objectType, "")
+		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, schema.GroupResource{Resource: "pods"}, "")
 	}
 
 	clock := testingclock.NewFakeClock(time.Now())
@@ -642,7 +716,9 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
 
@@ -738,7 +814,9 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = allowWatchBookmarks
 
@@ -836,7 +914,9 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 	cacher.bookmarkWatchers.bookmarkFrequency = time.Second
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
 
@@ -904,7 +984,9 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	// Ensure there is some budget for slowing down processing.
 	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
@@ -980,7 +1062,9 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	cacher.bookmarkWatchers = newTimeBucketWatchers(clock.RealClock{}, 2*time.Second)
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	makePod := func(i int) *examplev1.Pod {
 		return &examplev1.Pod{
@@ -1056,7 +1140,9 @@ func TestStartingResourceVersion(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	// Ensure there is some budget for slowing down processing.
 	// We use the fakeTimeBudget to prevent this test from flaking under
@@ -1134,7 +1220,9 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	// Ensure there is some budget for slowing down processing.
 	// We use the fakeTimeBudget to prevent this test from flaking under
@@ -1243,7 +1331,9 @@ func TestCachingDeleteEvents(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	fooPredicate := storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{"foo": "true"}),
@@ -1323,7 +1413,9 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 
 	dispatchedEvents := []*watchCacheEvent{}
 	cacher.watchCache.eventHandler = func(event *watchCacheEvent) {
@@ -1417,7 +1509,9 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	defer cacher.Stop()
 
 	// Wait until cacher is initialized.
-	cacher.ready.wait()
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
 	// Ensure there is enough budget for slow processing since
 	// the entire watch cache is going to be served through the
 	// interval and events won't be popped from the cacheWatcher's
@@ -1487,5 +1581,92 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	// we should have processed exactly bufferSize number of elements.
 	if received != bufferSize {
 		t.Errorf("unexpected number of events received, expected: %d, got: %d", bufferSize+1, received)
+	}
+}
+
+func makeWatchCacheEvent(rv uint64) *watchCacheEvent {
+	return &watchCacheEvent{
+		Type: watch.Added,
+		Object: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", rv),
+				ResourceVersion: fmt.Sprintf("%d", rv),
+			},
+		},
+		ResourceVersion: rv,
+	}
+}
+
+// TestCacheWatcherDraining verifies the cacheWatcher.process goroutine is properly cleaned up when draining was requested
+func TestCacheWatcherDraining(t *testing.T) {
+	var lock sync.RWMutex
+	var w *cacheWatcher
+	count := 0
+	filter := func(string, labels.Set, fields.Set) bool { return true }
+	forget := func(drainWatcher bool) {
+		lock.Lock()
+		defer lock.Unlock()
+		count++
+		w.setDrainInputBufferLocked(drainWatcher)
+		w.stopLocked()
+	}
+	initEvents := []*watchCacheEvent{
+		makeWatchCacheEvent(5),
+		makeWatchCacheEvent(6),
+	}
+	w = newCacheWatcher(1, filter, forget, testVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, "")
+	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 1)
+	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+	forget(true) // drain the watcher
+
+	eventCount := 0
+	for range w.ResultChan() {
+		eventCount++
+	}
+	if eventCount != 3 {
+		t.Errorf("Unexpected number of objects received: %d, expected: 3", eventCount)
+	}
+	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+		lock.RLock()
+		defer lock.RUnlock()
+		return count == 2, nil
+	}); err != nil {
+		t.Fatalf("expected forget() to be called twice, because processInterval should call Stop(): %v", err)
+	}
+}
+
+// TestCacheWatcherDrainingRequestedButNotDrained verifies the cacheWatcher.process goroutine is properly cleaned up when draining was requested
+// but the client never actually get any data
+func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
+	var lock sync.RWMutex
+	var w *cacheWatcher
+	count := 0
+	filter := func(string, labels.Set, fields.Set) bool { return true }
+	forget := func(drainWatcher bool) {
+		lock.Lock()
+		defer lock.Unlock()
+		count++
+		w.setDrainInputBufferLocked(drainWatcher)
+		w.stopLocked()
+	}
+	initEvents := []*watchCacheEvent{
+		makeWatchCacheEvent(5),
+		makeWatchCacheEvent(6),
+	}
+	w = newCacheWatcher(1, filter, forget, testVersioner{}, time.Now(), true, schema.GroupResource{Resource: "pods"}, "")
+	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 1)
+	if !w.add(makeWatchCacheEvent(7), time.NewTimer(1*time.Second)) {
+		t.Fatal("failed adding an even to the watcher")
+	}
+	forget(true) // drain the watcher
+	w.Stop()     // client disconnected, timeout expired or ctx was actually closed
+	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+		lock.RLock()
+		defer lock.RUnlock()
+		return count == 3, nil
+	}); err != nil {
+		t.Fatalf("expected forget() to be called three times, because processInterval should call Stop(): %v", err)
 	}
 }

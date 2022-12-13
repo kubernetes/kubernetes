@@ -17,7 +17,6 @@ limitations under the License.
 // Package app implements a server that runs a set of active
 // components.  This includes replication controllers, service endpoints and
 // nodes.
-//
 package app
 
 import (
@@ -88,6 +87,6 @@ func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext 
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
-	).Run(ctx)
+	).Run(ctx, int(controllerContext.ComponentConfig.HPAController.ConcurrentHorizontalPodAutoscalerSyncs))
 	return nil, true, nil
 }

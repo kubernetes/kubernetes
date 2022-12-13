@@ -99,7 +99,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 		}
 	}
 
-	nodes, err := GetReadySchedulableNodes(p.client)
+	nodes, err := waitListAllNodes(p.client)
 	if err != nil {
 		klog.Fatalf("Error listing nodes: %v", err)
 	}
@@ -119,7 +119,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 func (p *IntegrationTestNodePreparer) CleanupNodes() error {
 	// TODO(#93794): make CleanupNodes only clean up the nodes created by this
 	// IntegrationTestNodePreparer to make this more intuitive.
-	nodes, err := GetReadySchedulableNodes(p.client)
+	nodes, err := waitListAllNodes(p.client)
 	if err != nil {
 		klog.Fatalf("Error listing nodes: %v", err)
 	}

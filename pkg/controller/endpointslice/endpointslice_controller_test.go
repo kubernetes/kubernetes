@@ -35,18 +35,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
-	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 // Most of the tests related to EndpointSlice allocation can be found in reconciler_test.go
@@ -241,6 +238,51 @@ func TestSyncServicePodSelection(t *testing.T) {
 	assert.EqualValues(t, endpoint.TargetRef, &v1.ObjectReference{Kind: "Pod", Namespace: ns, Name: pod1.Name})
 }
 
+func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
+	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	ns := metav1.NamespaceDefault
+	serviceName := "testing-1"
+	service := createService(t, esController, ns, serviceName)
+	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	assert.Nil(t, err, "Expected no error syncing service")
+
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+	ownerRef := metav1.NewControllerRef(service, gvk)
+
+	deletedTs := metav1.Now()
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "epSlice-1",
+			Namespace:       ns,
+			OwnerReferences: []metav1.OwnerReference{*ownerRef},
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			DeletionTimestamp: &deletedTs,
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}
+	err = esController.endpointSliceStore.Add(endpointSlice)
+	if err != nil {
+		t.Fatalf("Expected no error adding EndpointSlice: %v", err)
+	}
+	_, err = client.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Expected no error creating EndpointSlice: %v", err)
+	}
+
+	numActionsBefore := len(client.Actions())
+	err = esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	assert.Nil(t, err, "Expected no error syncing service")
+
+	// The EndpointSlice marked for deletion should be ignored by the controller, and thus
+	// should not result in any action.
+	if len(client.Actions()) != numActionsBefore {
+		t.Errorf("Expected 0 more actions, got %d", len(client.Actions())-numActionsBefore)
+	}
+}
+
 // Ensure SyncService correctly selects and labels EndpointSlices.
 func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
@@ -373,12 +415,11 @@ func TestSyncService(t *testing.T) {
 	deletionTimestamp := metav1.Now()
 
 	testcases := []struct {
-		name                   string
-		service                *v1.Service
-		pods                   []*v1.Pod
-		expectedEndpointPorts  []discovery.EndpointPort
-		expectedEndpoints      []discovery.Endpoint
-		terminatingGateEnabled bool
+		name                  string
+		service               *v1.Service
+		pods                  []*v1.Pod
+		expectedEndpointPorts []discovery.EndpointPort
+		expectedEndpoints     []discovery.Endpoint
 	}{
 		{
 			name: "pods with multiple IPs and Service with ipFamilies=ipv4",
@@ -459,37 +500,41 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     pointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     pointer.Int32(3456),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     pointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     pointer.Int32(161),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     pointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     pointer.Int32(80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  pointer.String("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  pointer.String("node-1"),
 				},
 			},
 		},
@@ -572,34 +617,36 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     pointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     pointer.Int32(3456),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     pointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     pointer.Int32(161),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     pointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     pointer.Int32(80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
 					Addresses: []string{"fd08::5678:0000:0000:9abc:def0"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  pointer.String("node-1"),
 				},
 			},
 		},
 		{
-			name: "Terminating pods with EndpointSliceTerminatingCondition enabled",
+			name: "Terminating pods",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foobar",
@@ -675,151 +722,46 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     pointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     pointer.Int32(3456),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     pointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     pointer.Int32(161),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     pointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     pointer.Int32(80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(true),
-						Serving:     utilpointer.BoolPtr(true),
-						Terminating: utilpointer.BoolPtr(false),
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  pointer.String("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(false),
-						Serving:     utilpointer.BoolPtr(true),
-						Terminating: utilpointer.BoolPtr(true),
+						Ready:       pointer.Bool(false),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(true),
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  pointer.String("node-1"),
 				},
 			},
-			terminatingGateEnabled: true,
 		},
 		{
-			name: "Terminating pods with EndpointSliceTerminatingCondition disabled",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "foobar",
-					Namespace:         "default",
-					CreationTimestamp: creationTimestamp,
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{
-						{Name: "tcp-example", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP},
-						{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
-						{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
-					},
-					Selector:   map[string]string{"foo": "bar"},
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-				},
-			},
-			pods: []*v1.Pod{
-				{
-					// one ready pod for comparison
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:         "default",
-						Name:              "pod0",
-						Labels:            map[string]string{"foo": "bar"},
-						DeletionTimestamp: nil,
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{{
-							Name: "container-1",
-						}},
-						NodeName: "node-1",
-					},
-					Status: v1.PodStatus{
-						PodIP: "10.0.0.1",
-						PodIPs: []v1.PodIP{{
-							IP: "10.0.0.1",
-						}},
-						Conditions: []v1.PodCondition{
-							{
-								Type:   v1.PodReady,
-								Status: v1.ConditionTrue,
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:         "default",
-						Name:              "pod1",
-						Labels:            map[string]string{"foo": "bar"},
-						DeletionTimestamp: &deletionTimestamp,
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{{
-							Name: "container-1",
-						}},
-						NodeName: "node-1",
-					},
-					Status: v1.PodStatus{
-						PodIP: "10.0.0.2",
-						PodIPs: []v1.PodIP{
-							{
-								IP: "10.0.0.2",
-							},
-						},
-						Conditions: []v1.PodCondition{
-							{
-								Type:   v1.PodReady,
-								Status: v1.ConditionTrue,
-							},
-						},
-					},
-				},
-			},
-			expectedEndpointPorts: []discovery.EndpointPort{
-				{
-					Name:     utilpointer.StringPtr("sctp-example"),
-					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
-				},
-				{
-					Name:     utilpointer.StringPtr("udp-example"),
-					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
-				},
-				{
-					Name:     utilpointer.StringPtr("tcp-example"),
-					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
-				},
-			},
-			expectedEndpoints: []discovery.Endpoint{
-				{
-					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
-					},
-					Addresses: []string{"10.0.0.1"},
-					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
-				},
-			},
-			terminatingGateEnabled: false,
-		},
-		{
-			name: "Not ready terminating pods with EndpointSliceTerminatingCondition enabled",
+			name: "Not ready terminating pods",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "foobar",
@@ -895,155 +837,48 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     pointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     pointer.Int32(3456),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     pointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     pointer.Int32(161),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     pointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     pointer.Int32(80),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(true),
-						Serving:     utilpointer.BoolPtr(true),
-						Terminating: utilpointer.BoolPtr(false),
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  pointer.String("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(false),
-						Serving:     utilpointer.BoolPtr(false),
-						Terminating: utilpointer.BoolPtr(true),
+						Ready:       pointer.Bool(false),
+						Serving:     pointer.Bool(false),
+						Terminating: pointer.Bool(true),
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  pointer.String("node-1"),
 				},
 			},
-			terminatingGateEnabled: true,
-		},
-		{
-			name: "Not ready terminating pods with EndpointSliceTerminatingCondition disabled",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "foobar",
-					Namespace:         "default",
-					CreationTimestamp: creationTimestamp,
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{
-						{Name: "tcp-example", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP},
-						{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
-						{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
-					},
-					Selector:   map[string]string{"foo": "bar"},
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-				},
-			},
-			pods: []*v1.Pod{
-				{
-					// one ready pod for comparison
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:         "default",
-						Name:              "pod0",
-						Labels:            map[string]string{"foo": "bar"},
-						DeletionTimestamp: nil,
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{{
-							Name: "container-1",
-						}},
-						NodeName: "node-1",
-					},
-					Status: v1.PodStatus{
-						PodIP: "10.0.0.1",
-						PodIPs: []v1.PodIP{{
-							IP: "10.0.0.1",
-						}},
-						Conditions: []v1.PodCondition{
-							{
-								Type:   v1.PodReady,
-								Status: v1.ConditionTrue,
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace:         "default",
-						Name:              "pod1",
-						Labels:            map[string]string{"foo": "bar"},
-						DeletionTimestamp: &deletionTimestamp,
-					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{{
-							Name: "container-1",
-						}},
-						NodeName: "node-1",
-					},
-					Status: v1.PodStatus{
-						PodIP: "10.0.0.2",
-						PodIPs: []v1.PodIP{
-							{
-								IP: "10.0.0.2",
-							},
-						},
-						Conditions: []v1.PodCondition{
-							{
-								Type:   v1.PodReady,
-								Status: v1.ConditionFalse,
-							},
-						},
-					},
-				},
-			},
-			expectedEndpointPorts: []discovery.EndpointPort{
-				{
-					Name:     utilpointer.StringPtr("sctp-example"),
-					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
-				},
-				{
-					Name:     utilpointer.StringPtr("udp-example"),
-					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
-				},
-				{
-					Name:     utilpointer.StringPtr("tcp-example"),
-					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
-				},
-			},
-			expectedEndpoints: []discovery.Endpoint{
-				{
-					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
-					},
-					Addresses: []string{"10.0.0.1"},
-					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
-				},
-			},
-			terminatingGateEnabled: false,
 		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testcase.terminatingGateEnabled)()
-
 			client, esController := newController([]string{"node-1"}, time.Duration(0))
 
 			for _, pod := range testcase.pods {
@@ -1806,5 +1641,62 @@ func (cmc *cacheMutationCheck) Check(t *testing.T) {
 			// copied before changed in any way.
 			t.Errorf("Cached object was unexpectedly mutated. Original: %+v, Mutated: %+v", o.deepCopy, o.original)
 		}
+	}
+}
+
+func Test_dropEndpointSlicesPendingDeletion(t *testing.T) {
+	now := metav1.Now()
+	endpointSlices := []*discovery.EndpointSlice{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "epSlice1",
+				DeletionTimestamp: &now,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "epSlice2",
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses: []string{"172.18.0.2"},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "epSlice3",
+			},
+			AddressType: discovery.AddressTypeIPv6,
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses: []string{"3001:0da8:75a3:0000:0000:8a2e:0370:7334"},
+				},
+			},
+		},
+	}
+
+	epSlice2 := endpointSlices[1]
+	epSlice3 := endpointSlices[2]
+
+	result := dropEndpointSlicesPendingDeletion(endpointSlices)
+
+	assert.Len(t, result, 2)
+	for _, epSlice := range result {
+		if epSlice.Name == "epSlice1" {
+			t.Errorf("Expected EndpointSlice marked for deletion to be dropped.")
+		}
+	}
+
+	// We don't use endpointSlices and instead check manually for equality, because
+	// `dropEndpointSlicesPendingDeletion` mutates the slice it receives, so it's easy
+	// to break this test later. This way, we can be absolutely sure that the result
+	// has exactly what we expect it to.
+	if !reflect.DeepEqual(epSlice2, result[0]) {
+		t.Errorf("EndpointSlice was unexpectedly mutated. Expected: %+v, Mutated: %+v", epSlice2, result[0])
+	}
+	if !reflect.DeepEqual(epSlice3, result[1]) {
+		t.Errorf("EndpointSlice was unexpectedly mutated. Expected: %+v, Mutated: %+v", epSlice3, result[1])
 	}
 }

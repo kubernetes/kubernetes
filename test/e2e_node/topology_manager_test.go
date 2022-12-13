@@ -45,7 +45,7 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -201,7 +201,6 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
-	newCfg.FeatureGates["CPUManager"] = true
 	newCfg.FeatureGates["TopologyManager"] = true
 
 	// Set the Topology Manager policy
@@ -382,7 +381,7 @@ func waitForAllContainerRemoval(podName, podNS string) {
 	rs, _, err := getCRIClient()
 	framework.ExpectNoError(err)
 	gomega.Eventually(func() bool {
-		containers, err := rs.ListContainers(&runtimeapi.ContainerFilter{
+		containers, err := rs.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
 			LabelSelector: map[string]string{
 				types.KubernetesPodNameLabel:      podName,
 				types.KubernetesPodNamespaceLabel: podNS,
@@ -402,7 +401,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 		podName := fmt.Sprintf("gu-pod-%d", podID)
 		framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 		pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2epod.NewPodClient(f).CreateSync(pod)
 		framework.Logf("created pod %s", podName)
 		podMap[podName] = pod
 	}
@@ -444,7 +443,7 @@ func runTopologyManagerNegativeTest(f *framework.Framework, ctnAttrs, initCtnAtt
 	framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 	pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 
-	pod = f.PodClient().Create(pod)
+	pod = e2epod.NewPodClient(f).Create(pod)
 	err := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 		if pod.Status.Phase != v1.PodPending {
 			return true, nil
@@ -452,7 +451,7 @@ func runTopologyManagerNegativeTest(f *framework.Framework, ctnAttrs, initCtnAtt
 		return false, nil
 	})
 	framework.ExpectNoError(err)
-	pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	pod, err = e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	if pod.Status.Phase != v1.PodFailed {
@@ -885,7 +884,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		topologymanager.PolicyNone,
 	}
 
-	ginkgo.It("run Topology Manager policy test suite", func() {
+	ginkgo.It("run Topology Manager policy test suite", func(ctx context.Context) {
 		oldCfg, err = getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 
@@ -902,7 +901,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		}
 	})
 
-	ginkgo.It("run Topology Manager node alignment test suite", func() {
+	ginkgo.It("run Topology Manager node alignment test suite", func(ctx context.Context) {
 		numaNodes, coreCount := hostPrecheck()
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
@@ -926,7 +925,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		}
 	})
 
-	ginkgo.It("run the Topology Manager pod scope alignment test suite", func() {
+	ginkgo.It("run the Topology Manager pod scope alignment test suite", func(ctx context.Context) {
 		numaNodes, coreCount := hostPrecheck()
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)

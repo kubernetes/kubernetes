@@ -22,14 +22,14 @@ import (
 	"testing"
 	"time"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	machinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	flowcontrolapply "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta2"
+	flowcontrolapply "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
@@ -38,10 +38,10 @@ import (
 func TestConditionIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
-	_, loopbackConfig, closeFn := setup(t, 10, 10)
+	kubeConfig, closeFn := setup(t, 10, 10)
 	defer closeFn()
 
-	loopbackClient := clientset.NewForConfigOrDie(loopbackConfig)
+	loopbackClient := clientset.NewForConfigOrDie(kubeConfig)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -49,7 +49,7 @@ func TestConditionIsolation(t *testing.T) {
 
 	fsOrig := fcboot.SuggestedFlowSchemas[0]
 	t.Logf("Testing Status Condition isolation in FlowSchema %q", fsOrig.Name)
-	fsClient := loopbackClient.FlowcontrolV1beta2().FlowSchemas()
+	fsClient := loopbackClient.FlowcontrolV1beta3().FlowSchemas()
 	var dangleOrig *flowcontrol.FlowSchemaCondition
 
 	wait.PollUntil(time.Second, func() (bool, error) {

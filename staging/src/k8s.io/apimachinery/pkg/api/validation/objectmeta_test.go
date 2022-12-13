@@ -163,34 +163,34 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 			ownerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "customresourceVersion",
-					Kind:       "customresourceKind",
+					Kind:       "customresourceKind1",
 					Name:       "name",
 					UID:        "1",
 					Controller: &falseVar,
 				},
 				{
 					APIVersion: "customresourceVersion",
-					Kind:       "customresourceKind",
+					Kind:       "customresourceKind2",
 					Name:       "name",
 					UID:        "2",
 					Controller: &trueVar,
 				},
 				{
 					APIVersion: "customresourceVersion",
-					Kind:       "customresourceKind",
+					Kind:       "customresourceKind3",
 					Name:       "name",
 					UID:        "3",
 					Controller: &trueVar,
 				},
 				{
 					APIVersion: "customresourceVersion",
-					Kind:       "customresourceKind",
+					Kind:       "customresourceKind4",
 					Name:       "name",
 					UID:        "4",
 				},
 			},
 			expectError:          true,
-			expectedErrorMessage: "Only one reference can have Controller set to true",
+			expectedErrorMessage: "Only one reference can have Controller set to true. Found \"true\" in references for customresourceKind2/name and customresourceKind3/name",
 		},
 	}
 

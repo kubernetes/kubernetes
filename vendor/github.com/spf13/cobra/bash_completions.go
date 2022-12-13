@@ -1,3 +1,17 @@
+// Copyright 2013-2022 The Cobra Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cobra
 
 import (
@@ -73,7 +87,8 @@ __%[1]s_handle_go_custom_completion()
     # Prepare the command to request completions for the program.
     # Calling ${words[0]} instead of directly %[1]s allows to handle aliases
     args=("${words[@]:1}")
-    requestComp="${words[0]} %[2]s ${args[*]}"
+    # Disable ActiveHelp which is not supported for bash completion v1
+    requestComp="%[8]s=0 ${words[0]} %[2]s ${args[*]}"
 
     lastParam=${words[$((${#words[@]}-1))]}
     lastChar=${lastParam:$((${#lastParam}-1)):1}
@@ -99,7 +114,7 @@ __%[1]s_handle_go_custom_completion()
         directive=0
     fi
     __%[1]s_debug "${FUNCNAME[0]}: the completion directive is: ${directive}"
-    __%[1]s_debug "${FUNCNAME[0]}: the completions are: ${out[*]}"
+    __%[1]s_debug "${FUNCNAME[0]}: the completions are: ${out}"
 
     if [ $((directive & shellCompDirectiveError)) -ne 0 ]; then
         # Error code.  No completion.
@@ -125,7 +140,7 @@ __%[1]s_handle_go_custom_completion()
         local fullFilter filter filteringCmd
         # Do not use quotes around the $out variable or else newline
         # characters will be kept.
-        for filter in ${out[*]}; do
+        for filter in ${out}; do
             fullFilter+="$filter|"
         done
 
@@ -136,7 +151,7 @@ __%[1]s_handle_go_custom_completion()
         # File completion for directories only
         local subdir
         # Use printf to strip any trailing newline
-        subdir=$(printf "%%s" "${out[0]}")
+        subdir=$(printf "%%s" "${out}")
         if [ -n "$subdir" ]; then
             __%[1]s_debug "Listing directories in $subdir"
             __%[1]s_handle_subdirs_in_dir_flag "$subdir"
@@ -147,7 +162,7 @@ __%[1]s_handle_go_custom_completion()
     else
         while IFS='' read -r comp; do
             COMPREPLY+=("$comp")
-        done < <(compgen -W "${out[*]}" -- "$cur")
+        done < <(compgen -W "${out}" -- "$cur")
     fi
 }
 
@@ -383,11 +398,11 @@ __%[1]s_handle_word()
 
 `, name, ShellCompNoDescRequestCmd,
 		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
-		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs))
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, activeHelpEnvVar(name)))
 }
 
 func writePostscript(buf io.StringWriter, name string) {
-	name = strings.Replace(name, ":", "__", -1)
+	name = strings.ReplaceAll(name, ":", "__")
 	WriteStringAndCheck(buf, fmt.Sprintf("__start_%s()\n", name))
 	WriteStringAndCheck(buf, fmt.Sprintf(`{
     local cur prev words cword split
@@ -645,8 +660,8 @@ func gen(buf io.StringWriter, cmd *Command) {
 		gen(buf, c)
 	}
 	commandName := cmd.CommandPath()
-	commandName = strings.Replace(commandName, " ", "_", -1)
-	commandName = strings.Replace(commandName, ":", "__", -1)
+	commandName = strings.ReplaceAll(commandName, " ", "_")
+	commandName = strings.ReplaceAll(commandName, ":", "__")
 
 	if cmd.Root() == cmd {
 		WriteStringAndCheck(buf, fmt.Sprintf("_%s_root_command()\n{\n", commandName))

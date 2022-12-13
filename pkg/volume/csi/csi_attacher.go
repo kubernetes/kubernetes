@@ -26,9 +26,6 @@ import (
 	"strings"
 	"time"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,17 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/utils/clock"
 )
 
-const (
-	persistentVolumeInGlobalPath = "pv"
-	globalMountInGlobalPath      = "globalmount"
-)
+const globalMountInGlobalPath = "globalmount"
 
 type csiAttacher struct {
 	plugin       *csiPlugin
@@ -323,6 +320,23 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		}
 	}
 
+	var mountOptions []string
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.MountOptions != nil {
+		mountOptions = spec.PersistentVolume.Spec.MountOptions
+	}
+
+	var seLinuxSupported bool
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		support, err := c.plugin.SupportsSELinuxContextMount(spec)
+		if err != nil {
+			return errors.New(log("failed to query for SELinuxMount support: %s", err))
+		}
+		if support && deviceMounterArgs.SELinuxLabel != "" {
+			mountOptions = util.AddSELinuxMountOption(mountOptions, deviceMounterArgs.SELinuxLabel)
+			seLinuxSupported = true
+		}
+	}
+
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
 	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
@@ -333,6 +347,10 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	data := map[string]string{
 		volDataKey.volHandle:  csiSource.VolumeHandle,
 		volDataKey.driverName: csiSource.Driver,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && seLinuxSupported {
+		data[volDataKey.seLinuxMountContext] = deviceMounterArgs.SELinuxLabel
 	}
 
 	err = saveVolumeData(dataDir, volDataFileName, data)
@@ -366,22 +384,15 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		accessMode = spec.PersistentVolume.Spec.AccessModes[0]
 	}
 
-	var mountOptions []string
-	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.MountOptions != nil {
-		mountOptions = spec.PersistentVolume.Spec.MountOptions
+	var nodeStageFSGroupArg *int64
+	driverSupportsCSIVolumeMountGroup, err := csi.NodeSupportsVolumeMountGroup(ctx)
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("attacher.MountDevice failed to determine if the node service has VOLUME_MOUNT_GROUP capability: %v", err))
 	}
 
-	var nodeStageFSGroupArg *int64
-	if utilfeature.DefaultFeatureGate.Enabled(features.DelegateFSGroupToCSIDriver) {
-		driverSupportsCSIVolumeMountGroup, err := csi.NodeSupportsVolumeMountGroup(ctx)
-		if err != nil {
-			return volumetypes.NewTransientOperationFailure(log("attacher.MountDevice failed to determine if the node service has VOLUME_MOUNT_GROUP capability: %v", err))
-		}
-
-		if driverSupportsCSIVolumeMountGroup {
-			klog.V(3).Infof("Driver %s supports applying FSGroup (has VOLUME_MOUNT_GROUP node capability). Delegating FSGroup application to the driver through NodeStageVolume.", csiSource.Driver)
-			nodeStageFSGroupArg = deviceMounterArgs.FsGroup
-		}
+	if driverSupportsCSIVolumeMountGroup {
+		klog.V(3).Infof("Driver %s supports applying FSGroup (has VOLUME_MOUNT_GROUP node capability). Delegating FSGroup application to the driver through NodeStageVolume.", csiSource.Driver)
+		nodeStageFSGroupArg = deviceMounterArgs.FsGroup
 	}
 
 	fsType := csiSource.FSType

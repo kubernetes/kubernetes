@@ -28,12 +28,11 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestDefaultBinder(t *testing.T) {
-	testPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"},
-	}
+	testPod := st.MakePod().Name("foo").Namespace("ns").Obj()
 	testNode := "foohost.kubernetes.mydomain.com"
 	tests := []struct {
 		name        string
@@ -53,6 +52,9 @@ func TestDefaultBinder(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			var gotBinding *v1.Binding
 			client := fake.NewSimpleClientset(testPod)
 			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -66,12 +68,12 @@ func TestDefaultBinder(t *testing.T) {
 				return true, gotBinding, nil
 			})
 
-			fh, err := frameworkruntime.NewFramework(nil, nil, frameworkruntime.WithClientSet(client))
+			fh, err := frameworkruntime.NewFramework(nil, nil, ctx.Done(), frameworkruntime.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}
 			binder := &DefaultBinder{handle: fh}
-			status := binder.Bind(context.Background(), nil, testPod, "foohost.kubernetes.mydomain.com")
+			status := binder.Bind(ctx, nil, testPod, "foohost.kubernetes.mydomain.com")
 			if got := status.AsError(); (tt.injectErr != nil) != (got != nil) {
 				t.Errorf("got error %q, want %q", got, tt.injectErr)
 			}

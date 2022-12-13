@@ -44,12 +44,13 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -113,7 +114,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		The mutatingwebhookconfigurations and validatingwebhookconfigurations resources MUST exist in the
 		/apis/admissionregistration.k8s.io/v1 discovery document.
 	*/
-	framework.ConformanceIt("should include webhook resources in discovery documents", func() {
+	framework.ConformanceIt("should include webhook resources in discovery documents", func(ctx context.Context) {
 		{
 			ginkgo.By("fetching the /apis discovery document")
 			apiGroupList := &metav1.APIGroupList{}
@@ -193,7 +194,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		and the pod creation MUST be denied. An attempt to create a non-compliant configmap in a whitelisted
 		namespace based on the webhook namespace selector MUST be allowed.
 	*/
-	framework.ConformanceIt("should be able to deny pod and configmap creation", func() {
+	framework.ConformanceIt("should be able to deny pod and configmap creation", func(ctx context.Context) {
 		webhookCleanup := registerWebhook(f, f.UniqueName, certCtx, servicePort)
 		defer webhookCleanup()
 		testWebhook(f)
@@ -205,7 +206,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register an admission webhook configuration that denies connecting to a pod's attach sub-resource.
 		Attempts to attach MUST be denied.
 	*/
-	framework.ConformanceIt("should be able to deny attaching pod", func() {
+	framework.ConformanceIt("should be able to deny attaching pod", func(ctx context.Context) {
 		webhookCleanup := registerWebhookForAttachingPod(f, f.UniqueName, certCtx, servicePort)
 		defer webhookCleanup()
 		testAttachingPodWebhook(f)
@@ -217,7 +218,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register an admission webhook configuration that denies creation, update and deletion of
 		custom resources. Attempts to create, update and delete custom resources MUST be denied.
 	*/
-	framework.ConformanceIt("should be able to deny custom resource creation, update and deletion", func() {
+	framework.ConformanceIt("should be able to deny custom resource creation, update and deletion", func(ctx context.Context) {
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
@@ -235,7 +236,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register a webhook with a fail closed policy and without CA bundle so that it cannot be called.
 		Attempt operations that require the admission webhook; all MUST be denied.
 	*/
-	framework.ConformanceIt("should unconditionally reject operations on fail closed webhook", func() {
+	framework.ConformanceIt("should unconditionally reject operations on fail closed webhook", func(ctx context.Context) {
 		webhookCleanup := registerFailClosedWebhook(f, f.UniqueName, certCtx, servicePort)
 		defer webhookCleanup()
 		testFailClosedWebhook(f)
@@ -248,7 +249,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		adds a data key if the configmap already has a specific key, and another that adds a key if the key added by
 		the first webhook is present. Attempt to create a config map; both keys MUST be added to the config map.
 	*/
-	framework.ConformanceIt("should mutate configmap", func() {
+	framework.ConformanceIt("should mutate configmap", func(ctx context.Context) {
 		webhookCleanup := registerMutatingWebhookForConfigMap(f, f.UniqueName, certCtx, servicePort)
 		defer webhookCleanup()
 		testMutatingConfigMapWebhook(f)
@@ -260,7 +261,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register a mutating webhook that adds an InitContainer to pods. Attempt to create a pod;
 		the InitContainer MUST be added the TerminationMessagePolicy MUST be defaulted.
 	*/
-	framework.ConformanceIt("should mutate pod and apply defaults after mutation", func() {
+	framework.ConformanceIt("should mutate pod and apply defaults after mutation", func(ctx context.Context) {
 		webhookCleanup := registerMutatingWebhookForPod(f, f.UniqueName, certCtx, servicePort)
 		defer webhookCleanup()
 		testMutatingPodWebhook(f)
@@ -273,7 +274,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		and delete a webhook configuration object; both operations MUST be allowed and the webhook configuration object
 		MUST NOT be mutated the webhooks.
 	*/
-	framework.ConformanceIt("should not be able to mutate or prevent deletion of webhook configuration objects", func() {
+	framework.ConformanceIt("should not be able to mutate or prevent deletion of webhook configuration objects", func(ctx context.Context) {
 		validatingWebhookCleanup := registerValidatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", certCtx, servicePort)
 		defer validatingWebhookCleanup()
 		mutatingWebhookCleanup := registerMutatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", certCtx, servicePort)
@@ -287,7 +288,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register a webhook that mutates a custom resource. Attempt to create custom resource object;
 		the custom resource MUST be mutated.
 	*/
-	framework.ConformanceIt("should mutate custom resource", func() {
+	framework.ConformanceIt("should mutate custom resource", func(ctx context.Context) {
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
@@ -304,7 +305,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Description: Register a webhook that denies custom resource definition create. Attempt to create a
 		custom resource definition; the create request MUST be denied.
 	*/
-	framework.ConformanceIt("should deny crd creation", func() {
+	framework.ConformanceIt("should deny crd creation", func(ctx context.Context) {
 		crdWebhookCleanup := registerValidatingWebhookForCRD(f, f.UniqueName, certCtx, servicePort)
 		defer crdWebhookCleanup()
 
@@ -319,7 +320,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		the stored version. Attempt to patch the custom resource with a new field and value; the patch MUST be applied
 		successfully.
 	*/
-	framework.ConformanceIt("should mutate custom resource with different stored version", func() {
+	framework.ConformanceIt("should mutate custom resource with different stored version", func(ctx context.Context) {
 		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f)
 		if err != nil {
 			return
@@ -337,7 +338,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		with a schema that includes only one of the data keys added by the webhooks. Attempt to a custom resource;
 		the fields included in the schema MUST be present and field not included in the schema MUST NOT be present.
 	*/
-	framework.ConformanceIt("should mutate custom resource with pruning", func() {
+	framework.ConformanceIt("should mutate custom resource with pruning", func(ctx context.Context) {
 		const prune = true
 		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.PreserveUnknownFields = false
@@ -377,7 +378,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		the failure policy is ignore. Requests MUST NOT timeout if configured webhook timeout is 10 seconds (much longer
 		than the webhook wait duration).
 	*/
-	framework.ConformanceIt("should honor timeout", func() {
+	framework.ConformanceIt("should honor timeout", func(ctx context.Context) {
 		policyFail := admissionregistrationv1.Fail
 		policyIgnore := admissionregistrationv1.Ignore
 
@@ -409,7 +410,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		operation and attempt to create an object; the webhook MUST NOT deny the create. Patch the webhook to apply to the
 		create operation again and attempt to create an object; the webhook MUST deny the create.
 	*/
-	framework.ConformanceIt("patching/updating a validating webhook should work", func() {
+	framework.ConformanceIt("patching/updating a validating webhook should work", func(ctx context.Context) {
 		client := f.ClientSet
 		admissionClient := client.AdmissionregistrationV1()
 
@@ -504,7 +505,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		operation and attempt to create an object; the webhook MUST NOT mutate the object. Patch the webhook to apply to the
 		create operation again and attempt to create an object; the webhook MUST mutate the object.
 	*/
-	framework.ConformanceIt("patching/updating a mutating webhook should work", func() {
+	framework.ConformanceIt("patching/updating a mutating webhook should work", func(ctx context.Context) {
 		client := f.ClientSet
 		admissionClient := client.AdmissionregistrationV1()
 
@@ -578,7 +579,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		object; the create MUST be denied. Attempt to remove the webhook configurations matching the label with deletecollection;
 		all webhook configurations MUST be deleted. Attempt to create an object; the create MUST NOT be denied.
 	*/
-	framework.ConformanceIt("listing validating webhooks should work", func() {
+	framework.ConformanceIt("listing validating webhooks should work", func(ctx context.Context) {
 		testListSize := 10
 		testUUID := string(uuid.NewUUID())
 
@@ -652,7 +653,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		object; the object MUST be mutated. Attempt to remove the webhook configurations matching the label with deletecollection;
 		all webhook configurations MUST be deleted. Attempt to create an object; the object MUST NOT be mutated.
 	*/
-	framework.ConformanceIt("listing mutating webhooks should work", func() {
+	framework.ConformanceIt("listing mutating webhooks should work", func(ctx context.Context) {
 		testListSize := 10
 		testUUID := string(uuid.NewUUID())
 
@@ -792,7 +793,6 @@ func deployWebhookAndService(f *framework.Framework, image string, certCtx *cert
 				"webhook",
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
-				"--alsologtostderr",
 				"-v=4",
 				// Use a non-default port for containers.
 				fmt.Sprintf("--port=%d", containerPort),
@@ -838,7 +838,7 @@ func deployWebhookAndService(f *framework.Framework, image string, certCtx *cert
 			Selector: serviceLabels,
 			Ports: []v1.ServicePort{
 				{
-					Protocol:   "TCP",
+					Protocol:   v1.ProtocolTCP,
 					Port:       servicePort,
 					TargetPort: intstr.FromInt(int(containerPort)),
 				},
@@ -1183,7 +1183,7 @@ func testAttachingPodWebhook(f *framework.Framework) {
 	ginkgo.By("'kubectl attach' the pod, should be denied by the webhook")
 	timer := time.NewTimer(30 * time.Second)
 	defer timer.Stop()
-	_, err = framework.NewKubectlCommand(f.Namespace.Name, "attach", fmt.Sprintf("--namespace=%v", f.Namespace.Name), pod.Name, "-i", "-c=container1").WithTimeout(timer.C).Exec()
+	_, err = e2ekubectl.NewKubectlCommand(f.Namespace.Name, "attach", fmt.Sprintf("--namespace=%v", f.Namespace.Name), pod.Name, "-i", "-c=container1").WithTimeout(timer.C).Exec()
 	framework.ExpectError(err, "'kubectl attach' the pod, should be denied by the webhook")
 	if e, a := "attaching to pod 'to-be-attached-pod' is not allowed", err.Error(); !strings.Contains(a, e) {
 		framework.Failf("unexpected 'kubectl attach' error message. expected to contain %q, got %q", e, a)
@@ -2199,7 +2199,7 @@ func testSlowWebhookTimeoutNoError(f *framework.Framework) {
 }
 
 // createAdmissionWebhookMultiVersionTestCRDWithV1Storage creates a new CRD specifically
-// for the admissin webhook calling test.
+// for the admission webhook calling test.
 func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framework, opts ...crd.Option) (*crd.TestCrd, error) {
 	group := fmt.Sprintf("%s.example.com", f.BaseName)
 	return crd.CreateMultiVersionTestCRD(f, group, append([]crd.Option{func(crd *apiextensionsv1.CustomResourceDefinition) {

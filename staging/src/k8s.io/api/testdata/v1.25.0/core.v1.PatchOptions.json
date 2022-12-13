@@ -1,0 +1,10 @@
+{
+  "kind": "PatchOptions",
+  "apiVersion": "v1",
+  "dryRun": [
+    "dryRunValue"
+  ],
+  "force": true,
+  "fieldManager": "fieldManagerValue",
+  "fieldValidation": "fieldValidationValue"
+}

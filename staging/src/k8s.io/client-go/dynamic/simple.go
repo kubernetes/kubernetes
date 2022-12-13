@@ -31,11 +31,11 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-type dynamicClient struct {
-	client *rest.RESTClient
+type DynamicClient struct {
+	client rest.Interface
 }
 
-var _ Interface = &dynamicClient{}
+var _ Interface = &DynamicClient{}
 
 // ConfigFor returns a copy of the provided config with the
 // appropriate dynamic client defaults set.
@@ -50,9 +50,14 @@ func ConfigFor(inConfig *rest.Config) *rest.Config {
 	return config
 }
 
-// NewForConfigOrDie creates a new Interface for the given config and
+// New creates a new DynamicClient for the given RESTClient.
+func New(c rest.Interface) *DynamicClient {
+	return &DynamicClient{client: c}
+}
+
+// NewForConfigOrDie creates a new DynamicClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) Interface {
+func NewForConfigOrDie(c *rest.Config) *DynamicClient {
 	ret, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -63,7 +68,7 @@ func NewForConfigOrDie(c *rest.Config) Interface {
 // NewForConfig creates a new dynamic client or returns an error.
 // NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
 // where httpClient was generated with rest.HTTPClientFor(c).
-func NewForConfig(inConfig *rest.Config) (Interface, error) {
+func NewForConfig(inConfig *rest.Config) (*DynamicClient, error) {
 	config := ConfigFor(inConfig)
 
 	httpClient, err := rest.HTTPClientFor(config)
@@ -75,7 +80,7 @@ func NewForConfig(inConfig *rest.Config) (Interface, error) {
 
 // NewForConfigAndClient creates a new dynamic client for the given config and http client.
 // Note the http client provided takes precedence over the configured transport values.
-func NewForConfigAndClient(inConfig *rest.Config, h *http.Client) (Interface, error) {
+func NewForConfigAndClient(inConfig *rest.Config, h *http.Client) (*DynamicClient, error) {
 	config := ConfigFor(inConfig)
 	// for serializing the options
 	config.GroupVersion = &schema.GroupVersion{}
@@ -85,16 +90,16 @@ func NewForConfigAndClient(inConfig *rest.Config, h *http.Client) (Interface, er
 	if err != nil {
 		return nil, err
 	}
-	return &dynamicClient{client: restClient}, nil
+	return &DynamicClient{client: restClient}, nil
 }
 
 type dynamicResourceClient struct {
-	client    *dynamicClient
+	client    *DynamicClient
 	namespace string
 	resource  schema.GroupVersionResource
 }
 
-func (c *dynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface {
+func (c *DynamicClient) Resource(resource schema.GroupVersionResource) NamespaceableResourceInterface {
 	return &dynamicResourceClient{client: c, resource: resource}
 }
 
@@ -119,6 +124,9 @@ func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Un
 		if len(name) == 0 {
 			return nil, fmt.Errorf("name is required")
 		}
+	}
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return nil, err
 	}
 
 	result := c.client.client.
@@ -151,6 +159,9 @@ func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Un
 	name := accessor.GetName()
 	if len(name) == 0 {
 		return nil, fmt.Errorf("name is required")
+	}
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return nil, err
 	}
 	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
@@ -188,7 +199,9 @@ func (c *dynamicResourceClient) UpdateStatus(ctx context.Context, obj *unstructu
 	if len(name) == 0 {
 		return nil, fmt.Errorf("name is required")
 	}
-
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return nil, err
+	}
 	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
@@ -220,6 +233,9 @@ func (c *dynamicResourceClient) Delete(ctx context.Context, name string, opts me
 	if len(name) == 0 {
 		return fmt.Errorf("name is required")
 	}
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return err
+	}
 	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
 	if err != nil {
 		return err
@@ -235,6 +251,10 @@ func (c *dynamicResourceClient) Delete(ctx context.Context, name string, opts me
 }
 
 func (c *dynamicResourceClient) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	if err := validateNamespaceWithOptionalName(c.namespace); err != nil {
+		return err
+	}
+
 	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
 	if err != nil {
 		return err
@@ -254,6 +274,9 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 	if len(name) == 0 {
 		return nil, fmt.Errorf("name is required")
 	}
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return nil, err
+	}
 	result := c.client.client.Get().AbsPath(append(c.makeURLSegments(name), subresources...)...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do(ctx)
 	if err := result.Error(); err != nil {
 		return nil, err
@@ -270,6 +293,9 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 }
 
 func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+	if err := validateNamespaceWithOptionalName(c.namespace); err != nil {
+		return nil, err
+	}
 	result := c.client.client.Get().AbsPath(c.makeURLSegments("")...).SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).Do(ctx)
 	if err := result.Error(); err != nil {
 		return nil, err
@@ -295,6 +321,9 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 
 func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
+	if err := validateNamespaceWithOptionalName(c.namespace); err != nil {
+		return nil, err
+	}
 	return c.client.client.Get().AbsPath(c.makeURLSegments("")...).
 		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
 		Watch(ctx)
@@ -303,6 +332,9 @@ func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptio
 func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	if len(name) == 0 {
 		return nil, fmt.Errorf("name is required")
+	}
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return nil, err
 	}
 	result := c.client.client.
 		Patch(pt).
@@ -322,6 +354,65 @@ func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types
 		return nil, err
 	}
 	return uncastObj.(*unstructured.Unstructured), nil
+}
+
+func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, opts metav1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
+	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
+		return nil, err
+	}
+	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
+	if err != nil {
+		return nil, err
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	managedFields := accessor.GetManagedFields()
+	if len(managedFields) > 0 {
+		return nil, fmt.Errorf(`cannot apply an object with managed fields already set.
+		Use the client-go/applyconfigurations "UnstructructuredExtractor" to obtain the unstructured ApplyConfiguration for the given field manager that you can use/modify here to apply`)
+	}
+	patchOpts := opts.ToPatchOptions()
+
+	result := c.client.client.
+		Patch(types.ApplyPatchType).
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		Body(outBytes).
+		SpecificallyVersionedParams(&patchOpts, dynamicParameterCodec, versionV1).
+		Do(ctx)
+	if err := result.Error(); err != nil {
+		return nil, err
+	}
+	retBytes, err := result.Raw()
+	if err != nil {
+		return nil, err
+	}
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
+	if err != nil {
+		return nil, err
+	}
+	return uncastObj.(*unstructured.Unstructured), nil
+}
+func (c *dynamicResourceClient) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, opts metav1.ApplyOptions) (*unstructured.Unstructured, error) {
+	return c.Apply(ctx, name, obj, opts, "status")
+}
+
+func validateNamespaceWithOptionalName(namespace string, name ...string) error {
+	if msgs := rest.IsValidPathSegmentName(namespace); len(msgs) != 0 {
+		return fmt.Errorf("invalid namespace %q: %v", namespace, msgs)
+	}
+	if len(name) > 1 {
+		panic("Invalid number of names")
+	} else if len(name) == 1 {
+		if msgs := rest.IsValidPathSegmentName(name[0]); len(msgs) != 0 {
+			return fmt.Errorf("invalid resource name %q: %v", name[0], msgs)
+		}
+	}
+	return nil
 }
 
 func (c *dynamicResourceClient) makeURLSegments(name string) []string {

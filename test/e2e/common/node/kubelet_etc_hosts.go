@@ -17,10 +17,11 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -60,7 +61,7 @@ var _ = SIGDescribe("KubeletManagedEtcHosts", func() {
 			3. The Pod with hostNetwork=true , /etc/hosts file MUST not be managed by the Kubelet.
 		This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 	*/
-	framework.ConformanceIt("should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		ginkgo.By("Setting up the test")
 		config.setup()
 
@@ -92,12 +93,12 @@ func (config *KubeletManagedHostConfig) setup() {
 
 func (config *KubeletManagedHostConfig) createPodWithoutHostNetwork() {
 	podSpec := config.createPodSpec(etcHostsPodName)
-	config.pod = config.f.PodClient().CreateSync(podSpec)
+	config.pod = e2epod.NewPodClient(config.f).CreateSync(podSpec)
 }
 
 func (config *KubeletManagedHostConfig) createPodWithHostNetwork() {
 	podSpec := config.createPodSpecWithHostNetwork(etcHostsHostNetworkPodName)
-	config.hostNetworkPod = config.f.PodClient().CreateSync(podSpec)
+	config.hostNetworkPod = e2epod.NewPodClient(config.f).CreateSync(podSpec)
 }
 
 func assertManagedStatus(
@@ -148,7 +149,7 @@ func assertManagedStatus(
 }
 
 func (config *KubeletManagedHostConfig) getFileContents(podName, containerName, path string) string {
-	return config.f.ExecCommandInContainer(podName, containerName, "cat", path)
+	return e2epod.ExecCommandInContainer(config.f, podName, containerName, "cat", path)
 }
 
 func (config *KubeletManagedHostConfig) createPodSpec(podName string) *v1.Pod {

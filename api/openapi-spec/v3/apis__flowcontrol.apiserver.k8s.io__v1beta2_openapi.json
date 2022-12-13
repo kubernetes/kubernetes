@@ -251,11 +251,21 @@
         ]
       },
       "io.k8s.api.flowcontrol.v1beta2.LimitedPriorityLevelConfiguration": {
-        "description": "LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits. It addresses two issues:\n * How are requests for this priority level limited?\n * What should be done with requests that exceed the limit?",
+        "description": "LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits. It addresses two issues:\n  - How are requests for this priority level limited?\n  - What should be done with requests that exceed the limit?",
         "properties": {
           "assuredConcurrencyShares": {
             "default": 0,
             "description": "`assuredConcurrencyShares` (ACS) configures the execution limit, which is a limit on the number of requests of this priority level that may be exeucting at a given time.  ACS must be a positive number. The server's concurrency limit (SCL) is divided among the concurrency-controlled priority levels in proportion to their assured concurrency shares. This produces the assured concurrency value (ACV) --- the number of requests that may be executing at a time --- for each such priority level:\n\n            ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )\n\nbigger numbers of ACS mean more reserved concurrent requests (at the expense of every other PL). This field has a default value of 30.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "borrowingLimitPercent": {
+            "description": "`borrowingLimitPercent`, if present, configures a limit on how many seats this priority level can borrow from other priority levels. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "lendablePercent": {
+            "description": "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
             "format": "int32",
             "type": "integer"
           },
@@ -871,6 +881,11 @@
           {
             "group": "admissionregistration.k8s.io",
             "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "DeleteOptions",
             "version": "v1beta1"
           },
           {
@@ -912,6 +927,11 @@
             "group": "authentication.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           },
           {
             "group": "authentication.k8s.io",
@@ -1019,6 +1039,11 @@
             "version": "v1beta2"
           },
           {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta3"
+          },
+          {
             "group": "imagepolicy.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1alpha1"
@@ -1036,6 +1061,11 @@
           {
             "group": "networking.k8s.io",
             "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "DeleteOptions",
             "version": "v1beta1"
           },
           {
@@ -1077,6 +1107,11 @@
             "group": "rbac.authorization.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1beta1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           },
           {
             "group": "scheduling.k8s.io",
@@ -1189,10 +1224,6 @@
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations",
             "type": "object"
-          },
-          "clusterName": {
-            "description": "Deprecated: ClusterName is a legacy field that was always cleared by the system and never used; it will be removed completely in 1.25.\n\nThe name in the go struct is changed to help clients detect accidental use.",
-            "type": "string"
           },
           "creationTimestamp": {
             "allOf": [
@@ -1402,6 +1433,11 @@
             "group": "",
             "kind": "Status",
             "version": "v1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "Status",
+            "version": "v1alpha1"
           }
         ]
       },
@@ -1513,6 +1549,11 @@
           {
             "group": "admissionregistration.k8s.io",
             "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "WatchEvent",
             "version": "v1beta1"
           },
           {
@@ -1554,6 +1595,11 @@
             "group": "authentication.k8s.io",
             "kind": "WatchEvent",
             "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           },
           {
             "group": "authentication.k8s.io",
@@ -1661,6 +1707,11 @@
             "version": "v1beta2"
           },
           {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta3"
+          },
+          {
             "group": "imagepolicy.k8s.io",
             "kind": "WatchEvent",
             "version": "v1alpha1"
@@ -1678,6 +1729,11 @@
           {
             "group": "networking.k8s.io",
             "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "WatchEvent",
             "version": "v1beta1"
           },
           {
@@ -1719,6 +1775,11 @@
             "group": "rbac.authorization.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           },
           {
             "group": "scheduling.k8s.io",
@@ -1753,7 +1814,7 @@
         ]
       },
       "io.k8s.apimachinery.pkg.runtime.RawExtension": {
-        "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.Object `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// External package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// On the wire, the JSON will look something like this: {\n\t\"kind\":\"MyAPIObject\",\n\t\"apiVersion\":\"v1\",\n\t\"myPlugin\": {\n\t\t\"kind\":\"PluginA\",\n\t\t\"aOption\":\"foo\",\n\t},\n}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
+        "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.Object `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// External package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// On the wire, the JSON will look something like this:\n\n\t{\n\t\t\"kind\":\"MyAPIObject\",\n\t\t\"apiVersion\":\"v1\",\n\t\t\"myPlugin\": {\n\t\t\t\"kind\":\"PluginA\",\n\t\t\t\"aOption\":\"foo\",\n\t\t},\n\t}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
         "type": "object"
       }
     },

@@ -27,6 +27,7 @@ import (
 	"net"
 	"strings"
 
+	"google.golang.org/grpc/channelz"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/internal"
@@ -75,24 +76,26 @@ func Get(name string) Builder {
 	return nil
 }
 
-// SubConn represents a gRPC sub connection.
-// Each sub connection contains a list of addresses. gRPC will
-// try to connect to them (in sequence), and stop trying the
-// remainder once one connection is successful.
+// A SubConn represents a single connection to a gRPC backend service.
 //
-// The reconnect backoff will be applied on the list, not a single address.
-// For example, try_on_all_addresses -> backoff -> try_on_all_addresses.
+// Each SubConn contains a list of addresses.
 //
-// All SubConns start in IDLE, and will not try to connect. To trigger
-// the connecting, Balancers must call Connect.
-// When the connection encounters an error, it will reconnect immediately.
-// When the connection becomes IDLE, it will not reconnect unless Connect is
-// called.
+// All SubConns start in IDLE, and will not try to connect. To trigger the
+// connecting, Balancers must call Connect.  If a connection re-enters IDLE,
+// Balancers must call Connect again to trigger a new connection attempt.
 //
-// This interface is to be implemented by gRPC. Users should not need a
-// brand new implementation of this interface. For the situations like
-// testing, the new implementation should embed this interface. This allows
-// gRPC to add new methods to this interface.
+// gRPC will try to connect to the addresses in sequence, and stop trying the
+// remainder once the first connection is successful. If an attempt to connect
+// to all addresses encounters an error, the SubConn will enter
+// TRANSIENT_FAILURE for a backoff period, and then transition to IDLE.
+//
+// Once established, if a connection is lost, the SubConn will transition
+// directly to IDLE.
+//
+// This interface is to be implemented by gRPC. Users should not need their own
+// implementation of this interface. For situations like testing, any
+// implementations should embed this interface. This allows gRPC to add new
+// methods to this interface.
 type SubConn interface {
 	// UpdateAddresses updates the addresses used in this SubConn.
 	// gRPC checks if currently-connected address is still in the new list.
@@ -107,6 +110,11 @@ type SubConn interface {
 	UpdateAddresses([]resolver.Address)
 	// Connect starts the connecting for this SubConn.
 	Connect()
+	// GetOrBuildProducer returns a reference to the existing Producer for this
+	// ProducerBuilder in this SubConn, or, if one does not currently exist,
+	// creates a new one and returns it.  Returns a close function which must
+	// be called when the Producer is no longer needed.
+	GetOrBuildProducer(ProducerBuilder) (p Producer, close func())
 }
 
 // NewSubConnOptions contains options to create new SubConn.
@@ -172,25 +180,32 @@ type ClientConn interface {
 
 // BuildOptions contains additional information for Build.
 type BuildOptions struct {
-	// DialCreds is the transport credential the Balancer implementation can
-	// use to dial to a remote load balancer server. The Balancer implementations
-	// can ignore this if it does not need to talk to another party securely.
+	// DialCreds is the transport credentials to use when communicating with a
+	// remote load balancer server. Balancer implementations which do not
+	// communicate with a remote load balancer server can ignore this field.
 	DialCreds credentials.TransportCredentials
-	// CredsBundle is the credentials bundle that the Balancer can use.
+	// CredsBundle is the credentials bundle to use when communicating with a
+	// remote load balancer server. Balancer implementations which do not
+	// communicate with a remote load balancer server can ignore this field.
 	CredsBundle credentials.Bundle
-	// Dialer is the custom dialer the Balancer implementation can use to dial
-	// to a remote load balancer server. The Balancer implementations
-	// can ignore this if it doesn't need to talk to remote balancer.
+	// Dialer is the custom dialer to use when communicating with a remote load
+	// balancer server. Balancer implementations which do not communicate with a
+	// remote load balancer server can ignore this field.
 	Dialer func(context.Context, string) (net.Conn, error)
-	// ChannelzParentID is the entity parent's channelz unique identification number.
-	ChannelzParentID int64
+	// Authority is the server name to use as part of the authentication
+	// handshake when communicating with a remote load balancer server. Balancer
+	// implementations which do not communicate with a remote load balancer
+	// server can ignore this field.
+	Authority string
+	// ChannelzParentID is the parent ClientConn's channelz ID.
+	ChannelzParentID *channelz.Identifier
 	// CustomUserAgent is the custom user agent set on the parent ClientConn.
 	// The balancer should set the same custom user agent if it creates a
 	// ClientConn.
 	CustomUserAgent string
-	// Target contains the parsed address info of the dial target. It is the same resolver.Target as
-	// passed to the resolver.
-	// See the documentation for the resolver.Target type for details about what it contains.
+	// Target contains the parsed address info of the dial target. It is the
+	// same resolver.Target as passed to the resolver. See the documentation for
+	// the resolver.Target type for details about what it contains.
 	Target resolver.Target
 }
 
@@ -234,7 +249,7 @@ type DoneInfo struct {
 	// ServerLoad is the load received from server. It's usually sent as part of
 	// trailing metadata.
 	//
-	// The only supported type now is *orca_v1.LoadReport.
+	// The only supported type now is *orca_v3.LoadReport.
 	ServerLoad interface{}
 }
 
@@ -326,6 +341,20 @@ type Balancer interface {
 	Close()
 }
 
+// ExitIdler is an optional interface for balancers to implement.  If
+// implemented, ExitIdle will be called when ClientConn.Connect is called, if
+// the ClientConn is idle.  If unimplemented, ClientConn.Connect will cause
+// all SubConns to connect.
+//
+// Notice: it will be required for all balancers to implement this in a future
+// release.
+type ExitIdler interface {
+	// ExitIdle instructs the LB policy to reconnect to backends / exit the
+	// IDLE state, if appropriate and possible.  Note that SubConns that enter
+	// the IDLE state will not reconnect until SubConn.Connect is called.
+	ExitIdle()
+}
+
 // SubConnState describes the state of a SubConn.
 type SubConnState struct {
 	// ConnectivityState is the connectivity state of the SubConn.
@@ -348,41 +377,20 @@ type ClientConnState struct {
 // problem with the provided name resolver data.
 var ErrBadResolverState = errors.New("bad resolver state")
 
-// ConnectivityStateEvaluator takes the connectivity states of multiple SubConns
-// and returns one aggregated connectivity state.
-//
-// It's not thread safe.
-type ConnectivityStateEvaluator struct {
-	numReady      uint64 // Number of addrConns in ready state.
-	numConnecting uint64 // Number of addrConns in connecting state.
+// A ProducerBuilder is a simple constructor for a Producer.  It is used by the
+// SubConn to create producers when needed.
+type ProducerBuilder interface {
+	// Build creates a Producer.  The first parameter is always a
+	// grpc.ClientConnInterface (a type to allow creating RPCs/streams on the
+	// associated SubConn), but is declared as interface{} to avoid a
+	// dependency cycle.  Should also return a close function that will be
+	// called when all references to the Producer have been given up.
+	Build(grpcClientConnInterface interface{}) (p Producer, close func())
 }
 
-// RecordTransition records state change happening in subConn and based on that
-// it evaluates what aggregated state should be.
-//
-//  - If at least one SubConn in Ready, the aggregated state is Ready;
-//  - Else if at least one SubConn in Connecting, the aggregated state is Connecting;
-//  - Else the aggregated state is TransientFailure.
-//
-// Idle and Shutdown are not considered.
-func (cse *ConnectivityStateEvaluator) RecordTransition(oldState, newState connectivity.State) connectivity.State {
-	// Update counters.
-	for idx, state := range []connectivity.State{oldState, newState} {
-		updateVal := 2*uint64(idx) - 1 // -1 for oldState and +1 for new.
-		switch state {
-		case connectivity.Ready:
-			cse.numReady += updateVal
-		case connectivity.Connecting:
-			cse.numConnecting += updateVal
-		}
-	}
-
-	// Evaluate.
-	if cse.numReady > 0 {
-		return connectivity.Ready
-	}
-	if cse.numConnecting > 0 {
-		return connectivity.Connecting
-	}
-	return connectivity.TransientFailure
+// A Producer is a type shared among potentially many consumers.  It is
+// associated with a SubConn, and an implementation will typically contain
+// other methods to provide additional functionality, e.g. configuration or
+// subscription registration.
+type Producer interface {
 }

@@ -37,7 +37,7 @@ func ConsumeMem(megabytes int, durationSec int) {
 	megabytesString := strconv.Itoa(megabytes)
 	durationSecString := strconv.Itoa(durationSec)
 	// creating new consume memory process
-	consumeMem := exec.Command(consumeMemBinary, "-accepteula", "-r", megabytesString, "-e", "0", durationSecString, "-c", "1")
+	consumeMem := exec.Command(consumeMemBinary, "-accepteula", "-d", megabytesString, "-e", "0", durationSecString, "-c", "1")
 	err := consumeMem.Start()
 	if err != nil {
 		log.Printf("Error while consuming memory: %v", err)

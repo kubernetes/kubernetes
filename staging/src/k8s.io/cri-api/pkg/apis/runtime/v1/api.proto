@@ -79,7 +79,8 @@ service RuntimeService {
     // ContainerStatus returns status of the container. If the container is not
     // present, returns an error.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
-    // UpdateContainerResources updates ContainerConfig of the container.
+    // UpdateContainerResources updates ContainerConfig of the container synchronously.
+    // If runtime fails to transactionally update the requested resources, an error is returned.
     rpc UpdateContainerResources(UpdateContainerResourcesRequest) returns (UpdateContainerResourcesResponse) {}
     // ReopenContainerLog asks runtime to reopen the stdout/stderr log file
     // for the container. This is often called after the log file has been
@@ -114,6 +115,22 @@ service RuntimeService {
 
     // Status returns the status of the runtime.
     rpc Status(StatusRequest) returns (StatusResponse) {}
+
+    // CheckpointContainer checkpoints a container
+    rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
+
+    // GetContainerEvents gets container events from the CRI runtime
+    rpc  GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
+
+    // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
+    // This list should be static at startup: either the client and server restart together when
+    // adding or removing metrics descriptors, or they should not change.
+    // Put differently, if ListPodSandboxMetrics references a name that is not described in the initial
+    // ListMetricDescriptors call, then the metric will not be broadcasted.
+    rpc ListMetricDescriptors(ListMetricDescriptorsRequest) returns (ListMetricDescriptorsResponse) {}
+
+    // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
+    rpc ListPodSandboxMetrics(ListPodSandboxMetricsRequest) returns (ListPodSandboxMetricsResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -207,6 +224,16 @@ message Mount {
     MountPropagation propagation = 5;
 }
 
+// IDMapping describes host to container ID mappings for a pod sandbox.
+message IDMapping {
+    // HostId is the id on the host.
+    uint32 host_id = 1;
+    // ContainerId is the id in the container.
+    uint32 container_id = 2;
+    // Length is the size of the range to map.
+    uint32 length = 3;
+}
+
 // A NamespaceMode describes the intended namespace configuration for each
 // of the namespaces (Network, PID, IPC) in NamespaceOption. Runtimes should
 // map these modes as appropriate for the technology underlying the runtime.
@@ -232,6 +259,19 @@ enum NamespaceMode {
     TARGET    = 3;
 }
 
+// UserNamespace describes the intended user namespace configuration for a pod sandbox.
+message UserNamespace {
+    // Mode is the NamespaceMode for this UserNamespace.
+    // Note: NamespaceMode for UserNamespace currently supports only POD and NODE, not CONTAINER OR TARGET.
+    NamespaceMode mode = 1;
+
+    // Uids specifies the UID mappings for the user namespace.
+    repeated IDMapping uids = 2;
+
+    // Gids specifies the GID mappings for the user namespace.
+    repeated IDMapping gids = 3;
+}
+
 // NamespaceOption provides options for Linux namespaces.
 message NamespaceOption {
     // Network namespace for this container/sandbox.
@@ -251,6 +291,12 @@ message NamespaceOption {
     // previously created in the same pod. It is not possible to specify different targets
     // for each namespace.
     string target_id = 4;
+    // UsernsOptions for this pod sandbox.
+    // The Kubelet picks the user namespace configuration to use for the pod sandbox.  The mappings
+    // are specified as part of the UserNamespace struct.  If the struct is nil, then the POD mode
+    // must be assumed.  This is done for backward compatibility with older Kubelet versions that
+    // do not set a user namespace.
+    UserNamespace userns_options = 5;
 }
 
 // Int64Value is the wrapper of int64.
@@ -278,7 +324,11 @@ message LinuxSandboxSecurityContext {
     // If set, the root filesystem of the sandbox is read-only.
     bool readonly_rootfs = 4;
     // List of groups applied to the first process run in the sandbox, in
-    // addition to the sandbox's primary GID.
+    // addition to the sandbox's primary GID, and group memberships defined 
+    // in the container image for the sandbox's primary UID of the container process.
+    // If the list is empty, no additional groups are added to any container.
+    // Note that group memberships defined in the container image for the sandbox's primary UID 
+    // of the container process are still effective, even if they are not included in this list.
     repeated int64 supplemental_groups = 5;
     // Indicates whether the sandbox will be asked to run a privileged
     // container. If a privileged container is to be executed within it, this
@@ -503,6 +553,10 @@ message PodSandboxStatusResponse {
     // debug, e.g. network namespace for linux container based container runtime.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
+    // Container statuses
+    repeated ContainerStatus containers_statuses = 3;
+    // Timestamp at which container and pod statuses were recorded
+    int64 timestamp = 4;
 }
 
 // PodSandboxStateValue is the wrapper of PodSandboxState.
@@ -628,17 +682,36 @@ message LinuxPodSandboxStats {
 
 // WindowsPodSandboxStats provides the resource usage statistics for a pod sandbox on windows
 message WindowsPodSandboxStats {
-    // TODO: Add stats relevant to windows.
+    // CPU usage gathered for the pod sandbox.
+    WindowsCpuUsage cpu = 1;
+    // Memory usage gathered for the pod sandbox.
+    WindowsMemoryUsage memory = 2;
+    // Network usage gathered for the pod sandbox
+    WindowsNetworkUsage network = 3;
+    // Stats pertaining to processes in the pod sandbox.
+    WindowsProcessUsage process = 4;
+    // Stats of containers in the measured pod sandbox.
+    repeated WindowsContainerStats containers = 5;
 }
 
 // NetworkUsage contains data about network resources.
 message NetworkUsage {
-    // The time at which these stats were updated.
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
     int64 timestamp = 1;
     // Stats for the default network interface.
     NetworkInterfaceUsage default_interface = 2;
     // Stats for all found network interfaces, excluding the default.
     repeated NetworkInterfaceUsage interfaces = 3;
+}
+
+// WindowsNetworkUsage contains data about network resources specific to Windows.
+message WindowsNetworkUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Stats for the default network interface.
+    WindowsNetworkInterfaceUsage default_interface = 2;
+    // Stats for all found network interfaces, excluding the default.
+    repeated WindowsNetworkInterfaceUsage interfaces = 3;
 }
 
 // NetworkInterfaceUsage contains resource value data about a network interface.
@@ -655,9 +728,31 @@ message NetworkInterfaceUsage {
     UInt64Value tx_errors = 5;
 }
 
+// WindowsNetworkInterfaceUsage contains resource value data about a network interface specific for Windows.
+message WindowsNetworkInterfaceUsage {
+    // The name of the network interface.
+    string name = 1;
+    // Cumulative count of bytes received.
+    UInt64Value rx_bytes = 2;
+    // Cumulative count of receive errors encountered.
+    UInt64Value rx_packets_dropped = 3;
+    // Cumulative count of bytes transmitted.
+    UInt64Value tx_bytes = 4;
+    // Cumulative count of transmit errors encountered.
+    UInt64Value tx_packets_dropped = 5;
+}
+
 // ProcessUsage are stats pertaining to processes.
 message ProcessUsage {
-    // The time at which these stats were updated.
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Number of processes.
+    UInt64Value process_count = 2;
+}
+
+// WindowsProcessUsage are stats pertaining to processes specific to Windows.
+message WindowsProcessUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
     int64 timestamp = 1;
     // Number of processes.
     UInt64Value process_count = 2;
@@ -726,7 +821,7 @@ message SELinuxOption {
 
 // Capability contains the container capabilities to add or drop
 // Dropping a capability will drop it from all sets.
-// If a capability is added to only the add_capabilities list then it gets added to permitted, 
+// If a capability is added to only the add_capabilities list then it gets added to permitted,
 // inheritable, effective and bounding sets, i.e. all sets except the ambient set.
 // If a capability is added to only the add_ambient_capabilities list then it gets added to all sets, i.e permitted
 // inheritable, effective, bounding and ambient sets.
@@ -782,7 +877,11 @@ message LinuxContainerSecurityContext {
     // If set, the root filesystem of the container is read-only.
     bool readonly_rootfs = 7;
     // List of groups applied to the first process run in the container, in
-    // addition to the container's primary GID.
+    // addition to the container's primary GID, and group memberships defined 
+    // in the container image for the container's primary UID of the container process.
+    // If the list is empty, no additional groups are added to any container.
+    // Note that group memberships defined in the container image for the container's primary UID 
+    // of the container process are still effective, even if they are not included in this list.
     repeated int64 supplemental_groups = 8;
     // no_new_privs defines if the flag for no_new_privs should be set on the
     // container.
@@ -822,6 +921,13 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
+// WindowsNamespaceOption provides options for Windows namespaces.
+message WindowsNamespaceOption {
+    // Network namespace for this container/sandbox.
+    // Namespaces currently set by the kubelet: POD, NODE
+    NamespaceMode network = 1;
+}
+
 // WindowsSandboxSecurityContext holds platform-specific configurations that will be
 // applied to a sandbox.
 // These settings will only apply to the sandbox container.
@@ -836,6 +942,9 @@ message WindowsSandboxSecurityContext {
 
     // Indicates whether the container requested to run as a HostProcess container.
     bool host_process = 3;
+
+    // Configuration for the sandbox's namespaces
+    WindowsNamespaceOption namespace_options = 4;
 }
 
 // WindowsPodSandboxConfig holds platform-specific configurations for Windows
@@ -1122,6 +1231,8 @@ message ContainerStatus {
     repeated Mount mounts = 14;
     // Log path of container.
     string log_path = 15;
+    // Resource limits configuration of the container.
+    ContainerResources resources = 16;
 }
 
 message ContainerStatusResponse {
@@ -1132,6 +1243,14 @@ message ContainerStatusResponse {
     // debug, e.g. pid for linux container based container runtime.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
+}
+
+// ContainerResources holds resource limits configuration for a container.
+message ContainerResources {
+    // Resource limits configuration specific to Linux container.
+    LinuxContainerResources linux = 1;
+    // Resource limits configuration specific to Windows container.
+    WindowsContainerResources windows = 2;
 }
 
 message UpdateContainerResourcesRequest {
@@ -1413,6 +1532,18 @@ message FilesystemUsage {
     UInt64Value inodes_used = 4;
 }
 
+// WindowsFilesystemUsage provides the filesystem usage information specific to Windows.
+message WindowsFilesystemUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // The unique identifier of the filesystem.
+    FilesystemIdentifier fs_id = 2;
+    // UsedBytes represents the bytes used for images on the filesystem.
+    // This may differ from the total bytes used on the filesystem and may not
+    // equal CapacityBytes - AvailableBytes.
+    UInt64Value used_bytes = 3;
+}
+
 message ImageFsInfoResponse {
     // Information of image filesystem(s).
     repeated FilesystemUsage image_filesystems = 1;
@@ -1478,8 +1609,31 @@ message ContainerStats {
     FilesystemUsage writable_layer = 4;
 }
 
+// WindowsContainerStats provides the resource usage statistics for a container specific for Windows 
+message WindowsContainerStats {
+    // Information of the container.
+    ContainerAttributes attributes = 1;
+    // CPU usage gathered from the container.
+    WindowsCpuUsage cpu = 2;
+    // Memory usage gathered from the container.
+    WindowsMemoryUsage memory = 3;
+    // Usage of the writable layer.
+    WindowsFilesystemUsage writable_layer = 4;
+}
+
 // CpuUsage provides the CPU usage information.
 message CpuUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Cumulative CPU usage (sum across all cores) since object creation.
+    UInt64Value usage_core_nano_seconds = 2;
+    // Total CPU usage (sum of all cores) averaged over the sample window.
+    // The "core" unit can be interpreted as CPU core-nanoseconds per second.
+    UInt64Value usage_nano_cores = 3;
+}
+
+// WindowsCpuUsage provides the CPU usage information specific to Windows
+message WindowsCpuUsage {
     // Timestamp in nanoseconds at which the information were collected. Must be > 0.
     int64 timestamp = 1;
     // Cumulative CPU usage (sum across all cores) since object creation.
@@ -1507,10 +1661,123 @@ message MemoryUsage {
     UInt64Value major_page_faults = 7;
 }
 
+// WindowsMemoryUsage provides the memory usage information specific to Windows
+message WindowsMemoryUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // The amount of working set memory in bytes.
+    UInt64Value working_set_bytes = 2;
+    // Available memory for use. This is defined as the memory limit - workingSetBytes.
+    UInt64Value available_bytes = 3;
+    // Cumulative number of page faults.
+    UInt64Value page_faults = 4;
+}
+
 message ReopenContainerLogRequest {
     // ID of the container for which to reopen the log.
     string container_id = 1;
 }
 
 message ReopenContainerLogResponse{
+}
+
+message CheckpointContainerRequest {
+    // ID of the container to be checkpointed.
+    string container_id = 1;
+    // Location of the checkpoint archive used for export
+    string location = 2;
+    // Timeout in seconds for the checkpoint to complete.
+    // Timeout of zero means to use the CRI default.
+    // Timeout > 0 means to use the user specified timeout.
+    int64 timeout = 3;
+}
+
+message CheckpointContainerResponse {}
+
+message GetEventsRequest {}
+
+message ContainerEventResponse {
+    // ID of the container
+    string container_id = 1;
+
+    // Type of the container event
+    ContainerEventType container_event_type = 2;
+
+    // Creation timestamp of this event
+    int64 created_at = 3;
+
+    // Sandbox status
+    PodSandboxStatus pod_sandbox_status = 4;
+
+    // Container statuses
+    repeated ContainerStatus containers_statuses = 5;
+}
+
+enum ContainerEventType {
+    // Container created
+    CONTAINER_CREATED_EVENT = 0;
+
+    // Container started
+    CONTAINER_STARTED_EVENT = 1;
+
+    // Container stopped
+    CONTAINER_STOPPED_EVENT = 2;
+
+    // Container deleted
+    CONTAINER_DELETED_EVENT = 3;
+}
+
+message ListMetricDescriptorsRequest {}
+
+message ListMetricDescriptorsResponse {
+    repeated MetricDescriptor descriptors = 1;
+}
+
+message MetricDescriptor {
+    // The name field will be used as a unique identifier of this MetricDescriptor,
+    // and be used in conjunction with the Metric structure to populate the full Metric.
+    string name = 1;
+    string help = 2;
+    // When a metric uses this metric descriptor, it should only define
+    // labels that have previously been declared in label_keys.
+    // It is the responsibility of the runtime to correctly keep sorted the keys and values.
+    // If the two slices have different length, the behavior is undefined.
+    repeated string label_keys = 3;
+}
+
+message ListPodSandboxMetricsRequest {} 
+
+message ListPodSandboxMetricsResponse {
+    repeated PodSandboxMetrics pod_metrics = 1;
+}
+
+message PodSandboxMetrics {
+    string pod_sandbox_id = 1;
+    repeated Metric metrics = 2;
+    repeated ContainerMetrics container_metrics = 3;
+}
+
+message ContainerMetrics {
+    string container_id = 1;
+    repeated Metric metrics = 2;
+}
+
+message Metric {
+    // Name must match a name previously returned in a MetricDescriptors call,
+    // otherwise, it will be ignored.
+    string name = 1;
+    // Timestamp should be 0 if the metric was gathered live.
+    // If it was cached, the Timestamp should reflect the time it was collected.
+    int64 timestamp = 2;
+    MetricType metric_type = 3;
+    // The corresponding LabelValues to the LabelKeys defined in the MetricDescriptor.
+    // It is the responsibility of the runtime to correctly keep sorted the keys and values.
+    // If the two slices have different length, the behavior is undefined.
+    repeated string label_values = 4;
+    UInt64Value value = 5;
+}
+
+enum MetricType {
+    COUNTER = 0;
+    GAUGE = 1;
 }

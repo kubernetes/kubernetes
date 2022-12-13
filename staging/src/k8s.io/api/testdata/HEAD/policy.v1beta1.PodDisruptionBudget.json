@@ -31,7 +31,6 @@
     "finalizers": [
       "finalizersValue"
     ],
-    "clusterName": "clusterNameValue",
     "managedFields": [
       {
         "manager": "managerValue",
@@ -60,7 +59,8 @@
         }
       ]
     },
-    "maxUnavailable": "maxUnavailableValue"
+    "maxUnavailable": "maxUnavailableValue",
+    "unhealthyPodEvictionPolicy": "unhealthyPodEvictionPolicyValue"
   },
   "status": {
     "observedGeneration": 1,

@@ -20,22 +20,22 @@ limitations under the License.
 Package applyconfigurations provides typesafe go representations of the apply
 configurations that are used to constructs Server-side Apply requests.
 
-Basics
+# Basics
 
 The Apply functions in the typed client (see the k8s.io/client-go/kubernetes/typed packages) offer
 a direct and typesafe way of calling Server-side Apply. Each Apply function takes an "apply
 configuration" type as an argument, which is a structured representation of an Apply request. For
 example:
 
-    import (
-         ...
-         v1ac "k8s.io/client-go/applyconfigurations/autoscaling/v1"
-    )
-    hpaApplyConfig := v1ac.HorizontalPodAutoscaler(autoscalerName, ns).
-         WithSpec(v1ac.HorizontalPodAutoscalerSpec().
-                  WithMinReplicas(0)
-         )
-    return hpav1client.Apply(ctx, hpaApplyConfig, metav1.ApplyOptions{FieldManager: "mycontroller", Force: true})
+	import (
+	     ...
+	     v1ac "k8s.io/client-go/applyconfigurations/autoscaling/v1"
+	)
+	hpaApplyConfig := v1ac.HorizontalPodAutoscaler(autoscalerName, ns).
+	     WithSpec(v1ac.HorizontalPodAutoscalerSpec().
+	              WithMinReplicas(0)
+	     )
+	return hpav1client.Apply(ctx, hpaApplyConfig, metav1.ApplyOptions{FieldManager: "mycontroller", Force: true})
 
 Note in this example that HorizontalPodAutoscaler is imported from an "applyconfigurations"
 package. Each "apply configuration" type represents the same Kubernetes object kind as the
@@ -43,46 +43,46 @@ corresponding go struct, but where all fields are pointers to make them optional
 requests to be accurately represented. For example, this when the apply configuration in the above
 example is marshalled to YAML, it produces:
 
-    apiVersion: autoscaling/v1
-    kind: HorizontalPodAutoscaler
-    metadata:
-        name: myHPA
-        namespace: myNamespace
-    spec:
-        minReplicas: 0
+	apiVersion: autoscaling/v1
+	kind: HorizontalPodAutoscaler
+	metadata:
+	    name: myHPA
+	    namespace: myNamespace
+	spec:
+	    minReplicas: 0
 
 To understand why this is needed, the above YAML cannot be produced by the
 v1.HorizontalPodAutoscaler go struct. Take for example:
 
-    hpa := v1.HorizontalPodAutoscaler{
-         TypeMeta: metav1.TypeMeta{
-                  APIVersion: "autoscaling/v1",
-                  Kind:       "HorizontalPodAutoscaler",
-         },
-         ObjectMeta: ObjectMeta{
-                  Namespace: ns,
-                  Name:      autoscalerName,
-         },
-         Spec: v1.HorizontalPodAutoscalerSpec{
-                  MinReplicas: pointer.Int32Ptr(0),
-         },
-    }
+	hpa := v1.HorizontalPodAutoscaler{
+	     TypeMeta: metav1.TypeMeta{
+	              APIVersion: "autoscaling/v1",
+	              Kind:       "HorizontalPodAutoscaler",
+	     },
+	     ObjectMeta: ObjectMeta{
+	              Namespace: ns,
+	              Name:      autoscalerName,
+	     },
+	     Spec: v1.HorizontalPodAutoscalerSpec{
+	              MinReplicas: pointer.Int32Ptr(0),
+	     },
+	}
 
 The above code attempts to declare the same apply configuration as shown in the previous examples,
 but when marshalled to YAML, produces:
 
-    kind: HorizontalPodAutoscaler
-    apiVersion: autoscaling/v1
-    metadata:
-      name: myHPA
-      namespace: myNamespace
-      creationTimestamp: null
-    spec:
-      scaleTargetRef:
-        kind: ""
-        name: ""
-      minReplicas: 0
-      maxReplicas: 0
+	kind: HorizontalPodAutoscaler
+	apiVersion: autoscaling/v1
+	metadata:
+	  name: myHPA
+	  namespace: myNamespace
+	  creationTimestamp: null
+	spec:
+	  scaleTargetRef:
+	    kind: ""
+	    name: ""
+	  minReplicas: 0
+	  maxReplicas: 0
 
 Which, among other things, contains spec.maxReplicas set to 0. This is almost certainly not what
 the caller intended (the intended apply configuration says nothing about the maxReplicas field),
@@ -102,7 +102,7 @@ general purpose library. In addition to the convenience, the With functions also
 developers from the underlying representation, which makes it safer for the underlying
 representation to be changed to support additional features in the future.
 
-Controller Support
+# Controller Support
 
 The new client-go support makes it much easier to use Server-side Apply in controllers, by either of
 two mechanisms.
@@ -130,24 +130,24 @@ accidentally deleted. For such cases, an alternative to mechanism 1 is to replac
 reconciliation code that performs a "read/modify-in-place/update" (or patch) workflow with a
 "extract/modify-in-place/apply" workflow. Here's an example of the new workflow:
 
-    fieldMgr := "my-field-manager"
-    deploymentClient := clientset.AppsV1().Deployments("default")
-    // read, could also be read from a shared informer
-    deployment, err := deploymentClient.Get(ctx, "example-deployment", metav1.GetOptions{})
-    if err != nil {
-      // handle error
-    }
-    // extract
-    deploymentApplyConfig, err := appsv1ac.ExtractDeployment(deployment, fieldMgr)
-    if err != nil {
-      // handle error
-    }
-    // modify-in-place
-    deploymentApplyConfig.Spec.Template.Spec.WithContainers(corev1ac.Container().
-	WithName("modify-slice").
-	WithImage("nginx:1.14.2"),
-    )
-    // apply
-    applied, err := deploymentClient.Apply(ctx, extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
+	    fieldMgr := "my-field-manager"
+	    deploymentClient := clientset.AppsV1().Deployments("default")
+	    // read, could also be read from a shared informer
+	    deployment, err := deploymentClient.Get(ctx, "example-deployment", metav1.GetOptions{})
+	    if err != nil {
+	      // handle error
+	    }
+	    // extract
+	    deploymentApplyConfig, err := appsv1ac.ExtractDeployment(deployment, fieldMgr)
+	    if err != nil {
+	      // handle error
+	    }
+	    // modify-in-place
+	    deploymentApplyConfig.Spec.Template.Spec.WithContainers(corev1ac.Container().
+		WithName("modify-slice").
+		WithImage("nginx:1.14.2"),
+	    )
+	    // apply
+	    applied, err := deploymentClient.Apply(ctx, extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
 */
 package applyconfigurations

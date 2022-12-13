@@ -18,17 +18,25 @@ package framework
 
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
 type NodeInfoLister interface {
-	// Returns the list of NodeInfos.
+	// List returns the list of NodeInfos.
 	List() ([]*NodeInfo, error)
-	// Returns the list of NodeInfos of nodes with pods with affinity terms.
+	// HavePodsWithAffinityList returns the list of NodeInfos of nodes with pods with affinity terms.
 	HavePodsWithAffinityList() ([]*NodeInfo, error)
-	// Returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
+	// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
 	HavePodsWithRequiredAntiAffinityList() ([]*NodeInfo, error)
-	// Returns the NodeInfo of the given node name.
+	// Get returns the NodeInfo of the given node name.
 	Get(nodeName string) (*NodeInfo, error)
+}
+
+// StorageInfoLister interface represents anything that handles storage-related operations and resources.
+type StorageInfoLister interface {
+	// IsPVCUsedByPods returns true/false on whether the PVC is used by one or more scheduled pods,
+	// keyed in the format "namespace/name".
+	IsPVCUsedByPods(key string) bool
 }
 
 // SharedLister groups scheduler-specific listers.
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
+	StorageInfos() StorageInfoLister
 }

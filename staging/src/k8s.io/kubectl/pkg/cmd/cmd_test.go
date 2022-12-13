@@ -18,11 +18,12 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
@@ -143,7 +144,7 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 				t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
 			}
 
-			if len(pluginsHandler.withArgs) != len(test.expectPluginArgs) {
+			if !cmp.Equal(pluginsHandler.withArgs, test.expectPluginArgs, cmpopts.EquateEmpty()) {
 				t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
 			}
 		})
@@ -176,7 +177,7 @@ func (h *testPluginHandler) Lookup(filename string) (string, bool) {
 		return "", false
 	}
 
-	plugins, err := ioutil.ReadDir(h.pluginsDirectory)
+	plugins, err := os.ReadDir(h.pluginsDirectory)
 	if err != nil {
 		h.err = err
 		return "", false

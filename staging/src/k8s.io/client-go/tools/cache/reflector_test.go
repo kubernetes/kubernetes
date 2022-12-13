@@ -138,8 +138,7 @@ func TestReflectorWatchHandlerError(t *testing.T) {
 	go func() {
 		fw.Stop()
 	}()
-	var resumeRV string
-	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc, wait.NeverStop)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -158,8 +157,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz", ResourceVersion: "32"}})
 		fw.Stop()
 	}()
-	var resumeRV string
-	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc, wait.NeverStop)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -191,7 +189,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 	}
 
 	// RV should send the last version we see.
-	if e, a := "32", resumeRV; e != a {
+	if e, a := "32", g.LastSyncResourceVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -205,10 +203,9 @@ func TestReflectorStopWatch(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &v1.Pod{}, s, 0)
 	fw := watch.NewFake()
-	var resumeRV string
 	stopWatch := make(chan struct{}, 1)
 	stopWatch <- struct{}{}
-	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, stopWatch)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc, stopWatch)
 	if err != errorStopRequested {
 		t.Errorf("expected stop error, got %q", err)
 	}
@@ -487,6 +484,79 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 	close(stopCh)
 	if bm.calls != 2 {
 		t.Errorf("unexpected watch backoff calls: %d", bm.calls)
+	}
+}
+
+func TestRetryInternalError(t *testing.T) {
+	testCases := []struct {
+		name                string
+		maxInternalDuration time.Duration
+		rewindTime          int
+		wantRetries         int
+	}{
+		{
+			name:                "retries off",
+			maxInternalDuration: time.Duration(0),
+			wantRetries:         0,
+		},
+		{
+			name:                "retries on, all calls fail",
+			maxInternalDuration: time.Second * 30,
+			wantRetries:         31,
+		},
+		{
+			name:                "retries on, one call successful",
+			maxInternalDuration: time.Second * 30,
+			rewindTime:          10,
+			wantRetries:         40,
+		},
+	}
+
+	for _, tc := range testCases {
+		err := apierrors.NewInternalError(fmt.Errorf("etcdserver: no leader"))
+		fakeClock := testingclock.NewFakeClock(time.Now())
+		bm := &fakeBackoff{clock: fakeClock}
+
+		counter := 0
+
+		lw := &testLW{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				counter = counter + 1
+				t.Logf("Counter: %v", counter)
+				if counter == tc.rewindTime {
+					t.Logf("Rewinding")
+					fakeClock.Step(time.Minute)
+				}
+
+				fakeClock.Step(time.Second)
+				w := watch.NewFakeWithChanSize(1, false)
+				status := err.Status()
+				w.Error(&status)
+				return w, nil
+			},
+		}
+
+		r := &Reflector{
+			name:                   "test-reflector",
+			listerWatcher:          lw,
+			store:                  NewFIFO(MetaNamespaceKeyFunc),
+			initConnBackoffManager: bm,
+			clock:                  fakeClock,
+			watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+		}
+
+		r.MaxInternalErrorRetryDuration = tc.maxInternalDuration
+
+		stopCh := make(chan struct{})
+		r.ListAndWatch(stopCh)
+		close(stopCh)
+
+		if counter-1 != tc.wantRetries {
+			t.Errorf("%v unexpected number of retries: %d", tc, counter-1)
+		}
 	}
 }
 
@@ -909,7 +979,7 @@ func TestReflectorFullListIfTooLarge(t *testing.T) {
 	}
 }
 
-func TestReflectorSetExpectedType(t *testing.T) {
+func TestGetTypeDescriptionFromObject(t *testing.T) {
 	obj := &unstructured.Unstructured{}
 	gvk := schema.GroupVersionKind{
 		Group:   "mygroup",
@@ -917,48 +987,71 @@ func TestReflectorSetExpectedType(t *testing.T) {
 		Kind:    "MyKind",
 	}
 	obj.SetGroupVersionKind(gvk)
+
 	testCases := map[string]struct {
-		inputType        interface{}
-		expectedTypeName string
-		expectedType     reflect.Type
-		expectedGVK      *schema.GroupVersionKind
+		inputType               interface{}
+		expectedTypeDescription string
 	}{
 		"Nil type": {
-			expectedTypeName: defaultExpectedTypeName,
+			expectedTypeDescription: defaultExpectedTypeName,
 		},
 		"Normal type": {
-			inputType:        &v1.Pod{},
-			expectedTypeName: "*v1.Pod",
-			expectedType:     reflect.TypeOf(&v1.Pod{}),
+			inputType:               &v1.Pod{},
+			expectedTypeDescription: "*v1.Pod",
 		},
 		"Unstructured type without GVK": {
-			inputType:        &unstructured.Unstructured{},
-			expectedTypeName: "*unstructured.Unstructured",
-			expectedType:     reflect.TypeOf(&unstructured.Unstructured{}),
+			inputType:               &unstructured.Unstructured{},
+			expectedTypeDescription: "*unstructured.Unstructured",
 		},
 		"Unstructured type with GVK": {
-			inputType:        obj,
-			expectedTypeName: gvk.String(),
-			expectedType:     reflect.TypeOf(&unstructured.Unstructured{}),
-			expectedGVK:      &gvk,
+			inputType:               obj,
+			expectedTypeDescription: gvk.String(),
 		},
 	}
 	for testName, tc := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			r := &Reflector{}
-			r.setExpectedType(tc.inputType)
-			if tc.expectedType != r.expectedType {
-				t.Fatalf("Expected expectedType %v, got %v", tc.expectedType, r.expectedType)
+			typeDescription := getTypeDescriptionFromObject(tc.inputType)
+			if tc.expectedTypeDescription != typeDescription {
+				t.Fatalf("Expected typeDescription %v, got %v", tc.expectedTypeDescription, typeDescription)
 			}
-			if tc.expectedTypeName != r.expectedTypeName {
-				t.Fatalf("Expected expectedTypeName %v, got %v", tc.expectedTypeName, r.expectedTypeName)
-			}
-			gvkNotEqual := (tc.expectedGVK == nil) != (r.expectedGVK == nil)
-			if tc.expectedGVK != nil && r.expectedGVK != nil {
-				gvkNotEqual = *tc.expectedGVK != *r.expectedGVK
+		})
+	}
+}
+
+func TestGetExpectedGVKFromObject(t *testing.T) {
+	obj := &unstructured.Unstructured{}
+	gvk := schema.GroupVersionKind{
+		Group:   "mygroup",
+		Version: "v1",
+		Kind:    "MyKind",
+	}
+	obj.SetGroupVersionKind(gvk)
+
+	testCases := map[string]struct {
+		inputType   interface{}
+		expectedGVK *schema.GroupVersionKind
+	}{
+		"Nil type": {},
+		"Some non Unstructured type": {
+			inputType: &v1.Pod{},
+		},
+		"Unstructured type without GVK": {
+			inputType: &unstructured.Unstructured{},
+		},
+		"Unstructured type with GVK": {
+			inputType:   obj,
+			expectedGVK: &gvk,
+		},
+	}
+	for testName, tc := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			expectedGVK := getExpectedGVKFromObject(tc.inputType)
+			gvkNotEqual := (tc.expectedGVK == nil) != (expectedGVK == nil)
+			if tc.expectedGVK != nil && expectedGVK != nil {
+				gvkNotEqual = *tc.expectedGVK != *expectedGVK
 			}
 			if gvkNotEqual {
-				t.Fatalf("Expected expectedGVK %v, got %v", tc.expectedGVK, r.expectedGVK)
+				t.Fatalf("Expected expectedGVK %v, got %v", tc.expectedGVK, expectedGVK)
 			}
 		})
 	}

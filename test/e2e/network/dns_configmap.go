@@ -27,7 +27,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/network/common"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var (
@@ -298,7 +298,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 		t.checkDNSRecordFrom(
 			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
-				return len(actual) >= 1 && actual[0] == fooHostname+"." && actual[1] == "2001:db8::29"
+				return len(actual) >= 2 && actual[0] == fooHostname+"." && actual[1] == "2001:db8::29"
 			},
 			"cluster-dns-ipv6",
 			moreForeverTestTimeout)
@@ -320,7 +320,7 @@ var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 	ginkgo.Context("Change stubDomain", func() {
 		nsTest := &dnsNameserverTest{dnsTestCommon: newDNSTestCommon()}
 
-		ginkgo.It("should be able to change stubDomain configuration [Slow][Serial]", func() {
+		ginkgo.It("should be able to change stubDomain configuration [Slow][Serial]", func(ctx context.Context) {
 			nsTest.c = nsTest.f.ClientSet
 			nsTest.run(framework.TestContext.ClusterIsIPv6())
 		})
@@ -329,7 +329,7 @@ var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 	ginkgo.Context("Forward PTR lookup", func() {
 		fwdTest := &dnsPtrFwdTest{dnsTestCommon: newDNSTestCommon()}
 
-		ginkgo.It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
+		ginkgo.It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func(ctx context.Context) {
 			fwdTest.c = fwdTest.f.ClientSet
 			fwdTest.run(framework.TestContext.ClusterIsIPv6())
 		})
@@ -338,7 +338,7 @@ var _ = common.SIGDescribe("DNS configMap nameserver", func() {
 	ginkgo.Context("Forward external name lookup", func() {
 		externalNameTest := &dnsExternalNameTest{dnsTestCommon: newDNSTestCommon()}
 
-		ginkgo.It("should forward externalname lookup to upstream nameserver [Slow][Serial]", func() {
+		ginkgo.It("should forward externalname lookup to upstream nameserver [Slow][Serial]", func(ctx context.Context) {
 			externalNameTest.c = externalNameTest.f.ClientSet
 			externalNameTest.run(framework.TestContext.ClusterIsIPv6())
 		})

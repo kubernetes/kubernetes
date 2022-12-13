@@ -31,7 +31,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
@@ -40,6 +39,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
+	"k8s.io/utils/pointer"
 )
 
 func TestNew(t *testing.T) {
@@ -69,7 +69,7 @@ func TestGet(t *testing.T) {
 
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets/subnet1"
 	testSubnet := network.Subnet{
-		Name: to.StringPtr("subnet1"),
+		Name: pointer.String("subnet1"),
 	}
 	subnet, err := testSubnet.MarshalJSON()
 	assert.NoError(t, err)
@@ -84,7 +84,7 @@ func TestGet(t *testing.T) {
 
 	expected := network.Subnet{
 		Response: autorest.Response{Response: response},
-		Name:     to.StringPtr("subnet1"),
+		Name:     pointer.String("subnet1"),
 	}
 	subnetClient := getTestSubnetClient(armClient)
 	result, rerr := subnetClient.Get(context.TODO(), "rg", "vnet", "subnet1", "")
@@ -313,7 +313,7 @@ func TestListWithNextPage(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets"
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	subnetList := []network.Subnet{getTestSubnet("subnet1"), getTestSubnet("subnet2"), getTestSubnet("subnet3")}
-	partialResponse, err := json.Marshal(network.SubnetListResult{Value: &subnetList, NextLink: to.StringPtr("nextLink")})
+	partialResponse, err := json.Marshal(network.SubnetListResult{Value: &subnetList, NextLink: pointer.String("nextLink")})
 	assert.NoError(t, err)
 	pagedResponse, err := json.Marshal(network.SubnetListResult{Value: &subnetList})
 	assert.NoError(t, err)
@@ -391,7 +391,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 	}
 
 	lastResult := network.SubnetListResult{
-		NextLink: to.StringPtr("next"),
+		NextLink: pointer.String("next"),
 	}
 
 	for _, test := range tests {
@@ -436,7 +436,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	}
 
 	lastResult := network.SubnetListResult{
-		NextLink: to.StringPtr("next"),
+		NextLink: pointer.String("next"),
 	}
 
 	armClient := mockarmclient.NewMockInterface(ctrl)
@@ -474,7 +474,7 @@ func TestCreateOrUpdate(t *testing.T) {
 		StatusCode: http.StatusOK,
 		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
 	}
-	armClient.EXPECT().PutResource(gomock.Any(), to.String(subnet.ID), subnet).Return(response, nil).Times(1)
+	armClient.EXPECT().PutResource(gomock.Any(), pointer.StringDeref(subnet.ID, ""), subnet).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	subnetClient := getTestSubnetClient(armClient)
@@ -491,7 +491,7 @@ func TestCreateOrUpdateWithCreateOrUpdateResponderError(t *testing.T) {
 		StatusCode: http.StatusNotFound,
 		Body:       ioutil.NopCloser(bytes.NewReader([]byte(""))),
 	}
-	armClient.EXPECT().PutResource(gomock.Any(), to.String(subnet.ID), subnet).Return(response, nil).Times(1)
+	armClient.EXPECT().PutResource(gomock.Any(), pointer.StringDeref(subnet.ID, ""), subnet).Return(response, nil).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	subnetClient := getTestSubnetClient(armClient)
@@ -551,7 +551,7 @@ func TestCreateOrUpdateThrottle(t *testing.T) {
 
 	subnet := getTestSubnet("subnet1")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().PutResource(gomock.Any(), to.String(subnet.ID), subnet).Return(response, throttleErr).Times(1)
+	armClient.EXPECT().PutResource(gomock.Any(), pointer.StringDeref(subnet.ID, ""), subnet).Return(response, throttleErr).Times(1)
 	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(1)
 
 	subnetClient := getTestSubnetClient(armClient)
@@ -566,7 +566,7 @@ func TestDelete(t *testing.T) {
 
 	r := getTestSubnet("subnet1")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(r.ID), "").Return(nil).Times(1)
+	armClient.EXPECT().DeleteResource(gomock.Any(), pointer.StringDeref(r.ID, ""), "").Return(nil).Times(1)
 
 	subnetClient := getTestSubnetClient(armClient)
 	rerr := subnetClient.Delete(context.TODO(), "rg", "vnet", "subnet1")
@@ -619,7 +619,7 @@ func TestDeleteThrottle(t *testing.T) {
 
 	subnet := getTestSubnet("subnet1")
 	armClient := mockarmclient.NewMockInterface(ctrl)
-	armClient.EXPECT().DeleteResource(gomock.Any(), to.String(subnet.ID), "").Return(throttleErr).Times(1)
+	armClient.EXPECT().DeleteResource(gomock.Any(), pointer.StringDeref(subnet.ID, ""), "").Return(throttleErr).Times(1)
 
 	subnetClient := getTestSubnetClient(armClient)
 	rerr := subnetClient.Delete(context.TODO(), "rg", "vnet", "subnet1")
@@ -629,8 +629,8 @@ func TestDeleteThrottle(t *testing.T) {
 
 func getTestSubnet(name string) network.Subnet {
 	return network.Subnet{
-		ID:   to.StringPtr(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets/%s", name)),
-		Name: to.StringPtr(name),
+		ID:   pointer.String(fmt.Sprintf("/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets/%s", name)),
+		Name: pointer.String(name),
 	}
 }
 

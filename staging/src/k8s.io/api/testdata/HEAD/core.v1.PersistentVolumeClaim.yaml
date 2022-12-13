@@ -3,7 +3,6 @@ kind: PersistentVolumeClaim
 metadata:
   annotations:
     annotationsKey: annotationsValue
-  clusterName: clusterNameValue
   creationTimestamp: "2008-01-01T01:01:01Z"
   deletionGracePeriodSeconds: 10
   deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -44,7 +43,10 @@ spec:
     apiGroup: apiGroupValue
     kind: kindValue
     name: nameValue
+    namespace: namespaceValue
   resources:
+    claims:
+    - name: nameValue
     limits:
       limitsKey: "0"
     requests:

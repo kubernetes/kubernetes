@@ -39,7 +39,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -439,12 +438,7 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 	var apiServerCountServers = make([]*kubeapiservertesting.TestServer, apiServerCount)
 	etcd := framework.SharedEtcd()
 
-	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
-		DisableStorageCleanup: true,
-	}
-
-	// cleanup the registry storage
-	defer registry.CleanupStorage()
+	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
 	wg := sync.WaitGroup{}
 	// 1. start apiServerCount api servers
@@ -542,12 +536,7 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 	var clientAPIServers []*kubernetes.Clientset
 	etcd := framework.SharedEtcd()
 
-	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
-		DisableStorageCleanup: true,
-	}
-
-	// cleanup the registry storage
-	defer registry.CleanupStorage()
+	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
 	// create 2 api servers and 2 clients
 	for i := 0; i < 2; i++ {

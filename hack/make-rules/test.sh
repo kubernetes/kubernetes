@@ -44,7 +44,7 @@ kube::test::find_dirs() {
           -o -path './output/*' \
           -o -path './release/*' \
           -o -path './target/*' \
-          -o -path './test/e2e/*' \
+          -o -path './test/e2e/e2e_test.go' \
           -o -path './test/e2e_node/*' \
           -o -path './test/e2e_kubeadm/*' \
           -o -path './test/integration/*' \
@@ -140,6 +140,7 @@ eval "testargs=(${KUBE_TEST_ARGS:-})"
 # Used to filter verbose test output.
 go_test_grep_pattern=".*"
 
+goflags=()
 # The junit report tool needs full test case information to produce a
 # meaningful report.
 if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then

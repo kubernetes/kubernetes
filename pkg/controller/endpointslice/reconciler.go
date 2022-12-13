@@ -26,18 +26,18 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // reconciler is responsible for transforming current EndpointSlice state into
@@ -51,6 +51,8 @@ type reconciler struct {
 	// topologyCache tracks the distribution of Nodes and endpoints across zones
 	// to enable TopologyAwareHints.
 	topologyCache *topologycache.TopologyCache
+	// eventRecorder allows reconciler to record and publish events.
+	eventRecorder record.EventRecorder
 }
 
 // endpointMeta includes the attributes we group slices on, this type helps with
@@ -129,19 +131,19 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 // slices (by address type) for the given service. It creates, updates, or deletes endpoint slices
 // to ensure the desired set of pods are represented by endpoint slices.
 func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time, addressType discovery.AddressType) error {
+	errs := []error{}
 
 	slicesToCreate := []*discovery.EndpointSlice{}
 	slicesToUpdate := []*discovery.EndpointSlice{}
 	slicesToDelete := []*discovery.EndpointSlice{}
+	events := []*topologycache.EventBuilder{}
 
 	// Build data structures for existing state.
 	existingSlicesByPortMap := map[endpointutil.PortMapKey][]*discovery.EndpointSlice{}
-	numExistingEndpoints := 0
 	for _, existingSlice := range existingSlices {
 		if ownedBy(existingSlice, service) {
 			epHash := endpointutil.NewPortMapKey(existingSlice.Ports)
 			existingSlicesByPortMap[epHash] = append(existingSlicesByPortMap[epHash], existingSlice)
-			numExistingEndpoints += len(existingSlice.Endpoints)
 		} else {
 			slicesToDelete = append(slicesToDelete, existingSlice)
 		}
@@ -150,11 +152,9 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// Build data structures for desired state.
 	desiredMetaByPortMap := map[endpointutil.PortMapKey]*endpointMeta{}
 	desiredEndpointsByPortMap := map[endpointutil.PortMapKey]endpointsliceutil.EndpointSet{}
-	numDesiredEndpoints := 0
 
 	for _, pod := range pods {
-		includeTerminating := service.Spec.PublishNotReadyAddresses || utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
-		if !endpointutil.ShouldPodBeInEndpointSlice(pod, includeTerminating) {
+		if !endpointutil.ShouldPodBeInEndpoints(pod, true) {
 			continue
 		}
 
@@ -173,12 +173,27 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 
 		node, err := r.nodeLister.Get(pod.Spec.NodeName)
 		if err != nil {
-			return err
+			// we are getting the information from the local informer,
+			// an error different than IsNotFound should not happen
+			if !errors.IsNotFound(err) {
+				return err
+			}
+			// If the Node specified by the Pod doesn't exist we want to requeue the Service so we
+			// retry later, but also update the EndpointSlice without the problematic Pod.
+			// Theoretically, the pod Garbage Collector will remove the Pod, but we want to avoid
+			// situations where a reference from a Pod to a missing node can leave the EndpointSlice
+			// stuck forever.
+			// On the other side, if the service.Spec.PublishNotReadyAddresses is set we just add the
+			// Pod, since the user is explicitly indicating that the Pod address should be published.
+			if !service.Spec.PublishNotReadyAddresses {
+				klog.Warningf("skipping Pod %s for Service %s/%s: Node %s Not Found", pod.Name, service.Namespace, service.Name, pod.Spec.NodeName)
+				errs = append(errs, fmt.Errorf("skipping Pod %s for Service %s/%s: Node %s Not Found", pod.Name, service.Namespace, service.Name, pod.Spec.NodeName))
+				continue
+			}
 		}
 		endpoint := podToEndpoint(pod, node, service, addressType)
 		if len(endpoint.Addresses) > 0 {
 			desiredEndpointsByPortMap[epHash].Insert(&endpoint)
-			numDesiredEndpoints++
 		}
 	}
 
@@ -209,16 +224,20 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// the corresponding endpoint slices for deletion.
 	for portMap, existingSlices := range existingSlicesByPortMap {
 		if _, ok := desiredEndpointsByPortMap[portMap]; !ok {
-			for _, existingSlice := range existingSlices {
-				slicesToDelete = append(slicesToDelete, existingSlice)
-			}
+			slicesToDelete = append(slicesToDelete, existingSlices...)
 		}
 	}
 
 	// When no endpoint slices would usually exist, we need to add a placeholder.
 	if len(existingSlices) == len(slicesToDelete) && len(slicesToCreate) < 1 {
+		// Check for existing placeholder slice outside of the core control flow
 		placeholderSlice := newEndpointSlice(service, &endpointMeta{Ports: []discovery.EndpointPort{}, AddressType: addressType})
-		slicesToCreate = append(slicesToCreate, placeholderSlice)
+		if len(slicesToDelete) == 1 && placeholderSliceCompare.DeepEqual(slicesToDelete[0], placeholderSlice) {
+			// We are about to unnecessarily delete/recreate the placeholder, remove it now.
+			slicesToDelete = slicesToDelete[:0]
+		} else {
+			slicesToCreate = append(slicesToCreate, placeholderSlice)
+		}
 		spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), metrics.EfficiencyInfo{
 			Endpoints: 0,
 			Slices:    1,
@@ -235,23 +254,63 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// theoretically possible for endpoints of one address type to be assigned
 	// hints while another endpoints of another address type are not.
 	si := &topologycache.SliceInfo{
-		ServiceKey: fmt.Sprintf("%s/%s", service.Namespace, service.Name),
-		ToCreate:   slicesToCreate,
-		ToUpdate:   slicesToUpdate,
-		Unchanged:  unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete),
+		ServiceKey:  fmt.Sprintf("%s/%s", service.Namespace, service.Name),
+		AddressType: addressType,
+		ToCreate:    slicesToCreate,
+		ToUpdate:    slicesToUpdate,
+		Unchanged:   unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete),
 	}
 
 	if r.topologyCache != nil && hintsEnabled(service.Annotations) {
-		slicesToCreate, slicesToUpdate = r.topologyCache.AddHints(si)
+		slicesToCreate, slicesToUpdate, events = r.topologyCache.AddHints(si)
 	} else {
 		if r.topologyCache != nil {
+			if r.topologyCache.HasPopulatedHints(si.ServiceKey) {
+				klog.InfoS("TopologyAwareHints annotation has changed, removing hints", "serviceKey", si.ServiceKey, "addressType", si.AddressType)
+				events = append(events, &topologycache.EventBuilder{
+					EventType: corev1.EventTypeWarning,
+					Reason:    "TopologyAwareHintsDisabled",
+					Message:   topologycache.FormatWithAddressType(topologycache.TopologyAwareHintsDisabled, si.AddressType),
+				})
+			}
 			r.topologyCache.RemoveHints(si.ServiceKey, addressType)
 		}
 		slicesToCreate, slicesToUpdate = topologycache.RemoveHintsFromSlices(si)
 	}
+	err := r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	for _, event := range events {
+		r.eventRecorder.Event(service, event.EventType, event.Reason, event.Message)
+	}
+	return utilerrors.NewAggregate(errs)
 
-	return r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)
 }
+
+// placeholderSliceCompare is a conversion func for comparing two placeholder endpoint slices.
+// It only compares the specific fields we care about.
+var placeholderSliceCompare = conversion.EqualitiesOrDie(
+	func(a, b metav1.OwnerReference) bool {
+		return a.String() == b.String()
+	},
+	func(a, b metav1.ObjectMeta) bool {
+		if a.Namespace != b.Namespace {
+			return false
+		}
+		for k, v := range a.Labels {
+			if b.Labels[k] != v {
+				return false
+			}
+		}
+		for k, v := range b.Labels {
+			if a.Labels[k] != v {
+				return false
+			}
+		}
+		return true
+	},
+)
 
 // finalize creates, updates, and deletes slices as specified
 func (r *reconciler) finalize(
@@ -340,13 +399,13 @@ func (r *reconciler) finalize(
 // the list of desired endpoints and returns lists of slices to create, update,
 // and delete. It also checks that the slices mirror the parent services labels.
 // The logic is split up into several main steps:
-// 1. Iterate through existing slices, delete endpoints that are no longer
-//    desired and update matching endpoints that have changed. It also checks
-//    if the slices have the labels of the parent services, and updates them if not.
-// 2. Iterate through slices that have been modified in 1 and fill them up with
-//    any remaining desired endpoints.
-// 3. If there still desired endpoints left, try to fit them into a previously
-//    unchanged slice and/or create new ones.
+//  1. Iterate through existing slices, delete endpoints that are no longer
+//     desired and update matching endpoints that have changed. It also checks
+//     if the slices have the labels of the parent services, and updates them if not.
+//  2. Iterate through slices that have been modified in 1 and fill them up with
+//     any remaining desired endpoints.
+//  3. If there still desired endpoints left, try to fit them into a previously
+//     unchanged slice and/or create new ones.
 func (r *reconciler) reconcileByPortMapping(
 	service *corev1.Service,
 	existingSlices []*discovery.EndpointSlice,

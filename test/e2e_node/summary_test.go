@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -28,11 +29,12 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	systemdutil "github.com/coreos/go-systemd/v22/util"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
@@ -43,7 +45,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
 		ginkgo.AfterEach(func() {
-			if !ginkgo.CurrentGinkgoTestDescription().Failed {
+			if !ginkgo.CurrentSpecReport().Failed() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
@@ -52,14 +54,14 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
 		})
-		ginkgo.It("should report resource usage through the stats api", func() {
+		ginkgo.It("should report resource usage through the stats api", func(ctx context.Context) {
 			const pod0 = "stats-busybox-0"
 			const pod1 = "stats-busybox-1"
 
 			ginkgo.By("Creating test pods")
 			numRestarts := int32(1)
 			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
-			f.PodClient().CreateBatch(pods)
+			e2epod.NewPodClient(f).CreateBatch(pods)
 
 			ginkgo.By("restarting the containers to ensure container metrics are still being gathered after a container is restarted")
 			gomega.Eventually(func() error {

@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 
@@ -130,8 +131,8 @@ func (c *hollowNodeConfig) bootstrapClientConfig() error {
 	return nil
 }
 
-func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubletOptions {
-	return &kubemark.HollowKubletOptions{
+func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubeletOptions {
+	return &kubemark.HollowKubeletOptions{
 		NodeName:            c.NodeName,
 		KubeletPort:         c.KubeletPort,
 		KubeletReadOnlyPort: c.KubeletReadOnlyPort,
@@ -246,14 +247,14 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) error {
 			return fmt.Errorf("Failed to start fake runtime, error: %w", err)
 		}
 		defer fakeRemoteRuntime.Stop()
-		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second)
+		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
 		if err != nil {
 			return fmt.Errorf("Failed to init runtime service, error: %w", err)
 		}
 
 		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
 		if config.UseHostImageService {
-			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second)
+			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
 			if err != nil {
 				return fmt.Errorf("Failed to init image service, error: %w", err)
 			}

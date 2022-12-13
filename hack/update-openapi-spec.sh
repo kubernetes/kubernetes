@@ -84,7 +84,6 @@ kube::log::status "Starting kube-apiserver"
   --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
   --service-account-issuer="https://kubernetes.default.svc" \
   --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
-  --logtostderr \
   --v=2 \
   --service-cluster-ip-range="10.0.0.0/24" >"${API_LOGFILE}" 2>&1 &
 APISERVER_PID=$!

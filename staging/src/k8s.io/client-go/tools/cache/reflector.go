@@ -54,7 +54,7 @@ type Reflector struct {
 	// will be the stringification of expectedGVK if provided, and the
 	// stringification of expectedType otherwise. It is for display
 	// only, and should not be used for parsing or comparison.
-	expectedTypeName string
+	typeDescription string
 	// An example object of the type we expect to place in the store.
 	// Only the type needs to be right, except that when that is
 	// `unstructured.Unstructured` the object's `"apiVersion"` and
@@ -71,6 +71,8 @@ type Reflector struct {
 	backoffManager wait.BackoffManager
 	// initConnBackoffManager manages backoff the initial connection with the Watch call of ListAndWatch.
 	initConnBackoffManager wait.BackoffManager
+	// MaxInternalErrorRetryDuration defines how long we should retry internal errors returned by watch.
+	MaxInternalErrorRetryDuration time.Duration
 
 	resyncPeriod time.Duration
 	// ShouldResync is invoked periodically and whenever it returns `true` the Store's Resync operation is invoked
@@ -129,13 +131,13 @@ func DefaultWatchErrorHandler(r *Reflector, err error) {
 		// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
 		// has a semantic that it returns data at least as fresh as provided RV.
 		// So first try to LIST with setting RV to resource version of last observed object.
-		klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
+		klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.typeDescription, err)
 	case err == io.EOF:
 		// watch closed normally
 	case err == io.ErrUnexpectedEOF:
-		klog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedTypeName, err)
+		klog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.typeDescription, err)
 	default:
-		utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedTypeName, err))
+		utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.typeDescription, err))
 	}
 }
 
@@ -153,7 +155,37 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 	return indexer, reflector
 }
 
-// NewReflector creates a new Reflector object which will keep the
+// NewReflector creates a new Reflector with its name defaulted to the closest source_file.go:line in the call stack
+// that is outside this package. See NewReflectorWithOptions for further information.
+func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+	return NewReflectorWithOptions(lw, expectedType, store, ReflectorOptions{ResyncPeriod: resyncPeriod})
+}
+
+// NewNamedReflector creates a new Reflector with the specified name. See NewReflectorWithOptions for further
+// information.
+func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+	return NewReflectorWithOptions(lw, expectedType, store, ReflectorOptions{Name: name, ResyncPeriod: resyncPeriod})
+}
+
+// ReflectorOptions configures a Reflector.
+type ReflectorOptions struct {
+	// Name is the Reflector's name. If unset/unspecified, the name defaults to the closest source_file.go:line
+	// in the call stack that is outside this package.
+	Name string
+
+	// TypeDescription is the Reflector's type description. If unset/unspecified, the type description is defaulted
+	// using the following rules: if the expectedType passed to NewReflectorWithOptions was nil, the type description is
+	// "<unspecified>". If the expectedType is an instance of *unstructured.Unstructured and its apiVersion and kind fields
+	// are set, the type description is the string encoding of those. Otherwise, the type description is set to the
+	// go type of expectedType..
+	TypeDescription string
+
+	// ResyncPeriod is the Reflector's resync period. If unset/unspecified, the resync period defaults to 0
+	// (do not resync).
+	ResyncPeriod time.Duration
+}
+
+// NewReflectorWithOptions creates a new Reflector object which will keep the
 // given store up to date with the server's contents for the given
 // resource. Reflector promises to only put things in the store that
 // have the type of expectedType, unless expectedType is nil. If
@@ -163,49 +195,71 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 // "yes".  This enables you to use reflectors to periodically process
 // everything as well as incrementally processing the things that
 // change.
-func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
-	return NewNamedReflector(naming.GetNameFromCallsite(internalPackages...), lw, expectedType, store, resyncPeriod)
-}
-
-// NewNamedReflector same as NewReflector, but with a specified name for logging
-func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store Store, options ReflectorOptions) *Reflector {
 	realClock := &clock.RealClock{}
 	r := &Reflector{
-		name:          name,
-		listerWatcher: lw,
-		store:         store,
+		name:            options.Name,
+		resyncPeriod:    options.ResyncPeriod,
+		typeDescription: options.TypeDescription,
+		listerWatcher:   lw,
+		store:           store,
 		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
 		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
 		backoffManager:         wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, realClock),
 		initConnBackoffManager: wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, realClock),
-		resyncPeriod:           resyncPeriod,
 		clock:                  realClock,
 		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+		expectedType:           reflect.TypeOf(expectedType),
 	}
-	r.setExpectedType(expectedType)
+
+	if r.name == "" {
+		r.name = naming.GetNameFromCallsite(internalPackages...)
+	}
+
+	if r.typeDescription == "" {
+		r.typeDescription = getTypeDescriptionFromObject(expectedType)
+	}
+
+	if r.expectedGVK == nil {
+		r.expectedGVK = getExpectedGVKFromObject(expectedType)
+	}
+
 	return r
 }
 
-func (r *Reflector) setExpectedType(expectedType interface{}) {
-	r.expectedType = reflect.TypeOf(expectedType)
-	if r.expectedType == nil {
-		r.expectedTypeName = defaultExpectedTypeName
-		return
+func getTypeDescriptionFromObject(expectedType interface{}) string {
+	if expectedType == nil {
+		return defaultExpectedTypeName
 	}
 
-	r.expectedTypeName = r.expectedType.String()
+	reflectDescription := reflect.TypeOf(expectedType).String()
 
-	if obj, ok := expectedType.(*unstructured.Unstructured); ok {
-		// Use gvk to check that watch event objects are of the desired type.
-		gvk := obj.GroupVersionKind()
-		if gvk.Empty() {
-			klog.V(4).Infof("Reflector from %s configured with expectedType of *unstructured.Unstructured with empty GroupVersionKind.", r.name)
-			return
-		}
-		r.expectedGVK = &gvk
-		r.expectedTypeName = gvk.String()
+	obj, ok := expectedType.(*unstructured.Unstructured)
+	if !ok {
+		return reflectDescription
 	}
+
+	gvk := obj.GroupVersionKind()
+	if gvk.Empty() {
+		return reflectDescription
+	}
+
+	return gvk.String()
+}
+
+func getExpectedGVKFromObject(expectedType interface{}) *schema.GroupVersionKind {
+	obj, ok := expectedType.(*unstructured.Unstructured)
+	if !ok {
+		return nil
+	}
+
+	gvk := obj.GroupVersionKind()
+	if gvk.Empty() {
+		return nil
+	}
+
+	return &gvk
 }
 
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
@@ -216,13 +270,13 @@ var internalPackages = []string{"client-go/tools/cache/"}
 // objects and subsequent deltas.
 // Run will exit when stopCh is closed.
 func (r *Reflector) Run(stopCh <-chan struct{}) {
-	klog.V(3).Infof("Starting reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
+	klog.V(3).Infof("Starting reflector %s (%s) from %s", r.typeDescription, r.resyncPeriod, r.name)
 	wait.BackoffUntil(func() {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			r.watchErrorHandler(r, err)
 		}
 	}, r.backoffManager, true, stopCh)
-	klog.V(3).Infof("Stopping reflector %s (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
+	klog.V(3).Infof("Stopping reflector %s (%s) from %s", r.typeDescription, r.resyncPeriod, r.name)
 }
 
 var (
@@ -252,113 +306,10 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // and then use the resource version to watch.
 // It returns error if ListAndWatch didn't even try to initialize watch.
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
-	klog.V(3).Infof("Listing and watching %v from %s", r.expectedTypeName, r.name)
-	var resourceVersion string
+	klog.V(3).Infof("Listing and watching %v from %s", r.typeDescription, r.name)
 
-	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
-
-	if err := func() error {
-		initTrace := trace.New("Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
-		defer initTrace.LogIfLong(10 * time.Second)
-		var list runtime.Object
-		var paginatedResult bool
-		var err error
-		listCh := make(chan struct{}, 1)
-		panicCh := make(chan interface{}, 1)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					panicCh <- r
-				}
-			}()
-			// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
-			// list request will return the full response.
-			pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
-				return r.listerWatcher.List(opts)
-			}))
-			switch {
-			case r.WatchListPageSize != 0:
-				pager.PageSize = r.WatchListPageSize
-			case r.paginatedResult:
-				// We got a paginated result initially. Assume this resource and server honor
-				// paging requests (i.e. watch cache is probably disabled) and leave the default
-				// pager size set.
-			case options.ResourceVersion != "" && options.ResourceVersion != "0":
-				// User didn't explicitly request pagination.
-				//
-				// With ResourceVersion != "", we have a possibility to list from watch cache,
-				// but we do that (for ResourceVersion != "0") only if Limit is unset.
-				// To avoid thundering herd on etcd (e.g. on master upgrades), we explicitly
-				// switch off pagination to force listing from watch cache (if enabled).
-				// With the existing semantic of RV (result is at least as fresh as provided RV),
-				// this is correct and doesn't lead to going back in time.
-				//
-				// We also don't turn off pagination for ResourceVersion="0", since watch cache
-				// is ignoring Limit in that case anyway, and if watch cache is not enabled
-				// we don't introduce regression.
-				pager.PageSize = 0
-			}
-
-			list, paginatedResult, err = pager.List(context.Background(), options)
-			if isExpiredError(err) || isTooLargeResourceVersionError(err) {
-				r.setIsLastSyncResourceVersionUnavailable(true)
-				// Retry immediately if the resource version used to list is unavailable.
-				// The pager already falls back to full list if paginated list calls fail due to an "Expired" error on
-				// continuation pages, but the pager might not be enabled, the full list might fail because the
-				// resource version it is listing at is expired or the cache may not yet be synced to the provided
-				// resource version. So we need to fallback to resourceVersion="" in all to recover and ensure
-				// the reflector makes forward progress.
-				list, paginatedResult, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
-			}
-			close(listCh)
-		}()
-		select {
-		case <-stopCh:
-			return nil
-		case r := <-panicCh:
-			panic(r)
-		case <-listCh:
-		}
-		initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
-		if err != nil {
-			klog.Warningf("%s: failed to list %v: %v", r.name, r.expectedTypeName, err)
-			return fmt.Errorf("failed to list %v: %v", r.expectedTypeName, err)
-		}
-
-		// We check if the list was paginated and if so set the paginatedResult based on that.
-		// However, we want to do that only for the initial list (which is the only case
-		// when we set ResourceVersion="0"). The reasoning behind it is that later, in some
-		// situations we may force listing directly from etcd (by setting ResourceVersion="")
-		// which will return paginated result, even if watch cache is enabled. However, in
-		// that case, we still want to prefer sending requests to watch cache if possible.
-		//
-		// Paginated result returned for request with ResourceVersion="0" mean that watch
-		// cache is disabled and there are a lot of objects of a given type. In such case,
-		// there is no need to prefer listing from watch cache.
-		if options.ResourceVersion == "0" && paginatedResult {
-			r.paginatedResult = true
-		}
-
-		r.setIsLastSyncResourceVersionUnavailable(false) // list was successful
-		listMetaInterface, err := meta.ListAccessor(list)
-		if err != nil {
-			return fmt.Errorf("unable to understand list result %#v: %v", list, err)
-		}
-		resourceVersion = listMetaInterface.GetResourceVersion()
-		initTrace.Step("Resource version extracted")
-		items, err := meta.ExtractList(list)
-		if err != nil {
-			return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
-		}
-		initTrace.Step("Objects extracted")
-		if err := r.syncWith(items, resourceVersion); err != nil {
-			return fmt.Errorf("unable to sync list result: %v", err)
-		}
-		initTrace.Step("SyncWith done")
-		r.setLastSyncResourceVersion(resourceVersion)
-		initTrace.Step("Resource version updated")
-		return nil
-	}(); err != nil {
+	err := r.list(stopCh)
+	if err != nil {
 		return err
 	}
 
@@ -390,6 +341,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		}
 	}()
 
+	retry := NewRetryWithDeadline(r.MaxInternalErrorRetryDuration, time.Minute, apierrors.IsInternalError, r.clock)
 	for {
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
 		select {
@@ -399,8 +351,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		}
 
 		timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
-		options = metav1.ListOptions{
-			ResourceVersion: resourceVersion,
+		options := metav1.ListOptions{
+			ResourceVersion: r.LastSyncResourceVersion(),
 			// We want to avoid situations of hanging watchers. Stop any watchers that do not
 			// receive any events within the timeout window.
 			TimeoutSeconds: &timeoutSeconds,
@@ -426,25 +378,138 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			return err
 		}
 
-		if err := r.watchHandler(start, w, &resourceVersion, resyncerrc, stopCh); err != nil {
+		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, r.clock, resyncerrc, stopCh)
+		retry.After(err)
+		if err != nil {
 			if err != errorStopRequested {
 				switch {
 				case isExpiredError(err):
 					// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
 					// has a semantic that it returns data at least as fresh as provided RV.
 					// So first try to LIST with setting RV to resource version of last observed object.
-					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
+					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.typeDescription, err)
 				case apierrors.IsTooManyRequests(err):
-					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.expectedTypeName)
+					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.typeDescription)
 					<-r.initConnBackoffManager.Backoff().C()
 					continue
+				case apierrors.IsInternalError(err) && retry.ShouldRetry():
+					klog.V(2).Infof("%s: retrying watch of %v internal error: %v", r.name, r.typeDescription, err)
+					continue
 				default:
-					klog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedTypeName, err)
+					klog.Warningf("%s: watch of %v ended with: %v", r.name, r.typeDescription, err)
 				}
 			}
 			return nil
 		}
 	}
+}
+
+// list simply lists all items and records a resource version obtained from the server at the moment of the call.
+// the resource version can be used for further progress notification (aka. watch).
+func (r *Reflector) list(stopCh <-chan struct{}) error {
+	var resourceVersion string
+	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
+
+	initTrace := trace.New("Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
+	defer initTrace.LogIfLong(10 * time.Second)
+	var list runtime.Object
+	var paginatedResult bool
+	var err error
+	listCh := make(chan struct{}, 1)
+	panicCh := make(chan interface{}, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				panicCh <- r
+			}
+		}()
+		// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
+		// list request will return the full response.
+		pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
+			return r.listerWatcher.List(opts)
+		}))
+		switch {
+		case r.WatchListPageSize != 0:
+			pager.PageSize = r.WatchListPageSize
+		case r.paginatedResult:
+			// We got a paginated result initially. Assume this resource and server honor
+			// paging requests (i.e. watch cache is probably disabled) and leave the default
+			// pager size set.
+		case options.ResourceVersion != "" && options.ResourceVersion != "0":
+			// User didn't explicitly request pagination.
+			//
+			// With ResourceVersion != "", we have a possibility to list from watch cache,
+			// but we do that (for ResourceVersion != "0") only if Limit is unset.
+			// To avoid thundering herd on etcd (e.g. on master upgrades), we explicitly
+			// switch off pagination to force listing from watch cache (if enabled).
+			// With the existing semantic of RV (result is at least as fresh as provided RV),
+			// this is correct and doesn't lead to going back in time.
+			//
+			// We also don't turn off pagination for ResourceVersion="0", since watch cache
+			// is ignoring Limit in that case anyway, and if watch cache is not enabled
+			// we don't introduce regression.
+			pager.PageSize = 0
+		}
+
+		list, paginatedResult, err = pager.List(context.Background(), options)
+		if isExpiredError(err) || isTooLargeResourceVersionError(err) {
+			r.setIsLastSyncResourceVersionUnavailable(true)
+			// Retry immediately if the resource version used to list is unavailable.
+			// The pager already falls back to full list if paginated list calls fail due to an "Expired" error on
+			// continuation pages, but the pager might not be enabled, the full list might fail because the
+			// resource version it is listing at is expired or the cache may not yet be synced to the provided
+			// resource version. So we need to fallback to resourceVersion="" in all to recover and ensure
+			// the reflector makes forward progress.
+			list, paginatedResult, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
+		}
+		close(listCh)
+	}()
+	select {
+	case <-stopCh:
+		return nil
+	case r := <-panicCh:
+		panic(r)
+	case <-listCh:
+	}
+	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
+	if err != nil {
+		klog.Warningf("%s: failed to list %v: %v", r.name, r.typeDescription, err)
+		return fmt.Errorf("failed to list %v: %w", r.typeDescription, err)
+	}
+
+	// We check if the list was paginated and if so set the paginatedResult based on that.
+	// However, we want to do that only for the initial list (which is the only case
+	// when we set ResourceVersion="0"). The reasoning behind it is that later, in some
+	// situations we may force listing directly from etcd (by setting ResourceVersion="")
+	// which will return paginated result, even if watch cache is enabled. However, in
+	// that case, we still want to prefer sending requests to watch cache if possible.
+	//
+	// Paginated result returned for request with ResourceVersion="0" mean that watch
+	// cache is disabled and there are a lot of objects of a given type. In such case,
+	// there is no need to prefer listing from watch cache.
+	if options.ResourceVersion == "0" && paginatedResult {
+		r.paginatedResult = true
+	}
+
+	r.setIsLastSyncResourceVersionUnavailable(false) // list was successful
+	listMetaInterface, err := meta.ListAccessor(list)
+	if err != nil {
+		return fmt.Errorf("unable to understand list result %#v: %v", list, err)
+	}
+	resourceVersion = listMetaInterface.GetResourceVersion()
+	initTrace.Step("Resource version extracted")
+	items, err := meta.ExtractList(list)
+	if err != nil {
+		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
+	}
+	initTrace.Step("Objects extracted")
+	if err := r.syncWith(items, resourceVersion); err != nil {
+		return fmt.Errorf("unable to sync list result: %v", err)
+	}
+	initTrace.Step("SyncWith done")
+	r.setLastSyncResourceVersion(resourceVersion)
+	initTrace.Step("Resource version updated")
+	return nil
 }
 
 // syncWith replaces the store's items with the given list.
@@ -456,8 +521,19 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 	return r.store.Replace(found, resourceVersion)
 }
 
-// watchHandler watches w and keeps *resourceVersion up to date.
-func (r *Reflector) watchHandler(start time.Time, w watch.Interface, resourceVersion *string, errc chan error, stopCh <-chan struct{}) error {
+// watchHandler watches w and sets setLastSyncResourceVersion
+func watchHandler(start time.Time,
+	w watch.Interface,
+	store Store,
+	expectedType reflect.Type,
+	expectedGVK *schema.GroupVersionKind,
+	name string,
+	expectedTypeName string,
+	setLastSyncResourceVersion func(string),
+	clock clock.Clock,
+	errc chan error,
+	stopCh <-chan struct{},
+) error {
 	eventCount := 0
 
 	// Stopping the watcher should be idempotent and if we return from this function there's no way
@@ -478,62 +554,61 @@ loop:
 			if event.Type == watch.Error {
 				return apierrors.FromObject(event.Object)
 			}
-			if r.expectedType != nil {
-				if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
-					utilruntime.HandleError(fmt.Errorf("%s: expected type %v, but watch event object had type %v", r.name, e, a))
+			if expectedType != nil {
+				if e, a := expectedType, reflect.TypeOf(event.Object); e != a {
+					utilruntime.HandleError(fmt.Errorf("%s: expected type %v, but watch event object had type %v", name, e, a))
 					continue
 				}
 			}
-			if r.expectedGVK != nil {
-				if e, a := *r.expectedGVK, event.Object.GetObjectKind().GroupVersionKind(); e != a {
-					utilruntime.HandleError(fmt.Errorf("%s: expected gvk %v, but watch event object had gvk %v", r.name, e, a))
+			if expectedGVK != nil {
+				if e, a := *expectedGVK, event.Object.GetObjectKind().GroupVersionKind(); e != a {
+					utilruntime.HandleError(fmt.Errorf("%s: expected gvk %v, but watch event object had gvk %v", name, e, a))
 					continue
 				}
 			}
 			meta, err := meta.Accessor(event.Object)
 			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
+				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", name, event))
 				continue
 			}
-			newResourceVersion := meta.GetResourceVersion()
+			resourceVersion := meta.GetResourceVersion()
 			switch event.Type {
 			case watch.Added:
-				err := r.store.Add(event.Object)
+				err := store.Add(event.Object)
 				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("%s: unable to add watch event object (%#v) to store: %v", r.name, event.Object, err))
+					utilruntime.HandleError(fmt.Errorf("%s: unable to add watch event object (%#v) to store: %v", name, event.Object, err))
 				}
 			case watch.Modified:
-				err := r.store.Update(event.Object)
+				err := store.Update(event.Object)
 				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("%s: unable to update watch event object (%#v) to store: %v", r.name, event.Object, err))
+					utilruntime.HandleError(fmt.Errorf("%s: unable to update watch event object (%#v) to store: %v", name, event.Object, err))
 				}
 			case watch.Deleted:
 				// TODO: Will any consumers need access to the "last known
 				// state", which is passed in event.Object? If so, may need
 				// to change this.
-				err := r.store.Delete(event.Object)
+				err := store.Delete(event.Object)
 				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("%s: unable to delete watch event object (%#v) from store: %v", r.name, event.Object, err))
+					utilruntime.HandleError(fmt.Errorf("%s: unable to delete watch event object (%#v) from store: %v", name, event.Object, err))
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
 			default:
-				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
+				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", name, event))
 			}
-			*resourceVersion = newResourceVersion
-			r.setLastSyncResourceVersion(newResourceVersion)
-			if rvu, ok := r.store.(ResourceVersionUpdater); ok {
-				rvu.UpdateResourceVersion(newResourceVersion)
+			setLastSyncResourceVersion(resourceVersion)
+			if rvu, ok := store.(ResourceVersionUpdater); ok {
+				rvu.UpdateResourceVersion(resourceVersion)
 			}
 			eventCount++
 		}
 	}
 
-	watchDuration := r.clock.Since(start)
+	watchDuration := clock.Since(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
-		return fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", r.name)
+		return fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", name)
 	}
-	klog.V(4).Infof("%s: Watch close - %v total %v items received", r.name, r.expectedTypeName, eventCount)
+	klog.V(4).Infof("%s: Watch close - %v total %v items received", name, expectedTypeName, eventCount)
 	return nil
 }
 

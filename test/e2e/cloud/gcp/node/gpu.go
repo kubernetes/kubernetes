@@ -17,6 +17,8 @@ limitations under the License.
 package node
 
 import (
+	"context"
+
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -25,7 +27,7 @@ import (
 	"k8s.io/kubernetes/test/utils/junit"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var upgradeTests = []upgrades.Test{
@@ -38,7 +40,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("master upgrade", func() {
-		ginkgo.It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func() {
+		ginkgo.It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func(ctx context.Context) {
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
@@ -52,7 +54,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 		})
 	})
 	ginkgo.Describe("cluster upgrade", func() {
-		ginkgo.It("should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]", func() {
+		ginkgo.It("should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]", func(ctx context.Context) {
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
@@ -66,7 +68,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 		})
 	})
 	ginkgo.Describe("cluster downgrade", func() {
-		ginkgo.It("should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]", func() {
+		ginkgo.It("should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]", func(ctx context.Context) {
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)

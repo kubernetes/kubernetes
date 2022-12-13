@@ -18,9 +18,14 @@ package pod
 
 import (
 	"flag"
+	"fmt"
+
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	psaapi "k8s.io/pod-security-admission/api"
+	psapolicy "k8s.io/pod-security-admission/policy"
 	"k8s.io/utils/pointer"
 )
 
@@ -56,14 +61,14 @@ func GetDefaultTestImage() string {
 // If the node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 // If the node OS is linux, return busybox image
-func GetDefaultTestImageID() int {
+func GetDefaultTestImageID() imageutils.ImageID {
 	return GetTestImageID(imageutils.BusyBox)
 }
 
 // GetTestImage returns the image name with the given input
 // If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImage(id int) string {
+func GetTestImage(id imageutils.ImageID) string {
 	if NodeOSDistroIs("windows") {
 		return imageutils.GetE2EImage(imageutils.Agnhost)
 	}
@@ -73,11 +78,21 @@ func GetTestImage(id int) string {
 // GetTestImageID returns the image id with the given input
 // If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImageID(id int) int {
+func GetTestImageID(id imageutils.ImageID) imageutils.ImageID {
 	if NodeOSDistroIs("windows") {
 		return imageutils.Agnhost
 	}
 	return id
+}
+
+// GetDefaultNonRootUser returns default non root user
+// If the Node OS is windows, we return nill due to issue with invalid permissions set on projected volumes
+// https://github.com/kubernetes/kubernetes/issues/102849
+func GetDefaultNonRootUser() *int64 {
+	if NodeOSDistroIs("windows") {
+		return nil
+	}
+	return pointer.Int64(DefaultNonRootUser)
 }
 
 // GeneratePodSecurityContext generates the corresponding pod security context with the given inputs
@@ -115,12 +130,28 @@ func GetLinuxLabel() *v1.SELinuxOptions {
 		Level: "s0:c0,c1"}
 }
 
-// GetRestrictedPodSecurityContext returns a minimal restricted pod security context.
+// DefaultNonRootUser is the default user ID used for running restricted (non-root) containers.
+const DefaultNonRootUser = 1000
+
+// DefaultNonRootUserName is the default username in Windows used for running restricted (non-root) containers
+const DefaultNonRootUserName = "ContainerUser"
+
+// GetRestrictedPodSecurityContext returns a restricted pod security context.
+// This includes setting RunAsUser for convenience, to pass the RunAsNonRoot check.
+// Tests that require a specific user ID should override this.
 func GetRestrictedPodSecurityContext() *v1.PodSecurityContext {
-	return &v1.PodSecurityContext{
+	psc := &v1.PodSecurityContext{
 		RunAsNonRoot:   pointer.BoolPtr(true),
+		RunAsUser:      GetDefaultNonRootUser(),
 		SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
 	}
+
+	if NodeOSDistroIs("windows") {
+		psc.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+		psc.WindowsOptions.RunAsUserName = pointer.StringPtr(DefaultNonRootUserName)
+	}
+
+	return psc
 }
 
 // GetRestrictedContainerSecurityContext returns a minimal restricted container security context.
@@ -129,4 +160,84 @@ func GetRestrictedContainerSecurityContext() *v1.SecurityContext {
 		AllowPrivilegeEscalation: pointer.BoolPtr(false),
 		Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
 	}
+}
+
+var psaEvaluator, _ = psapolicy.NewEvaluator(psapolicy.DefaultChecks())
+
+// MustMixinRestrictedPodSecurity makes the given pod compliant with the restricted pod security level.
+// If doing so would overwrite existing non-conformant configuration, a test failure is triggered.
+func MustMixinRestrictedPodSecurity(pod *v1.Pod) *v1.Pod {
+	err := MixinRestrictedPodSecurity(pod)
+	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
+	return pod
+}
+
+// MixinRestrictedPodSecurity makes the given pod compliant with the restricted pod security level.
+// If doing so would overwrite existing non-conformant configuration, an error is returned.
+// Note that this sets a default RunAsUser. See GetRestrictedPodSecurityContext.
+// TODO(#105919): Handle PodOS for windows pods.
+func MixinRestrictedPodSecurity(pod *v1.Pod) error {
+	if pod.Spec.SecurityContext == nil {
+		pod.Spec.SecurityContext = GetRestrictedPodSecurityContext()
+	} else {
+		if pod.Spec.SecurityContext.RunAsNonRoot == nil {
+			pod.Spec.SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
+		}
+		if pod.Spec.SecurityContext.RunAsUser == nil {
+			pod.Spec.SecurityContext.RunAsUser = GetDefaultNonRootUser()
+		}
+		if pod.Spec.SecurityContext.SeccompProfile == nil {
+			pod.Spec.SecurityContext.SeccompProfile = &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}
+		}
+		if NodeOSDistroIs("windows") && pod.Spec.SecurityContext.WindowsOptions == nil {
+			pod.Spec.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+			pod.Spec.SecurityContext.WindowsOptions.RunAsUserName = pointer.StringPtr(DefaultNonRootUserName)
+		}
+	}
+	for i := range pod.Spec.Containers {
+		mixinRestrictedContainerSecurityContext(&pod.Spec.Containers[i])
+	}
+	for i := range pod.Spec.InitContainers {
+		mixinRestrictedContainerSecurityContext(&pod.Spec.InitContainers[i])
+	}
+
+	// Validate the resulting pod against the restricted profile.
+	restricted := psaapi.LevelVersion{
+		Level:   psaapi.LevelRestricted,
+		Version: psaapi.LatestVersion(),
+	}
+	if agg := psapolicy.AggregateCheckResults(psaEvaluator.EvaluatePod(restricted, &pod.ObjectMeta, &pod.Spec)); !agg.Allowed {
+		return fmt.Errorf("failed to make pod %s restricted: %s", pod.Name, agg.ForbiddenDetail())
+	}
+
+	return nil
+}
+
+// mixinRestrictedContainerSecurityContext adds the required container security context options to
+// be compliant with the restricted pod security level. Non-conformance checking is handled by the
+// caller.
+func mixinRestrictedContainerSecurityContext(container *v1.Container) {
+	if container.SecurityContext == nil {
+		container.SecurityContext = GetRestrictedContainerSecurityContext()
+	} else {
+		if container.SecurityContext.AllowPrivilegeEscalation == nil {
+			container.SecurityContext.AllowPrivilegeEscalation = pointer.Bool(false)
+		}
+		if container.SecurityContext.Capabilities == nil {
+			container.SecurityContext.Capabilities = &v1.Capabilities{}
+		}
+		if len(container.SecurityContext.Capabilities.Drop) == 0 {
+			container.SecurityContext.Capabilities.Drop = []v1.Capability{"ALL"}
+		}
+	}
+}
+
+// FindPodConditionByType loops through all pod conditions in pod status and returns the specified condition.
+func FindPodConditionByType(podStatus *v1.PodStatus, conditionType v1.PodConditionType) *v1.PodCondition {
+	for _, cond := range podStatus.Conditions {
+		if cond.Type == conditionType {
+			return &cond
+		}
+	}
+	return nil
 }

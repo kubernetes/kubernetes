@@ -33,7 +33,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
@@ -43,19 +42,15 @@ import (
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
-	"k8s.io/kubernetes/pkg/proxy/winuserspace"
-	utilnetsh "k8s.io/kubernetes/pkg/util/netsh"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
 )
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.master)
+	return newProxyServer(o.config, o.master)
 }
 
-func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExit bool, master string) (*ProxyServer, error) {
+func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
@@ -64,11 +59,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		c.Set(config)
 	} else {
 		return nil, fmt.Errorf("unable to register configz: %s", err)
-	}
-
-	// We omit creation of pretty much everything if we run in cleanup mode
-	if cleanupAndExit {
-		return &ProxyServer{}, nil
 	}
 
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
@@ -106,75 +96,51 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		healthzPort, _ = strconv.Atoi(port)
 	}
 
+	// Check if Kernel Space can be used.
+	canUseWinKernelProxy, err := winkernel.CanUseWinKernelProxier(winkernel.WindowsKernelCompatTester{})
+	if !canUseWinKernelProxy && err != nil {
+		return nil, err
+	}
+
 	var proxier proxy.Provider
-	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
+	proxyMode := proxyconfigapi.ProxyModeKernelspace
 	dualStackMode := getDualStackMode(config.Winkernel.NetworkName, winkernel.DualStackCompatTester{})
-	if proxyMode == proxyModeKernelspace {
-		klog.V(0).InfoS("Using Kernelspace Proxier.")
-		if dualStackMode {
-			klog.V(0).InfoS("Creating dualStackProxier for Windows kernel.")
+	if dualStackMode {
+		klog.V(0).InfoS("Creating dualStackProxier for Windows kernel.")
 
-			proxier, err = winkernel.NewDualStackProxier(
-				config.IPTables.SyncPeriod.Duration,
-				config.IPTables.MinSyncPeriod.Duration,
-				config.IPTables.MasqueradeAll,
-				int(*config.IPTables.MasqueradeBit),
-				config.ClusterCIDR,
-				hostname,
-				nodeIPTuple(config.BindAddress),
-				recorder,
-				healthzServer,
-				config.Winkernel,
-				healthzPort,
-			)
-		} else {
-
-			proxier, err = winkernel.NewProxier(
-				config.IPTables.SyncPeriod.Duration,
-				config.IPTables.MinSyncPeriod.Duration,
-				config.IPTables.MasqueradeAll,
-				int(*config.IPTables.MasqueradeBit),
-				config.ClusterCIDR,
-				hostname,
-				nodeIP,
-				recorder,
-				healthzServer,
-				config.Winkernel,
-				healthzPort,
-			)
-
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("unable to create proxier: %v", err)
-		}
-
-		winkernel.RegisterMetrics()
-	} else {
-		klog.V(0).InfoS("Using userspace Proxier.")
-		klog.V(0).InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'kernelspace' instead")
-		execer := exec.New()
-		var netshInterface utilnetsh.Interface
-		netshInterface = utilnetsh.New(execer)
-
-		proxier, err = winuserspace.NewProxier(
-			winuserspace.NewLoadBalancerRR(),
-			netutils.ParseIPSloppy(config.BindAddress),
-			netshInterface,
-			*utilnet.ParsePortRangeOrDie(config.PortRange),
-			// TODO @pires replace below with default values, if applicable
+		proxier, err = winkernel.NewDualStackProxier(
 			config.IPTables.SyncPeriod.Duration,
-			config.UDPIdleTimeout.Duration,
+			config.IPTables.MinSyncPeriod.Duration,
+			config.IPTables.MasqueradeAll,
+			int(*config.IPTables.MasqueradeBit),
+			config.ClusterCIDR,
+			hostname,
+			nodeIPTuple(config.BindAddress),
+			recorder,
+			healthzServer,
+			config.Winkernel,
+			healthzPort,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create proxier: %v", err)
-		}
+	} else {
+		proxier, err = winkernel.NewProxier(
+			config.IPTables.SyncPeriod.Duration,
+			config.IPTables.MinSyncPeriod.Duration,
+			config.IPTables.MasqueradeAll,
+			int(*config.IPTables.MasqueradeBit),
+			config.ClusterCIDR,
+			hostname,
+			nodeIP,
+			recorder,
+			healthzServer,
+			config.Winkernel,
+			healthzPort,
+		)
 	}
-	useEndpointSlices := true
-	if proxyMode == proxyModeUserspace {
-		// userspace mode doesn't support endpointslice.
-		useEndpointSlices = false
+	if err != nil {
+		return nil, fmt.Errorf("unable to create proxier: %v", err)
 	}
+	winkernel.RegisterMetrics()
+
 	return &ProxyServer{
 		Client:              client,
 		EventClient:         eventClient,
@@ -189,7 +155,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		OOMScoreAdj:         config.OOMScoreAdj,
 		ConfigSyncPeriod:    config.ConfigSyncPeriod.Duration,
 		HealthzServer:       healthzServer,
-		UseEndpointSlices:   useEndpointSlices,
 	}, nil
 }
 
@@ -197,31 +162,11 @@ func getDualStackMode(networkname string, compatTester winkernel.StackCompatTest
 	return compatTester.DualStackCompatible(networkname)
 }
 
-func getProxyMode(proxyMode string, kcompat winkernel.KernelCompatTester) string {
-	if proxyMode == proxyModeKernelspace {
-		return tryWinKernelSpaceProxy(kcompat)
-	}
-	return proxyModeUserspace
-}
-
 func detectNumCPU() int {
 	return goruntime.NumCPU()
 }
 
-func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
-	// Check for Windows Kernel Version if we can support Kernel Space proxy
-	// Check for Windows Version
-
-	// guaranteed false on error, error only necessary for debugging
-	useWinKernelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
-	if err != nil {
-		klog.ErrorS(err, "Can't determine whether to use windows kernel proxy, using userspace proxier")
-		return proxyModeUserspace
-	}
-	if useWinKernelProxy {
-		return proxyModeKernelspace
-	}
-	// Fallback.
-	klog.V(1).InfoS("Can't use winkernel proxy, using userspace proxier")
-	return proxyModeUserspace
+// cleanupAndExit cleans up after a previous proxy run
+func cleanupAndExit() error {
+	return errors.New("--cleanup-and-exit is not implemented on Windows")
 }

@@ -43,10 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-const (
-	// Name of the plugin used in the plugin registry and configurations.
-	Name = names.DefaultPreemption
-)
+// Name of the plugin used in the plugin registry and configurations.
+const Name = names.DefaultPreemption
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
@@ -76,7 +74,7 @@ func New(dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 		fh:        fh,
 		args:      *args,
 		podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister(),
-		pdbLister: getPDBLister(fh.SharedInformerFactory(), fts.EnablePodDisruptionBudget),
+		pdbLister: getPDBLister(fh.SharedInformerFactory()),
 	}
 	return &pl, nil
 }
@@ -314,9 +312,6 @@ func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.Po
 	return violatingPodInfos, nonViolatingPodInfos
 }
 
-func getPDBLister(informerFactory informers.SharedInformerFactory, enablePodDisruptionBudget bool) policylisters.PodDisruptionBudgetLister {
-	if enablePodDisruptionBudget {
-		return informerFactory.Policy().V1().PodDisruptionBudgets().Lister()
-	}
-	return nil
+func getPDBLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
+	return informerFactory.Policy().V1().PodDisruptionBudgets().Lister()
 }

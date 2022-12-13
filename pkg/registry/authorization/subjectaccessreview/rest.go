@@ -46,6 +46,12 @@ func (r *REST) New() runtime.Object {
 	return &authorizationapi.SubjectAccessReview{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *REST) Destroy() {
+	// Given no underlying store, we don't destroy anything
+	// here explicitly.
+}
+
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	subjectAccessReview, ok := obj.(*authorizationapi.SubjectAccessReview)
 	if !ok {

@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -43,7 +44,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // This test primarily checks 2 things:
@@ -269,7 +270,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		close(stopCh)
 	})
 
-	ginkgo.It("Controller Manager should not create/delete replicas across restart", func() {
+	ginkgo.It("Controller Manager should not create/delete replicas across restart", func(ctx context.Context) {
 
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
@@ -300,7 +301,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 	})
 
-	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func() {
+	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func(ctx context.Context) {
 
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
@@ -318,7 +319,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		framework.ExpectNoError(e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
 	})
 
-	ginkgo.It("Kubelet should not restart containers across restart", func() {
+	ginkgo.It("Kubelet should not restart containers across restart", func(ctx context.Context) {
 		nodeIPs, err := e2enode.GetPublicIps(f.ClientSet)
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
@@ -335,12 +336,12 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		postRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if postRestarts != preRestarts {
-			framework.DumpNodeDebugInfo(f.ClientSet, badNodes, framework.Logf)
+			e2edebug.DumpNodeDebugInfo(f.ClientSet, badNodes, framework.Logf)
 			framework.Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
 		}
 	})
 
-	ginkgo.It("Kube-proxy should recover after being killed accidentally", func() {
+	ginkgo.It("Kube-proxy should recover after being killed accidentally", func(ctx context.Context) {
 		nodeIPs, err := e2enode.GetPublicIps(f.ClientSet)
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)

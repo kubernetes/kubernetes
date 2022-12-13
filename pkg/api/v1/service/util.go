@@ -73,7 +73,7 @@ func ExternalPolicyLocal(service *v1.Service) bool {
 		service.Spec.Type != v1.ServiceTypeNodePort {
 		return false
 	}
-	return service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
+	return service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyLocal
 }
 
 // InternalPolicyLocal checks if service has ITP = Local.
@@ -90,16 +90,4 @@ func NeedsHealthCheck(service *v1.Service) bool {
 		return false
 	}
 	return ExternalPolicyLocal(service)
-}
-
-// GetServiceHealthCheckPathPort returns the path and nodePort programmed into the Cloud LB Health Check
-func GetServiceHealthCheckPathPort(service *v1.Service) (string, int32) {
-	if !NeedsHealthCheck(service) {
-		return "", 0
-	}
-	port := service.Spec.HealthCheckNodePort
-	if port == 0 {
-		return "", 0
-	}
-	return "/healthz", port
 }

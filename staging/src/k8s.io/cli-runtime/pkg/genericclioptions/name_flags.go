@@ -35,7 +35,7 @@ type NamePrintFlags struct {
 	Operation string
 }
 
-// Complete sets NamePrintFlags operation flag from sucessTemplate
+// Complete sets NamePrintFlags operation flag from successTemplate
 func (f *NamePrintFlags) Complete(successTemplate string) error {
 	f.Operation = fmt.Sprintf(successTemplate, f.Operation)
 	return nil

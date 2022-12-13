@@ -121,6 +121,10 @@
             ],
             "description": "Label query over pods whose evictions are managed by the disruption budget. A null selector will match no pods, while an empty ({}) selector will select all pods within the namespace.",
             "x-kubernetes-patch-strategy": "replace"
+          },
+          "unhealthyPodEvictionPolicy": {
+            "description": "UnhealthyPodEvictionPolicy defines the criteria for when unhealthy pods should be considered for eviction. Current implementation considers healthy pods, as pods that have status.conditions item with type=\"Ready\",status=\"True\".\n\nValid policies are IfHealthyBudget and AlwaysAllow. If no policy is specified, the default behavior will be used, which corresponds to the IfHealthyBudget policy.\n\nIfHealthyBudget policy means that running pods (status.phase=\"Running\"), but not yet healthy can be evicted only if the guarded application is not disrupted (status.currentHealthy is at least equal to status.desiredHealthy). Healthy pods will be subject to the PDB for eviction.\n\nAlwaysAllow policy means that all running pods (status.phase=\"Running\"), but not yet healthy are considered disrupted and can be evicted regardless of whether the criteria in a PDB is met. This means perspective running pods of a disrupted application might not get a chance to become healthy. Healthy pods will be subject to the PDB for eviction.\n\nAdditional policies may be added in the future. Clients making eviction decisions should disallow eviction of unhealthy pods if they encounter an unrecognized policy in this field.\n\nThis field is alpha-level. The eviction API uses this field when the feature gate PDBUnhealthyPodEvictionPolicy is enabled (disabled by default).",
+            "type": "string"
           }
         },
         "type": "object"
@@ -420,6 +424,11 @@
           {
             "group": "admissionregistration.k8s.io",
             "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "DeleteOptions",
             "version": "v1beta1"
           },
           {
@@ -461,6 +470,11 @@
             "group": "authentication.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           },
           {
             "group": "authentication.k8s.io",
@@ -568,6 +582,11 @@
             "version": "v1beta2"
           },
           {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta3"
+          },
+          {
             "group": "imagepolicy.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1alpha1"
@@ -585,6 +604,11 @@
           {
             "group": "networking.k8s.io",
             "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "DeleteOptions",
             "version": "v1beta1"
           },
           {
@@ -626,6 +650,11 @@
             "group": "rbac.authorization.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1beta1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           },
           {
             "group": "scheduling.k8s.io",
@@ -795,10 +824,6 @@
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations",
             "type": "object"
-          },
-          "clusterName": {
-            "description": "Deprecated: ClusterName is a legacy field that was always cleared by the system and never used; it will be removed completely in 1.25.\n\nThe name in the go struct is changed to help clients detect accidental use.",
-            "type": "string"
           },
           "creationTimestamp": {
             "allOf": [
@@ -1008,6 +1033,11 @@
             "group": "",
             "kind": "Status",
             "version": "v1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "Status",
+            "version": "v1alpha1"
           }
         ]
       },
@@ -1119,6 +1149,11 @@
           {
             "group": "admissionregistration.k8s.io",
             "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "WatchEvent",
             "version": "v1beta1"
           },
           {
@@ -1160,6 +1195,11 @@
             "group": "authentication.k8s.io",
             "kind": "WatchEvent",
             "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           },
           {
             "group": "authentication.k8s.io",
@@ -1267,6 +1307,11 @@
             "version": "v1beta2"
           },
           {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta3"
+          },
+          {
             "group": "imagepolicy.k8s.io",
             "kind": "WatchEvent",
             "version": "v1alpha1"
@@ -1284,6 +1329,11 @@
           {
             "group": "networking.k8s.io",
             "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "WatchEvent",
             "version": "v1beta1"
           },
           {
@@ -1325,6 +1375,11 @@
             "group": "rbac.authorization.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           },
           {
             "group": "scheduling.k8s.io",
@@ -1359,7 +1414,7 @@
         ]
       },
       "io.k8s.apimachinery.pkg.runtime.RawExtension": {
-        "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.Object `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// External package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// On the wire, the JSON will look something like this: {\n\t\"kind\":\"MyAPIObject\",\n\t\"apiVersion\":\"v1\",\n\t\"myPlugin\": {\n\t\t\"kind\":\"PluginA\",\n\t\t\"aOption\":\"foo\",\n\t},\n}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
+        "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.Object `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// External package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// On the wire, the JSON will look something like this:\n\n\t{\n\t\t\"kind\":\"MyAPIObject\",\n\t\t\"apiVersion\":\"v1\",\n\t\t\"myPlugin\": {\n\t\t\t\"kind\":\"PluginA\",\n\t\t\t\"aOption\":\"foo\",\n\t\t},\n\t}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
         "type": "object"
       },
       "io.k8s.apimachinery.pkg.util.intstr.IntOrString": {

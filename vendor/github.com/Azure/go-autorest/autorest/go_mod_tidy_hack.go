@@ -1,3 +1,4 @@
+//go:build modhack
 // +build modhack
 
 package autorest

@@ -18,7 +18,6 @@ package pluginmanager
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -81,7 +80,7 @@ func (f *fakePluginHandler) Reset() {
 }
 
 func init() {
-	d, err := ioutil.TempDir("", "plugin_manager_test")
+	d, err := os.MkdirTemp("", "plugin_manager_test")
 	if err != nil {
 		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}

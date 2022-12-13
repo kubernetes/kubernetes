@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
-	clientset "k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes" // import known versions
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
@@ -47,9 +47,6 @@ import (
 	c "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
-
-	// import known versions
-	_ "k8s.io/client-go/kubernetes"
 )
 
 // ResourceResyncTime defines the resync period of the garbage collector's informers.
@@ -77,6 +74,9 @@ type GarbageCollector struct {
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *ReferenceCache
 
+	kubeClient       clientset.Interface
+	eventBroadcaster record.EventBroadcaster
+
 	workerLock sync.RWMutex
 }
 
@@ -94,8 +94,6 @@ func NewGarbageCollector(
 ) (*GarbageCollector, error) {
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
 
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
@@ -107,6 +105,8 @@ func NewGarbageCollector(
 		attemptToDelete:  attemptToDelete,
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
+		kubeClient:       kubeClient,
+		eventBroadcaster: eventBroadcaster,
 	}
 	gc.dependencyGraphBuilder = &GraphBuilder{
 		eventRecorder:    eventRecorder,
@@ -145,6 +145,11 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 	defer gc.attemptToDelete.ShutDown()
 	defer gc.attemptToOrphan.ShutDown()
 	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
+
+	// Start events processing pipeline.
+	gc.eventBroadcaster.StartStructuredLogging(0)
+	gc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: gc.kubeClient.CoreV1().Events("")})
+	defer gc.eventBroadcaster.Shutdown()
 
 	klog.Infof("Starting garbage collector controller")
 	defer klog.Infof("Shutting down garbage collector controller")

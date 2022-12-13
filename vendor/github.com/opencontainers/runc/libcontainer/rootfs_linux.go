@@ -80,6 +80,8 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig, mountFds []int) (err
 		// Therefore, we can access mountFds[i] without any concerns.
 		if mountFds != nil && mountFds[i] != -1 {
 			mountConfig.fd = &mountFds[i]
+		} else {
+			mountConfig.fd = nil
 		}
 
 		if err := mountToRootfs(m, mountConfig); err != nil {
@@ -577,6 +579,7 @@ func checkProcMount(rootfs, dest, source string) error {
 		"/proc/loadavg",
 		"/proc/slabinfo",
 		"/proc/net/dev",
+		"/proc/sys/kernel/ns_last_pid",
 	}
 	for _, valid := range validProcMounts {
 		path, err := filepath.Rel(filepath.Join(rootfs, valid), dest)

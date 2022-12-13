@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
@@ -46,7 +46,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		The csistoragecapacities resource MUST exist in the /apis/storage.k8s.io/v1 discovery document.
 		The csistoragecapacities resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.ConformanceIt(" should support CSIStorageCapacities API operations", func() {
+	framework.ConformanceIt(" should support CSIStorageCapacities API operations", func(ctx context.Context) {
 		// Setup
 		cscVersion := "v1"
 		cscClient := f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name)

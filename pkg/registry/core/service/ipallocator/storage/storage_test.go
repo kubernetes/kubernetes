@@ -26,11 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	allocatorstore "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -121,8 +118,6 @@ func TestStore(t *testing.T) {
 }
 
 func TestAllocateReserved(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
-
 	_, storage, _, si, destroyFunc := newStorage(t)
 	defer destroyFunc()
 	if err := si.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
@@ -163,6 +158,35 @@ func TestAllocateReserved(t *testing.T) {
 	if _, err := storage.AllocateNext(); err != nil {
 		t.Error(err)
 	}
+	if _, err := storage.AllocateNext(); err == nil {
+		t.Error("Allocator expected to be full")
+	}
+}
+
+func TestAllocateReservedDynamicBlockExhausted(t *testing.T) {
+	_, storage, _, si, destroyFunc := newStorage(t)
+	defer destroyFunc()
+	if err := si.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// allocate all addresses both on the dynamic and reserved blocks
+	// once the dynamic block has been exhausted
+	// the dynamic allocator will use the reserved block
+	max := 254
+
+	for i := 0; i < max; i++ {
+		if _, err := storage.AllocateNext(); err != nil {
+			t.Errorf("Unexpected error trying to allocate: %v", err)
+		}
+	}
+	for i := 0; i < max; i++ {
+		ip := fmt.Sprintf("192.168.1.%d", i+1)
+		if !storage.Has(netutils.ParseIPSloppy(ip)) {
+			t.Errorf("IP %s expected to be allocated", ip)
+		}
+	}
+
 	if _, err := storage.AllocateNext(); err == nil {
 		t.Error("Allocator expected to be full")
 	}

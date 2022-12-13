@@ -25,16 +25,17 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
-	"github.com/Azure/go-autorest/autorest/to"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/pointer"
 
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -158,11 +159,15 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
+	// On Windows, Mount will create the parent of dir and mklink (create a symbolic link) at the volume path later,
+	// so mounter.SetUp will not create the directory. Otherwise mklink will error: "Cannot create a file when that file already exists".
+	if goruntime.GOOS != "windows" {
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				t.Errorf("SetUp() failed, volume path not created: %s", path)
+			} else {
+				t.Errorf("SetUp() failed: %v", err)
+			}
 		}
 	}
 
@@ -215,7 +220,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, "/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, filepath.Join(os.TempDir(), "fake"), client, nil))
 	plug, _ := plugMgr.FindPluginByName(azureFilePluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
@@ -379,7 +384,7 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		},
 		{
 			options: []string{"file_mode=0777"},
-			fsGroup: to.Int64Ptr(0),
+			fsGroup: pointer.Int64(0),
 			expected: []string{"file_mode=0777",
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
 				fmt.Sprintf("%s=%s", vers, defaultVers),
@@ -390,7 +395,7 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		},
 		{
 			options: []string{"vers=2.1"},
-			fsGroup: to.Int64Ptr(1000),
+			fsGroup: pointer.Int64(1000),
 			expected: []string{"vers=2.1",
 				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
@@ -419,7 +424,7 @@ func TestAppendDefaultMountOptions(t *testing.T) {
 		},
 		{
 			options: []string{"gid=2000"},
-			fsGroup: to.Int64Ptr(1000),
+			fsGroup: pointer.Int64(1000),
 			expected: []string{"gid=2000",
 				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
 				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),

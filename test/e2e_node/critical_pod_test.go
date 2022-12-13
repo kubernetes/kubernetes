@@ -27,10 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -44,7 +45,7 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 	f := framework.NewDefaultFramework("critical-pod-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when we need to admit a critical pod", func() {
-		ginkgo.It("[Flaky] should be able to create and delete a critical pod", func() {
+		ginkgo.It("[Flaky] should be able to create and delete a critical pod", func(ctx context.Context) {
 			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.
 			node := getNodeName(f)
 			// Define test pods
@@ -72,8 +73,8 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 			}, node)
 
 			// Create pods, starting with non-critical so that the critical preempts the other pods.
-			f.PodClient().CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})
-			f.PodClientNS(kubeapi.NamespaceSystem).CreateSync(criticalPod)
+			e2epod.NewPodClient(f).CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})
+			e2epod.PodClientNS(f, kubeapi.NamespaceSystem).CreateSync(criticalPod)
 
 			// Check that non-critical pods other than the besteffort have been evicted
 			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
@@ -88,10 +89,10 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 		})
 		ginkgo.AfterEach(func() {
 			// Delete Pods
-			f.PodClient().DeleteSync(guaranteedPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(burstablePodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(bestEffortPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSync(criticalPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			e2epod.NewPodClient(f).DeleteSync(guaranteedPodName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			e2epod.NewPodClient(f).DeleteSync(burstablePodName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			e2epod.NewPodClient(f).DeleteSync(bestEffortPodName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			e2epod.PodClientNS(f, kubeapi.NamespaceSystem).DeleteSync(criticalPodName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 			// Log Events
 			logPodEvents(f)
 			logNodeEvents(f)

@@ -19,7 +19,7 @@ package kuberuntime
 import (
 	"fmt"
 	"math/rand"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,7 +42,7 @@ func TestLogSymLink(t *testing.T) {
 	containerName := randStringBytes(70)
 	dockerID := randStringBytes(80)
 	// The file name cannot exceed 255 characters. Since .log suffix is required, the prefix cannot exceed 251 characters.
-	expectedPath := path.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s", podFullName, containerName, dockerID)[:251]+".log")
+	expectedPath := filepath.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s", podFullName, containerName, dockerID)[:251]+".log")
 	as.Equal(expectedPath, logSymlink(containerLogsDir, podFullName, containerName, dockerID))
 }
 
@@ -53,6 +53,6 @@ func TestLegacyLogSymLink(t *testing.T) {
 	podName := randStringBytes(128)
 	podNamespace := randStringBytes(10)
 	// The file name cannot exceed 255 characters. Since .log suffix is required, the prefix cannot exceed 251 characters.
-	expectedPath := path.Join(legacyContainerLogsDir, fmt.Sprintf("%s_%s_%s-%s", podName, podNamespace, containerName, containerID)[:251]+".log")
+	expectedPath := filepath.Join(legacyContainerLogsDir, fmt.Sprintf("%s_%s_%s-%s", podName, podNamespace, containerName, containerID)[:251]+".log")
 	as.Equal(expectedPath, legacyLogSymlink(containerID, containerName, podName, podNamespace))
 }

@@ -25,35 +25,23 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
-const (
-	watchesPerSeat          = 10.0
-	eventAdditionalDuration = 5 * time.Millisecond
-	// TODO(wojtekt): Remove it once we tune the algorithm to not fail
-	// scalability tests.
-	enableMutatingWorkEstimator = true
-)
-
-func newMutatingWorkEstimator(countFn watchCountGetterFunc) WorkEstimatorFunc {
-	return newTestMutatingWorkEstimator(countFn, enableMutatingWorkEstimator)
-}
-
-func newTestMutatingWorkEstimator(countFn watchCountGetterFunc, enabled bool) WorkEstimatorFunc {
+func newMutatingWorkEstimator(countFn watchCountGetterFunc, config *WorkEstimatorConfig) WorkEstimatorFunc {
 	estimator := &mutatingWorkEstimator{
+		config:  config,
 		countFn: countFn,
-		enabled: enabled,
 	}
 	return estimator.estimate
 }
 
 type mutatingWorkEstimator struct {
+	config  *WorkEstimatorConfig
 	countFn watchCountGetterFunc
-	enabled bool
 }
 
 func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
 	// TODO(wojtekt): Remove once we tune the algorithm to not fail
 	// scalability tests.
-	if !e.enabled {
+	if !e.config.Enabled {
 		return WorkEstimate{
 			InitialSeats: 1,
 		}
@@ -65,10 +53,19 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 		// let's return a large value.
 		return WorkEstimate{
 			InitialSeats:      1,
-			FinalSeats:        maximumSeats,
-			AdditionalLatency: eventAdditionalDuration,
+			FinalSeats:        e.config.MaximumSeats,
+			AdditionalLatency: e.config.eventAdditionalDuration(),
 		}
 	}
+
+	if isRequestExemptFromWatchEvents(requestInfo) {
+		return WorkEstimate{
+			InitialSeats:      e.config.MinimumSeats,
+			FinalSeats:        0,
+			AdditionalLatency: time.Duration(0),
+		}
+	}
+
 	watchCount := e.countFn(requestInfo)
 	metrics.ObserveWatchCount(r.Context(), priorityLevelName, flowSchemaName, watchCount)
 
@@ -86,7 +83,7 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 	// is taking 1/Nth of a seat for M milliseconds.
 	// We allow the accounting of that work in P&F to be reshaped into another
 	// rectangle of equal area for practical reasons.
-	var finalSeats uint
+	var finalSeats uint64
 	var additionalLatency time.Duration
 
 	// TODO: Make this unconditional after we tune the algorithm better.
@@ -94,12 +91,12 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 	//   the request finishes even if there is a small number of watches.
 	//   However, until we tune the estimation we want to stay on the safe side
 	//   an avoid introducing additional latency for almost every single request.
-	if watchCount >= watchesPerSeat {
+	if watchCount >= int(e.config.WatchesPerSeat) {
 		// TODO: As described in the KEP, we should take into account that not all
 		//   events are equal and try to estimate the cost of a single event based on
 		//   some historical data about size of events.
-		finalSeats = uint(math.Ceil(float64(watchCount) / watchesPerSeat))
-		finalWork := SeatsTimesDuration(float64(finalSeats), eventAdditionalDuration)
+		finalSeats = uint64(math.Ceil(float64(watchCount) / e.config.WatchesPerSeat))
+		finalWork := SeatsTimesDuration(float64(finalSeats), e.config.eventAdditionalDuration())
 
 		// While processing individual events is highly parallel,
 		// the design/implementation of P&F has a couple limitations that
@@ -129,8 +126,8 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 		//
 		// TODO: Confirm that the current cap of maximumSeats allow us to
 		//   achieve the above.
-		if finalSeats > maximumSeats {
-			finalSeats = maximumSeats
+		if finalSeats > e.config.MaximumSeats {
+			finalSeats = e.config.MaximumSeats
 		}
 		additionalLatency = finalWork.DurationPerSeat(float64(finalSeats))
 	}
@@ -140,4 +137,13 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 		FinalSeats:        finalSeats,
 		AdditionalLatency: additionalLatency,
 	}
+}
+
+func isRequestExemptFromWatchEvents(requestInfo *apirequest.RequestInfo) bool {
+	// Creating token for service account does not produce any event,
+	// but still serviceaccounts can have multiple watchers.
+	if requestInfo.Resource == "serviceaccounts" && requestInfo.Subresource == "token" {
+		return true
+	}
+	return false
 }

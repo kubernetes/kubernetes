@@ -26,11 +26,13 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"google.golang.org/grpc/grpclog"
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/env"
 )
 
@@ -128,7 +130,18 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	stop := func() {
-		cancel()
+		// try to exit etcd gracefully
+		defer cancel()
+		cmd.Process.Signal(syscall.SIGTERM)
+		go func() {
+			select {
+			case <-ctx.Done():
+				klog.Infof("etcd exited gracefully, context cancelled")
+			case <-time.After(5 * time.Second):
+				klog.Infof("etcd didn't exit in 5 seconds, killing it")
+				cancel()
+			}
+		}()
 		err := cmd.Wait()
 		klog.Infof("etcd exit status: %v", err)
 		err = os.RemoveAll(etcdDataDir)
@@ -180,22 +193,29 @@ func EtcdMain(tests func() int) {
 	result := tests()
 	stop() // Don't defer this. See os.Exit documentation.
 
-	// Log the number of goroutines leaked.
-	// TODO: we should work on reducing this as much as possible.
-	var dg int
-	for i := 0; i < 10; i++ {
-		// Leave some room for goroutines we can not get rid of
-		// like k8s.io/klog/v2.(*loggingT).flushDaemon()
-		// TODO: adjust this number based on a more exhaustive analysis.
-		if dg = runtime.NumGoroutine() - before; dg <= 4 {
-			os.Exit(result)
+	checkNumberOfGoroutines := func() (bool, error) {
+		// We leave some room for leaked goroutines as there are
+		// still some leaks, mostly:
+		// - leak from lumberjack package we're vendoring
+		// - leak from apiserve healthz
+		// - leak from opencensus library
+		// Once fixed, we should be able to bring it down to zero.
+		if dg := runtime.NumGoroutine() - before; dg <= 3 {
+			return true, nil
 		}
 		// Allow goroutines to schedule and die off.
 		runtime.Gosched()
-		time.Sleep(100 * time.Millisecond)
+		return false, nil
 	}
-	after := runtime.NumGoroutine()
-	klog.Infof("unexpected number of goroutines: before: %d after %d", before, after)
+
+	// It generally takes visibly less than 1s to finish all goroutines.
+	// But we keep the limit higher to account for cpu-starved environments.
+	if err := wait.Poll(100*time.Millisecond, 5*time.Second, checkNumberOfGoroutines); err != nil {
+		after := runtime.NumGoroutine()
+		stacktraces := make([]byte, 1<<20)
+		runtime.Stack(stacktraces, true)
+		klog.Fatalf("unexpected number of goroutines: before: %d after %d\n%sd", before, after, string(stacktraces))
+	}
 	os.Exit(result)
 }
 

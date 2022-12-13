@@ -18,7 +18,8 @@ package node
 
 import (
 	"context"
-	"github.com/onsi/ginkgo"
+
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,7 @@ var _ = SIGDescribe("PodOSRejection [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("pod-os-rejection")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.Context("Kubelet", func() {
-		ginkgo.It("should reject pod when the node OS doesn't match pod's OS", func() {
+		ginkgo.It("should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
 			linuxNode, err := findLinuxNode(f)
 			framework.ExpectNoError(err)
 			pod := &v1.Pod{
@@ -56,7 +57,7 @@ var _ = SIGDescribe("PodOSRejection [NodeConformance]", func() {
 					NodeName: linuxNode.Name, // Set the node to an node which doesn't support
 				},
 			}
-			pod = f.PodClient().Create(pod)
+			pod = e2epod.NewPodClient(f).Create(pod)
 			// Check the pod is still not running
 			err = e2epod.WaitForPodFailedReason(f.ClientSet, pod, "PodOSNotSupported", f.Timeouts.PodStartShort)
 			framework.ExpectNoError(err)
@@ -83,7 +84,7 @@ func findLinuxNode(f *framework.Framework) (v1.Node, error) {
 		}
 	}
 
-	if foundNode == false {
+	if !foundNode {
 		e2eskipper.Skipf("Could not find and ready and schedulable Linux nodes")
 	}
 

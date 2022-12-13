@@ -296,6 +296,23 @@ func NewPV(pvName, volumeName string) *v1.PersistentVolume {
 	}
 }
 
+// Returns an NFS PV. This can be used for an in-tree volume that is not migrated (unlike NewPV, which uses the GCE persistent disk).
+func NewNFSPV(pvName, volumeName string) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  types.UID(pvName),
+			Name: pvName,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				NFS: &v1.NFSVolumeSource{
+					Server: volumeName,
+				},
+			},
+		},
+	}
+}
+
 func attachVolumeToNode(nodes *v1.NodeList, volumeName, nodeName string) {
 	// if nodeName exists, get the object.. if not create node object
 	var node *v1.Node
@@ -366,7 +383,14 @@ func (plugin *TestPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	if spec.Volume != nil {
 		return spec.Name(), nil
 	} else if spec.PersistentVolume != nil {
-		return spec.PersistentVolume.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName, nil
+		if spec.PersistentVolume.Spec.PersistentVolumeSource.GCEPersistentDisk != nil {
+			return spec.PersistentVolume.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName, nil
+		} else if spec.PersistentVolume.Spec.PersistentVolumeSource.NFS != nil {
+			return spec.PersistentVolume.Spec.PersistentVolumeSource.NFS.Server, nil
+		} else if spec.PersistentVolume.Spec.PersistentVolumeSource.RBD != nil {
+			return spec.PersistentVolume.Spec.PersistentVolumeSource.RBD.RBDImage, nil
+		}
+		return "", fmt.Errorf("GetVolumeName called with unexpected PersistentVolume: %v", spec)
 	} else {
 		return "", nil
 	}
@@ -400,7 +424,7 @@ func (plugin *TestPlugin) NewUnmounter(name string, podUID types.UID) (volume.Un
 	return nil, nil
 }
 
-func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	fakeVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -411,7 +435,9 @@ func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vo
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(fakeVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(fakeVolume),
+	}, nil
 }
 
 func (plugin *TestPlugin) NewAttacher() (volume.Attacher, error) {
@@ -457,6 +483,10 @@ func (plugin *TestPlugin) SupportsMountOption() bool {
 
 func (plugin *TestPlugin) SupportsBulkVolumeVerification() bool {
 	return false
+}
+
+func (plugin *TestPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
 }
 
 func (plugin *TestPlugin) GetErrorEncountered() bool {

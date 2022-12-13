@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"reflect"
 	"strings"
@@ -258,6 +259,18 @@ func (u unmarshaler) unmarshalScalar(value reflect.Value, data interface{}, tag 
 				return err
 			}
 			value.Set(reflect.ValueOf(v))
+		case *float64:
+			// These are regular strings when parsed by encoding/json's unmarshaler.
+			switch {
+			case strings.EqualFold(d, floatNaN):
+				value.Set(reflect.ValueOf(aws.Float64(math.NaN())))
+			case strings.EqualFold(d, floatInf):
+				value.Set(reflect.ValueOf(aws.Float64(math.Inf(1))))
+			case strings.EqualFold(d, floatNegInf):
+				value.Set(reflect.ValueOf(aws.Float64(math.Inf(-1))))
+			default:
+				return fmt.Errorf("unknown JSON number value: %s", d)
+			}
 		default:
 			return fmt.Errorf("unsupported value: %v (%s)", value.Interface(), value.Type())
 		}

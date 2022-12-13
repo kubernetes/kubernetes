@@ -17,13 +17,14 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"path"
 
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	clientset "k8s.io/client-go/kubernetes"
@@ -187,7 +188,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		suffix = ns.Name
 	})
 
-	ginkgo.It("should be mountable when non-attachable", func() {
+	ginkgo.It("should be mountable when non-attachable", func(ctx context.Context) {
 		driver := "dummy"
 		driverInstallAs := driver + "-" + suffix
 
@@ -205,7 +206,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		uninstallFlex(cs, node, "k8s", driverInstallAs)
 	})
 
-	ginkgo.It("should be mountable when attachable [Feature:Flexvolumes]", func() {
+	ginkgo.It("should be mountable when attachable [Feature:Flexvolumes]", func(ctx context.Context) {
 		driver := "dummy-attachable"
 		driverInstallAs := driver + "-" + suffix
 

@@ -37,28 +37,25 @@ import (
 )
 
 const (
-	flagClusterName      = "cluster"
-	flagAuthInfoName     = "user"
-	flagContext          = "context"
-	flagNamespace        = "namespace"
-	flagAPIServer        = "server"
-	flagTLSServerName    = "tls-server-name"
-	flagInsecure         = "insecure-skip-tls-verify"
-	flagCertFile         = "client-certificate"
-	flagKeyFile          = "client-key"
-	flagCAFile           = "certificate-authority"
-	flagBearerToken      = "token"
-	flagImpersonate      = "as"
-	flagImpersonateUID   = "as-uid"
-	flagImpersonateGroup = "as-group"
-	flagUsername         = "username"
-	flagPassword         = "password"
-	flagTimeout          = "request-timeout"
-	flagCacheDir         = "cache-dir"
-)
-
-var (
-	defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "cache")
+	flagClusterName        = "cluster"
+	flagAuthInfoName       = "user"
+	flagContext            = "context"
+	flagNamespace          = "namespace"
+	flagAPIServer          = "server"
+	flagTLSServerName      = "tls-server-name"
+	flagInsecure           = "insecure-skip-tls-verify"
+	flagCertFile           = "client-certificate"
+	flagKeyFile            = "client-key"
+	flagCAFile             = "certificate-authority"
+	flagBearerToken        = "token"
+	flagImpersonate        = "as"
+	flagImpersonateUID     = "as-uid"
+	flagImpersonateGroup   = "as-group"
+	flagUsername           = "username"
+	flagPassword           = "password"
+	flagTimeout            = "request-timeout"
+	flagCacheDir           = "cache-dir"
+	flagDisableCompression = "disable-compression"
 )
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
@@ -84,23 +81,24 @@ type ConfigFlags struct {
 	KubeConfig *string
 
 	// config flags
-	ClusterName      *string
-	AuthInfoName     *string
-	Context          *string
-	Namespace        *string
-	APIServer        *string
-	TLSServerName    *string
-	Insecure         *bool
-	CertFile         *string
-	KeyFile          *string
-	CAFile           *string
-	BearerToken      *string
-	Impersonate      *string
-	ImpersonateUID   *string
-	ImpersonateGroup *[]string
-	Username         *string
-	Password         *string
-	Timeout          *string
+	ClusterName        *string
+	AuthInfoName       *string
+	Context            *string
+	Namespace          *string
+	APIServer          *string
+	TLSServerName      *string
+	Insecure           *bool
+	CertFile           *string
+	KeyFile            *string
+	CAFile             *string
+	BearerToken        *string
+	Impersonate        *string
+	ImpersonateUID     *string
+	ImpersonateGroup   *[]string
+	Username           *string
+	Password           *string
+	Timeout            *string
+	DisableCompression *bool
 	// If non-nil, wrap config function can transform the Config
 	// before it is returned in ToRESTConfig function.
 	WrapConfigFn func(*rest.Config) *rest.Config
@@ -203,6 +201,9 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	if f.Insecure != nil {
 		overrides.ClusterInfo.InsecureSkipTLSVerify = *f.Insecure
 	}
+	if f.DisableCompression != nil {
+		overrides.ClusterInfo.DisableCompression = *f.DisableCompression
+	}
 
 	// bind context flags
 	if f.Context != nil {
@@ -275,17 +276,31 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	config.Burst = f.discoveryBurst
 	config.QPS = f.discoveryQPS
 
-	cacheDir := defaultCacheDir
+	cacheDir := getDefaultCacheDir()
 
 	// retrieve a user-provided value for the "cache-dir"
 	// override httpCacheDir and discoveryCacheDir if user-value is given.
-	if f.CacheDir != nil {
+	// user-provided value has higher precedence than default
+	// and KUBECACHEDIR environment variable.
+	if f.CacheDir != nil && *f.CacheDir != "" && *f.CacheDir != getDefaultCacheDir() {
 		cacheDir = *f.CacheDir
 	}
+
 	httpCacheDir := filepath.Join(cacheDir, "http")
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, "discovery"), config.Host)
 
 	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(6*time.Hour))
+}
+
+// getDefaultCacheDir returns default caching directory path.
+// it first looks at KUBECACHEDIR env var if it is set, otherwise
+// it returns standard kube cache dir.
+func getDefaultCacheDir() string {
+	if kcd := os.Getenv("KUBECACHEDIR"); kcd != "" {
+		return kcd
+	}
+
+	return filepath.Join(homedir.HomeDir(), ".kube", "cache")
 }
 
 // ToRESTMapper returns a mapper.
@@ -383,6 +398,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Timeout != nil {
 		flags.StringVar(f.Timeout, flagTimeout, *f.Timeout, "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.")
 	}
+	if f.DisableCompression != nil {
+		flags.BoolVar(f.DisableCompression, flagDisableCompression, *f.DisableCompression, "If true, opt-out of response compression for all requests to the server")
+	}
 }
 
 // WithDeprecatedPasswordFlag enables the username and password config flags
@@ -414,32 +432,34 @@ func (f *ConfigFlags) WithWrapConfigFn(wrapConfigFn func(*rest.Config) *rest.Con
 func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	impersonateGroup := []string{}
 	insecure := false
+	disableCompression := false
 
 	return &ConfigFlags{
 		Insecure:   &insecure,
 		Timeout:    utilpointer.String("0"),
 		KubeConfig: utilpointer.String(""),
 
-		CacheDir:         utilpointer.String(defaultCacheDir),
-		ClusterName:      utilpointer.String(""),
-		AuthInfoName:     utilpointer.String(""),
-		Context:          utilpointer.String(""),
-		Namespace:        utilpointer.String(""),
-		APIServer:        utilpointer.String(""),
-		TLSServerName:    utilpointer.String(""),
-		CertFile:         utilpointer.String(""),
-		KeyFile:          utilpointer.String(""),
-		CAFile:           utilpointer.String(""),
-		BearerToken:      utilpointer.String(""),
-		Impersonate:      utilpointer.String(""),
-		ImpersonateUID:   utilpointer.String(""),
-		ImpersonateGroup: &impersonateGroup,
+		CacheDir:           utilpointer.String(getDefaultCacheDir()),
+		ClusterName:        utilpointer.String(""),
+		AuthInfoName:       utilpointer.String(""),
+		Context:            utilpointer.String(""),
+		Namespace:          utilpointer.String(""),
+		APIServer:          utilpointer.String(""),
+		TLSServerName:      utilpointer.String(""),
+		CertFile:           utilpointer.String(""),
+		KeyFile:            utilpointer.String(""),
+		CAFile:             utilpointer.String(""),
+		BearerToken:        utilpointer.String(""),
+		Impersonate:        utilpointer.String(""),
+		ImpersonateUID:     utilpointer.String(""),
+		ImpersonateGroup:   &impersonateGroup,
+		DisableCompression: &disableCompression,
 
 		usePersistentConfig: usePersistentConfig,
 		// The more groups you have, the more discovery requests you need to make.
-		// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-		// double it just so we don't end up here again for a while.  This config is only used for discovery.
-		discoveryBurst: 100,
+		// with a burst of 300, we will not be rate-limiting for most clusters but
+		// the safeguard will still be here. This config is only used for discovery.
+		discoveryBurst: 300,
 	}
 }
 

@@ -27,15 +27,20 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -56,7 +61,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 
 	//Wait 10 seconds, then SEND delete requests for all the namespaces.
 	ginkgo.By("Waiting 10 seconds")
-	time.Sleep(time.Duration(10 * time.Second))
+	time.Sleep(10 * time.Second)
 	deleteFilter := []string{"nslifetest"}
 	deleted, err := framework.DeleteNamespaces(f.ClientSet, deleteFilter, nil /* skipFilter */)
 	framework.ExpectNoError(err, "failed to delete namespace(s) containing: %s", deleteFilter)
@@ -199,9 +204,10 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 // This test must run [Serial] due to the impact of running other parallel
 // tests can have on its performance.  Each test that follows the common
 // test framework follows this pattern:
-//   1. Create a Namespace
-//   2. Do work that generates content in that namespace
-//   3. Delete a Namespace
+//  1. Create a Namespace
+//  2. Do work that generates content in that namespace
+//  3. Delete a Namespace
+//
 // Creation of a Namespace is non-trivial since it requires waiting for a
 // ServiceAccount to be generated.
 // Deletion of a Namespace is non-trivial and performance intensive since
@@ -259,7 +265,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 	   The Namespace is patched.
 	   The Namespace and MUST now include the new Label.
 	*/
-	framework.ConformanceIt("should patch a Namespace", func() {
+	framework.ConformanceIt("should patch a Namespace", func(ctx context.Context) {
 		ginkgo.By("creating a Namespace")
 		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
 		ns, err := f.CreateNamespace(namespaceName, nil)
@@ -273,7 +279,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON patch data")
-		_, err = f.ClientSet.CoreV1().Namespaces().Patch(context.TODO(), namespaceName, types.StrategicMergePatchType, []byte(nspatch), metav1.PatchOptions{})
+		_, err = f.ClientSet.CoreV1().Namespaces().Patch(context.TODO(), namespaceName, types.StrategicMergePatchType, nspatch, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Namespace")
 
 		ginkgo.By("get the Namespace and ensuring it has the label")
@@ -282,4 +288,180 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		framework.ExpectEqual(namespace.ObjectMeta.Labels["testLabel"], "testValue", "namespace not patched")
 	})
 
+	/*
+		Release: v1.25
+		Testname: Namespace, apply changes to a namespace status
+		Description: Getting the current namespace status MUST succeed. The reported status
+		phase MUST be active. Given the patching of the namespace status, the fields MUST
+		equal the new values. Given the updating of the namespace status, the fields MUST
+		equal the new values.
+	*/
+	framework.ConformanceIt("should apply changes to a namespace status", func(ctx context.Context) {
+		ns := f.Namespace.Name
+		dc := f.DynamicClient
+		nsResource := v1.SchemeGroupVersion.WithResource("namespaces")
+		nsClient := f.ClientSet.CoreV1().Namespaces()
+
+		ginkgo.By("Read namespace status")
+
+		unstruct, err := dc.Resource(nsResource).Get(context.TODO(), ns, metav1.GetOptions{}, "status")
+		framework.ExpectNoError(err, "failed to fetch NamespaceStatus %s", ns)
+		nsStatus, err := unstructuredToNamespace(unstruct)
+		framework.ExpectNoError(err, "Getting the status of the namespace %s", ns)
+		framework.ExpectEqual(nsStatus.Status.Phase, v1.NamespaceActive, "The phase returned was %v", nsStatus.Status.Phase)
+		framework.Logf("Status: %#v", nsStatus.Status)
+
+		ginkgo.By("Patch namespace status")
+
+		nsCondition := v1.NamespaceCondition{
+			Type:    "StatusPatch",
+			Status:  v1.ConditionTrue,
+			Reason:  "E2E",
+			Message: "Patched by an e2e test",
+		}
+		nsConditionJSON, err := json.Marshal(nsCondition)
+		framework.ExpectNoError(err, "failed to marshal namespace condition")
+
+		patchedStatus, err := nsClient.Patch(context.TODO(), ns, types.MergePatchType,
+			[]byte(`{"metadata":{"annotations":{"e2e-patched-ns-status":"`+ns+`"}},"status":{"conditions":[`+string(nsConditionJSON)+`]}}`),
+			metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err, "Failed to patch status. err: %v ", err)
+		framework.ExpectEqual(patchedStatus.Annotations["e2e-patched-ns-status"], ns, "patched object should have the applied annotation")
+		framework.ExpectEqual(patchedStatus.Status.Conditions[len(patchedStatus.Status.Conditions)-1].Reason, "E2E", "The Reason returned was %v", patchedStatus.Status.Conditions[0].Reason)
+		framework.ExpectEqual(patchedStatus.Status.Conditions[len(patchedStatus.Status.Conditions)-1].Message, "Patched by an e2e test", "The Message returned was %v", patchedStatus.Status.Conditions[0].Message)
+		framework.Logf("Status.Condition: %#v", patchedStatus.Status.Conditions[len(patchedStatus.Status.Conditions)-1])
+
+		ginkgo.By("Update namespace status")
+		var statusUpdated *v1.Namespace
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			unstruct, err := dc.Resource(nsResource).Get(context.TODO(), ns, metav1.GetOptions{}, "status")
+			framework.ExpectNoError(err, "failed to fetch NamespaceStatus %s", ns)
+			statusToUpdate, err := unstructuredToNamespace(unstruct)
+			framework.ExpectNoError(err, "Getting the status of the namespace %s", ns)
+
+			statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, v1.NamespaceCondition{
+				Type:    "StatusUpdate",
+				Status:  v1.ConditionTrue,
+				Reason:  "E2E",
+				Message: "Updated by an e2e test",
+			})
+			statusUpdated, err = nsClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update namespace status %s", ns)
+		framework.ExpectEqual(len(statusUpdated.Status.Conditions), len(statusUpdated.Status.Conditions), fmt.Sprintf("updated object should have the applied condition, got %#v", statusUpdated.Status.Conditions))
+		framework.ExpectEqual(string(statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1].Type), "StatusUpdate", fmt.Sprintf("updated object should have the approved condition, got %#v", statusUpdated.Status.Conditions))
+		framework.ExpectEqual(statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1].Message, "Updated by an e2e test", "The Message returned was %v", statusUpdated.Status.Conditions[0].Message)
+		framework.Logf("Status.Condition: %#v", statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1])
+	})
+
+	/*
+		Release: v1.26
+		Testname: Namespace, apply update to a namespace
+		Description: When updating the namespace it MUST
+		succeed and the field MUST equal the new value.
+	*/
+	framework.ConformanceIt("should apply an update to a Namespace", func(ctx context.Context) {
+		var err error
+		var updatedNamespace *v1.Namespace
+		ns := f.Namespace.Name
+		cs := f.ClientSet
+
+		ginkgo.By(fmt.Sprintf("Updating Namespace %q", ns))
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			updatedNamespace, err = cs.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to get Namespace %q", ns)
+
+			updatedNamespace.Labels[ns] = "updated"
+			updatedNamespace, err = cs.CoreV1().Namespaces().Update(context.TODO(), updatedNamespace, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update Namespace: %q", ns)
+		framework.ExpectEqual(updatedNamespace.ObjectMeta.Labels[ns], "updated", "Failed to update namespace %q. Current Labels: %#v", ns, updatedNamespace.Labels)
+		framework.Logf("Namespace %q now has labels, %#v", ns, updatedNamespace.Labels)
+	})
+
+	/*
+		Release: v1.26
+		Testname: Namespace, apply finalizer to a namespace
+		Description: Attempt to create a Namespace which MUST be succeed.
+		Updating the namespace with a fake finalizer MUST succeed. The
+		fake finalizer MUST be found. Removing the fake finalizer from
+		the namespace MUST succeed and MUST NOT be found.
+	*/
+	framework.ConformanceIt("should apply a finalizer to a Namespace", func(ctx context.Context) {
+
+		fakeFinalizer := v1.FinalizerName("e2e.example.com/fakeFinalizer")
+		var updatedNamespace *v1.Namespace
+		nsName := "e2e-ns-" + utilrand.String(5)
+
+		ginkgo.By(fmt.Sprintf("Creating namespace %q", nsName))
+		testNamespace, err := f.CreateNamespace(nsName, nil)
+		framework.ExpectNoError(err, "failed creating Namespace")
+		ns := testNamespace.ObjectMeta.Name
+		nsClient := f.ClientSet.CoreV1().Namespaces()
+		framework.Logf("Namespace %q has %#v", testNamespace.Name, testNamespace.Spec.Finalizers)
+
+		ginkgo.By(fmt.Sprintf("Adding e2e finalizer to namespace %q", ns))
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			updateNamespace, err := nsClient.Get(context.TODO(), ns, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to get Namespace %q", ns)
+
+			updateNamespace.Spec.Finalizers = append(updateNamespace.Spec.Finalizers, fakeFinalizer)
+			updatedNamespace, err = nsClient.Finalize(context.TODO(), updateNamespace, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to add finalizer to the namespace: %q", ns)
+
+		var foundFinalizer bool
+		for _, item := range updatedNamespace.Spec.Finalizers {
+			if item == fakeFinalizer {
+				foundFinalizer = true
+				break
+			}
+		}
+		framework.ExpectEqual(foundFinalizer, true, "Finalizer %q was not found. Namespace %q has %#v", fakeFinalizer, updatedNamespace.Spec.Finalizers)
+		framework.Logf("Namespace %q has %#v", updatedNamespace.Name, updatedNamespace.Spec.Finalizers)
+
+		ginkgo.By(fmt.Sprintf("Removing e2e finalizer from namespace %q", ns))
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			updatedNamespace, err = nsClient.Get(context.TODO(), ns, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to get namespace %q", ns)
+
+			var finalizerList []v1.FinalizerName
+			for _, item := range updatedNamespace.Spec.Finalizers {
+				if item != fakeFinalizer {
+					finalizerList = append(finalizerList, item)
+				}
+			}
+			updatedNamespace.Spec.Finalizers = finalizerList
+			updatedNamespace, err = nsClient.Finalize(context.TODO(), updatedNamespace, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to remove finalizer from namespace: %q", ns)
+
+		foundFinalizer = false
+		for _, item := range updatedNamespace.Spec.Finalizers {
+			if item == fakeFinalizer {
+				foundFinalizer = true
+				break
+			}
+		}
+		framework.ExpectEqual(foundFinalizer, false, "Finalizer %q was found. Namespace %q has %#v", fakeFinalizer, updatedNamespace.Spec.Finalizers)
+		framework.Logf("Namespace %q has %#v", updatedNamespace.Name, updatedNamespace.Spec.Finalizers)
+	})
+
 })
+
+func unstructuredToNamespace(obj *unstructured.Unstructured) (*v1.Namespace, error) {
+	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
+	if err != nil {
+		return nil, err
+	}
+	ns := &v1.Namespace{}
+	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, ns)
+
+	return ns, err
+}

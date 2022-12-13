@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,19 +38,19 @@ import (
 )
 
 /*
-	Test to verify that a volume remains attached through vpxd restart.
+Test to verify that a volume remains attached through vpxd restart.
 
-	For the number of schedulable nodes:
-	1. Create a Volume with default options.
-	2. Create a Pod with the created Volume.
-	3. Verify that the Volume is attached.
-	4. Create a file with random contents under the Volume's mount point on the Pod.
-	5. Stop the vpxd service on the vCenter host.
-	6. Verify that the file is accessible on the Pod and that it's contents match.
-	7. Start the vpxd service on the vCenter host.
-	8. Verify that the Volume remains attached, the file is accessible on the Pod, and that it's contents match.
-	9. Delete the Pod and wait for the Volume to be detached.
-	10. Delete the Volume.
+For the number of schedulable nodes:
+1. Create a Volume with default options.
+2. Create a Pod with the created Volume.
+3. Verify that the Volume is attached.
+4. Create a file with random contents under the Volume's mount point on the Pod.
+5. Stop the vpxd service on the vCenter host.
+6. Verify that the file is accessible on the Pod and that it's contents match.
+7. Start the vpxd service on the vCenter host.
+8. Verify that the Volume remains attached, the file is accessible on the Pod, and that it's contents match.
+9. Delete the Pod and wait for the Volume to be detached.
+10. Delete the Volume.
 */
 var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vsphere][Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart-vpxd")
@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 
 		nodes, err := e2enode.GetReadySchedulableNodes(client)
 		framework.ExpectNoError(err)
@@ -91,7 +91,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 			nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodes.Items[i].Name)
 			nodeName := nodes.Items[i].Name
 			nodeLabel := "vsphere_e2e_" + string(uuid.NewUUID())
-			framework.AddOrUpdateLabelOnNode(client, nodeName, labelKey, nodeLabel)
+			e2enode.AddOrUpdateLabelOnNode(client, nodeName, labelKey, nodeLabel)
 
 			vcHost := nodeInfo.VSphere.Config.Hostname
 			vcNodesMap[vcHost] = append(vcNodesMap[vcHost], node{
@@ -102,7 +102,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 		}
 	})
 
-	ginkgo.It("verify volume remains attached through vpxd restart", func() {
+	ginkgo.It("verify volume remains attached through vpxd restart", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		for vcHost, nodes := range vcNodesMap {

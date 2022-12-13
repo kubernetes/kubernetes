@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -146,7 +146,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		Description: Register a conversion webhook and a custom resource definition. Create a v1 custom
 		resource. Attempts to read it at v2 MUST succeed.
 	*/
-	framework.ConformanceIt("should be able to convert from CR v1 to CR v2", func() {
+	framework.ConformanceIt("should be able to convert from CR v1 to CR v2", func(ctx context.Context) {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.Versions = apiVersions
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
@@ -181,7 +181,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		v1. Change the custom resource definition storage to v2. Create a custom resource stored at v2. Attempt to list
 		the custom resources at v2; the list result MUST contain both custom resources at v2.
 	*/
-	framework.ConformanceIt("should be able to convert a non homogeneous list of CRs", func() {
+	framework.ConformanceIt("should be able to convert a non homogeneous list of CRs", func(ctx context.Context) {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.Versions = apiVersions
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
@@ -291,7 +291,6 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 				"crd-conversion-webhook",
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
-				"--alsologtostderr",
 				"-v=4",
 				// Use a non-default port for containers.
 				fmt.Sprintf("--port=%d", containerPort),
@@ -340,7 +339,7 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 			Selector: serviceLabels,
 			Ports: []v1.ServicePort{
 				{
-					Protocol:   "TCP",
+					Protocol:   v1.ProtocolTCP,
 					Port:       servicePort,
 					TargetPort: intstr.FromInt(int(containerPort)),
 				},

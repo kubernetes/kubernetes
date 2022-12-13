@@ -21,10 +21,12 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 const mb int64 = 1024 * 1024
@@ -176,6 +178,53 @@ func TestCreateImageExistenceMap(t *testing.T) {
 			imageMap := createImageExistenceMap(test.nodes)
 			if !reflect.DeepEqual(test.expected, imageMap) {
 				t.Errorf("expected: %#v, got: %#v", test.expected, imageMap)
+			}
+		})
+	}
+}
+
+func TestCreateUsedPVCSet(t *testing.T) {
+	tests := []struct {
+		name     string
+		pods     []*v1.Pod
+		expected sets.String
+	}{
+		{
+			name:     "empty pods list",
+			pods:     []*v1.Pod{},
+			expected: sets.NewString(),
+		},
+		{
+			name: "pods not scheduled",
+			pods: []*v1.Pod{
+				st.MakePod().Name("foo").Namespace("foo").Obj(),
+				st.MakePod().Name("bar").Namespace("bar").Obj(),
+			},
+			expected: sets.NewString(),
+		},
+		{
+			name: "scheduled pods that do not use any PVC",
+			pods: []*v1.Pod{
+				st.MakePod().Name("foo").Namespace("foo").Node("node-1").Obj(),
+				st.MakePod().Name("bar").Namespace("bar").Node("node-2").Obj(),
+			},
+			expected: sets.NewString(),
+		},
+		{
+			name: "scheduled pods that use PVC",
+			pods: []*v1.Pod{
+				st.MakePod().Name("foo").Namespace("foo").Node("node-1").PVC("pvc1").Obj(),
+				st.MakePod().Name("bar").Namespace("bar").Node("node-2").PVC("pvc2").Obj(),
+			},
+			expected: sets.NewString("foo/pvc1", "bar/pvc2"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			usedPVCs := createUsedPVCSet(test.pods)
+			if diff := cmp.Diff(test.expected, usedPVCs); diff != "" {
+				t.Errorf("Unexpected usedPVCs (-want +got):\n%s", diff)
 			}
 		})
 	}

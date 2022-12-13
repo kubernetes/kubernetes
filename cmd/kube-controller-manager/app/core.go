@@ -17,7 +17,6 @@ limitations under the License.
 // Package app implements a server that runs a set of active
 // components.  This includes replication controllers, service endpoints and
 // nodes.
-//
 package app
 
 import (
@@ -28,7 +27,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/informers/networking/v1alpha1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,7 +41,6 @@ import (
 	cloudnodelifecyclecontroller "k8s.io/cloud-provider/controllers/nodelifecycle"
 	routecontroller "k8s.io/cloud-provider/controllers/route"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -54,6 +54,7 @@ import (
 	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
@@ -91,7 +92,7 @@ func startServiceController(ctx context.Context, controllerContext ControllerCon
 		klog.Errorf("Failed to start service controller: %v", err)
 		return nil, false, nil
 	}
-	go serviceController.Run(ctx, int(controllerContext.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
+	go serviceController.Run(ctx, int(controllerContext.ComponentConfig.ServiceController.ConcurrentServiceSyncs), controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 
@@ -104,20 +105,9 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 		return nil, false, nil
 	}
 
-	// failure: bad cidrs in config
-	clusterCIDRs, dualStack, err := processCIDRs(controllerContext.ComponentConfig.KubeCloudShared.ClusterCIDR)
+	clusterCIDRs, err := validateCIDRs(controllerContext.ComponentConfig.KubeCloudShared.ClusterCIDR)
 	if err != nil {
 		return nil, false, err
-	}
-
-	// failure: more than one cidr but they are not configured as dual stack
-	if len(clusterCIDRs) > 1 && !dualStack {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily)", len(clusterCIDRs))
-	}
-
-	// failure: more than cidrs is not allowed even with dual stack
-	if len(clusterCIDRs) > 2 {
-		return nil, false, fmt.Errorf("len of clusters is:%v > more than max allowed of 2", len(clusterCIDRs))
 	}
 
 	// service cidr processing
@@ -154,8 +144,14 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 		return nil, false, err
 	}
 
+	var clusterCIDRInformer v1alpha1.ClusterCIDRInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRRangeAllocator) {
+		clusterCIDRInformer = controllerContext.InformerFactory.Networking().V1alpha1().ClusterCIDRs()
+	}
+
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		controllerContext.InformerFactory.Core().V1().Nodes(),
+		clusterCIDRInformer,
 		controllerContext.Cloud,
 		controllerContext.ClientBuilder.ClientOrDie("node-controller"),
 		clusterCIDRs,
@@ -167,7 +163,7 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 	if err != nil {
 		return nil, true, err
 	}
-	go nodeIpamController.Run(ctx.Done())
+	go nodeIpamController.RunWithMetrics(ctx.Done(), controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 
@@ -212,7 +208,7 @@ func startCloudNodeLifecycleController(ctx context.Context, controllerContext Co
 		return nil, false, nil
 	}
 
-	go cloudNodeLifecycleController.Run(ctx)
+	go cloudNodeLifecycleController.Run(ctx, controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 
@@ -231,20 +227,9 @@ func startRouteController(ctx context.Context, controllerContext ControllerConte
 		return nil, false, nil
 	}
 
-	// failure: bad cidrs in config
-	clusterCIDRs, dualStack, err := processCIDRs(controllerContext.ComponentConfig.KubeCloudShared.ClusterCIDR)
+	clusterCIDRs, err := validateCIDRs(controllerContext.ComponentConfig.KubeCloudShared.ClusterCIDR)
 	if err != nil {
 		return nil, false, err
-	}
-
-	// failure: more than one cidr but they are not configured as dual stack
-	if len(clusterCIDRs) > 1 && !dualStack {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily", len(clusterCIDRs))
-	}
-
-	// failure: more than cidrs is not allowed even with dual stack
-	if len(clusterCIDRs) > 2 {
-		return nil, false, fmt.Errorf("length of clusterCIDRs is:%v more than max allowed of 2", len(clusterCIDRs))
 	}
 
 	routeController := routecontroller.New(routes,
@@ -252,7 +237,7 @@ func startRouteController(ctx context.Context, controllerContext ControllerConte
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs)
-	go routeController.Run(ctx, controllerContext.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
+	go routeController.Run(ctx, controllerContext.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration, controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 
@@ -290,10 +275,6 @@ func startPersistentVolumeBinderController(ctx context.Context, controllerContex
 }
 
 func startAttachDetachController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
-		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
-	}
-
 	csiNodeInformer := controllerContext.InformerFactory.Storage().V1().CSINodes()
 	csiDriverInformer := controllerContext.InformerFactory.Storage().V1().CSIDrivers()
 
@@ -377,6 +358,21 @@ func startEphemeralVolumeController(ctx context.Context, controllerContext Contr
 	return nil, true, nil
 }
 
+const defaultResourceClaimControllerWorkers = 10
+
+func startResourceClaimController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ephemeralController, err := resourceclaim.NewController(
+		controllerContext.ClientBuilder.ClientOrDie("resource-claim-controller"),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Resource().V1alpha1().ResourceClaims(),
+		controllerContext.InformerFactory.Resource().V1alpha1().ResourceClaimTemplates())
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
+	}
+	go ephemeralController.Run(ctx, defaultResourceClaimControllerWorkers)
+	return nil, true, nil
+}
+
 func startEndpointController(ctx context.Context, controllerCtx ControllerContext) (controller.Interface, bool, error) {
 	go endpointcontroller.NewEndpointController(
 		controllerCtx.InformerFactory.Core().V1().Pods(),
@@ -426,13 +422,8 @@ func startResourceQuotaController(ctx context.Context, controllerContext Control
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
 		InformersStarted:          controllerContext.InformersStarted,
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
+		UpdateFilter:              quotainstall.DefaultUpdateFilter(),
 	}
-	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, true, err
-		}
-	}
-
 	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
 	if err != nil {
 		return nil, false, err
@@ -571,6 +562,29 @@ func startTTLAfterFinishedController(ctx context.Context, controllerContext Cont
 		controllerContext.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
 	).Run(ctx, int(controllerContext.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs))
 	return nil, true, nil
+}
+
+// processCIDRs is a helper function that works on a comma separated cidrs and returns
+// a list of typed cidrs
+// error if failed to parse any of the cidrs or invalid length of cidrs
+func validateCIDRs(cidrsList string) ([]*net.IPNet, error) {
+	// failure: bad cidrs in config
+	clusterCIDRs, dualStack, err := processCIDRs(cidrsList)
+	if err != nil {
+		return nil, err
+	}
+
+	// failure: more than one cidr but they are not configured as dual stack
+	if len(clusterCIDRs) > 1 && !dualStack {
+		return nil, fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily", len(clusterCIDRs))
+	}
+
+	// failure: more than cidrs is not allowed even with dual stack
+	if len(clusterCIDRs) > 2 {
+		return nil, fmt.Errorf("length of clusterCIDRs is:%v more than max allowed of 2", len(clusterCIDRs))
+	}
+
+	return clusterCIDRs, nil
 }
 
 // processCIDRs is a helper function that works on a comma separated cidrs and returns

@@ -17,13 +17,15 @@ limitations under the License.
 package network
 
 import (
+	"context"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	"k8s.io/kubernetes/test/e2e/network/scale"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
@@ -58,7 +60,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
 			}
 		})
 
-		ginkgo.It("Creating and updating ingresses should happen promptly with small/medium/large amount of ingresses", func() {
+		ginkgo.It("Creating and updating ingresses should happen promptly with small/medium/large amount of ingresses", func(ctx context.Context) {
 			if errs := scaleFramework.RunScaleTest(); len(errs) != 0 {
 				framework.Failf("Unexpected error while running ingress scale test: %v", errs)
 			}

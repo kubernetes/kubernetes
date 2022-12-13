@@ -51,11 +51,11 @@ import (
 func TestCSRDuration(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	t.Cleanup(cancel)
-
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	t.Cleanup(s.TearDownFn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	t.Cleanup(cancel)
 
 	// assert that the metrics we collect during the test run match expectations
 	// we have 7 valid test cases below that request a duration of which 6 should have their duration honored

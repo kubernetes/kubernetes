@@ -19,7 +19,7 @@ package vsphere
 import (
 	"context"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/vmware/govmomi/object"
 
@@ -46,16 +46,18 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 		framework.ExpectNoError(err)
 		workingDir = GetAndExpectStringEnvVar("VSPHERE_WORKING_DIR")
 	})
 
-	ginkgo.It("node unregister", func() {
+	ginkgo.It("node unregister", func(ctx context.Context) {
 		ginkgo.By("Get total Ready nodes")
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nodeList.Items) > 1, true, "At least 2 nodes are required for this test")
+		if len(nodeList.Items) < 2 {
+			framework.Failf("At least 2 nodes are required for this test, got instead: %v", len(nodeList.Items))
+		}
 
 		totalNodesCount := len(nodeList.Items)
 		nodeVM := nodeList.Items[0]
@@ -66,9 +68,6 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		// Find VM .vmx file path, host, resource pool.
 		// They are required to register a node VM to VC
 		vmxFilePath := getVMXFilePath(vmObject)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 
 		vmHost, err := vmObject.HostSystem(ctx)
 		framework.ExpectNoError(err)

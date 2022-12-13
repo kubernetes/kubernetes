@@ -19,7 +19,6 @@ package testing
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -364,19 +363,45 @@ func AddToScheme(scheme *runtime.Scheme) (meta.RESTMapper, runtime.Codec) {
 	return mapper, codec
 }
 
-type fakeCachedDiscoveryClient struct {
+type FakeCachedDiscoveryClient struct {
 	discovery.DiscoveryInterface
+	Groups             []*metav1.APIGroup
+	Resources          []*metav1.APIResourceList
+	PreferredResources []*metav1.APIResourceList
+	Invalidations      int
 }
 
-func (d *fakeCachedDiscoveryClient) Fresh() bool {
+func NewFakeCachedDiscoveryClient() *FakeCachedDiscoveryClient {
+	return &FakeCachedDiscoveryClient{
+		Groups:             []*metav1.APIGroup{},
+		Resources:          []*metav1.APIResourceList{},
+		PreferredResources: []*metav1.APIResourceList{},
+		Invalidations:      0,
+	}
+}
+
+func (d *FakeCachedDiscoveryClient) Fresh() bool {
 	return true
 }
 
-func (d *fakeCachedDiscoveryClient) Invalidate() {
+func (d *FakeCachedDiscoveryClient) Invalidate() {
+	d.Invalidations++
 }
 
-func (d *fakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-	return []*metav1.APIGroup{}, []*metav1.APIResourceList{}, nil
+func (d *FakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return d.Groups, d.Resources, nil
+}
+
+func (d *FakeCachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
+	groupList := &metav1.APIGroupList{Groups: []metav1.APIGroup{}}
+	for _, g := range d.Groups {
+		groupList.Groups = append(groupList.Groups, *g)
+	}
+	return groupList, nil
+}
+
+func (d *FakeCachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return d.PreferredResources, nil
 }
 
 // TestFactory extends cmdutil.Factory
@@ -402,7 +427,7 @@ type TestFactory struct {
 func NewTestFactory() *TestFactory {
 	// specify an optionalClientConfig to explicitly use in testing
 	// to avoid polluting an existing user config.
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "cmdtests_temp")
+	tmpFile, err := os.CreateTemp(os.TempDir(), "cmdtests_temp")
 	if err != nil {
 		panic(fmt.Sprintf("unable to create a fake client config: %v", err))
 	}
@@ -444,6 +469,11 @@ func (f *TestFactory) WithNamespace(ns string) *TestFactory {
 // WithClientConfig sets the client config to use
 func (f *TestFactory) WithClientConfig(clientConfig clientcmd.ClientConfig) *TestFactory {
 	f.kubeConfigFlags.WithClientConfig(clientConfig)
+	return f
+}
+
+func (f *TestFactory) WithDiscoveryClient(discoveryClient discovery.CachedDiscoveryInterface) *TestFactory {
+	f.kubeConfigFlags.WithDiscoveryClient(discoveryClient)
 	return f
 }
 
@@ -494,7 +524,7 @@ func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 }
 
 // Validator returns a validation schema
-func (f *TestFactory) Validator(validateDirective string, verifier *resource.QueryParamVerifier) (validation.Schema, error) {
+func (f *TestFactory) Validator(validateDirective string) (validation.Schema, error) {
 	return validation.NullSchema{}, nil
 }
 
@@ -552,6 +582,7 @@ func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AuthorizationV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AuthorizationV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+	clientset.AuthenticationV1alpha1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AutoscalingV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AutoscalingV2beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.BatchV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
@@ -618,7 +649,7 @@ func testRESTMapper() meta.RESTMapper {
 		},
 	}
 
-	fakeDs := &fakeCachedDiscoveryClient{}
+	fakeDs := NewFakeCachedDiscoveryClient()
 	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
 	return expander
 }

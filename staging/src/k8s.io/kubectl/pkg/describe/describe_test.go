@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
@@ -34,6 +35,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -98,6 +100,30 @@ func TestDescribePod(t *testing.T) {
 		t.Errorf("unexpected out: %s", out)
 	}
 	if !strings.Contains(out, "Terminating (lasts 10y)") || !strings.Contains(out, "1234s") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodServiceAccount(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: "fooaccount",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Service Account:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "fooaccount") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -207,6 +233,40 @@ func TestDescribePodTolerations(t *testing.T) {
 		!strings.Contains(out, "key3=value3:NoExecute for 300s\n") ||
 		!strings.Contains(out, "key4:NoExecute for 60s\n") ||
 		!strings.Contains(out, "Tolerations:") {
+		t.Errorf("unexpected out:\n%s", out)
+	}
+}
+
+func TestDescribeTopologySpreadConstraints(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+				{
+					MaxSkew:           3,
+					TopologyKey:       "topology.kubernetes.io/test1",
+					WhenUnsatisfiable: "DoNotSchedule",
+					LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"key1": "val1", "key2": "val2"}},
+				},
+				{
+					MaxSkew:           1,
+					TopologyKey:       "topology.kubernetes.io/test2",
+					WhenUnsatisfiable: "ScheduleAnyway",
+				},
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "topology.kubernetes.io/test1:DoNotSchedule when max skew 3 is exceeded for selector key1=val1,key2=val2\n") ||
+		!strings.Contains(out, "topology.kubernetes.io/test2:ScheduleAnyway when max skew 1 is exceeded\n") {
 		t.Errorf("unexpected out:\n%s", out)
 	}
 }
@@ -341,6 +401,86 @@ func TestDescribePodPriority(t *testing.T) {
 	}
 	if !strings.Contains(out, "high-priority") || !strings.Contains(out, "1000") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodRuntimeClass(t *testing.T) {
+	runtimeClassNames := []string{"test1", ""}
+	testCases := []struct {
+		name     string
+		pod      *corev1.Pod
+		expect   []string
+		unexpect []string
+	}{
+		{
+			name: "test1",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[0],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Runtime Class Name", "test1",
+			},
+			unexpect: []string{},
+		},
+		{
+			name: "test2",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[1],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name",
+			},
+		},
+		{
+			name: "test3",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+			for _, unexpected := range testCase.unexpect {
+				if strings.Contains(out, unexpected) {
+					t.Errorf("unexpected to find %q in output: %q", unexpected, out)
+				}
+			}
+		})
 	}
 }
 
@@ -2232,6 +2372,302 @@ func TestDescribeDeployment(t *testing.T) {
 				"Normal  ScalingReplicaSet  60s                deployment-controller  Scaled down replica set bar-002 to 1",
 			},
 		},
+		{
+			name: "deployment after successful rollout",
+			objects: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "bar",
+						Namespace:         "foo",
+						Labels:            labels,
+						UID:               "00000000-0000-0000-0000-000000000001",
+						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+					},
+					Spec: appsv1.DeploymentSpec{
+						Replicas: utilpointer.Int32Ptr(2),
+						Selector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "bar",
+								Namespace: "foo",
+								Labels:    labels,
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Image: "mytest-image:v2.0",
+										VolumeMounts: []corev1.VolumeMount{
+											{
+												Name:      "vol-foo",
+												MountPath: "/tmp/vol-foo",
+											}, {
+												Name:      "vol-bar",
+												MountPath: "/tmp/vol-bar",
+											},
+										},
+									},
+								},
+								Volumes: []corev1.Volume{
+									{
+										Name:         "vol-foo",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+									{
+										Name:         "vol-bar",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						Replicas:            2,
+						UpdatedReplicas:     2,
+						AvailableReplicas:   2,
+						UnavailableReplicas: 0,
+					},
+				}, &appsv1.ReplicaSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-001",
+						Namespace: "foo",
+						Labels:    labels,
+						UID:       "00000000-0000-0000-0000-000000000001",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Controller: utilpointer.BoolPtr(true),
+								UID:        "00000000-0000-0000-0000-000000000001",
+							},
+						},
+					},
+					Spec: appsv1.ReplicaSetSpec{
+						Replicas: utilpointer.Int32Ptr(0),
+						Selector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "bar",
+								Namespace: "foo",
+								Labels:    labels,
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Image: "mytest-image:v1.0",
+										VolumeMounts: []corev1.VolumeMount{
+											{
+												Name:      "vol-foo",
+												MountPath: "/tmp/vol-foo",
+											}, {
+												Name:      "vol-bar",
+												MountPath: "/tmp/vol-bar",
+											},
+										},
+									},
+								},
+								Volumes: []corev1.Volume{
+									{
+										Name:         "vol-foo",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+									{
+										Name:         "vol-bar",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.ReplicaSetStatus{
+						Replicas:          0,
+						ReadyReplicas:     0,
+						AvailableReplicas: 0,
+					},
+				}, &appsv1.ReplicaSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-002",
+						Namespace: "foo",
+						Labels:    labels,
+						UID:       "00000000-0000-0000-0000-000000000002",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Controller: utilpointer.BoolPtr(true),
+								UID:        "00000000-0000-0000-0000-000000000001",
+							},
+						},
+					},
+					Spec: appsv1.ReplicaSetSpec{
+						Replicas: utilpointer.Int32Ptr(2),
+						Selector: &metav1.LabelSelector{
+							MatchLabels: labels,
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "bar",
+								Namespace: "foo",
+								Labels:    labels,
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Image: "mytest-image:v2.0",
+										VolumeMounts: []corev1.VolumeMount{
+											{
+												Name:      "vol-foo",
+												MountPath: "/tmp/vol-foo",
+											}, {
+												Name:      "vol-bar",
+												MountPath: "/tmp/vol-bar",
+											},
+										},
+									},
+								},
+								Volumes: []corev1.Volume{
+									{
+										Name:         "vol-foo",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+									{
+										Name:         "vol-bar",
+										VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+									},
+								},
+							},
+						},
+					},
+					Status: appsv1.ReplicaSetStatus{
+						Replicas:          2,
+						ReadyReplicas:     2,
+						AvailableReplicas: 2,
+					},
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-000",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:                corev1.EventTypeNormal,
+					Reason:              "ScalingReplicaSet",
+					Message:             "Scaled up replica set bar-002 to 1",
+					ReportingController: "deployment-controller",
+					EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
+					Series: &corev1.EventSeries{
+						Count:            3,
+						LastObservedTime: metav1.NewMicroTime(time.Now().Add(-12 * time.Minute)),
+					},
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-001",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:    corev1.EventTypeNormal,
+					Reason:  "ScalingReplicaSet",
+					Message: "Scaled up replica set bar-001 to 2",
+					Source: corev1.EventSource{
+						Component: "deployment-controller",
+					},
+					FirstTimestamp: metav1.NewTime(time.Now().Add(-10 * time.Minute)),
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-002",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:    corev1.EventTypeNormal,
+					Reason:  "ScalingReplicaSet",
+					Message: "Scaled up replica set bar-002 to 1",
+					Source: corev1.EventSource{
+						Component: "deployment-controller",
+					},
+					FirstTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Minute)),
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-003",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:                corev1.EventTypeNormal,
+					Reason:              "ScalingReplicaSet",
+					Message:             "Scaled down replica set bar-002 to 1",
+					ReportingController: "deployment-controller",
+					EventTime:           metav1.NewMicroTime(time.Now().Add(-1 * time.Minute)),
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-004",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:                corev1.EventTypeNormal,
+					Reason:              "ScalingReplicaSet",
+					Message:             "Scaled up replica set bar-002 to 2",
+					ReportingController: "deployment-controller",
+					EventTime:           metav1.NewMicroTime(time.Now().Add(-15 * time.Second)),
+				}, &corev1.Event{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-005",
+						Namespace: "foo",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "bar",
+						Namespace:  "foo",
+						UID:        "00000000-0000-0000-0000-000000000001",
+					},
+					Type:                corev1.EventTypeNormal,
+					Reason:              "ScalingReplicaSet",
+					Message:             "Scaled down replica set bar-001 to 0",
+					ReportingController: "deployment-controller",
+					EventTime:           metav1.NewMicroTime(time.Now().Add(-3 * time.Second)),
+				},
+			},
+			expects: []string{
+				"Replicas:           2 desired | 2 updated | 2 total | 2 available | 0 unavailable",
+				"Image:        mytest-image:v2.0",
+				"OldReplicaSets:  bar-001 (0/0 replicas created)",
+				"NewReplicaSet:   bar-002 (2/2 replicas created)",
+				"Events:\n",
+				"Normal  ScalingReplicaSet  12m (x3 over 20m)  deployment-controller  Scaled up replica set bar-002 to 1",
+				"Normal  ScalingReplicaSet  10m                deployment-controller  Scaled up replica set bar-001 to 2",
+				"Normal  ScalingReplicaSet  2m                 deployment-controller  Scaled up replica set bar-002 to 1",
+				"Normal  ScalingReplicaSet  60s                deployment-controller  Scaled down replica set bar-002 to 1",
+				"Normal  ScalingReplicaSet  15s                deployment-controller  Scaled up replica set bar-002 to 2",
+				"Normal  ScalingReplicaSet  3s                 deployment-controller  Scaled down replica set bar-001 to 0",
+			},
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -2671,6 +3107,30 @@ Rules:
   Host        Path  Backends
   ----        ----  --------
   *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:  <none>
+Events:       <none>
+`,
+		},
+		"EmptyBackend": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
+					IngressClassName: &ingresClassName,
+				},
+			}),
+			output: `Name:             bar
+Labels:           <none>
+Namespace:        foo
+Address:          
+Ingress Class:    test
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           *     <default>
 Annotations:  <none>
 Events:       <none>
 `,
@@ -5233,6 +5693,64 @@ Events:         <none>` + "\n",
 	}
 }
 
+func TestDescribeClusterCIDR(t *testing.T) {
+
+	testcases := map[string]struct {
+		input  *fake.Clientset
+		output string
+	}{
+		"ClusterCIDR v1alpha1": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1alpha1.ClusterCIDRSpec{
+					PerNodeHostBits: int32(8),
+					IPv4:            "10.1.0.0/16",
+					IPv6:            "fd00:1:1::/64",
+					NodeSelector: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: "In",
+										Values:   []string{"bar"}},
+								},
+							},
+						},
+					},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+NodeSelector:
+  NodeSelector Terms:
+    Term 0:       foo in [bar]
+PerNodeHostBits:  8
+IPv4:             10.1.0.0/16
+IPv6:             fd00:1:1::/64
+Events:           <none>` + "\n",
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			c := &describeClient{T: t, Namespace: "foo", Interface: tc.input}
+			d := ClusterCIDRDescriber{c}
+			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if out != tc.output {
+				t.Errorf("expected :\n%s\nbut got output:\n%s diff:\n%s", tc.output, out, cmp.Diff(tc.output, out))
+			}
+		})
+	}
+}
+
 func TestControllerRef(t *testing.T) {
 	var replicas int32 = 1
 	f := fake.NewSimpleClientset(
@@ -5320,5 +5838,165 @@ func TestControllerRef(t *testing.T) {
 	}
 	if !strings.Contains(out, "1 Running") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribeTerminalEscape(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "mycm",
+			Namespace:   "foo",
+			Annotations: map[string]string{"annotation1": "terminal escape: \x1b"},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := ConfigMapDescriber{c}
+	out, err := d.Describe("foo", "mycm", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if strings.Contains(out, "\x1b") || !strings.Contains(out, "^[") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribeSeccompProfile(t *testing.T) {
+	testLocalhostProfiles := []string{"lauseafoodpod", "tikkamasalaconatiner", "dropshotephemeral"}
+
+	testCases := []struct {
+		name   string
+		pod    *corev1.Pod
+		expect []string
+	}{
+		{
+			name: "podLocalhostSeccomp",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{
+							Type:             corev1.SeccompProfileTypeLocalhost,
+							LocalhostProfile: &testLocalhostProfiles[0],
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Localhost",
+				"LocalhostProfile", testLocalhostProfiles[0],
+			},
+		},
+		{
+			name: "podOther",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "RuntimeDefault",
+			},
+		},
+		{
+			name: "containerLocalhostSeccomp",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							SecurityContext: &corev1.SecurityContext{
+								SeccompProfile: &corev1.SeccompProfile{
+									Type:             corev1.SeccompProfileTypeLocalhost,
+									LocalhostProfile: &testLocalhostProfiles[1],
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Localhost",
+				"LocalhostProfile", testLocalhostProfiles[1],
+			},
+		},
+		{
+			name: "containerOther",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							SecurityContext: &corev1.SecurityContext{
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: corev1.SeccompProfileTypeUnconfined,
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Unconfined",
+			},
+		},
+		{
+			name: "ephemeralLocalhostSeccomp",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					EphemeralContainers: []corev1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+								SecurityContext: &corev1.SecurityContext{
+									SeccompProfile: &corev1.SeccompProfile{
+										Type:             corev1.SeccompProfileTypeLocalhost,
+										LocalhostProfile: &testLocalhostProfiles[2],
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Localhost",
+				"LocalhostProfile", testLocalhostProfiles[2],
+			},
+		},
+		{
+			name: "ephemeralOther",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							SecurityContext: &corev1.SecurityContext{
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: corev1.SeccompProfileTypeUnconfined,
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Unconfined",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
 	}
 }

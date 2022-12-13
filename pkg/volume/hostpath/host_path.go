@@ -108,6 +108,10 @@ func (plugin *hostPathPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *hostPathPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *hostPathPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -177,7 +181,7 @@ func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volu
 	return newProvisioner(options, plugin.host, plugin)
 }
 
-func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	hostPathVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -186,7 +190,9 @@ func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) 
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(hostPathVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(hostPathVolume),
+	}, nil
 }
 
 func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error) {

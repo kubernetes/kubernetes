@@ -50,10 +50,11 @@ type Config struct {
 	Process ProcessFunc
 
 	// ObjectType is an example object of the type this controller is
-	// expected to handle.  Only the type needs to be right, except
-	// that when that is `unstructured.Unstructured` the object's
-	// `"apiVersion"` and `"kind"` must also be right.
+	// expected to handle.
 	ObjectType runtime.Object
+
+	// ObjectDescription is the description to use when logging type-specific information about this controller.
+	ObjectDescription string
 
 	// FullResyncPeriod is the period at which ShouldResync is considered.
 	FullResyncPeriod time.Duration
@@ -131,11 +132,14 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		<-stopCh
 		c.config.Queue.Close()
 	}()
-	r := NewReflector(
+	r := NewReflectorWithOptions(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
-		c.config.FullResyncPeriod,
+		ReflectorOptions{
+			ResyncPeriod:    c.config.FullResyncPeriod,
+			TypeDescription: c.config.ObjectDescription,
+		},
 	)
 	r.ShouldResync = c.config.ShouldResync
 	r.WatchListPageSize = c.config.WatchListPageSize
@@ -199,17 +203,17 @@ func (c *controller) processLoop() {
 // can't return an error.  The handlers MUST NOT modify the objects
 // received; this concerns not only the top level of structure but all
 // the data structures reachable from it.
-//  * OnAdd is called when an object is added.
-//  * OnUpdate is called when an object is modified. Note that oldObj is the
-//      last known state of the object-- it is possible that several changes
-//      were combined together, so you can't use this to see every single
-//      change. OnUpdate is also called when a re-list happens, and it will
-//      get called even if nothing changed. This is useful for periodically
-//      evaluating or syncing something.
-//  * OnDelete will get the final state of the item if it is known, otherwise
-//      it will get an object of type DeletedFinalStateUnknown. This can
-//      happen if the watch is closed and misses the delete event and we don't
-//      notice the deletion until the subsequent re-list.
+//   - OnAdd is called when an object is added.
+//   - OnUpdate is called when an object is modified. Note that oldObj is the
+//     last known state of the object-- it is possible that several changes
+//     were combined together, so you can't use this to see every single
+//     change. OnUpdate is also called when a re-list happens, and it will
+//     get called even if nothing changed. This is useful for periodically
+//     evaluating or syncing something.
+//   - OnDelete will get the final state of the item if it is known, otherwise
+//     it will get an object of type DeletedFinalStateUnknown. This can
+//     happen if the watch is closed and misses the delete event and we don't
+//     notice the deletion until the subsequent re-list.
 type ResourceEventHandler interface {
 	OnAdd(obj interface{})
 	OnUpdate(oldObj, newObj interface{})
@@ -305,15 +309,14 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 // notifications to be faulty.
 //
 // Parameters:
-//  * lw is list and watch functions for the source of the resource you want to
-//    be informed of.
-//  * objType is an object of the type that you expect to receive.
-//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
-//    calls, even if nothing changed). Otherwise, re-list will be delayed as
-//    long as possible (until the upstream source closes the watch or times out,
-//    or you stop the controller).
-//  * h is the object you want notifications sent to.
-//
+//   - lw is list and watch functions for the source of the resource you want to
+//     be informed of.
+//   - objType is an object of the type that you expect to receive.
+//   - resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//     calls, even if nothing changed). Otherwise, re-list will be delayed as
+//     long as possible (until the upstream source closes the watch or times out,
+//     or you stop the controller).
+//   - h is the object you want notifications sent to.
 func NewInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -332,16 +335,15 @@ func NewInformer(
 // notifications to be faulty.
 //
 // Parameters:
-//  * lw is list and watch functions for the source of the resource you want to
-//    be informed of.
-//  * objType is an object of the type that you expect to receive.
-//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
-//    calls, even if nothing changed). Otherwise, re-list will be delayed as
-//    long as possible (until the upstream source closes the watch or times out,
-//    or you stop the controller).
-//  * h is the object you want notifications sent to.
-//  * indexers is the indexer for the received object type.
-//
+//   - lw is list and watch functions for the source of the resource you want to
+//     be informed of.
+//   - objType is an object of the type that you expect to receive.
+//   - resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//     calls, even if nothing changed). Otherwise, re-list will be delayed as
+//     long as possible (until the upstream source closes the watch or times out,
+//     or you stop the controller).
+//   - h is the object you want notifications sent to.
+//   - indexers is the indexer for the received object type.
 func NewIndexerInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -454,16 +456,15 @@ func processDeltas(
 // providing event notifications.
 //
 // Parameters
-//  * lw is list and watch functions for the source of the resource you want to
-//    be informed of.
-//  * objType is an object of the type that you expect to receive.
-//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
-//    calls, even if nothing changed). Otherwise, re-list will be delayed as
-//    long as possible (until the upstream source closes the watch or times out,
-//    or you stop the controller).
-//  * h is the object you want notifications sent to.
-//  * clientState is the store you want to populate
-//
+//   - lw is list and watch functions for the source of the resource you want to
+//     be informed of.
+//   - objType is an object of the type that you expect to receive.
+//   - resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//     calls, even if nothing changed). Otherwise, re-list will be delayed as
+//     long as possible (until the upstream source closes the watch or times out,
+//     or you stop the controller).
+//   - h is the object you want notifications sent to.
+//   - clientState is the store you want to populate
 func newInformer(
 	lw ListerWatcher,
 	objType runtime.Object,

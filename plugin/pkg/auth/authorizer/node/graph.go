@@ -327,12 +327,12 @@ func (g *Graph) recomputeDestinationIndex_locked(n graph.Node) {
 // AddPod should only be called once spec.NodeName is populated.
 // It sets up edges for the following relationships (which are immutable for a pod once bound to a node):
 //
-//   pod -> node
+//	pod -> node
 //
-//   secret    -> pod
-//   configmap -> pod
-//   pvc       -> pod
-//   svcacct   -> pod
+//	secret    -> pod
+//	configmap -> pod
+//	pvc       -> pod
+//	svcacct   -> pod
 func (g *Graph) AddPod(pod *corev1.Pod) {
 	start := time.Now()
 	defer func() {
@@ -407,9 +407,9 @@ func (g *Graph) DeletePod(name, namespace string) {
 
 // AddPV sets up edges for the following relationships:
 //
-//   secret -> pv
+//	secret -> pv
 //
-//   pv -> pvc
+//	pv -> pvc
 func (g *Graph) AddPV(pv *corev1.PersistentVolume) {
 	start := time.Now()
 	defer func() {
@@ -448,7 +448,7 @@ func (g *Graph) DeletePV(name string) {
 
 // AddVolumeAttachment sets up edges for the following relationships:
 //
-//   volume attachment -> node
+//	volume attachment -> node
 func (g *Graph) AddVolumeAttachment(attachmentName, nodeName string) {
 	start := time.Now()
 	defer func() {
@@ -475,32 +475,4 @@ func (g *Graph) DeleteVolumeAttachment(name string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(vaVertexType, "", name)
-}
-
-// SetNodeConfigMap sets up edges for the Node.Spec.ConfigSource.ConfigMap relationship:
-//
-// configmap -> node
-func (g *Graph) SetNodeConfigMap(nodeName, configMapName, configMapNamespace string) {
-	start := time.Now()
-	defer func() {
-		graphActionsDuration.WithLabelValues("SetNodeConfigMap").Observe(time.Since(start).Seconds())
-	}()
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	// TODO(mtaufen): ensure len(nodeName) > 0 in all cases (would sure be nice to have a dependently-typed language here...)
-
-	// clear edges configmaps -> node where the destination is the current node *only*
-	// at present, a node can only have one *direct* configmap reference at a time
-	g.deleteEdges_locked(configMapVertexType, nodeVertexType, "", nodeName)
-
-	// establish new edges if we have a real ConfigMap to reference
-	if len(configMapName) > 0 && len(configMapNamespace) > 0 {
-		configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, configMapNamespace, configMapName)
-		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
-		e := newDestinationEdge(configmapVertex, nodeVertex, nodeVertex)
-		g.graph.SetEdge(e)
-		g.addEdgeToDestinationIndex_locked(e)
-	}
-
 }

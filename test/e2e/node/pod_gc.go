@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +38,7 @@ import (
 var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]", func() {
 	f := framework.NewDefaultFramework("pod-garbage-collector")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	ginkgo.It("should handle the creation of 1000 pods", func() {
+	ginkgo.It("should handle the creation of 1000 pods", func(ctx context.Context) {
 		var count int
 		for count < 1000 {
 			pod, err := createTerminatingPod(f)

@@ -162,17 +162,18 @@ message ApplyOptions {
 // Condition contains details for one aspect of the current state of this API Resource.
 // ---
 // This struct is intended for direct use as an array at the field path .status.conditions.  For example,
-// type FooStatus struct{
-//     // Represents the observations of a foo's current state.
-//     // Known .status.conditions.type are: "Available", "Progressing", and "Degraded"
-//     // +patchMergeKey=type
-//     // +patchStrategy=merge
-//     // +listType=map
-//     // +listMapKey=type
-//     Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 //
-//     // other fields
-// }
+// 	type FooStatus struct{
+// 	    // Represents the observations of a foo's current state.
+// 	    // Known .status.conditions.type are: "Available", "Progressing", and "Degraded"
+// 	    // +patchMergeKey=type
+// 	    // +patchStrategy=merge
+// 	    // +listType=map
+// 	    // +listMapKey=type
+// 	    Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+//
+// 	    // other fields
+// 	}
 message Condition {
   // type of condition in CamelCase or in foo.example.com/CamelCase.
   // ---
@@ -784,15 +785,6 @@ message ObjectMeta {
   // +optional
   // +patchStrategy=merge
   repeated string finalizers = 14;
-
-  // Deprecated: ClusterName is a legacy field that was always cleared by
-  // the system and never used; it will be removed completely in 1.25.
-  //
-  // The name in the go struct is changed to help clients detect
-  // accidental use.
-  //
-  // +optional
-  optional string clusterName = 15;
 
   // ManagedFields maps workflow-id and version to the set of fields
   // that are managed by that workflow. This is mostly for internal

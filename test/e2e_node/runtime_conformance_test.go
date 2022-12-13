@@ -17,19 +17,21 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/common/node"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Container Runtime Conformance Test", func() {
@@ -66,11 +68,11 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 				},
 			} {
 				testCase := testCase
-				ginkgo.It(testCase.description+" [NodeConformance]", func() {
+				ginkgo.It(testCase.description+" [NodeConformance]", func(ctx context.Context) {
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := node.ConformanceContainer{
-						PodClient: f.PodClient(),
+						PodClient: e2epod.NewPodClient(f),
 						Container: v1.Container{
 							Name:    name,
 							Image:   testCase.image,

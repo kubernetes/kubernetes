@@ -406,10 +406,16 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				klog.Errorf("iscsi: could not find transport name in iface %s", b.Iface)
 				return "", fmt.Errorf("could not parse iface file for %s", b.Iface)
 			}
+
+			addr := tp
+			if strings.HasPrefix(tp, "[") {
+				// Delete [] from IP address, links in /dev/disk/by-path do not have it.
+				addr = strings.NewReplacer("[", "", "]", "").Replace(tp)
+			}
 			if iscsiTransport == "tcp" {
-				devicePath = strings.Join([]string{"/dev/disk/by-path/ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
+				devicePath = strings.Join([]string{"/dev/disk/by-path/ip", addr, "iscsi", b.Iqn, "lun", b.Lun}, "-")
 			} else {
-				devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
+				devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", addr, "iscsi", b.Iqn, "lun", b.Lun}, "-")
 			}
 
 			if exist := waitForPathToExist(&devicePath, deviceDiscoveryTimeout, iscsiTransport); !exist {

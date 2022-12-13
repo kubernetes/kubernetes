@@ -48,6 +48,9 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	if name != "mark-control-plane" {
 		flags = append(flags, options.APIServerAdvertiseAddress)
 	}
+	if name != "update-status" {
+		flags = append(flags, options.DryRun)
+	}
 	return flags
 }
 
@@ -116,7 +119,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	}
 
 	// gets access to the cluster using the identity defined in admin.conf
-	client, err := data.ClientSet()
+	client, err := data.Client()
 	if err != nil {
 		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}
@@ -180,7 +183,7 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 	}
 
 	// gets access to the cluster using the identity defined in admin.conf
-	client, err := data.ClientSet()
+	client, err := data.Client()
 	if err != nil {
 		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		vSphereCSIMigrationEnabled = GetAndExpectBoolEnvVar(VSphereCSIMigrationEnabled)
 	})
 
-	ginkgo.It("verify dynamically provisioned pv using storageclass fails on an invalid datastore", func() {
+	ginkgo.It("verify dynamically provisioned pv using storageclass fails on an invalid datastore", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for invalid datastore")
 		scParameters[Datastore] = invalidDatastore
 		scParameters[DiskFormat] = ThinDisk

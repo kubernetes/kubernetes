@@ -47,7 +47,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -108,18 +108,18 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		Testname: Replica Set, run basic image
 		Description: Create a ReplicaSet with a Pod and a single Container. Make sure that the Pod is running. Pod SHOULD send a valid response when queried.
 	*/
-	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
+	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func(ctx context.Context) {
 		testReplicaSetServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
 
-	ginkgo.It("should serve a basic image on each replica with a private image", func() {
+	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {
 		// requires private images
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		testReplicaSetServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
-	ginkgo.It("should surface a failure condition on a common issue like exceeded quota", func() {
+	ginkgo.It("should surface a failure condition on a common issue like exceeded quota", func(ctx context.Context) {
 		testReplicaSetConditionCheck(f)
 	})
 
@@ -128,7 +128,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		Testname: Replica Set, adopt matching pods and release non matching pods
 		Description: A Pod is created, then a Replica Set (RS) whose label selector will match the Pod. The RS MUST either adopt the Pod or delete and replace it with a new Pod. When the labels on one of the Pods owned by the RS change to no longer match the RS's label selector, the RS MUST release the Pod and update the Pod's owner references
 	*/
-	framework.ConformanceIt("should adopt matching pods on creation and release no longer matching pods", func() {
+	framework.ConformanceIt("should adopt matching pods on creation and release no longer matching pods", func(ctx context.Context) {
 		testRSAdoptMatchingAndReleaseNotMatching(f)
 	})
 
@@ -140,7 +140,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		The RS MUST update and verify the scale subresource. The RS MUST patch and verify
 		a scale subresource.
 	*/
-	framework.ConformanceIt("Replicaset should have a working scale subresource", func() {
+	framework.ConformanceIt("Replicaset should have a working scale subresource", func(ctx context.Context) {
 		testRSScaleSubresources(f)
 	})
 
@@ -151,7 +151,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		that it is running. The RS MUST scale to two replicas and verify the scale count
 		The RS MUST be patched and verify that patch succeeded.
 	*/
-	framework.ConformanceIt("Replace and Patch tests", func() {
+	framework.ConformanceIt("Replace and Patch tests", func(ctx context.Context) {
 		testRSLifeCycle(f)
 	})
 
@@ -162,7 +162,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		MUST succeed when listing ReplicaSets via a label selector. It
 		MUST succeed when deleting the ReplicaSet via deleteCollection.
 	*/
-	framework.ConformanceIt("should list and delete a collection of ReplicaSets", func() {
+	framework.ConformanceIt("should list and delete a collection of ReplicaSets", func(ctx context.Context) {
 		listRSDeleteCollection(f)
 
 	})
@@ -173,7 +173,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		Attempt to read, update and patch its status sub-resource; all
 		mutating sub-resource operations MUST be visible to subsequent reads.
 	*/
-	framework.ConformanceIt("should validate Replicaset Status endpoints", func() {
+	framework.ConformanceIt("should validate Replicaset Status endpoints", func(ctx context.Context) {
 		testRSStatus(f)
 	})
 })
@@ -185,7 +185,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	replicas := int32(1)
 
 	// Create a ReplicaSet for a service that serves its hostname.
-	// The source for the Docker containter kubernetes/serve_hostname is
+	// The source for the Docker container kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	framework.Logf("Creating ReplicaSet %s", name)
 	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
@@ -323,7 +323,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 	name := "pod-adoption-release"
 	ginkgo.By(fmt.Sprintf("Given a Pod with a 'name' label %s is created", name))
-	p := f.PodClient().CreateSync(&v1.Pod{
+	p := e2epod.NewPodClient(f).CreateSync(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{

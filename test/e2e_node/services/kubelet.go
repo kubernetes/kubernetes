@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -73,13 +72,13 @@ func init() {
 
 // RunKubelet starts kubelet and waits for termination signal. Once receives the
 // termination signal, it will stop the kubelet gracefully.
-func RunKubelet() {
+func RunKubelet(featureGates map[string]bool) {
 	var err error
 	// Enable monitorParent to make sure kubelet will receive termination signal
 	// when test process exits.
 	e := NewE2EServices(true /* monitorParent */)
 	defer e.Stop()
-	e.kubelet, err = e.startKubelet()
+	e.kubelet, err = e.startKubelet(featureGates)
 	if err != nil {
 		klog.Fatalf("Failed to start kubelet: %v", err)
 	}
@@ -88,13 +87,12 @@ func RunKubelet() {
 }
 
 const (
-	// Ports of different e2e services.
-	kubeletReadOnlyPort = "10255"
 	// KubeletRootDirectory specifies the directory where the kubelet runtime information is stored.
 	KubeletRootDirectory = "/var/lib/kubelet"
-	// Health check url of kubelet
-	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 )
+
+// Health check url of kubelet
+var kubeletHealthCheckURL = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
 
 func baseKubeConfiguration(cfgPath string) (*kubeletconfig.KubeletConfiguration, error) {
 	cfgPath, err := filepath.Abs(cfgPath)
@@ -152,13 +150,8 @@ func baseKubeConfiguration(cfgPath string) (*kubeletconfig.KubeletConfiguration,
 
 // startKubelet starts the Kubelet in a separate process or returns an error
 // if the Kubelet fails to start.
-func (e *E2EServices) startKubelet() (*server, error) {
+func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error) {
 	klog.Info("Starting kubelet")
-
-	// set feature gates so we can check which features are enabled and pass the appropriate flags
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates); err != nil {
-		return nil, err
-	}
 
 	// Build kubeconfig
 	kubeconfigPath, err := createKubeconfigCWD()
@@ -205,6 +198,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 
 	var killCommand, restartCommand *exec.Cmd
 	var isSystemd bool
+	var unitName string
 	// Apply default kubelet flags.
 	cmdArgs := []string{}
 	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
@@ -233,7 +227,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cwd, _ := os.Getwd()
 		// Use the timestamp from the current directory to name the systemd unit.
 		unitTimestamp := remote.GetTimestampFromWorkspaceDir(cwd)
-		unitName := fmt.Sprintf("kubelet-%s.service", unitTimestamp)
+		unitName = fmt.Sprintf("kubelet-%s.service", unitTimestamp)
 		cmdArgs = append(cmdArgs,
 			systemdRun,
 			"-p", "Delegate=true",
@@ -259,14 +253,14 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	cmdArgs = append(cmdArgs,
 		"--kubeconfig", kubeconfigPath,
 		"--root-dir", KubeletRootDirectory,
-		"--v", LogVerbosityLevel, "--logtostderr",
+		"--v", LogVerbosityLevel,
 	)
 
 	// Apply test framework feature gates by default. This could also be overridden
 	// by kubelet-flags.
-	if len(framework.TestContext.FeatureGates) > 0 {
-		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&framework.TestContext.FeatureGates).String())
-		kc.FeatureGates = framework.TestContext.FeatureGates
+	if len(featureGates) > 0 {
+		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&featureGates).String())
+		kc.FeatureGates = featureGates
 	}
 
 	// Keep hostname override for convenience.
@@ -306,7 +300,8 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		[]string{kubeletHealthCheckURL},
 		"kubelet.log",
 		e.monitorParent,
-		restartOnExit)
+		restartOnExit,
+		unitName)
 	return server, server.start()
 }
 

@@ -6,7 +6,6 @@ approvers:
   - jsturtevant
   - ravisantoshgudimetla
 reviewers:
-  - chewong
   - feiskyer
   - jayunit100
   - jsturtevant
@@ -14,6 +13,7 @@ reviewers:
   - ravisantoshgudimetla
 emeritus_approvers:
   - benmoss
+  - chewong
   - michmike
   - dchen1107
   - patricklang

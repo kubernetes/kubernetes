@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -52,7 +52,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 		e2eskipper.SkipUnlessMultizone(c)
 	})
 
-	ginkgo.It("should distribute endpoints evenly", func() {
+	ginkgo.It("should distribute endpoints evenly", func(ctx context.Context) {
 		portNum := 9376
 		thLabels := map[string]string{labelKey: clientLabelValue}
 		img := imageutils.GetE2EImage(imageutils.Agnhost)
@@ -184,7 +184,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 			cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do sleep 1; echo "Date: $(date) Try: ${i}"; curl -q -s --connect-timeout 2 http://%s:80/ ; echo; done`, svc.Name)
 			clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 			clientPod.Spec.Containers[0].Name = clientPod.Name
-			f.PodClient().CreateSync(clientPod)
+			e2epod.NewPodClient(f).CreateSync(clientPod)
 
 			framework.Logf("Ensuring that requests from %s pod on %s node stay in %s zone", clientPod.Name, nodeName, fromZone)
 

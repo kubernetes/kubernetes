@@ -37,35 +37,33 @@ import (
 )
 
 func TestWebhookLoopback(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	webhookPath := "/webhook-test"
 
 	called := int32(0)
 
-	client, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			// Avoid resolveable kubernetes service
+			// Avoid resolvable kubernetes service
 			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
 
 			// Hook into audit to watch requests
 			config.GenericConfig.AuditBackend = auditSinkFunc(func(events ...*auditinternal.Event) {})
-			config.GenericConfig.AuditPolicyRuleEvaluator = auditPolicyRuleEvaluator(func(attrs authorizer.Attributes) audit.RequestAuditConfigWithLevel {
+			config.GenericConfig.AuditPolicyRuleEvaluator = auditPolicyRuleEvaluator(func(attrs authorizer.Attributes) audit.RequestAuditConfig {
 				if attrs.GetPath() == webhookPath {
 					if attrs.GetUser().GetName() != "system:apiserver" {
 						t.Errorf("expected user %q, got %q", "system:apiserver", attrs.GetUser().GetName())
 					}
 					atomic.AddInt32(&called, 1)
 				}
-				return audit.RequestAuditConfigWithLevel{
+				return audit.RequestAuditConfig{
 					Level: auditinternal.LevelNone,
 				}
 			})
 		},
 	})
+	defer tearDownFn()
 
 	fail := admissionregistrationv1.Fail
 	noSideEffects := admissionregistrationv1.SideEffectClassNone
@@ -109,9 +107,9 @@ func TestWebhookLoopback(t *testing.T) {
 	}
 }
 
-type auditPolicyRuleEvaluator func(authorizer.Attributes) audit.RequestAuditConfigWithLevel
+type auditPolicyRuleEvaluator func(authorizer.Attributes) audit.RequestAuditConfig
 
-func (f auditPolicyRuleEvaluator) EvaluatePolicyRule(attrs authorizer.Attributes) audit.RequestAuditConfigWithLevel {
+func (f auditPolicyRuleEvaluator) EvaluatePolicyRule(attrs authorizer.Attributes) audit.RequestAuditConfig {
 	return f(attrs)
 }
 

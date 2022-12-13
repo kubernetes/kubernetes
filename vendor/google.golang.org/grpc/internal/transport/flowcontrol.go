@@ -136,12 +136,10 @@ type inFlow struct {
 
 // newLimit updates the inflow window to a new value n.
 // It assumes that n is always greater than the old limit.
-func (f *inFlow) newLimit(n uint32) uint32 {
+func (f *inFlow) newLimit(n uint32) {
 	f.mu.Lock()
-	d := n - f.limit
 	f.limit = n
 	f.mu.Unlock()
-	return d
 }
 
 func (f *inFlow) maybeAdjust(n uint32) uint32 {

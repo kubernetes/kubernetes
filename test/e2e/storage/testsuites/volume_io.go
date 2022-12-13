@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +41,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
-	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -98,8 +97,7 @@ func (t *volumeIOTestSuite) SkipUnsupportedTests(driver storageframework.TestDri
 
 func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
+		config *storageframework.PerTestConfig
 
 		resource *storageframework.VolumeResource
 
@@ -119,7 +117,7 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		l = local{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
@@ -137,16 +135,11 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 			l.resource = nil
 		}
 
-		if l.driverCleanup != nil {
-			errs = append(errs, storageutils.TryFunc(l.driverCleanup))
-			l.driverCleanup = nil
-		}
-
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
-	ginkgo.It("should write files of various sizes, verify size, validate content [Slow]", func() {
+	ginkgo.It("should write files of various sizes, verify size, validate content [Slow]", func(ctx context.Context) {
 		init()
 		defer cleanup()
 
@@ -310,7 +303,8 @@ func deleteFile(f *framework.Framework, pod *v1.Pod, fpath string) {
 // Note: the file name is appended to "/opt/<Prefix>/<namespace>", eg. "/opt/nfs/e2e-.../<file>".
 // Note: nil can be passed for the podSecContext parm, in which case it is ignored.
 // Note: `fsizes` values are enforced to each be at least `MinFileSize` and a multiple of `MinFileSize`
-//   bytes.
+//
+//	bytes.
 func testVolumeIO(f *framework.Framework, cs clientset.Interface, config e2evolume.TestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
 	ddInput := filepath.Join(mountPath, fmt.Sprintf("%s-%s-dd_if", config.Prefix, config.Namespace))
 	writeBlk := strings.Repeat("abcdefghijklmnopqrstuvwxyz123456", 32) // 1KiB value

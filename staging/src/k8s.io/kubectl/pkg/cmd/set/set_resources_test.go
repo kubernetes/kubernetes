@@ -18,7 +18,7 @@ package set
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -59,7 +59,8 @@ func TestResourcesLocal(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdResources(tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
@@ -107,7 +108,8 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdResources(tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
@@ -480,7 +482,7 @@ func TestSetResourcesRemote(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						bytes, err := ioutil.ReadAll(stream)
+						bytes, err := io.ReadAll(stream)
 						if err != nil {
 							return nil, err
 						}
@@ -586,7 +588,7 @@ func TestSetResourcesRemoteWithSpecificContainers(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						bytes, err := ioutil.ReadAll(stream)
+						bytes, err := io.ReadAll(stream)
 						if err != nil {
 							return nil, err
 						}

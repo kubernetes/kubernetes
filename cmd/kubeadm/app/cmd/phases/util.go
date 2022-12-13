@@ -36,7 +36,10 @@ func SetKubernetesVersion(cfg *kubeadmapiv1.ClusterConfiguration) {
 
 // CopyFile copy file from src to dest.
 func CopyFile(src, dest string) error {
-	fileInfo, _ := os.Stat(src)
+	fileInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
 	contents, err := os.ReadFile(src)
 	if err != nil {
 		return err

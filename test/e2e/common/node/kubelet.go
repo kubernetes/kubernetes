@@ -27,18 +27,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Kubelet", func() {
 	f := framework.NewDefaultFramework("kubelet-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2epod.NewPodClient(f)
 	})
 	ginkgo.Context("when scheduling a busybox command in a pod", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
@@ -48,7 +49,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Testname: Kubelet, log output, default
 			Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 		*/
-		framework.ConformanceIt("should print the output to logs [NodeConformance]", func() {
+		framework.ConformanceIt("should print the output to logs [NodeConformance]", func(ctx context.Context) {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -106,7 +107,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Testname: Kubelet, failed pod, terminated reason
 			Description: Create a Pod with terminated state. Pod MUST have only one container. Container MUST be in terminated state and MUST have an terminated reason.
 		*/
-		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func() {
+		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func(ctx context.Context) {
 			gomega.Eventually(func() error {
 				podData, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 				if err != nil {
@@ -131,60 +132,44 @@ var _ = SIGDescribe("Kubelet", func() {
 			Testname: Kubelet, failed pod, delete
 			Description: Create a Pod with terminated state. This terminated pod MUST be able to be deleted.
 		*/
-		framework.ConformanceIt("should be possible to delete [NodeConformance]", func() {
+		framework.ConformanceIt("should be possible to delete [NodeConformance]", func(ctx context.Context) {
 			err := podClient.Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})
-	ginkgo.Context("when scheduling a busybox Pod with hostAliases", func() {
-		podName := "busybox-host-aliases" + string(uuid.NewUUID())
+	ginkgo.Context("when scheduling an agnhost Pod with hostAliases", func() {
+		podName := "agnhost-host-aliases" + string(uuid.NewUUID())
 
 		/*
 			Release: v1.13
 			Testname: Kubelet, hostAliases
 			Description: Create a Pod with hostAliases and a container with command to output /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases to the output of /etc/hosts entries.
-			Kubernetes mounts the /etc/hosts file into its containers, however, mounting individual files is not supported on Windows Containers. For this reason, this test is marked LinuxOnly.
 		*/
-		framework.ConformanceIt("should write entries to /etc/hosts [LinuxOnly] [NodeConformance]", func() {
-			podClient.CreateSync(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: podName,
+		framework.ConformanceIt("should write entries to /etc/hosts [NodeConformance]", func(ctx context.Context) {
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil, "etc-hosts")
+			// Don't restart the Pod since it is expected to exit
+			pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			pod.Spec.HostAliases = []v1.HostAlias{
+				{
+					IP:        "123.45.67.89",
+					Hostnames: []string{"foo", "bar"},
 				},
-				Spec: v1.PodSpec{
-					// Don't restart the Pod since it is expected to exit
-					RestartPolicy: v1.RestartPolicyNever,
-					Containers: []v1.Container{
-						{
-							Image:   framework.BusyBoxImage,
-							Name:    podName,
-							Command: []string{"/bin/sh", "-c", "cat /etc/hosts; sleep 6000"},
-						},
-					},
-					HostAliases: []v1.HostAlias{
-						{
-							IP:        "123.45.67.89",
-							Hostnames: []string{"foo", "bar"},
-						},
-					},
-				},
-			})
+			}
 
-			gomega.Eventually(func() error {
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
-				if err != nil {
-					return err
-				}
-				defer rc.Close()
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(rc)
-				hostsFileContent := buf.String()
+			pod = podClient.Create(pod)
+			ginkgo.By("Waiting for pod completion")
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err)
 
-				if !strings.Contains(hostsFileContent, "123.45.67.89\tfoo\tbar") {
-					return fmt.Errorf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
-				}
+			rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
+			framework.ExpectNoError(err)
+			defer rc.Close()
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(rc)
+			hostsFileContent := buf.String()
 
-				return nil
-			}, time.Minute, time.Second*4).Should(gomega.BeNil())
+			errMsg := fmt.Sprintf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
+			framework.ExpectEqual(true, strings.Contains(hostsFileContent, "123.45.67.89\tfoo\tbar"), errMsg)
 		})
 	})
 	ginkgo.Context("when scheduling a read only busybox container", func() {
@@ -196,7 +181,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Description: Create a Pod with security context set with ReadOnlyRootFileSystem set to true. The Pod then tries to write to the /file on the root, write operation to the root filesystem MUST fail as expected.
 			This test is marked LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		framework.ConformanceIt("should not write to root filesystem [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("should not write to root filesystem [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			isReadOnly := true
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

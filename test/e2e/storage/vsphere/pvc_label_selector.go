@@ -20,11 +20,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -32,21 +33,20 @@ import (
 )
 
 /*
-   This is a function test for Selector-Label Volume Binding Feature
-   Test verifies volume with the matching label is bounded with the PVC.
+This is a function test for Selector-Label Volume Binding Feature
+Test verifies volume with the matching label is bounded with the PVC.
 
-   Test Steps
-   ----------
-   1. Create VMDK.
-   2. Create pv with label volume-type:ssd, volume path set to vmdk created in previous step, and PersistentVolumeReclaimPolicy is set to Delete.
-   3. Create PVC (pvcVvol) with label selector to match with volume-type:vvol
-   4. Create PVC (pvcSsd) with label selector to match with volume-type:ssd
-   5. Wait and verify pvSsd is bound with PV.
-   6. Verify Status of pvcVvol is still pending.
-   7. Delete pvcSsd.
-   8. verify associated pv is also deleted.
-   9. delete pvcVvol
-
+Test Steps
+----------
+1. Create VMDK.
+2. Create pv with label volume-type:ssd, volume path set to vmdk created in previous step, and PersistentVolumeReclaimPolicy is set to Delete.
+3. Create PVC (pvcVvol) with label selector to match with volume-type:vvol
+4. Create PVC (pvcSsd) with label selector to match with volume-type:ssd
+5. Wait and verify pvSsd is bound with PV.
+6. Verify Status of pvcVvol is still pending.
+7. Delete pvcSsd.
+8. verify associated pv is also deleted.
+9. delete pvcVvol
 */
 var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSelector]", func() {
 	f := framework.NewDefaultFramework("pvclabelselector")
@@ -69,7 +69,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 		ns = f.Namespace.Name
 		Bootstrap(f)
 		nodeInfo = GetReadySchedulableRandomNodeInfo()
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 		ssdlabels = make(map[string]string)
 		ssdlabels["volume-type"] = "ssd"
 		vvollabels = make(map[string]string)
@@ -84,7 +84,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 				testCleanupVSpherePVClabelselector(c, ns, nodeInfo, volumePath, pvSsd, pvcSsd, pvcVvol)
 			}
 		})
-		ginkgo.It("should bind volume with claim for given label", func() {
+		ginkgo.It("should bind volume with claim for given label", func(ctx context.Context) {
 			volumePath, pvSsd, pvcSsd, pvcVvol, err = testSetupVSpherePVClabelselector(c, nodeInfo, ns, ssdlabels, vvollabels)
 			framework.ExpectNoError(err)
 

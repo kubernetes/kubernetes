@@ -34,11 +34,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = common.SIGDescribe("EndpointSlice", func() {
@@ -46,11 +47,11 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	var cs clientset.Interface
-	var podClient *framework.PodClient
+	var podClient *e2epod.PodClient
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
-		podClient = f.PodClient()
+		podClient = e2epod.NewPodClient(f)
 	})
 
 	/*
@@ -62,7 +63,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		The cluster MUST have a service named "kubernetes" on the default namespace referencing the API servers.
 		The "kubernetes.default" service MUST have Endpoints and EndpointSlices pointing to each API server instance.
 	*/
-	framework.ConformanceIt("should have Endpoints and EndpointSlices pointing to API Server", func() {
+	framework.ConformanceIt("should have Endpoints and EndpointSlices pointing to API Server", func(ctx context.Context) {
 		namespace := "default"
 		name := "kubernetes"
 		// verify "kubernetes.default" service exist
@@ -98,7 +99,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
 		The endpointslice controller should create and delete EndpointSlices for Pods matching a Service.
 	*/
-	framework.ConformanceIt("should create and delete Endpoints and EndpointSlices for a Service with a selector specified", func() {
+	framework.ConformanceIt("should create and delete Endpoints and EndpointSlices for a Service with a selector specified", func(ctx context.Context) {
 		svc := createServiceReportErr(cs, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-empty-selector",
@@ -201,7 +202,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
 		The endpointslice controller must create EndpointSlices for Pods mataching a Service.
 	*/
-	framework.ConformanceIt("should create Endpoints and EndpointSlices for Pods matching a Service", func() {
+	framework.ConformanceIt("should create Endpoints and EndpointSlices for Pods matching a Service", func(ctx context.Context) {
 		labelPod1 := "pod1"
 		labelPod2 := "pod2"
 		labelPod3 := "pod3"
@@ -349,7 +350,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
 		The endpointslices resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.ConformanceIt("should support creating EndpointSlice API operations", func() {
+	framework.ConformanceIt("should support creating EndpointSlice API operations", func(ctx context.Context) {
 		// Setup
 		ns := f.Namespace.Name
 		epsVersion := "v1"

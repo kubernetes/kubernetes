@@ -67,7 +67,9 @@ elif [[ "$#" -ne 0 ]]; then
 fi
 
 # - Ensure all source files contain a copyright message.
-not git grep -L "\(Copyright [0-9]\{4,\} gRPC authors\)\|DO NOT EDIT" -- '*.go'
+# (Done in two parts because Darwin "git grep" has broken support for compound
+# exclusion matches.)
+(grep -L "DO NOT EDIT" $(git grep -L "\(Copyright [0-9]\{4,\} gRPC authors\)" -- '*.go') || true) | fail_on_output
 
 # - Make sure all tests in grpc and grpc/test use leakcheck via Teardown.
 not grep 'func Test[^(]' *_test.go
@@ -81,17 +83,13 @@ not git grep -l 'x/net/context' -- "*.go"
 git grep -l '"math/rand"' -- "*.go" 2>&1 | not grep -v '^examples\|^stress\|grpcrand\|^benchmark\|wrr_test'
 
 # - Do not call grpclog directly. Use grpclog.Component instead.
-git grep -l 'grpclog.I\|grpclog.W\|grpclog.E\|grpclog.F\|grpclog.V' -- "*.go" | not grep -v '^grpclog/component.go\|^internal/grpctest/tlogger_test.go'
+git grep -l -e 'grpclog.I' --or -e 'grpclog.W' --or -e 'grpclog.E' --or -e 'grpclog.F' --or -e 'grpclog.V' -- "*.go" | not grep -v '^grpclog/component.go\|^internal/grpctest/tlogger_test.go'
 
 # - Ensure all ptypes proto packages are renamed when importing.
 not git grep "\(import \|^\s*\)\"github.com/golang/protobuf/ptypes/" -- "*.go"
 
 # - Ensure all xds proto imports are renamed to *pb or *grpc.
 git grep '"github.com/envoyproxy/go-control-plane/envoy' -- '*.go' ':(exclude)*.pb.go' | not grep -v 'pb "\|grpc "'
-
-# - Check imports that are illegal in appengine (until Go 1.11).
-# TODO: Remove when we drop Go 1.10 support
-go list -f {{.Dir}} ./... | xargs go run test/go_vet/vet.go
 
 misspell -error .
 
@@ -111,7 +109,7 @@ for MOD_FILE in $(find . -name 'go.mod'); do
   go vet -all ./... | fail_on_output
   gofmt -s -d -l . 2>&1 | fail_on_output
   goimports -l . 2>&1 | not grep -vE "\.pb\.go"
-  golint ./... 2>&1 | not grep -vE "/testv3\.pb\.go:"
+  golint ./... 2>&1 | not grep -vE "/grpc_testing_not_regenerate/.*\.pb\.go:"
 
   go mod tidy
   git status --porcelain 2>&1 | fail_on_output || \
@@ -151,7 +149,6 @@ grpc.NewGZIPDecompressor
 grpc.RPCCompressor
 grpc.RPCDecompressor
 grpc.ServiceConfig
-grpc.WithBalancerName
 grpc.WithCompressor
 grpc.WithDecompressor
 grpc.WithDialer

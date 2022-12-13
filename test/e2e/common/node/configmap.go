@@ -26,10 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("ConfigMap", func() {
@@ -41,7 +42,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap, from environment field
 		Description: Create a Pod with an environment variable value set using a value from ConfigMap. A ConfigMap value MUST be accessible in the container environment.
 	*/
-	framework.ConformanceIt("should be consumable via environment variable [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable via environment variable [NodeConformance]", func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -79,7 +80,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume configMaps", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "consume configMaps", pod, 0, []string{
 			"CONFIG_DATA_1=value-1",
 		})
 	})
@@ -89,7 +90,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		Testname: ConfigMap, from environment variables
 		Description: Create a Pod with a environment source from ConfigMap. All ConfigMap values MUST be available as environment variables in the container.
 	*/
-	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -123,7 +124,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume configMaps", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "consume configMaps", pod, 0, []string{
 			"data-1=value-1", "data-2=value-2", "data-3=value-3",
 			"p-data-1=value-1", "p-data-2=value-2", "p-data-3=value-3",
 		})
@@ -134,12 +135,12 @@ var _ = SIGDescribe("ConfigMap", func() {
 	   Testname: ConfigMap, with empty-key
 	   Description: Attempt to create a ConfigMap with an empty key. The creation MUST fail.
 	*/
-	framework.ConformanceIt("should fail to create ConfigMap with empty key", func() {
+	framework.ConformanceIt("should fail to create ConfigMap with empty key", func(ctx context.Context) {
 		configMap, err := newConfigMapWithEmptyKey(f)
 		framework.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
 
-	ginkgo.It("should update ConfigMap successfully", func() {
+	ginkgo.It("should update ConfigMap successfully", func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating ConfigMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -165,7 +166,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 	   Description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching the ConfigMap MUST reflect changes.
 	   By fetching all the ConfigMaps via a Label selector it MUST find the ConfigMap by it's static label and updated value. The ConfigMap must be deleted by Collection.
 	*/
-	framework.ConformanceIt("should run through a ConfigMap lifecycle", func() {
+	framework.ConformanceIt("should run through a ConfigMap lifecycle", func(ctx context.Context) {
 		testNamespaceName := f.Namespace.Name
 		testConfigMapName := "test-configmap" + string(uuid.NewUUID())
 
@@ -223,7 +224,9 @@ var _ = SIGDescribe("ConfigMap", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap by label selector")
+		if !testConfigMapFound {
+			framework.Failf("failed to find ConfigMap %s/%s by label selector", testNamespaceName, testConfigMap.ObjectMeta.Name)
+		}
 
 		ginkgo.By("deleting the ConfigMap by collection with a label selector")
 		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{

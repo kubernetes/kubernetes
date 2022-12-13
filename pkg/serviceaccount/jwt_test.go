@@ -60,9 +60,9 @@ WwIDAQAB
 
 // Obtained by:
 //
-//   1. Serializing rsaPublicKey as DER
-//   2. Taking the SHA256 of the DER bytes
-//   3. URLSafe Base64-encoding the sha bytes
+//  1. Serializing rsaPublicKey as DER
+//  2. Taking the SHA256 of the DER bytes
+//  3. URLSafe Base64-encoding the sha bytes
 const rsaKeyID = "JHJehTTTZlsspKHT-GaJxK7Kd1NQgZJu3fyK6K_QDYU"
 
 // Fake value for testing.
@@ -111,9 +111,9 @@ X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 
 // Obtained by:
 //
-//   1. Serializing ecdsaPublicKey as DER
-//   2. Taking the SHA256 of the DER bytes
-//   3. URLSafe Base64-encoding the sha bytes
+//  1. Serializing ecdsaPublicKey as DER
+//  2. Taking the SHA256 of the DER bytes
+//  3. URLSafe Base64-encoding the sha bytes
 const ecdsaKeyID = "SoABiieYuNx4UdqYvZRVeuC6SihxgLrhLy9peHMHpTc"
 
 func getPrivateKey(data string) interface{} {
@@ -342,7 +342,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 				return tc.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 		)
-		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
+		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter, nil))
 
 		// An invalid, non-JWT token should always fail
 		ctx := authenticator.WithAudiences(context.Background(), auds)

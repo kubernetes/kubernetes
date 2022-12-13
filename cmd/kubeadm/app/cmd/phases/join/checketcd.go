@@ -61,7 +61,7 @@ func runCheckEtcdPhase(c workflow.RunData) error {
 	// Checks that the etcd cluster is healthy
 	// NB. this check cannot be implemented before because it requires the admin.conf and all the certificates
 	//     for connecting to etcd already in place
-	client, err := data.ClientSet()
+	client, err := data.Client()
 	if err != nil {
 		return err
 	}

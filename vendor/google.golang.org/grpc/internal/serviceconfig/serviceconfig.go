@@ -67,10 +67,10 @@ func (bc *BalancerConfig) MarshalJSON() ([]byte, error) {
 // ServiceConfig contains a list of loadBalancingConfigs, each with a name and
 // config. This method iterates through that list in order, and stops at the
 // first policy that is supported.
-// - If the config for the first supported policy is invalid, the whole service
-//   config is invalid.
-// - If the list doesn't contain any supported policy, the whole service config
-//   is invalid.
+//   - If the config for the first supported policy is invalid, the whole service
+//     config is invalid.
+//   - If the list doesn't contain any supported policy, the whole service config
+//     is invalid.
 func (bc *BalancerConfig) UnmarshalJSON(b []byte) error {
 	var ir intermediateBalancerConfig
 	err := json.Unmarshal(b, &ir)
@@ -78,6 +78,7 @@ func (bc *BalancerConfig) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
+	var names []string
 	for i, lbcfg := range ir {
 		if len(lbcfg) != 1 {
 			return fmt.Errorf("invalid loadBalancingConfig: entry %v does not contain exactly 1 policy/config pair: %q", i, lbcfg)
@@ -92,6 +93,7 @@ func (bc *BalancerConfig) UnmarshalJSON(b []byte) error {
 		for name, jsonCfg = range lbcfg {
 		}
 
+		names = append(names, name)
 		builder := balancer.Get(name)
 		if builder == nil {
 			// If the balancer is not registered, move on to the next config.
@@ -120,7 +122,7 @@ func (bc *BalancerConfig) UnmarshalJSON(b []byte) error {
 	// return. This means we had a loadBalancingConfig slice but did not
 	// encounter a registered policy. The config is considered invalid in this
 	// case.
-	return fmt.Errorf("invalid loadBalancingConfig: no supported policies found")
+	return fmt.Errorf("invalid loadBalancingConfig: no supported policies found in %v", names)
 }
 
 // MethodConfig defines the configuration recommended by the service providers for a

@@ -19,6 +19,7 @@ package iscsi
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -170,7 +171,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 
 	path := mounter.GetPath()
-	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~iscsi/vol1", tmpDir)
+	expectedPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~iscsi/vol1")
 	if path != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}

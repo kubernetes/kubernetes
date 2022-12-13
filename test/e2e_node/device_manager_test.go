@@ -40,7 +40,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -57,7 +57,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 
 	ginkgo.Context("With SRIOV devices in the system", func() {
 		// this test wants to reproduce what happened in https://github.com/kubernetes/kubernetes/issues/102880
-		ginkgo.It("should be able to recover V1 (aka pre-1.20) checkpoint data and reject pods before device re-registration", func() {
+		ginkgo.It("should be able to recover V1 (aka pre-1.20) checkpoint data and reject pods before device re-registration", func(ctx context.Context) {
 			if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount == 0 {
 				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 			}
@@ -85,7 +85,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			podName := "gu-pod-rec-pre-1"
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-			pod = f.PodClient().CreateSync(pod)
+			pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 			// now we need to simulate a node drain, so we remove all the pods, including the sriov device plugin.
 
@@ -131,7 +131,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod = makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 
-			pod = f.PodClient().Create(pod)
+			pod = e2epod.NewPodClient(f).Create(pod)
 			err = e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 				if pod.Status.Phase != v1.PodPending {
 					return true, nil
@@ -139,7 +139,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 				return false, nil
 			})
 			framework.ExpectNoError(err)
-			pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			pod, err = e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			if pod.Status.Phase != v1.PodFailed {
@@ -154,7 +154,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			deletePodSyncByName(f, pod.Name)
 		})
 
-		ginkgo.It("should be able to recover V1 (aka pre-1.20) checkpoint data and update topology info on device re-registration", func() {
+		ginkgo.It("should be able to recover V1 (aka pre-1.20) checkpoint data and update topology info on device re-registration", func(ctx context.Context) {
 			if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount == 0 {
 				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 			}
@@ -205,7 +205,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			podName := "gu-pod-rec-pre-1"
 			framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
 			pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
-			pod = f.PodClient().CreateSync(pod)
+			pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 			// now we need to simulate a node drain, so we remove all the pods, including the sriov device plugin.
 

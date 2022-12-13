@@ -17,6 +17,8 @@ limitations under the License.
 package sets
 
 import (
+	"fmt"
+	"math/rand"
 	"reflect"
 	"testing"
 )
@@ -114,6 +116,19 @@ func TestStringSetDifference(t *testing.T) {
 		t.Errorf("Expected len=2: %d", len(d))
 	}
 	if !d.Has("4") || !d.Has("5") {
+		t.Errorf("Unexpected contents: %#v", d.List())
+	}
+}
+
+func TestStringSetSymmetricDifference(t *testing.T) {
+	a := NewString("1", "2", "3")
+	b := NewString("1", "2", "4", "5")
+	c := a.SymmetricDifference(b)
+	d := b.SymmetricDifference(a)
+	if !c.Equal(NewString("3", "4", "5")) {
+		t.Errorf("Unexpected contents: %#v", c.List())
+	}
+	if !d.Equal(NewString("3", "4", "5")) {
 		t.Errorf("Unexpected contents: %#v", d.List())
 	}
 }
@@ -266,5 +281,93 @@ func TestStringIntersection(t *testing.T) {
 		if !intersection.Equal(test.expected) {
 			t.Errorf("Expected intersection.Equal(expected) but not true.  intersection:%v expected:%v", intersection.List(), test.expected.List())
 		}
+	}
+}
+
+type randomStringAlphabet string
+
+func (a randomStringAlphabet) makeString(minLen, maxLen int) string {
+	n := minLen
+	if minLen < maxLen {
+		n += rand.Intn(maxLen - minLen)
+	}
+	var s string
+	for i := 0; i < n; i++ {
+		s += string(a[rand.Intn(len(a))])
+	}
+	return s
+}
+
+var randomStringMaker = randomStringAlphabet("abcdefghijklmnopqrstuvwxyz0123456789")
+
+func BenchmarkStringSet(b *testing.B) {
+	cases := []struct {
+		size         int
+		minStringLen int
+		maxStringLen int
+	}{
+		{20, 10, 20},
+		{50, 10, 30},
+		{100, 20, 40},
+		{500, 20, 50},
+		{1000, 20, 60},
+	}
+
+	for i := range cases {
+		here := cases[i]
+		makeSet := func() String {
+			s := NewString()
+			for j := 0; j < here.size; j++ {
+				s.Insert(randomStringMaker.makeString(here.minStringLen, here.maxStringLen))
+			}
+			return s
+		}
+		operands := make([]String, 500)
+		for i := range operands {
+			operands[i] = makeSet()
+		}
+		randOperand := func() String { return operands[rand.Intn(len(operands))] }
+
+		b.Run(fmt.Sprintf("insert-%v", here.size), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				makeSet()
+			}
+		})
+
+		b.Run(fmt.Sprintf("key-set-%v", here.size), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				StringKeySet(randOperand())
+			}
+		})
+
+		b.Run(fmt.Sprintf("has-%v", here.size), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				randOperand().Has(randomStringMaker.makeString(here.minStringLen, here.maxStringLen))
+			}
+		})
+
+		b.Run(fmt.Sprintf("intersection-%v", here.size), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				randOperand().Intersection(randOperand())
+			}
+		})
+
+		b.Run(fmt.Sprintf("symmetric-difference-%v", here.size), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				randOperand().SymmetricDifference(randOperand())
+			}
+		})
+
+		b.Run(fmt.Sprintf("list-%v", here.size), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				randOperand().List()
+			}
+		})
 	}
 }

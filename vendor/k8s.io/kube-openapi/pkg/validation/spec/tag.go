@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // TagProps describe a tag entry in the top level tags section of a swagger spec
@@ -52,8 +54,29 @@ func (t Tag) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON marshal this from JSON
 func (t *Tag) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshaling {
+		return jsonv2.Unmarshal(data, t)
+	}
+
 	if err := json.Unmarshal(data, &t.TagProps); err != nil {
 		return err
 	}
 	return json.Unmarshal(data, &t.VendorExtensible)
+}
+
+func (t *Tag) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		Extensions
+		TagProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	x.Extensions.sanitize()
+	if len(x.Extensions) == 0 {
+		x.Extensions = nil
+	}
+	t.VendorExtensible.Extensions = x.Extensions
+	t.TagProps = x.TagProps
+	return nil
 }

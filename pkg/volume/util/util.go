@@ -35,11 +35,13 @@ import (
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -73,6 +75,9 @@ const (
 	// VolumeDynamicallyCreatedByKey is the key of the annotation on PersistentVolume
 	// object created dynamically
 	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
+
+	// kubernetesPluginPathPrefix is the prefix of kubernetes plugin mount paths.
+	kubernetesPluginPathPrefix = "/plugins/kubernetes.io/"
 )
 
 // IsReady checks for the existence of a regular file
@@ -572,15 +577,29 @@ func IsLocalEphemeralVolume(volume v1.Volume) bool {
 }
 
 // GetPodVolumeNames returns names of volumes that are used in a pod,
-// either as filesystem mount or raw block device.
-func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String) {
+// either as filesystem mount or raw block device, together with list
+// of all SELinux contexts of all containers that use the volumes.
+func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String, seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
 	mounts = sets.NewString()
 	devices = sets.NewString()
+	seLinuxContainerContexts = make(map[string][]*v1.SELinuxOptions)
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
+		var seLinuxOptions *v1.SELinuxOptions
+		if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
+			if effectiveContainerSecurity != nil {
+				// No DeepCopy, SELinuxOptions is already a copy of Pod's or container's SELinuxOptions
+				seLinuxOptions = effectiveContainerSecurity.SELinuxOptions
+			}
+		}
+
 		if container.VolumeMounts != nil {
 			for _, mount := range container.VolumeMounts {
 				mounts.Insert(mount.Name)
+				if seLinuxOptions != nil {
+					seLinuxContainerContexts[mount.Name] = append(seLinuxContainerContexts[mount.Name], seLinuxOptions.DeepCopy())
+				}
 			}
 		}
 		if container.VolumeDevices != nil {
@@ -619,19 +638,37 @@ func FsUserFrom(pod *v1.Pod) *int64 {
 // In GCI cluster, if gci mounter is used for mounting, the container started by mounter
 // script will cause additional mounts created in the container. Since these mounts are
 // irrelevant to the original mounts, they should be not considered when checking the
-// mount references. Current solution is to filter out those mount paths that contain
-// the string of original mount path.
-// Plan to work on better approach to solve this issue.
+// mount references. The current solution is to filter out those mount paths that contain
+// the k8s plugin suffix of original mount path.
 func HasMountRefs(mountPath string, mountRefs []string) bool {
+	// A mountPath typically is like
+	//   /var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX
+	// Mount refs can look like
+	//   /home/somewhere/var/lib/kubelet/plugins/kubernetes.io/some-plugin/...
+	// but if /var/lib/kubelet is mounted to a different device a ref might be like
+	//   /mnt/some-other-place/kubelet/plugins/kubernetes.io/some-plugin/...
+	// Neither of the above should be counted as a mount ref as those are handled
+	// by the kubelet. What we're concerned about is a path like
+	//   /data/local/some/manual/mount
+	// As unmonting could interrupt usage from that mountpoint.
+	//
+	// So instead of looking for the entire /var/lib/... path, the plugins/kuberentes.io/
+	// suffix is trimmed off and searched for.
+	//
+	// If there isn't a /plugins/... path, the whole mountPath is used instead.
+	pathToFind := mountPath
+	if i := strings.Index(mountPath, kubernetesPluginPathPrefix); i > -1 {
+		pathToFind = mountPath[i:]
+	}
 	for _, ref := range mountRefs {
-		if !strings.Contains(ref, mountPath) {
+		if !strings.Contains(ref, pathToFind) {
 			return true
 		}
 	}
 	return false
 }
 
-//WriteVolumeCache flush disk data given the spcified mount path
+// WriteVolumeCache flush disk data given the spcified mount path
 func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
 	if runtime.GOOS == "windows" {

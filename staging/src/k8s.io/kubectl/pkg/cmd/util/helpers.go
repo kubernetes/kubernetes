@@ -133,6 +133,20 @@ func CheckDiffErr(err error) {
 	})
 }
 
+// isInvalidReasonStatusError returns true if this is an API Status error with reason=Invalid.
+// This is distinct from generic 422 errors we want to fall back to generic error handling.
+func isInvalidReasonStatusError(err error) bool {
+	if !apierrors.IsInvalid(err) {
+		return false
+	}
+	statusError, isStatusError := err.(*apierrors.StatusError)
+	if !isStatusError {
+		return false
+	}
+	status := statusError.Status()
+	return status.Reason == metav1.StatusReasonInvalid
+}
+
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
 func checkErr(err error, handleErr func(string, int)) {
@@ -148,16 +162,26 @@ func checkErr(err error, handleErr func(string, int)) {
 	switch {
 	case err == ErrExit:
 		handleErr("", DefaultErrorExitCode)
-	case apierrors.IsInvalid(err):
-		details := err.(*apierrors.StatusError).Status().Details
+	case isInvalidReasonStatusError(err):
+		status := err.(*apierrors.StatusError).Status()
+		details := status.Details
 		s := "The request is invalid"
 		if details == nil {
+			// if we have no other details, include the message from the server if present
+			if len(status.Message) > 0 {
+				s += ": " + status.Message
+			}
 			handleErr(s, DefaultErrorExitCode)
 			return
 		}
 		if len(details.Kind) != 0 || len(details.Name) != 0 {
 			s = fmt.Sprintf("The %s %q is invalid", details.Kind, details.Name)
+		} else if len(status.Message) > 0 && len(details.Causes) == 0 {
+			// only append the message if we have no kind/name details and no causes,
+			// since default invalid error constructors duplicate that information in the message
+			s += ": " + status.Message
 		}
+
 		if len(details.Causes) > 0 {
 			errs := statusCausesToAggrError(details.Causes)
 			handleErr(MultilineError(s+": ", errs), DefaultErrorExitCode)
@@ -407,6 +431,8 @@ func AddValidateFlags(cmd *cobra.Command) {
 		"warn" will warn about unknown or duplicate fields without blocking the request if server-side field validation is enabled on the API server, and behave as "ignore" otherwise.
 		"false" or "ignore" will not perform any schema validation, silently dropping any unknown or duplicate fields.`,
 	)
+
+	cmd.Flags().Lookup("validate").NoOptDefVal = "strict"
 }
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
@@ -475,6 +501,9 @@ func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
 
 func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresources ...string) {
 	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s Must be one of %v. This flag is alpha and may change in the future.", usage, allowedSubresources))
+	CheckErr(cmd.RegisterFlagCompletionFunc("subresource", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+		return allowedSubresources, cobra.ShellCompDirectiveNoFileComp
+	}))
 }
 
 type ValidateOptions struct {
@@ -584,8 +613,6 @@ func GetValidationDirective(cmd *cobra.Command) (string, error) {
 	b, err := strconv.ParseBool(validateFlag)
 	if err != nil {
 		switch validateFlag {
-		case cmd.Flag("validate").NoOptDefVal:
-			return metav1.FieldValidationStrict, nil
 		case "strict":
 			return metav1.FieldValidationStrict, nil
 		case "warn":
@@ -745,7 +772,8 @@ func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
 // arguments (sub-commands) are provided, or a usage error otherwise.
 func DefaultSubCommandRun(out io.Writer) func(c *cobra.Command, args []string) {
 	return func(c *cobra.Command, args []string) {
-		c.SetOutput(out)
+		c.SetOut(out)
+		c.SetErr(out)
 		RequireNoArguments(c, args)
 		c.Help()
 		CheckErr(ErrExit)

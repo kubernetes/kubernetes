@@ -56,6 +56,7 @@ func NewBootstrapTokenPhase() workflow.Phase {
 			options.CfgPath,
 			options.KubeconfigPath,
 			options.SkipTokenPrint,
+			options.DryRun,
 		},
 		Run: runBootstrapToken,
 	}

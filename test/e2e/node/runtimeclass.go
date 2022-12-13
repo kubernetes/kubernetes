@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/pod-security-admission/api"
 
 	v1 "k8s.io/api/core/v1"
@@ -33,7 +34,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -41,7 +42,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline
 
-	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func() {
+	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
 
 		scheduling := &nodev1.Scheduling{
@@ -65,7 +66,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func(ctx context.Context) {
 		labelFooName := "foo-" + string(uuid.NewUUID())
 		labelFizzName := "fizz-" + string(uuid.NewUUID())
 
@@ -89,9 +90,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		ginkgo.By("Trying to apply a label on the found node.")
 		for key, value := range nodeSelector {
-			framework.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
-			framework.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
-			defer framework.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
+			e2enode.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
+			defer e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, key)
 		}
 
 		ginkgo.By("Trying to apply taint on the found node.")
@@ -101,7 +102,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			Effect: v1.TaintEffectNoSchedule,
 		}
 		e2enode.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
-		framework.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
+		e2enode.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
 		defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
 
 		ginkgo.By("Trying to create runtimeclass and pod")
@@ -114,7 +115,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
-		pod = f.PodClient().Create(pod)
+		pod = e2epod.NewPodClient(f).Create(pod)
 
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
 
@@ -126,7 +127,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		gomega.Expect(pod.Spec.Tolerations).To(gomega.ContainElement(tolerations[0]))
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func(ctx context.Context) {
 		// Requires special setup of test-handler which is only done in GCE kube-up environment
 		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
 		e2eskipper.SkipUnlessProviderIs("gce")
@@ -145,9 +146,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 		ginkgo.By("Trying to apply a label on the found node.")
 		for key, value := range nodeSelector {
-			framework.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
-			framework.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
-			defer framework.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+			e2enode.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
+			e2enode.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
+			defer e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, key)
 		}
 
 		ginkgo.By("Trying to create runtimeclass and pod")
@@ -160,7 +161,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		pod.Spec.NodeSelector = map[string]string{
 			labelFooName: "bar",
 		}
-		pod = f.PodClient().Create(pod)
+		pod = e2epod.NewPodClient(f).Create(pod)
 
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
 

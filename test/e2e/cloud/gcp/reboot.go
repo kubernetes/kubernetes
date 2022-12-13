@@ -37,7 +37,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -66,7 +66,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			// Most of the reboot tests just make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
 			namespaceName := metav1.NamespaceSystem
@@ -94,25 +94,25 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	f = framework.NewDefaultFramework("reboot")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("each node by ordering clean reboot and ensure they function upon restart", func() {
+	ginkgo.It("each node by ordering clean reboot and ensure they function upon restart", func(ctx context.Context) {
 		// clean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is rebooted.
 		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &", nil)
 	})
 
-	ginkgo.It("each node by ordering unclean reboot and ensure they function upon restart", func() {
+	ginkgo.It("each node by ordering unclean reboot and ensure they function upon restart", func(ctx context.Context) {
 		// unclean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
 		testReboot(f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
-	ginkgo.It("each node by triggering kernel panic and ensure they function upon restart", func() {
+	ginkgo.It("each node by triggering kernel panic and ensure they function upon restart", func(ctx context.Context) {
 		// kernel panic
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
 		testReboot(f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
-	ginkgo.It("each node by switching off the network interface and ensure they function upon switch on", func() {
+	ginkgo.It("each node by switching off the network interface and ensure they function upon switch on", func(ctx context.Context) {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
 		cmd := "nohup sh -c '" +
@@ -133,7 +133,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		testReboot(f.ClientSet, cmd, nil)
 	})
 
-	ginkgo.It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
+	ginkgo.It("each node by dropping all inbound packets for a while and ensure they function afterwards", func(ctx context.Context) {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
@@ -141,7 +141,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		testReboot(f.ClientSet, dropPacketsScript("INPUT", tmpLogPath), catLogHook(tmpLogPath))
 	})
 
-	ginkgo.It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
+	ginkgo.It("each node by dropping all outbound packets for a while and ensure they function afterwards", func(ctx context.Context) {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
@@ -229,12 +229,12 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 }
 
 // rebootNode takes node name on provider through the following steps using c:
-//  - ensures the node is ready
-//  - ensures all pods on the node are running and ready
-//  - reboots the node (by executing rebootCmd over ssh)
-//  - ensures the node reaches some non-ready state
-//  - ensures the node becomes ready again
-//  - ensures all pods on the node become running and ready again
+//   - ensures the node is ready
+//   - ensures all pods on the node are running and ready
+//   - reboots the node (by executing rebootCmd over ssh)
+//   - ensures the node reaches some non-ready state
+//   - ensures the node becomes ready again
+//   - ensures all pods on the node become running and ready again
 //
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.

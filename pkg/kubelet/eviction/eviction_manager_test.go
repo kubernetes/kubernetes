@@ -17,11 +17,14 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	gomock "github.com/golang/mock/gomock"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -67,7 +70,7 @@ type mockDiskInfoProvider struct {
 }
 
 // HasDedicatedImageFs returns the mocked value
-func (m *mockDiskInfoProvider) HasDedicatedImageFs() (bool, error) {
+func (m *mockDiskInfoProvider) HasDedicatedImageFs(_ context.Context) (bool, error) {
 	return m.dedicatedImageFs, nil
 }
 
@@ -81,7 +84,7 @@ type mockDiskGC struct {
 }
 
 // DeleteUnusedImages returns the mocked values.
-func (m *mockDiskGC) DeleteUnusedImages() error {
+func (m *mockDiskGC) DeleteUnusedImages(_ context.Context) error {
 	m.imageGCInvoked = true
 	if m.summaryAfterGC != nil && m.fakeSummaryProvider != nil {
 		m.fakeSummaryProvider.result = m.summaryAfterGC
@@ -90,7 +93,7 @@ func (m *mockDiskGC) DeleteUnusedImages() error {
 }
 
 // DeleteAllUnusedContainers returns the mocked value
-func (m *mockDiskGC) DeleteAllUnusedContainers() error {
+func (m *mockDiskGC) DeleteAllUnusedContainers(_ context.Context) error {
 	m.containerGCInvoked = true
 	if m.summaryAfterGC != nil && m.fakeSummaryProvider != nil {
 		m.fakeSummaryProvider.result = m.summaryAfterGC
@@ -182,6 +185,204 @@ type podToMake struct {
 	rootFsInodesUsed         string
 	perLocalVolumeUsed       string
 	perLocalVolumeInodesUsed string
+}
+
+func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
+	testCases := map[string]struct {
+		wantPodStatus v1.PodStatus
+	}{
+		"eviction due to memory pressure": {
+			wantPodStatus: v1.PodStatus{
+				Phase:   v1.PodFailed,
+				Reason:  "Evicted",
+				Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
+			},
+		},
+	}
+	for name, tc := range testCases {
+		for _, enablePodDisruptionConditions := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s;PodDisruptionConditions=%v", name, enablePodDisruptionConditions), func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, enablePodDisruptionConditions)()
+
+				podMaker := makePodWithMemoryStats
+				summaryStatsMaker := makeMemoryStats
+				podsToMake := []podToMake{
+					{name: "below-requests", requests: newResourceList("", "1Gi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "900Mi"},
+					{name: "above-requests", requests: newResourceList("", "100Mi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "700Mi"},
+				}
+				pods := []*v1.Pod{}
+				podStats := map[*v1.Pod]statsapi.PodStats{}
+				for _, podToMake := range podsToMake {
+					pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+					pods = append(pods, pod)
+					podStats[pod] = podStat
+				}
+				activePodsFunc := func() []*v1.Pod {
+					return pods
+				}
+
+				fakeClock := testingclock.NewFakeClock(time.Now())
+				podKiller := &mockPodKiller{}
+				diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+				diskGC := &mockDiskGC{err: nil}
+				nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+				config := Config{
+					PressureTransitionPeriod: time.Minute * 5,
+					Thresholds: []evictionapi.Threshold{
+						{
+							Signal:   evictionapi.SignalMemoryAvailable,
+							Operator: evictionapi.OpLessThan,
+							Value: evictionapi.ThresholdValue{
+								Quantity: quantityMustParse("2Gi"),
+							},
+						},
+					},
+				}
+				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
+				manager := &managerImpl{
+					clock:                        fakeClock,
+					killPodFunc:                  podKiller.killPodNow,
+					imageGC:                      diskGC,
+					containerGC:                  diskGC,
+					config:                       config,
+					recorder:                     &record.FakeRecorder{},
+					summaryProvider:              summaryProvider,
+					nodeRef:                      nodeRef,
+					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				}
+
+				// synchronize to detect the memory pressure
+				manager.synchronize(diskInfoProvider, activePodsFunc)
+
+				// verify memory pressure is detected
+				if !manager.IsUnderMemoryPressure() {
+					t.Fatalf("Manager should have detected memory pressure")
+				}
+
+				// verify a pod is selected for eviction
+				if podKiller.pod == nil {
+					t.Fatalf("Manager should have selected a pod for eviction")
+				}
+
+				wantPodStatus := tc.wantPodStatus.DeepCopy()
+				if enablePodDisruptionConditions {
+					wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
+						Type:    "DisruptionTarget",
+						Status:  "True",
+						Reason:  "TerminationByKubelet",
+						Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
+					})
+				}
+
+				// verify the pod status after applying the status update function
+				podKiller.statusFn(&podKiller.pod.Status)
+				if diff := cmp.Diff(*wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+					t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
+func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
+	testCases := map[string]struct {
+		wantPodStatus v1.PodStatus
+	}{
+		"eviction due to disk pressure": {
+			wantPodStatus: v1.PodStatus{
+				Phase:   v1.PodFailed,
+				Reason:  "Evicted",
+				Message: "The node was low on resource: ephemeral-storage. Threshold quantity: 2Gi, available: 1536Mi. ",
+			},
+		},
+	}
+	for name, tc := range testCases {
+		for _, enablePodDisruptionConditions := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s;PodDisruptionConditions=%v", name, enablePodDisruptionConditions), func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, enablePodDisruptionConditions)()
+
+				podMaker := makePodWithDiskStats
+				summaryStatsMaker := makeDiskStats
+				podsToMake := []podToMake{
+					{name: "below-requests", requests: newResourceList("", "", "1Gi"), limits: newResourceList("", "", "1Gi"), rootFsUsed: "900Mi"},
+					{name: "above-requests", requests: newResourceList("", "", "100Mi"), limits: newResourceList("", "", "1Gi"), rootFsUsed: "700Mi"},
+				}
+				pods := []*v1.Pod{}
+				podStats := map[*v1.Pod]statsapi.PodStats{}
+				for _, podToMake := range podsToMake {
+					pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
+					pods = append(pods, pod)
+					podStats[pod] = podStat
+				}
+				activePodsFunc := func() []*v1.Pod {
+					return pods
+				}
+
+				fakeClock := testingclock.NewFakeClock(time.Now())
+				podKiller := &mockPodKiller{}
+				diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+				diskGC := &mockDiskGC{err: nil}
+				nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+				config := Config{
+					PressureTransitionPeriod: time.Minute * 5,
+					Thresholds: []evictionapi.Threshold{
+						{
+							Signal:   evictionapi.SignalNodeFsAvailable,
+							Operator: evictionapi.OpLessThan,
+							Value: evictionapi.ThresholdValue{
+								Quantity: quantityMustParse("2Gi"),
+							},
+						},
+					},
+				}
+				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1.5Gi", "200Gi", podStats)}
+				manager := &managerImpl{
+					clock:                        fakeClock,
+					killPodFunc:                  podKiller.killPodNow,
+					imageGC:                      diskGC,
+					containerGC:                  diskGC,
+					config:                       config,
+					recorder:                     &record.FakeRecorder{},
+					summaryProvider:              summaryProvider,
+					nodeRef:                      nodeRef,
+					nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+					thresholdsFirstObservedAt:    thresholdsObservedAt{},
+				}
+
+				// synchronize
+				manager.synchronize(diskInfoProvider, activePodsFunc)
+
+				// verify menager detected disk pressure
+				if !manager.IsUnderDiskPressure() {
+					t.Fatalf("Manager should report disk pressure")
+				}
+
+				// verify a pod is selected for eviction
+				if podKiller.pod == nil {
+					t.Fatalf("Manager should have selected a pod for eviction")
+				}
+
+				wantPodStatus := tc.wantPodStatus.DeepCopy()
+				if enablePodDisruptionConditions {
+					wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
+						Type:    "DisruptionTarget",
+						Status:  "True",
+						Reason:  "TerminationByKubelet",
+						Message: "The node was low on resource: ephemeral-storage. Threshold quantity: 2Gi, available: 1536Mi. ",
+					})
+				}
+
+				// verify the pod status after applying the status update function
+				podKiller.statusFn(&podKiller.pod.Status)
+				if diff := cmp.Diff(*wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+					t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
+				}
+			})
+		}
+	}
 }
 
 // TestMemoryPressure
@@ -449,8 +650,6 @@ func parseQuantity(value string) resource.Quantity {
 }
 
 func TestDiskPressureNodeFs(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
-
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
@@ -786,8 +985,6 @@ func TestMinReclaim(t *testing.T) {
 }
 
 func TestNodeReclaimFuncs(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
-
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{

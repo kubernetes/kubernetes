@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,7 +32,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // makePodToVerifyPids returns a pod that verifies specified cgroup with pids
@@ -87,9 +88,9 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *v1.Pod {
 }
 
 func runPodPidsLimitTests(f *framework.Framework) {
-	ginkgo.It("should set pids.max for Pod", func() {
+	ginkgo.It("should set pids.max for Pod", func(ctx context.Context) {
 		ginkgo.By("by creating a G pod")
-		pod := f.PodClient().Create(&v1.Pod{
+		pod := e2epod.NewPodClient(f).Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uuid.NewUUID()),
 				Namespace: f.Namespace.Name,
@@ -112,7 +113,7 @@ func runPodPidsLimitTests(f *framework.Framework) {
 		podUID := string(pod.UID)
 		ginkgo.By("checking if the expected pids settings were applied")
 		verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("1024"))
-		f.PodClient().Create(verifyPod)
+		e2epod.NewPodClient(f).Create(verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
 	})

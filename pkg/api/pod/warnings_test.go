@@ -206,6 +206,15 @@ func TestWarnings(t *testing.T) {
 			expected: []string{`spec.volumes[0].quobyte: deprecated in v1.22, support removal is planned in v1.26`},
 		},
 		{
+			name: "glusterfs",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].glusterfs: deprecated in v1.25, this feature will be removed soon after in a subsequent release`},
+		},
+		{
 			name: "duplicate hostAlias",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				HostAliases: []api.HostAlias{
@@ -423,8 +432,8 @@ func TestWarnings(t *testing.T) {
 			},
 			expected: []string{
 				`metadata.annotations[scheduler.alpha.kubernetes.io/critical-pod]: non-functional in v1.16+; use the "priorityClassName" field instead`,
-				`metadata.annotations[seccomp.security.alpha.kubernetes.io/pod]: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`,
-				`metadata.annotations[container.seccomp.security.alpha.kubernetes.io/foo]: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`,
+				`metadata.annotations[seccomp.security.alpha.kubernetes.io/pod]: deprecated since v1.19, non-functional in a future release; use the "seccompProfile" field instead`,
+				`metadata.annotations[container.seccomp.security.alpha.kubernetes.io/foo]: deprecated since v1.19, non-functional in a future release; use the "seccompProfile" field instead`,
 				`metadata.annotations[security.alpha.kubernetes.io/sysctls]: non-functional in v1.11+; use the "sysctls" field instead`,
 				`metadata.annotations[security.alpha.kubernetes.io/unsafe-sysctls]: non-functional in v1.11+; use the "sysctls" field instead`,
 			},
@@ -449,6 +458,36 @@ func TestWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{},
+		},
+		{
+			name: "pod with ephemeral volume source 200Mi",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{Volumes: []api.Volume{
+					{Name: "ephemeral-volume", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{
+						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+							Spec: api.PersistentVolumeClaimSpec{Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("200Mi")}}},
+						},
+					}}}}},
+			},
+			expected: []string{},
+		},
+		{
+			name: "pod with ephemeral volume source 200m",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{Volumes: []api.Volume{
+					{Name: "ephemeral-volume", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{
+						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+							Spec: api.PersistentVolumeClaimSpec{Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("200m")}}},
+						},
+					}}}}},
+			},
+			expected: []string{
+				`spec.volumes[0].ephemeral.volumeClaimTemplate.spec.resources.requests[storage]: fractional byte value "200m" is invalid, must be an integer`,
+			},
 		},
 	}
 

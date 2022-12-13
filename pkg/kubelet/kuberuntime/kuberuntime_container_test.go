@@ -17,8 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"fmt"
-	"io/ioutil"
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,10 +29,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -43,6 +44,7 @@ import (
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
 func TestRemoveContainer(t *testing.T) {
+	ctx := context.Background()
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := &v1.Pod{
@@ -70,6 +72,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	fakeOS.GlobFn = func(pattern, path string) bool {
 		pattern = strings.Replace(pattern, "*", ".*", -1)
+		pattern = strings.Replace(pattern, "\\", "\\\\", -1)
 		return regexp.MustCompile(pattern).MatchString(path)
 	}
 	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
@@ -79,7 +82,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS.Create(expectedContainerLogPath)
 	fakeOS.Create(expectedContainerLogPathRotated)
 
-	err = m.removeContainer(containerID)
+	err = m.removeContainer(ctx, containerID)
 	assert.NoError(t, err)
 
 	// Verify container log is removed.
@@ -89,7 +92,7 @@ func TestRemoveContainer(t *testing.T) {
 		fakeOS.Removes)
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
-	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerID})
+	containers, err := fakeRuntime.ListContainers(ctx, &runtimeapi.ContainerFilter{Id: containerID})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
 }
@@ -122,7 +125,8 @@ func TestKillContainer(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := m.killContainer(test.pod, test.containerID, test.containerName, test.reason, "", &test.gracePeriodOverride)
+		ctx := context.Background()
+		err := m.killContainer(ctx, test.pod, test.containerID, test.containerName, test.reason, "", &test.gracePeriodOverride)
 		if test.succeed != (err == nil) {
 			t.Errorf("%s: expected %v, got %v (%v)", test.caseName, test.succeed, (err == nil), err)
 		}
@@ -281,18 +285,30 @@ func TestLifeCycleHook(t *testing.T) {
 
 	fakeRunner := &containertest.FakeContainerCommandRunner{}
 	fakeHTTP := &fakeHTTP{}
+	fakePodStatusProvider := podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+		return &kubecontainer.PodStatus{
+			ID:        uid,
+			Name:      name,
+			Namespace: namespace,
+			IPs: []string{
+				"127.0.0.1",
+			},
+		}, nil
+	})
 
 	lcHanlder := lifecycle.NewHandlerRunner(
 		fakeHTTP,
 		fakeRunner,
+		fakePodStatusProvider,
 		nil)
 
 	m.runner = lcHanlder
 
 	// Configured and works as expected
 	t.Run("PreStop-CMDExec", func(t *testing.T) {
+		ctx := context.Background()
 		testPod.Spec.Containers[0].Lifecycle = cmdLifeCycle
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
+		m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
 		if fakeRunner.Cmd[0] != cmdLifeCycle.PreStop.Exec.Command[0] {
 			t.Errorf("CMD Prestop hook was not invoked")
 		}
@@ -300,32 +316,49 @@ func TestLifeCycleHook(t *testing.T) {
 
 	// Configured and working HTTP hook
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
-		defer func() { fakeHTTP.url = "" }()
-		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
+		t.Run("inconsistent", func(t *testing.T) {
+			ctx := context.Background()
+			defer func() { fakeHTTP.req = nil }()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
+			httpLifeCycle.PreStop.HTTPGet.Port = intstr.IntOrString{}
+			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
+			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
 
-		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
-			t.Errorf("HTTP Prestop hook was not invoked")
-		}
+			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
+				t.Errorf("HTTP Prestop hook was not invoked")
+			}
+		})
+		t.Run("consistent", func(t *testing.T) {
+			ctx := context.Background()
+			defer func() { fakeHTTP.req = nil }()
+			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt(80)
+			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
+			m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriod)
+
+			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
+				t.Errorf("HTTP Prestop hook was not invoked")
+			}
+		})
 	})
 
 	// When there is no time to run PreStopHook
 	t.Run("PreStop-NoTimeToRun", func(t *testing.T) {
+		ctx := context.Background()
 		gracePeriodLocal := int64(0)
 
 		testPod.DeletionGracePeriodSeconds = &gracePeriodLocal
 		testPod.Spec.TerminationGracePeriodSeconds = &gracePeriodLocal
 
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
+		m.killContainer(ctx, testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
 
-		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
-			t.Errorf("HTTP Should not execute when gracePeriod is 0")
+		if fakeHTTP.req != nil {
+			t.Errorf("HTTP Prestop hook Should not execute when gracePeriod is 0")
 		}
 	})
 
 	// Post Start script
 	t.Run("PostStart-CmdExe", func(t *testing.T) {
-
+		ctx := context.Background()
 		// Fake all the things you need before trying to create a container
 		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
 		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(testPod, 0)
@@ -346,7 +379,7 @@ func TestLifeCycleHook(t *testing.T) {
 		}
 
 		// Now try to create a container, which should in turn invoke PostStart Hook
-		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{})
+		_, err := m.startContainer(ctx, fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{})
 		if err != nil {
 			t.Errorf("startContainer error =%v", err)
 		}
@@ -405,21 +438,10 @@ func TestStartSpec(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 			if got, err := tc.spec.getTargetID(podStatus); err != nil {
 				t.Fatalf("%v: getTargetID got unexpected error: %v", t.Name(), err)
 			} else if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("%v: getTargetID got unexpected result. diff:\n%v", t.Name(), diff)
-			}
-		})
-
-		// Test with feature disabled in self-contained section which can be removed when feature flag is removed.
-		t.Run(fmt.Sprintf("%s (disabled)", tc.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, false)()
-			if got, err := tc.spec.getTargetID(podStatus); err != nil {
-				t.Fatalf("%v: getTargetID got unexpected error: %v", t.Name(), err)
-			} else if got != nil {
-				t.Errorf("%v: getTargetID got: %v, wanted nil", t.Name(), got)
 			}
 		})
 	}
@@ -455,14 +477,178 @@ func TestRestartCountByLogDir(t *testing.T) {
 			restartCount: 8,
 		},
 	} {
-		tempDirPath, err := ioutil.TempDir("", "test-restart-count-")
+		tempDirPath, err := os.MkdirTemp("", "test-restart-count-")
 		assert.NoError(t, err, "create tempdir error")
 		defer os.RemoveAll(tempDirPath)
 		for _, filename := range tc.filenames {
-			err = ioutil.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
+			err = os.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
 			assert.NoError(t, err, "could not write log file")
 		}
 		count, _ := calcRestartCountByLogDir(tempDirPath)
 		assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
+	}
+}
+
+func TestKillContainerGracePeriod(t *testing.T) {
+
+	shortGracePeriod := int64(10)
+	mediumGracePeriod := int64(30)
+	longGracePeriod := int64(60)
+
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		reason              containerKillReason
+		expectedGracePeriod int64
+	}{
+		{
+			name: "default termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{Name: "foo"}}},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: int64(2),
+		},
+		{
+			name: "use pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers:                    []v1.Container{{Name: "foo"}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "liveness probe overrides pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonLivenessProbe,
+			expectedGracePeriod: shortGracePeriod,
+		},
+		{
+			name: "startup probe overrides pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", StartupProbe: &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonStartupProbe,
+			expectedGracePeriod: shortGracePeriod,
+		},
+		{
+			name: "startup probe overrides pod termination grace period, probe period > pod period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", StartupProbe: &v1.Probe{TerminationGracePeriodSeconds: &longGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &shortGracePeriod,
+				},
+			},
+			reason:              reasonStartupProbe,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "liveness probe overrides pod termination grace period, probe period > pod period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &longGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &shortGracePeriod,
+				},
+			},
+			reason:              reasonLivenessProbe,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "non-liveness probe failure, use pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "non-startup probe failure, use pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", StartupProbe: &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "all three grace periods set, use pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:          "foo",
+						StartupProbe:  &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+						LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &mediumGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "all three grace periods set, use startup termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:          "foo",
+						StartupProbe:  &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+						LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &mediumGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonStartupProbe,
+			expectedGracePeriod: shortGracePeriod,
+		},
+		{
+			name: "all three grace periods set, use liveness termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:          "foo",
+						StartupProbe:  &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+						LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &mediumGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonLivenessProbe,
+			expectedGracePeriod: mediumGracePeriod,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualGracePeriod := setTerminationGracePeriod(test.pod, &test.pod.Spec.Containers[0], "", kubecontainer.ContainerID{}, test.reason)
+			require.Equal(t, test.expectedGracePeriod, actualGracePeriod)
+		})
 	}
 }

@@ -70,11 +70,11 @@ func TestUtils(t *testing.T) {
 	}
 }
 
-func TestIsvCenterDeprecated(t *testing.T) {
+func TestIsvCenterNotSupported(t *testing.T) {
 	type testsData struct {
-		vcVersion    string
-		vcAPIVersion string
-		isDeprecated bool
+		vcVersion      string
+		vcAPIVersion   string
+		isNotSupported bool
 	}
 	testdataArray := []testsData{
 		{"8.0.0", "8.0.0.0", false},
@@ -90,16 +90,16 @@ func TestIsvCenterDeprecated(t *testing.T) {
 	}
 
 	for _, test := range testdataArray {
-		deprecated, err := isvCenterDeprecated(test.vcVersion, test.vcAPIVersion)
+		notsupported, err := isvCenterNotSupported(test.vcVersion, test.vcAPIVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if deprecated != test.isDeprecated {
-			t.Fatalf("deprecation test failed for vc version: %q and vc API version: %q",
+		if notsupported != test.isNotSupported {
+			t.Fatalf("test failed for vc version: %q and vc API version: %q",
 				test.vcVersion, test.vcAPIVersion)
 		} else {
-			t.Logf("deprecation test for vc version: %q and vc API version: %q passed. Is Deprecated : %v",
-				test.vcAPIVersion, test.vcAPIVersion, deprecated)
+			t.Logf("test for vc version: %q and vc API version: %q passed. Is Not Supported : %v",
+				test.vcAPIVersion, test.vcAPIVersion, notsupported)
 		}
 	}
 }

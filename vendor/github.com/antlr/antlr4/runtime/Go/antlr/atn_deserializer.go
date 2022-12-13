@@ -5,50 +5,34 @@
 package antlr
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strconv"
-	"strings"
-	"unicode/utf16"
 )
 
-// This is the earliest supported serialized UUID.
-// stick to serialized version for now, we don't need a UUID instance
-var BaseSerializedUUID = "AADB8D7E-AEEF-4415-AD2B-8204D6CF042E"
-var AddedUnicodeSMP = "59627784-3BE5-417A-B9EB-8131A7286089"
+const serializedVersion = 4
 
-// This list contains all of the currently supported UUIDs, ordered by when
-// the feature first appeared in this branch.
-var SupportedUUIDs = []string{BaseSerializedUUID, AddedUnicodeSMP}
-
-var SerializedVersion = 3
-
-// This is the current serialized UUID.
-var SerializedUUID = AddedUnicodeSMP
-
-type LoopEndStateIntPair struct {
+type loopEndStateIntPair struct {
 	item0 *LoopEndState
 	item1 int
 }
 
-type BlockStartStateIntPair struct {
+type blockStartStateIntPair struct {
 	item0 BlockStartState
 	item1 int
 }
 
 type ATNDeserializer struct {
-	deserializationOptions *ATNDeserializationOptions
-	data                   []rune
-	pos                    int
-	uuid                   string
+	options *ATNDeserializationOptions
+	data    []int32
+	pos     int
 }
 
 func NewATNDeserializer(options *ATNDeserializationOptions) *ATNDeserializer {
 	if options == nil {
-		options = ATNDeserializationOptionsdefaultOptions
+		options = &defaultATNDeserializationOptions
 	}
 
-	return &ATNDeserializer{deserializationOptions: options}
+	return &ATNDeserializer{options: options}
 }
 
 func stringInSlice(a string, list []string) int {
@@ -61,30 +45,10 @@ func stringInSlice(a string, list []string) int {
 	return -1
 }
 
-// isFeatureSupported determines if a particular serialized representation of an
-// ATN supports a particular feature, identified by the UUID used for
-// serializing the ATN at the time the feature was first introduced. Feature is
-// the UUID marking the first time the feature was supported in the serialized
-// ATN. ActualUuid is the UUID of the actual serialized ATN which is currently
-// being deserialized. It returns true if actualUuid represents a serialized ATN
-// at or after the feature identified by feature was introduced, and otherwise
-// false.
-func (a *ATNDeserializer) isFeatureSupported(feature, actualUUID string) bool {
-	idx1 := stringInSlice(feature, SupportedUUIDs)
-
-	if idx1 < 0 {
-		return false
-	}
-
-	idx2 := stringInSlice(actualUUID, SupportedUUIDs)
-
-	return idx2 >= idx1
-}
-
-func (a *ATNDeserializer) DeserializeFromUInt16(data []uint16) *ATN {
-	a.reset(utf16.Decode(data))
+func (a *ATNDeserializer) Deserialize(data []int32) *ATN {
+	a.data = data
+	a.pos = 0
 	a.checkVersion()
-	a.checkUUID()
 
 	atn := a.readATN()
 
@@ -92,15 +56,7 @@ func (a *ATNDeserializer) DeserializeFromUInt16(data []uint16) *ATN {
 	a.readRules(atn)
 	a.readModes(atn)
 
-	sets := make([]*IntervalSet, 0)
-
-	// First, deserialize sets with 16-bit arguments <= U+FFFF.
-	sets = a.readSets(atn, sets, a.readInt)
-	// Next, if the ATN was serialized with the Unicode SMP feature,
-	// deserialize sets with 32-bit arguments <= U+10FFFF.
-	if (a.isFeatureSupported(AddedUnicodeSMP, a.uuid)) {
-		sets = a.readSets(atn, sets, a.readInt32)
-	}
+	sets := a.readSets(atn, nil)
 
 	a.readEdges(atn, sets)
 	a.readDecisions(atn)
@@ -108,7 +64,7 @@ func (a *ATNDeserializer) DeserializeFromUInt16(data []uint16) *ATN {
 	a.markPrecedenceDecisions(atn)
 	a.verifyATN(atn)
 
-	if a.deserializationOptions.generateRuleBypassTransitions && atn.grammarType == ATNTypeParser {
+	if a.options.GenerateRuleBypassTransitions() && atn.grammarType == ATNTypeParser {
 		a.generateRuleBypassTransitions(atn)
 		// Re-verify after modification
 		a.verifyATN(atn)
@@ -118,40 +74,12 @@ func (a *ATNDeserializer) DeserializeFromUInt16(data []uint16) *ATN {
 
 }
 
-func (a *ATNDeserializer) reset(data []rune) {
-	temp := make([]rune, len(data))
-
-	for i, c := range data {
-		// Don't adjust the first value since that's the version number
-		if i == 0 {
-			temp[i] = c
-		} else if c > 1 {
-			temp[i] = c - 2
-		} else {
-		    temp[i] = c + 65533
-		}
-	}
-
-	a.data = temp
-	a.pos = 0
-}
-
 func (a *ATNDeserializer) checkVersion() {
 	version := a.readInt()
 
-	if version != SerializedVersion {
-		panic("Could not deserialize ATN with version " + strconv.Itoa(version) + " (expected " + strconv.Itoa(SerializedVersion) + ").")
+	if version != serializedVersion {
+		panic("Could not deserialize ATN with version " + strconv.Itoa(version) + " (expected " + strconv.Itoa(serializedVersion) + ").")
 	}
-}
-
-func (a *ATNDeserializer) checkUUID() {
-	uuid := a.readUUID()
-
-	if stringInSlice(uuid, SupportedUUIDs) < 0 {
-		panic("Could not deserialize ATN with UUID: " + uuid + " (expected " + SerializedUUID + " or a legacy UUID).")
-	}
-
-	a.uuid = uuid
 }
 
 func (a *ATNDeserializer) readATN() *ATN {
@@ -162,10 +90,14 @@ func (a *ATNDeserializer) readATN() *ATN {
 }
 
 func (a *ATNDeserializer) readStates(atn *ATN) {
-	loopBackStateNumbers := make([]LoopEndStateIntPair, 0)
-	endStateNumbers := make([]BlockStartStateIntPair, 0)
-
 	nstates := a.readInt()
+
+	// Allocate worst case size.
+	loopBackStateNumbers := make([]loopEndStateIntPair, 0, nstates)
+	endStateNumbers := make([]blockStartStateIntPair, 0, nstates)
+
+	// Preallocate states slice.
+	atn.states = make([]ATNState, 0, nstates)
 
 	for i := 0; i < nstates; i++ {
 		stype := a.readInt()
@@ -173,26 +105,21 @@ func (a *ATNDeserializer) readStates(atn *ATN) {
 		// Ignore bad types of states
 		if stype == ATNStateInvalidType {
 			atn.addState(nil)
-
 			continue
 		}
 
 		ruleIndex := a.readInt()
-
-		if ruleIndex == 0xFFFF {
-			ruleIndex = -1
-		}
 
 		s := a.stateFactory(stype, ruleIndex)
 
 		if stype == ATNStateLoopEnd {
 			loopBackStateNumber := a.readInt()
 
-			loopBackStateNumbers = append(loopBackStateNumbers, LoopEndStateIntPair{s.(*LoopEndState), loopBackStateNumber})
+			loopBackStateNumbers = append(loopBackStateNumbers, loopEndStateIntPair{s.(*LoopEndState), loopBackStateNumber})
 		} else if s2, ok := s.(BlockStartState); ok {
 			endStateNumber := a.readInt()
 
-			endStateNumbers = append(endStateNumbers, BlockStartStateIntPair{s2, endStateNumber})
+			endStateNumbers = append(endStateNumbers, blockStartStateIntPair{s2, endStateNumber})
 		}
 
 		atn.addState(s)
@@ -200,20 +127,15 @@ func (a *ATNDeserializer) readStates(atn *ATN) {
 
 	// Delay the assignment of loop back and end states until we know all the state
 	// instances have been initialized
-	for j := 0; j < len(loopBackStateNumbers); j++ {
-		pair := loopBackStateNumbers[j]
-
+	for _, pair := range loopBackStateNumbers {
 		pair.item0.loopBackState = atn.states[pair.item1]
 	}
 
-	for j := 0; j < len(endStateNumbers); j++ {
-		pair := endStateNumbers[j]
-
+	for _, pair := range endStateNumbers {
 		pair.item0.setEndState(atn.states[pair.item1].(*BlockEndState))
 	}
 
 	numNonGreedyStates := a.readInt()
-
 	for j := 0; j < numNonGreedyStates; j++ {
 		stateNumber := a.readInt()
 
@@ -221,7 +143,6 @@ func (a *ATNDeserializer) readStates(atn *ATN) {
 	}
 
 	numPrecedenceStates := a.readInt()
-
 	for j := 0; j < numPrecedenceStates; j++ {
 		stateNumber := a.readInt()
 
@@ -233,12 +154,12 @@ func (a *ATNDeserializer) readRules(atn *ATN) {
 	nrules := a.readInt()
 
 	if atn.grammarType == ATNTypeLexer {
-		atn.ruleToTokenType = make([]int, nrules) // TODO: initIntArray(nrules, 0)
+		atn.ruleToTokenType = make([]int, nrules)
 	}
 
-	atn.ruleToStartState = make([]*RuleStartState, nrules) // TODO: initIntArray(nrules, 0)
+	atn.ruleToStartState = make([]*RuleStartState, nrules)
 
-	for i := 0; i < nrules; i++ {
+	for i := range atn.ruleToStartState {
 		s := a.readInt()
 		startState := atn.states[s].(*RuleStartState)
 
@@ -247,19 +168,13 @@ func (a *ATNDeserializer) readRules(atn *ATN) {
 		if atn.grammarType == ATNTypeLexer {
 			tokenType := a.readInt()
 
-			if tokenType == 0xFFFF {
-				tokenType = TokenEOF
-			}
-
 			atn.ruleToTokenType[i] = tokenType
 		}
 	}
 
-	atn.ruleToStopState = make([]*RuleStopState, nrules) //initIntArray(nrules, 0)
+	atn.ruleToStopState = make([]*RuleStopState, nrules)
 
-	for i := 0; i < len(atn.states); i++ {
-		state := atn.states[i]
-
+	for _, state := range atn.states {
 		if s2, ok := state.(*RuleStopState); ok {
 			atn.ruleToStopState[s2.ruleIndex] = s2
 			atn.ruleToStartState[s2.ruleIndex].stopState = s2
@@ -269,16 +184,24 @@ func (a *ATNDeserializer) readRules(atn *ATN) {
 
 func (a *ATNDeserializer) readModes(atn *ATN) {
 	nmodes := a.readInt()
+	atn.modeToStartState = make([]*TokensStartState, nmodes)
 
-	for i := 0; i < nmodes; i++ {
+	for i := range atn.modeToStartState {
 		s := a.readInt()
 
-		atn.modeToStartState = append(atn.modeToStartState, atn.states[s].(*TokensStartState))
+		atn.modeToStartState[i] = atn.states[s].(*TokensStartState)
 	}
 }
 
-func (a *ATNDeserializer) readSets(atn *ATN, sets []*IntervalSet, readUnicode func() int) []*IntervalSet {
+func (a *ATNDeserializer) readSets(atn *ATN, sets []*IntervalSet) []*IntervalSet {
 	m := a.readInt()
+
+	// Preallocate the needed capacity.
+	if cap(sets)-len(sets) < m {
+		isets := make([]*IntervalSet, len(sets), len(sets)+m)
+		copy(isets, sets)
+		sets = isets
+	}
 
 	for i := 0; i < m; i++ {
 		iset := NewIntervalSet()
@@ -293,8 +216,8 @@ func (a *ATNDeserializer) readSets(atn *ATN, sets []*IntervalSet, readUnicode fu
 		}
 
 		for j := 0; j < n; j++ {
-			i1 := readUnicode()
-			i2 := readUnicode()
+			i1 := a.readInt()
+			i2 := a.readInt()
 
 			iset.addRange(i1, i2)
 		}
@@ -322,11 +245,9 @@ func (a *ATNDeserializer) readEdges(atn *ATN, sets []*IntervalSet) {
 	}
 
 	// Edges for rule stop states can be derived, so they are not serialized
-	for i := 0; i < len(atn.states); i++ {
-		state := atn.states[i]
-
-		for j := 0; j < len(state.GetTransitions()); j++ {
-			var t, ok = state.GetTransitions()[j].(*RuleTransition)
+	for _, state := range atn.states {
+		for _, t := range state.GetTransitions() {
+			var rt, ok = t.(*RuleTransition)
 
 			if !ok {
 				continue
@@ -334,48 +255,42 @@ func (a *ATNDeserializer) readEdges(atn *ATN, sets []*IntervalSet) {
 
 			outermostPrecedenceReturn := -1
 
-			if atn.ruleToStartState[t.getTarget().GetRuleIndex()].isPrecedenceRule {
-				if t.precedence == 0 {
-					outermostPrecedenceReturn = t.getTarget().GetRuleIndex()
+			if atn.ruleToStartState[rt.getTarget().GetRuleIndex()].isPrecedenceRule {
+				if rt.precedence == 0 {
+					outermostPrecedenceReturn = rt.getTarget().GetRuleIndex()
 				}
 			}
 
-			trans := NewEpsilonTransition(t.followState, outermostPrecedenceReturn)
+			trans := NewEpsilonTransition(rt.followState, outermostPrecedenceReturn)
 
-			atn.ruleToStopState[t.getTarget().GetRuleIndex()].AddTransition(trans, -1)
+			atn.ruleToStopState[rt.getTarget().GetRuleIndex()].AddTransition(trans, -1)
 		}
 	}
 
-	for i := 0; i < len(atn.states); i++ {
-		state := atn.states[i]
-
-		if s2, ok := state.(*BaseBlockStartState); ok {
+	for _, state := range atn.states {
+		if s2, ok := state.(BlockStartState); ok {
 			// We need to know the end state to set its start state
-			if s2.endState == nil {
+			if s2.getEndState() == nil {
 				panic("IllegalState")
 			}
 
 			// Block end states can only be associated to a single block start state
-			if s2.endState.startState != nil {
+			if s2.getEndState().startState != nil {
 				panic("IllegalState")
 			}
 
-			s2.endState.startState = state
+			s2.getEndState().startState = state
 		}
 
 		if s2, ok := state.(*PlusLoopbackState); ok {
-			for j := 0; j < len(s2.GetTransitions()); j++ {
-				target := s2.GetTransitions()[j].getTarget()
-
-				if t2, ok := target.(*PlusBlockStartState); ok {
+			for _, t := range s2.GetTransitions() {
+				if t2, ok := t.getTarget().(*PlusBlockStartState); ok {
 					t2.loopBackState = state
 				}
 			}
 		} else if s2, ok := state.(*StarLoopbackState); ok {
-			for j := 0; j < len(s2.GetTransitions()); j++ {
-				target := s2.GetTransitions()[j].getTarget()
-
-				if t2, ok := target.(*StarLoopEntryState); ok {
+			for _, t := range s2.GetTransitions() {
+				if t2, ok := t.getTarget().(*StarLoopEntryState); ok {
 					t2.loopBackState = state
 				}
 			}
@@ -399,25 +314,13 @@ func (a *ATNDeserializer) readLexerActions(atn *ATN) {
 	if atn.grammarType == ATNTypeLexer {
 		count := a.readInt()
 
-		atn.lexerActions = make([]LexerAction, count) // initIntArray(count, nil)
+		atn.lexerActions = make([]LexerAction, count)
 
-		for i := 0; i < count; i++ {
+		for i := range atn.lexerActions {
 			actionType := a.readInt()
 			data1 := a.readInt()
-
-			if data1 == 0xFFFF {
-				data1 = -1
-			}
-
 			data2 := a.readInt()
-
-			if data2 == 0xFFFF {
-				data2 = -1
-			}
-
-			lexerAction := a.lexerActionFactory(actionType, data1, data2)
-
-			atn.lexerActions[i] = lexerAction
+			atn.lexerActions[i] = a.lexerActionFactory(actionType, data1, data2)
 		}
 	}
 }
@@ -565,14 +468,12 @@ func (a *ATNDeserializer) markPrecedenceDecisions(atn *ATN) {
 }
 
 func (a *ATNDeserializer) verifyATN(atn *ATN) {
-	if !a.deserializationOptions.verifyATN {
+	if !a.options.VerifyATN() {
 		return
 	}
 
 	// Verify assumptions
-	for i := 0; i < len(atn.states); i++ {
-		state := atn.states[i]
-
+	for _, state := range atn.states {
 		if state == nil {
 			continue
 		}
@@ -587,18 +488,18 @@ func (a *ATNDeserializer) verifyATN(atn *ATN) {
 			a.checkCondition(s2.loopBackState != nil, "")
 			a.checkCondition(len(s2.GetTransitions()) == 2, "")
 
-			switch s2 := state.(type) {
+			switch s2.transitions[0].getTarget().(type) {
 			case *StarBlockStartState:
-				var _, ok2 = s2.GetTransitions()[1].getTarget().(*LoopEndState)
+				_, ok := s2.transitions[1].getTarget().(*LoopEndState)
 
-				a.checkCondition(ok2, "")
+				a.checkCondition(ok, "")
 				a.checkCondition(!s2.nonGreedy, "")
 
 			case *LoopEndState:
-				var s3, ok2 = s2.GetTransitions()[1].getTarget().(*StarBlockStartState)
+				var _, ok = s2.transitions[1].getTarget().(*StarBlockStartState)
 
-				a.checkCondition(ok2, "")
-				a.checkCondition(s3.nonGreedy, "")
+				a.checkCondition(ok, "")
+				a.checkCondition(s2.nonGreedy, "")
 
 			default:
 				panic("IllegalState")
@@ -607,9 +508,9 @@ func (a *ATNDeserializer) verifyATN(atn *ATN) {
 		case *StarLoopbackState:
 			a.checkCondition(len(state.GetTransitions()) == 1, "")
 
-			var _, ok2 = state.GetTransitions()[0].getTarget().(*StarLoopEntryState)
+			var _, ok = state.GetTransitions()[0].getTarget().(*StarLoopEntryState)
 
-			a.checkCondition(ok2, "")
+			a.checkCondition(ok, "")
 
 		case *LoopEndState:
 			a.checkCondition(s2.loopBackState != nil, "")
@@ -617,8 +518,8 @@ func (a *ATNDeserializer) verifyATN(atn *ATN) {
 		case *RuleStartState:
 			a.checkCondition(s2.stopState != nil, "")
 
-		case *BaseBlockStartState:
-			a.checkCondition(s2.endState != nil, "")
+		case BlockStartState:
+			a.checkCondition(s2.getEndState() != nil, "")
 
 		case *BlockEndState:
 			a.checkCondition(s2.startState != nil, "")
@@ -649,53 +550,7 @@ func (a *ATNDeserializer) readInt() int {
 
 	a.pos++
 
-	return int(v)
-}
-
-func (a *ATNDeserializer) readInt32() int {
-	var low = a.readInt()
-	var high = a.readInt()
-	return low | (high << 16)
-}
-
-//TODO
-//func (a *ATNDeserializer) readLong() int64 {
-//    panic("Not implemented")
-//    var low = a.readInt32()
-//    var high = a.readInt32()
-//    return (low & 0x00000000FFFFFFFF) | (high << int32)
-//}
-
-func createByteToHex() []string {
-	bth := make([]string, 256)
-
-	for i := 0; i < 256; i++ {
-		bth[i] = strings.ToUpper(hex.EncodeToString([]byte{byte(i)}))
-	}
-
-	return bth
-}
-
-var byteToHex = createByteToHex()
-
-func (a *ATNDeserializer) readUUID() string {
-	bb := make([]int, 16)
-
-	for i := 7; i >= 0; i-- {
-		integer := a.readInt()
-
-		bb[(2*i)+1] = integer & 0xFF
-		bb[2*i] = (integer >> 8) & 0xFF
-	}
-
-	return byteToHex[bb[0]] + byteToHex[bb[1]] +
-		byteToHex[bb[2]] + byteToHex[bb[3]] + "-" +
-		byteToHex[bb[4]] + byteToHex[bb[5]] + "-" +
-		byteToHex[bb[6]] + byteToHex[bb[7]] + "-" +
-		byteToHex[bb[8]] + byteToHex[bb[9]] + "-" +
-		byteToHex[bb[10]] + byteToHex[bb[11]] +
-		byteToHex[bb[12]] + byteToHex[bb[13]] +
-		byteToHex[bb[14]] + byteToHex[bb[15]]
+	return int(v) // data is 32 bits but int is at least that big
 }
 
 func (a *ATNDeserializer) edgeFactory(atn *ATN, typeIndex, src, trg, arg1, arg2, arg3 int, sets []*IntervalSet) Transition {

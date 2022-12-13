@@ -45,6 +45,10 @@ type Overload struct {
 	// Function defines the overload with a FunctionOp implementation. May be
 	// nil.
 	Function FunctionOp
+
+	// NonStrict specifies whether the Overload will tolerate arguments that
+	// are types.Err or types.Unknown.
+	NonStrict bool
 }
 
 // UnaryOp is a function that takes a single value and produces an output.

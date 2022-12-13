@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -65,7 +65,7 @@ var (
 var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	ginkgo.It("Should be able to send traffic between Pods without SNAT", func() {
+	ginkgo.It("Should be able to send traffic between Pods without SNAT", func(ctx context.Context) {
 		cs := f.ClientSet
 		pc := cs.CoreV1().Pods(f.Namespace.Name)
 

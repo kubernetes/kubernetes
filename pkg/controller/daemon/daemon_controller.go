@@ -47,7 +47,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -84,10 +83,13 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("DaemonSet")
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
 type DaemonSetsController struct {
-	kubeClient    clientset.Interface
-	eventRecorder record.EventRecorder
-	podControl    controller.PodControlInterface
-	crControl     controller.ControllerRevisionControlInterface
+	kubeClient clientset.Interface
+
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
+
+	podControl controller.PodControlInterface
+	crControl  controller.ControllerRevisionControlInterface
 
 	// An dsc is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
@@ -111,8 +113,6 @@ type DaemonSetsController struct {
 	historyStoreSynced cache.InformerSynced
 	// podLister get list/get pods from the shared informers's store
 	podLister corelisters.PodLister
-	// podNodeIndex indexes pods by their nodeName
-	podNodeIndex cache.Indexer
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced cache.InformerSynced
@@ -138,17 +138,11 @@ func NewDaemonSetsController(
 	failedPodsBackoff *flowcontrol.Backoff,
 ) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, err
-		}
-	}
 	dsc := &DaemonSetsController{
-		kubeClient:    kubeClient,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
+		kubeClient:       kubeClient,
+		eventBroadcaster: eventBroadcaster,
+		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
@@ -185,12 +179,6 @@ func NewDaemonSetsController(
 		DeleteFunc: dsc.deletePod,
 	})
 	dsc.podLister = podInformer.Lister()
-
-	// This custom indexer will index pods based on their NodeName which will decrease the amount of pods we need to get in simulate() call.
-	podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
-		"nodeName": indexByPodNodeName,
-	})
-	dsc.podNodeIndex = podInformer.Informer().GetIndexer()
 	dsc.podStoreSynced = podInformer.Informer().HasSynced
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -207,18 +195,6 @@ func NewDaemonSetsController(
 	dsc.failedPodsBackoff = failedPodsBackoff
 
 	return dsc, nil
-}
-
-func indexByPodNodeName(obj interface{}) ([]string, error) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return []string{}, nil
-	}
-	// We are only interested in active pods with nodeName set
-	if len(pod.Spec.NodeName) == 0 || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-		return []string{}, nil
-	}
-	return []string{pod.Spec.NodeName}, nil
 }
 
 func (dsc *DaemonSetsController) addDaemonset(obj interface{}) {
@@ -279,6 +255,11 @@ func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
 // Run begins watching and syncing daemon sets.
 func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
+
+	dsc.eventBroadcaster.StartStructuredLogging(0)
+	dsc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dsc.kubeClient.CoreV1().Events("")})
+	defer dsc.eventBroadcaster.Shutdown()
+
 	defer dsc.queue.ShutDown()
 
 	klog.Infof("Starting daemon sets controller")
@@ -1123,27 +1104,29 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *
 
 		if shouldRun {
 			desiredNumberScheduled++
-			if scheduled {
-				currentNumberScheduled++
-				// Sort the daemon pods by creation time, so that the oldest is first.
-				daemonPods, _ := nodeToDaemonPods[node.Name]
-				sort.Sort(podByCreationTimestampAndPhase(daemonPods))
-				pod := daemonPods[0]
-				if podutil.IsPodReady(pod) {
-					numberReady++
-					if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
-						numberAvailable++
-					}
+			if !scheduled {
+				continue
+			}
+
+			currentNumberScheduled++
+			// Sort the daemon pods by creation time, so that the oldest is first.
+			daemonPods, _ := nodeToDaemonPods[node.Name]
+			sort.Sort(podByCreationTimestampAndPhase(daemonPods))
+			pod := daemonPods[0]
+			if podutil.IsPodReady(pod) {
+				numberReady++
+				if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+					numberAvailable++
 				}
-				// If the returned error is not nil we have a parse error.
-				// The controller handles this via the hash.
-				generation, err := util.GetTemplateGeneration(ds)
-				if err != nil {
-					generation = nil
-				}
-				if util.IsPodUpdated(pod, hash, generation) {
-					updatedNumberScheduled++
-				}
+			}
+			// If the returned error is not nil we have a parse error.
+			// The controller handles this via the hash.
+			generation, err := util.GetTemplateGeneration(ds)
+			if err != nil {
+				generation = nil
+			}
+			if util.IsPodUpdated(pod, hash, generation) {
+				updatedNumberScheduled++
 			}
 		} else {
 			if scheduled {
@@ -1256,10 +1239,10 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 
 // NodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
 // summary. Returned booleans are:
-// * shouldRun:
+//   - shouldRun:
 //     Returns true when a daemonset should run on the node if a daemonset pod is not already
 //     running on that node.
-// * shouldContinueRunning:
+//   - shouldContinueRunning:
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
 func NodeShouldRunDaemonPod(node *v1.Node, ds *apps.DaemonSet) (bool, bool) {
@@ -1344,14 +1327,17 @@ func getUnscheduledPodsWithoutNode(runningNodesList []*v1.Node, nodeToDaemonPods
 	for _, node := range runningNodesList {
 		isNodeRunning[node.Name] = true
 	}
+
 	for n, pods := range nodeToDaemonPods {
-		if !isNodeRunning[n] {
-			for _, pod := range pods {
-				if len(pod.Spec.NodeName) == 0 {
-					results = append(results, pod.Name)
-				}
+		if isNodeRunning[n] {
+			continue
+		}
+		for _, pod := range pods {
+			if len(pod.Spec.NodeName) == 0 {
+				results = append(results, pod.Name)
 			}
 		}
 	}
+
 	return results
 }

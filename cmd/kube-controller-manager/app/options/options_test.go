@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	eventv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -35,6 +36,8 @@ import (
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
+	netutils "k8s.io/utils/net"
+
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
@@ -60,7 +63,6 @@ import (
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
-	netutils "k8s.io/utils/net"
 )
 
 var args = []string{
@@ -82,6 +84,7 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-cert-file=/cluster-signing-legacy-unknown/cert-file",
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
+	"--concurrent-horizontal-pod-autoscaler-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-ephemeralvolume-syncs=10",
@@ -266,10 +269,7 @@ func TestAddFlags(t *testing.T) {
 			},
 		},
 		DeprecatedFlags: &DeprecatedControllerOptions{
-			&kubectrlmgrconfig.DeprecatedControllerConfiguration{
-				DeletingPodsQPS:    0.1,
-				RegisterRetryCount: 10,
-			},
+			&kubectrlmgrconfig.DeprecatedControllerConfiguration{},
 		},
 		EndpointController: &EndpointControllerOptions{
 			&endpointconfig.EndpointControllerConfiguration{
@@ -298,12 +298,14 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentGCSyncs: 30,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
 					{Group: "", Resource: "events"},
+					{Group: eventv1.GroupName, Resource: "events"},
 				},
 				EnableGarbageCollector: false,
 			},
 		},
 		HPAController: &HPAControllerOptions{
 			&poautosclerconfig.HPAControllerConfiguration{
+				ConcurrentHorizontalPodAutoscalerSyncs:              10,
 				HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
 				HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
 				HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
@@ -534,10 +536,7 @@ func TestApplyTo(t *testing.T) {
 			StatefulSetController: statefulsetconfig.StatefulSetControllerConfiguration{
 				ConcurrentStatefulSetSyncs: 15,
 			},
-			DeprecatedController: kubectrlmgrconfig.DeprecatedControllerConfiguration{
-				DeletingPodsQPS:    0.1,
-				RegisterRetryCount: 10,
-			},
+			DeprecatedController: kubectrlmgrconfig.DeprecatedControllerConfiguration{},
 			EndpointController: endpointconfig.EndpointControllerConfiguration{
 				ConcurrentEndpointSyncs: 10,
 			},
@@ -556,10 +555,12 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentGCSyncs: 30,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
 					{Group: "", Resource: "events"},
+					{Group: eventv1.GroupName, Resource: "events"},
 				},
 				EnableGarbageCollector: false,
 			},
 			HPAController: poautosclerconfig.HPAControllerConfiguration{
+				ConcurrentHorizontalPodAutoscalerSyncs:              10,
 				HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
 				HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
 				HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},

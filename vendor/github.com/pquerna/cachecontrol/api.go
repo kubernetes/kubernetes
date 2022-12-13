@@ -25,7 +25,7 @@ import (
 )
 
 type Options struct {
-	// Set to True for a prviate cache, which is not shared amoung users (eg, in a browser)
+	// Set to True for a private cache, which is not shared among users (eg, in a browser)
 	// Set to False for a "shared" cache, which is more common in a server context.
 	PrivateCache bool
 }

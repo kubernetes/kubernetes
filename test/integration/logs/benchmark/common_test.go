@@ -23,7 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	"go.uber.org/zap/zapcore"
 
-	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	logsjson "k8s.io/component-base/logs/json"
 	"k8s.io/klog/v2"
 )
@@ -61,8 +61,8 @@ func newJSONLogger(out io.Writer) logr.Logger {
 	encoderConfig := &zapcore.EncoderConfig{
 		MessageKey: "msg",
 	}
-	options := logs.NewOptions()
-	logger, _ := logsjson.NewJSONLogger(options.Config.Verbosity, zapcore.AddSync(out), nil, encoderConfig)
+	c := logsapi.NewLoggingConfiguration()
+	logger, _ := logsjson.NewJSONLogger(c.Verbosity, zapcore.AddSync(out), nil, encoderConfig)
 	return logger
 }
 

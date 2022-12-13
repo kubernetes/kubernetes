@@ -22,10 +22,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"reflect"
 	"strconv"
@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,8 +117,11 @@ type Request struct {
 	subresource  string
 
 	// output
-	err  error
-	body io.Reader
+	err error
+
+	// only one of body / bodyBytes may be set. requests using body are not retriable.
+	body      io.Reader
+	bodyBytes []byte
 
 	retryFn requestRetryFunc
 }
@@ -437,18 +441,21 @@ func (r *Request) Body(obj interface{}) *Request {
 	}
 	switch t := obj.(type) {
 	case string:
-		data, err := ioutil.ReadFile(t)
+		data, err := os.ReadFile(t)
 		if err != nil {
 			r.err = err
 			return r
 		}
 		glogBody("Request Body", data)
-		r.body = bytes.NewReader(data)
+		r.body = nil
+		r.bodyBytes = data
 	case []byte:
 		glogBody("Request Body", t)
-		r.body = bytes.NewReader(t)
+		r.body = nil
+		r.bodyBytes = t
 	case io.Reader:
 		r.body = t
+		r.bodyBytes = nil
 	case runtime.Object:
 		// callers may pass typed interface pointers, therefore we must check nil with reflection
 		if reflect.ValueOf(t).IsNil() {
@@ -465,7 +472,8 @@ func (r *Request) Body(obj interface{}) *Request {
 			return r
 		}
 		glogBody("Request Body", data)
-		r.body = bytes.NewReader(data)
+		r.body = nil
+		r.bodyBytes = data
 		r.SetHeader("Content-Type", r.c.content.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
@@ -508,6 +516,87 @@ func (r *Request) URL() *url.URL {
 	return finalURL
 }
 
+// finalURLTemplate is similar to URL(), but will make all specific parameter values equal
+// - instead of name or namespace, "{name}" and "{namespace}" will be used, and all query
+// parameters will be reset. This creates a copy of the url so as not to change the
+// underlying object.
+func (r Request) finalURLTemplate() url.URL {
+	newParams := url.Values{}
+	v := []string{"{value}"}
+	for k := range r.params {
+		newParams[k] = v
+	}
+	r.params = newParams
+	u := r.URL()
+	if u == nil {
+		return url.URL{}
+	}
+
+	segments := strings.Split(u.Path, "/")
+	groupIndex := 0
+	index := 0
+	trimmedBasePath := ""
+	if r.c.base != nil && strings.Contains(u.Path, r.c.base.Path) {
+		p := strings.TrimPrefix(u.Path, r.c.base.Path)
+		if !strings.HasPrefix(p, "/") {
+			p = "/" + p
+		}
+		// store the base path that we have trimmed so we can append it
+		// before returning the URL
+		trimmedBasePath = r.c.base.Path
+		segments = strings.Split(p, "/")
+		groupIndex = 1
+	}
+	if len(segments) <= 2 {
+		return *u
+	}
+
+	const CoreGroupPrefix = "api"
+	const NamedGroupPrefix = "apis"
+	isCoreGroup := segments[groupIndex] == CoreGroupPrefix
+	isNamedGroup := segments[groupIndex] == NamedGroupPrefix
+	if isCoreGroup {
+		// checking the case of core group with /api/v1/... format
+		index = groupIndex + 2
+	} else if isNamedGroup {
+		// checking the case of named group with /apis/apps/v1/... format
+		index = groupIndex + 3
+	} else {
+		// this should not happen that the only two possibilities are /api... and /apis..., just want to put an
+		// outlet here in case more API groups are added in future if ever possible:
+		// https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-groups
+		// if a wrong API groups name is encountered, return the {prefix} for url.Path
+		u.Path = "/{prefix}"
+		u.RawQuery = ""
+		return *u
+	}
+	// switch segLength := len(segments) - index; segLength {
+	switch {
+	// case len(segments) - index == 1:
+	// resource (with no name) do nothing
+	case len(segments)-index == 2:
+		// /$RESOURCE/$NAME: replace $NAME with {name}
+		segments[index+1] = "{name}"
+	case len(segments)-index == 3:
+		if segments[index+2] == "finalize" || segments[index+2] == "status" {
+			// /$RESOURCE/$NAME/$SUBRESOURCE: replace $NAME with {name}
+			segments[index+1] = "{name}"
+		} else {
+			// /namespace/$NAMESPACE/$RESOURCE: replace $NAMESPACE with {namespace}
+			segments[index+1] = "{namespace}"
+		}
+	case len(segments)-index >= 4:
+		segments[index+1] = "{namespace}"
+		// /namespace/$NAMESPACE/$RESOURCE/$NAME: replace $NAMESPACE with {namespace},  $NAME with {name}
+		if segments[index+3] != "finalize" && segments[index+3] != "status" {
+			// /$RESOURCE/$NAME/$SUBRESOURCE: replace $NAME with {name}
+			segments[index+3] = "{name}"
+		}
+	}
+	u.Path = path.Join(trimmedBasePath, path.Join(segments...))
+	return *u
+}
+
 func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) error {
 	if r.rateLimiter == nil {
 		return nil
@@ -537,7 +626,7 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 		// but we use a throttled logger to prevent spamming.
 		globalThrottledLogger.Infof("%s", message)
 	}
-	metrics.RateLimiterLatency.Observe(ctx, r.verb, *r.URL(), latency)
+	metrics.RateLimiterLatency.Observe(ctx, r.verb, r.finalURLTemplate(), latency)
 
 	return err
 }
@@ -710,7 +799,7 @@ func updateURLMetrics(ctx context.Context, req *Request, resp *http.Response, er
 	if err != nil {
 		metrics.RequestResult.Increment(ctx, "<error>", req.verb, url)
 	} else {
-		//Metrics for failure codes
+		// Metrics for failure codes
 		metrics.RequestResult.Increment(ctx, strconv.Itoa(resp.StatusCode), req.verb, url)
 	}
 }
@@ -743,9 +832,6 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if r.body != nil {
-			req.Body = ioutil.NopCloser(r.body)
 		}
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
@@ -808,8 +894,20 @@ func (r *Request) requestPreflightCheck() error {
 }
 
 func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
+	var body io.Reader
+	switch {
+	case r.body != nil && r.bodyBytes != nil:
+		return nil, fmt.Errorf("cannot set both body and bodyBytes")
+	case r.body != nil:
+		body = r.body
+	case r.bodyBytes != nil:
+		// Create a new reader specifically for this request.
+		// Giving each request a dedicated reader allows retries to avoid races resetting the request body.
+		body = bytes.NewReader(r.bodyBytes)
+	}
+
 	url := r.URL().String()
-	req, err := http.NewRequest(r.verb, url, r.body)
+	req, err := http.NewRequest(r.verb, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -823,10 +921,10 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 // fn at most once. It will return an error if a problem occurred prior to connecting to the
 // server - the provided function is responsible for handling server errors.
 func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Response)) error {
-	//Metrics for total request latency
+	// Metrics for total request latency
 	start := time.Now()
 	defer func() {
-		metrics.RequestLatency.Observe(ctx, r.verb, *r.URL(), time.Since(start))
+		metrics.RequestLatency.Observe(ctx, r.verb, r.finalURLTemplate(), time.Since(start))
 	}()
 
 	if r.err != nil {
@@ -892,7 +990,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		done := func() bool {
 			defer readAndCloseResponseBody(resp)
 
-			// if the the server returns an error in err, the response will be nil.
+			// if the server returns an error in err, the response will be nil.
 			f := func(req *http.Request, resp *http.Response) {
 				if resp == nil {
 					return
@@ -917,8 +1015,8 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 // processing.
 //
 // Error type:
-//  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
-//  * http.Client.Do errors are returned directly.
+//   - If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
+//   - http.Client.Do errors are returned directly.
 func (r *Request) Do(ctx context.Context) Result {
 	var result Result
 	err := r.request(ctx, func(req *http.Request, resp *http.Response) {
@@ -937,7 +1035,7 @@ func (r *Request) Do(ctx context.Context) Result {
 func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 	var result Result
 	err := r.request(ctx, func(req *http.Request, resp *http.Response) {
-		result.body, result.err = ioutil.ReadAll(resp.Body)
+		result.body, result.err = io.ReadAll(resp.Body)
 		glogBody("Response Body", result.body)
 		if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
 			result.err = r.transformUnstructuredResponseError(resp, req, result.body)
@@ -956,7 +1054,7 @@ func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 func (r *Request) transformResponse(resp *http.Response, req *http.Request) Result {
 	var body []byte
 	if resp.Body != nil {
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		switch err.(type) {
 		case nil:
 			body = data
@@ -1085,20 +1183,20 @@ const maxUnstructuredResponseTextBytes = 2048
 // unexpected responses. The rough structure is:
 //
 // 1. Assume the server sends you something sane - JSON + well defined error objects + proper codes
-//    - this is the happy path
-//    - when you get this output, trust what the server sends
-// 2. Guard against empty fields / bodies in received JSON and attempt to cull sufficient info from them to
-//    generate a reasonable facsimile of the original failure.
-//    - Be sure to use a distinct error type or flag that allows a client to distinguish between this and error 1 above
-// 3. Handle true disconnect failures / completely malformed data by moving up to a more generic client error
-// 4. Distinguish between various connection failures like SSL certificates, timeouts, proxy errors, unexpected
-//    initial contact, the presence of mismatched body contents from posted content types
-//    - Give these a separate distinct error type and capture as much as possible of the original message
+//   - this is the happy path
+//   - when you get this output, trust what the server sends
+//     2. Guard against empty fields / bodies in received JSON and attempt to cull sufficient info from them to
+//     generate a reasonable facsimile of the original failure.
+//   - Be sure to use a distinct error type or flag that allows a client to distinguish between this and error 1 above
+//     3. Handle true disconnect failures / completely malformed data by moving up to a more generic client error
+//     4. Distinguish between various connection failures like SSL certificates, timeouts, proxy errors, unexpected
+//     initial contact, the presence of mismatched body contents from posted content types
+//   - Give these a separate distinct error type and capture as much as possible of the original message
 //
 // TODO: introduce transformation of generic http.Client.Do() errors that separates 4.
 func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *http.Request, body []byte) error {
 	if body == nil && resp.Body != nil {
-		if data, err := ioutil.ReadAll(&io.LimitedReader{R: resp.Body, N: maxUnstructuredResponseTextBytes}); err == nil {
+		if data, err := io.ReadAll(&io.LimitedReader{R: resp.Body, N: maxUnstructuredResponseTextBytes}); err == nil {
 			body = data
 		}
 	}
@@ -1204,6 +1302,14 @@ func (r Result) Get() (runtime.Object, error) {
 // error was returned.)
 func (r Result) StatusCode(statusCode *int) Result {
 	*statusCode = r.statusCode
+	return r
+}
+
+// ContentType returns the "Content-Type" response header into the passed
+// string, returning the Result for possible chaining. (Only valid if no
+// error code was returned.)
+func (r Result) ContentType(contentType *string) Result {
+	*contentType = r.contentType
 	return r
 }
 

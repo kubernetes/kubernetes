@@ -57,14 +57,14 @@ func IsLocalAPIService(apiServiceName string) bool {
 	return strings.HasPrefix(apiServiceName, localDelegateChainNamePrefix)
 }
 
-// GetAPIServicesName returns the names of APIServices recorded in apiServiceInfo.
+// GetAPIServiceNames returns the names of APIServices recorded in apiServiceInfo.
 // We use this function to pass the names of local APIServices to the controller in this package,
 // so that the controller can periodically sync the OpenAPI spec from delegation API servers.
 func (s *specProxier) GetAPIServiceNames() []string {
 	s.rwMutex.RLock()
 	defer s.rwMutex.RUnlock()
 
-	names := make([]string, len(s.apiServiceInfo))
+	names := make([]string, 0, len(s.apiServiceInfo))
 	for key := range s.apiServiceInfo {
 		names = append(names, key)
 	}

@@ -32,7 +32,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -47,7 +47,7 @@ var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout))
 		e2enode.WaitForTotalHealthy(f.ClientSet, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(f.ClientSet, f.Namespace.Name)
@@ -55,7 +55,7 @@ var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	})
 
 	// answers dns for service - creates the maximum number of services, and then check dns record for one
-	ginkgo.It("Should answer DNS query for maximum number of services per cluster", func() {
+	ginkgo.It("Should answer DNS query for maximum number of services per cluster", func(ctx context.Context) {
 		// get integer ceiling of maxServicesPerCluster / maxServicesPerNamespace
 		numNs := (maxServicesPerCluster + maxServicesPerNamespace - 1) / maxServicesPerNamespace
 

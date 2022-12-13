@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -43,7 +44,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("ReplicationController", func() {
@@ -63,11 +64,11 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, run basic image
 		Description: Replication Controller MUST create a Pod with Basic Image and MUST run the service with the provided image. Image MUST be tested by dialing into the service listening through TCP, UDP and HTTP.
 	*/
-	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
+	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func(ctx context.Context) {
 		TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
 
-	ginkgo.It("should serve a basic image on each replica with a private image", func() {
+	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {
 		// requires private images
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
@@ -79,7 +80,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, check for issues like exceeding allocated quota
 		Description: Attempt to create a Replication Controller with pods exceeding the namespace quota. The creation MUST fail
 	*/
-	framework.ConformanceIt("should surface a failure condition on a common issue like exceeded quota", func() {
+	framework.ConformanceIt("should surface a failure condition on a common issue like exceeded quota", func(ctx context.Context) {
 		testReplicationControllerConditionCheck(f)
 	})
 
@@ -88,7 +89,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, adopt matching pods
 		Description: An ownerless Pod is created, then a Replication Controller (RC) is created whose label selector will match the Pod. The RC MUST either adopt the Pod or delete and replace it with a new Pod
 	*/
-	framework.ConformanceIt("should adopt matching pods on creation", func() {
+	framework.ConformanceIt("should adopt matching pods on creation", func(ctx context.Context) {
 		testRCAdoptMatchingOrphans(f)
 	})
 
@@ -97,7 +98,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, release pods
 		Description: A Replication Controller (RC) is created, and its Pods are created. When the labels on one of the Pods change to no longer match the RC's label selector, the RC MUST release the Pod and update the Pod's owner references.
 	*/
-	framework.ConformanceIt("should release no longer matching pods", func() {
+	framework.ConformanceIt("should release no longer matching pods", func(ctx context.Context) {
 		testRCReleaseControlledNotMatching(f)
 	})
 
@@ -106,7 +107,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, lifecycle
 		Description: A Replication Controller (RC) is created, read, patched, and deleted with verification.
 	*/
-	framework.ConformanceIt("should test the lifecycle of a ReplicationController", func() {
+	framework.ConformanceIt("should test the lifecycle of a ReplicationController", func(ctx context.Context) {
 		testRcName := "rc-test"
 		testRcNamespace := ns
 		testRcInitialReplicaCount := int32(1)
@@ -390,6 +391,43 @@ var _ = SIGDescribe("ReplicationController", func() {
 			return err
 		})
 	})
+
+	/*
+		Release: v1.26
+		Testname: Replication Controller, get and update ReplicationController scale
+		Description: A ReplicationController is created which MUST succeed. It MUST
+		succeed when reading the ReplicationController scale. When updating the
+		ReplicationController scale it MUST succeed and the field MUST equal the new value.
+	*/
+	framework.ConformanceIt("should get and update a ReplicationController scale", func(ctx context.Context) {
+		rcClient := f.ClientSet.CoreV1().ReplicationControllers(ns)
+		rcName := "e2e-rc-" + utilrand.String(5)
+		initialRCReplicaCount := int32(1)
+		expectedRCReplicaCount := int32(2)
+
+		ginkgo.By(fmt.Sprintf("Creating ReplicationController %q", rcName))
+		rc := newRC(rcName, initialRCReplicaCount, map[string]string{"name": rcName}, WebserverImageName, WebserverImage, nil)
+		_, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Failed to create ReplicationController: %v", err)
+
+		err = wait.PollImmediate(1*time.Second, 1*time.Minute, checkReplicationControllerStatusReplicaCount(f, rcName, initialRCReplicaCount))
+		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
+
+		ginkgo.By(fmt.Sprintf("Getting scale subresource for ReplicationController %q", rcName))
+		scale, err := rcClient.GetScale(context.TODO(), rcName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get scale subresource: %v", err)
+		framework.ExpectEqual(scale.Status.Replicas, initialRCReplicaCount, "Failed to get the current replica count")
+
+		ginkgo.By("Updating a scale subresource")
+		scale.ResourceVersion = "" // indicate the scale update should be unconditional
+		scale.Spec.Replicas = expectedRCReplicaCount
+		_, err = rcClient.UpdateScale(context.TODO(), rcName, scale, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "Failed to update scale subresource: %v", err)
+
+		ginkgo.By(fmt.Sprintf("Verifying replicas where modified for replication controller %q", rcName))
+		err = wait.PollImmediate(1*time.Second, 1*time.Minute, checkReplicationControllerStatusReplicaCount(f, rcName, expectedRCReplicaCount))
+		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
+	})
 })
 
 func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageName string, image string, args []string) *v1.ReplicationController {
@@ -565,7 +603,7 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 func testRCAdoptMatchingOrphans(f *framework.Framework) {
 	name := "pod-adoption"
 	ginkgo.By(fmt.Sprintf("Given a Pod with a 'name' label %s is created", name))
-	p := f.PodClient().CreateSync(&v1.Pod{
+	p := e2epod.NewPodClient(f).CreateSync(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
@@ -729,4 +767,21 @@ func watchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, condit
 		}
 	}
 	return lastEvent, nil
+}
+
+func checkReplicationControllerStatusReplicaCount(f *framework.Framework, rcName string, quantity int32) func() (bool, error) {
+	return func() (bool, error) {
+
+		framework.Logf("Get Replication Controller %q to confirm replicas", rcName)
+		rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Get(context.TODO(), rcName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		if rc.Status.Replicas != quantity {
+			return false, nil
+		}
+		framework.Logf("Found %d replicas for %q replication controller", quantity, rc.Name)
+		return true, nil
+	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -35,7 +36,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -265,7 +266,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 			podsPerNode := itArg.podsPerNode
 			name := fmt.Sprintf(
 				"resource tracking for %d pods per node", podsPerNode)
-			ginkgo.It(name, func() {
+			ginkgo.It(name, func(ctx context.Context) {
 				runResourceTrackingTest(f, podsPerNode, nodeNames, rm, itArg.cpuLimits, itArg.memLimits)
 			})
 		}
@@ -276,7 +277,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 			podsPerNode := density[i]
 			name := fmt.Sprintf(
 				"resource tracking for %d pods per node", podsPerNode)
-			ginkgo.It(name, func() {
+			ginkgo.It(name, func(ctx context.Context) {
 				runResourceTrackingTest(f, podsPerNode, nodeNames, rm, nil, nil)
 			})
 		}

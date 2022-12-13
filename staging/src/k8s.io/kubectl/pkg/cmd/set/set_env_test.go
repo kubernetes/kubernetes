@@ -18,7 +18,7 @@ package set
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -498,7 +498,7 @@ func TestSetEnvRemote(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						bytes, err := ioutil.ReadAll(stream)
+						bytes, err := io.ReadAll(stream)
 						if err != nil {
 							return nil, err
 						}
@@ -690,7 +690,7 @@ func TestSetEnvFromResource(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						bytes, err := ioutil.ReadAll(stream)
+						bytes, err := io.ReadAll(stream)
 						if err != nil {
 							return nil, err
 						}
@@ -720,9 +720,9 @@ func TestSetEnvFromResource(t *testing.T) {
 			assert.NoError(t, err)
 			err = opts.RunEnv()
 			if input.warning {
-				assert.Contains(t, errOut.String(), "warning")
+				assert.Contains(t, errOut.String(), "Warning")
 			} else {
-				assert.NotContains(t, errOut.String(), "warning")
+				assert.NotContains(t, errOut.String(), "Warning")
 			}
 			assert.NoError(t, err)
 		})
@@ -798,7 +798,7 @@ func TestSetEnvRemoteWithSpecificContainers(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						bytes, err := ioutil.ReadAll(stream)
+						bytes, err := io.ReadAll(stream)
 						if err != nil {
 							return nil, err
 						}

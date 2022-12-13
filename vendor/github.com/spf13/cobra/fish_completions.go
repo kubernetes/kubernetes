@@ -1,3 +1,17 @@
+// Copyright 2013-2022 The Cobra Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cobra
 
 import (
@@ -11,8 +25,8 @@ import (
 func genFishComp(buf io.StringWriter, name string, includeDesc bool) {
 	// Variables should not contain a '-' or ':' character
 	nameForVar := name
-	nameForVar = strings.Replace(nameForVar, "-", "_", -1)
-	nameForVar = strings.Replace(nameForVar, ":", "_", -1)
+	nameForVar = strings.ReplaceAll(nameForVar, "-", "_")
+	nameForVar = strings.ReplaceAll(nameForVar, ":", "_")
 
 	compCmd := ShellCompRequestCmd
 	if !includeDesc {
@@ -38,7 +52,8 @@ function __%[1]s_perform_completion
     __%[1]s_debug "args: $args"
     __%[1]s_debug "last arg: $lastArg"
 
-    set -l requestComp "$args[1] %[3]s $args[2..-1] $lastArg"
+    # Disable ActiveHelp which is not supported for fish shell
+    set -l requestComp "%[9]s=0 $args[1] %[3]s $args[2..-1] $lastArg"
 
     __%[1]s_debug "Calling $requestComp"
     set -l results (eval $requestComp 2> /dev/null)
@@ -196,7 +211,7 @@ complete -c %[2]s -n '__%[1]s_prepare_completions' -f -a '$__%[1]s_comp_results'
 
 `, nameForVar, name, compCmd,
 		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
-		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs))
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, activeHelpEnvVar(name)))
 }
 
 // GenFishCompletion generates fish completion file and writes to the passed writer.

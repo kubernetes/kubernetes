@@ -39,10 +39,10 @@ import (
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
 func ValidateStatefulSetName(name string, prefix bool) []string {
-	// TODO: Validate that there's name for the suffix inserted by the pods.
+	// TODO: Validate that there's room for the suffix inserted by the pods.
 	// Currently this is just "-index". In the future we may allow a user
 	// specified list of suffixes and we need  to validate the longest one.
-	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
+	return apimachineryvalidation.NameIsDNSLabel(name, prefix)
 }
 
 // ValidatePodTemplateSpecForStatefulSet validates the given template and ensures that it is in accordance with the desired selector.
@@ -129,13 +129,19 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(spec.PersistentVolumeClaimRetentionPolicy, fldPath.Child("persistentVolumeClaimRetentionPolicy"))...)
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
+		if spec.Ordinals != nil {
+			replicaStartOrdinal := spec.Ordinals.Start
+			allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(replicaStartOrdinal), fldPath.Child("ordinals.start"))...)
+		}
 	}
+
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		// validate selector strictly, spec.selector was always required to pass LabelSelectorAsSelector below
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, fldPath.Child("selector"))...)
 		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is invalid for statefulset"))
 		}
@@ -166,32 +172,32 @@ func ValidateStatefulSet(statefulSet *apps.StatefulSet, opts apivalidation.PodVa
 }
 
 // ValidateStatefulSetUpdate tests if required fields in the StatefulSet are set.
-func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
+func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, opts apivalidation.PodValidationOptions) field.ErrorList {
+	// first, validate that the new statefulset is valid
+	allErrs := ValidateStatefulSet(statefulSet, opts)
+
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))...)
 
 	// statefulset updates aren't super common and general updates are likely to be touching spec, so we'll do this
 	// deep copy right away.  This avoids mutating our inputs
 	newStatefulSetClone := statefulSet.DeepCopy()
-	newStatefulSetClone.Spec.Replicas = oldStatefulSet.Spec.Replicas             // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template             // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy // +k8s:verify-mutation:reason=clone
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-		newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.Replicas = oldStatefulSet.Spec.Replicas               // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template               // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy   // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds // +k8s:verify-mutation:reason=clone
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
+		newStatefulSetClone.Spec.Ordinals = oldStatefulSet.Spec.Ordinals // +k8s:verify-mutation:reason=clone
 	}
+
 	newStatefulSetClone.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy // +k8s:verify-mutation:reason=clone
 	if !apiequality.Semantic.DeepEqual(newStatefulSetClone.Spec, oldStatefulSet.Spec) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
+		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
 		} else {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy' and 'persistentVolumeClaimRetentionPolicy' are forbidden"))
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
 		}
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.MinReadySeconds), field.NewPath("spec", "minReadySeconds"))...)
-	}
-	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(statefulSet.Spec.PersistentVolumeClaimRetentionPolicy, field.NewPath("spec", "persistentVolumeClaimRetentionPolicy"))...)
 	return allErrs
 }
 
@@ -203,9 +209,7 @@ func ValidateStatefulSetStatus(status *apps.StatefulSetStatus, fieldPath *field.
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fieldPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), fieldPath.Child("currentReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fieldPath.Child("updatedReplicas"))...)
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fieldPath.Child("availableReplicas"))...)
-	}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fieldPath.Child("availableReplicas"))...)
 	if status.ObservedGeneration != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.ObservedGeneration), fieldPath.Child("observedGeneration"))...)
 	}
@@ -223,15 +227,12 @@ func ValidateStatefulSetStatus(status *apps.StatefulSetStatus, fieldPath *field.
 	if status.UpdatedReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fieldPath.Child("updatedReplicas"), status.UpdatedReplicas, msg))
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-		if status.AvailableReplicas > status.Replicas {
-			allErrs = append(allErrs, field.Invalid(fieldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
-		}
-		if status.AvailableReplicas > status.ReadyReplicas {
-			allErrs = append(allErrs, field.Invalid(fieldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than readyReplicas"))
-		}
+	if status.AvailableReplicas > status.Replicas {
+		allErrs = append(allErrs, field.Invalid(fieldPath.Child("availableReplicas"), status.AvailableReplicas, msg))
 	}
-
+	if status.AvailableReplicas > status.ReadyReplicas {
+		allErrs = append(allErrs, field.Invalid(fieldPath.Child("availableReplicas"), status.AvailableReplicas, "cannot be greater than status.readyReplicas"))
+	}
 	return allErrs
 }
 
@@ -351,8 +352,9 @@ func ValidateDaemonSetStatusUpdate(ds, oldDS *apps.DaemonSet) field.ErrorList {
 // ValidateDaemonSetSpec tests if required fields in the DaemonSetSpec are set.
 func ValidateDaemonSetSpec(spec *apps.DaemonSetSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector}
 
-	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOpts, fldPath.Child("selector"))...)
 
 	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
 	if err == nil && !selector.Matches(labels.Set(spec.Template.Labels)) {
@@ -386,34 +388,25 @@ func ValidateDaemonSetSpec(spec *apps.DaemonSetSpec, fldPath *field.Path, opts a
 // ValidateRollingUpdateDaemonSet validates a given RollingUpdateDaemonSet.
 func ValidateRollingUpdateDaemonSet(rollingUpdate *apps.RollingUpdateDaemonSet, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if utilfeature.DefaultFeatureGate.Enabled(features.DaemonSetUpdateSurge) {
-		// Validate both fields are positive ints or have a percentage value
-		allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-		allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
 
-		// Validate that MaxUnavailable and MaxSurge are not more than 100%.
-		allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-		allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
+	// Validate both fields are positive ints or have a percentage value
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
 
-		// Validate exactly one of MaxSurge or MaxUnavailable is non-zero
-		hasUnavailable := getIntOrPercentValue(rollingUpdate.MaxUnavailable) != 0
-		hasSurge := getIntOrPercentValue(rollingUpdate.MaxSurge) != 0
-		switch {
-		case hasUnavailable && hasSurge:
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), rollingUpdate.MaxSurge, "may not be set when maxUnavailable is non-zero"))
-		case !hasUnavailable && !hasSurge:
-			allErrs = append(allErrs, field.Required(fldPath.Child("maxUnavailable"), "cannot be 0 when maxSurge is 0"))
-		}
+	// Validate that MaxUnavailable and MaxSurge are not more than 100%.
+	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxSurge, fldPath.Child("maxSurge"))...)
 
-	} else {
-		allErrs = append(allErrs, ValidatePositiveIntOrPercent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-		if getIntOrPercentValue(rollingUpdate.MaxUnavailable) == 0 {
-			// MaxUnavailable cannot be 0.
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), rollingUpdate.MaxUnavailable, "cannot be 0"))
-		}
-		// Validate that MaxUnavailable is not more than 100%.
-		allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	// Validate exactly one of MaxSurge or MaxUnavailable is non-zero
+	hasUnavailable := getIntOrPercentValue(rollingUpdate.MaxUnavailable) != 0
+	hasSurge := getIntOrPercentValue(rollingUpdate.MaxSurge) != 0
+	switch {
+	case hasUnavailable && hasSurge:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), rollingUpdate.MaxSurge, "may not be set when maxUnavailable is non-zero"))
+	case !hasUnavailable && !hasSurge:
+		allErrs = append(allErrs, field.Required(fldPath.Child("maxUnavailable"), "cannot be 0 when maxSurge is 0"))
 	}
+
 	return allErrs
 }
 
@@ -564,7 +557,8 @@ func ValidateDeploymentSpec(spec *apps.DeploymentSpec, fldPath *field.Path, opts
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		// validate selector strictly, spec.selector was always required to pass LabelSelectorAsSelector below
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, fldPath.Child("selector"))...)
 		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is invalid for deployment"))
 		}
@@ -726,7 +720,8 @@ func ValidateReplicaSetSpec(spec *apps.ReplicaSetSpec, fldPath *field.Path, opts
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		// validate selector strictly, spec.selector was always required to pass LabelSelectorAsSelector below
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, fldPath.Child("selector"))...)
 		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is invalid for deployment"))
 		}

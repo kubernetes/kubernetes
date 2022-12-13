@@ -1146,7 +1146,7 @@
       "description": "Describe a container image",
       "properties": {
         "names": {
-          "description": "Names by which this image is known. e.g. [\"k8s.gcr.io/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
+          "description": "Names by which this image is known. e.g. [\"registry.k8s.io/hyperkube:v1.0.7\", \"dockerhub.io/google_containers/hyperkube:v1.0.7\"]",
           "items": {
             "type": "string"
           },

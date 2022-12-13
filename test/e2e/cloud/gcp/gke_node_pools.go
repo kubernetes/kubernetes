@@ -17,6 +17,7 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 
@@ -25,7 +26,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("GKE node pools [Feature:GKENodePool]", func() {
@@ -37,7 +38,7 @@ var _ = SIGDescribe("GKE node pools [Feature:GKENodePool]", func() {
 		e2eskipper.SkipUnlessProviderIs("gke")
 	})
 
-	ginkgo.It("should create a cluster with multiple node pools [Feature:GKENodePool]", func() {
+	ginkgo.It("should create a cluster with multiple node pools [Feature:GKENodePool]", func(ctx context.Context) {
 		framework.Logf("Start create node pool test")
 		testCreateDeleteNodePool(f, "test-pool")
 	})

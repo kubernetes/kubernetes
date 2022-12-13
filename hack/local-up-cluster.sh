@@ -26,7 +26,6 @@ export DOCKER=(docker "${DOCKER_OPTS[@]}")
 DOCKER_ROOT=${DOCKER_ROOT:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}
-PSP_ADMISSION=${PSP_ADMISSION:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
 KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
@@ -134,18 +133,6 @@ KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 # Audit policy
 AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
 
-# sanity check for OpenStack provider
-if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
-    if [ "${CLOUD_CONFIG}" == "" ]; then
-        echo "Missing CLOUD_CONFIG env for OpenStack provider!"
-        exit 1
-    fi
-    if [ ! -f "${CLOUD_CONFIG}" ]; then
-        echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
-        exit 1
-    fi
-fi
-
 # Stop right away if the build fails
 set -e
 
@@ -199,7 +186,7 @@ do
     esac
 done
 
-if [ "x${GO_OUT}" == "x" ]; then
+if [ -z "${GO_OUT}" ]; then
     make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kubelet cmd/kube-proxy cmd/kube-scheduler"
 else
     echo "skipped the build."
@@ -238,6 +225,7 @@ CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
+LOCAL_STORAGE_CAPACITY_ISOLATION=${LOCAL_STORAGE_CAPACITY_ISOLATION:-"true"} # current default
 # This is the default dir and filename where the apiserver will generate a self-signed cert
 # which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
@@ -479,9 +467,6 @@ function start_apiserver {
     security_admission=""
     if [[ -n "${DENY_SECURITY_CONTEXT_ADMISSION}" ]]; then
       security_admission=",SecurityContextDeny"
-    fi
-    if [[ -n "${PSP_ADMISSION}" ]]; then
-      security_admission=",PodSecurityPolicy"
     fi
 
     # Append security_admission plugin
@@ -758,6 +743,7 @@ cgroupRoot: "${CGROUP_ROOT}"
 cgroupsPerQOS: ${CGROUPS_PER_QOS}
 cpuCFSQuota: ${CPU_CFS_QUOTA}
 enableControllerAttachDetach: ${ENABLE_CONTROLLER_ATTACH_DETACH}
+localStorageCapacityIsolation: ${LOCAL_STORAGE_CAPACITY_ISOLATION}
 evictionPressureTransitionPeriod: "${EVICTION_PRESSURE_TRANSITION_PERIOD}"
 failSwapOn: ${FAIL_SWAP_ON}
 port: ${KUBELET_PORT}
@@ -767,6 +753,15 @@ runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
 EOF
+
+    if [[ "$FEATURE_GATES" == *KubeletTracing=true* ]]; then
+        cat <<EOF >> /tmp/kubelet.yaml
+tracing:
+  endpoint: localhost:4317 # the default value
+  samplingRatePerMillion: 1000000 # sample always
+EOF
+    fi
+
     {
       # authentication
       echo "authentication:"
@@ -877,7 +872,7 @@ function start_kubescheduler {
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
 
     cat <<EOF > /tmp/kube-scheduler.yaml
-apiVersion: kubescheduler.config.k8s.io/v1beta2
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/scheduler.kubeconfig
@@ -937,13 +932,6 @@ function start_csi_snapshotter {
 
         echo "Kubernetes-CSI snapshotter successfully deployed."
     fi
-}
-
-function create_psp_policy {
-    echo "Create podsecuritypolicy policies for RBAC."
-    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f "${KUBE_ROOT}/examples/podsecuritypolicy/rbac/policies.yaml"
-    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f "${KUBE_ROOT}/examples/podsecuritypolicy/rbac/roles.yaml"
-    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f "${KUBE_ROOT}/examples/podsecuritypolicy/rbac/bindings.yaml"
 }
 
 function create_storage_class {
@@ -1040,9 +1028,10 @@ function parse_eviction {
 }
 
 function install_cni {
+  cni_plugin_sha=CNI_PLUGINS_${CNI_TARGETARCH^^}_SHA256SUM
   echo "Installing CNI plugin binaries ..." \
     && curl -sSL --retry 5 --output /tmp/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
-    && echo "${CNI_PLUGINS_AMD64_SHA256SUM}  /tmp/cni.amd64.tgz" | tee /tmp/cni.sha256 \
+    && echo "${!cni_plugin_sha} /tmp/cni.${CNI_TARGETARCH}.tgz" | tee /tmp/cni.sha256 \
     && sha256sum --ignore-missing -c /tmp/cni.sha256 \
     && rm -f /tmp/cni.sha256 \
     && sudo mkdir -p /opt/cni/bin \
@@ -1206,10 +1195,6 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
         ;;
     esac
   fi
-fi
-
-if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
-  create_psp_policy
 fi
 
 if [[ "${DEFAULT_STORAGE_CLASS}" = "true" ]]; then

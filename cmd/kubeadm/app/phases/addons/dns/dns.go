@@ -19,6 +19,7 @@ package dns
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/coredns/corefile-migration/migration"
@@ -86,26 +87,31 @@ func deployedDNSReplicas(client clientset.Interface, replicas int32) (*int32, er
 }
 
 // EnsureDNSAddon creates the CoreDNS addon
-func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
-	replicas, err := deployedDNSReplicas(client, coreDNSReplicas)
-	if err != nil {
-		return err
+func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, out io.Writer, printManifest bool) error {
+	var replicas *int32
+	var err error
+	if !printManifest {
+		replicas, err = deployedDNSReplicas(client, coreDNSReplicas)
+		if err != nil {
+			return err
+		}
+	} else {
+		var defaultReplicas int32 = coreDNSReplicas
+		replicas = &defaultReplicas
 	}
-	return coreDNSAddon(cfg, client, replicas)
+	return coreDNSAddon(cfg, client, replicas, out, printManifest)
 }
 
-func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32) error {
+func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32, out io.Writer, printManifest bool) error {
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct {
-		DeploymentName, Image, OldControlPlaneTaintKey, ControlPlaneTaintKey string
-		Replicas                                                             *int32
+		DeploymentName, Image, ControlPlaneTaintKey string
+		Replicas                                    *int32
 	}{
-		DeploymentName: kubeadmconstants.CoreDNSDeploymentName,
-		Image:          images.GetDNSImage(cfg),
-		// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-		OldControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleOldControlPlane,
-		ControlPlaneTaintKey:    kubeadmconstants.LabelNodeRoleControlPlane,
-		Replicas:                replicas,
+		DeploymentName:       kubeadmconstants.CoreDNSDeploymentName,
+		Image:                images.GetDNSImage(cfg),
+		ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleControlPlane,
+		Replicas:             replicas,
 	})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing CoreDNS deployment template")
@@ -132,10 +138,26 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 		return errors.Wrap(err, "error when parsing CoreDNS service template")
 	}
 
+	if printManifest {
+		fmt.Fprint(out, "---")
+		fmt.Fprintf(out, "%s", coreDNSDeploymentBytes)
+		fmt.Fprint(out, "---")
+		fmt.Fprintf(out, "%s", coreDNSConfigMapBytes)
+		fmt.Fprint(out, "---")
+		fmt.Fprintf(out, "%s", coreDNSServiceBytes)
+		fmt.Fprint(out, "---")
+		fmt.Fprintf(out, "%s", []byte(CoreDNSClusterRole))
+		fmt.Fprint(out, "---")
+		fmt.Fprintf(out, "%s", []byte(CoreDNSClusterRoleBinding))
+		fmt.Fprint(out, "---")
+		fmt.Fprintf(out, "%s", []byte(CoreDNSServiceAccount))
+		return nil
+	}
+
 	if err := createCoreDNSAddon(coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client); err != nil {
 		return err
 	}
-	fmt.Println("[addons] Applied essential addon: CoreDNS")
+	fmt.Fprintln(out, "[addons] Applied essential addon: CoreDNS")
 	return nil
 }
 
@@ -322,11 +344,11 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 // GetCoreDNSInfo gets the current CoreDNS installed and the current Corefile Configuration of CoreDNS.
 func GetCoreDNSInfo(client clientset.Interface) (*v1.ConfigMap, string, string, error) {
 	coreDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, "", "", nil
+		}
 		return nil, "", "", err
-	}
-	if apierrors.IsNotFound(err) {
-		return nil, "", "", nil
 	}
 	corefile, ok := coreDNSConfigMap.Data["Corefile"]
 	if !ok {

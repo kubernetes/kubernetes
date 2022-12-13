@@ -704,6 +704,104 @@ func TestProxyUpgradeErrorResponse(t *testing.T) {
 	}
 }
 
+func TestRejectForwardingRedirectsOption(t *testing.T) {
+	originalBody := []byte(`some data`)
+	testCases := []struct {
+		name                      string
+		rejectForwardingRedirects bool
+		serverStatusCode          int
+		redirect                  string
+		expectStatusCode          int
+		expectBody                []byte
+	}{
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 200 response",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          200,
+			expectStatusCode:          200,
+			expectBody:                originalBody,
+		},
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 301 response",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          301,
+			redirect:                  "/",
+			expectStatusCode:          502,
+			expectBody:                []byte(`the backend attempted to redirect this request, which is not permitted`),
+		},
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 304 response with a location header",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          304,
+			redirect:                  "/",
+			expectStatusCode:          502,
+			expectBody:                []byte(`the backend attempted to redirect this request, which is not permitted`),
+		},
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 304 response with no location header",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          304,
+			expectStatusCode:          304,
+			expectBody:                []byte{}, // client doesn't read the body for 304 responses
+		},
+		{
+			name:                      "reject redirection disabled in proxy, backend server sending 200 response",
+			rejectForwardingRedirects: false,
+			serverStatusCode:          200,
+			expectStatusCode:          200,
+			expectBody:                originalBody,
+		},
+		{
+			name:                      "reject redirection disabled in proxy, backend server sending 301 response",
+			rejectForwardingRedirects: false,
+			serverStatusCode:          301,
+			redirect:                  "/",
+			expectStatusCode:          301,
+			expectBody:                originalBody,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set up a backend server
+			backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tc.redirect != "" {
+					w.Header().Set("Location", tc.redirect)
+				}
+				w.WriteHeader(tc.serverStatusCode)
+				w.Write(originalBody)
+			}))
+			defer backendServer.Close()
+			backendServerURL, _ := url.Parse(backendServer.URL)
+
+			// Set up a proxy pointing to the backend
+			proxyHandler := NewUpgradeAwareHandler(backendServerURL, nil, false, false, &fakeResponder{t: t})
+			proxyHandler.RejectForwardingRedirects = tc.rejectForwardingRedirects
+			proxy := httptest.NewServer(proxyHandler)
+			defer proxy.Close()
+			proxyURL, _ := url.Parse(proxy.URL)
+
+			conn, err := net.Dial("tcp", proxyURL.Host)
+			require.NoError(t, err)
+			bufferedReader := bufio.NewReader(conn)
+
+			req, _ := http.NewRequest("GET", proxyURL.String(), nil)
+			require.NoError(t, req.Write(conn))
+			// Verify we get the correct response and message body content
+			resp, err := http.ReadResponse(bufferedReader, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectStatusCode, resp.StatusCode)
+			data, err := ioutil.ReadAll(resp.Body)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectBody, data)
+			assert.Equal(t, int64(len(tc.expectBody)), resp.ContentLength)
+			resp.Body.Close()
+
+			// clean up
+			conn.Close()
+		})
+	}
+}
+
 func TestDefaultProxyTransport(t *testing.T) {
 	tests := []struct {
 		name,
@@ -1113,7 +1211,8 @@ func TestProxyRedirectsforRootPath(t *testing.T) {
 }
 
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
-//    go run generate_cert.go  --rsa-bits 1024 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+//
+//	go run generate_cert.go  --rsa-bits 1024 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var exampleCert = []byte(`-----BEGIN CERTIFICATE-----
 MIIDADCCAeigAwIBAgIQVHG3Fn9SdWayyLOZKCW1vzANBgkqhkiG9w0BAQsFADAS
 MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw

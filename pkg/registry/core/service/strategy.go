@@ -18,74 +18,27 @@ package service
 
 import (
 	"context"
-	"net"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
-	netutil "k8s.io/utils/net"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
-
-type Strategy interface {
-	rest.RESTCreateUpdateStrategy
-	rest.ResetFieldsStrategy
-}
 
 // svcStrategy implements behavior for Services
 type svcStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
-
-	ipFamilies []api.IPFamily
 }
 
-// StrategyForServiceCIDRs returns the appropriate service strategy for the given configuration.
-func StrategyForServiceCIDRs(primaryCIDR net.IPNet, hasSecondary bool) (Strategy, api.IPFamily) {
-	// detect this cluster default Service IPFamily (ipfamily of --service-cluster-ip-range)
-	// we do it once here, to avoid having to do it over and over during ipfamily assignment
-	serviceIPFamily := api.IPv4Protocol
-	if netutil.IsIPv6CIDR(&primaryCIDR) {
-		serviceIPFamily = api.IPv6Protocol
-	}
-
-	var strategy Strategy
-	switch {
-	case hasSecondary && serviceIPFamily == api.IPv4Protocol:
-		strategy = svcStrategy{
-			ObjectTyper:   legacyscheme.Scheme,
-			NameGenerator: names.SimpleNameGenerator,
-			ipFamilies:    []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-		}
-	case hasSecondary && serviceIPFamily == api.IPv6Protocol:
-		strategy = svcStrategy{
-			ObjectTyper:   legacyscheme.Scheme,
-			NameGenerator: names.SimpleNameGenerator,
-			ipFamilies:    []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-		}
-	case serviceIPFamily == api.IPv6Protocol:
-		strategy = svcStrategy{
-			ObjectTyper:   legacyscheme.Scheme,
-			NameGenerator: names.SimpleNameGenerator,
-			ipFamilies:    []api.IPFamily{api.IPv6Protocol},
-		}
-	default:
-		strategy = svcStrategy{
-			ObjectTyper:   legacyscheme.Scheme,
-			NameGenerator: names.SimpleNameGenerator,
-			ipFamilies:    []api.IPFamily{api.IPv4Protocol},
-		}
-	}
-	return strategy, serviceIPFamily
-}
+// Strategy is the default logic that applies when creating and updating Services
+// objects via the REST API.
+var Strategy = svcStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for services.
 func (svcStrategy) NamespaceScoped() bool {
@@ -105,7 +58,7 @@ func (svcStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // PrepareForCreate sets contextual defaults and clears fields that are not allowed to be set by end users on creation.
-func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 
@@ -113,7 +66,7 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 }
 
 // PrepareForUpdate sets contextual defaults and clears fields that are not allowed to be set by end users on update.
-func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
@@ -123,10 +76,9 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 }
 
 // Validate validates a new service.
-func (strategy svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+func (svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
 	allErrs := validation.ValidateServiceCreate(service)
-	allErrs = append(allErrs, validation.ValidateConditionalService(service, nil)...)
 	return allErrs
 }
 
@@ -143,7 +95,6 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 
 func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	allErrs := validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
-	allErrs = append(allErrs, validation.ValidateConditionalService(obj.(*api.Service), old.(*api.Service))...)
 	return allErrs
 }
 
@@ -158,66 +109,20 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 
 // dropServiceDisabledFields drops fields that are not used if their associated feature gates
 // are not enabled.  The typical pattern is:
-//     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
-//         newSvc.Spec.MyFeature = nil
-//     }
+//
+//	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//	    newSvc.Spec.MyFeature = nil
+//	}
 func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MixedProtocolLBService) {
-		if !serviceConditionsInUse(oldSvc) {
-			newSvc.Status.Conditions = nil
-		}
-		if !loadBalancerPortsInUse(oldSvc) {
-			for i := range newSvc.Status.LoadBalancer.Ingress {
-				newSvc.Status.LoadBalancer.Ingress[i].Ports = nil
-			}
-		}
-	}
-
-	// Clear InternalTrafficPolicy if not enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-		if !serviceInternalTrafficPolicyInUse(oldSvc) {
-			newSvc.Spec.InternalTrafficPolicy = nil
-		}
-	}
-}
-
-// returns true when the svc.Status.Conditions field is in use.
-func serviceConditionsInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	return svc.Status.Conditions != nil
-}
-
-// returns true when the svc.Status.LoadBalancer.Ingress.Ports field is in use.
-func loadBalancerPortsInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	for _, ing := range svc.Status.LoadBalancer.Ingress {
-		if ing.Ports != nil {
-			return true
-		}
-	}
-	return false
-}
-
-func serviceInternalTrafficPolicyInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	return svc.Spec.InternalTrafficPolicy != nil
 }
 
 type serviceStatusStrategy struct {
-	Strategy
+	svcStrategy
 }
 
-// NewServiceStatusStrategy creates a status strategy for the provided base strategy.
-func NewServiceStatusStrategy(strategy Strategy) Strategy {
-	return serviceStatusStrategy{strategy}
-}
+// StatusStrategy wraps and exports the used svcStrategy for the storage package.
+var StatusStrategy = serviceStatusStrategy{Strategy}
 
 // GetResetFields returns the set of fields that get reset by the strategy
 // and should not be modified by the user.
@@ -338,7 +243,7 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 	// If a user is switching to a type that doesn't need ExternalTrafficPolicy
 	// AND they did not change this field, it is safe to drop it.
 	if needsExternalTrafficPolicy(oldSvc) && !needsExternalTrafficPolicy(newSvc) && sameExternalTrafficPolicy(oldSvc, newSvc) {
-		newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyType("")
+		newSvc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicy("")
 	}
 
 	// NOTE: there are other fields like `selector` which we could wipe.
@@ -412,7 +317,7 @@ func needsHCNodePort(svc *api.Service) bool {
 	if svc.Spec.Type != api.ServiceTypeLoadBalancer {
 		return false
 	}
-	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
+	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyLocal {
 		return false
 	}
 	return true

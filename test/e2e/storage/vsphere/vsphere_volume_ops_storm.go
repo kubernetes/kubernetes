@@ -22,7 +22,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -89,7 +89,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create pod with many volumes and verify no attach call fails", func() {
+	ginkgo.It("should create pod with many volumes and verify no attach call fails", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Running test with VOLUME_OPS_SCALE: %v", volumeOpsScale))
 		ginkgo.By("Creating Storage Class")
 		scParameters := make(map[string]string)

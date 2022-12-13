@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,7 +39,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -137,7 +137,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		klog.Infof("Made nodes schedulable again in %v", time.Since(s).String())
 	})
 
-	ginkgo.It("should scale up at all [Feature:ClusterAutoscalerScalability1]", func() {
+	ginkgo.It("should scale up at all [Feature:ClusterAutoscalerScalability1]", func(ctx context.Context) {
 		perNodeReservation := int(float64(memCapacityMb) * 0.95)
 		replicasPerNode := 10
 
@@ -160,7 +160,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		defer testCleanup()
 	})
 
-	ginkgo.It("should scale up twice [Feature:ClusterAutoscalerScalability2]", func() {
+	ginkgo.It("should scale up twice [Feature:ClusterAutoscalerScalability2]", func(ctx context.Context) {
 		perNodeReservation := int(float64(memCapacityMb) * 0.95)
 		replicasPerNode := 10
 		additionalNodes1 := int(math.Ceil(0.7 * maxNodes))
@@ -209,7 +209,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		klog.Infof("Scaled up twice")
 	})
 
-	ginkgo.It("should scale down empty nodes [Feature:ClusterAutoscalerScalability3]", func() {
+	ginkgo.It("should scale down empty nodes [Feature:ClusterAutoscalerScalability3]", func(ctx context.Context) {
 		perNodeReservation := int(float64(memCapacityMb) * 0.7)
 		replicas := int(math.Ceil(maxNodes * 0.7))
 		totalNodes := maxNodes
@@ -237,7 +237,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 			}, scaleDownTimeout))
 	})
 
-	ginkgo.It("should scale down underutilized nodes [Feature:ClusterAutoscalerScalability4]", func() {
+	ginkgo.It("should scale down underutilized nodes [Feature:ClusterAutoscalerScalability4]", func(ctx context.Context) {
 		perPodReservation := int(float64(memCapacityMb) * 0.01)
 		// underutilizedNodes are 10% full
 		underutilizedPerNodeReplicas := 10
@@ -296,7 +296,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		}, timeout))
 	})
 
-	ginkgo.It("shouldn't scale down with underutilized nodes due to host port conflicts [Feature:ClusterAutoscalerScalability5]", func() {
+	ginkgo.It("shouldn't scale down with underutilized nodes due to host port conflicts [Feature:ClusterAutoscalerScalability5]", func(ctx context.Context) {
 		fullReservation := int(float64(memCapacityMb) * 0.9)
 		hostPortPodReservation := int(float64(memCapacityMb) * 0.3)
 		totalNodes := maxNodes
@@ -501,7 +501,7 @@ type podBatch struct {
 // 1. Create replication controllers that eat up all the space that should be
 // empty after setup, making sure they end up on different nodes by specifying
 // conflicting host port
-// 2. Create targer RC that will generate the load on the cluster
+// 2. Create target RC that will generate the load on the cluster
 // 3. Remove the rcs created in 1.
 func distributeLoad(f *framework.Framework, namespace string, id string, podDistribution []podBatch,
 	podMemRequestMegabytes int, nodeMemCapacity int, labels map[string]string, timeout time.Duration) func() error {

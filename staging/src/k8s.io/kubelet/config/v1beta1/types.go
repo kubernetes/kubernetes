@@ -19,7 +19,8 @@ package v1beta1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	logsapi "k8s.io/component-base/logs/api/v1"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -381,6 +382,12 @@ type KubeletConfiguration struct {
 	// Default: "container"
 	// +optional
 	TopologyManagerScope string `json:"topologyManagerScope,omitempty"`
+	// TopologyManagerPolicyOptions is a set of key=value which allows to set extra options
+	// to fine tune the behaviour of the topology manager policies.
+	// Requires  both the "TopologyManager" and "TopologyManagerPolicyOptions" feature gates to be enabled.
+	// Default: nil
+	// +optional
+	TopologyManagerPolicyOptions map[string]string `json:"topologyManagerPolicyOptions,omitempty"`
 	// qosReserved is a set of resource name to percentage pairs that specify
 	// the minimum percentage of a resource reserved for exclusive use by the
 	// guaranteed QoS tier.
@@ -439,7 +446,7 @@ type KubeletConfiguration struct {
 	// +optional
 	CPUCFSQuota *bool `json:"cpuCFSQuota,omitempty"`
 	// cpuCFSQuotaPeriod is the CPU CFS quota period value, `cpu.cfs_period_us`.
-	// The value must be between 1 us and 1 second, inclusive.
+	// The value must be between 1 ms and 1 second, inclusive.
 	// Requires the CustomCPUCFSQuotaPeriod feature gate to be enabled.
 	// Default: "100ms"
 	// +optional
@@ -664,7 +671,7 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	ProviderID string `json:"providerID,omitempty"`
-	// kernelMemcgNotification, if set, instructs the the kubelet to integrate with the
+	// kernelMemcgNotification, if set, instructs the kubelet to integrate with the
 	// kernel memcg notification for determining if memory eviction thresholds are
 	// exceeded rather than polling.
 	// Default: false
@@ -676,7 +683,7 @@ type KubeletConfiguration struct {
 	// Default:
 	//   Format: text
 	// + optional
-	Logging componentbaseconfigv1alpha1.LoggingConfiguration `json:"logging,omitempty"`
+	Logging logsapi.LoggingConfiguration `json:"logging,omitempty"`
 	// enableSystemLogHandler enables system logs via web interface host:port/logs/
 	// Default: true
 	// +optional
@@ -765,7 +772,7 @@ type KubeletConfiguration struct {
 	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
 	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
 	// while increasing will put less reclaim pressure.
-	// See http://kep.k8s.io/2570 for more details.
+	// See https://kep.k8s.io/2570 for more details.
 	// Default: 0.8
 	// +featureGate=MemoryQoS
 	// +optional
@@ -780,6 +787,22 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	RegisterNode *bool `json:"registerNode,omitempty"`
+	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
+	// See https://kep.k8s.io/2832 for more details.
+	// +featureGate=KubeletTracing
+	// +optional
+	Tracing *tracingapi.TracingConfiguration `json:"tracing,omitempty"`
+
+	// LocalStorageCapacityIsolation enables local ephemeral storage isolation feature. The default setting is true.
+	// This feature allows users to set request/limit for container's ephemeral storage and manage it in a similar way
+	// as cpu and memory. It also allows setting sizeLimit for emptyDir volume, which will trigger pod eviction if disk
+	// usage from the volume exceeds the limit.
+	// This feature depends on the capability of detecting correct root file system disk usage. For certain systems,
+	// such as kind rootless, if this capability cannot be supported, the feature LocalStorageCapacityIsolation should be
+	// disabled. Once disabled, user should not set request/limit for container's ephemeral storage, or sizeLimit for emptyDir.
+	// Default: true
+	// +optional
+	LocalStorageCapacityIsolation *bool `json:"localStorageCapacityIsolation,omitempty"`
 }
 
 type KubeletAuthorizationMode string

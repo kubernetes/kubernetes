@@ -56,6 +56,8 @@ var (
 
 // ComponentPod returns a Pod object from the container, volume and annotations specifications
 func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotations map[string]string) v1.Pod {
+	// priority value for system-node-critical class
+	priority := int32(2000001000)
 	return v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -71,6 +73,7 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotati
 		},
 		Spec: v1.PodSpec{
 			Containers:        []v1.Container{container},
+			Priority:          &priority,
 			PriorityClassName: "system-node-critical",
 			HostNetwork:       true,
 			Volumes:           VolumeMapToSlice(volumes),
@@ -168,14 +171,7 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 		return pod, errors.Wrapf(err, "failed to marshal Pod manifest to YAML")
 	}
 
-	var knownTargets = []string{
-		kubeadmconstants.Etcd,
-		kubeadmconstants.KubeAPIServer,
-		kubeadmconstants.KubeControllerManager,
-		kubeadmconstants.KubeScheduler,
-	}
-
-	patchManager, err := patches.GetPatchManagerForPath(patchesDir, knownTargets, output)
+	patchManager, err := patches.GetPatchManagerForPath(patchesDir, patches.KnownTargets(), output)
 	if err != nil {
 		return pod, err
 	}

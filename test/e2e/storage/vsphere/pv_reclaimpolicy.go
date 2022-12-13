@@ -21,12 +21,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -49,7 +50,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
 	ginkgo.Describe("persistentvolumereclaim:vsphere [Feature:vsphere]", func() {
@@ -78,7 +79,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			5. Delete PVC
 			6. Verify PV is deleted automatically.
 		*/
-		ginkgo.It("should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted", func() {
+		ginkgo.It("should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted", func(ctx context.Context) {
 			var err error
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
 			framework.ExpectNoError(err)
@@ -106,7 +107,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			8. Delete the pod.
 			9. Verify PV should be detached from the node and automatically deleted.
 		*/
-		ginkgo.It("should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod", func() {
+		ginkgo.It("should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod", func(ctx context.Context) {
 			var err error
 
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
@@ -131,7 +132,9 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			ginkgo.By("Verify the volume is attached to the node")
 			isVolumeAttached, verifyDiskAttachedError := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
 			framework.ExpectNoError(verifyDiskAttachedError)
-			framework.ExpectEqual(isVolumeAttached, true)
+			if !isVolumeAttached {
+				framework.Failf("Disk %s is not attached with the node %s", pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
+			}
 
 			ginkgo.By("Verify the volume is accessible and available in the pod")
 			verifyVSphereVolumesAccessible(c, pod, []*v1.PersistentVolume{pv})
@@ -168,7 +171,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			11. Created POD using PVC created in Step 10 and verify volume content is matching.
 		*/
 
-		ginkgo.It("should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted", func() {
+		ginkgo.It("should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted", func(ctx context.Context) {
 			var err error
 			var volumeFileContent = "hello from vsphere cloud provider, Random Content is :" + strconv.FormatInt(time.Now().UnixNano(), 10)
 

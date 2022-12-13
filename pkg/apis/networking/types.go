@@ -154,21 +154,19 @@ type NetworkPolicyPort struct {
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
-	// This feature is in Beta state and is enabled by default.
-	// It can be disabled using the Feature Gate "NetworkPolicyEndPort".
 	// +optional
 	EndPort *int32
 }
 
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// IPBlock describes a particular CIDR (Ex. "192.168.1.0/24","2001:db8::/64") that is allowed
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
 type IPBlock struct {
 	// CIDR is a string representing the IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	CIDR string
 	// Except is a slice of CIDRs that should not be included within an IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// Except values will be rejected if they are outside the CIDR range
 	// +optional
 	Except []string
@@ -361,7 +359,7 @@ const (
 	// IngressClassParametersReferenceScopeNamespace indicates that the
 	// referenced Parameters resource is namespace-scoped.
 	IngressClassParametersReferenceScopeNamespace = "Namespace"
-	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// IngressClassParametersReferenceScopeCluster indicates that the
 	// referenced Parameters resource is cluster-scoped.
 	IngressClassParametersReferenceScopeCluster = "Cluster"
 )
@@ -425,7 +423,45 @@ type IngressTLS struct {
 type IngressStatus struct {
 	// LoadBalancer contains the current status of the load-balancer.
 	// +optional
-	LoadBalancer api.LoadBalancerStatus
+	LoadBalancer IngressLoadBalancerStatus
+}
+
+// IngressLoadBalancerStatus represents the status of a load-balancer
+type IngressLoadBalancerStatus struct {
+	// Ingress is a list containing ingress points for the load-balancer.
+	// +optional
+	Ingress []IngressLoadBalancerIngress
+}
+
+// IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
+type IngressLoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based.
+	// +optional
+	IP string
+
+	// Hostname is set for load-balancer ingress points that are DNS based.
+	// +optional
+	Hostname string
+
+	// Ports provides information about the ports exposed by this LoadBalancer.
+	// +optional
+	Ports []IngressPortStatus
+}
+
+// IngressPortStatus represents the error condition of an ingress port
+type IngressPortStatus struct {
+	// Port is the port number of the ingress port.
+	Port int32
+
+	// Protocol is the protocol of the ingress port.
+	Protocol api.Protocol
+
+	// Error indicates a problem on this port.
+	// The format of the error must comply with the following rules:
+	// - Kubernetes-defined error values use CamelCase names
+	// - Provider-specific error values must follow label-name style (e.g.
+	//   example.com/name).
+	Error *string
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to
@@ -584,4 +620,68 @@ type ServiceBackendPort struct {
 	// This is a mutually exclusive setting with "Name".
 	// +optional
 	Number int32
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterCIDR represents a single configuration for per-Node Pod CIDR
+// allocations when the MultiCIDRRangeAllocator is enabled (see the config for
+// kube-controller-manager).  A cluster may have any number of ClusterCIDR
+// resources, all of which will be considered when allocating a CIDR for a
+// Node.  A ClusterCIDR is eligible to be used for a given Node when the node
+// selector matches the node in question and has free CIDRs to allocate.  In
+// case of multiple matching ClusterCIDR resources, the allocator will attempt
+// to break ties using internal heuristics, but any ClusterCIDR whose node
+// selector matches the Node may be used.
+type ClusterCIDR struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	Spec ClusterCIDRSpec
+}
+
+// ClusterCIDRSpec defines the desired state of ClusterCIDR.
+type ClusterCIDRSpec struct {
+	// NodeSelector defines which nodes the config is applicable to.
+	// An empty or nil NodeSelector selects all nodes.
+	// This field is immutable.
+	// +optional
+	NodeSelector *api.NodeSelector
+
+	// PerNodeHostBits defines the number of host bits to be configured per node.
+	// A subnet mask determines how much of the address is used for network bits
+	// and host bits. For example an IPv4 address of 192.168.0.0/24, splits the
+	// address into 24 bits for the network portion and 8 bits for the host portion.
+	// To allocate 256 IPs, set this field to 8 (a /24 mask for IPv4 or a /120 for IPv6).
+	// Minimum value is 4 (16 IPs).
+	// This field is immutable.
+	// +required
+	PerNodeHostBits int32
+
+	// IPv4 defines an IPv4 IP block in CIDR notation(e.g. "10.0.0.0/8").
+	// At least one of IPv4 and IPv6 must be specified.
+	// This field is immutable.
+	// +optional
+	IPv4 string
+
+	// IPv6 defines an IPv6 IP block in CIDR notation(e.g. "2001:db8::/64").
+	// At least one of IPv4 and IPv6 must be specified.
+	// This field is immutable.
+	// +optional
+	IPv6 string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterCIDRList contains a list of ClusterCIDRs.
+type ClusterCIDRList struct {
+	metav1.TypeMeta
+
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of ClusterCIDRs.
+	Items []ClusterCIDR
 }

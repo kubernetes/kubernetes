@@ -35,7 +35,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // State partially cloned from webserver.go
@@ -155,9 +155,9 @@ func testPreStop(c clientset.Interface, ns string) {
 var _ = SIGDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2epod.NewPodClient(f)
 	})
 
 	/*
@@ -165,11 +165,11 @@ var _ = SIGDescribe("PreStop", func() {
 		Testname: Pods, prestop hook
 		Description: Create a server pod with a rest endpoint '/write' that changes state.Received field. Create a Pod with a pre-stop handle that posts to the /write endpoint on the server Pod. Verify that the Pod with pre-stop hook is running. Delete the Pod with the pre-stop hook. Before the Pod is deleted, pre-stop handler MUST be called when configured. Verify that the Pod is deleted and a call to prestop hook is verified by checking the status received on the server Pod.
 	*/
-	framework.ConformanceIt("should call prestop when killing a pod ", func() {
+	framework.ConformanceIt("should call prestop when killing a pod ", func(ctx context.Context) {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 
-	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func() {
+	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func(ctx context.Context) {
 		gracefulTerminationPeriodSeconds := int64(30)
 		ginkgo.By("creating the pod")
 		name := "pod-prestop-hook-" + string(uuid.NewUUID())

@@ -20,6 +20,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"path"
@@ -34,10 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -80,7 +82,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
 		ginkgo.Context("once the node is setup", func() {
-			ginkgo.It("container runtime's oom-score-adj should be -999", func() {
+			ginkgo.It("container runtime's oom-score-adj should be -999", func(ctx context.Context) {
 				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
 				framework.ExpectNoError(err, "failed to get list of container runtime pids")
 				for _, pid := range runtimePids {
@@ -89,7 +91,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					}, 5*time.Minute, 30*time.Second).Should(gomega.BeNil())
 				}
 			})
-			ginkgo.It("Kubelet's oom-score-adj should be -999", func() {
+			ginkgo.It("Kubelet's oom-score-adj should be -999", func(ctx context.Context) {
 				kubeletPids, err := getPidsForProcess(kubeletProcessName, "")
 				framework.ExpectNoError(err, "failed to get list of kubelet pids")
 				framework.ExpectEqual(len(kubeletPids), 1, "expected only one kubelet process; found %d", len(kubeletPids))
@@ -98,7 +100,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 				}, 5*time.Minute, 30*time.Second).Should(gomega.BeNil())
 			})
 			ginkgo.Context("", func() {
-				ginkgo.It("pod infra containers oom-score-adj should be -998 and best effort container's should be 1000", func() {
+				ginkgo.It("pod infra containers oom-score-adj should be -998 and best effort container's should be 1000", func(ctx context.Context) {
 					// Take a snapshot of existing pause processes. These were
 					// created before this test, and may not be infra
 					// containers. They should be excluded from the test.
@@ -106,7 +108,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					framework.ExpectNoError(err, "failed to list all pause processes on the node")
 					existingPausePIDSet := sets.NewInt(existingPausePIDs...)
 
-					podClient := f.PodClient()
+					podClient := e2epod.NewPodClient(f)
 					podName := "besteffort" + string(uuid.NewUUID())
 					podClient.Create(&v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
@@ -155,11 +157,11 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 				})
 				// Log the running containers here to help debugging.
 				ginkgo.AfterEach(func() {
-					if ginkgo.CurrentGinkgoTestDescription().Failed {
+					if ginkgo.CurrentSpecReport().Failed() {
 						ginkgo.By("Dump all running containers")
 						runtime, _, err := getCRIClient()
 						framework.ExpectNoError(err)
-						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
+						containers, err := runtime.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
 							State: &runtimeapi.ContainerStateValue{
 								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 							},
@@ -172,8 +174,8 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					}
 				})
 			})
-			ginkgo.It("guaranteed container's oom-score-adj should be -998", func() {
-				podClient := f.PodClient()
+			ginkgo.It("guaranteed container's oom-score-adj should be -998", func(ctx context.Context) {
+				podClient := e2epod.NewPodClient(f)
 				podName := "guaranteed" + string(uuid.NewUUID())
 				podClient.Create(&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -213,8 +215,8 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 				}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			})
-			ginkgo.It("burstable container's oom-score-adj should be between [2, 1000)", func() {
-				podClient := f.PodClient()
+			ginkgo.It("burstable container's oom-score-adj should be between [2, 1000)", func(ctx context.Context) {
+				podClient := e2epod.NewPodClient(f)
 				podName := "burstable" + string(uuid.NewUUID())
 				podClient.Create(&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{

@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -46,12 +47,12 @@ const (
 )
 
 type fakeHTTP struct {
-	url string
+	req *http.Request
 	err error
 }
 
-func (f *fakeHTTP) Get(url string) (*http.Response, error) {
-	f.url = url
+func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
+	f.req = req
 	return nil, f.err
 }
 
@@ -82,7 +83,14 @@ func (f *fakePodStateProvider) ShouldPodContentBeRemoved(uid types.UID) bool {
 	return found
 }
 
+type fakePodPullingTimeRecorder struct{}
+
+func (f *fakePodPullingTimeRecorder) RecordImageStartedPulling(podUID types.UID) {}
+
+func (f *fakePodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID) {}
+
 func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
+	ctx := context.Background()
 	recorder := &record.FakeRecorder{}
 	logManager, err := logs.NewContainerLogManager(runtimeService, osInterface, "1", 2)
 	if err != nil {
@@ -91,7 +99,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
 		cpuCFSQuota:            false,
-		cpuCFSQuotaPeriod:      metav1.Duration{Duration: time.Microsecond * 100},
+		cpuCFSQuotaPeriod:      metav1.Duration{Duration: time.Millisecond * 100},
 		livenessManager:        proberesults.NewManager(),
 		startupManager:         proberesults.NewManager(),
 		machineInfo:            machineInfo,
@@ -107,7 +115,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		memoryThrottlingFactor: 0.8,
 	}
 
-	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)
+	typedVersion, err := runtimeService.Version(ctx, kubeRuntimeAPIVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -123,11 +131,13 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		false,
 		0, // Disable image pull throttling by setting QPS to 0,
 		0,
+		&fakePodPullingTimeRecorder{},
 	)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},
 		kubeRuntimeManager,
-		kubeRuntimeManager)
+		kubeRuntimeManager,
+		recorder)
 
 	kubeRuntimeManager.getNodeAllocatable = func() v1.ResourceList {
 		return v1.ResourceList{

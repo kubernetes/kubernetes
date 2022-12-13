@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -154,6 +155,15 @@ func (rc *reconciler) hasOutOfServiceTaint(nodeName types.NodeName) (bool, error
 	return false, nil
 }
 
+// nodeIsHealthy returns true if the node looks healthy.
+func (rc *reconciler) nodeIsHealthy(nodeName types.NodeName) (bool, error) {
+	node, err := rc.nodeLister.Get(string(nodeName))
+	if err != nil {
+		return false, err
+	}
+	return nodeutil.IsNodeReady(node), nil
+}
+
 func (rc *reconciler) reconcile() {
 	// Detaches are triggered before attaches so that volumes referenced by
 	// pods that are rescheduled to a different node are detached first.
@@ -204,14 +214,22 @@ func (rc *reconciler) reconcile() {
 			// Check whether timeout has reached the maximum waiting time
 			timeout := elapsedTime > rc.maxWaitForUnmountDuration
 
+			isHealthy, err := rc.nodeIsHealthy(attachedVolume.NodeName)
+			if err != nil {
+				klog.Errorf("failed to get health of node %s: %s", attachedVolume.NodeName, err.Error())
+			}
+
+			// Force detach volumes from unhealthy nodes after maxWaitForUnmountDuration.
+			forceDetach := !isHealthy && timeout
+
 			hasOutOfServiceTaint, err := rc.hasOutOfServiceTaint(attachedVolume.NodeName)
 			if err != nil {
 				klog.Errorf("failed to get taint specs for node %s: %s", attachedVolume.NodeName, err.Error())
 			}
 
-			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout
+			// Check whether volume is still mounted. Skip detach if it is still mounted unless force detach timeout
 			// or the node has `node.kubernetes.io/out-of-service` taint.
-			if attachedVolume.MountedByNode && !timeout && !hasOutOfServiceTaint {
+			if attachedVolume.MountedByNode && !forceDetach && !hasOutOfServiceTaint {
 				klog.V(5).InfoS("Cannot detach volume because it is still mounted", "volume", attachedVolume)
 				continue
 			}
@@ -233,6 +251,9 @@ func (rc *reconciler) reconcile() {
 			if err != nil {
 				// Skip detaching this volume if unable to update node status
 				klog.ErrorS(err, "UpdateNodeStatusForNode failed while attempting to report volume as attached", "volume", attachedVolume)
+				// Add volume back to ReportAsAttached if UpdateNodeStatusForNode call failed so that node status updater will add it back to VolumeAttached list.
+				// It is needed here too because DetachVolume is not call actually and we keep the data consistency for every reconcile.
+				rc.actualStateOfWorld.AddVolumeToReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
 				continue
 			}
 
@@ -302,7 +323,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 		attachState := rc.actualStateOfWorld.GetAttachState(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		if attachState == cache.AttachStateAttached {
 			// Volume/Node exists, touch it to reset detachRequestedTime
-			klog.V(5).InfoS("Volume attached--touching", "volume", volumeToAttach)
+			klog.V(10).InfoS("Volume attached--touching", "volume", volumeToAttach)
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			continue
 		}
@@ -396,5 +417,5 @@ func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach
 	}
 
 	// Log all pods for system admin
-	klog.InfoS("Multi-Attach error: volume is already used by pods", "pods", klog.KObjs(pods), "attachedTo", otherNodesStr, "volume", volumeToAttach)
+	klog.InfoS("Multi-Attach error: volume is already used by pods", "pods", klog.KObjSlice(pods), "attachedTo", otherNodesStr, "volume", volumeToAttach)
 }

@@ -19,7 +19,7 @@ package auth
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -121,8 +122,8 @@ func TestRunAccessCheck(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			test.o.Out = ioutil.Discard
-			test.o.ErrOut = ioutil.Discard
+			test.o.Out = io.Discard
+			test.o.ErrOut = io.Discard
 
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
@@ -138,7 +139,7 @@ func TestRunAccessCheck(t *testing.T) {
 						t.Errorf("%s: expected %v, got %v", test.name, expectPath, req.URL.Path)
 						return nil, nil
 					}
-					bodyBits, err := ioutil.ReadAll(req.Body)
+					bodyBits, err := io.ReadAll(req.Body)
 					if err != nil {
 						t.Errorf("%s: %v", test.name, err)
 						return nil, nil
@@ -153,7 +154,7 @@ func TestRunAccessCheck(t *testing.T) {
 
 					return &http.Response{
 							StatusCode: http.StatusOK,
-							Body: ioutil.NopCloser(bytes.NewBufferString(
+							Body: io.NopCloser(bytes.NewBufferString(
 								fmt.Sprintf(`{"kind":"SelfSubjectAccessReview","apiVersion":"authorization.k8s.io/v1","status":{"allowed":%v}}`, test.allowed),
 							)),
 						},
@@ -206,7 +207,7 @@ func TestRunAccessList(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch req.URL.Path {
 				case "/apis/authorization.k8s.io/v1/selfsubjectrulesreviews":
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, getSelfSubjectRulesReview()))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, getSelfSubjectRulesReview()))))
 					return &http.Response{StatusCode: http.StatusOK, Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -281,7 +282,7 @@ func TestRunResourceFor(t *testing.T) {
 			expectGVR: schema.GroupVersionResource{
 				Resource: "invalid",
 			},
-			expectedErrOut: "Warning: the server doesn't have a resource type 'invalid'\n",
+			expectedErrOut: "Warning: the server doesn't have a resource type 'invalid'\n\n",
 		},
 	}
 
@@ -292,6 +293,7 @@ func TestRunResourceFor(t *testing.T) {
 
 			ioStreams, _, _, buf := genericclioptions.NewTestIOStreams()
 			test.o.IOStreams = ioStreams
+			test.o.warningPrinter = printers.NewWarningPrinter(test.o.IOStreams.ErrOut, printers.WarningPrinterOptions{Color: false})
 
 			restMapper, err := tf.ToRESTMapper()
 			if err != nil {

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 )
 
 type DrainCmdOptions struct {
@@ -49,6 +49,7 @@ type DrainCmdOptions struct {
 	nodeInfos []*resource.Info
 
 	genericclioptions.IOStreams
+	warningPrinter *printers.WarningPrinter
 }
 
 var (
@@ -223,11 +224,6 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.drainer.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
@@ -257,6 +253,8 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 		return printer.PrintObj, nil
 	}
+
+	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
 
 	builder := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
@@ -338,7 +336,7 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 		return utilerrors.NewAggregate(errs)
 	}
 	if warnings := list.Warnings(); warnings != "" {
-		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", warnings)
+		o.warningPrinter.Print(warnings)
 	}
 	if o.drainer.DryRunStrategy == cmdutil.DryRunClient {
 		for _, pod := range list.Pods() {
@@ -397,12 +395,6 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 				printObj(nodeInfo.Object, o.Out)
 			} else {
 				if o.drainer.DryRunStrategy != cmdutil.DryRunClient {
-					if o.drainer.DryRunStrategy == cmdutil.DryRunServer {
-						if err := o.drainer.DryRunVerifier.HasSupport(gvk); err != nil {
-							printError(err)
-							continue
-						}
-					}
 					err, patchErr := c.PatchOrReplace(o.drainer.Client, o.drainer.DryRunStrategy == cmdutil.DryRunServer)
 					if patchErr != nil {
 						printError(patchErr)

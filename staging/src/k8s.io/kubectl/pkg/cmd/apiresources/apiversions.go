@@ -51,7 +51,7 @@ func NewAPIVersionsOptions(ioStreams genericclioptions.IOStreams) *APIVersionsOp
 }
 
 // NewCmdAPIVersions creates the `api-versions` command
-func NewCmdAPIVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAPIVersions(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAPIVersionsOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "api-versions",
@@ -60,7 +60,7 @@ func NewCmdAPIVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 		Example:               apiversionsExample,
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
 			cmdutil.CheckErr(o.RunAPIVersions())
 		},
 	}
@@ -68,16 +68,13 @@ func NewCmdAPIVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 }
 
 // Complete adapts from the command line args and factory to the data required
-func (o *APIVersionsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *APIVersionsOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
 	}
 	var err error
-	o.discoveryClient, err = f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	return nil
+	o.discoveryClient, err = restClientGetter.ToDiscoveryClient()
+	return err
 }
 
 // RunAPIVersions does the work

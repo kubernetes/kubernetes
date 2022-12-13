@@ -81,11 +81,11 @@ func (est *EndpointSliceTracker) ShouldSync(endpointSlice *discovery.EndpointSli
 }
 
 // StaleSlices returns true if any of the following are true:
-// 1. One or more of the provided EndpointSlices have older generations than the
-//    corresponding tracked ones.
-// 2. The tracker is expecting one or more of the provided EndpointSlices to be
-//    deleted.
-// 3. The tracker is tracking EndpointSlices that have not been provided.
+//  1. One or more of the provided EndpointSlices have older generations than the
+//     corresponding tracked ones.
+//  2. The tracker is expecting one or more of the provided EndpointSlices to be
+//     deleted. (EndpointSlices that have already been marked for deletion are ignored here.)
+//  3. The tracker is tracking EndpointSlices that have not been provided.
 func (est *EndpointSliceTracker) StaleSlices(service *v1.Service, endpointSlices []*discovery.EndpointSlice) bool {
 	est.lock.Lock()
 	defer est.lock.Unlock()

@@ -36,16 +36,16 @@ import (
 // PerRPCCredentials defines the common interface for the credentials which need to
 // attach security information to every RPC (e.g., oauth2).
 type PerRPCCredentials interface {
-	// GetRequestMetadata gets the current request metadata, refreshing
-	// tokens if required. This should be called by the transport layer on
-	// each request, and the data should be populated in headers or other
-	// context. If a status code is returned, it will be used as the status
-	// for the RPC. uri is the URI of the entry point for the request.
-	// When supported by the underlying implementation, ctx can be used for
-	// timeout and cancellation. Additionally, RequestInfo data will be
-	// available via ctx to this call.
-	// TODO(zhaoq): Define the set of the qualified keys instead of leaving
-	// it as an arbitrary string.
+	// GetRequestMetadata gets the current request metadata, refreshing tokens
+	// if required. This should be called by the transport layer on each
+	// request, and the data should be populated in headers or other
+	// context. If a status code is returned, it will be used as the status for
+	// the RPC (restricted to an allowable set of codes as defined by gRFC
+	// A54). uri is the URI of the entry point for the request.  When supported
+	// by the underlying implementation, ctx can be used for timeout and
+	// cancellation. Additionally, RequestInfo data will be available via ctx
+	// to this call.  TODO(zhaoq): Define the set of the qualified keys instead
+	// of leaving it as an arbitrary string.
 	GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error)
 	// RequireTransportSecurity indicates whether the credentials requires
 	// transport security.
@@ -140,6 +140,11 @@ type TransportCredentials interface {
 	// Additionally, ClientHandshakeInfo data will be available via the context
 	// passed to this call.
 	//
+	// The second argument to this method is the `:authority` header value used
+	// while creating new streams on this connection after authentication
+	// succeeds. Implementations must use this as the server name during the
+	// authentication handshake.
+	//
 	// If the returned net.Conn is closed, it MUST close the net.Conn provided.
 	ClientHandshake(context.Context, string, net.Conn) (net.Conn, AuthInfo, error)
 	// ServerHandshake does the authentication handshake for servers. It returns
@@ -153,9 +158,13 @@ type TransportCredentials interface {
 	Info() ProtocolInfo
 	// Clone makes a copy of this TransportCredentials.
 	Clone() TransportCredentials
-	// OverrideServerName overrides the server name used to verify the hostname on the returned certificates from the server.
-	// gRPC internals also use it to override the virtual hosting name if it is set.
-	// It must be called before dialing. Currently, this is only used by grpclb.
+	// OverrideServerName specifies the value used for the following:
+	// - verifying the hostname on the returned certificates
+	// - as SNI in the client's handshake to support virtual hosting
+	// - as the value for `:authority` header at stream creation time
+	//
+	// Deprecated: use grpc.WithAuthority instead. Will be supported
+	// throughout 1.x.
 	OverrideServerName(string) error
 }
 
@@ -169,8 +178,18 @@ type TransportCredentials interface {
 //
 // This API is experimental.
 type Bundle interface {
+	// TransportCredentials returns the transport credentials from the Bundle.
+	//
+	// Implementations must return non-nil transport credentials. If transport
+	// security is not needed by the Bundle, implementations may choose to
+	// return insecure.NewCredentials().
 	TransportCredentials() TransportCredentials
+
+	// PerRPCCredentials returns the per-RPC credentials from the Bundle.
+	//
+	// May be nil if per-RPC credentials are not needed.
 	PerRPCCredentials() PerRPCCredentials
+
 	// NewWithMode should make a copy of Bundle, and switch mode. Modifying the
 	// existing Bundle may cause races.
 	//

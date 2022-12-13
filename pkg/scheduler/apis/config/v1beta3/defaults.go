@@ -102,7 +102,7 @@ func setDefaults_KubeSchedulerProfile(prof *v1beta3.KubeSchedulerProfile) {
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *v1beta3.KubeSchedulerConfiguration) {
 	if obj.Parallelism == nil {
-		obj.Parallelism = pointer.Int32Ptr(16)
+		obj.Parallelism = pointer.Int32(16)
 	}
 
 	if len(obj.Profiles) == 0 {
@@ -111,7 +111,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta3.KubeSchedulerConfigurat
 	// Only apply a default scheduler name when there is a single profile.
 	// Validation will ensure that every profile has a non-empty unique name.
 	if len(obj.Profiles) == 1 && obj.Profiles[0].SchedulerName == nil {
-		obj.Profiles[0].SchedulerName = pointer.StringPtr(v1.DefaultSchedulerName)
+		obj.Profiles[0].SchedulerName = pointer.String(v1.DefaultSchedulerName)
 	}
 
 	// Add the default set of plugins and apply the configuration.
@@ -153,49 +153,42 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta3.KubeSchedulerConfigurat
 	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 
 	if obj.PodInitialBackoffSeconds == nil {
-		val := int64(1)
-		obj.PodInitialBackoffSeconds = &val
+		obj.PodInitialBackoffSeconds = pointer.Int64(1)
 	}
 
 	if obj.PodMaxBackoffSeconds == nil {
-		val := int64(10)
-		obj.PodMaxBackoffSeconds = &val
+		obj.PodMaxBackoffSeconds = pointer.Int64(10)
 	}
 
 	// Enable profiling by default in the scheduler
 	if obj.EnableProfiling == nil {
-		enableProfiling := true
-		obj.EnableProfiling = &enableProfiling
+		obj.EnableProfiling = pointer.Bool(true)
 	}
 
 	// Enable contention profiling by default if profiling is enabled
 	if *obj.EnableProfiling && obj.EnableContentionProfiling == nil {
-		enableContentionProfiling := true
-		obj.EnableContentionProfiling = &enableContentionProfiling
+		obj.EnableContentionProfiling = pointer.Bool(true)
 	}
 }
 
 func SetDefaults_DefaultPreemptionArgs(obj *v1beta3.DefaultPreemptionArgs) {
 	if obj.MinCandidateNodesPercentage == nil {
-		obj.MinCandidateNodesPercentage = pointer.Int32Ptr(10)
+		obj.MinCandidateNodesPercentage = pointer.Int32(10)
 	}
 	if obj.MinCandidateNodesAbsolute == nil {
-		obj.MinCandidateNodesAbsolute = pointer.Int32Ptr(100)
+		obj.MinCandidateNodesAbsolute = pointer.Int32(100)
 	}
 }
 
 func SetDefaults_InterPodAffinityArgs(obj *v1beta3.InterPodAffinityArgs) {
-	// Note that an object is created manually in cmd/kube-scheduler/app/options/deprecated.go
-	// DeprecatedOptions#ApplyTo.
-	// Update that object if a new default field is added here.
 	if obj.HardPodAffinityWeight == nil {
-		obj.HardPodAffinityWeight = pointer.Int32Ptr(1)
+		obj.HardPodAffinityWeight = pointer.Int32(1)
 	}
 }
 
 func SetDefaults_VolumeBindingArgs(obj *v1beta3.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
-		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
+		obj.BindTimeoutSeconds = pointer.Int64(600)
 	}
 	if len(obj.Shape) == 0 && feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
 		obj.Shape = []v1beta3.UtilizationShapePoint{
@@ -213,10 +206,8 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta3.VolumeBindingArgs) {
 
 func SetDefaults_NodeResourcesBalancedAllocationArgs(obj *v1beta3.NodeResourcesBalancedAllocationArgs) {
 	if len(obj.Resources) == 0 {
-		obj.Resources = append(obj.Resources,
-			v1beta3.ResourceSpec{Name: string(v1.ResourceCPU), Weight: 1},
-			v1beta3.ResourceSpec{Name: string(v1.ResourceMemory), Weight: 1},
-		)
+		obj.Resources = defaultResourceSpec
+		return
 	}
 	// If the weight is not set or it is explicitly set to 0, then apply the default weight(1) instead.
 	for i := range obj.Resources {

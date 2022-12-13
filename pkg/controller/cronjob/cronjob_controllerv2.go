@@ -45,7 +45,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
@@ -63,8 +62,11 @@ var (
 // ControllerV2 is a controller for CronJobs.
 // Refactored Cronjob controller that uses DelayingQueue and informers
 type ControllerV2 struct {
-	queue    workqueue.RateLimitingInterface
-	recorder record.EventRecorder
+	queue workqueue.RateLimitingInterface
+
+	kubeClient  clientset.Interface
+	recorder    record.EventRecorder
+	broadcaster record.EventBroadcaster
 
 	jobControl     jobControlInterface
 	cronJobControl cjControlInterface
@@ -82,18 +84,12 @@ type ControllerV2 struct {
 // NewControllerV2 creates and initializes a new Controller.
 func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&covev1client.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, err
-		}
-	}
 
 	jm := &ControllerV2{
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cronjob"),
-		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),
+		queue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cronjob"),
+		kubeClient:  kubeClient,
+		broadcaster: eventBroadcaster,
+		recorder:    eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),
 
 		jobControl:     realJobControl{KubeClient: kubeClient},
 		cronJobControl: &realCJControl{KubeClient: kubeClient},
@@ -130,6 +126,12 @@ func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer 
 // Run starts the main goroutine responsible for watching and syncing jobs.
 func (jm *ControllerV2) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
+
+	// Start event processing pipeline.
+	jm.broadcaster.StartStructuredLogging(0)
+	jm.broadcaster.StartRecordingToSink(&covev1client.EventSinkImpl{Interface: jm.kubeClient.CoreV1().Events("")})
+	defer jm.broadcaster.Shutdown()
+
 	defer jm.queue.ShutDown()
 
 	klog.InfoS("Starting cronjob controller v2")
@@ -396,7 +398,7 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 			return
 		}
 		now := jm.now()
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*newCJ, sched, now)
 
 		jm.enqueueControllerAfter(curr, *t)
 		return
@@ -529,7 +531,7 @@ func (jm *ControllerV2) syncCronJob(
 		// Otherwise, the queue is always suppose to trigger sync function at the time of
 		// the scheduled time, that will give atleast 1 unmet time schedule
 		klog.V(4).InfoS("No unmet start times", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()))
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
 	}
 
@@ -548,7 +550,7 @@ func (jm *ControllerV2) syncCronJob(
 		// Status.LastScheduleTime, Status.LastMissedTime), and then so we won't generate
 		// and event the next time we process it, and also so the user looking at the status
 		// can see easily that there was a missed execution.
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
 	}
 	if isJobInActiveList(&batchv1.Job{
@@ -557,7 +559,7 @@ func (jm *ControllerV2) syncCronJob(
 			Namespace: cronJob.Namespace,
 		}}, cronJob.Status.Active) || cronJob.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		klog.V(4).InfoS("Not starting job because the scheduled time is already processed", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "schedule", scheduledTime)
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
 	}
 	if cronJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent && len(cronJob.Status.Active) > 0 {
@@ -572,7 +574,7 @@ func (jm *ControllerV2) syncCronJob(
 		// But that would mean that you could not inspect prior successes or failures of Forbid jobs.
 		klog.V(4).InfoS("Not starting job because prior execution is still running and concurrency policy is Forbid", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()))
 		jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "JobAlreadyActive", "Not starting job because prior execution is running and concurrency policy is Forbid")
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
 	}
 	if cronJob.Spec.ConcurrencyPolicy == batchv1.ReplaceConcurrent {
@@ -633,7 +635,7 @@ func (jm *ControllerV2) syncCronJob(
 	cronJob.Status.LastScheduleTime = &metav1.Time{Time: *scheduledTime}
 	updateStatus = true
 
-	t := nextScheduledTimeDuration(sched, now)
+	t := nextScheduledTimeDuration(*cronJob, sched, now)
 	return cronJob, t, updateStatus, nil
 }
 
@@ -642,12 +644,26 @@ func getJobName(cj *batchv1.CronJob, scheduledTime time.Time) string {
 }
 
 // nextScheduledTimeDuration returns the time duration to requeue based on
-// the schedule and current time. It adds a 100ms padding to the next requeue to account
+// the schedule and last schedule time. It adds a 100ms padding to the next requeue to account
 // for Network Time Protocol(NTP) time skews. If the time drifts are adjusted which in most
 // realistic cases would be around 100s, scheduled cron will still be executed without missing
 // the schedule.
-func nextScheduledTimeDuration(sched cron.Schedule, now time.Time) *time.Duration {
-	t := sched.Next(now).Add(nextScheduleDelta).Sub(now)
+func nextScheduledTimeDuration(cj batchv1.CronJob, sched cron.Schedule, now time.Time) *time.Duration {
+	earliestTime := cj.ObjectMeta.CreationTimestamp.Time
+	if cj.Status.LastScheduleTime != nil {
+		earliestTime = cj.Status.LastScheduleTime.Time
+	}
+	mostRecentTime, _, err := getMostRecentScheduleTime(earliestTime, now, sched)
+	if err != nil {
+		// we still have to requeue at some point, so aim for the next scheduling slot from now
+		mostRecentTime = &now
+	} else if mostRecentTime == nil {
+		// no missed schedules since earliestTime
+		mostRecentTime = &earliestTime
+	}
+
+	t := sched.Next(*mostRecentTime).Add(nextScheduleDelta).Sub(now)
+
 	return &t
 }
 

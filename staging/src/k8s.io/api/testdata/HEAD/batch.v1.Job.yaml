@@ -3,7 +3,6 @@ kind: Job
 metadata:
   annotations:
     annotationsKey: annotationsValue
-  clusterName: clusterNameValue
   creationTimestamp: "2008-01-01T01:01:01Z"
   deletionGracePeriodSeconds: 10
   deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -40,6 +39,17 @@ spec:
   completions: 2
   manualSelector: true
   parallelism: 1
+  podFailurePolicy:
+    rules:
+    - action: actionValue
+      onExitCodes:
+        containerName: containerNameValue
+        operator: operatorValue
+        values:
+        - 3
+      onPodConditions:
+      - status: statusValue
+        type: typeValue
   selector:
     matchExpressions:
     - key: keyValue
@@ -53,7 +63,6 @@ spec:
     metadata:
       annotations:
         annotationsKey: annotationsValue
-      clusterName: clusterNameValue
       creationTimestamp: "2008-01-01T01:01:01Z"
       deletionGracePeriodSeconds: 10
       deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -320,6 +329,8 @@ spec:
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
         resources:
+          claims:
+          - name: nameValue
           limits:
             limitsKey: "0"
           requests:
@@ -521,6 +532,8 @@ spec:
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
         resources:
+          claims:
+          - name: nameValue
           limits:
             limitsKey: "0"
           requests:
@@ -599,6 +612,7 @@ spec:
       hostIPC: true
       hostNetwork: true
       hostPID: true
+      hostUsers: true
       hostname: hostnameValue
       imagePullSecrets:
       - name: nameValue
@@ -723,6 +737,8 @@ spec:
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
         resources:
+          claims:
+          - name: nameValue
           limits:
             limitsKey: "0"
           requests:
@@ -805,9 +821,16 @@ spec:
       priorityClassName: priorityClassNameValue
       readinessGates:
       - conditionType: conditionTypeValue
+      resourceClaims:
+      - name: nameValue
+        source:
+          resourceClaimName: resourceClaimNameValue
+          resourceClaimTemplateName: resourceClaimTemplateNameValue
       restartPolicy: restartPolicyValue
       runtimeClassName: runtimeClassNameValue
       schedulerName: schedulerNameValue
+      schedulingGates:
+      - name: nameValue
       securityContext:
         fsGroup: 5
         fsGroupChangePolicy: fsGroupChangePolicyValue
@@ -853,8 +876,12 @@ spec:
             - valuesValue
           matchLabels:
             matchLabelsKey: matchLabelsValue
+        matchLabelKeys:
+        - matchLabelKeysValue
         maxSkew: 1
         minDomains: 5
+        nodeAffinityPolicy: nodeAffinityPolicyValue
+        nodeTaintsPolicy: nodeTaintsPolicyValue
         topologyKey: topologyKeyValue
         whenUnsatisfiable: whenUnsatisfiableValue
       volumes:
@@ -925,7 +952,6 @@ spec:
             metadata:
               annotations:
                 annotationsKey: annotationsValue
-              clusterName: clusterNameValue
               creationTimestamp: "2008-01-01T01:01:01Z"
               deletionGracePeriodSeconds: 10
               deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -966,7 +992,10 @@ spec:
                 apiGroup: apiGroupValue
                 kind: kindValue
                 name: nameValue
+                namespace: namespaceValue
               resources:
+                claims:
+                - name: nameValue
                 limits:
                   limitsKey: "0"
                 requests:

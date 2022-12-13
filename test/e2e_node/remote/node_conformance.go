@@ -56,7 +56,7 @@ func commandToString(c *exec.Cmd) string {
 
 // Image path constants.
 const (
-	conformanceRegistry         = "k8s.gcr.io"
+	conformanceRegistry         = "registry.k8s.io"
 	conformanceArch             = runtime.GOARCH
 	conformanceTarfile          = "node_conformance.tar"
 	conformanceTestBinary       = "e2e_node.test"
@@ -181,7 +181,7 @@ func launchKubelet(host, workspace, results, testArgs, bearerToken string) error
 		return fmt.Errorf("failed to create kubelet pod manifest path %q: error - %v output - %q",
 			podManifestPath, err, output)
 	}
-	startKubeletCmd := fmt.Sprintf("./%s --run-kubelet-mode --logtostderr --node-name=%s"+
+	startKubeletCmd := fmt.Sprintf("./%s --run-kubelet-mode --node-name=%s"+
 		" --bearer-token=%s"+
 		" --report-dir=%s %s --kubelet-flags=--pod-manifest-path=%s > %s 2>&1",
 		conformanceTestBinary, host, bearerToken, results, testArgs, podManifestPath, filepath.Join(results, kubeletLauncherLog))

@@ -19,18 +19,18 @@ package cel
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
-	"github.com/google/cel-go/checker/decls"
-	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
-	"google.golang.org/protobuf/proto"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/library"
-	celmodel "k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
+	celmodel "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
+	apiservercel "k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/library"
+	"k8s.io/apiserver/pkg/cel/metrics"
 )
 
 const (
@@ -58,7 +58,7 @@ const (
 // CompilationResult represents the cel compilation result for one rule
 type CompilationResult struct {
 	Program cel.Program
-	Error   *Error
+	Error   *apiservercel.Error
 	// If true, the compiled expression contains a reference to the identifier "oldSelf", and its corresponding rule
 	// is implicitly a transition rule.
 	TransitionRule bool
@@ -69,61 +69,87 @@ type CompilationResult struct {
 	MaxCardinality uint64
 }
 
+var (
+	initEnvOnce sync.Once
+	initEnv     *cel.Env
+	initEnvErr  error
+)
+
+// This func is duplicated in k8s.io/apiserver/pkg/admission/plugin/cel/validator.go
+// If any changes are made here, consider to make the same changes there as well.
+func getBaseEnv() (*cel.Env, error) {
+	initEnvOnce.Do(func() {
+		var opts []cel.EnvOption
+		opts = append(opts, cel.HomogeneousAggregateLiterals())
+		// Validate function declarations once during base env initialization,
+		// so they don't need to be evaluated each time a CEL rule is compiled.
+		// This is a relatively expensive operation.
+		opts = append(opts, cel.EagerlyValidateDeclarations(true), cel.DefaultUTCTimeZone(true))
+		opts = append(opts, library.ExtensionLibs...)
+
+		initEnv, initEnvErr = cel.NewEnv(opts...)
+	})
+	return initEnv, initEnvErr
+}
+
 // Compile compiles all the XValidations rules (without recursing into the schema) and returns a slice containing a
-// CompilationResult for each ValidationRule, or an error.
+// CompilationResult for each ValidationRule, or an error. declType is expected to be a CEL DeclType corresponding
+// to the structural schema.
 // Each CompilationResult may contain:
-/// - non-nil Program, nil Error: The program was compiled successfully
-//  - nil Program, non-nil Error: Compilation resulted in an error
-//  - nil Program, nil Error: The provided rule was empty so compilation was not attempted
+// / - non-nil Program, nil Error: The program was compiled successfully
+//   - nil Program, non-nil Error: Compilation resulted in an error
+//   - nil Program, nil Error: The provided rule was empty so compilation was not attempted
+//
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
-func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]CompilationResult, error) {
+func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit uint64) ([]CompilationResult, error) {
+	t := time.Now()
+	defer func() {
+		metrics.Metrics.ObserveCompilation(time.Since(t))
+	}()
+
 	if len(s.Extensions.XValidations) == 0 {
 		return nil, nil
 	}
 	celRules := s.Extensions.XValidations
 
-	var propDecls []*expr.Decl
-	var root *celmodel.DeclType
+	var propDecls []cel.EnvOption
+	var root *apiservercel.DeclType
 	var ok bool
-	env, err := cel.NewEnv(
-		cel.HomogeneousAggregateLiterals(),
-	)
+	baseEnv, err := getBaseEnv()
 	if err != nil {
 		return nil, err
 	}
-	reg := celmodel.NewRegistry(env)
+	reg := apiservercel.NewRegistry(baseEnv)
 	scopedTypeName := generateUniqueSelfTypeName()
-	rt, err := celmodel.NewRuleTypes(scopedTypeName, s, isResourceRoot, reg)
+	rt, err := apiservercel.NewRuleTypes(scopedTypeName, declType, reg)
 	if err != nil {
 		return nil, err
 	}
 	if rt == nil {
 		return nil, nil
 	}
-	opts, err := rt.EnvOptions(env.TypeProvider())
+	opts, err := rt.EnvOptions(baseEnv.TypeProvider())
 	if err != nil {
 		return nil, err
 	}
 	root, ok = rt.FindDeclType(scopedTypeName)
 	if !ok {
-		rootDecl := celmodel.SchemaDeclType(s, isResourceRoot)
-		if rootDecl == nil {
+		if declType == nil {
 			return nil, fmt.Errorf("rule declared on schema that does not support validation rules type: '%s' x-kubernetes-preserve-unknown-fields: '%t'", s.Type, s.XPreserveUnknownFields)
 		}
-		root = rootDecl.MaybeAssignTypeName(scopedTypeName)
+		root = declType.MaybeAssignTypeName(scopedTypeName)
 	}
-	propDecls = append(propDecls, decls.NewVar(ScopedVarName, root.ExprType()))
-	propDecls = append(propDecls, decls.NewVar(OldScopedVarName, root.ExprType()))
-	opts = append(opts, cel.Declarations(propDecls...), cel.HomogeneousAggregateLiterals())
-	opts = append(opts, library.ExtensionLibs...)
-	env, err = env.Extend(opts...)
+	propDecls = append(propDecls, cel.Variable(ScopedVarName, root.CelType()))
+	propDecls = append(propDecls, cel.Variable(OldScopedVarName, root.CelType()))
+	opts = append(opts, propDecls...)
+	env, err := baseEnv.Extend(opts...)
 	if err != nil {
 		return nil, err
 	}
 	estimator := newCostEstimator(root)
 	// compResults is the return value which saves a list of compilation results in the same order as x-kubernetes-validations rules.
 	compResults := make([]CompilationResult, len(celRules))
-	maxCardinality := celmodel.MaxCardinality(s)
+	maxCardinality := celmodel.MaxCardinality(root.MinSerializedSize)
 	for i, rule := range celRules {
 		compResults[i] = compileRule(rule, env, perCallLimit, estimator, maxCardinality)
 	}
@@ -139,18 +165,18 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 	}
 	ast, issues := env.Compile(rule.Rule)
 	if issues != nil {
-		compilationResult.Error = &Error{ErrorTypeInvalid, "compilation failed: " + issues.String()}
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInvalid, "compilation failed: " + issues.String()}
 		return
 	}
-	if !proto.Equal(ast.ResultType(), decls.Bool) {
-		compilationResult.Error = &Error{ErrorTypeInvalid, "cel expression must evaluate to a bool"}
+	if ast.OutputType() != cel.BoolType {
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInvalid, "cel expression must evaluate to a bool"}
 		return
 	}
 
 	checkedExpr, err := cel.AstToCheckedExpr(ast)
 	if err != nil {
 		// should be impossible since env.Compile returned no issues
-		compilationResult.Error = &Error{ErrorTypeInternal, "unexpected compilation error: " + err.Error()}
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInternal, "unexpected compilation error: " + err.Error()}
 		return
 	}
 	for _, ref := range checkedExpr.ReferenceMap {
@@ -169,12 +195,12 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 		cel.InterruptCheckFrequency(checkFrequency),
 	)
 	if err != nil {
-		compilationResult.Error = &Error{ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
 		return
 	}
 	costEst, err := env.EstimateCost(ast, estimator)
 	if err != nil {
-		compilationResult.Error = &Error{ErrorTypeInternal, "cost estimation failed: " + err.Error()}
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInternal, "cost estimation failed: " + err.Error()}
 		return
 	}
 	compilationResult.MaxCost = costEst.Max
@@ -191,12 +217,12 @@ func generateUniqueSelfTypeName() string {
 	return fmt.Sprintf("selfType%d", time.Now().Nanosecond())
 }
 
-func newCostEstimator(root *celmodel.DeclType) *library.CostEstimator {
+func newCostEstimator(root *apiservercel.DeclType) *library.CostEstimator {
 	return &library.CostEstimator{SizeEstimator: &sizeEstimator{root: root}}
 }
 
 type sizeEstimator struct {
-	root *celmodel.DeclType
+	root *apiservercel.DeclType
 }
 
 func (c *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {

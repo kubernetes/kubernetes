@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+
+	"github.com/go-logr/logr"
 )
 
 // WithValues implements LogSink.WithValues. The old key/value pairs are
@@ -44,53 +46,49 @@ func WithValues(oldKV, newKV []interface{}) []interface{} {
 	return kv
 }
 
-// TrimDuplicates deduplicates elements provided in multiple key/value tuple
-// slices, whilst maintaining the distinction between where the items are
-// contained.
-func TrimDuplicates(kvLists ...[]interface{}) [][]interface{} {
-	// maintain a map of all seen keys
-	seenKeys := map[interface{}]struct{}{}
-	// build the same number of output slices as inputs
-	outs := make([][]interface{}, len(kvLists))
-	// iterate over the input slices backwards, as 'later' kv specifications
-	// of the same key will take precedence over earlier ones
-	for i := len(kvLists) - 1; i >= 0; i-- {
-		// initialise this output slice
-		outs[i] = []interface{}{}
-		// obtain a reference to the kvList we are processing
-		// and make sure it has an even number of entries
-		kvList := kvLists[i]
-		if len(kvList)%2 != 0 {
-			kvList = append(kvList, missingValue)
-		}
-
-		// start iterating at len(kvList) - 2 (i.e. the 2nd last item) for
-		// slices that have an even number of elements.
-		// We add (len(kvList) % 2) here to handle the case where there is an
-		// odd number of elements in a kvList.
-		// If there is an odd number, then the last element in the slice will
-		// have the value 'null'.
-		for i2 := len(kvList) - 2 + (len(kvList) % 2); i2 >= 0; i2 -= 2 {
-			k := kvList[i2]
-			// if we have already seen this key, do not include it again
-			if _, ok := seenKeys[k]; ok {
-				continue
-			}
-			// make a note that we've observed a new key
-			seenKeys[k] = struct{}{}
-			// attempt to obtain the value of the key
-			var v interface{}
-			// i2+1 should only ever be out of bounds if we handling the first
-			// iteration over a slice with an odd number of elements
-			if i2+1 < len(kvList) {
-				v = kvList[i2+1]
-			}
-			// add this KV tuple to the *start* of the output list to maintain
-			// the original order as we are iterating over the slice backwards
-			outs[i] = append([]interface{}{k, v}, outs[i]...)
-		}
+// MergeKVs deduplicates elements provided in two key/value slices.
+//
+// Keys in each slice are expected to be unique, so duplicates can only occur
+// when the first and second slice contain the same key. When that happens, the
+// key/value pair from the second slice is used. The first slice must be well-formed
+// (= even key/value pairs). The second one may have a missing value, in which
+// case the special "missing value" is added to the result.
+func MergeKVs(first, second []interface{}) []interface{} {
+	maxLength := len(first) + (len(second)+1)/2*2
+	if maxLength == 0 {
+		// Nothing to do at all.
+		return nil
 	}
-	return outs
+
+	if len(first) == 0 && len(second)%2 == 0 {
+		// Nothing to be overridden, second slice is well-formed
+		// and can be used directly.
+		return second
+	}
+
+	// Determine which keys are in the second slice so that we can skip
+	// them when iterating over the first one. The code intentionally
+	// favors performance over completeness: we assume that keys are string
+	// constants and thus compare equal when the string values are equal. A
+	// string constant being overridden by, for example, a fmt.Stringer is
+	// not handled.
+	overrides := map[interface{}]bool{}
+	for i := 0; i < len(second); i += 2 {
+		overrides[second[i]] = true
+	}
+	merged := make([]interface{}, 0, maxLength)
+	for i := 0; i+1 < len(first); i += 2 {
+		key := first[i]
+		if overrides[key] {
+			continue
+		}
+		merged = append(merged, key, first[i+1])
+	}
+	merged = append(merged, second...)
+	if len(merged)%2 != 0 {
+		merged = append(merged, missingValue)
+	}
+	return merged
 }
 
 const missingValue = "(MISSING)"
@@ -111,10 +109,10 @@ func KVListFormat(b *bytes.Buffer, keysAndValues ...interface{}) {
 		// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/migration-to-structured-logging.md#name-arguments
 		// for the sake of performance. Keys with spaces,
 		// special characters, etc. will break parsing.
-		if k, ok := k.(string); ok {
+		if sK, ok := k.(string); ok {
 			// Avoid one allocation when the key is a string, which
 			// normally it should be.
-			b.WriteString(k)
+			b.WriteString(sK)
 		} else {
 			b.WriteString(fmt.Sprintf("%s", k))
 		}
@@ -131,6 +129,24 @@ func KVListFormat(b *bytes.Buffer, keysAndValues ...interface{}) {
 			writeStringValue(b, true, v)
 		case error:
 			writeStringValue(b, true, ErrorToString(v))
+		case logr.Marshaler:
+			value := MarshalerToValue(v)
+			// A marshaler that returns a string is useful for
+			// delayed formatting of complex values. We treat this
+			// case like a normal string. This is useful for
+			// multi-line support.
+			//
+			// We could do this by recursively formatting a value,
+			// but that comes with the risk of infinite recursion
+			// if a marshaler returns itself. Instead we call it
+			// only once and rely on it returning the intended
+			// value directly.
+			switch value := value.(type) {
+			case string:
+				writeStringValue(b, true, value)
+			default:
+				writeStringValue(b, false, fmt.Sprintf("%+v", value))
+			}
 		case []byte:
 			// In https://github.com/kubernetes/klog/pull/237 it was decided
 			// to format byte slices with "%+q". The advantages of that are:
@@ -160,6 +176,18 @@ func StringerToString(s fmt.Stringer) (ret string) {
 		}
 	}()
 	ret = s.String()
+	return
+}
+
+// MarshalerToValue invokes a marshaler and catches
+// panics.
+func MarshalerToValue(m logr.Marshaler) (ret interface{}) {
+	defer func() {
+		if err := recover(); err != nil {
+			ret = fmt.Sprintf("<panic: %s>", err)
+		}
+	}()
+	ret = m.MarshalLog()
 	return
 }
 

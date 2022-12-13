@@ -53,9 +53,8 @@ How to get your contributions merged smoothly and quickly.
 - **All tests need to be passing** before your change can be merged. We
   recommend you **run tests locally** before creating your PR to catch breakages
   early on.
-  - `make all` to test everything, OR
-  - `make vet` to catch vet errors
-  - `make test` to run the tests
-  - `make testrace` to run tests in race mode
+  - `VET_SKIP_PROTO=1 ./vet.sh` to catch vet errors
+  - `go test -cpu 1,4 -timeout 7m ./...` to run the tests
+  - `go test -race -cpu 1,4 -timeout 7m ./...` to run tests in race mode
 
 - Exceptions to the rules can be made if there's a compelling reason for doing so.

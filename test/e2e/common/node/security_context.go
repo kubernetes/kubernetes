@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -27,12 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -44,9 +46,264 @@ var (
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *framework.PodClient
+	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2epod.NewPodClient(f)
+	})
+
+	ginkgo.Context("When creating a pod with HostUsers", func() {
+		containerName := "userns-test"
+		makePod := func(hostUsers bool) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "userns-" + string(uuid.NewUUID()),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    containerName,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"cat", "/proc/self/uid_map"},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+					HostUsers:     &hostUsers,
+				},
+			}
+		}
+
+		ginkgo.It("must create the user namespace if set to false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+			// with hostUsers=false the pod must use a new user namespace
+			podClient := e2epod.PodClientNS(f, f.Namespace.Name)
+
+			createdPod1 := podClient.Create(makePod(false))
+			createdPod2 := podClient.Create(makePod(false))
+			defer func() {
+				ginkgo.By("delete the pods")
+				podClient.DeleteSync(createdPod1.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+				podClient.DeleteSync(createdPod2.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			}()
+			getLogs := func(pod *v1.Pod) (string, error) {
+				err := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod1.Name, f.Namespace.Name, f.Timeouts.PodStart)
+				if err != nil {
+					return "", err
+				}
+				podStatus, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return "", err
+				}
+				return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podStatus.Name, containerName)
+			}
+
+			logs1, err := getLogs(createdPod1)
+			framework.ExpectNoError(err)
+			logs2, err := getLogs(createdPod2)
+			framework.ExpectNoError(err)
+
+			// 65536 is the size used for a user namespace.  Verify that the value is present
+			// in the /proc/self/uid_map file.
+			if !strings.Contains(logs1, "65536") || !strings.Contains(logs2, "65536") {
+				framework.Failf("user namespace not created")
+			}
+			if logs1 == logs2 {
+				framework.Failf("two different pods are running with the same user namespace configuration")
+			}
+		})
+
+		ginkgo.It("must not create the user namespace if set to true [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+			// with hostUsers=true the pod must use the host user namespace
+			pod := makePod(true)
+			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
+			// 0          0 4294967295
+			// Verify the value 4294967295 is present in the output.
+			e2epodoutput.TestContainerOutput(f, "read namespace", pod, 0, []string{
+				"4294967295",
+			})
+		})
+
+		ginkgo.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+			// Create all volume types supported: configmap, secret, downwardAPI, projected.
+
+			// Create configmap.
+			name := "userns-volumes-test-" + string(uuid.NewUUID())
+			configMap := newConfigMap(f, name)
+			ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
+			var err error
+			if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+				framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+			}
+
+			// Create secret.
+			secret := secretForTest(f.Namespace.Name, name)
+			ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
+			if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+				framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+			}
+
+			// downwardAPI definition.
+			downwardVolSource := &v1.DownwardAPIVolumeSource{
+				Items: []v1.DownwardAPIVolumeFile{
+					{
+						Path: "name",
+						FieldRef: &v1.ObjectFieldSelector{
+							APIVersion: "v1",
+							FieldPath:  "metadata.name",
+						},
+					},
+				},
+			}
+
+			// Create a pod with all the volumes
+			falseVar := false
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-userns-volumes-" + string(uuid.NewUUID()),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "userns-file-permissions",
+							Image: imageutils.GetE2EImage(imageutils.BusyBox),
+							// Print (numeric) GID of the files in /vol/.
+							// We limit to "type f" as kubelet uses symlinks to those files, but we
+							// don't care about the owner of the symlink itself, just the files.
+							Command: []string{"sh", "-c", "stat -c='%g' $(find /vol/ -type f)"},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "cfg",
+									MountPath: "/vol/cfg/",
+								},
+								{
+									Name:      "secret",
+									MountPath: "/vol/secret/",
+								},
+								{
+									Name:      "downward",
+									MountPath: "/vol/downward/",
+								},
+								{
+									Name:      "projected",
+									MountPath: "/vol/projected/",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "cfg",
+							VolumeSource: v1.VolumeSource{
+								ConfigMap: &v1.ConfigMapVolumeSource{
+									LocalObjectReference: v1.LocalObjectReference{Name: configMap.Name},
+								},
+							},
+						},
+						{
+							Name: "secret",
+							VolumeSource: v1.VolumeSource{
+								Secret: &v1.SecretVolumeSource{
+									SecretName: secret.Name,
+								},
+							},
+						},
+						{
+							Name: "downward",
+							VolumeSource: v1.VolumeSource{
+								DownwardAPI: downwardVolSource,
+							},
+						},
+						{
+							Name: "projected",
+							VolumeSource: v1.VolumeSource{
+								Projected: &v1.ProjectedVolumeSource{
+									Sources: []v1.VolumeProjection{
+										{
+											DownwardAPI: &v1.DownwardAPIProjection{
+												Items: downwardVolSource.Items,
+											},
+										},
+										{
+											Secret: &v1.SecretProjection{
+												LocalObjectReference: v1.LocalObjectReference{Name: secret.Name},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					HostUsers:     &falseVar,
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+
+			// Expect one line for each file on all the volumes.
+			// Each line should be "=0" that means root inside the container is the owner of the file.
+			downwardAPIVolFiles := 1
+			projectedFiles := len(secret.Data) + downwardAPIVolFiles
+			e2epodoutput.TestContainerOutput(f, "check file permissions", pod, 0, []string{
+				strings.Repeat("=0\n", len(secret.Data)+len(configMap.Data)+downwardAPIVolFiles+projectedFiles),
+			})
+		})
+
+		ginkgo.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+			// Create configmap.
+			name := "userns-volumes-test-" + string(uuid.NewUUID())
+			configMap := newConfigMap(f, name)
+			ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
+			var err error
+			if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+				framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+			}
+
+			// Create a pod with hostUsers=false
+			falseVar := false
+			fsGroup := int64(200)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-userns-fsgroup-" + string(uuid.NewUUID()),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "userns-fsgroup",
+							Image: imageutils.GetE2EImage(imageutils.BusyBox),
+							// Print (numeric) GID of the files in /vol/.
+							// We limit to "type f" as kubelet uses symlinks to those files, but we
+							// don't care about the owner of the symlink itself, just the files.
+							Command: []string{"sh", "-c", "stat -c='%g' $(find /vol/ -type f)"},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "cfg",
+									MountPath: "/vol/cfg/",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "cfg",
+							VolumeSource: v1.VolumeSource{
+								ConfigMap: &v1.ConfigMapVolumeSource{
+									LocalObjectReference: v1.LocalObjectReference{Name: configMap.Name},
+								},
+							},
+						},
+					},
+					HostUsers:     &falseVar,
+					RestartPolicy: v1.RestartPolicyNever,
+					SecurityContext: &v1.PodSecurityContext{
+						FSGroup: &fsGroup,
+					},
+				},
+			}
+
+			// Expect one line for each file on all the volumes.
+			// Each line should be "=200" (fsGroup) that means it was mapped to the
+			// right user inside the container.
+			e2epodoutput.TestContainerOutput(f, "check FSGroup is mapped correctly", pod, 0, []string{
+				strings.Repeat(fmt.Sprintf("=%v\n", fsGroup), len(configMap.Data)),
+			})
+		})
 	})
 
 	ginkgo.Context("When creating a container with runAsUser", func() {
@@ -87,18 +344,18 @@ var _ = SIGDescribe("Security Context", func() {
 			Description: Container is created with runAsUser option by passing uid 65534 to run as unpriviledged user. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		framework.ConformanceIt("should run the container with uid 65534 [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("should run the container with uid 65534 [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			createAndWaitUserPod(65534)
 		})
 
 		/*
 			Release: v1.15
 			Testname: Security Context, runAsUser=0
-			Description: Container is created with runAsUser option by passing uid 0 to run as root priviledged user. Pod MUST be in Succeeded phase.
+			Description: Container is created with runAsUser option by passing uid 0 to run as root privileged user. Pod MUST be in Succeeded phase.
 			This e2e can not be promoted to Conformance because a Conformant platform may not allow to run containers with 'uid 0' or running privileged operations.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		ginkgo.It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			createAndWaitUserPod(0)
 		})
 	})
@@ -128,7 +385,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 
-		ginkgo.It("should run with an explicit non-root user ID [LinuxOnly]", func() {
+		ginkgo.It("should run with an explicit non-root user ID [LinuxOnly]", func(ctx context.Context) {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
@@ -138,7 +395,7 @@ var _ = SIGDescribe("Security Context", func() {
 			podClient.WaitForSuccess(name, framework.PodStartTimeout)
 			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1000"))
 		})
-		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func() {
+		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func(ctx context.Context) {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-root-uid"
@@ -150,7 +407,7 @@ var _ = SIGDescribe("Security Context", func() {
 			gomega.Expect(ev).NotTo(gomega.BeNil())
 			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
 		})
-		ginkgo.It("should run with an image specified user ID", func() {
+		ginkgo.It("should run with an image specified user ID", func(ctx context.Context) {
 			name := "implicit-nonroot-uid"
 			pod := makeNonRootPod(name, nonRootImage, nil)
 			podClient.Create(pod)
@@ -158,7 +415,7 @@ var _ = SIGDescribe("Security Context", func() {
 			podClient.WaitForSuccess(name, framework.PodStartTimeout)
 			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
 		})
-		ginkgo.It("should not run without a specified user ID", func() {
+		ginkgo.It("should not run without a specified user ID", func(ctx context.Context) {
 			name := "implicit-root-uid"
 			pod := makeNonRootPod(name, rootImage, nil)
 			pod = podClient.Create(pod)
@@ -216,7 +473,7 @@ var _ = SIGDescribe("Security Context", func() {
 			At this moment we are not considering this test for Conformance due to use of SecurityContext.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		ginkgo.It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			createAndWaitUserPod(true)
 		})
 
@@ -226,7 +483,7 @@ var _ = SIGDescribe("Security Context", func() {
 			Description: Container is configured to run with readOnlyRootFilesystem to false.
 			Write operation MUST be allowed and Pod MUST be in Succeeded state.
 		*/
-		framework.ConformanceIt("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func() {
+		framework.ConformanceIt("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func(ctx context.Context) {
 			createAndWaitUserPod(false)
 		})
 	})
@@ -268,7 +525,7 @@ var _ = SIGDescribe("Security Context", func() {
 			Description: Create a container to run in unprivileged mode by setting pod's SecurityContext Privileged option as false. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since it runs a Linux-specific command.
 		*/
-		framework.ConformanceIt("should run the container as unprivileged when false [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("should run the container as unprivileged when false [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			podName := createAndWaitUserPod(false)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
@@ -281,7 +538,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		ginkgo.It("should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess]", func() {
+		ginkgo.It("should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess]", func(ctx context.Context) {
 			podName := createAndWaitUserPod(true)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
@@ -334,7 +591,7 @@ var _ = SIGDescribe("Security Context", func() {
 			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and not all conformant platforms will require this behavior.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		ginkgo.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, nonRootTestUserID); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
@@ -349,7 +606,7 @@ var _ = SIGDescribe("Security Context", func() {
 			When the container is run, container's output MUST match with expected output verifying container ran with given uid i.e. uid=1000.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		framework.ConformanceIt("should not allow privilege escalation when false [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("should not allow privilege escalation when false [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(podName, fmt.Sprintf("Effective uid: %d", nonRootTestUserID), &apeFalse, nonRootTestUserID); err != nil {
@@ -366,7 +623,7 @@ var _ = SIGDescribe("Security Context", func() {
 			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and runtime may not allow to run.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		ginkgo.It("should allow privilege escalation when true [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should allow privilege escalation when true [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, nonRootTestUserID); err != nil {
@@ -384,7 +641,7 @@ func waitForFailure(f *framework.Framework, name string, timeout time.Duration) 
 			case v1.PodFailed:
 				return true, nil
 			case v1.PodSucceeded:
-				return true, fmt.Errorf("pod %q successed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
+				return true, fmt.Errorf("pod %q succeeded with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
 			default:
 				return false, nil
 			}

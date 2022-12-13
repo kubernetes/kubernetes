@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/utils/junit"
 )
@@ -35,8 +36,6 @@ import (
 // ControlPlaneUpgradeFunc returns a function that performs control plane upgrade.
 func ControlPlaneUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs []string) func() {
 	return func() {
-		start := time.Now()
-		defer upgrades.FinalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
 		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
 		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
@@ -46,8 +45,6 @@ func ControlPlaneUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeCon
 // ClusterUpgradeFunc returns a function that performs full cluster upgrade (both control plane and nodes).
 func ClusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func() {
 	return func() {
-		start := time.Now()
-		defer upgrades.FinalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
 		image := upgCtx.Versions[1].NodeImage
 		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
@@ -60,8 +57,6 @@ func ClusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext,
 // ClusterDowngradeFunc returns a function that performs full cluster downgrade (both nodes and control plane).
 func ClusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func() {
 	return func() {
-		start := time.Now()
-		defer upgrades.FinalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
 		image := upgCtx.Versions[1].NodeImage
 		// Yes this really is a downgrade. And nodes must downgrade first.
@@ -80,7 +75,7 @@ func controlPlaneUpgrade(f *framework.Framework, v string, extraEnvs []string) e
 	case "gce":
 		return controlPlaneUpgradeGCE(v, extraEnvs)
 	case "gke":
-		return framework.MasterUpgradeGKE(f.Namespace.Name, v)
+		return e2eproviders.MasterUpgradeGKE(f.Namespace.Name, v)
 	default:
 		return fmt.Errorf("controlPlaneUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
@@ -101,7 +96,7 @@ func controlPlaneUpgradeGCE(rawV string, extraEnvs []string) error {
 	}
 
 	v := "v" + rawV
-	_, _, err := framework.RunCmdEnv(env, framework.GCEUpgradeScript(), "-M", v)
+	_, _, err := framework.RunCmdEnv(env, e2eproviders.GCEUpgradeScript(), "-M", v)
 	return err
 }
 
@@ -172,10 +167,10 @@ func nodeUpgradeGCE(rawV, img string, extraEnvs []string) error {
 	env := append(os.Environ(), extraEnvs...)
 	if img != "" {
 		env = append(env, "KUBE_NODE_OS_DISTRIBUTION="+img)
-		_, _, err := framework.RunCmdEnv(env, framework.GCEUpgradeScript(), "-N", "-o", v)
+		_, _, err := framework.RunCmdEnv(env, e2eproviders.GCEUpgradeScript(), "-N", "-o", v)
 		return err
 	}
-	_, _, err := framework.RunCmdEnv(env, framework.GCEUpgradeScript(), "-N", v)
+	_, _, err := framework.RunCmdEnv(env, e2eproviders.GCEUpgradeScript(), "-N", v)
 	return err
 }
 
@@ -191,7 +186,7 @@ func nodeUpgradeGKE(namespace string, v string, img string) error {
 			"container",
 			"clusters",
 			fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-			framework.LocationParamGKE(),
+			e2eproviders.LocationParamGKE(),
 			"upgrade",
 			framework.TestContext.CloudConfig.Cluster,
 			fmt.Sprintf("--node-pool=%s", np),
@@ -207,7 +202,7 @@ func nodeUpgradeGKE(namespace string, v string, img string) error {
 			return err
 		}
 
-		framework.WaitForSSHTunnels(namespace)
+		e2enode.WaitForSSHTunnels(namespace)
 	}
 	return nil
 }
@@ -217,7 +212,7 @@ func nodePoolsGKE() ([]string, error) {
 		"container",
 		"node-pools",
 		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-		framework.LocationParamGKE(),
+		e2eproviders.LocationParamGKE(),
 		"list",
 		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
 		"--format=get(name)",

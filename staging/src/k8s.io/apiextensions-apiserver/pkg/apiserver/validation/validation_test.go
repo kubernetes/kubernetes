@@ -29,6 +29,8 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 	kjson "sigs.k8s.io/json"
 
+	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -40,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
-	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // TestRoundTrip checks the conversion to go-openapi types.
@@ -163,6 +164,7 @@ func TestValidateCustomResource(t *testing.T) {
 	}{
 		{name: "!nullable",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:     "object",
@@ -185,6 +187,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:     "object",
@@ -207,6 +210,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable and no type",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Nullable: true,
@@ -226,6 +230,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "x-kubernetes-int-or-string",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						XIntOrString: true,
@@ -247,6 +252,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable and x-kubernetes-int-or-string",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Nullable:     true,
@@ -269,6 +275,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable, x-kubernetes-int-or-string and user-provided anyOf",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Nullable:     true,
@@ -311,6 +318,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "nullable, x-kubernetes-int-or-string and user-provider allOf",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Nullable:     true,
@@ -361,6 +369,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "invalid regex",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:    "string",
@@ -374,6 +383,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "required field",
 			schema: apiextensions.JSONSchemaProps{
+				Type:     "object",
 				Required: []string{"field"},
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
@@ -392,6 +402,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "enum",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:     "object",
@@ -424,6 +435,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "immutability transition rule",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type: "string",
@@ -453,6 +465,7 @@ func TestValidateCustomResource(t *testing.T) {
 		{name: "correlatable transition rule",
 			// Ensures a transition rule under a "listMap" is supported.
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type:         "array",
@@ -503,6 +516,7 @@ func TestValidateCustomResource(t *testing.T) {
 			// does NOT use oldSelf (is not a transition rule), still behaves
 			// as expected under a non-correlatable field.
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"field": {
 						Type: "array",
@@ -537,6 +551,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "maxProperties",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:          "object",
@@ -552,6 +567,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "maxItems",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:     "array",
@@ -567,6 +583,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 		{name: "maxLength",
 			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:      "string",
@@ -591,7 +608,7 @@ func TestValidateCustomResource(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			celValidator := cel.NewValidator(structural, cel.PerCallLimit)
+			celValidator := cel.NewValidator(structural, false, cel.PerCallLimit)
 			for i, obj := range tt.objects {
 				var oldObject interface{}
 				if len(tt.oldObjects) == len(tt.objects) {
