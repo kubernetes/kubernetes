@@ -61,7 +61,7 @@ var _ = utils.SIGDescribe("CSI Mock fsgroup as mount option", func() {
 					enableVolumeMountGroup: t.enableVolumeMountGroup,
 					hooks:                  createFSGroupRequestPreHook(&nodeStageFsGroup, &nodePublishFsGroup),
 				})
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				fsGroupVal := int64(rand.Int63n(20000) + 1024)
 				fsGroup := &fsGroupVal

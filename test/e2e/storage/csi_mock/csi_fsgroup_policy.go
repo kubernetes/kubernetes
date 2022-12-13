@@ -72,7 +72,7 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 					registerDriver: true,
 					fsGroupPolicy:  &test.fsGroupPolicy,
 				})
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				// kube-scheduler may need some time before it gets the CSIDriver object.
 				// Without them, scheduling doesn't run as expected by the test.

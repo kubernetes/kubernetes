@@ -72,7 +72,7 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 			ginkgo.It(t.name, func(ctx context.Context) {
 				var err error
 				m.init(testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				volumeType := test.volumeType
 				if volumeType == "" {
@@ -110,7 +110,7 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 		ginkgo.It("should bringup pod after deploying CSIDriver attach=false [Slow]", func(ctx context.Context) {
 			var err error
 			m.init(testParameters{registerDriver: false, disableAttach: true})
-			defer m.cleanup()
+			ginkgo.DeferCleanup(m.cleanup)
 
 			_, claim, pod := m.createPod(pvcReference) // late binding as specified above
 			if pod == nil {
@@ -156,13 +156,12 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 				NewDriverName: "csi-mock-" + f.UniqueName,
 				CanAttach:     &canAttach,
 			}
-			cleanupCSIDriver, err := utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
+			err = utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
 				return utils.PatchCSIDeployment(f, o, item)
 			}, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
 			if err != nil {
 				framework.Failf("fail to deploy CSIDriver object: %v", err)
 			}
-			m.testCleanups = append(m.testCleanups, cleanupCSIDriver)
 
 			ginkgo.By("Wait for the pod in running status")
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)

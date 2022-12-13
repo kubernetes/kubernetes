@@ -87,7 +87,7 @@ var _ = utils.SIGDescribe("CSI Mock workload info", func() {
 					registerDriver: test.deployClusterRegistrar,
 					podInfo:        test.podInfoOnMount})
 
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				withVolume := pvcReference
 				if test.expectEphemeral {

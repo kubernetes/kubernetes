@@ -143,7 +143,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 					registerDriver: true,
 					hooks:          hooks,
 				})
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				_, claim, pod := m.createPod(pvcReference)
 				if pod == nil {
@@ -281,7 +281,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 					registerDriver: true,
 					hooks:          hooks,
 				})
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				_, claim, pod := m.createPod(pvcReference)
 				if pod == nil {

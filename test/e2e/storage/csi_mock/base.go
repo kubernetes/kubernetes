@@ -196,9 +196,7 @@ func (m *mockDriverSetup) init(tp testParameters) {
 	if tp.registerDriver {
 		err = waitForCSIDriver(m.cs, m.config.GetUniqueDriverName())
 		framework.ExpectNoError(err, "Failed to get CSIDriver %v", m.config.GetUniqueDriverName())
-		m.testCleanups = append(m.testCleanups, func() {
-			destroyCSIDriver(m.cs, m.config.GetUniqueDriverName())
-		})
+		ginkgo.DeferCleanup(destroyCSIDriver, m.cs, m.config.GetUniqueDriverName())
 	}
 
 	// Wait for the CSIDriver actually get deployed and CSINode object to be generated.

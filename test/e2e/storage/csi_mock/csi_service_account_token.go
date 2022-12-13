@@ -69,7 +69,7 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 					requiresRepublish: &csiServiceAccountTokenEnabled,
 				})
 
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				_, _, pod := m.createPod(pvcReference)
 				if pod == nil {

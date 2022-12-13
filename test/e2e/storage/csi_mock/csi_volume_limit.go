@@ -44,7 +44,8 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 			// define volume limit to be 2 for this test
 			var err error
 			m.init(testParameters{attachLimit: 2})
-			defer m.cleanup()
+			ginkgo.DeferCleanup(m.cleanup)
+
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
@@ -75,7 +76,8 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 			// define volume limit to be 2 for this test
 			var err error
 			m.init(testParameters{attachLimit: 1})
-			defer m.cleanup()
+			ginkgo.DeferCleanup(m.cleanup)
+
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
@@ -100,7 +102,8 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 			// define volume limit to be 2 for this test
 			var err error
 			m.init(testParameters{attachLimit: 1})
-			defer m.cleanup()
+			ginkgo.DeferCleanup(m.cleanup)
+
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 

@@ -78,7 +78,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				}
 
 				m.init(tp)
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				sc, pvc, pod := m.createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
@@ -172,8 +172,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				}
 
 				m.init(params)
-
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				sc, pvc, pod := m.createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")

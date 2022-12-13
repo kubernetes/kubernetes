@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				}
 				ctx, cancel := context.WithTimeout(ctx, csiPodRunningTimeout)
 				defer cancel()
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
 				ginkgo.By("Creating storage class")
@@ -219,7 +219,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				if !ok {
 					e2eskipper.Skipf("mock driver does not support snapshots -- skipping")
 				}
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				var sc *storagev1.StorageClass
 				if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
@@ -308,7 +308,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				if !ok {
 					e2eskipper.Skipf("mock driver does not support snapshots -- skipping")
 				}
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				metricsGrabber, err := e2emetrics.NewMetricsGrabber(m.config.Framework.ClientSet, nil, f.ClientConfig(), false, false, false, false, false, true)
 				if err != nil {

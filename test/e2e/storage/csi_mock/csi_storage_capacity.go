@@ -127,7 +127,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 				}
 
 				m.init(params)
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				ctx, cancel := context.WithTimeout(ctx, csiPodRunningTimeout)
 				defer cancel()
@@ -331,7 +331,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 					storageCapacity: test.storageCapacity,
 					lateBinding:     true,
 				})
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				// The storage class uses a random name, therefore we have to create it first
 				// before adding CSIStorageCapacity objects for it.
@@ -348,9 +348,7 @@ var _ = utils.SIGDescribe("CSI Mock volume storage capacity", func() {
 					}
 					createdCapacity, err := f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "create CSIStorageCapacity %+v", *capacity)
-					m.testCleanups = append(m.testCleanups, func() {
-						f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
-					})
+					ginkgo.DeferCleanup(framework.IgnoreNotFound(f.ClientSet.StorageV1().CSIStorageCapacities(f.Namespace.Name).Delete), createdCapacity.Name, metav1.DeleteOptions{})
 				}
 
 				// kube-scheduler may need some time before it gets the CSIDriver and CSIStorageCapacity objects.

@@ -101,7 +101,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 					enableSELinuxMount: &t.seLinuxEnabled,
 					hooks:              createSELinuxMountPreHook(&nodeStageMountOpts, &nodePublishMountOpts),
 				})
-				defer m.cleanup()
+				ginkgo.DeferCleanup(m.cleanup)
 
 				accessModes := []v1.PersistentVolumeAccessMode{t.volumeMode}
 				var podSELinuxOpts *v1.SELinuxOptions
