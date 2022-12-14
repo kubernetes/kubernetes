@@ -70,7 +70,6 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -3781,6 +3780,61 @@ var _ = common.SIGDescribe("Services", func() {
 		e2epod.DeletePodOrFail(cs, ns, podname1)
 	})
 
+	// These is [Serial] because it can't run at the same time as the
+	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
+	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints [LinuxOnly] [Serial]", func(ctx context.Context) {
+		serviceName := "sctp-endpoint-test"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		ginkgo.By("getting the state of the sctp module on nodes")
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
+		framework.ExpectNoError(err)
+		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
+
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+		_, err = jig.CreateSCTPServiceWithPort(nil, 5060)
+		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
+		})
+
+		err = e2enetwork.WaitForService(f.ClientSet, ns, serviceName, true, 5*time.Second, e2eservice.TestTimeout)
+		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
+
+		ginkgo.By("validating endpoints do not exist yet")
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
+
+		ginkgo.By("creating a pod for the service")
+		names := map[string]bool{}
+
+		name1 := "pod1"
+
+		createPodOrFail(f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 5060, Protocol: v1.ProtocolSCTP}})
+		names[name1] = true
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			for name := range names {
+				err := cs.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", name, ns)
+			}
+		})
+
+		ginkgo.By("validating endpoints exists")
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{name1: {5060}})
+
+		ginkgo.By("deleting the pod")
+		e2epod.DeletePodOrFail(cs, ns, name1)
+		delete(names, name1)
+		ginkgo.By("validating endpoints do not exist anymore")
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
+
+		ginkgo.By("validating sctp module is still not loaded")
+		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+		if !sctpLoadedAtStart && sctpLoadedAtEnd {
+			framework.Failf("The state of the sctp module has changed due to the test case")
+		}
+	})
 })
 
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
@@ -4310,185 +4364,3 @@ func validatePortsAndProtocols(ep, expectedEndpoints fullPortsByPodUID) error {
 	}
 	return nil
 }
-
-var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
-	f := framework.NewDefaultFramework("sctp")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
-	var cs clientset.Interface
-
-	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
-	})
-
-	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints", func(ctx context.Context) {
-		serviceName := "sctp-endpoint-test"
-		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-
-		ginkgo.By("getting the state of the sctp module on nodes")
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
-		framework.ExpectNoError(err)
-		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
-
-		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
-		_, err = jig.CreateSCTPServiceWithPort(nil, 5060)
-		framework.ExpectNoError(err)
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
-		})
-
-		err = e2enetwork.WaitForService(f.ClientSet, ns, serviceName, true, 5*time.Second, e2eservice.TestTimeout)
-		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
-
-		ginkgo.By("validating endpoints do not exist yet")
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
-
-		ginkgo.By("creating a pod for the service")
-		names := map[string]bool{}
-
-		name1 := "pod1"
-
-		createPodOrFail(f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 5060, Protocol: v1.ProtocolSCTP}})
-		names[name1] = true
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			for name := range names {
-				err := cs.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", name, ns)
-			}
-		})
-
-		ginkgo.By("validating endpoints exists")
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{name1: {5060}})
-
-		ginkgo.By("deleting the pod")
-		e2epod.DeletePodOrFail(cs, ns, name1)
-		delete(names, name1)
-		ginkgo.By("validating endpoints do not exist anymore")
-		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
-
-		ginkgo.By("validating sctp module is still not loaded")
-		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
-		if !sctpLoadedAtStart && sctpLoadedAtEnd {
-			framework.Failf("The state of the sctp module has changed due to the test case")
-		}
-	})
-
-	ginkgo.It("should create a Pod with SCTP HostPort", func(ctx context.Context) {
-		node, err := e2enode.GetRandomReadySchedulableNode(cs)
-		framework.ExpectNoError(err)
-		hostExec := utils.NewHostExec(f)
-		ginkgo.DeferCleanup(hostExec.Cleanup)
-
-		ginkgo.By("getting the state of the sctp module on the selected node")
-		nodes := &v1.NodeList{}
-		nodes.Items = append(nodes.Items, *node)
-		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
-
-		ginkgo.By("creating a pod with hostport on the selected node")
-		podName := "hostport"
-		ports := []v1.ContainerPort{{Protocol: v1.ProtocolSCTP, ContainerPort: 5060, HostPort: 5060}}
-		podSpec := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, ports)
-		nodeSelection := e2epod.NodeSelection{Name: node.Name}
-		e2epod.SetNodeSelection(&podSpec.Spec, nodeSelection)
-
-		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
-		e2epod.NewPodClient(f).CreateSync(podSpec)
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err := cs.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
-		})
-		// wait until host port manager syncs rules
-		cmd := "iptables-save"
-		if framework.TestContext.ClusterIsIPv6() {
-			cmd = "ip6tables-save"
-		}
-		err = wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
-			framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-			result, err := hostExec.IssueCommandWithResult(cmd, node)
-			if err != nil {
-				framework.Logf("Interrogation of iptables rules failed on node %v", node.Name)
-				return false, nil
-			}
-
-			for _, line := range strings.Split(result, "\n") {
-				if strings.Contains(line, "-p sctp") && strings.Contains(line, "--dport 5060") {
-					return true, nil
-				}
-			}
-			framework.Logf("retrying ... not hostport sctp iptables rules found on node %v", node.Name)
-			return false, nil
-		})
-		if err != nil {
-			framework.Failf("iptables rules are not set for a pod with sctp hostport")
-		}
-		ginkgo.By("validating sctp module is still not loaded")
-		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
-		if !sctpLoadedAtStart && sctpLoadedAtEnd {
-			framework.Failf("The state of the sctp module has changed due to the test case")
-		}
-	})
-	ginkgo.It("should create a ClusterIP Service with SCTP ports", func(ctx context.Context) {
-		ginkgo.By("checking that kube-proxy is in iptables mode")
-		if proxyMode, err := proxyMode(f); err != nil {
-			e2eskipper.Skipf("Couldn't detect KubeProxy mode - skip, %v", err)
-		} else if proxyMode != "iptables" {
-			e2eskipper.Skipf("The test doesn't work if kube-proxy is not in iptables mode")
-		}
-
-		serviceName := "sctp-clusterip"
-		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-
-		ginkgo.By("getting the state of the sctp module on nodes")
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
-		framework.ExpectNoError(err)
-		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
-
-		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
-		_, err = jig.CreateSCTPServiceWithPort(func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeClusterIP
-			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolSCTP, Port: 5060}}
-		}, 5060)
-		framework.ExpectNoError(err)
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
-		})
-
-		err = e2enetwork.WaitForService(f.ClientSet, ns, serviceName, true, 5*time.Second, e2eservice.TestTimeout)
-		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
-		hostExec := utils.NewHostExec(f)
-		ginkgo.DeferCleanup(hostExec.Cleanup)
-		node := &nodes.Items[0]
-		cmd := "iptables-save"
-		if framework.TestContext.ClusterIsIPv6() {
-			cmd = "ip6tables-save"
-		}
-		err = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
-			framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-			result, err := hostExec.IssueCommandWithResult(cmd, node)
-			if err != nil {
-				framework.Logf("Interrogation of iptables rules failed on node %v", node.Name)
-				return false, nil
-			}
-
-			for _, line := range strings.Split(result, "\n") {
-				if strings.Contains(line, "-A KUBE-SERVICES") && strings.Contains(line, "-p sctp") {
-					return true, nil
-				}
-			}
-			framework.Logf("retrying ... no iptables rules found for service with sctp ports on node %v", node.Name)
-			return false, nil
-		})
-		if err != nil {
-			framework.Failf("iptables rules are not set for a clusterip service with sctp ports")
-		}
-		ginkgo.By("validating sctp module is still not loaded")
-		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
-		if !sctpLoadedAtStart && sctpLoadedAtEnd {
-			framework.Failf("The state of the sctp module has changed due to the test case")
-		}
-	})
-})

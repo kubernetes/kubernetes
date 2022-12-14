@@ -131,14 +131,12 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
+		ginkgo.It("should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			checkPodToPodConnectivity(config, "sctp", e2enetwork.EndpointSCTPPort)
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
+		ginkgo.It("should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity]", func(ctx context.Context) {
 			ginkgo.Skip("Skipping SCTP node to pod test until DialFromNode supports SCTP #96482")
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			for _, endpointPod := range config.EndpointPods {

@@ -29,10 +29,12 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -174,8 +176,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
+		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromTestContainer("sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -217,8 +218,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
+		ginkgo.It("should function for node-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
 			ginkgo.Skip("Skipping SCTP node to service test until DialFromNode supports SCTP #96482")
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, e2enetwork.ClusterSCTPPort))
@@ -262,8 +262,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
+		ginkgo.It("should function for endpoint-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromEndpointContainer("sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -631,5 +630,38 @@ var _ = common.SIGDescribe("Networking", func() {
 			e2essh.LogResult(result)
 		}
 		framework.ExpectNoError(err, "kubelet did not recreate its iptables rules")
+	})
+
+	// This is [Serial] because it can't run at the same time as the
+	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
+	ginkgo.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly] [Serial]", func(ctx context.Context) {
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		hostExec := utils.NewHostExec(f)
+		ginkgo.DeferCleanup(hostExec.Cleanup)
+
+		ginkgo.By("getting the state of the sctp module on the selected node")
+		nodes := &v1.NodeList{}
+		nodes.Items = append(nodes.Items, *node)
+		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
+
+		ginkgo.By("creating a pod with hostport on the selected node")
+		podName := "hostport"
+		ports := []v1.ContainerPort{{Protocol: v1.ProtocolSCTP, ContainerPort: 5060, HostPort: 5060}}
+		podSpec := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, ports)
+		nodeSelection := e2epod.NodeSelection{Name: node.Name}
+		e2epod.SetNodeSelection(&podSpec.Spec, nodeSelection)
+
+		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
+		e2epod.NewPodClient(f).CreateSync(podSpec)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
+		})
+		ginkgo.By("validating sctp module is still not loaded")
+		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+		if !sctpLoadedAtStart && sctpLoadedAtEnd {
+			framework.Failf("The state of the sctp module has changed due to the test case")
+		}
 	})
 })

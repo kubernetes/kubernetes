@@ -2117,7 +2117,7 @@ func TestClusterIPReject(t *testing.T) {
 	})
 }
 
-func TestClusterIPEndpointsJump(t *testing.T) {
+func TestClusterIPEndpointsMore(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	svcIP := "172.30.0.41"
@@ -2125,7 +2125,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
-		Protocol:       v1.ProtocolTCP,
+		Protocol:       v1.ProtocolSCTP,
 	}
 
 	makeServiceMap(fp,
@@ -2134,13 +2134,13 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
 				Port:     int32(svcPort),
-				Protocol: v1.ProtocolTCP,
+				Protocol: v1.ProtocolSCTP,
 			}}
 		}),
 	)
 
 	epIP := "10.180.0.1"
-	tcpProtocol := v1.ProtocolTCP
+	sctpProtocol := v1.ProtocolSCTP
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
@@ -2150,7 +2150,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     pointer.String(svcPortName.Port),
 				Port:     pointer.Int32(int32(svcPort)),
-				Protocol: &tcpProtocol,
+				Protocol: &sctpProtocol,
 			}}
 		}),
 	)
@@ -2173,18 +2173,18 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
-		:KUBE-SEP-SXIVWICOYRO3J4NJ - [0:0]
-		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
-		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+		:KUBE-SEP-RFW33Y6OHVBQ4W3M - [0:0]
+		:KUBE-SVC-GFCIFIA5VTFSTMSM - [0:0]
+		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m sctp -p sctp -d 172.30.0.41 --dport 80 -j KUBE-SVC-GFCIFIA5VTFSTMSM
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-SXIVWICOYRO3J4NJ
+		-A KUBE-SEP-RFW33Y6OHVBQ4W3M -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ
+		-A KUBE-SEP-RFW33Y6OHVBQ4W3M -m comment --comment ns1/svc1:p80 -m sctp -p sctp -j DNAT --to-destination 10.180.0.1:80
+		-A KUBE-SVC-GFCIFIA5VTFSTMSM -m comment --comment "ns1/svc1:p80 cluster IP" -m sctp -p sctp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+		-A KUBE-SVC-GFCIFIA5VTFSTMSM -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-RFW33Y6OHVBQ4W3M
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
