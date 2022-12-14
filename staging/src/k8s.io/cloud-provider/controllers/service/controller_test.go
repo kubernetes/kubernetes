@@ -47,7 +47,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/cloud-provider/api"
-	queuetesting "k8s.io/cloud-provider/controllers/service/testing"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -2285,7 +2284,7 @@ func TestServiceQueueDelay(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			controller, cloud, client := newController()
-			queue := &queuetesting.SpyWorkQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-service-queue-delay")}
+			queue := &spyWorkQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-service-queue-delay")}
 			controller.serviceQueue = queue
 			cloud.Err = tc.lbCloudErr
 
@@ -2323,7 +2322,7 @@ func TestServiceQueueDelay(t *testing.T) {
 			}
 
 			if tc.wantRetryDelay > 0 {
-				items := queue.GetItems()
+				items := queue.getItems()
 				if len(items) != 1 {
 					t.Fatalf("got %d item(s), want 1", len(items))
 				}
@@ -2395,4 +2394,34 @@ func (l *fakeServiceLister) Get(name string) (*v1.Service, error) {
 // This is fakeServiceLister itself.
 func (l *fakeServiceLister) Services(_ string) corelisters.ServiceNamespaceLister {
 	return l
+}
+
+// spyWorkQueue implements a work queue and adds the ability to inspect processed
+// items for testing purposes.
+type spyWorkQueue struct {
+	workqueue.RateLimitingInterface
+	items []spyQueueItem
+}
+
+// spyQueueItem represents an item that was being processed.
+type spyQueueItem struct {
+	Key interface{}
+	// Delay represents the delayed duration if and only if AddAfter was invoked.
+	Delay time.Duration
+}
+
+// AddAfter is like workqueue.RateLimitingInterface.AddAfter but records the
+// added key and delay internally.
+func (f *spyWorkQueue) AddAfter(key interface{}, delay time.Duration) {
+	f.items = append(f.items, spyQueueItem{
+		Key:   key,
+		Delay: delay,
+	})
+
+	f.RateLimitingInterface.AddAfter(key, delay)
+}
+
+// getItems returns all items that were recorded.
+func (f *spyWorkQueue) getItems() []spyQueueItem {
+	return f.items
 }
