@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"mime"
 	"reflect"
 	"strings"
@@ -115,7 +116,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 		return e
 	}
 	f.AddSerializationChains(testEncoderChain, nil, example.Resource("test"))
-	f.SetEtcdLocation(example.Resource("*"), []string{"/server2"})
+	f.SetEtcdLocation(testContext(t), example.Resource("*"), []string{"/server2"})
 	f.SetEtcdPrefix(example.Resource("test"), "/prefix_for_test")
 
 	config, err := f.NewConfig(example.Resource("test"))
@@ -160,7 +161,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			},
 		}
 		storageFactory := NewDefaultStorageFactory(defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
-		storageFactory.SetEtcdLocation(test.resource, test.servers)
+		storageFactory.SetEtcdLocation(testContext(t), test.resource, test.servers)
 
 		var err error
 		config, err := storageFactory.NewConfig(test.resource)
@@ -184,4 +185,10 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 		}
 
 	}
+}
+
+func testContext(t *testing.T) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	return ctx
 }
