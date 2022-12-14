@@ -110,7 +110,7 @@ func (es *e2eServices) stop(t *testing.T) {
 // startEtcd starts the embedded etcd instance or returns an error.
 func (es *e2eServices) startEtcd(t *testing.T) error {
 	klog.Info("Starting etcd")
-	server, etcdStorage := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	server, etcdStorage := etcd3testing.NewUnsecuredEtcd3TestClientServerWithoutComplete(t)
 	es.etcdServer = server
 	es.etcdStorage = etcdStorage
 	return nil
