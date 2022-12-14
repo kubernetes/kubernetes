@@ -192,7 +192,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	compactorsMu.Lock()
 	defer compactorsMu.Unlock()
 
-	key := fmt.Sprintf("%v", c) // gives: {[server1 server2] keyFile certFile caFile}
+	key := fmt.Sprintf("%v", c) // gives: {[server1 server2] keyFile certFile caFile}  // TODO does this make sense?
 	if compactor, foundBefore := compactors[key]; !foundBefore || compactor.interval > interval {
 		compactorClient, err := newETCD3Client(c)
 		if err != nil {
