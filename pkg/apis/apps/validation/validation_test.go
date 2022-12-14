@@ -2223,6 +2223,30 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				},
 			},
 		},
+		"read-write volume": {
+			old: apps.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: apps.DaemonSetUpdateStrategy{
+						Type: apps.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: apps.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 2,
+					Template:           readWriteVolumePodTemplate.Template,
+					UpdateStrategy: apps.DaemonSetUpdateStrategy{
+						Type: apps.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+		},
 	}
 	for testName, successCase := range successCases {
 		// ResourceVersion is required for updates.
@@ -2308,31 +2332,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
 					TemplateGeneration: 2,
 					Template:           invalidPodTemplate.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			expectedErrNum: 1,
-		},
-		"invalid read-write volume": {
-			old: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			update: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 2,
-					Template:           readWriteVolumePodTemplate.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},

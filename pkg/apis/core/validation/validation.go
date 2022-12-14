@@ -5155,9 +5155,6 @@ func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap ma
 			}
 		}
 		allErrs = append(allErrs, ValidatePodTemplateSpec(template, fldPath, opts)...)
-		if replicas > 1 {
-			allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(template.Spec.Volumes, fldPath.Child("spec", "volumes"))...)
-		}
 		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 		if template.Spec.RestartPolicy != core.RestartPolicyAlways {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "restartPolicy"), template.Spec.RestartPolicy, []string{string(core.RestartPolicyAlways)}))

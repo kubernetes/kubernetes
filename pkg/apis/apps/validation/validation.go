@@ -365,8 +365,6 @@ func ValidateDaemonSetSpec(spec *apps.DaemonSetSpec, fldPath *field.Path, opts a
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
-	// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
-	allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(spec.Template.Spec.Volumes, fldPath.Child("template", "spec", "volumes"))...)
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
@@ -750,9 +748,6 @@ func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selecto
 			}
 		}
 		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath, opts)...)
-		if replicas > 1 {
-			allErrs = append(allErrs, apivalidation.ValidateReadOnlyPersistentDisks(template.Spec.Volumes, fldPath.Child("spec", "volumes"))...)
-		}
 		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 		if template.Spec.RestartPolicy != api.RestartPolicyAlways {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "restartPolicy"), template.Spec.RestartPolicy, []string{string(api.RestartPolicyAlways)}))
