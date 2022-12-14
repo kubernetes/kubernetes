@@ -466,7 +466,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		sameSizeClaim := l.testCase.Claim.DeepCopy()
 		sameSizeClaim.Name = "claim2"
 
-		for _, claim := range []*v1.PersistentVolumeClaim{biggerClaim, sameSizeClaim} {
+		for _, claim := range []*v1.PersistentVolumeClaim{sameSizeClaim, biggerClaim} {
 			ginkgo.By(fmt.Sprintf("creating claim=%+v", claim))
 			claim, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
@@ -479,9 +479,10 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 				}
 			}()
 
-			ginkgo.By("checking the claim")
+			ginkgo.By(fmt.Sprintf( "checking the claim %+v", claim))
 			pv, err := getBoundPV(ctx, l.testCase.Client, claim)
 			framework.ExpectNoError(err)
+
 
 			pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
 			gomega.Expect(pvCapacity.Value()).To(gomega.BeNumerically("=", originalSize.Value()), "pvCapacity of pv for claim %s (%d) is not equal to original pvc size", claim.Name, pvCapacity, originalSize)
