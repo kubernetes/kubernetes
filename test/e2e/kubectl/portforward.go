@@ -398,7 +398,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 			return fmt.Errorf("received the wrong port: %d", p)
 		}
 		return nil
-	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
+	}, time.Minute, 10*time.Second).Should(gomega.Succeed())
 
 	gomega.Eventually(func() error {
 		channel, msg, err := wsRead(ws)
@@ -412,7 +412,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 			return fmt.Errorf("received the wrong port: %d", p)
 		}
 		return nil
-	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
+	}, time.Minute, 10*time.Second).Should(gomega.Succeed())
 
 	ginkgo.By("Sending the expected data to the local port")
 	err = wsWrite(ws, 0, []byte("def"))
@@ -436,7 +436,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 			return fmt.Errorf("expected %q from server, got %q", expectedData, buf.Bytes())
 		}
 		return nil
-	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
+	}, time.Minute, 10*time.Second).Should(gomega.Succeed())
 
 	ginkgo.By("Verifying logs")
 	gomega.Eventually(func() (string, error) {

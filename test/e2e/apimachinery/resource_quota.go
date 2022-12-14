@@ -162,7 +162,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
 		// Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
-		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		err := wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
 			secrets, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			if len(secrets.Items) == found {
@@ -174,6 +174,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			found = len(secrets.Items)
 			return false, nil
 		})
+		framework.ExpectNoError(err)
 		defaultSecrets := fmt.Sprintf("%d", found)
 		hardSecrets := fmt.Sprintf("%d", found+1)
 
@@ -327,7 +328,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
 		// Wait up to 15s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
-		wait.Poll(1*time.Second, time.Minute, func() (bool, error) {
+		err := wait.Poll(1*time.Second, time.Minute, func() (bool, error) {
 			configmaps, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			if len(configmaps.Items) == found {
@@ -339,6 +340,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			found = len(configmaps.Items)
 			return false, nil
 		})
+		framework.ExpectNoError(err)
 		defaultConfigMaps := fmt.Sprintf("%d", found)
 		hardConfigMaps := fmt.Sprintf("%d", found+1)
 
