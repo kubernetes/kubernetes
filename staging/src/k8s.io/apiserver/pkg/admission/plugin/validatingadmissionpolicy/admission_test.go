@@ -278,10 +278,12 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 	controller = handler.evaluator.(*celAdmissionController)
 	controller.validatorCompiler = compiler
 
+	wg := sync.WaitGroup{}
+
 	t.Cleanup(func() {
 		testContextCancel()
 		// wait for informer factory to shutdown
-		fakeInformerFactory.Shutdown()
+		wg.Wait()
 	})
 
 	if !shouldStartInformers {
@@ -289,7 +291,11 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 	}
 
 	// Make sure to start the fake informers
-	fakeInformerFactory.Start(testContext.Done())
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		fakeInformerFactory.Run(testContext.Done())
+	}()
 
 	// Wait for admission controller to begin its object watches
 	// This is because there is a very rare (0.05% on my machine) race doing the

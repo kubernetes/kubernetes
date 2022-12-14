@@ -232,10 +232,14 @@ func TestSyncHandler(t *testing.T) {
 			}
 
 			// Ensure informers are up-to-date.
-			go informerFactory.Start(ctx.Done())
+			factoryDone := make(chan struct{})
+			go func() {
+				defer close(factoryDone)
+				informerFactory.Run(ctx.Done())
+			}()
 			stopInformers := func() {
 				cancel()
-				informerFactory.Shutdown()
+				<-factoryDone
 			}
 			defer stopInformers()
 			informerFactory.WaitForCacheSync(ctx.Done())

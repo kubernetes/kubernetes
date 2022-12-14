@@ -706,12 +706,16 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha1.ResourceCl
 		require.NoError(t, err, "create pod scheduling")
 	}
 
-	informerFactory.Start(tc.ctx.Done())
+	factoryDone := make(chan struct{})
+	go func() {
+		defer close(factoryDone)
+		informerFactory.Run(tc.ctx.Done())
+	}()
 	t.Cleanup(func() {
 		// Need to cancel before waiting for the shutdown.
 		cancel()
 		// Now we can wait for all goroutines to stop.
-		informerFactory.Shutdown()
+		<-factoryDone
 	})
 
 	informerFactory.WaitForCacheSync(tc.ctx.Done())
