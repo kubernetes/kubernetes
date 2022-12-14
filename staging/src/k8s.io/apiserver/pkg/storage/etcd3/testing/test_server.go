@@ -35,26 +35,19 @@ func (e *EtcdTestServer) Terminate(t *testing.T) {
 	// no-op, server termination moved to test cleanup
 }
 
-// NewUnsecuredEtcd3TestClientServer creates a new client and server for testing
+// NewUnsecuredEtcd3TestClientServer creates a new client and server for testing.
+// This function should be used in tests that do not run most of the API server etcd config code.
 func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
-	server := &EtcdTestServer{}
-	server.V3Client = testserver.RunEtcd(t, nil)
-	config := &storagebackend.Config{
-		Type:   "etcd3",
-		Prefix: PathPrefix(),
-		Transport: storagebackend.TransportConfig{
-			ServerList: server.V3Client.Endpoints(),
-		},
-		Paging: true,
-	}
-	if err := config.Transport.Complete(testContext(t)); err != nil {
-		t.Fatal(err)
-	}
-	return server, config
+	return newUnsecuredEtcd3TestClientServer(t, true)
 }
 
-// NewUnsecuredEtcd3TestClientServerWithoutComplete creates a new client and server for testing
+// NewUnsecuredEtcd3TestClientServerWithoutComplete creates a new client and server for testing.
+// This function should be used in tests that run most of the API server etcd config code which handles completion.
 func NewUnsecuredEtcd3TestClientServerWithoutComplete(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
+	return newUnsecuredEtcd3TestClientServer(t, false)
+}
+
+func newUnsecuredEtcd3TestClientServer(t *testing.T, complete bool) (*EtcdTestServer, *storagebackend.Config) {
 	server := &EtcdTestServer{}
 	server.V3Client = testserver.RunEtcd(t, nil)
 	config := &storagebackend.Config{
@@ -64,6 +57,11 @@ func NewUnsecuredEtcd3TestClientServerWithoutComplete(t *testing.T) (*EtcdTestSe
 			ServerList: server.V3Client.Endpoints(),
 		},
 		Paging: true,
+	}
+	if complete {
+		if err := config.Transport.Complete(testContext(t)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return server, config
 }
