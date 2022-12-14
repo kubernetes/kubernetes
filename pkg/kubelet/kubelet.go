@@ -1458,7 +1458,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
-		klog.ErrorS(err, "Kubelet failed to get node info")
+		klog.ErrorS(err, "kubelet failed to get node info")
 		os.Exit(1)
 	}
 	// containerManager must start after cAdvisor because it needs filesystem capacity information
@@ -2218,7 +2218,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
-			klog.ErrorS(nil, "Kubelet does not support snapshot update")
+			klog.ErrorS(nil, "kubelet does not support snapshot update")
 		default:
 			klog.ErrorS(nil, "Invalid operation type received", "operation", u.Op)
 		}

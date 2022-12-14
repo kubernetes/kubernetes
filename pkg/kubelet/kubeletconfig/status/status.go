@@ -153,7 +153,7 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 	var err error
 	defer func() {
 		if err != nil {
-			klog.ErrorS(err, "Kubelet config controller")
+			klog.ErrorS(err, "kubelet config controller")
 			s.sync()
 		}
 	}()
@@ -180,6 +180,6 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 
 	// patch the node with the new status
 	if _, _, err := nodeutil.PatchNodeStatus(client.CoreV1(), types.NodeName(nodeName), oldNode, newNode); err != nil {
-		klog.ErrorS(err, "Kubelet config controller failed to patch node status")
+		klog.ErrorS(err, "kubelet config controller failed to patch node status")
 	}
 }

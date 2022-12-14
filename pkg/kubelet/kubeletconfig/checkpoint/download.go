@@ -182,7 +182,7 @@ func (r *remoteConfigMap) Download(client clientset.Interface, store cache.Store
 		cm, err = getConfigMapFromStore(store, r.source.ConfigMap.Namespace, r.source.ConfigMap.Name)
 		if err != nil {
 			// just log the error, we'll attempt a direct download instead
-			klog.ErrorS(err, "Kubelet config controller failed to check in-memory store for remoteConfigMap", "apiPath", r.APIPath())
+			klog.ErrorS(err, "kubelet config controller failed to check in-memory store for remoteConfigMap", "apiPath", r.APIPath())
 		} else if cm != nil {
 			klog.InfoS("Kubelet config controller found remoteConfigMap in in-memory store", "apiPath", r.APIPath(), "configMapUID", cm.UID, "resourceVersion", cm.ResourceVersion)
 		} else {
@@ -255,7 +255,7 @@ func getConfigMapFromStore(store cache.Store, namespace, name string) (*apiv1.Co
 	cm, ok := obj.(*apiv1.ConfigMap)
 	if !ok {
 		err := fmt.Errorf("failed to cast object %s from informer's store to ConfigMap", key)
-		klog.ErrorS(err, "Kubelet config controller")
+		klog.ErrorS(err, "kubelet config controller")
 		return nil, err
 	}
 	return cm, nil
