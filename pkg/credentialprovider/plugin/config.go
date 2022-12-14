@@ -18,7 +18,7 @@ package plugin
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -33,7 +33,7 @@ func readCredentialProviderConfigFile(configPath string) (*kubeletconfig.Credent
 		return nil, fmt.Errorf("credential provider config path is empty")
 	}
 
-	data, err := ioutil.ReadFile(configPath)
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read external registry credential provider configuration from %q: %w", configPath, err)
 	}

@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -1684,7 +1683,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			// Make JSON for this object
 			if tc.jsonFile != "" {
 				dataPath := filepath.Join(dir, volDataFileName)
-				if err := ioutil.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
+				if err := os.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
 					t.Fatalf("error creating %s: %s", dataPath, err)
 				}
 			}

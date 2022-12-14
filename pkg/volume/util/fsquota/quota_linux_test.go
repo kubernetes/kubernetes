@@ -21,7 +21,6 @@ package fsquota
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -97,7 +96,7 @@ type mountpointTest struct {
 }
 
 func testBackingDev1(testcase backingDevTest) error {
-	tmpfile, err := ioutil.TempFile("", "backingdev")
+	tmpfile, err := os.CreateTemp("", "backingdev")
 	if err != nil {
 		return err
 	}
@@ -486,7 +485,7 @@ var quotaTestCases = []quotaTestCase{
 }
 
 func compareProjectsFiles(t *testing.T, testcase quotaTestCase, projectsFile string, projidFile string, enabled bool) {
-	bytes, err := ioutil.ReadFile(projectsFile)
+	bytes, err := os.ReadFile(projectsFile)
 	if err != nil {
 		t.Error(err.Error())
 	} else {
@@ -499,7 +498,7 @@ func compareProjectsFiles(t *testing.T, testcase quotaTestCase, projectsFile str
 			t.Errorf("Case %v /etc/projects miscompare: expected\n`%s`\ngot\n`%s`\n", testcase.path, p, s)
 		}
 	}
-	bytes, err = ioutil.ReadFile(projidFile)
+	bytes, err = os.ReadFile(projidFile)
 	if err != nil {
 		t.Error(err.Error())
 	} else {
@@ -582,7 +581,7 @@ func runCaseDisabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 
 func testAddRemoveQuotas(t *testing.T, enabled bool) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolationFSQuotaMonitoring, enabled)()
-	tmpProjectsFile, err := ioutil.TempFile("", "projects")
+	tmpProjectsFile, err := os.CreateTemp("", "projects")
 	if err == nil {
 		_, err = tmpProjectsFile.WriteString(projectsHeader)
 	}
@@ -591,7 +590,7 @@ func testAddRemoveQuotas(t *testing.T, enabled bool) {
 	}
 	projectsFile = tmpProjectsFile.Name()
 	tmpProjectsFile.Close()
-	tmpProjidFile, err := ioutil.TempFile("", "projid")
+	tmpProjidFile, err := os.CreateTemp("", "projid")
 	if err == nil {
 		_, err = tmpProjidFile.WriteString(projidHeader)
 	}

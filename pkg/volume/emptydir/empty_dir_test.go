@@ -21,7 +21,6 @@ package emptydir
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -634,7 +633,7 @@ func (md *testMountDetector) GetMountMedium(path string, requestedMedium v1.Stor
 }
 
 func TestSetupHugepages(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "TestSetupHugepages")
+	tmpdir, err := os.MkdirTemp("", "TestSetupHugepages")
 	if err != nil {
 		t.Fatal(err)
 	}
