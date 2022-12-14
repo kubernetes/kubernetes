@@ -104,9 +104,9 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	f := framework.NewFrameworkWithCustomTimeouts("topology", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	init := func() topologyTest {
+	init := func() *topologyTest {
 		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
-		l := topologyTest{}
+		l := &topologyTest{}
 
 		// Now do the more expensive test initialization.
 		l.config = driver.PrepareTest(f)
@@ -123,7 +123,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 			e2eskipper.Skipf("Driver didn't provide topology keys -- skipping")
 		}
 
-		ginkgo.DeferCleanup(t.CleanupResources, cs, &l)
+		ginkgo.DeferCleanup(t.CleanupResources, cs, l)
 
 		if dInfo.NumAllowedTopologies == 0 {
 			// Any plugin that supports topology defaults to 1 topology
@@ -166,7 +166,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		}
 		allowedTopologies := t.setAllowedTopologies(l.resource.Sc, l.allTopologies, excludedIndex)
 
-		t.createResources(cs, &l, nil)
+		t.createResources(cs, l, nil)
 
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
@@ -213,7 +213,7 @@ func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, patt
 				},
 			},
 		}
-		t.createResources(cs, &l, affinity)
+		t.createResources(cs, l, affinity)
 
 		// Wait for pod to fail scheduling
 		// With delayed binding, the scheduler errors before provisioning
