@@ -50,7 +50,8 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 			initialConfig.ContainerLogMaxSize = testContainerLogMaxSize
 		})
 
-		ginkgo.It("should be rotated and limited to a fixed amount of files", func(ctx context.Context) {
+		var logRotationPod *v1.Pod
+		ginkgo.BeforeEach(func() {
 			ginkgo.By("create log container")
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -72,12 +73,17 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 					},
 				},
 			}
-			pod = e2epod.NewPodClient(f).CreateSync(pod)
+			logRotationPod = e2epod.NewPodClient(f).CreateSync(pod)
+			ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, logRotationPod.Name, metav1.DeleteOptions{}, time.Minute)
+		})
+
+		ginkgo.It("should be rotated and limited to a fixed amount of files", func(ctx context.Context) {
+
 			ginkgo.By("get container log path")
-			framework.ExpectEqual(len(pod.Status.ContainerStatuses), 1)
-			id := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID).ID
+			framework.ExpectEqual(len(logRotationPod.Status.ContainerStatuses), 1, "log rotation pod should have one container")
+			id := kubecontainer.ParseContainerID(logRotationPod.Status.ContainerStatuses[0].ContainerID).ID
 			r, _, err := getCRIClient()
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "should connect to CRI and obtain runtime service clients and image service client")
 			resp, err := r.ContainerStatus(context.Background(), id, false)
 			framework.ExpectNoError(err)
 			logPath := resp.GetStatus().GetLogPath()
