@@ -199,6 +199,7 @@ func NewKubeGenericRuntimeManager(
 	memoryThrottlingFactor float64,
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 ) (KubeGenericRuntime, error) {
+	klog.InfoS("TEST-TEST: DO-NOT-MERGE. This PR is for verifying test-infra PR 28229")
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
 	imageService = newInstrumentedImageManagerService(imageService)
