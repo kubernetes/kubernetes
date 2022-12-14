@@ -109,17 +109,35 @@ func NewSharedInformerFactoryWithOptions(client versioned.Interface, defaultResy
 	return factory
 }
 
-// Start initializes all requested informers.
-func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
+func (f *sharedInformerFactory) start(stopCh <-chan struct{}) *sync.WaitGroup {
+	wg := &sync.WaitGroup{}
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			go informer.Run(stopCh)
+			wg.Add(1)
+			informerCopy := informer
+			go func() {
+				defer wg.Done()
+				informerCopy.Run(stopCh)
+			}()
 			f.startedInformers[informerType] = true
 		}
 	}
+
+	return wg
+}
+
+// Start initializes all requested informers.
+func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
+	f.start(stopCh)
+}
+
+// Run initializes all requested informers and blocks until they
+// all complete
+func (f *sharedInformerFactory) Run(stopCh <-chan struct{}) {
+	f.start(stopCh).Wait()
 }
 
 // WaitForCacheSync waits for all started informers' cache were synced.
