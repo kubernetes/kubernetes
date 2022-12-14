@@ -127,16 +127,16 @@ func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 }
 
 func TestGetCpuWeight(t *testing.T) {
-	assert.Equal(t, uint64(0), getCpuWeight(nil))
+	assert.Equal(t, uint64(0), getCPUWeight(nil))
 
 	v := uint64(2)
-	assert.Equal(t, uint64(1), getCpuWeight(&v))
+	assert.Equal(t, uint64(1), getCPUWeight(&v))
 
 	v = uint64(262144)
-	assert.Equal(t, uint64(10000), getCpuWeight(&v))
+	assert.Equal(t, uint64(10000), getCPUWeight(&v))
 
 	v = uint64(1000000000)
-	assert.Equal(t, uint64(10000), getCpuWeight(&v))
+	assert.Equal(t, uint64(10000), getCPUWeight(&v))
 }
 
 func TestSoftRequirementsValidationSuccess(t *testing.T) {
