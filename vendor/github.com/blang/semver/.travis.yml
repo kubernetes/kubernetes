@@ -1,0 +1,21 @@
+language: go
+matrix:
+  include:
+  - go: 1.4.3
+  - go: 1.5.4
+  - go: 1.6.3
+  - go: 1.7
+  - go: tip
+  allow_failures:
+  - go: tip
+install:
+- go get golang.org/x/tools/cmd/cover
+- go get github.com/mattn/goveralls
+script:
+- echo "Test and track coverage" ; $HOME/gopath/bin/goveralls -package "." -service=travis-ci
+  -repotoken $COVERALLS_TOKEN
+- echo "Build examples" ; cd examples && go build
+- echo "Check if gofmt'd" ; diff -u <(echo -n) <(gofmt -d -s .)
+env:
+  global:
+    secure: HroGEAUQpVq9zX1b1VIkraLiywhGbzvNnTZq2TMxgK7JHP8xqNplAeF1izrR2i4QLL9nsY+9WtYss4QuPvEtZcVHUobw6XnL6radF7jS1LgfYZ9Y7oF+zogZ2I5QUMRLGA7rcxQ05s7mKq3XZQfeqaNts4bms/eZRefWuaFZbkw=

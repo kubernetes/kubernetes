@@ -15,10 +15,11 @@ require (
 	github.com/google/cel-go v0.12.5
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.9
-	github.com/google/gofuzz v1.1.0
+	github.com/google/gofuzz v1.2.0
 	github.com/google/uuid v1.1.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
+	github.com/openshift/library-go v0.0.0-20221213175740-eaa3941d403b
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
 	go.etcd.io/etcd/api/v3 v3.5.5
@@ -31,6 +32,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.10.0
 	go.opentelemetry.io/otel/sdk v1.10.0
 	go.opentelemetry.io/otel/trace v1.10.0
+	go.uber.org/atomic v1.7.0
 	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.1.0
 	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10
@@ -42,12 +44,12 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/client-go v0.0.0
-	k8s.io/component-base v0.0.0
+	k8s.io/api v0.26.0
+	k8s.io/apimachinery v0.26.0
+	k8s.io/client-go v0.26.0
+	k8s.io/component-base v0.26.0
 	k8s.io/klog/v2 v2.80.1
-	k8s.io/kms v0.0.0
+	k8s.io/kms v0.26.0
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33
@@ -57,7 +59,6 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.97.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -80,7 +81,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
-	github.com/imdario/mergo v0.3.6 // indirect
+	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -110,9 +111,8 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.10.0 // indirect
 	go.opentelemetry.io/otel/metric v0.31.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
+	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/term v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
@@ -122,10 +122,19 @@ require (
 )
 
 replace (
+	github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.4.1-0.20221214150008-e73634cb3870
+	github.com/openshift/api => github.com/sanchezl/api v0.0.0-20221212212126-51bab418a0a6
+	github.com/openshift/apiserver-library-go => github.com/sanchezl/apiserver-library-go v0.0.0-20221213204702-3d7b8923e8be
+	github.com/openshift/client-go => github.com/sanchezl/client-go v0.0.0-20221213024106-45c6078f5efe
+	github.com/openshift/library-go => github.com/sanchezl/library-go v0.0.0-20221213154741-26ea0c85fa9d
 	k8s.io/api => ../api
+	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
+	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
+	k8s.io/component-helpers => ../component-helpers
 	k8s.io/kms => ../kms
+	k8s.io/kube-aggregator => ../kube-aggregator
 )

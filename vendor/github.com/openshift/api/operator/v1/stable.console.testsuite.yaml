@@ -1,0 +1,16 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] Console"
+crd: 0000_70_console-operator.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal Console
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec: {} # No spec is required for a Console
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      spec:
+        logLevel: Normal
+        operatorLogLevel: Normal

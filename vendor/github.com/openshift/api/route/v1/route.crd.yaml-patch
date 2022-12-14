@@ -1,0 +1,86 @@
+- op: add
+  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/spec/allOf
+  value:
+  # spec.path must be empty when using passthrough TLS.
+  - anyOf:
+    - properties:
+        path:
+          maxLength: 0
+    - properties:
+        tls:
+          enum: [null]
+    - not:
+        properties:
+          tls:
+            properties:
+              termination:
+                enum: ["passthrough"]
+  # spec.host must be nonempty for a wildcard route.
+  - anyOf:
+    - not:
+        properties:
+          host:
+            maxLength: 0
+    - not:
+        properties:
+          wildcardPolicy:
+            enum: ["Subdomain"]
+- op: add
+  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/spec/properties/port/properties/targetPort
+  value:
+    # spec.port.targetPort cannot be the integer 0 or the empty string.  (Note
+    # that negative integer values are allowed, as is the string "0".)
+    allOf:
+    - not:
+        enum: [0]
+    - not:
+        enum: [""]
+    x-kubernetes-int-or-string: true
+- op: add
+  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/spec/properties/tls/allOf
+  value:
+  # spec.tls.certificate, spec.tls.key, spec.tls.caCertificate, and
+  # spec.tls.destinationCACertificate must omitted when using passthrough TLS.
+  - anyOf:
+    - properties:
+        certificate:
+          maxLength: 0
+        key:
+          maxLength: 0
+        caCertificate:
+          maxLength: 0
+        destinationCACertificate:
+          maxLength: 0
+    - not:
+        properties:
+          termination:
+            enum: ["passthrough"]
+  # spec.tls.destinationCACertificate must be omitted when using edge-terminated
+  # TLS.
+  - anyOf:
+    - properties:
+        destinationCACertificate:
+          maxLength: 0
+    - not:
+        properties:
+          termination:
+            enum: ["edge"]
+  # Any insecure edge-termination policy may be used if we terminate TLS.
+  - anyOf:
+    - properties:
+        insecureEdgeTerminationPolicy:
+          enum: ["", "None", "Allow", "Redirect"]
+    - not:
+        properties:
+          termination:
+            enum: ["edge","reencrypt"]
+  # Any insecure edge-termination policy *except* for "Allow" maybe used when
+  # using passthrough TLS.
+  - anyOf:
+    - properties:
+        insecureEdgeTerminationPolicy:
+          enum: ["", "None", "Redirect"]
+    - not:
+        properties:
+          termination:
+            enum: ["passthrough"]

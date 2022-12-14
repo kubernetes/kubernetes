@@ -12,20 +12,20 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.9
-	github.com/google/gofuzz v1.1.0
+	github.com/google/gofuzz v1.2.0
 	github.com/google/uuid v1.1.2
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
-	github.com/imdario/mergo v0.3.6
+	github.com/imdario/mergo v0.3.7
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
 	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10
-	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
+	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5
 	golang.org/x/term v0.3.0
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	google.golang.org/protobuf v1.28.1
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
+	k8s.io/api v0.26.0
+	k8s.io/apimachinery v0.26.0
 	k8s.io/klog/v2 v2.80.1
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
@@ -59,6 +59,7 @@ require (
 )
 
 replace (
+	github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.4.1-0.20221214150008-e73634cb3870
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go

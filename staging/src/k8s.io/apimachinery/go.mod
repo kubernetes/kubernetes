@@ -13,7 +13,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.9
-	github.com/google/gofuzz v1.1.0
+	github.com/google/gofuzz v1.2.0
 	github.com/google/uuid v1.1.2
 	github.com/moby/spdystream v0.2.0
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
@@ -47,4 +47,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.4.1-0.20221214150008-e73634cb3870
+	k8s.io/apimachinery => ../apimachinery
+)

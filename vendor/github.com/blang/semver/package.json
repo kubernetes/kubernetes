@@ -1,0 +1,17 @@
+{
+  "author": "blang",
+  "bugs": {
+    "URL": "https://github.com/blang/semver/issues",
+    "url": "https://github.com/blang/semver/issues"
+  },
+  "gx": {
+    "dvcsimport": "github.com/blang/semver"
+  },
+  "gxVersion": "0.10.0",
+  "language": "go",
+  "license": "MIT",
+  "name": "semver",
+  "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
+  "version": "3.5.1"
+}
+
