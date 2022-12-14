@@ -457,8 +457,10 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		// Create bigger claim
 		biggerClaim := l.testCase.Claim.DeepCopy()
 		biggerClaim.Name = "claim1"
-		biggerClaim.Spec.Resources.Requests = v1.ResourceList{
-			v1.ResourceStorage: biggerSize,
+		biggerClaim.Spec.Resources = v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceStorage: biggerSize,
+			},
 		}
 
 		sameSizeClaim := l.testCase.Claim.DeepCopy()
