@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -47,6 +48,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/component-base/tracing"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -190,7 +192,7 @@ func (c *TransportConfig) Complete(ctx context.Context) error {
 	)
 	c.getClient = func() (*clientv3.Client, error) {
 		once.Do(func() {
-			client, err = getClient(ctx, c)
+			client, err = getClientWithRetries(ctx, *c)
 		})
 		return client, err
 	}
@@ -214,7 +216,29 @@ func (c *TransportConfig) ShallowCopyAndResetComplete() TransportConfig {
 	return out
 }
 
-func getClient(ctx context.Context, c *TransportConfig) (*clientv3.Client, error) {
+func getClientWithRetries(ctx context.Context, c TransportConfig) (*clientv3.Client, error) {
+	// constructing the etcd v3 client blocks and times out if etcd is not available
+	// retry in a loop until we successfully create the client
+	// otherwise this loop terminates when the context is cancelled (i.e. server shutdown)
+
+	var (
+		client *clientv3.Client
+		err    error
+	)
+	if pollErr := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (bool, error) {
+		client, err = getClient(ctx, c)
+		if err != nil {
+			klog.ErrorS(err, "failed to get etcd client")
+		}
+		return err == nil, nil
+	}); pollErr != nil {
+		return nil, fmt.Errorf("failed to get etcd client, pollErr=%v: %w", pollErr, err)
+	}
+
+	return client, err
+}
+
+func getClient(ctx context.Context, c TransportConfig) (*clientv3.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
 		KeyFile:       c.KeyFile,

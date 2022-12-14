@@ -93,42 +93,29 @@ func (a *atomicLastError) Load() error {
 }
 
 func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan struct{}) (func() error, error) {
-	// constructing the etcd v3 client blocks and times out if etcd is not available.
-	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
+	// constructing the etcd v3 client blocks until it succeeds so we fetch the client in the background
 
 	lock := sync.RWMutex{}
 	var client *clientv3.Client
 	clientErr := fmt.Errorf("etcd client connection not yet established")
 
-	go wait.PollUntil(time.Second, func() (bool, error) {
-		newClient, err := newETCD3Client(c.Transport)
-		lock.Lock()
-		defer lock.Unlock()
-		// Ensure that server is already not shutting down.
-		select {
-		case <-stopCh:
-			return true, nil
-		default:
-		}
-		if err != nil {
-			clientErr = err
-			return false, nil
-		}
-		client = newClient
-		clientErr = nil
-		return true, nil
-	}, stopCh)
-
-	// Close the client on shutdown.
 	go func() {
 		defer utilruntime.HandleCrash()
-		<-stopCh
+
+		newClient, newClientErr := newETCD3Client(c.Transport)
+
+		// do nothing if the server is already not shutting down
+		select {
+		case <-stopCh:
+			return
+		default:
+		}
 
 		lock.Lock()
 		defer lock.Unlock()
-		if client != nil {
-			clientErr = fmt.Errorf("server is shutting down")
-		}
+
+		client = newClient
+		clientErr = newClientErr
 	}()
 
 	// limit to a request every half of the configured timeout with a maximum burst of one
@@ -138,11 +125,6 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 	lastError := &atomicLastError{err: fmt.Errorf("etcd client connection not yet established")}
 
 	return func() error {
-		// Given that client is closed on shutdown we hold the lock for
-		// the entire period of healthcheck call to ensure that client will
-		// not be closed during healthcheck.
-		// Given that healthchecks has a 2s timeout, worst case of blocking
-		// shutdown for additional 2s seems acceptable.
 		lock.RLock()
 		defer lock.RUnlock()
 
