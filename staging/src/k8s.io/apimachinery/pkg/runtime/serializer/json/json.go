@@ -17,7 +17,7 @@ limitations under the License.
 package json
 
 import (
-	"encoding/json"
+	//"encoding/json"
 	"io"
 	"strconv"
 
@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/util/framer"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	json "k8s.io/apimachinery/third_party/forked/golang/jsonencode"
 	"k8s.io/klog/v2"
 )
 

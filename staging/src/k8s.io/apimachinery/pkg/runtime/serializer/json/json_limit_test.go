@@ -17,11 +17,12 @@ limitations under the License.
 package json
 
 import (
-	gojson "encoding/json"
+	//gojson "encoding/json"
 	"strings"
 	"testing"
 
 	utiljson "k8s.io/apimachinery/pkg/util/json"
+	gojson "k8s.io/apimachinery/third_party/forked/golang/jsonencode"
 )
 
 type testcase struct {

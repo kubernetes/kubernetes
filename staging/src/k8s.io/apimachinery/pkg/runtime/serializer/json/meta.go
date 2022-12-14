@@ -17,10 +17,11 @@ limitations under the License.
 package json
 
 import (
-	"encoding/json"
+	//"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	json "k8s.io/apimachinery/third_party/forked/golang/jsonencode"
 )
 
 // MetaFactory is used to store and retrieve the version and kind
