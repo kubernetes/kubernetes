@@ -423,14 +423,15 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
-		
+
     l.sourcePVC.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
 		dataSource := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
-		l.pvc.Spec.DataSource = dataSource
-
-		//dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
-		//l.pvc.Spec.DataSourceRef = dataSourceRef
-    
+		localDataSource := &v1.TypedLocalObjectReference{
+			APIGroup: dataSource.APIGroup,
+			Kind:     dataSource.Kind,
+			Name:     dataSource.Name,
+		}
+		l.pvc.Spec.DataSource = localDataSource
 		l.testCase.NodeSelection = testConfig.ClientNodeSelection
 		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			ginkgo.By("checking whether the created volume has the pre-populated data")
