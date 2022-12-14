@@ -81,17 +81,35 @@ func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResour
 	return informer
 }
 
-// Start initializes all requested informers.
-func (f *dynamicSharedInformerFactory) Start(stopCh <-chan struct{}) {
+func (f *dynamicSharedInformerFactory) start(stopCh <-chan struct{}) *sync.WaitGroup {
+	wg := &sync.WaitGroup{}
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			go informer.Informer().Run(stopCh)
+			wg.Add(1)
+			informerCopy := informer.Informer()
+			go func() {
+				defer wg.Done()
+				informerCopy.Run(stopCh)
+			}()
 			f.startedInformers[informerType] = true
 		}
 	}
+
+	return wg
+}
+
+// Start initializes all requested informers.
+func (f *dynamicSharedInformerFactory) Start(stopCh <-chan struct{}) {
+	f.start(stopCh)
+}
+
+// Start initializes all requested informers and blocks until they
+// all complete
+func (f *dynamicSharedInformerFactory) Run(stopCh <-chan struct{}) {
+	f.start(stopCh).Wait()
 }
 
 // WaitForCacheSync waits for all started informers' cache were synced.
