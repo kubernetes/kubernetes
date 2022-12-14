@@ -238,7 +238,7 @@ func ValidateTokenGroups(usages []string, groups []string, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 
 	// adding groups only makes sense for authentication
-	usagesSet := sets.NewString(usages...)
+	usagesSet := sets.New(usages...)
 	usageAuthentication := strings.TrimPrefix(bootstrapapi.BootstrapTokenUsageAuthentication, bootstrapapi.BootstrapTokenUsagePrefix)
 	if len(groups) > 0 && !usagesSet.Has(usageAuthentication) {
 		allErrs = append(allErrs, field.Invalid(fldPath, groups, fmt.Sprintf("token groups cannot be specified unless --usages includes %q", usageAuthentication)))
@@ -564,7 +564,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 }
 
 func isAllowedFlag(flagName string) bool {
-	allowedFlags := sets.NewString(kubeadmcmdoptions.CfgPath,
+	allowedFlags := sets.New(kubeadmcmdoptions.CfgPath,
 		kubeadmcmdoptions.IgnorePreflightErrors,
 		kubeadmcmdoptions.DryRun,
 		kubeadmcmdoptions.KubeconfigPath,
@@ -603,8 +603,8 @@ func ValidateAPIEndpoint(c *kubeadm.APIEndpoint, fldPath *field.Path) field.Erro
 // ValidateIgnorePreflightErrors validates duplicates in:
 // - ignore-preflight-errors flag and
 // - ignorePreflightErrors field in {Init,Join}Configuration files.
-func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflightErrorsFromConfigFile []string) (sets.String, error) {
-	ignoreErrors := sets.NewString()
+func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflightErrorsFromConfigFile []string) (sets.Set[string], error) {
+	ignoreErrors := sets.New[string]()
 	allErrs := field.ErrorList{}
 
 	for _, item := range ignorePreflightErrorsFromConfigFile {
@@ -623,7 +623,7 @@ func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflight
 	}
 
 	if ignoreErrors.Has("all") && ignoreErrors.Len() > 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("ignore-preflight-errors"), strings.Join(ignoreErrors.List(), ","), "don't specify individual checks if 'all' is used"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("ignore-preflight-errors"), strings.Join(sets.List(ignoreErrors), ","), "don't specify individual checks if 'all' is used"))
 	}
 
 	return ignoreErrors, allErrs.ToAggregate()

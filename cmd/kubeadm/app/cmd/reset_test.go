@@ -49,7 +49,7 @@ func TestNewResetData(t *testing.T) {
 			data: &resetData{
 				certificatesDir:       "/tmp",
 				criSocketPath:         "unix:///var/run/crio/crio.sock",
-				ignorePreflightErrors: sets.NewString("all"),
+				ignorePreflightErrors: sets.New("all"),
 				forceReset:            true,
 				dryRun:                true,
 				cleanupTmpDir:         true,
@@ -67,7 +67,7 @@ func TestNewResetData(t *testing.T) {
 			flags: map[string]string{
 				options.IgnorePreflightErrors: "a,b",
 			},
-			validate: expectedResetIgnorePreflightErrors(sets.NewString("a", "b")),
+			validate: expectedResetIgnorePreflightErrors(sets.New("a", "b")),
 		},
 	}
 	for _, tc := range testCases {
@@ -103,13 +103,13 @@ func TestNewResetData(t *testing.T) {
 	}
 }
 
-func expectedResetIgnorePreflightErrors(expected sets.String) func(t *testing.T, data *resetData) {
+func expectedResetIgnorePreflightErrors(expected sets.Set[string]) func(t *testing.T, data *resetData) {
 	return func(t *testing.T, data *resetData) {
 		if !expected.Equal(data.ignorePreflightErrors) {
-			t.Errorf("Invalid ignore preflight errors. Expected: %v. Actual: %v", expected.List(), data.ignorePreflightErrors.List())
+			t.Errorf("Invalid ignore preflight errors. Expected: %v. Actual: %v", sets.List(expected), sets.List(data.ignorePreflightErrors))
 		}
 		if data.cfg != nil && !expected.HasAll(data.cfg.NodeRegistration.IgnorePreflightErrors...) {
-			t.Errorf("Invalid ignore preflight errors in InitConfiguration. Expected: %v. Actual: %v", expected.List(), data.cfg.NodeRegistration.IgnorePreflightErrors)
+			t.Errorf("Invalid ignore preflight errors in InitConfiguration. Expected: %v. Actual: %v", sets.List(expected), data.cfg.NodeRegistration.IgnorePreflightErrors)
 		}
 	}
 }

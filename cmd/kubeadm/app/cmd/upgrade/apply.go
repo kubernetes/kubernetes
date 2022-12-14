@@ -143,7 +143,7 @@ func runApply(flags *applyFlags, args []string) error {
 		fmt.Println("[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster")
 		fmt.Println("[upgrade/prepull] This might take a minute or two, depending on the speed of your internet connection")
 		fmt.Println("[upgrade/prepull] You can also perform this action in beforehand using 'kubeadm config images pull'")
-		if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, sets.NewString(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
+		if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, sets.New(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
 			return err
 		}
 	} else {
@@ -164,7 +164,7 @@ func runApply(flags *applyFlags, args []string) error {
 	}
 
 	if flags.dryRun {
-		fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
+		fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 		return nil
 	}
 

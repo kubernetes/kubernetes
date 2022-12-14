@@ -500,7 +500,7 @@ func getAltNames(cfg *kubeadmapi.InitConfiguration, certName string) (*certutil.
 // valid IP address strings are parsed and added to altNames.IPs as net.IP's
 // RFC-1123 compliant DNS strings are added to altNames.DNSNames as strings
 // RFC-1123 compliant wildcard DNS strings are added to altNames.DNSNames as strings
-// certNames is used to print user facing warnings and should be the name of the cert the altNames will be used for
+// certNames is used to print user facing warnings and should be the name of the cert the altNames will be used for
 func appendSANsToAltNames(altNames *certutil.AltNames, SANs []string, certName string) {
 	for _, altname := range SANs {
 		if ip := netutils.ParseIPSloppy(altname); ip != nil {
@@ -680,7 +680,7 @@ func RemoveDuplicateAltNames(altNames *certutil.AltNames) {
 	}
 
 	if altNames.DNSNames != nil {
-		altNames.DNSNames = sets.NewString(altNames.DNSNames...).List()
+		altNames.DNSNames = sets.List(sets.New(altNames.DNSNames...))
 	}
 
 	ipsKeys := make(map[string]struct{})

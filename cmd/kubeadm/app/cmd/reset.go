@@ -76,7 +76,7 @@ type resetData struct {
 	client                clientset.Interface
 	criSocketPath         string
 	forceReset            bool
-	ignorePreflightErrors sets.String
+	ignorePreflightErrors sets.Set[string]
 	inputReader           io.Reader
 	outputWriter          io.Writer
 	cfg                   *kubeadmapi.InitConfiguration
@@ -116,7 +116,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 	}
 	if cfg != nil {
 		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-		cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+		cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 	}
 
 	var criSocketPath string
@@ -249,7 +249,7 @@ func (r *resetData) InputReader() io.Reader {
 }
 
 // IgnorePreflightErrors returns the list of preflight errors to ignore.
-func (r *resetData) IgnorePreflightErrors() sets.String {
+func (r *resetData) IgnorePreflightErrors() sets.Set[string] {
 	return r.ignorePreflightErrors
 }
 

@@ -31,13 +31,13 @@ type testData struct{}
 // testData must satisfy Data.
 var _ Data = &testData{}
 
-func (t *testData) EtcdUpgrade() bool                  { return false }
-func (t *testData) RenewCerts() bool                   { return false }
-func (t *testData) DryRun() bool                       { return false }
-func (t *testData) Cfg() *kubeadmapi.InitConfiguration { return nil }
-func (t *testData) IsControlPlaneNode() bool           { return false }
-func (t *testData) Client() clientset.Interface        { return nil }
-func (t *testData) IgnorePreflightErrors() sets.String { return nil }
-func (t *testData) PatchesDir() string                 { return "" }
-func (t *testData) KubeConfigPath() string             { return "" }
-func (t *testData) OutputWriter() io.Writer            { return nil }
+func (t *testData) EtcdUpgrade() bool                       { return false }
+func (t *testData) RenewCerts() bool                        { return false }
+func (t *testData) DryRun() bool                            { return false }
+func (t *testData) Cfg() *kubeadmapi.InitConfiguration      { return nil }
+func (t *testData) IsControlPlaneNode() bool                { return false }
+func (t *testData) Client() clientset.Interface             { return nil }
+func (t *testData) IgnorePreflightErrors() sets.Set[string] { return nil }
+func (t *testData) PatchesDir() string                      { return "" }
+func (t *testData) KubeConfigPath() string                  { return "" }
+func (t *testData) OutputWriter() io.Writer                 { return nil }
