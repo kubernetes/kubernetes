@@ -525,12 +525,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
 	var validators = []system.Validator{
 		&system.KernelValidator{Reporter: reporter}}
 
-	if runtime.GOOS == "linux" {
-		//add linux validators
-		validators = append(validators,
-			&system.OSValidator{Reporter: reporter},
-			&system.CgroupsValidator{Reporter: reporter})
-	}
+	validators = addOSValidator(validators, reporter)
 
 	// Run all validators
 	for _, v := range validators {
@@ -931,11 +926,8 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
 		if ip := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if netutils.IsIPv6(ip) && runtime.GOOS == "linux" {
-				checks = append(checks,
-					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
-				)
+			if netutils.IsIPv6(ip) {
+				checks = addIPv6Checks(checks)
 			}
 		}
 
@@ -987,7 +979,6 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
 	}
 
-	addIPv6Checks := false
 	if cfg.Discovery.BootstrapToken != nil {
 		ipstr, _, err := net.SplitHostPort(cfg.Discovery.BootstrapToken.APIServerEndpoint)
 		if err == nil {
@@ -996,16 +987,10 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			)
 			if ip := netutils.ParseIPSloppy(ipstr); ip != nil {
 				if netutils.IsIPv6(ip) {
-					addIPv6Checks = true
+					checks = addIPv6Checks(checks)
 				}
 			}
 		}
-	}
-	if addIPv6Checks && runtime.GOOS == "linux" {
-		checks = append(checks,
-			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
-		)
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
@@ -1022,23 +1007,9 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 	}
 
 	// non-windows checks
-	if runtime.GOOS == "linux" {
-		checks = append(checks,
-			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
-			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
-			SwapCheck{},
-			InPathCheck{executable: "crictl", mandatory: true, exec: execer},
-			InPathCheck{executable: "conntrack", mandatory: true, exec: execer},
-			InPathCheck{executable: "ip", mandatory: true, exec: execer},
-			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
-			InPathCheck{executable: "mount", mandatory: true, exec: execer},
-			InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
-			InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
-			InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
-			InPathCheck{executable: "socat", mandatory: false, exec: execer},
-			InPathCheck{executable: "tc", mandatory: false, exec: execer},
-			InPathCheck{executable: "touch", mandatory: false, exec: execer})
-	}
+	checks = addIPv4Checks(checks)
+	checks = addSwapCheck(checks)
+	checks = addExecChecks(checks, execer)
 	checks = append(checks,
 		SystemVerificationCheck{},
 		HostnameCheck{nodeName: nodeReg.Name},
