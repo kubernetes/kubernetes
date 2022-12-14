@@ -75,7 +75,7 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 		return string(data)
 	}
 
-	ginkgo.It("should create pod that uses dns", func() {
+	ginkgo.It("should create pod that uses dns", func(ctx context.Context) {
 		// contrary to the example, this test does not use contexts, for simplicity
 		// namespaces are passed directly.
 		// Also, for simplicity, we don't use yamls with namespaces, but we

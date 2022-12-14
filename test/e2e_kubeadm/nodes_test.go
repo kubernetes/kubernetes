@@ -47,7 +47,7 @@ var _ = Describe("nodes", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	ginkgo.It("should have CRI annotation", func() {
+	ginkgo.It("should have CRI annotation", func(ctx context.Context) {
 		nodes, err := f.ClientSet.CoreV1().Nodes().
 			List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading nodes")
@@ -60,7 +60,7 @@ var _ = Describe("nodes", func() {
 		}
 	})
 
-	ginkgo.It("should be allowed to rotate CSR", func() {
+	ginkgo.It("should be allowed to rotate CSR", func(ctx context.Context) {
 		// Nb. this is technically implemented a part of the bootstrap-token phase
 		ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 			nodesCertificateRotationClusterRoleBinding,

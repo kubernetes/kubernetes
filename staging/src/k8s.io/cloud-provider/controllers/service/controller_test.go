@@ -73,7 +73,7 @@ func newETPLocalService(name string, serviceType v1.ServiceType) *v1.Service {
 		},
 		Spec: v1.ServiceSpec{
 			Type:                  serviceType,
-			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 		},
 	}
 }
@@ -1334,7 +1334,7 @@ func TestNeedsUpdate(t *testing.T) {
 			updateFn: func() {
 				oldSvc = defaultExternalService()
 				newSvc = defaultExternalService()
-				newSvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+				newSvc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			},
 			expectedNeedsUpdate: true,
 		},

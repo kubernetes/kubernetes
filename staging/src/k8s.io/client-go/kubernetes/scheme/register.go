@@ -20,6 +20,7 @@ package scheme
 
 import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	internalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -61,6 +62,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -79,6 +81,7 @@ var Codecs = serializer.NewCodecFactory(Scheme)
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
 	admissionregistrationv1.AddToScheme,
+	admissionregistrationv1alpha1.AddToScheme,
 	admissionregistrationv1beta1.AddToScheme,
 	internalv1alpha1.AddToScheme,
 	appsv1.AddToScheme,
@@ -120,6 +123,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	rbacv1.AddToScheme,
 	rbacv1beta1.AddToScheme,
 	rbacv1alpha1.AddToScheme,
+	resourcev1alpha1.AddToScheme,
 	schedulingv1alpha1.AddToScheme,
 	schedulingv1beta1.AddToScheme,
 	schedulingv1.AddToScheme,

@@ -17,6 +17,8 @@ limitations under the License.
 package auth
 
 import (
+	"context"
+
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -37,7 +39,7 @@ var _ = SIGDescribe("ServiceAccount admission controller migration [Feature:Boun
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("master upgrade", func() {
-		ginkgo.It("should maintain a functioning cluster", func() {
+		ginkgo.It("should maintain a functioning cluster", func(ctx context.Context) {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 

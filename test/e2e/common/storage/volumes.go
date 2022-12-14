@@ -32,7 +32,7 @@ limitations under the License.
  * be used in production.
  *
  * 2) With server outside of Kubernetes
- * Appropriate server exist somewhere outside
+ * Appropriate server must exist somewhere outside
  * the tested Kubernetes cluster. The test itself creates a new volume,
  * and checks, that Kubernetes can use it as a volume.
  */
@@ -43,6 +43,8 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -74,9 +76,9 @@ var _ = SIGDescribe("Volumes", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 	ginkgo.Describe("NFSv4", func() {
-		ginkgo.It("should be mountable for NFSv4", func() {
+		ginkgo.It("should be mountable for NFSv4", func(ctx context.Context) {
 			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
-			defer e2evolume.TestServerCleanup(f, config)
+			ginkgo.DeferCleanup(e2evolume.TestServerCleanup, f, config)
 
 			tests := []e2evolume.Test{
 				{
@@ -98,9 +100,9 @@ var _ = SIGDescribe("Volumes", func() {
 	})
 
 	ginkgo.Describe("NFSv3", func() {
-		ginkgo.It("should be mountable for NFSv3", func() {
+		ginkgo.It("should be mountable for NFSv3", func(ctx context.Context) {
 			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
-			defer e2evolume.TestServerCleanup(f, config)
+			ginkgo.DeferCleanup(e2evolume.TestServerCleanup, f, config)
 
 			tests := []e2evolume.Test{
 				{

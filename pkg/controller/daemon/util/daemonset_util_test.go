@@ -27,7 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
@@ -51,8 +51,8 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 }
 
 func TestIsPodUpdated(t *testing.T) {
-	templateGeneration := utilpointer.Int64Ptr(12345)
-	badGeneration := utilpointer.Int64Ptr(12350)
+	templateGeneration := pointer.Int64(12345)
+	badGeneration := pointer.Int64(12350)
 	hash := "55555"
 	labels := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(*templateGeneration), extensions.DefaultDaemonSetUniqueLabelKey: hash}
 	labelsNoHash := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(*templateGeneration)}
@@ -148,8 +148,8 @@ func TestCreatePodTemplate(t *testing.T) {
 		hash               string
 		expectUniqueLabel  bool
 	}{
-		{utilpointer.Int64Ptr(1), "", false},
-		{utilpointer.Int64Ptr(2), "3242341807", true},
+		{pointer.Int64(1), "", false},
+		{pointer.Int64(2), "3242341807", true},
 	}
 	for _, test := range tests {
 		podTemplateSpec := v1.PodTemplateSpec{}

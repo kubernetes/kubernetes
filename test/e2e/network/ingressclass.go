@@ -45,42 +45,85 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.It("should set default value on new IngressClass [Serial]", func() {
+	ginkgo.It("should set default value on new IngressClass [Serial]", func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", true, f.UniqueName)
 		framework.ExpectNoError(err)
-		defer deleteIngressClass(cs, ingressClass1.Name)
+		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
 
-		ingress, err := createBasicIngress(cs, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		lastFailure := ""
 
-		if ingress.Spec.IngressClassName == nil {
-			framework.Failf("Expected IngressClassName to be set by Admission Controller")
-		} else if *ingress.Spec.IngressClassName != ingressClass1.Name {
-			framework.Failf("Expected IngressClassName to be %s, got %s", ingressClass1.Name, *ingress.Spec.IngressClassName)
+		// the admission controller may take a few seconds to observe the ingress classes
+		if err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+			lastFailure = ""
+
+			ingress, err := createBasicIngress(cs, f.Namespace.Name)
+			if err != nil {
+				lastFailure = err.Error()
+				return false, err
+			}
+			defer func() {
+				err := cs.NetworkingV1().Ingresses(ingress.Namespace).Delete(ctx, ingress.Name, metav1.DeleteOptions{})
+				framework.Logf("%v", err)
+			}()
+
+			if ingress.Spec.IngressClassName == nil {
+				lastFailure = "Expected IngressClassName to be set by Admission Controller"
+				return false, nil
+			} else if *ingress.Spec.IngressClassName != ingressClass1.Name {
+				lastFailure = fmt.Sprintf("Expected IngressClassName to be %s, got %s", ingressClass1.Name, *ingress.Spec.IngressClassName)
+				return false, nil
+			}
+			return true, nil
+
+		}); err != nil {
+			framework.Failf("%v, final err= %v", lastFailure, err)
 		}
 	})
 
-	ginkgo.It("should not set default value if no default IngressClass [Serial]", func() {
+	ginkgo.It("should not set default value if no default IngressClass [Serial]", func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", false, f.UniqueName)
 		framework.ExpectNoError(err)
-		defer deleteIngressClass(cs, ingressClass1.Name)
+		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
 
-		ingress, err := createBasicIngress(cs, f.Namespace.Name)
-		framework.ExpectNoError(err)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		lastFailure := ""
 
-		if ingress.Spec.IngressClassName != nil {
-			framework.Failf("Expected IngressClassName to be nil, got %s", *ingress.Spec.IngressClassName)
+		// the admission controller may take a few seconds to observe the ingress classes
+		if err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
+			lastFailure = ""
+
+			ingress, err := createBasicIngress(cs, f.Namespace.Name)
+			if err != nil {
+				lastFailure = err.Error()
+				return false, err
+			}
+			defer func() {
+				err := cs.NetworkingV1().Ingresses(ingress.Namespace).Delete(ctx, ingress.Name, metav1.DeleteOptions{})
+				framework.Logf("%v", err)
+			}()
+
+			if ingress.Spec.IngressClassName != nil {
+				lastFailure = fmt.Sprintf("Expected IngressClassName to be nil, got %s", *ingress.Spec.IngressClassName)
+				return false, nil
+			}
+			return true, nil
+
+		}); err != nil {
+			framework.Failf("%v, final err= %v", lastFailure, err)
 		}
 	})
 
-	ginkgo.It("should choose the one with the later CreationTimestamp, if equal the one with the lower name when two ingressClasses are marked as default[Serial]", func() {
+	ginkgo.It("should choose the one with the later CreationTimestamp, if equal the one with the lower name when two ingressClasses are marked as default[Serial]", func(ctx context.Context) {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", true, f.UniqueName)
 		framework.ExpectNoError(err)
-		defer deleteIngressClass(cs, ingressClass1.Name)
+		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass1.Name)
 
 		ingressClass2, err := createIngressClass(cs, "ingressclass2", true, f.UniqueName)
 		framework.ExpectNoError(err)
-		defer deleteIngressClass(cs, ingressClass2.Name)
+		ginkgo.DeferCleanup(deleteIngressClass, cs, ingressClass2.Name)
 
 		expectedName := ingressClass1.Name
 		if ingressClass2.CreationTimestamp.UnixNano() > ingressClass1.CreationTimestamp.UnixNano() {
@@ -121,7 +164,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should allow IngressClass to have Namespace-scoped parameters [Serial]", func() {
+	ginkgo.It("should allow IngressClass to have Namespace-scoped parameters [Serial]", func(ctx context.Context) {
 		ingressClass := &networkingv1.IngressClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "ingressclass1",
@@ -143,7 +186,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 		createdIngressClass, err := cs.NetworkingV1().IngressClasses().Create(context.TODO(), ingressClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		defer deleteIngressClass(cs, createdIngressClass.Name)
+		ginkgo.DeferCleanup(deleteIngressClass, cs, createdIngressClass.Name)
 
 		if createdIngressClass.Spec.Parameters == nil {
 			framework.Failf("Expected IngressClass.spec.parameters to be set")
@@ -220,7 +263,7 @@ var _ = common.SIGDescribe("IngressClass API", func() {
 		- The ingressclasses resource MUST exist in the /apis/networking.k8s.io/v1 discovery document.
 		- The ingressclass resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.ConformanceIt(" should support creating IngressClass API operations", func() {
+	framework.ConformanceIt(" should support creating IngressClass API operations", func(ctx context.Context) {
 
 		// Setup
 		icClient := f.ClientSet.NetworkingV1().IngressClasses()

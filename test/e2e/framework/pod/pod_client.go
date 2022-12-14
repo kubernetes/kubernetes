@@ -40,6 +40,7 @@ import (
 	"github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -302,4 +303,12 @@ func (c *PodClient) PodIsReady(name string) bool {
 	pod, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return podutils.IsPodReady(pod)
+}
+
+// RemovePodFinalizer removes the pod's finalizer
+func (c *PodClient) RemoveFinalizer(podName string, finalizerName string) {
+	framework.Logf("Removing pod's %q finalizer: %q", podName, finalizerName)
+	c.Update(podName, func(pod *v1.Pod) {
+		pod.ObjectMeta.Finalizers = slice.RemoveString(pod.ObjectMeta.Finalizers, finalizerName, nil)
+	})
 }

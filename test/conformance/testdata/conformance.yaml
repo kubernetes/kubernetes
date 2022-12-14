@@ -384,6 +384,14 @@
     MUST cause pods created by that RC to be orphaned.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+- testname: Namespace, apply finalizer to a namespace
+  codename: '[sig-api-machinery] Namespaces [Serial] should apply a finalizer to a
+    Namespace [Conformance]'
+  description: Attempt to create a Namespace which MUST be succeed. Updating the namespace
+    with a fake finalizer MUST succeed. The fake finalizer MUST be found. Removing
+    the fake finalizer from the namespace MUST succeed and MUST NOT be found.
+  release: v1.26
+  file: test/e2e/apimachinery/namespace.go
 - testname: Namespace, apply update to a namespace
   codename: '[sig-api-machinery] Namespaces [Serial] should apply an update to a Namespace
     [Conformance]'
@@ -420,6 +428,20 @@
     MUST now include the new Label.
   release: v1.18
   file: test/e2e/apimachinery/namespace.go
+- testname: ResourceQuota, apply changes to a ResourceQuota status
+  codename: '[sig-api-machinery] ResourceQuota should apply changes to a resourcequota
+    status [Conformance]'
+  description: Attempt to create a ResourceQuota for CPU and Memory quota limits.
+    Creation MUST be successful. Updating the hard status values MUST succeed and
+    the new values MUST be found. The reported hard status values MUST equal the spec
+    hard values. Patching the spec hard values MUST succeed and the new values MUST
+    be found. Patching the hard status values MUST succeed. The reported hard status
+    values MUST equal the new spec hard values. Getting the /status MUST succeed and
+    the reported hard status values MUST equal the spec hard values. Repatching the
+    hard status values MUST succeed. The spec spec MUST NOT be changed when patching
+    /status.
+  release: v1.26
+  file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, update and delete
   codename: '[sig-api-machinery] ResourceQuota should be able to update and delete
     ResourceQuota. [Conformance]'
@@ -2450,6 +2472,20 @@
     pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: CSIInlineVolumes should support Pods with inline volumes
+  codename: '[sig-storage] CSIInlineVolumes should support CSIVolumeSource in Pod
+    API [Conformance]'
+  description: Pod resources with CSIVolumeSource should support create, get, list,
+    patch, and delete operations.
+  release: v1.26
+  file: test/e2e/storage/csi_inline.go
+- testname: CSIInlineVolumes should support ephemeral CSIDrivers
+  codename: '[sig-storage] CSIInlineVolumes should support ephemeral VolumeLifecycleMode
+    in CSIDriver API [Conformance]'
+  description: CSIDriver resources with ephemeral VolumeLifecycleMode should support
+    create, get, list, and delete operations.
+  release: v1.26
+  file: test/e2e/storage/csi_inline.go
 - testname: CSIStorageCapacity API
   codename: '[sig-storage] CSIStorageCapacity  should support CSIStorageCapacities
     API operations [Conformance]'

@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 	"k8s.io/klog/v2"
+
 	"k8s.io/kubernetes/pkg/windows/service"
 )
 
@@ -57,7 +57,7 @@ func getPriorityValue(priorityClassName string) uint32 {
 func createWindowsJobObject(pc uint32) (windows.Handle, error) {
 	job, err := windows.CreateJobObject(nil, nil)
 	if err != nil {
-		return windows.InvalidHandle, errors.Wrap(err, "windows.CreateJobObject failed")
+		return windows.InvalidHandle, fmt.Errorf("windows.CreateJobObject failed: %w", err)
 	}
 	limitInfo := windows.JOBOBJECT_BASIC_LIMIT_INFORMATION{
 		LimitFlags:    windows.JOB_OBJECT_LIMIT_PRIORITY_CLASS,
@@ -68,7 +68,7 @@ func createWindowsJobObject(pc uint32) (windows.Handle, error) {
 		windows.JobObjectBasicLimitInformation,
 		uintptr(unsafe.Pointer(&limitInfo)),
 		uint32(unsafe.Sizeof(limitInfo))); err != nil {
-		return windows.InvalidHandle, errors.Wrap(err, "windows.SetInformationJobObject failed")
+		return windows.InvalidHandle, fmt.Errorf("windows.SetInformationJobObject failed: %w", err)
 	}
 	return job, nil
 }
@@ -85,7 +85,7 @@ func initForOS(windowsService bool, windowsPriorityClass string) error {
 		return err
 	}
 	if err := windows.AssignProcessToJobObject(job, windows.CurrentProcess()); err != nil {
-		return errors.Wrap(err, "windows.AssignProcessToJobObject failed")
+		return fmt.Errorf("windows.AssignProcessToJobObject failed: %w", err)
 	}
 
 	if windowsService {

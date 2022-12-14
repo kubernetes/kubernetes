@@ -60,7 +60,7 @@ var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should recover from network partition with master", func() {
+	ginkgo.It("should recover from network partition with master", func(ctx context.Context) {
 		etcdFailTest(
 			f,
 			"sudo iptables -A INPUT -p tcp --destination-port 2379 -j DROP",
@@ -68,7 +68,7 @@ var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 		)
 	})
 
-	ginkgo.It("should recover from SIGKILL", func() {
+	ginkgo.It("should recover from SIGKILL", func(ctx context.Context) {
 		etcdFailTest(
 			f,
 			"pgrep etcd | xargs -I {} sudo kill -9 {}",

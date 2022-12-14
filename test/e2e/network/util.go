@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -87,7 +89,7 @@ func DescribeSvc(ns string) {
 // that would cause the sctp kernel module to be loaded.
 func CheckSCTPModuleLoadedOnNodes(f *framework.Framework, nodes *v1.NodeList) bool {
 	hostExec := utils.NewHostExec(f)
-	defer hostExec.Cleanup()
+	ginkgo.DeferCleanup(hostExec.Cleanup)
 	re := regexp.MustCompile(`^\s*sctp\s+`)
 	cmd := "lsmod | grep sctp"
 	for _, node := range nodes.Items {

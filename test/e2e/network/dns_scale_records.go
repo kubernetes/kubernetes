@@ -55,7 +55,7 @@ var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	})
 
 	// answers dns for service - creates the maximum number of services, and then check dns record for one
-	ginkgo.It("Should answer DNS query for maximum number of services per cluster", func() {
+	ginkgo.It("Should answer DNS query for maximum number of services per cluster", func(ctx context.Context) {
 		// get integer ceiling of maxServicesPerCluster / maxServicesPerNamespace
 		numNs := (maxServicesPerCluster + maxServicesPerNamespace - 1) / maxServicesPerNamespace
 
@@ -79,7 +79,7 @@ var _ = common.SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 			ns: f.Namespace.Name,
 		}
 		dnsTest.createUtilPodLabel("e2e-dns-scale-records")
-		defer dnsTest.deleteUtilPod()
+		ginkgo.DeferCleanup(dnsTest.deleteUtilPod)
 		framework.Logf("Querying %v%% of service records", checkServicePercent*100)
 		for i := 0; i < len(services); i++ {
 			if i%(1/checkServicePercent) != 0 {

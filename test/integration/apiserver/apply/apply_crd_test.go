@@ -435,6 +435,7 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer etcdclient.Close()
 
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, storageConfig)
 	if err != nil {

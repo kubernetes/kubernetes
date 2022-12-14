@@ -157,10 +157,8 @@ if [[ (( "${KUBE_FEATURE_GATES:-}" = *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GA
 fi
 
 # Optional: set feature gates
+# shellcheck disable=SC2034 # Variables sourced in other scripts.
 FEATURE_GATES=${KUBE_FEATURE_GATES:-}
-
-#Optional: disable the cloud provider no schedule taint for testing.
-TEST_IGNORE_CLOUDPROVIDER_TAINT=${KUBE_TEST_IGNORE_CLOUDPROVIDER_TAINT:-}
 
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
@@ -297,23 +295,19 @@ export LOGGING_DESTINATION=${KUBE_LOGGING_DESTINATION:-gcp} # options: gcp
 export ENABLE_CLUSTER_LOGGING=${KUBE_ENABLE_CLUSTER_LOGGING:-true}
 export ELASTICSEARCH_LOGGING_REPLICAS=1
 
-export TEST_IGNORE_CLOUDPROVIDER_TAINT=${KUBE_TEST_IGNORE_CLOUDPROVIDER_TAINT:-false}
-
 # Optional: Don't require https for registries in our local RFC1918 network
 if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} = 'true' ]]; then
   EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS} --insecure-registry 10.0.0.0/8"
 fi
 
 if [[ -n "${NODE_ACCELERATORS}" ]]; then
-    if [[ -z "${FEATURE_GATES:-}" ]]; then
-        FEATURE_GATES='DevicePlugins=true'
-    else
-        FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
-    fi
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
         NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
 fi
+
+# List of the set of feature gates recognized by the GCP CCM
+export CCM_FEATURE_GATES="APIListChunking,APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,CustomResourceValidationExpressions,KMSv2,OpenAPIEnums,OpenAPIV3,RemainingItemCount,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
 
 # Optional: Install cluster DNS.
 # Set CLUSTER_DNS_CORE_DNS to 'false' to install kube-dns instead of CoreDNS.

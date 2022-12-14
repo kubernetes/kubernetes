@@ -27,7 +27,7 @@ limitations under the License.
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
  *
- * 2) With server or cloud provider outside of Kubernetes (GCE, AWS, Azure, ...)
+ * 2) With server or cloud provider outside of Kubernetes (Cinder, GCE, AWS, Azure, ...)
  * Appropriate server or cloud provider must exist somewhere outside
  * the tested Kubernetes cluster. CreateVolume will create a new volume to be
  * used in the TestSuites for inlineVolume or DynamicPV tests.
@@ -168,10 +168,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) *storageframework.PerTes
 	err := e2eauth.BindClusterRole(cs.RbacV1(), "cluster-admin", ns.Name,
 		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
 	framework.ExpectNoError(err)
-	ginkgo.DeferCleanup(func(ctx context.Context) {
-		clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-		cs.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleBindingName, *metav1.NewDeleteOptions(0))
-	})
+	ginkgo.DeferCleanup(cs.RbacV1().ClusterRoleBindings().Delete, ns.Name+"--"+"cluster-admin", *metav1.NewDeleteOptions(0))
 
 	err = e2eauth.WaitForAuthorizationUpdate(cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
@@ -180,9 +177,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) *storageframework.PerTes
 
 	ginkgo.By("creating an external dynamic provisioner pod")
 	n.externalProvisionerPod = utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName)
-	ginkgo.DeferCleanup(func() {
-		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
-	})
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, cs, n.externalProvisionerPod)
 
 	return &storageframework.PerTestConfig{
 		Driver:    n,
@@ -928,6 +923,70 @@ func (e *emptydirDriver) PrepareTest(f *framework.Framework) *storageframework.P
 	}
 }
 
+// Cinder
+// This tests only CSI migration with dynamically provisioned volumes.
+type cinderDriver struct {
+	driverInfo storageframework.DriverInfo
+}
+
+var _ storageframework.TestDriver = &cinderDriver{}
+var _ storageframework.DynamicPVTestDriver = &cinderDriver{}
+
+// InitCinderDriver returns cinderDriver that implements TestDriver interface
+func InitCinderDriver() storageframework.TestDriver {
+	return &cinderDriver{
+		driverInfo: storageframework.DriverInfo{
+			Name:             "cinder",
+			InTreePluginName: "kubernetes.io/cinder",
+			MaxFileSize:      storageframework.FileSizeMedium,
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "1Gi",
+			},
+			SupportedFsType: sets.NewString(
+				"", // Default fsType
+			),
+			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
+			Capabilities: map[storageframework.Capability]bool{
+				storageframework.CapPersistence: true,
+				storageframework.CapFsGroup:     true,
+				storageframework.CapExec:        true,
+				storageframework.CapBlock:       true,
+				// Cinder supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				storageframework.CapVolumeLimits: false,
+				storageframework.CapTopology:     true,
+			},
+		},
+	}
+}
+
+func (c *cinderDriver) GetDriverInfo() *storageframework.DriverInfo {
+	return &c.driverInfo
+}
+
+func (c *cinderDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+	e2eskipper.SkipUnlessProviderIs("openstack")
+}
+
+func (c *cinderDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+	provisioner := "kubernetes.io/cinder"
+	parameters := map[string]string{}
+	if fsType != "" {
+		parameters["fsType"] = fsType
+	}
+	ns := config.Framework.Namespace.Name
+
+	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
+}
+
+func (c *cinderDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
+	return &storageframework.PerTestConfig{
+		Driver:    c,
+		Prefix:    "cinder",
+		Framework: f,
+	}
+}
+
 // GCE
 type gcePdDriver struct {
 	driverInfo storageframework.DriverInfo
@@ -1222,7 +1281,7 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *storageframework
 }
 
 func (v *vSphereDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
-	ginkgo.DeferCleanup(func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) {
 		// Driver Cleanup function
 		// Logout each vSphere client connection to prevent session leakage
 		nodes := vspheretest.GetReadySchedulableNodeInfos()

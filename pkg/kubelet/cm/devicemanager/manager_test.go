@@ -81,8 +81,8 @@ func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) 
 	if err != nil {
 		return
 	}
-	socketName = socketDir + "/server.sock"
-	pluginSocketName = socketDir + "/device-plugin.sock"
+	socketName = filepath.Join(socketDir, "server.sock")
+	pluginSocketName = filepath.Join(socketDir, "device-plugin.sock")
 	os.MkdirAll(socketDir, 0755)
 	return
 }

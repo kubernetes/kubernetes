@@ -80,8 +80,7 @@ func BytePtrToString(p *byte) string {
 		ptr = unsafe.Pointer(uintptr(ptr) + 1)
 	}
 
-	s := unsafe.Slice((*byte)(unsafe.Pointer(p)), n)
-	return string(s)
+	return string(unsafe.Slice(p, n))
 }
 
 // Single-word zero for use when we need a valid pointer to 0 bytes.

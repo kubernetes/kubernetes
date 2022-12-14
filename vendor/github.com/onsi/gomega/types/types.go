@@ -19,11 +19,11 @@ type Gomega interface {
 	Expect(actual interface{}, extra ...interface{}) Assertion
 	ExpectWithOffset(offset int, actual interface{}, extra ...interface{}) Assertion
 
-	Eventually(actual interface{}, intervals ...interface{}) AsyncAssertion
-	EventuallyWithOffset(offset int, actual interface{}, intervals ...interface{}) AsyncAssertion
+	Eventually(args ...interface{}) AsyncAssertion
+	EventuallyWithOffset(offset int, args ...interface{}) AsyncAssertion
 
-	Consistently(actual interface{}, intervals ...interface{}) AsyncAssertion
-	ConsistentlyWithOffset(offset int, actual interface{}, intervals ...interface{}) AsyncAssertion
+	Consistently(args ...interface{}) AsyncAssertion
+	ConsistentlyWithOffset(offset int, args ...interface{}) AsyncAssertion
 
 	SetDefaultEventuallyTimeout(time.Duration)
 	SetDefaultEventuallyPollingInterval(time.Duration)

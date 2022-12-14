@@ -23,7 +23,7 @@
 // https://github.com/grpc/proposal/blob/master/A14-channelz.md, is provided by
 // the `internal/channelz` package.
 //
-// Experimental
+// # Experimental
 //
 // Notice: All APIs in this package are experimental and may be removed in a
 // later release.

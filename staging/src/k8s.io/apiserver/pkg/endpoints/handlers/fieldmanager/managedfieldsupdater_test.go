@@ -14,26 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package fieldmanager_test
 
 import (
 	"fmt"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"testing"
 	"time"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/yaml"
 )
 
 func TestManagedFieldsUpdateDoesModifyTime(t *testing.T) {
 	var err error
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"), "", nil)
+	f := fieldmanagertest.NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = updateObject(&f, "fieldmanager_test", []byte(`{
 		"apiVersion": "v1",
@@ -74,7 +77,7 @@ func TestManagedFieldsUpdateDoesModifyTime(t *testing.T) {
 
 func TestManagedFieldsApplyDoesModifyTime(t *testing.T) {
 	var err error
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"), "", nil)
+	f := fieldmanagertest.NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = applyObject(&f, "fieldmanager_test", []byte(`{
 		"apiVersion": "v1",
@@ -115,7 +118,7 @@ func TestManagedFieldsApplyDoesModifyTime(t *testing.T) {
 
 func TestManagedFieldsUpdateWithoutChangesDoesNotModifyTime(t *testing.T) {
 	var err error
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"), "", nil)
+	f := fieldmanagertest.NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = updateObject(&f, "fieldmanager_test", []byte(`{
 		"apiVersion": "v1",
@@ -156,7 +159,7 @@ func TestManagedFieldsUpdateWithoutChangesDoesNotModifyTime(t *testing.T) {
 
 func TestManagedFieldsApplyWithoutChangesDoesNotModifyTime(t *testing.T) {
 	var err error
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"), "", nil)
+	f := fieldmanagertest.NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = applyObject(&f, "fieldmanager_test", []byte(`{
 		"apiVersion": "v1",
@@ -197,7 +200,7 @@ func TestManagedFieldsApplyWithoutChangesDoesNotModifyTime(t *testing.T) {
 
 func TestNonManagedFieldsUpdateDoesNotModifyTime(t *testing.T) {
 	var err error
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"), "", nil)
+	f := fieldmanagertest.NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = updateObject(&f, "fieldmanager_a_test", []byte(`{
 		"apiVersion": "v1",
@@ -260,7 +263,7 @@ func TestNonManagedFieldsUpdateDoesNotModifyTime(t *testing.T) {
 
 func TestNonManagedFieldsApplyDoesNotModifyTime(t *testing.T) {
 	var err error
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"), "", nil)
+	f := fieldmanagertest.NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = applyObject(&f, "fieldmanager_a_test", []byte(`{
 		"apiVersion": "v1",
@@ -323,7 +326,7 @@ func TestNonManagedFieldsApplyDoesNotModifyTime(t *testing.T) {
 
 func TestTakingOverManagedFieldsDuringUpdateDoesNotModifyPreviousManagerTime(t *testing.T) {
 	var err error
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"), "", nil)
+	f := fieldmanagertest.NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = updateObject(&f, "fieldmanager_a_test", []byte(`{
 		"apiVersion": "v1",
@@ -374,7 +377,7 @@ func TestTakingOverManagedFieldsDuringUpdateDoesNotModifyPreviousManagerTime(t *
 
 func TestTakingOverManagedFieldsDuringApplyDoesNotModifyPreviousManagerTime(t *testing.T) {
 	var err error
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"), "", nil)
+	f := fieldmanagertest.NewDefaultTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = applyObject(&f, "fieldmanager_a_test", []byte(`{
 		"apiVersion": "v1",
@@ -425,15 +428,15 @@ func TestTakingOverManagedFieldsDuringApplyDoesNotModifyPreviousManagerTime(t *t
 
 type NoopManager struct{}
 
-func (NoopManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
+func (NoopManager) Apply(liveObj, appliedObj runtime.Object, managed fieldmanager.Managed, fieldManager string, force bool) (runtime.Object, fieldmanager.Managed, error) {
 	return nil, managed, nil
 }
 
-func (NoopManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+func (NoopManager) Update(liveObj, newObj runtime.Object, managed fieldmanager.Managed, manager string) (runtime.Object, fieldmanager.Managed, error) {
 	return nil, nil, nil
 }
 
-func updateObject(f *TestFieldManager, fieldManagerName string, object []byte) error {
+func updateObject(f *fieldmanagertest.TestFieldManager, fieldManagerName string, object []byte) error {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal(object, &obj.Object); err != nil {
 		return fmt.Errorf("error decoding YAML: %v", err)
@@ -444,7 +447,7 @@ func updateObject(f *TestFieldManager, fieldManagerName string, object []byte) e
 	return nil
 }
 
-func applyObject(f *TestFieldManager, fieldManagerName string, object []byte) error {
+func applyObject(f *fieldmanagertest.TestFieldManager, fieldManagerName string, object []byte) error {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal(object, &obj.Object); err != nil {
 		return fmt.Errorf("error decoding YAML: %v", err)
@@ -495,12 +498,12 @@ func TestNilNewObjectReplacedWithDeepCopyExcludingManagedFields(t *testing.T) {
 	}
 
 	// Decode the managed fields in the live object, since it isn't allowed in the patch.
-	managed, err := DecodeManagedFields(accessor.GetManagedFields())
+	managed, err := fieldmanager.DecodeManagedFields(accessor.GetManagedFields())
 	if err != nil {
 		t.Fatalf("failed to decode managed fields: %v", err)
 	}
 
-	updater := NewManagedFieldsUpdater(NoopManager{})
+	updater := fieldmanager.NewManagedFieldsUpdater(NoopManager{})
 
 	newObject, _, err := updater.Apply(obj, obj.DeepCopyObject(), managed, "some_manager", false)
 	if err != nil {

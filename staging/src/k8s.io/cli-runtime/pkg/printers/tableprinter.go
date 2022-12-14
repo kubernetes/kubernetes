@@ -212,18 +212,19 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 				case string:
 					print := val
 					truncated := false
-					// truncate at newlines
-					newline := strings.Index(print, "\n")
-					if newline >= 0 {
+					// Truncate at the first newline, carriage return or formfeed
+					// (treated as a newline by tabwriter).
+					breakchar := strings.IndexAny(print, "\f\n\r")
+					if breakchar >= 0 {
 						truncated = true
-						print = print[:newline]
+						print = print[:breakchar]
 					}
-					fmt.Fprint(output, print)
+					WriteEscaped(output, print)
 					if truncated {
 						fmt.Fprint(output, "...")
 					}
 				default:
-					fmt.Fprint(output, val)
+					WriteEscaped(output, fmt.Sprint(val))
 				}
 			}
 		}

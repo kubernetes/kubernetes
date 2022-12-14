@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -298,6 +299,7 @@ fd00::6	podFoo.domainFoo	podFoo
 }
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
+	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -308,6 +310,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
+		ctx,
 		kubecontainer.GetPodFullName(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
@@ -317,6 +320,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 }
 
 func TestRunInContainer(t *testing.T) {
+	ctx := context.Background()
 	for _, testError := range []error{nil, errors.New("bar")} {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 		defer testKubelet.Cleanup()
@@ -342,7 +346,7 @@ func TestRunInContainer(t *testing.T) {
 			}},
 		}
 		cmd := []string{"ls"}
-		actualOutput, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
+		actualOutput, err := kubelet.RunInContainer(ctx, "podFoo_nsFoo", "", "containerFoo", cmd)
 		assert.Equal(t, containerID, fakeCommandRunner.ContainerID, "(testError=%v) ID", testError)
 		assert.Equal(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
 		// this isn't 100% foolproof as a bug in a real CommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
@@ -2493,7 +2497,9 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			},
 		},
 	}
+
 	now := metav1.Now()
+	normalized_now := now.Rfc3339Copy()
 
 	tests := []struct {
 		name                           string
@@ -2501,9 +2507,66 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		currentStatus                  *kubecontainer.PodStatus
 		unreadyContainer               []string
 		previousStatus                 v1.PodStatus
+		enablePodDisruptionConditions  bool
 		expected                       v1.PodStatus
+		expectedPodDisruptionCondition v1.PodCondition
 		expectedPodHasNetworkCondition v1.PodCondition
 	}{
+		{
+			name: "pod disruption condition is copied over; PodDisruptionConditions enabled",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+					Conditions: []v1.PodCondition{{
+						Type:               v1.DisruptionTarget,
+						Status:             v1.ConditionTrue,
+						LastTransitionTime: normalized_now,
+					}},
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+			},
+			currentStatus: sandboxReadyStatus,
+			previousStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+				Conditions: []v1.PodCondition{{
+					Type:               v1.DisruptionTarget,
+					Status:             v1.ConditionTrue,
+					LastTransitionTime: normalized_now,
+				}},
+			},
+			enablePodDisruptionConditions: true,
+			expected: v1.PodStatus{
+				Phase:    v1.PodRunning,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 0)),
+					ready(waitingWithLastTerminationUnknown("containerB", 0)),
+				},
+			},
+			expectedPodDisruptionCondition: v1.PodCondition{
+				Type:               v1.DisruptionTarget,
+				Status:             v1.ConditionTrue,
+				LastTransitionTime: normalized_now,
+			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionTrue,
+			},
+		},
 		{
 			name: "current status ready, with previous statuses and deletion",
 			pod: &v1.Pod{
@@ -2872,6 +2935,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	for _, test := range tests {
 		for _, enablePodHasNetworkCondition := range []bool{false, true} {
 			t.Run(test.name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHasNetworkCondition, enablePodHasNetworkCondition)()
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
@@ -2880,12 +2944,16 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				for _, name := range test.unreadyContainer {
 					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
 				}
+				expected := test.expected.DeepCopy()
 				actual := kl.generateAPIPodStatus(test.pod, test.currentStatus)
 				if enablePodHasNetworkCondition {
-					test.expected.Conditions = append([]v1.PodCondition{test.expectedPodHasNetworkCondition}, test.expected.Conditions...)
+					expected.Conditions = append([]v1.PodCondition{test.expectedPodHasNetworkCondition}, expected.Conditions...)
 				}
-				if !apiequality.Semantic.DeepEqual(test.expected, actual) {
-					t.Fatalf("Unexpected status: %s", diff.ObjectReflectDiff(actual, test.expected))
+				if test.enablePodDisruptionConditions {
+					expected.Conditions = append([]v1.PodCondition{test.expectedPodDisruptionCondition}, expected.Conditions...)
+				}
+				if !apiequality.Semantic.DeepEqual(*expected, actual) {
+					t.Fatalf("Unexpected status: %s", diff.ObjectReflectDiff(*expected, actual))
 				}
 			})
 		}
@@ -2962,6 +3030,7 @@ func TestGetExec(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
+			ctx := context.Background()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
@@ -2983,7 +3052,7 @@ func TestGetExec(t *testing.T) {
 			kubelet.containerRuntime = fakeRuntime
 			kubelet.streamingRuntime = fakeRuntime
 
-			redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
+			redirect, err := kubelet.GetExec(ctx, tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
 			if tc.expectError {
 				assert.Error(t, err, description)
 			} else {
@@ -3016,6 +3085,7 @@ func TestGetPortForward(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
+		ctx := context.Background()
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
@@ -3037,7 +3107,7 @@ func TestGetPortForward(t *testing.T) {
 		kubelet.containerRuntime = fakeRuntime
 		kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})
+		redirect, err := kubelet.GetPortForward(ctx, tc.podName, podNamespace, podUID, portforward.V4Options{})
 		if tc.expectError {
 			assert.Error(t, err, description)
 		} else {
@@ -3086,6 +3156,7 @@ func TestHasHostMountPVC(t *testing.T) {
 	}
 
 	run := func(t *testing.T, v testcase) {
+		ctx := context.Background()
 		testKubelet := newTestKubelet(t, false)
 		defer testKubelet.Cleanup()
 		pod := &v1.Pod{
@@ -3134,7 +3205,7 @@ func TestHasHostMountPVC(t *testing.T) {
 			return true, volumeToReturn, v.pvError
 		})
 
-		actual := testKubelet.kubelet.hasHostMountPVC(pod)
+		actual := testKubelet.kubelet.hasHostMountPVC(ctx, pod)
 		if actual != v.expected {
 			t.Errorf("expected %t but got %t", v.expected, actual)
 		}

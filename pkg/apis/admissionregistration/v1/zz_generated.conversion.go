@@ -68,26 +68,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.Rule)(nil), (*admissionregistration.Rule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Rule_To_admissionregistration_Rule(a.(*v1.Rule), b.(*admissionregistration.Rule), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*admissionregistration.Rule)(nil), (*v1.Rule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_admissionregistration_Rule_To_v1_Rule(a.(*admissionregistration.Rule), b.(*v1.Rule), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.RuleWithOperations)(nil), (*admissionregistration.RuleWithOperations)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(a.(*v1.RuleWithOperations), b.(*admissionregistration.RuleWithOperations), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*admissionregistration.RuleWithOperations)(nil), (*v1.RuleWithOperations)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(a.(*admissionregistration.RuleWithOperations), b.(*v1.RuleWithOperations), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.ServiceReference)(nil), (*admissionregistration.ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ServiceReference_To_admissionregistration_ServiceReference(a.(*v1.ServiceReference), b.(*admissionregistration.ServiceReference), scope)
 	}); err != nil {
@@ -138,6 +118,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*admissionregistration.RuleWithOperations)(nil), (*v1.RuleWithOperations)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(a.(*admissionregistration.RuleWithOperations), b.(*v1.RuleWithOperations), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*admissionregistration.Rule)(nil), (*v1.Rule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_admissionregistration_Rule_To_v1_Rule(a.(*admissionregistration.Rule), b.(*v1.Rule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.RuleWithOperations)(nil), (*admissionregistration.RuleWithOperations)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(a.(*v1.RuleWithOperations), b.(*admissionregistration.RuleWithOperations), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.Rule)(nil), (*admissionregistration.Rule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Rule_To_admissionregistration_Rule(a.(*v1.Rule), b.(*admissionregistration.Rule), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -146,7 +146,17 @@ func autoConvert_v1_MutatingWebhook_To_admissionregistration_MutatingWebhook(in 
 	if err := Convert_v1_WebhookClientConfig_To_admissionregistration_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
-	out.Rules = *(*[]admissionregistration.RuleWithOperations)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]admissionregistration.RuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*admissionregistration.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
@@ -168,7 +178,17 @@ func autoConvert_admissionregistration_MutatingWebhook_To_v1_MutatingWebhook(in 
 	if err := Convert_admissionregistration_WebhookClientConfig_To_v1_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
-	out.Rules = *(*[]v1.RuleWithOperations)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]v1.RuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	out.FailurePolicy = (*v1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*v1.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
@@ -277,22 +297,12 @@ func autoConvert_v1_Rule_To_admissionregistration_Rule(in *v1.Rule, out *admissi
 	return nil
 }
 
-// Convert_v1_Rule_To_admissionregistration_Rule is an autogenerated conversion function.
-func Convert_v1_Rule_To_admissionregistration_Rule(in *v1.Rule, out *admissionregistration.Rule, s conversion.Scope) error {
-	return autoConvert_v1_Rule_To_admissionregistration_Rule(in, out, s)
-}
-
 func autoConvert_admissionregistration_Rule_To_v1_Rule(in *admissionregistration.Rule, out *v1.Rule, s conversion.Scope) error {
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.APIVersions = *(*[]string)(unsafe.Pointer(&in.APIVersions))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
 	out.Scope = (*v1.ScopeType)(unsafe.Pointer(in.Scope))
 	return nil
-}
-
-// Convert_admissionregistration_Rule_To_v1_Rule is an autogenerated conversion function.
-func Convert_admissionregistration_Rule_To_v1_Rule(in *admissionregistration.Rule, out *v1.Rule, s conversion.Scope) error {
-	return autoConvert_admissionregistration_Rule_To_v1_Rule(in, out, s)
 }
 
 func autoConvert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in *v1.RuleWithOperations, out *admissionregistration.RuleWithOperations, s conversion.Scope) error {
@@ -303,22 +313,12 @@ func autoConvert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperatio
 	return nil
 }
 
-// Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations is an autogenerated conversion function.
-func Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in *v1.RuleWithOperations, out *admissionregistration.RuleWithOperations, s conversion.Scope) error {
-	return autoConvert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in, out, s)
-}
-
 func autoConvert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(in *admissionregistration.RuleWithOperations, out *v1.RuleWithOperations, s conversion.Scope) error {
 	out.Operations = *(*[]v1.OperationType)(unsafe.Pointer(&in.Operations))
 	if err := Convert_admissionregistration_Rule_To_v1_Rule(&in.Rule, &out.Rule, s); err != nil {
 		return err
 	}
 	return nil
-}
-
-// Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations is an autogenerated conversion function.
-func Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(in *admissionregistration.RuleWithOperations, out *v1.RuleWithOperations, s conversion.Scope) error {
-	return autoConvert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(in, out, s)
 }
 
 func autoConvert_v1_ServiceReference_To_admissionregistration_ServiceReference(in *v1.ServiceReference, out *admissionregistration.ServiceReference, s conversion.Scope) error {
@@ -356,7 +356,17 @@ func autoConvert_v1_ValidatingWebhook_To_admissionregistration_ValidatingWebhook
 	if err := Convert_v1_WebhookClientConfig_To_admissionregistration_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
-	out.Rules = *(*[]admissionregistration.RuleWithOperations)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]admissionregistration.RuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*admissionregistration.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
@@ -377,7 +387,17 @@ func autoConvert_admissionregistration_ValidatingWebhook_To_v1_ValidatingWebhook
 	if err := Convert_admissionregistration_WebhookClientConfig_To_v1_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
-	out.Rules = *(*[]v1.RuleWithOperations)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]v1.RuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	out.FailurePolicy = (*v1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*v1.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))

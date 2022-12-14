@@ -430,7 +430,7 @@ func calculatePodRequests(pods []*v1.Pod, container string, resource v1.Resource
 				if containerRequest, ok := c.Resources.Requests[resource]; ok {
 					podSum += containerRequest.MilliValue()
 				} else {
-					return nil, fmt.Errorf("missing request for %s", resource)
+					return nil, fmt.Errorf("missing request for %s in container %s of Pod %s", resource, c.Name, pod.ObjectMeta.Name)
 				}
 			}
 		}

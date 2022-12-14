@@ -309,7 +309,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, delete replication controller, propagation policy background
 		Description: Create a replication controller with 2 Pods. Once RC is created and the first Pod is created, delete RC with deleteOptions.PropagationPolicy set to Background. Deleting the Replication Controller MUST cause pods created by that RC to be deleted.
 	*/
-	framework.ConformanceIt("should delete pods created by rc when not orphaning", func() {
+	framework.ConformanceIt("should delete pods created by rc when not orphaning", func(ctx context.Context) {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -367,7 +367,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, delete replication controller, propagation policy orphan
 		Description: Create a replication controller with maximum allocatable Pods between 10 and 100 replicas. Once RC is created and the all Pods are created, delete RC with deleteOptions.PropagationPolicy set to Orphan. Deleting the Replication Controller MUST cause pods created by that RC to be orphaned.
 	*/
-	framework.ConformanceIt("should orphan pods created by rc if delete options say so", func() {
+	framework.ConformanceIt("should orphan pods created by rc if delete options say so", func(ctx context.Context) {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -436,7 +436,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	// deleteOptions.OrphanDependents is deprecated in 1.7 and preferred to use the PropagationPolicy.
 	// Discussion is tracked under https://github.com/kubernetes/kubernetes/issues/65427 to promote for conformance in future.
-	ginkgo.It("should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func() {
+	ginkgo.It("should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func(ctx context.Context) {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -488,7 +488,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, delete deployment,  propagation policy background
 		Description: Create a deployment with a replicaset. Once replicaset is created , delete the deployment  with deleteOptions.PropagationPolicy set to Background. Deleting the deployment MUST delete the replicaset created by the deployment and also the Pods that belong to the deployments MUST be deleted.
 	*/
-	framework.ConformanceIt("should delete RS created by deployment when not orphaning", func() {
+	framework.ConformanceIt("should delete RS created by deployment when not orphaning", func(ctx context.Context) {
 		clientSet := f.ClientSet
 		deployClient := clientSet.AppsV1().Deployments(f.Namespace.Name)
 		rsClient := clientSet.AppsV1().ReplicaSets(f.Namespace.Name)
@@ -547,7 +547,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, delete deployment, propagation policy orphan
 		Description: Create a deployment with a replicaset. Once replicaset is created , delete the deployment  with deleteOptions.PropagationPolicy set to Orphan. Deleting the deployment MUST cause the replicaset created by the deployment to be orphaned, also the Pods created by the deployments MUST be orphaned.
 	*/
-	framework.ConformanceIt("should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan", func() {
+	framework.ConformanceIt("should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan", func(ctx context.Context) {
 		clientSet := f.ClientSet
 		deployClient := clientSet.AppsV1().Deployments(f.Namespace.Name)
 		rsClient := clientSet.AppsV1().ReplicaSets(f.Namespace.Name)
@@ -647,7 +647,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, delete replication controller, after owned pods
 		Description: Create a replication controller with maximum allocatable Pods between 10 and 100 replicas. Once RC is created and the all Pods are created, delete RC with deleteOptions.PropagationPolicy set to Foreground. Deleting the Replication Controller MUST cause pods created by that RC to be deleted before the RC is deleted.
 	*/
-	framework.ConformanceIt("should keep the rc around until all its pods are deleted if the deleteOptions says so", func() {
+	framework.ConformanceIt("should keep the rc around until all its pods are deleted if the deleteOptions says so", func(ctx context.Context) {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -732,7 +732,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, multiple owners
 		Description: Create a replication controller RC1, with maximum allocatable Pods between 10 and 100 replicas. Create second replication controller RC2 and set RC2 as owner for half of those replicas. Once RC1 is created and the all Pods are created, delete RC1 with deleteOptions.PropagationPolicy set to Foreground. Half of the Pods that has RC2 as owner MUST not be deleted or have a deletion timestamp. Deleting the Replication Controller MUST not delete Pods that are owned by multiple replication controllers.
 	*/
-	framework.ConformanceIt("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func() {
+	framework.ConformanceIt("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func(ctx context.Context) {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -846,7 +846,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, dependency cycle
 		Description: Create three pods, patch them with Owner references such that pod1 has pod3, pod2 has pod1 and pod3 has pod2 as owner references respectively. Delete pod1 MUST delete all pods. The dependency cycle MUST not block the garbage collection.
 	*/
-	framework.ConformanceIt("should not be blocked by dependency circle", func() {
+	framework.ConformanceIt("should not be blocked by dependency circle", func(ctx context.Context) {
 		clientSet := f.ClientSet
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		pod1Name := "pod1"
@@ -902,7 +902,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 	})
 
-	ginkgo.It("should support cascading deletion of custom resources", func() {
+	ginkgo.It("should support cascading deletion of custom resources", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		if err != nil {
 			framework.Failf("failed to load config: %v", err)
@@ -1037,7 +1037,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 	})
 
-	ginkgo.It("should support orphan deletion of custom resources", func() {
+	ginkgo.It("should support orphan deletion of custom resources", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		if err != nil {
 			framework.Failf("failed to load config: %v", err)
@@ -1142,7 +1142,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 	})
 
-	ginkgo.It("should delete jobs and pods created by cronjob", func() {
+	ginkgo.It("should delete jobs and pods created by cronjob", func(ctx context.Context) {
 
 		ginkgo.By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")

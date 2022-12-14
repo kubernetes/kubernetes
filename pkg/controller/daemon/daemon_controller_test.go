@@ -2234,9 +2234,8 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			}
 			manager.nodeStore.Add(node)
 			for _, p := range c.podsOnNode {
-				manager.podStore.Add(p)
 				p.Spec.NodeName = "test-node"
-				manager.podNodeIndex.Add(p)
+				manager.podStore.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
 			shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(node, c.ds)

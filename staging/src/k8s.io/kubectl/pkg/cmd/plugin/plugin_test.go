@@ -18,7 +18,6 @@ package plugin
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -29,11 +28,11 @@ import (
 )
 
 func TestPluginPathsAreUnaltered(t *testing.T) {
-	tempDir, err := ioutil.TempDir(os.TempDir(), "test-cmd-plugins")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "test-cmd-plugins")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	tempDir2, err := ioutil.TempDir(os.TempDir(), "test-cmd-plugins2")
+	tempDir2, err := os.MkdirTemp(os.TempDir(), "test-cmd-plugins2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,10 +57,10 @@ func TestPluginPathsAreUnaltered(t *testing.T) {
 	}
 
 	// write at least one valid plugin file
-	if _, err := ioutil.TempFile(tempDir, "kubectl-"); err != nil {
+	if _, err := os.CreateTemp(tempDir, "kubectl-"); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-	if _, err := ioutil.TempFile(tempDir2, "kubectl-"); err != nil {
+	if _, err := os.CreateTemp(tempDir2, "kubectl-"); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
@@ -81,7 +80,7 @@ func TestPluginPathsAreUnaltered(t *testing.T) {
 }
 
 func TestPluginPathsAreValid(t *testing.T) {
-	tempDir, err := ioutil.TempDir(os.TempDir(), "test-cmd-plugins")
+	tempDir, err := os.MkdirTemp(os.TempDir(), "test-cmd-plugins")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -107,7 +106,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 			pluginPaths: []string{tempDir},
 			verifier:    newFakePluginPathVerifier(),
 			pluginFile: func() (*os.File, error) {
-				return ioutil.TempFile(tempDir, "notkubectl-")
+				return os.CreateTemp(tempDir, "notkubectl-")
 			},
 			expectErr: "error: unable to find any kubectl plugins in your PATH\n",
 		},
@@ -116,7 +115,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 			pluginPaths: []string{tempDir, tempDir},
 			verifier:    newFakePluginPathVerifier(),
 			pluginFile: func() (*os.File, error) {
-				return ioutil.TempFile(tempDir, "kubectl-")
+				return os.CreateTemp(tempDir, "kubectl-")
 			},
 			expectOut: "The following compatible plugins are available:",
 		},
@@ -125,7 +124,7 @@ func TestPluginPathsAreValid(t *testing.T) {
 			pluginPaths: []string{tempDir, "", " "},
 			verifier:    newFakePluginPathVerifier(),
 			pluginFile: func() (*os.File, error) {
-				return ioutil.TempFile(tempDir, "kubectl-")
+				return os.CreateTemp(tempDir, "kubectl-")
 			},
 			expectOut: "The following compatible plugins are available:",
 		},

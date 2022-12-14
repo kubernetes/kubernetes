@@ -79,7 +79,6 @@ func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) (*CidrSet, error) {
 	clusterMask := clusterCIDR.Mask
 	clusterMaskSize, bits := clusterMask.Size()
 
-	var maxCIDRs int
 	if (clusterCIDR.IP.To4() == nil) && (subNetMaskSize-clusterMaskSize > clusterSubnetMaxDiff) {
 		return nil, ErrCIDRSetSubNetTooBig
 	}
@@ -87,15 +86,18 @@ func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) (*CidrSet, error) {
 	// register CidrSet metrics
 	registerCidrsetMetrics()
 
-	maxCIDRs = 1 << uint32(subNetMaskSize-clusterMaskSize)
-	return &CidrSet{
+	maxCIDRs := getMaxCIDRs(subNetMaskSize, clusterMaskSize)
+	cidrSet := &CidrSet{
 		clusterCIDR:     clusterCIDR,
 		nodeMask:        net.CIDRMask(subNetMaskSize, bits),
 		clusterMaskSize: clusterMaskSize,
 		maxCIDRs:        maxCIDRs,
 		nodeMaskSize:    subNetMaskSize,
 		label:           clusterCIDR.String(),
-	}, nil
+	}
+	cidrSetMaxCidrs.WithLabelValues(cidrSet.label).Set(float64(maxCIDRs))
+
+	return cidrSet, nil
 }
 
 func (s *CidrSet) indexToCIDRBlock(index int) *net.IPNet {
@@ -174,7 +176,7 @@ func (s *CidrSet) AllocateNext() (*net.IPNet, error) {
 	return s.indexToCIDRBlock(candidate), nil
 }
 
-func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
+func (s *CidrSet) getBeginningAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
 	if cidr == nil {
 		return -1, -1, fmt.Errorf("error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
 	}
@@ -225,7 +227,7 @@ func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err
 
 // Release releases the given CIDR range.
 func (s *CidrSet) Release(cidr *net.IPNet) error {
-	begin, end, err := s.getBeginingAndEndIndices(cidr)
+	begin, end, err := s.getBeginningAndEndIndices(cidr)
 	if err != nil {
 		return err
 	}
@@ -248,7 +250,7 @@ func (s *CidrSet) Release(cidr *net.IPNet) error {
 // Occupy marks the given CIDR range as used. Occupy succeeds even if the CIDR
 // range was previously used.
 func (s *CidrSet) Occupy(cidr *net.IPNet) (err error) {
-	begin, end, err := s.getBeginingAndEndIndices(cidr)
+	begin, end, err := s.getBeginningAndEndIndices(cidr)
 	if err != nil {
 		return err
 	}
@@ -292,4 +294,10 @@ func (s *CidrSet) getIndexForIP(ip net.IP) (int, error) {
 	}
 
 	return 0, fmt.Errorf("invalid IP: %v", ip)
+}
+
+// getMaxCIDRs returns the max number of CIDRs that can be obtained by subdividing a mask of size `clusterMaskSize`
+// into subnets with mask of size `subNetMaskSize`.
+func getMaxCIDRs(subNetMaskSize, clusterMaskSize int) int {
+	return 1 << uint32(subNetMaskSize-clusterMaskSize)
 }

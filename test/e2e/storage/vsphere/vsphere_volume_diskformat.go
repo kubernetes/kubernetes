@@ -81,15 +81,15 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, client, nodeName, NodeLabelKey)
 	})
 
-	ginkgo.It("verify disk format type - eagerzeroedthick is honored for dynamically provisioned pv using storageclass", func() {
+	ginkgo.It("verify disk format type - eagerzeroedthick is honored for dynamically provisioned pv using storageclass", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for diskformat: eagerzeroedthick")
 		invokeTest(f, client, namespace, nodeName, nodeKeyValueLabel, "eagerzeroedthick")
 	})
-	ginkgo.It("verify disk format type - zeroedthick is honored for dynamically provisioned pv using storageclass", func() {
+	ginkgo.It("verify disk format type - zeroedthick is honored for dynamically provisioned pv using storageclass", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for diskformat: zeroedthick")
 		invokeTest(f, client, namespace, nodeName, nodeKeyValueLabel, "zeroedthick")
 	})
-	ginkgo.It("verify disk format type - thin is honored for dynamically provisioned pv using storageclass", func() {
+	ginkgo.It("verify disk format type - thin is honored for dynamically provisioned pv using storageclass", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for diskformat: thin")
 		invokeTest(f, client, namespace, nodeName, nodeKeyValueLabel, "thin")
 	})
@@ -106,16 +106,14 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass)
 	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), pvclaimSpec, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	defer func() {
-		client.CoreV1().PersistentVolumeClaims(namespace).Delete(context.TODO(), pvclaimSpec.Name, metav1.DeleteOptions{})
-	}()
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.CoreV1().PersistentVolumeClaims(namespace).Delete), pvclaimSpec.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Waiting for claim to be in bound phase")
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, f.Timeouts.ClaimProvision)

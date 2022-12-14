@@ -50,7 +50,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		e2eskipper.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())
 	})
 
-	ginkgo.It("should return pod details", func() {
+	ginkgo.It("should return pod details", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 
@@ -77,7 +77,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		framework.Logf("Table:\n%s", out)
 	})
 
-	ginkgo.It("should return chunks of table results for list calls", func() {
+	ginkgo.It("should return chunks of table results for list calls", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)
@@ -126,7 +126,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0002")
 	})
 
-	ginkgo.It("should return generic metadata details across all namespaces for nodes", func() {
+	ginkgo.It("should return generic metadata details across all namespaces for nodes", func(ctx context.Context) {
 		c := f.ClientSet
 
 		table := &metav1beta1.Table{}
@@ -151,7 +151,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 				Description: Issue a HTTP request to the API.
 		        HTTP request MUST return a HTTP status code of 406.
 	*/
-	framework.ConformanceIt("should return a 406 for a backend which does not implement metadata", func() {
+	framework.ConformanceIt("should return a 406 for a backend which does not implement metadata", func(ctx context.Context) {
 		c := f.ClientSet
 
 		table := &metav1beta1.Table{}

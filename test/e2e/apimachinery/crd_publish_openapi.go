@@ -66,7 +66,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		explain the nested custom resource properties.
 		All validation should be the same.
 	*/
-	framework.ConformanceIt("works for CRD with validation schema", func() {
+	framework.ConformanceIt("works for CRD with validation schema", func(ctx context.Context) {
 		crd, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -150,7 +150,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST contain a valid DESCRIPTION stanza.
 	*/
-	framework.ConformanceIt("works for CRD without validation schema", func() {
+	framework.ConformanceIt("works for CRD without validation schema", func(ctx context.Context) {
 		crd, err := setupCRD(f, nil, "empty", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -191,7 +191,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST show the custom resource KIND.
 	*/
-	framework.ConformanceIt("works for CRD preserving unknown fields at the schema root", func() {
+	framework.ConformanceIt("works for CRD preserving unknown fields at the schema root", func(ctx context.Context) {
 		crd, err := setupCRDAndVerifySchema(f, schemaPreserveRoot, nil, "unknown-at-root", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -233,7 +233,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		properties. Attempt kubectl explain; the output MUST show that x-preserve-unknown-properties is used on the
 		nested field.
 	*/
-	framework.ConformanceIt("works for CRD preserving unknown fields in an embedded object", func() {
+	framework.ConformanceIt("works for CRD preserving unknown fields in an embedded object", func(ctx context.Context) {
 		crd, err := setupCRDAndVerifySchema(f, schemaPreserveNested, nil, "unknown-in-nested", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -273,7 +273,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Description: Register multiple custom resource definitions spanning different groups and versions;
 		OpenAPI definitions MUST be published for custom resource definitions.
 	*/
-	framework.ConformanceIt("works for multiple CRDs of different groups", func() {
+	framework.ConformanceIt("works for multiple CRDs of different groups", func(ctx context.Context) {
 		ginkgo.By("CRs in different groups (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
@@ -306,7 +306,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Description: Register a custom resource definition with multiple versions; OpenAPI definitions MUST be published
 		for custom resource definitions.
 	*/
-	framework.ConformanceIt("works for multiple CRDs of same group but different versions", func() {
+	framework.ConformanceIt("works for multiple CRDs of same group but different versions", func(ctx context.Context) {
 		ginkgo.By("CRs in the same group but different versions (one multiversion CRD) show up in OpenAPI documentation")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
@@ -354,7 +354,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		Description: Register multiple custom resource definitions in the same group and version but spanning different kinds;
 		OpenAPI definitions MUST be published for custom resource definitions.
 	*/
-	framework.ConformanceIt("works for multiple CRDs of same group and version but different kinds", func() {
+	framework.ConformanceIt("works for multiple CRDs of same group and version but different kinds", func(ctx context.Context) {
 		ginkgo.By("CRs in the same group and version but different kinds (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "common-group", "v6")
 		if err != nil {
@@ -388,7 +388,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		for custom resource definitions. Rename one of the versions of the custom resource definition via a patch;
 		OpenAPI definitions MUST update to reflect the rename.
 	*/
-	framework.ConformanceIt("updates the published spec when one version gets renamed", func() {
+	framework.ConformanceIt("updates the published spec when one version gets renamed", func(ctx context.Context) {
 		ginkgo.By("set up a multi version CRD")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
@@ -439,7 +439,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		for custom resource definitions. Update the custom resource definition to not serve one of the versions. OpenAPI
 		definitions MUST be updated to not contain the version that is no longer served.
 	*/
-	framework.ConformanceIt("removes definition from spec when one version gets changed to not be served", func() {
+	framework.ConformanceIt("removes definition from spec when one version gets changed to not be served", func(ctx context.Context) {
 		ginkgo.By("set up a multi version CRD")
 		crd, err := setupCRD(f, schemaFoo, "multi-to-single-ver", "v5", "v6alpha1")
 		if err != nil {
@@ -479,7 +479,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 	})
 
 	// Marked as flaky until https://github.com/kubernetes/kubernetes/issues/65517 is solved.
-	ginkgo.It("[Flaky] kubectl explain works for CR with the same resource name as built-in object.", func() {
+	ginkgo.It("[Flaky] kubectl explain works for CR with the same resource name as built-in object.", func(ctx context.Context) {
 		customServiceShortName := fmt.Sprintf("ksvc-%d", time.Now().Unix()) // make short name unique
 		opt := func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.ObjectMeta = metav1.ObjectMeta{Name: "services." + crd.Spec.Group}

@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -81,7 +82,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 				}, time.Minute, time.Second*2).Should(gomega.BeNil())
 			})
 
-			ginkgo.It("should not be evicted upon DiskPressure", func() {
+			ginkgo.It("should not be evicted upon DiskPressure", func(ctx context.Context) {
 				ginkgo.By("wait for the node to have DiskPressure condition")
 				gomega.Eventually(func() error {
 					if hasNodeCondition(f, v1.NodeDiskPressure) {

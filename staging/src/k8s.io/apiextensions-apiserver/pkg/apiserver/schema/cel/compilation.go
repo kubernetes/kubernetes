@@ -75,6 +75,8 @@ var (
 	initEnvErr  error
 )
 
+// This func is duplicated in k8s.io/apiserver/pkg/admission/plugin/cel/validator.go
+// If any changes are made here, consider to make the same changes there as well.
 func getBaseEnv() (*cel.Env, error) {
 	initEnvOnce.Do(func() {
 		var opts []cel.EnvOption

@@ -50,10 +50,11 @@ type Config struct {
 	Process ProcessFunc
 
 	// ObjectType is an example object of the type this controller is
-	// expected to handle.  Only the type needs to be right, except
-	// that when that is `unstructured.Unstructured` the object's
-	// `"apiVersion"` and `"kind"` must also be right.
+	// expected to handle.
 	ObjectType runtime.Object
+
+	// ObjectDescription is the description to use when logging type-specific information about this controller.
+	ObjectDescription string
 
 	// FullResyncPeriod is the period at which ShouldResync is considered.
 	FullResyncPeriod time.Duration
@@ -131,11 +132,14 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		<-stopCh
 		c.config.Queue.Close()
 	}()
-	r := NewReflector(
+	r := NewReflectorWithOptions(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
 		c.config.Queue,
-		c.config.FullResyncPeriod,
+		ReflectorOptions{
+			ResyncPeriod:    c.config.FullResyncPeriod,
+			TypeDescription: c.config.ObjectDescription,
+		},
 	)
 	r.ShouldResync = c.config.ShouldResync
 	r.WatchListPageSize = c.config.WatchListPageSize

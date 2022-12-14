@@ -22,10 +22,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -115,19 +113,13 @@ type basicManager struct {
 	// Mirror pod UID to pod UID map.
 	translationByUID map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID
 
-	// basicManager is keeping secretManager and configMapManager up-to-date.
-	secretManager    secret.Manager
-	configMapManager configmap.Manager
-
 	// A mirror pod client to create/delete mirror pods.
 	MirrorClient
 }
 
 // NewBasicPodManager returns a functional Manager.
-func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager) Manager {
+func NewBasicPodManager(client MirrorClient) Manager {
 	pm := &basicManager{}
-	pm.secretManager = secretManager
-	pm.configMapManager = configMapManager
 	pm.MirrorClient = client
 	pm.SetPods(nil)
 	return pm

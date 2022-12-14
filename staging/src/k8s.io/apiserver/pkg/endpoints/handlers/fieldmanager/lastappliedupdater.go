@@ -21,9 +21,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 )
 
 type lastAppliedUpdater struct {
@@ -62,7 +62,7 @@ func (f *lastAppliedUpdater) Apply(liveObj, newObj runtime.Object, managed Manag
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to build last-applied annotation: %v", err)
 		}
-		err = setLastApplied(liveObj, lastAppliedValue)
+		err = internal.SetLastApplied(liveObj, lastAppliedValue)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to set last-applied annotation: %v", err)
 		}
@@ -81,23 +81,6 @@ func hasLastApplied(obj runtime.Object) bool {
 	}
 	lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
 	return ok && len(lastApplied) > 0
-}
-
-func setLastApplied(obj runtime.Object, value string) error {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		panic(fmt.Sprintf("couldn't get accessor: %v", err))
-	}
-	var annotations = accessor.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-	annotations[corev1.LastAppliedConfigAnnotation] = value
-	if err := apimachineryvalidation.ValidateAnnotationsSize(annotations); err != nil {
-		delete(annotations, corev1.LastAppliedConfigAnnotation)
-	}
-	accessor.SetAnnotations(annotations)
-	return nil
 }
 
 func buildLastApplied(obj runtime.Object) (string, error) {

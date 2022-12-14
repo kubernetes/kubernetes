@@ -19,7 +19,7 @@
 // Package attributes defines a generic key/value store used in various gRPC
 // components.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This package is EXPERIMENTAL and may be changed or removed in a
 // later release.

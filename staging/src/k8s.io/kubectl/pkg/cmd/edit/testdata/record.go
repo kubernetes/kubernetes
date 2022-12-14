@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -85,7 +85,7 @@ func main() {
 			record = true
 		}
 
-		body, err := ioutil.ReadAll(req.Body)
+		body, err := io.ReadAll(req.Body)
 		checkErr(err)
 
 		switch m, p := req.Method, req.URL.Path; {
@@ -94,14 +94,14 @@ func main() {
 				panic("cannot post input with step already in progress")
 			}
 			filename := fmt.Sprintf("%d.original", len(tc.Steps))
-			checkErr(ioutil.WriteFile(filename, body, os.FileMode(0755)))
+			checkErr(os.WriteFile(filename, body, os.FileMode(0755)))
 			currentStep = &EditStep{StepType: "edit", Input: filename}
 		case m == "POST" && p == "/callback/out":
 			if currentStep == nil || currentStep.StepType != "edit" {
 				panic("cannot post output without posting input first")
 			}
 			filename := fmt.Sprintf("%d.edited", len(tc.Steps))
-			checkErr(ioutil.WriteFile(filename, body, os.FileMode(0755)))
+			checkErr(os.WriteFile(filename, body, os.FileMode(0755)))
 			currentStep.Output = filename
 			tc.Steps = append(tc.Steps, *currentStep)
 			currentStep = nil
@@ -120,7 +120,7 @@ func main() {
 			checkErr(err)
 			defer resp.Body.Close()
 
-			bodyOut, err := ioutil.ReadAll(resp.Body)
+			bodyOut, err := io.ReadAll(resp.Body)
 			checkErr(err)
 
 			for k, vs := range resp.Header {
@@ -134,8 +134,8 @@ func main() {
 			if record {
 				infile := fmt.Sprintf("%d.request", len(tc.Steps))
 				outfile := fmt.Sprintf("%d.response", len(tc.Steps))
-				checkErr(ioutil.WriteFile(infile, tryIndent(body), os.FileMode(0755)))
-				checkErr(ioutil.WriteFile(outfile, tryIndent(bodyOut), os.FileMode(0755)))
+				checkErr(os.WriteFile(infile, tryIndent(body), os.FileMode(0755)))
+				checkErr(os.WriteFile(outfile, tryIndent(bodyOut), os.FileMode(0755)))
 				tc.Steps = append(tc.Steps, EditStep{
 					StepType:           "request",
 					Input:              infile,
@@ -150,7 +150,7 @@ func main() {
 
 		tcData, err := yaml.Marshal(tc)
 		checkErr(err)
-		checkErr(ioutil.WriteFile("test.yaml", tcData, os.FileMode(0755)))
+		checkErr(os.WriteFile("test.yaml", tcData, os.FileMode(0755)))
 	})))
 }
 

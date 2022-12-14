@@ -19,6 +19,7 @@ package reconciler
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -187,7 +188,7 @@ func Test_Run_Positive_Register(t *testing.T) {
 	stopChan := make(chan struct{})
 	defer close(stopChan)
 	go reconciler.Run(stopChan)
-	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
+	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
@@ -233,7 +234,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	defer close(stopChan)
 	go reconciler.Run(stopChan)
 
-	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
+	socketPath := filepath.Join(socketDir, "plugin.sock")
 	pluginName := fmt.Sprintf("example-plugin")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
@@ -289,7 +290,7 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	defer close(stopChan)
 	go reconciler.Run(stopChan)
 
-	socketPath := fmt.Sprintf("%s/plugin2.sock", socketDir)
+	socketPath := filepath.Join(socketDir, "plugin2.sock")
 	pluginName := fmt.Sprintf("example-plugin2")
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))

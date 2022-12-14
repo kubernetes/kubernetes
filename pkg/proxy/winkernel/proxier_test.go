@@ -138,18 +138,19 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 		networkType: networkType,
 	}
 	proxier := &Proxier{
-		serviceMap:          make(proxy.ServiceMap),
-		endpointsMap:        make(proxy.EndpointsMap),
-		clusterCIDR:         clusterCIDR,
-		hostname:            testHostName,
-		nodeIP:              nodeIP,
-		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
-		network:             *hnsNetworkInfo,
-		sourceVip:           sourceVip,
-		hostMac:             macAddress,
-		isDSR:               false,
-		hns:                 newFakeHNS(),
-		endPointsRefCount:   make(endPointsReferenceCountMap),
+		svcPortMap:            make(proxy.ServicePortMap),
+		endpointsMap:          make(proxy.EndpointsMap),
+		clusterCIDR:           clusterCIDR,
+		hostname:              testHostName,
+		nodeIP:                nodeIP,
+		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
+		network:               *hnsNetworkInfo,
+		sourceVip:             sourceVip,
+		hostMac:               macAddress,
+		isDSR:                 false,
+		hns:                   newFakeHNS(),
+		endPointsRefCount:     make(endPointsReferenceCountMap),
+		forwardHealthCheckVip: true,
 	}
 
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, v1.IPv4Protocol, nil, proxier.serviceMapChange)
@@ -200,7 +201,7 @@ func TestCreateServiceVip(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.serviceMap[svcPortName]
+	svc := proxier.svcPortMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
@@ -706,7 +707,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.serviceMap[svcPortName]
+	svc := proxier.svcPortMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
@@ -739,7 +740,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
 			svc.Spec.Type = "NodePort"
 			svc.Spec.ClusterIP = svcIP
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			svc.Spec.Ports = []v1.ServicePort{{
 				Name:     svcPortName.Port,
 				Port:     int32(svcPort),
@@ -769,7 +770,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.serviceMap[svcPortName]
+	svc := proxier.svcPortMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
@@ -839,7 +840,7 @@ func TestEndpointSlice(t *testing.T) {
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
 
-	svc := proxier.serviceMap[svcPortName]
+	svc := proxier.svcPortMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())

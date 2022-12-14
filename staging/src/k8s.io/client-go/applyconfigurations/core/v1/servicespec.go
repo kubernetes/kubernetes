@@ -35,7 +35,7 @@ type ServiceSpecApplyConfiguration struct {
 	LoadBalancerIP                *string                                  `json:"loadBalancerIP,omitempty"`
 	LoadBalancerSourceRanges      []string                                 `json:"loadBalancerSourceRanges,omitempty"`
 	ExternalName                  *string                                  `json:"externalName,omitempty"`
-	ExternalTrafficPolicy         *corev1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
+	ExternalTrafficPolicy         *corev1.ServiceExternalTrafficPolicy     `json:"externalTrafficPolicy,omitempty"`
 	HealthCheckNodePort           *int32                                   `json:"healthCheckNodePort,omitempty"`
 	PublishNotReadyAddresses      *bool                                    `json:"publishNotReadyAddresses,omitempty"`
 	SessionAffinityConfig         *SessionAffinityConfigApplyConfiguration `json:"sessionAffinityConfig,omitempty"`
@@ -43,7 +43,7 @@ type ServiceSpecApplyConfiguration struct {
 	IPFamilyPolicy                *corev1.IPFamilyPolicy                   `json:"ipFamilyPolicy,omitempty"`
 	AllocateLoadBalancerNodePorts *bool                                    `json:"allocateLoadBalancerNodePorts,omitempty"`
 	LoadBalancerClass             *string                                  `json:"loadBalancerClass,omitempty"`
-	InternalTrafficPolicy         *corev1.ServiceInternalTrafficPolicyType `json:"internalTrafficPolicy,omitempty"`
+	InternalTrafficPolicy         *corev1.ServiceInternalTrafficPolicy     `json:"internalTrafficPolicy,omitempty"`
 }
 
 // ServiceSpecApplyConfiguration constructs an declarative configuration of the ServiceSpec type for use with
@@ -152,7 +152,7 @@ func (b *ServiceSpecApplyConfiguration) WithExternalName(value string) *ServiceS
 // WithExternalTrafficPolicy sets the ExternalTrafficPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ExternalTrafficPolicy field is set to the value of the last call.
-func (b *ServiceSpecApplyConfiguration) WithExternalTrafficPolicy(value corev1.ServiceExternalTrafficPolicyType) *ServiceSpecApplyConfiguration {
+func (b *ServiceSpecApplyConfiguration) WithExternalTrafficPolicy(value corev1.ServiceExternalTrafficPolicy) *ServiceSpecApplyConfiguration {
 	b.ExternalTrafficPolicy = &value
 	return b
 }
@@ -218,7 +218,7 @@ func (b *ServiceSpecApplyConfiguration) WithLoadBalancerClass(value string) *Ser
 // WithInternalTrafficPolicy sets the InternalTrafficPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the InternalTrafficPolicy field is set to the value of the last call.
-func (b *ServiceSpecApplyConfiguration) WithInternalTrafficPolicy(value corev1.ServiceInternalTrafficPolicyType) *ServiceSpecApplyConfiguration {
+func (b *ServiceSpecApplyConfiguration) WithInternalTrafficPolicy(value corev1.ServiceInternalTrafficPolicy) *ServiceSpecApplyConfiguration {
 	b.InternalTrafficPolicy = &value
 	return b
 }

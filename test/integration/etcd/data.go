@@ -128,6 +128,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("autoscaling", "v1", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa2"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa2",
+			ExpectedGVK:      gvkP("autoscaling", "v2", "HorizontalPodAutoscaler"),
 		},
 		// --
 
@@ -135,7 +136,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("autoscaling", "v2", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa4"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa4",
-			ExpectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
 		},
 		// --
 
@@ -143,7 +143,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("autoscaling", "v2beta1", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa1"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa1",
-			ExpectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
+			ExpectedGVK:      gvkP("autoscaling", "v2", "HorizontalPodAutoscaler"),
 		},
 		// --
 
@@ -151,7 +151,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("autoscaling", "v2beta2", "horizontalpodautoscalers"): {
 			Stub:             `{"metadata": {"name": "hpa3"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
 			ExpectedEtcdPath: "/registry/horizontalpodautoscalers/" + namespace + "/hpa3",
-			ExpectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
+			ExpectedGVK:      gvkP("autoscaling", "v2", "HorizontalPodAutoscaler"),
 		},
 		// --
 
@@ -386,6 +386,17 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): {
+			Stub:             `{"metadata":{"name":"vap1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
+			ExpectedEtcdPath: "/registry/validatingadmissionpolicies/vap1",
+		},
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): {
+			Stub:             `{"metadata":{"name":"pb1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"}}}`,
+			ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pb1",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/scheduling/v1
 		gvr("scheduling.k8s.io", "v1", "priorityclasses"): {
 			Stub:             `{"metadata":{"name":"pc3"},"Value":1000}`,
@@ -445,6 +456,25 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("node.k8s.io", "v1", "runtimeclasses"): {
 			Stub:             `{"metadata": {"name": "rc3"}, "handler": "h3"}`,
 			ExpectedEtcdPath: "/registry/runtimeclasses/rc3",
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/resource/v1alpha1
+		gvr("resource.k8s.io", "v1alpha1", "resourceclasses"): {
+			Stub:             `{"metadata": {"name": "class1name"}, "driverName": "example.com"}`,
+			ExpectedEtcdPath: "/registry/resourceclasses/class1name",
+		},
+		gvr("resource.k8s.io", "v1alpha1", "resourceclaims"): {
+			Stub:             `{"metadata": {"name": "claim1name"}, "spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}`,
+			ExpectedEtcdPath: "/registry/resourceclaims/" + namespace + "/claim1name",
+		},
+		gvr("resource.k8s.io", "v1alpha1", "resourceclaimtemplates"): {
+			Stub:             `{"metadata": {"name": "claimtemplate1name"}, "spec": {"spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}}`,
+			ExpectedEtcdPath: "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate1name",
+		},
+		gvr("resource.k8s.io", "v1alpha1", "podschedulings"): {
+			Stub:             `{"metadata": {"name": "pod1name"}, "spec": {"selectedNode": "node1name", "potentialNodes": ["node1name", "node2name"]}}`,
+			ExpectedEtcdPath: "/registry/podschedulings/" + namespace + "/pod1name",
 		},
 		// --
 

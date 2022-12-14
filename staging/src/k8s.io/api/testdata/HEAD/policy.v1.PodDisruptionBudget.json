@@ -59,7 +59,8 @@
         }
       ]
     },
-    "maxUnavailable": "maxUnavailableValue"
+    "maxUnavailable": "maxUnavailableValue",
+    "unhealthyPodEvictionPolicy": "unhealthyPodEvictionPolicyValue"
   },
   "status": {
     "observedGeneration": 1,

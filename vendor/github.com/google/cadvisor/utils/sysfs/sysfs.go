@@ -38,6 +38,8 @@ const (
 
 	meminfoFile = "meminfo"
 
+	distanceFile = "distance"
+
 	sysFsCPUTopology = "topology"
 
 	// CPUPhysicalPackageID is a physical package id of cpu#. Typically corresponds to a physical socket number,
@@ -113,6 +115,10 @@ type SysFs interface {
 	GetCacheInfo(cpu int, cache string) (CacheInfo, error)
 
 	GetSystemUUID() (string, error)
+
+	// GetDistances returns distance array
+	GetDistances(string) (string, error)
+
 	// IsCPUOnline determines if CPU status from kernel hotplug machanism standpoint.
 	// See: https://www.kernel.org/doc/html/latest/core-api/cpu_hotplug.html
 	IsCPUOnline(dir string) bool
@@ -159,6 +165,15 @@ func (fs *realSysFs) GetMemInfo(nodePath string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(meminfo)), err
+}
+
+func (fs *realSysFs) GetDistances(nodePath string) (string, error) {
+	distancePath := fmt.Sprintf("%s/%s", nodePath, distanceFile)
+	distance, err := ioutil.ReadFile(distancePath)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(distance)), err
 }
 
 func (fs *realSysFs) GetHugePagesInfo(hugePagesDirectory string) ([]os.FileInfo, error) {

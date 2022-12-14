@@ -99,7 +99,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		}
 	})
 
-	ginkgo.It("Verify \"immediate\" deletion of a PV that is not bound to a PVC", func() {
+	ginkgo.It("Verify \"immediate\" deletion of a PV that is not bound to a PVC", func(ctx context.Context) {
 		ginkgo.By("Deleting the PV")
 		err = client.CoreV1().PersistentVolumes().Delete(context.TODO(), pv.Name, *metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Error deleting PV")
@@ -107,7 +107,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		framework.ExpectNoError(err, "waiting for PV to be deleted")
 	})
 
-	ginkgo.It("Verify that PV bound to a PVC is not removed immediately", func() {
+	ginkgo.It("Verify that PV bound to a PVC is not removed immediately", func(ctx context.Context) {
 		ginkgo.By("Creating a PVC")
 		pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, nameSpace)
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})

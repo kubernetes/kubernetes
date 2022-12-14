@@ -17,12 +17,15 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -36,6 +39,8 @@ discovery:
     token: abcdef.0123456789abcdef
     apiServerEndpoint: 1.2.3.4:6443
     unsafeSkipCAVerification: true
+controlPlane:
+  certificateKey: c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd
 nodeRegistration:
   criSocket: /run/containerd/containerd.sock
   name: someName
@@ -74,6 +79,7 @@ func TestNewJoinData(t *testing.T) {
 		flags       map[string]string
 		validate    func(*testing.T, *joinData)
 		expectError bool
+		expectWarn  bool
 	}{
 		// Join data passed using flags
 		{
@@ -184,6 +190,7 @@ func TestNewJoinData(t *testing.T) {
 					t.Errorf("Invalid ControlPlane")
 				}
 			},
+			expectWarn: true,
 		},
 		{
 			name: "fails if invalid preflight checks are provided",
@@ -246,12 +253,34 @@ func TestNewJoinData(t *testing.T) {
 			},
 			validate: expectedJoinIgnorePreflightErrors(sets.NewString("a", "b", "c", "d")),
 		},
+		{
+			name: "warn if --control-plane flag is not set",
+			flags: map[string]string{
+				options.APIServerBindPort: "8888",
+				options.FileDiscovery:     "https://foo", //required only to pass discovery validation
+			},
+			expectWarn: true,
+		},
+		{
+			name: "no warn if --control-plane flag is set",
+			flags: map[string]string{
+				options.APIServerBindPort: "8888",
+				options.FileDiscovery:     "https://bar", //required only to pass discovery validation
+				options.ControlPlane:      "true",
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// initialize an external join option and inject it to the join cmd
 			joinOptions := newJoinOptions()
 			cmd := newCmdJoin(nil, joinOptions)
+
+			// set klog output destination to bytes.Buffer so that log could be fetched and verified later.
+			var buffer bytes.Buffer
+			klog.SetOutput(&buffer)
+			klog.LogToStderr(false)
+			defer klog.LogToStderr(true)
 
 			// sets cmd flags (that will be reflected on the join options)
 			for f, v := range tc.flags {
@@ -260,6 +289,17 @@ func TestNewJoinData(t *testing.T) {
 
 			// test newJoinData method
 			data, err := newJoinData(cmd, tc.args, joinOptions, nil, kubeconfigFilePath)
+			klog.Flush()
+			msg := "WARNING: --control-plane is also required when passing control-plane"
+			if tc.expectWarn {
+				if !strings.Contains(buffer.String(), msg) {
+					t.Errorf("Haven't detected the warning message, expected: %v, actual: %v", msg, buffer.String())
+				}
+			} else {
+				if strings.Contains(buffer.String(), msg) {
+					t.Errorf("Expect no such warning message: %v, but got: %v", msg, buffer.String())
+				}
+			}
 			if err != nil && !tc.expectError {
 				t.Fatalf("newJoinData returned unexpected error: %v", err)
 			}

@@ -42,7 +42,7 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 	powershellImage := imageutils.GetConfig(imageutils.BusyBox)
 
 	ginkgo.Context("Container limits", func() {
-		ginkgo.It("should not be exceeded after waiting 2 minutes", func() {
+		ginkgo.It("should not be exceeded after waiting 2 minutes", func(ctx context.Context) {
 			ginkgo.By("Creating one pod with limit set to '0.5'")
 			podsDecimal := newCPUBurnPods(1, powershellImage, "0.5", "1Gi")
 			e2epod.NewPodClient(f).CreateBatch(podsDecimal)

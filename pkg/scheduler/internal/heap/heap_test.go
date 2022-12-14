@@ -32,6 +32,26 @@ type testHeapObject struct {
 	val  interface{}
 }
 
+type testMetricRecorder int
+
+func (tmr *testMetricRecorder) Inc() {
+	if tmr != nil {
+		*tmr++
+	}
+}
+
+func (tmr *testMetricRecorder) Dec() {
+	if tmr != nil {
+		*tmr--
+	}
+}
+
+func (tmr *testMetricRecorder) Clear() {
+	if tmr != nil {
+		*tmr = 0
+	}
+}
+
 func mkHeapObj(name string, val interface{}) testHeapObject {
 	return testHeapObject{name: name, val: val}
 }
@@ -48,8 +68,18 @@ func TestHeapBasic(t *testing.T) {
 	const amount = 500
 	var i int
 
+	// empty queue
+	if item := h.Peek(); item != nil {
+		t.Errorf("expected nil object but got %v", item)
+	}
+
 	for i = amount; i > 0; i-- {
 		h.Add(mkHeapObj(string([]rune{'a', rune(i)}), i))
+		// Retrieve head without removing it
+		head := h.Peek()
+		if e, a := i, head.(testHeapObject).val; a != e {
+			t.Errorf("expected %d, got %d", e, a)
+		}
 	}
 
 	// Make sure that the numbers are popped in ascending order.
@@ -231,5 +261,35 @@ func TestHeap_List(t *testing.T) {
 		if !ok || v != heapObj.val {
 			t.Errorf("unexpected item in the list: %v", heapObj)
 		}
+	}
+}
+
+func TestHeapWithRecorder(t *testing.T) {
+	metricRecorder := new(testMetricRecorder)
+	h := NewWithRecorder(testHeapObjectKeyFunc, compareInts, metricRecorder)
+	h.Add(mkHeapObj("foo", 10))
+	h.Add(mkHeapObj("bar", 1))
+	h.Add(mkHeapObj("baz", 100))
+	h.Add(mkHeapObj("qux", 11))
+
+	if *metricRecorder != 4 {
+		t.Errorf("expected count to be 4 but got %d", *metricRecorder)
+	}
+	if err := h.Delete(mkHeapObj("bar", 1)); err != nil {
+		t.Fatal(err)
+	}
+	if *metricRecorder != 3 {
+		t.Errorf("expected count to be 3 but got %d", *metricRecorder)
+	}
+	if _, err := h.Pop(); err != nil {
+		t.Fatal(err)
+	}
+	if *metricRecorder != 2 {
+		t.Errorf("expected count to be 2 but got %d", *metricRecorder)
+	}
+
+	h.metricRecorder.Clear()
+	if *metricRecorder != 0 {
+		t.Errorf("expected count to be 0 but got %d", *metricRecorder)
 	}
 }

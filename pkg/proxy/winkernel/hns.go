@@ -20,6 +20,7 @@ limitations under the License.
 package winkernel
 
 import (
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 
@@ -47,6 +48,8 @@ type hns struct{}
 var (
 	// LoadBalancerFlagsIPv6 enables IPV6.
 	LoadBalancerFlagsIPv6 hcn.LoadBalancerFlags = 2
+	// LoadBalancerPortMappingFlagsVipExternalIP enables VipExternalIP.
+	LoadBalancerPortMappingFlagsVipExternalIP hcn.LoadBalancerPortMappingFlags = 16
 )
 
 func (hns hns) getNetworkByName(name string) (*hnsNetworkInfo, error) {
@@ -241,6 +244,20 @@ func (hns hns) deleteEndpoint(hnsID string) error {
 	return err
 }
 
+// findLoadBalancerID will construct a id from the provided loadbalancer fields
+func findLoadBalancerID(endpoints []endpointsInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
+	// Compute hash from backends (endpoint IDs)
+	hash, err := hashEndpoints(endpoints)
+	if err != nil {
+		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
+		return loadBalancerIdentifier{}, err
+	}
+	if len(vip) > 0 {
+		return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}, nil
+	}
+	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}, nil
+}
+
 func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
 	lbs, err := hcn.ListLoadBalancers()
 	var id loadBalancerIdentifier
@@ -250,11 +267,17 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 	loadBalancers := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 	for _, lb := range lbs {
 		portMap := lb.PortMappings[0]
+		// Compute hash from backends (endpoint IDs)
+		hash, err := hashEndpoints(lb.HostComputeEndpoints)
+		if err != nil {
+			klog.V(2).ErrorS(err, "Error hashing endpoints", "policy", lb)
+			return nil, err
+		}
 		if len(lb.FrontendVIPs) == 0 {
 			// Leave VIP uninitialized
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, endpointsCount: len(lb.HostComputeEndpoints)}
+			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, endpointsHash: hash}
 		} else {
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.FrontendVIPs[0], endpointsCount: len(lb.HostComputeEndpoints)}
+			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.FrontendVIPs[0], endpointsHash: hash}
 		}
 		loadBalancers[id] = &loadBalancerInfo{
 			hnsID: lb.Id,
@@ -267,11 +290,17 @@ func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerIn
 func (hns hns) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
 	var id loadBalancerIdentifier
 	vips := []string{}
+	// Compute hash from backends (endpoint IDs)
+	hash, err := hashEndpoints(endpoints)
+	if err != nil {
+		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
+		return nil, err
+	}
 	if len(vip) > 0 {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsCount: len(endpoints)}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}
 		vips = append(vips, vip)
 	} else {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsCount: len(endpoints)}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}
 	}
 
 	if lb, found := previousLoadBalancers[id]; found {
@@ -291,6 +320,9 @@ func (hns hns) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlag
 	}
 	if flags.localRoutedVIP {
 		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsLocalRoutedVIP
+	}
+	if flags.isVipExternalIP {
+		lbPortMappingFlags |= LoadBalancerPortMappingFlagsVipExternalIP
 	}
 
 	lbFlags := hcn.LoadBalancerFlagsNone
@@ -354,5 +386,46 @@ func (hns hns) deleteLoadBalancer(hnsID string) error {
 	}
 
 	err = lb.Delete()
+	if err != nil {
+		// There is a bug in Windows Server 2019, that can cause the delete call to fail sometimes. We retry one more time.
+		// TODO: The logic in syncProxyRules  should be rewritten in the future to better stage and handle a call like this failing using the policyApplied fields.
+		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource. Attempting one more time...", "loadBalancer", lb)
+		return lb.Delete()
+	}
 	return err
+}
+
+// Calculates a hash from the given endpoint IDs.
+func hashEndpoints[T string | endpointsInfo](endpoints []T) (hash [20]byte, err error) {
+	var id string
+	// Recover in case something goes wrong. Return error and null byte array.
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+			hash = [20]byte{}
+		}
+	}()
+
+	// Iterate over endpoints, compute hash
+	for _, ep := range endpoints {
+		switch x := any(ep).(type) {
+		case endpointsInfo:
+			id = strings.ToUpper(x.hnsID)
+		case string:
+			id = x
+		}
+		if len(id) > 0 {
+			// We XOR the hashes of endpoints, since they are an unordered set.
+			// This can cause collisions, but is sufficient since we are using other keys to identify the load balancer.
+			hash = xor(hash, sha1.Sum(([]byte(id))))
+		}
+	}
+	return
+}
+
+func xor(b1 [20]byte, b2 [20]byte) (xorbytes [20]byte) {
+	for i := 0; i < 20; i++ {
+		xorbytes[i] = b1[i] ^ b2[i]
+	}
+	return xorbytes
 }

@@ -45,6 +45,7 @@ source "${KUBE_ROOT}/test/cmd/events.sh"
 source "${KUBE_ROOT}/test/cmd/exec.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
+source "${KUBE_ROOT}/test/cmd/help.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
 source "${KUBE_ROOT}/test/cmd/plugins.sh"
@@ -554,6 +555,12 @@ runTests() {
   if kube::test::if_supports_resource "${pods}" ; then
     record_command run_kubectl_get_tests
   fi
+
+  ################
+  # Kubectl help #
+  ################
+
+  record_command run_kubectl_help_tests
 
   ##################
   # Kubectl events #

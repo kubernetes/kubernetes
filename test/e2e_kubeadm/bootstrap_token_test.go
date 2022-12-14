@@ -51,7 +51,7 @@ var _ = Describe("bootstrap token", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	ginkgo.It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 		secrets, err := f.ClientSet.CoreV1().
 			Secrets(kubeSystemNamespace).
 			List(context.TODO(), metav1.ListOptions{})
@@ -71,7 +71,7 @@ var _ = Describe("bootstrap token", func() {
 		gomega.Expect(tokenNum).Should(gomega.BeNumerically(">", 0), "At least one bootstrap token should exist")
 	})
 
-	ginkgo.It("should be allowed to post CSR for kubelet certificates on joining nodes", func() {
+	ginkgo.It("should be allowed to post CSR for kubelet certificates on joining nodes", func(ctx context.Context) {
 		ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 			bootstrapTokensAllowPostCSRClusterRoleBinding,
 			rbacv1.GroupKind, bootstrapTokensGroup,
@@ -79,7 +79,7 @@ var _ = Describe("bootstrap token", func() {
 		)
 	})
 
-	ginkgo.It("should be allowed to auto approve CSR for kubelet certificates on joining nodes", func() {
+	ginkgo.It("should be allowed to auto approve CSR for kubelet certificates on joining nodes", func(ctx context.Context) {
 		ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 			bootstrapTokensCSRAutoApprovalClusterRoleBinding,
 			rbacv1.GroupKind, bootstrapTokensGroup,

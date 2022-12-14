@@ -43,13 +43,14 @@ import (
 	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/controller/util/selectors"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
 
@@ -146,6 +147,7 @@ type testCase struct {
 	testScaleClient   *scalefake.FakeScaleClient
 
 	recommendations []timestampedRecommendation
+	hpaSelectors    *selectors.BiMultimap
 }
 
 // Needs to be called under a lock.
@@ -741,6 +743,9 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	if tc.recommendations != nil {
 		hpaController.recommendations["test-namespace/test-hpa"] = tc.recommendations
 	}
+	if tc.hpaSelectors != nil {
+		hpaController.hpaSelectors = tc.hpaSelectors
+	}
 
 	return hpaController, informerFactory
 }
@@ -816,7 +821,7 @@ func TestScaleUpContainer(t *testing.T) {
 				Name: v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: utilpointer.Int32Ptr(30),
+					AverageUtilization: pointer.Int32(30),
 				},
 				Container: "container1",
 			},
@@ -1350,7 +1355,7 @@ func TestScaleDownContainerResource(t *testing.T) {
 				Name:      v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: utilpointer.Int32Ptr(50),
+					AverageUtilization: pointer.Int32(50),
 				},
 			},
 		}},
@@ -2387,6 +2392,112 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestConditionNoAmbiguousSelectorWhenNoSelectorOverlapBetweenHPAs(t *testing.T) {
+	hpaSelectors := selectors.NewBiMultimap()
+	hpaSelectors.PutSelector(selectors.Key{Name: "test-hpa-2", Namespace: testNamespace}, labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}))
+
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 5,
+		CPUTarget:               30,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		hpaSelectors:            hpaSelectors,
+	}
+	tc.runTest(t)
+}
+
+func TestConditionAmbiguousSelectorWhenFullSelectorOverlapBetweenHPAs(t *testing.T) {
+	hpaSelectors := selectors.NewBiMultimap()
+	hpaSelectors.PutSelector(selectors.Key{Name: "test-hpa-2", Namespace: testNamespace}, labels.SelectorFromSet(labels.Set{"name": podNamePrefix}))
+
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               30,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{
+				Type:   autoscalingv2.AbleToScale,
+				Status: v1.ConditionTrue,
+				Reason: "SucceededGetScale",
+			},
+			{
+				Type:   autoscalingv2.ScalingActive,
+				Status: v1.ConditionFalse,
+				Reason: "AmbiguousSelector",
+			},
+		},
+		hpaSelectors: hpaSelectors,
+	}
+	tc.runTest(t)
+}
+
+func TestConditionAmbiguousSelectorWhenPartialSelectorOverlapBetweenHPAs(t *testing.T) {
+	hpaSelectors := selectors.NewBiMultimap()
+	hpaSelectors.PutSelector(selectors.Key{Name: "test-hpa-2", Namespace: testNamespace}, labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}))
+
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               30,
+		reportedLevels:          []uint64{300, 500, 700},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{
+				Type:   autoscalingv2.AbleToScale,
+				Status: v1.ConditionTrue,
+				Reason: "SucceededGetScale",
+			},
+			{
+				Type:   autoscalingv2.ScalingActive,
+				Status: v1.ConditionFalse,
+				Reason: "AmbiguousSelector",
+			},
+		},
+		hpaSelectors: hpaSelectors,
+	}
+
+	testClient, _, _, _, _ := tc.prepareTestClient(t)
+	tc.testClient = testClient
+
+	testClient.PrependReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		tc.Lock()
+		defer tc.Unlock()
+
+		obj := &v1.PodList{}
+		for i := range tc.reportedCPURequests {
+			pod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
+					Namespace: testNamespace,
+					Labels: map[string]string{
+						"name":    podNamePrefix, // selected by the original HPA
+						"cheddar": "cheese",      // selected by test-hpa-2
+					},
+				},
+			}
+			obj.Items = append(obj.Items, pod)
+		}
+		return true, obj, nil
+	})
+
+	tc.runTest(t)
+}
+
 func TestConditionFailedGetMetrics(t *testing.T) {
 	targetValue := resource.MustParse("15.0")
 	averageValue := resource.MustParse("15.0")
@@ -3031,7 +3142,7 @@ func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+		StabilizationWindowSeconds: pointer.Int32(300),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3053,7 +3164,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+		StabilizationWindowSeconds: pointer.Int32(300),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3074,7 +3185,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
 	policy := autoscalingv2.MaxChangePolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: utilpointer.Int32Ptr(stabilizationWindow),
+		StabilizationWindowSeconds: pointer.Int32(stabilizationWindow),
 		SelectPolicy:               &policy,
 	}
 	if pods != 0 {

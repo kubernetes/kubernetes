@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
@@ -68,7 +69,9 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 	numInvalidAddresses := 0
 	addressesSkipped := 0
 
-	for _, subset := range endpoints.Subsets {
+	// canonicalize the Endpoints subsets before processing them
+	subsets := endpointsv1.RepackSubsets(endpoints.Subsets)
+	for _, subset := range subsets {
 		multiKey := d.initPorts(subset.Ports)
 
 		totalAddresses := len(subset.Addresses) + len(subset.NotReadyAddresses)

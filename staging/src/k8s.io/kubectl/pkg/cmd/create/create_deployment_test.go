@@ -18,7 +18,7 @@ package create
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -45,7 +45,7 @@ func TestCreateDeployment(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+				Body:       io.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
 			}, nil
 		}),
 	}
@@ -76,7 +76,7 @@ func TestCreateDeploymentWithPort(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+				Body:       io.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
 			}, nil
 		}),
 	}
@@ -107,7 +107,7 @@ func TestCreateDeploymentWithReplicas(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+				Body:       io.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
 			}, nil
 		}),
 	}
@@ -137,7 +137,7 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
+				Body:       io.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
 			}, nil
 		}),
 	}

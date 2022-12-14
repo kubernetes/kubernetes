@@ -94,6 +94,7 @@ func NewHollowProxyOrDie(
 			proxierSyncPeriod,
 			proxierMinSyncPeriod,
 			false,
+			false,
 			0,
 			proxyutiliptables.NewNoOpLocalDetector(),
 			nodeName,

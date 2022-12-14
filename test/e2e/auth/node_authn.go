@@ -56,7 +56,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		framework.ExpectNotEqual(len(nodeIPs), 0)
 	})
 
-	ginkgo.It("The kubelet's main port 10250 should reject requests with no credentials", func() {
+	ginkgo.It("The kubelet's main port 10250 should reject requests with no credentials", func(ctx context.Context) {
 		pod := createNodeAuthTestPod(f)
 		for _, nodeIP := range nodeIPs {
 			// Anonymous authentication is disabled by default
@@ -66,7 +66,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		}
 	})
 
-	ginkgo.It("The kubelet can delegate ServiceAccount tokens to the API server", func() {
+	ginkgo.It("The kubelet can delegate ServiceAccount tokens to the API server", func(ctx context.Context) {
 		ginkgo.By("create a new ServiceAccount for authentication")
 		trueValue := true
 		newSA := &v1.ServiceAccount{

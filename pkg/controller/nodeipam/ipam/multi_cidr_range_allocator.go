@@ -91,6 +91,7 @@ type multiCIDRRangeAllocator struct {
 	// Channel that is used to pass updating Nodes and their reserved CIDRs to the background.
 	// This increases a throughput of CIDR assignment by not blocking on long operations.
 	nodeCIDRUpdateChannel chan multiCIDRNodeReservedCIDRs
+	broadcaster           record.EventBroadcaster
 	recorder              record.EventRecorder
 	// queue is where incoming work is placed to de-dup and to allow "easy"
 	// rate limited requeues on errors
@@ -124,13 +125,6 @@ func NewMultiCIDRRangeAllocator(
 		Component: "multiCIDRRangeAllocator",
 	}
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, eventSource)
-	eventBroadcaster.StartStructuredLogging(0)
-	klog.V(0).Infof("Started sending events to API Server. (EventSource = %v)", eventSource)
-
-	eventBroadcaster.StartRecordingToSink(
-		&v1core.EventSinkImpl{
-			Interface: client.CoreV1().Events(""),
-		})
 
 	ra := &multiCIDRRangeAllocator{
 		client:                client,
@@ -139,6 +133,7 @@ func NewMultiCIDRRangeAllocator(
 		clusterCIDRLister:     clusterCIDRInformer.Lister(),
 		clusterCIDRSynced:     clusterCIDRInformer.Informer().HasSynced,
 		nodeCIDRUpdateChannel: make(chan multiCIDRNodeReservedCIDRs, cidrUpdateQueueSize),
+		broadcaster:           eventBroadcaster,
 		recorder:              recorder,
 		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multi_cidr_range_allocator"),
 		lock:                  &sync.Mutex{},
@@ -242,6 +237,14 @@ func NewMultiCIDRRangeAllocator(
 
 func (r *multiCIDRRangeAllocator) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	// Start event processing pipeline.
+	r.broadcaster.StartStructuredLogging(0)
+	klog.V(0).Infof("Started sending events to API Server.")
+	r.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: r.client.CoreV1().Events("")})
+	defer r.broadcaster.Shutdown()
+
+	defer r.queue.ShutDown()
 
 	klog.Infof("Starting Multi CIDR Range allocator")
 	defer klog.Infof("Shutting down Multi CIDR Range allocator")

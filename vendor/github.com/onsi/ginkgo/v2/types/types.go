@@ -67,7 +67,7 @@ type PreRunStats struct {
 	SpecsThatWillRun int
 }
 
-//Add is ued by Ginkgo's parallel aggregation mechanisms to combine test run reports form individual parallel processes
+//Add is used by Ginkgo's parallel aggregation mechanisms to combine test run reports form individual parallel processes
 //to form a complete final report.
 func (report Report) Add(other Report) Report {
 	report.SuiteSucceeded = report.SuiteSucceeded && other.SuiteSucceeded
@@ -151,9 +151,16 @@ type SpecReport struct {
 	//It includes detailed information about the Failure
 	Failure Failure
 
-	// NumAttempts captures the number of times this Spec was run.  Flakey specs can be retried with
-	// ginkgo --flake-attempts=N
+	// NumAttempts captures the number of times this Spec was run.
+	// Flakey specs can be retried with ginkgo --flake-attempts=N or the use of the FlakeAttempts decorator.
+	// Repeated specs can be retried with the use of the MustPassRepeatedly decorator
 	NumAttempts int
+
+	// MaxFlakeAttempts captures whether the spec has been retried with ginkgo --flake-attempts=N or the use of the FlakeAttempts decorator.
+	MaxFlakeAttempts int
+
+	// MaxMustPassRepeatedly captures whether the spec has the MustPassRepeatedly decorator
+	MaxMustPassRepeatedly int
 
 	// CapturedGinkgoWriterOutput contains text printed to the GinkgoWriter
 	CapturedGinkgoWriterOutput string
@@ -190,6 +197,8 @@ func (report SpecReport) MarshalJSON() ([]byte, error) {
 		ParallelProcess             int
 		Failure                     *Failure `json:",omitempty"`
 		NumAttempts                 int
+		MaxFlakeAttempts            int
+		MaxMustPassRepeatedly       int
 		CapturedGinkgoWriterOutput  string              `json:",omitempty"`
 		CapturedStdOutErr           string              `json:",omitempty"`
 		ReportEntries               ReportEntries       `json:",omitempty"`
@@ -211,6 +220,8 @@ func (report SpecReport) MarshalJSON() ([]byte, error) {
 		Failure:                     nil,
 		ReportEntries:               nil,
 		NumAttempts:                 report.NumAttempts,
+		MaxFlakeAttempts:            report.MaxFlakeAttempts,
+		MaxMustPassRepeatedly:       report.MaxMustPassRepeatedly,
 		CapturedGinkgoWriterOutput:  report.CapturedGinkgoWriterOutput,
 		CapturedStdOutErr:           report.CapturedStdOutErr,
 	}
@@ -363,11 +374,22 @@ func (reports SpecReports) CountWithState(states SpecState) int {
 	return n
 }
 
-//CountWithState returns the number of SpecReports that passed after multiple attempts
+//If the Spec passes, CountOfFlakedSpecs returns the number of SpecReports that failed after multiple attempts.
 func (reports SpecReports) CountOfFlakedSpecs() int {
 	n := 0
 	for i := range reports {
-		if reports[i].State.Is(SpecStatePassed) && reports[i].NumAttempts > 1 {
+		if reports[i].MaxFlakeAttempts > 1 && reports[i].State.Is(SpecStatePassed) && reports[i].NumAttempts > 1 {
+			n += 1
+		}
+	}
+	return n
+}
+
+//If the Spec fails, CountOfRepeatedSpecs returns the number of SpecReports that passed after multiple attempts
+func (reports SpecReports) CountOfRepeatedSpecs() int {
+	n := 0
+	for i := range reports {
+		if reports[i].MaxMustPassRepeatedly > 1 && reports[i].State.Is(SpecStateFailureStates) && reports[i].NumAttempts > 1 {
 			n += 1
 		}
 	}

@@ -20,6 +20,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -86,7 +87,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		for _, testArg := range rTests {
 			itArg := testArg
 			desc := fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr)
-			ginkgo.It(desc, func() {
+			ginkgo.It(desc, func(ctx context.Context) {
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
@@ -116,7 +117,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		for _, testArg := range rTests {
 			itArg := testArg
 			desc := fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr)
-			ginkgo.It(desc, func() {
+			ginkgo.It(desc, func(ctx context.Context) {
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
 				runResourceUsageTest(f, rc, itArg)
@@ -152,8 +153,8 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 
 	rc.Start()
 	// Explicitly delete pods to prevent namespace controller cleanning up timeout
-	defer deletePodsSync(f, append(pods, getCadvisorPod()))
-	defer rc.Stop()
+	ginkgo.DeferCleanup(deletePodsSync, f, append(pods, getCadvisorPod()))
+	ginkgo.DeferCleanup(rc.Stop)
 
 	ginkgo.By("Creating a batch of Pods")
 	e2epod.NewPodClient(f).CreateBatch(pods)

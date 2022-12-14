@@ -30,10 +30,10 @@ import (
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta3"
 	"k8s.io/client-go/tools/cache"
 	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	"k8s.io/utils/pointer"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEnsurePriorityLevel(t *testing.T) {
@@ -257,6 +257,7 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
 				NominalConcurrencyShares: flowcontrolapisv1beta3.PriorityLevelConfigurationDefaultNominalConcurrencyShares,
+				LendablePercent:          pointer.Int32(0),
 				LimitResponse: flowcontrolv1beta3.LimitResponse{
 					Type: flowcontrolv1beta3.LimitResponseTypeReject,
 				},
@@ -291,7 +292,10 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			w := priorityLevelSpecChanged(testCase.expected, testCase.actual)
-			assert.Equal(t, testCase.specChanged, w)
+			if testCase.specChanged != w {
+				t.Errorf("Expected priorityLevelSpecChanged to return %t, but got: %t - diff: %s", testCase.specChanged, w,
+					cmp.Diff(testCase.expected, testCase.actual))
+			}
 		})
 	}
 }
@@ -472,6 +476,7 @@ func (b *plBuilder) WithLimited(nominalConcurrencyShares int32) *plBuilder {
 	b.object.Spec.Type = flowcontrolv1beta3.PriorityLevelEnablementLimited
 	b.object.Spec.Limited = &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
 		NominalConcurrencyShares: nominalConcurrencyShares,
+		LendablePercent:          pointer.Int32(0),
 		LimitResponse: flowcontrolv1beta3.LimitResponse{
 			Type: flowcontrolv1beta3.LimitResponseTypeReject,
 		},

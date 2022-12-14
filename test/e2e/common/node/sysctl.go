@@ -74,7 +74,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 	  Description: Pod is created with kernel.shm_rmid_forced sysctl. Kernel.shm_rmid_forced must be set to 1
 	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
 	*/
-	framework.ConformanceIt("should support sysctls [MinimumKubeletVersion:1.21]", func() {
+	framework.ConformanceIt("should support sysctls [MinimumKubeletVersion:1.21]", func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -120,7 +120,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 	  Description: Pod is created with one valid and two invalid sysctls. Pod should not apply invalid sysctls.
 	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
 	*/
-	framework.ConformanceIt("should reject invalid sysctls [MinimumKubeletVersion:1.21]", func() {
+	framework.ConformanceIt("should reject invalid sysctls [MinimumKubeletVersion:1.21]", func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -156,7 +156,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 	})
 
 	// Pod is created with kernel.msgmax, an unsafe sysctl.
-	ginkgo.It("should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21]", func() {
+	ginkgo.It("should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21]", func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -182,7 +182,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 	  Description: Pod is created with kernel/shm_rmid_forced sysctl. Support slashes as sysctl separator. The '/' separator is also accepted in place of a '.'
 	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
 	*/
-	ginkgo.It("should support sysctls with slashes as separator [MinimumKubeletVersion:1.23]", func() {
+	ginkgo.It("should support sysctls with slashes as separator [MinimumKubeletVersion:1.23]", func(ctx context.Context) {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{

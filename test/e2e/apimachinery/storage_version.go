@@ -40,7 +40,7 @@ var _ = SIGDescribe("StorageVersion resources [Feature:StorageVersionAPI]", func
 	f := framework.NewDefaultFramework("storage-version")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("storage version with non-existing id should be GC'ed", func() {
+	ginkgo.It("storage version with non-existing id should be GC'ed", func(ctx context.Context) {
 		client := f.ClientSet
 		sv := &apiserverinternalv1alpha1.StorageVersion{
 			ObjectMeta: metav1.ObjectMeta{

@@ -223,14 +223,26 @@ type SharedIndexInformer interface {
 	GetIndexer() Indexer
 }
 
-// NewSharedInformer creates a new instance for the listwatcher.
+// NewSharedInformer creates a new instance for the ListerWatcher. See NewSharedIndexInformerWithOptions for full details.
 func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration) SharedInformer {
 	return NewSharedIndexInformer(lw, exampleObject, defaultEventHandlerResyncPeriod, Indexers{})
 }
 
-// NewSharedIndexInformer creates a new instance for the listwatcher.
-// The created informer will not do resyncs if the given
-// defaultEventHandlerResyncPeriod is zero.  Otherwise: for each
+// NewSharedIndexInformer creates a new instance for the ListerWatcher and specified Indexers. See
+// NewSharedIndexInformerWithOptions for full details.
+func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+	return NewSharedIndexInformerWithOptions(
+		lw,
+		exampleObject,
+		SharedIndexInformerOptions{
+			ResyncPeriod: defaultEventHandlerResyncPeriod,
+			Indexers:     indexers,
+		},
+	)
+}
+
+// NewSharedIndexInformerWithOptions creates a new instance for the ListerWatcher.
+// The created informer will not do resyncs if options.ResyncPeriod is zero.  Otherwise: for each
 // handler that with a non-zero requested resync period, whether added
 // before or after the informer starts, the nominal resync period is
 // the requested resync period rounded up to a multiple of the
@@ -238,21 +250,36 @@ func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEv
 // checking period is established when the informer starts running,
 // and is the maximum of (a) the minimum of the resync periods
 // requested before the informer starts and the
-// defaultEventHandlerResyncPeriod given here and (b) the constant
+// options.ResyncPeriod given here and (b) the constant
 // `minimumResyncPeriod` defined in this file.
-func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.Object, options SharedIndexInformerOptions) SharedIndexInformer {
 	realClock := &clock.RealClock{}
-	sharedIndexInformer := &sharedIndexInformer{
+
+	return &sharedIndexInformer{
+		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
 		processor:                       &sharedProcessor{clock: realClock},
-		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
 		listerWatcher:                   lw,
 		objectType:                      exampleObject,
-		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
-		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
-		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
+		objectDescription:               options.ObjectDescription,
+		resyncCheckPeriod:               options.ResyncPeriod,
+		defaultEventHandlerResyncPeriod: options.ResyncPeriod,
 		clock:                           realClock,
+		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 	}
-	return sharedIndexInformer
+}
+
+// SharedIndexInformerOptions configures a sharedIndexInformer.
+type SharedIndexInformerOptions struct {
+	// ResyncPeriod is the default event handler resync period and resync check
+	// period. If unset/unspecified, these are defaulted to 0 (do not resync).
+	ResyncPeriod time.Duration
+
+	// Indexers is the sharedIndexInformer's indexers. If unset/unspecified, no indexers are configured.
+	Indexers Indexers
+
+	// ObjectDescription is the sharedIndexInformer's object description. This is passed through to the
+	// underlying Reflector's type description.
+	ObjectDescription string
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -326,11 +353,12 @@ type sharedIndexInformer struct {
 
 	listerWatcher ListerWatcher
 
-	// objectType is an example object of the type this informer is
-	// expected to handle.  Only the type needs to be right, except
-	// that when that is `unstructured.Unstructured` the object's
-	// `"apiVersion"` and `"kind"` must also be right.
+	// objectType is an example object of the type this informer is expected to handle. If set, an event
+	// with an object with a mismatching type is dropped instead of being delivered to listeners.
 	objectType runtime.Object
+
+	// objectDescription is the description of this informer's objects. This typically defaults to
+	objectDescription string
 
 	// resyncCheckPeriod is how often we want the reflector's resync timer to fire so it can call
 	// shouldResync to check if any of our listeners need a resync.
@@ -425,12 +453,13 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	})
 
 	cfg := &Config{
-		Queue:            fifo,
-		ListerWatcher:    s.listerWatcher,
-		ObjectType:       s.objectType,
-		FullResyncPeriod: s.resyncCheckPeriod,
-		RetryOnError:     false,
-		ShouldResync:     s.processor.shouldResync,
+		Queue:             fifo,
+		ListerWatcher:     s.listerWatcher,
+		ObjectType:        s.objectType,
+		ObjectDescription: s.objectDescription,
+		FullResyncPeriod:  s.resyncCheckPeriod,
+		RetryOnError:      false,
+		ShouldResync:      s.processor.shouldResync,
 
 		Process:           s.HandleDeltas,
 		WatchErrorHandler: s.watchErrorHandler,

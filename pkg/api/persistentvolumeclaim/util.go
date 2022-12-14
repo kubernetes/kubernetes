@@ -32,11 +32,22 @@ const (
 
 // DropDisabledFields removes disabled fields from the pvc spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pvc spec.
-func DropDisabledFields(pvcSpec *core.PersistentVolumeClaimSpec) {
+func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 	// Drop the contents of the dataSourceRef field if the AnyVolumeDataSource
 	// feature gate is disabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AnyVolumeDataSource) {
-		pvcSpec.DataSourceRef = nil
+		if !dataSourceRefInUse(oldPVCSpec) {
+			pvcSpec.DataSourceRef = nil
+		}
+	}
+
+	// Drop the contents of the dataSourceRef field if the CrossNamespaceVolumeDataSource
+	// feature gate is disabled and dataSourceRef.Namespace is specified.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CrossNamespaceVolumeDataSource) &&
+		pvcSpec.DataSourceRef != nil && pvcSpec.DataSourceRef.Namespace != nil && len(*pvcSpec.DataSourceRef.Namespace) != 0 {
+		if !dataSourceRefInUse(oldPVCSpec) {
+			pvcSpec.DataSourceRef = nil
+		}
 	}
 }
 
@@ -116,6 +127,16 @@ func dataSourceIsPvcOrSnapshot(dataSource *core.TypedLocalObjectReference) bool 
 	return false
 }
 
+func dataSourceRefInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
+	if oldPVCSpec == nil {
+		return false
+	}
+	if oldPVCSpec.DataSourceRef != nil {
+		return true
+	}
+	return false
+}
+
 // NormalizeDataSources ensures that DataSource and DataSourceRef have the same contents
 // as long as both are not explicitly set.
 // This should be used by creates/gets of PVCs, but not updates
@@ -126,10 +147,26 @@ func NormalizeDataSources(pvcSpec *core.PersistentVolumeClaimSpec) {
 	}
 	if pvcSpec.DataSource != nil && pvcSpec.DataSourceRef == nil {
 		// Using the old way of setting a data source
-		pvcSpec.DataSourceRef = pvcSpec.DataSource.DeepCopy()
+		pvcSpec.DataSourceRef = &core.TypedObjectReference{
+			Kind: pvcSpec.DataSource.Kind,
+			Name: pvcSpec.DataSource.Name,
+		}
+		if pvcSpec.DataSource.APIGroup != nil {
+			apiGroup := *pvcSpec.DataSource.APIGroup
+			pvcSpec.DataSourceRef.APIGroup = &apiGroup
+		}
 	} else if pvcSpec.DataSourceRef != nil && pvcSpec.DataSource == nil {
-		// Using the new way of setting a data source
-		pvcSpec.DataSource = pvcSpec.DataSourceRef.DeepCopy()
+		if pvcSpec.DataSourceRef.Namespace == nil || len(*pvcSpec.DataSourceRef.Namespace) == 0 {
+			// Using the new way of setting a data source
+			pvcSpec.DataSource = &core.TypedLocalObjectReference{
+				Kind: pvcSpec.DataSourceRef.Kind,
+				Name: pvcSpec.DataSourceRef.Name,
+			}
+			if pvcSpec.DataSourceRef.APIGroup != nil {
+				apiGroup := *pvcSpec.DataSourceRef.APIGroup
+				pvcSpec.DataSource.APIGroup = &apiGroup
+			}
+		}
 	}
 }
 

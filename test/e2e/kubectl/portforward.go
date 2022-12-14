@@ -453,21 +453,21 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 
 	ginkgo.Describe("With a server listening on 0.0.0.0", func() {
 		ginkgo.Describe("that expects a client request", func() {
-			ginkgo.It("should support a client that connects, sends NO DATA, and disconnects", func() {
+			ginkgo.It("should support a client that connects, sends NO DATA, and disconnects", func(ctx context.Context) {
 				doTestMustConnectSendNothing("0.0.0.0", f)
 			})
-			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func() {
+			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func(ctx context.Context) {
 				doTestMustConnectSendDisconnect("0.0.0.0", f)
 			})
 		})
 
 		ginkgo.Describe("that expects NO client request", func() {
-			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func() {
+			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func(ctx context.Context) {
 				doTestConnectSendDisconnect("0.0.0.0", f)
 			})
 		})
 
-		ginkgo.It("should support forwarding over websockets", func() {
+		ginkgo.It("should support forwarding over websockets", func(ctx context.Context) {
 			doTestOverWebSockets("0.0.0.0", f)
 		})
 	})
@@ -475,21 +475,21 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 	// kubectl port-forward may need elevated privileges to do its job.
 	ginkgo.Describe("With a server listening on localhost", func() {
 		ginkgo.Describe("that expects a client request", func() {
-			ginkgo.It("should support a client that connects, sends NO DATA, and disconnects", func() {
+			ginkgo.It("should support a client that connects, sends NO DATA, and disconnects", func(ctx context.Context) {
 				doTestMustConnectSendNothing("localhost", f)
 			})
-			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func() {
+			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func(ctx context.Context) {
 				doTestMustConnectSendDisconnect("localhost", f)
 			})
 		})
 
 		ginkgo.Describe("that expects NO client request", func() {
-			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func() {
+			ginkgo.It("should support a client that connects, sends DATA, and disconnects", func(ctx context.Context) {
 				doTestConnectSendDisconnect("localhost", f)
 			})
 		})
 
-		ginkgo.It("should support forwarding over websockets", func() {
+		ginkgo.It("should support forwarding over websockets", func(ctx context.Context) {
 			doTestOverWebSockets("localhost", f)
 		})
 	})

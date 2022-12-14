@@ -26,8 +26,7 @@ import (
 )
 
 const (
-	AnnotationInvalidReason = "InvalidSysctlAnnotation"
-	ForbiddenReason         = "SysctlForbidden"
+	ForbiddenReason = "SysctlForbidden"
 )
 
 // patternAllowlist takes a list of sysctls or sysctl patterns (ending in *) and

@@ -247,6 +247,10 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		return nil, nil, err
 	}
 
+	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
+	}
+
 	// We check if we want to get a default Kubelet's transport. It happens if either:
 	// - no port is specified in request (Kubelet's port is default)
 	// - the requested port matches the kubelet port for this node
@@ -257,10 +261,6 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 			},
 			info.Transport,
 			nil
-	}
-
-	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
-		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
 	// Otherwise, return the requested scheme and port, and the proxy transport

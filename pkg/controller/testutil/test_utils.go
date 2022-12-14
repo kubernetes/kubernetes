@@ -538,6 +538,7 @@ func CreateZoneID(region, zone string) string {
 // GetKey is a helper function used by controllers unit tests to get the
 // key for a given kubernetes resource.
 func GetKey(obj interface{}, t *testing.T) string {
+	t.Helper()
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if ok {
 		// if tombstone , try getting the value from tombstone.Obj

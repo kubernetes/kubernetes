@@ -119,8 +119,15 @@ func TestNamespaceCondition(t *testing.T) {
 
 // TestNamespaceLabels tests for default labels added in https://github.com/kubernetes/kubernetes/pull/96968
 func TestNamespaceLabels(t *testing.T) {
-	closeFn, _, _, kubeClient, _ := namespaceLifecycleSetup(t)
+	closeFn, nsController, _, kubeClient, _ := namespaceLifecycleSetup(t)
 	defer closeFn()
+
+	// Even though nscontroller isn't used in this test, its creation is already
+	// spawning some goroutines. So we need to run it to ensure they won't leak.
+	stopCh := make(chan struct{})
+	close(stopCh)
+	go nsController.Run(5, stopCh)
+
 	nsName := "test-namespace-labels-generated"
 	// Create a new namespace w/ no name
 	ns, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{

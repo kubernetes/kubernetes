@@ -109,7 +109,6 @@ type RunOptions struct {
 	DeleteOptions *cmddelete.DeleteOptions
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
@@ -166,6 +165,23 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	addRunFlags(cmd, o)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
+
+	// Deprecate the cascade flag. If set, it has no practical effect since the created pod has no dependents.
+	// TODO: Remove the cascade flag from the run command in kubectl 1.29
+	cmd.Flags().MarkDeprecated("cascade", "because it is not relevant for this command. It will be removed in version 1.29.")
+
+	// Deprecate and hide unused flags.
+	// These flags are being added to the run command by DeleteFlags to support pod deletion after attach,
+	// but they are not used if set, so they effectively do nothing.
+	// TODO: Remove these flags from the run command in kubectl 1.29
+	cmd.Flags().MarkDeprecated("filename", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("force", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("grace-period", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("kustomize", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("recursive", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("timeout", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("wait", "because it is not used by this command. It will be removed in version 1.29.")
+
 	return cmd
 }
 
@@ -210,7 +226,6 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
@@ -633,11 +648,6 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		client, err := f.ClientForMapping(mapping)
 		if err != nil {
 			return nil, err
-		}
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-				return nil, err
-			}
 		}
 		actualObj, err = resource.
 			NewHelper(client, mapping).

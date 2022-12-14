@@ -77,11 +77,11 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "unix:///var/run/containerd/containerd.sock",
 				},
-				pauseImage: "registry.k8s.io/pause:3.8",
+				pauseImage: "registry.k8s.io/pause:3.9",
 			},
 			expected: map[string]string{
 				"container-runtime-endpoint": "unix:///var/run/containerd/containerd.sock",
-				"pod-infra-container-image":  "registry.k8s.io/pause:3.8",
+				"pod-infra-container-image":  "registry.k8s.io/pause:3.9",
 			},
 		},
 	}

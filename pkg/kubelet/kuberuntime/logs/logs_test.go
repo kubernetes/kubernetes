@@ -17,8 +17,12 @@ limitations under the License.
 package logs
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -320,7 +324,7 @@ func TestWriteLogs(t *testing.T) {
 		stdoutBuf := bytes.NewBuffer(nil)
 		stderrBuf := bytes.NewBuffer(nil)
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{since: test.since, timestamp: test.timestamp, bytes: -1})
-		err := w.write(msg)
+		err := w.write(msg, true)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
 		assert.Equal(t, test.expectStderr, stderrBuf.String())
@@ -384,17 +388,68 @@ func TestWriteLogsWithBytesLimit(t *testing.T) {
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{timestamp: test.timestamp, bytes: int64(test.bytes)})
 		for i := 0; i < test.stdoutLines; i++ {
 			msg.stream = runtimeapi.Stdout
-			if err := w.write(msg); err != nil {
+			if err := w.write(msg, true); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
 		for i := 0; i < test.stderrLines; i++ {
 			msg.stream = runtimeapi.Stderr
-			if err := w.write(msg); err != nil {
+			if err := w.write(msg, true); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
 		assert.Equal(t, test.expectStderr, stderrBuf.String())
 	}
+}
+
+func TestReadLogsLimitsWithTimestamps(t *testing.T) {
+	logLineFmt := "2022-10-29T16:10:22.592603036-05:00 stdout P %v\n"
+	logLineNewLine := "2022-10-29T16:10:22.592603036-05:00 stdout F \n"
+
+	tmpfile, err := ioutil.TempFile("", "log.*.txt")
+	assert.NoError(t, err)
+
+	count := 10000
+
+	for i := 0; i < count; i++ {
+		tmpfile.WriteString(fmt.Sprintf(logLineFmt, i))
+	}
+	tmpfile.WriteString(logLineNewLine)
+
+	for i := 0; i < count; i++ {
+		tmpfile.WriteString(fmt.Sprintf(logLineFmt, i))
+	}
+	tmpfile.WriteString(logLineNewLine)
+
+	// two lines are in the buffer
+
+	defer os.Remove(tmpfile.Name()) // clean up
+
+	assert.NoError(t, err)
+	tmpfile.Close()
+
+	var buf bytes.Buffer
+	w := io.MultiWriter(&buf)
+
+	err = ReadLogs(context.Background(), tmpfile.Name(), "", &LogOptions{tail: -1, bytes: -1, timestamp: true}, nil, w, w)
+	assert.NoError(t, err)
+
+	lineCount := 0
+	scanner := bufio.NewScanner(bytes.NewReader(buf.Bytes()))
+	for scanner.Scan() {
+		lineCount++
+
+		// Split the line
+		ts, logline, _ := bytes.Cut(scanner.Bytes(), []byte(" "))
+
+		// Verification
+		//   1. The timestamp should exist
+		//   2. The last item in the log should be 9999
+		_, err = time.Parse(time.RFC3339, string(ts))
+		assert.NoError(t, err, "timestamp not found")
+		assert.Equal(t, true, bytes.HasSuffix(logline, []byte("9999")), "is the complete log found")
+	}
+
+	assert.Equal(t, 2, lineCount, "should have two lines")
 }

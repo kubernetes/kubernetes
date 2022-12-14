@@ -104,7 +104,7 @@ var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:d
 var elapsedSuffix = regexp.MustCompile(`Elapsed: [[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m)`)
 
 // timeSuffix matches "09/06/22 15:36:43.445" as printed by Ginkgo v2 for log output.
-var timeSuffix = regexp.MustCompile(`(?m)[[:space:]][[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}\.[[:digit:]]{1,3}$`)
+var timeSuffix = regexp.MustCompile(`(?m)[[:space:]][[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}(\.[[:digit:]]{1,3})?$`)
 
 func stripTimes(in string) string {
 	out := timePrefix.ReplaceAllString(in, "")
@@ -124,8 +124,8 @@ func stripAddresses(in string) string {
 // locally) or one of a few relative paths (built in the Kubernetes CI).
 var stackLocation = regexp.MustCompile(`(?:/|vendor/|test/|GOROOT/).*/([[:^space:]]+.go:[[:digit:]]+)( \+0x[0-9a-fA-F]+)?`)
 
-// functionArgs matches "<function name>(...)".
-var functionArgs = regexp.MustCompile(`([[:alpha:]]+)\(.*\)`)
+// functionArgs matches "<function name>(...)" where <function name> may be an anonymous function (e.g. "pod_test.glob..func1.1")
+var functionArgs = regexp.MustCompile(`([[:alpha:][:digit:].]+)\(.*\)`)
 
 // klogPrefix matches "I0822 16:10:39.343790  989127 "
 var klogPrefix = regexp.MustCompile(`(?m)^[IEF][[:digit:]]{4} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}\.[[:digit:]]{6}[[:space:]]+[[:digit:]]+ `)

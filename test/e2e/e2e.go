@@ -57,6 +57,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/azure"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/openstack"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/vsphere"
 
 	// Ensure that logging flags are part of the command line.
@@ -407,7 +408,7 @@ func prepullImages(c clientset.Interface) {
 	})
 	framework.ExpectNoError(err)
 	ns := namespace.Name
-	defer c.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(c.CoreV1().Namespaces().Delete, ns, metav1.DeleteOptions{})
 
 	images := commontest.PrePulledImages
 	if framework.NodeOSDistroIs("windows") {

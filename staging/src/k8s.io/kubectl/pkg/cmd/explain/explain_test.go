@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/discovery"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/util/openapi"
 )
@@ -39,13 +38,11 @@ var (
 			}
 			return openapi.NewOpenAPIData(s)
 		},
-		OpenAPIGetter: &fakeSchema,
 	}
 )
 
 type testOpenAPISchema struct {
 	OpenAPISchemaFn func() (openapi.Resources, error)
-	OpenAPIGetter   discovery.OpenAPISchemaInterface
 }
 
 func TestExplainInvalidArgs(t *testing.T) {
@@ -125,7 +122,6 @@ func TestExplain(t *testing.T) {
 	defer tf.Cleanup()
 
 	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
-	tf.FakeOpenAPIGetter = FakeOpenAPISchema.OpenAPIGetter
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()

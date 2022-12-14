@@ -424,9 +424,88 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		}
 	}
 
-	kl.setNodeStatus(node)
+	kl.setNodeStatus(ctx, node)
 
 	return node, nil
+}
+
+// fastNodeStatusUpdate is a "lightweight" version of syncNodeStatus which doesn't hit the
+// apiserver except for the final run, to be called by fastStatusUpdateOnce in each loop.
+// It holds the same lock as syncNodeStatus and is thread-safe when called concurrently with
+// syncNodeStatus. Its return value indicates whether the loop running it should exit
+// (final run), and it also sets kl.containerRuntimeReadyExpected.
+func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (completed bool) {
+	kl.syncNodeStatusMux.Lock()
+	defer func() {
+		kl.syncNodeStatusMux.Unlock()
+
+		if completed {
+			// containerRuntimeReadyExpected is read by updateRuntimeUp().
+			// Not going for a more granular mutex as this path runs only once.
+			kl.updateRuntimeMux.Lock()
+			defer kl.updateRuntimeMux.Unlock()
+			kl.containerRuntimeReadyExpected = true
+		}
+	}()
+
+	if timeout {
+		klog.ErrorS(nil, "Node not becoming ready in time after startup")
+		return true
+	}
+
+	originalNode, err := kl.GetNode()
+	if err != nil {
+		klog.ErrorS(err, "Error getting the current node from lister")
+		return false
+	}
+
+	readyIdx, originalNodeReady := nodeutil.GetNodeCondition(&originalNode.Status, v1.NodeReady)
+	if readyIdx == -1 {
+		klog.ErrorS(nil, "Node does not have NodeReady condition", "originalNode", originalNode)
+		return false
+	}
+
+	if originalNodeReady.Status == v1.ConditionTrue {
+		return true
+	}
+
+	// This is in addition to the regular syncNodeStatus logic so we can get the container runtime status earlier.
+	// This function itself has a mutex and it doesn't recursively call fastNodeStatusUpdate or syncNodeStatus.
+	kl.updateRuntimeUp()
+
+	node, changed := kl.updateNode(ctx, originalNode)
+
+	if !changed {
+		// We don't do markVolumesFromNode(node) here and leave it to the regular syncNodeStatus().
+		return false
+	}
+
+	readyIdx, nodeReady := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
+	if readyIdx == -1 {
+		klog.ErrorS(nil, "Node does not have NodeReady condition", "node", node)
+		return false
+	}
+
+	if nodeReady.Status == v1.ConditionFalse {
+		return false
+	}
+
+	klog.InfoS("Fast updating node status as it just became ready")
+	if _, err := kl.patchNodeStatus(originalNode, node); err != nil {
+		// The originalNode is probably stale, but we know that the current state of kubelet would turn
+		// the node to be ready. Retry using syncNodeStatus() which fetches from the apiserver.
+		klog.ErrorS(err, "Error updating node status, will retry with syncNodeStatus")
+
+		// The reversed kl.syncNodeStatusMux.Unlock/Lock() below to allow kl.syncNodeStatus() execution.
+		kl.syncNodeStatusMux.Unlock()
+		kl.syncNodeStatus()
+		// This lock action is unnecessary if we add a flag to check in the defer before unlocking it,
+		// but having it here makes the logic a bit easier to read.
+		kl.syncNodeStatusMux.Lock()
+	}
+
+	// We don't do markVolumesFromNode(node) here and leave it to the regular syncNodeStatus().
+	return true
 }
 
 // syncNodeStatus should be called periodically from a goroutine.
@@ -435,6 +514,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 func (kl *Kubelet) syncNodeStatus() {
 	kl.syncNodeStatusMux.Lock()
 	defer kl.syncNodeStatusMux.Unlock()
+	ctx := context.Background()
 
 	if kl.kubeClient == nil || kl.heartbeatClient == nil {
 		return
@@ -443,17 +523,17 @@ func (kl *Kubelet) syncNodeStatus() {
 		// This will exit immediately if it doesn't need to do anything.
 		kl.registerWithAPIServer()
 	}
-	if err := kl.updateNodeStatus(); err != nil {
+	if err := kl.updateNodeStatus(ctx); err != nil {
 		klog.ErrorS(err, "Unable to update node status")
 	}
 }
 
 // updateNodeStatus updates node status to master with retries if there is any
 // change or enough time passed from the last sync.
-func (kl *Kubelet) updateNodeStatus() error {
+func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
 	klog.V(5).InfoS("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
-		if err := kl.tryUpdateNodeStatus(i); err != nil {
+		if err := kl.tryUpdateNodeStatus(ctx, i); err != nil {
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
 			}
@@ -467,7 +547,7 @@ func (kl *Kubelet) updateNodeStatus() error {
 
 // tryUpdateNodeStatus tries to update node status to master if there is any
 // change or enough time passed from the last sync.
-func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
+func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
@@ -478,23 +558,42 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	if tryNumber == 0 {
 		util.FromApiserverCache(&opts)
 	}
-	node, err := kl.heartbeatClient.CoreV1().Nodes().Get(context.TODO(), string(kl.nodeName), opts)
+	originalNode, err := kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
-
-	originalNode := node.DeepCopy()
 	if originalNode == nil {
 		return fmt.Errorf("nil %q node object", kl.nodeName)
 	}
+
+	node, changed := kl.updateNode(ctx, originalNode)
+	shouldPatchNodeStatus := changed || kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency
+
+	if !shouldPatchNodeStatus {
+		kl.markVolumesFromNode(node)
+		return nil
+	}
+
+	updatedNode, err := kl.patchNodeStatus(originalNode, node)
+	if err == nil {
+		kl.markVolumesFromNode(updatedNode)
+	}
+	return err
+}
+
+// updateNode creates a copy of originalNode and runs update logic on it.
+// It returns the updated node object and a bool indicating if anything has been changed.
+func (kl *Kubelet) updateNode(ctx context.Context, originalNode *v1.Node) (*v1.Node, bool) {
+	node := originalNode.DeepCopy()
 
 	podCIDRChanged := false
 	if len(node.Spec.PodCIDRs) != 0 {
 		// Pod CIDR could have been updated before, so we cannot rely on
 		// node.Spec.PodCIDR being non-empty. We also need to know if pod CIDR is
 		// actually changed.
+		var err error
 		podCIDRs := strings.Join(node.Spec.PodCIDRs, ",")
-		if podCIDRChanged, err = kl.updatePodCIDR(podCIDRs); err != nil {
+		if podCIDRChanged, err = kl.updatePodCIDR(ctx, podCIDRs); err != nil {
 			klog.ErrorS(err, "Error updating pod CIDR")
 		}
 	}
@@ -518,43 +617,50 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		areRequiredLabelsNotPresent = true
 	}
 
-	kl.setNodeStatus(node)
+	kl.setNodeStatus(ctx, node)
 
-	now := kl.clock.Now()
-	if now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
-		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) && !areRequiredLabelsNotPresent {
-			// We must mark the volumes as ReportedInUse in volume manager's dsw even
-			// if no changes were made to the node status (no volumes were added or removed
-			// from the VolumesInUse list).
-			//
-			// The reason is that on a kubelet restart, the volume manager's dsw is
-			// repopulated and the volume ReportedInUse is initialized to false, while the
-			// VolumesInUse list from the Node object still contains the state from the
-			// previous kubelet instantiation.
-			//
-			// Once the volumes are added to the dsw, the ReportedInUse field needs to be
-			// synced from the VolumesInUse list in the Node.Status.
-			//
-			// The MarkVolumesAsReportedInUse() call cannot be performed in dsw directly
-			// because it does not have access to the Node object.
-			// This also cannot be populated on node status manager init because the volume
-			// may not have been added to dsw at that time.
-			kl.volumeManager.MarkVolumesAsReportedInUse(node.Status.VolumesInUse)
-			return nil
-		}
-	}
+	changed := podCIDRChanged || nodeStatusHasChanged(&originalNode.Status, &node.Status) || areRequiredLabelsNotPresent
+	return node, changed
+}
 
+// patchNodeStatus patches node on the API server based on originalNode.
+// It returns any potential error, or an updatedNode and refreshes the state of kubelet when successful.
+func (kl *Kubelet) patchNodeStatus(originalNode, node *v1.Node) (*v1.Node, error) {
 	// Patch the current status on the API server
 	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, node)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	kl.lastStatusReportTime = now
+	kl.lastStatusReportTime = kl.clock.Now()
 	kl.setLastObservedNodeAddresses(updatedNode.Status.Addresses)
-	// If update finishes successfully, mark the volumeInUse as reportedInUse to indicate
-	// those volumes are already updated in the node's status
-	kl.volumeManager.MarkVolumesAsReportedInUse(updatedNode.Status.VolumesInUse)
-	return nil
+	return updatedNode, nil
+}
+
+// markVolumesFromNode updates volumeManager with VolumesInUse status from node.
+//
+// In the case of node status update being unnecessary, call with the fetched node.
+// We must mark the volumes as ReportedInUse in volume manager's dsw even
+// if no changes were made to the node status (no volumes were added or removed
+// from the VolumesInUse list).
+//
+// The reason is that on a kubelet restart, the volume manager's dsw is
+// repopulated and the volume ReportedInUse is initialized to false, while the
+// VolumesInUse list from the Node object still contains the state from the
+// previous kubelet instantiation.
+//
+// Once the volumes are added to the dsw, the ReportedInUse field needs to be
+// synced from the VolumesInUse list in the Node.Status.
+//
+// The MarkVolumesAsReportedInUse() call cannot be performed in dsw directly
+// because it does not have access to the Node object.
+// This also cannot be populated on node status manager init because the volume
+// may not have been added to dsw at that time.
+//
+// Or, after a successful node status update, call with updatedNode returned from
+// the patch call, to mark the volumeInUse as reportedInUse to indicate
+// those volumes are already updated in the node's status
+func (kl *Kubelet) markVolumesFromNode(node *v1.Node) {
+	kl.volumeManager.MarkVolumesAsReportedInUse(node.Status.VolumesInUse)
 }
 
 // recordNodeStatusEvent records an event of the given type with the given
@@ -570,7 +676,7 @@ func (kl *Kubelet) recordEvent(eventType, event, message string) {
 }
 
 // record if node schedulable change.
-func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) error {
+func (kl *Kubelet) recordNodeSchedulableEvent(ctx context.Context, node *v1.Node) error {
 	kl.lastNodeUnschedulableLock.Lock()
 	defer kl.lastNodeUnschedulableLock.Unlock()
 	if kl.lastNodeUnschedulable != node.Spec.Unschedulable {
@@ -588,10 +694,10 @@ func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) error {
 // any fields that are currently set.
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
 // refactor the node status condition code out to a different file.
-func (kl *Kubelet) setNodeStatus(node *v1.Node) {
+func (kl *Kubelet) setNodeStatus(ctx context.Context, node *v1.Node) {
 	for i, f := range kl.setNodeStatusFuncs {
 		klog.V(5).InfoS("Setting node status condition code", "position", i, "node", klog.KObj(node))
-		if err := f(node); err != nil {
+		if err := f(ctx, node); err != nil {
 			klog.ErrorS(err, "Failed to set some node status fields", "node", klog.KObj(node))
 		}
 	}
@@ -610,7 +716,7 @@ func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
 
 // defaultNodeStatusFuncs is a factory that generates the default set of
 // setNodeStatus funcs
-func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
+func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) error {
 	// if cloud is not nil, we expect the cloud resource sync manager to exist
 	var nodeAddressesFunc func() ([]v1.NodeAddress, error)
 	if kl.cloud != nil {
@@ -620,7 +726,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	if kl.appArmorValidator != nil {
 		validateHostFunc = kl.appArmorValidator.ValidateHost
 	}
-	var setters []func(n *v1.Node) error
+	var setters []func(ctx context.Context, n *v1.Node) error
 	setters = append(setters,
 		nodestatus.NodeAddress(kl.nodeIPs, kl.nodeIPValidator, kl.hostname, kl.hostnameOverridden, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
 		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,

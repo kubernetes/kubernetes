@@ -42,7 +42,7 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 	f := framework.NewDefaultFramework("node-label-reconciliation")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("Kubelet", func() {
-		ginkgo.It("should reconcile the OS and Arch labels when restarted", func() {
+		ginkgo.It("should reconcile the OS and Arch labels when restarted", func(ctx context.Context) {
 			node := getLocalNode(f)
 			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)
 			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelArchStable, runtime.GOARCH)
@@ -63,7 +63,7 @@ var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", fu
 			err = waitForNodeLabels(f.ClientSet.CoreV1(), node.Name, 5*time.Minute)
 			framework.ExpectNoError(err)
 		})
-		ginkgo.It("should reconcile the OS and Arch labels when running", func() {
+		ginkgo.It("should reconcile the OS and Arch labels when running", func(ctx context.Context) {
 
 			node := getLocalNode(f)
 			e2enode.ExpectNodeHasLabel(f.ClientSet, node.Name, v1.LabelOSStable, runtime.GOOS)

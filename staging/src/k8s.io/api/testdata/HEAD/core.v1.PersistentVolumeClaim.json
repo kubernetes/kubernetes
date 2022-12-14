@@ -67,7 +67,12 @@
       },
       "requests": {
         "requestsKey": "0"
-      }
+      },
+      "claims": [
+        {
+          "name": "nameValue"
+        }
+      ]
     },
     "volumeName": "volumeNameValue",
     "storageClassName": "storageClassNameValue",
@@ -80,7 +85,8 @@
     "dataSourceRef": {
       "apiGroup": "apiGroupValue",
       "kind": "kindValue",
-      "name": "nameValue"
+      "name": "nameValue",
+      "namespace": "namespaceValue"
     }
   },
   "status": {

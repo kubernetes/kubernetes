@@ -239,6 +239,16 @@
   - k8s.io/klog
   - k8s.io/utils
 
+- baseImportPath: "./vendor/k8s.io/dynamic-resource-allocation/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/client-go
+  - k8s.io/dynamic-resource-allocation
+  - k8s.io/klog
+  - k8s.io/kubelet
+  - k8s.io/utils
+
 - baseImportPath: "./vendor/k8s.io/legacy-cloud-providers/"
   allowedImports:
   - k8s.io/api

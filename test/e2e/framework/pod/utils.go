@@ -231,3 +231,13 @@ func mixinRestrictedContainerSecurityContext(container *v1.Container) {
 		}
 	}
 }
+
+// FindPodConditionByType loops through all pod conditions in pod status and returns the specified condition.
+func FindPodConditionByType(podStatus *v1.PodStatus, conditionType v1.PodConditionType) *v1.PodCondition {
+	for _, cond := range podStatus.Conditions {
+		if cond.Type == conditionType {
+			return &cond
+		}
+	}
+	return nil
+}

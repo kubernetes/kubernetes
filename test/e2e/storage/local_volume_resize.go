@@ -39,6 +39,10 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
+const (
+	csiResizeWaitPeriod = 5 * time.Minute
+)
+
 var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-expansion")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
@@ -82,7 +86,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			cleanupStorageClass(config)
 		})
 
-		ginkgo.It("should support online expansion on node", func() {
+		ginkgo.It("should support online expansion on node", func(ctx context.Context) {
 			var (
 				pod1    *v1.Pod
 				pod1Err error

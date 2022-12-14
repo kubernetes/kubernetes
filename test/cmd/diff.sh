@@ -30,10 +30,10 @@ run_kubectl_diff_tests() {
     output_message=$(! kubectl diff -f hack/testdata/pod.yaml)
     kube::test::if_has_string "${output_message}" 'test-pod'
     # Ensure diff only dry-runs and doesn't persist change
-    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" ':'
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \"test-pod\" }}found{{end}}{{end}}:" ':'
 
     kubectl apply -f hack/testdata/pod.yaml
-    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" 'found:'
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \"test-pod\" }}found{{end}}{{end}}:" 'found:'
     initialResourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
 
     # Make sure that diffing the resource right after returns nothing (0 exit code).
@@ -46,8 +46,10 @@ run_kubectl_diff_tests() {
     # Make sure that:
     # 1. the exit code for diff is 1 because it found a difference
     # 2. the difference contains the changed image
-    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml || test $? -eq 1)
+    # 3. the output doesn't indicate this is an error
+    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml 2>&1 || test $? -eq 1)
     kube::test::if_has_string "${output_message}" 'registry.k8s.io/pause:3.4'
+    kube::test::if_has_not_string "${output_message}" 'exit status 1'
 
     # Ensure diff only dry-runs and doesn't persist change
     resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
@@ -73,11 +75,11 @@ run_kubectl_diff_tests() {
     output_message=$(! kubectl diff --server-side -f hack/testdata/pod.yaml)
     kube::test::if_has_string "${output_message}" 'test-pod'
     # Ensure diff --server-side only dry-runs and doesn't persist change
-    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" ':'
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \"test-pod\" }}found{{end}}{{end}}:" ':'
 
     # Server-side apply the Pod
     kubectl apply --server-side -f hack/testdata/pod.yaml
-    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \\\"test-pod\\\" }}found{{end}}{{end}}:" 'found:'
+    kube::test::get_object_assert 'pod' "{{range.items}}{{ if eq ${id_field:?} \"test-pod\" }}found{{end}}{{end}}:" 'found:'
 
     # Make sure that --server-side diffing the resource right after returns nothing (0 exit code).
     kubectl diff --server-side -f hack/testdata/pod.yaml

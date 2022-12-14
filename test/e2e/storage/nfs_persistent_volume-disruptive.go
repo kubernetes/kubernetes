@@ -42,7 +42,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
+type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string)
 type disruptiveTest struct {
 	testItStmt string
 	runTest    testBody
@@ -102,6 +102,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		selector = metav1.SetAsLabelSelector(volLabel)
 		// Start the NFS server pod.
 		_, nfsServerPod, nfsServerHost = e2evolume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+		ginkgo.DeferCleanup(e2epod.DeletePodWithWait, c, nfsServerPod)
 		nfsPVconfig = e2epv.PersistentVolumeConfig{
 			NamePrefix: "nfs-",
 			Labels:     volLabel,
@@ -126,7 +127,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {
 					clientNode = &node
-					clientNodeIP, err = e2enode.GetExternalIP(clientNode)
+					clientNodeIP, err = e2enode.GetSSHExternalIP(clientNode)
 					framework.ExpectNoError(err)
 					break
 				}
@@ -208,7 +209,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			}
 		})
 
-		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func() {
+		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func(ctx context.Context) {
 			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			ginkgo.By("Deleting PVC for volume 2")
@@ -270,9 +271,10 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		// Test loop executes each disruptiveTest iteratively.
 		for _, test := range disruptiveTestTable {
 			func(t disruptiveTest) {
-				ginkgo.It(t.testItStmt, func() {
+				ginkgo.It(t.testItStmt, func(ctx context.Context) {
+					e2eskipper.SkipUnlessSSHKeyPresent()
 					ginkgo.By("Executing Spec")
-					t.runTest(c, f, clientPod)
+					t.runTest(c, f, clientPod, e2epod.VolumeMountPath1)
 				})
 			}(test)
 		}
@@ -298,8 +300,8 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig e2epv.
 	pv, pvc, err := e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 	defer func() {
 		if err != nil {
-			e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns)
-			e2epv.DeletePersistentVolume(c, pv.Name)
+			ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, c, pvc.Name, ns)
+			ginkgo.DeferCleanup(e2epv.DeletePersistentVolume, c, pv.Name)
 		}
 	}()
 	framework.ExpectNoError(err)
@@ -311,7 +313,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig e2epv.
 	framework.ExpectNoError(err)
 	defer func() {
 		if err != nil {
-			e2epod.DeletePodWithWait(c, pod)
+			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, c, pod)
 		}
 	}()
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)

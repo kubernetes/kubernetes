@@ -20,10 +20,10 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-
-	"k8s.io/apimachinery/pkg/types"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // This const block defines the metric names for the kubelet metrics.
@@ -61,6 +61,27 @@ const (
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
 	RunPodSandboxErrorsKey   = "run_podsandbox_errors_total"
+)
+
+const (
+	// Subsystem names.
+	pvControllerSubsystem = "pv_collector"
+
+	// Metric names.
+	totalPVKey    = "total_pv_count"
+	boundPVKey    = "bound_pv_count"
+	unboundPVKey  = "unbound_pv_count"
+	boundPVCKey   = "bound_pvc_count"
+	unboundPVCKey = "unbound_pvc_count"
+
+	// Label names.
+	namespaceLabel    = "namespace"
+	storageClassLabel = "storage_class"
+	pluginNameLabel   = "plugin_name"
+	volumeModeLabel   = "volume_mode"
+
+	// String to use when plugin name cannot be determined
+	pluginNameNotAvailable = "N/A"
 )
 
 const (
@@ -502,6 +523,38 @@ var (
 			),
 			StabilityLevel: metrics.BETA,
 		},
+	)
+
+	volumeManagerTotalVolumes = "volume_manager_total_volumes"
+
+	_ = metrics.NewDesc(
+		volumeManagerTotalVolumes,
+		"Number of volumes in Volume Manager",
+		[]string{"plugin_name", "state"},
+		nil,
+		metrics.STABLE, "",
+	)
+
+	_ = metrics.NewDesc(
+		metrics.BuildFQName("test", "beta", "desc"),
+		"Number of volumes in Volume Manager",
+		nil,
+		map[string]string{"alalala": "lalalal"},
+		metrics.BETA, "",
+	)
+	_ = metrics.NewDesc(
+		"test_desc_alpha",
+		"Number of volumes in Volume Manager",
+		[]string{"plugin_name", "state"},
+		map[string]string{"alalala": "lalalal"},
+		metrics.ALPHA, "",
+	)
+
+	_ = metrics.NewDesc(
+		metrics.BuildFQName("", kubeletmetrics.KubeletSubsystem, kubeletmetrics.VolumeStatsCapacityBytesKey),
+		"Capacity in bytes of the volume",
+		[]string{"namespace", "persistentvolumeclaim"}, nil,
+		metrics.BETA, "",
 	)
 )
 

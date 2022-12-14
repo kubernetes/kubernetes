@@ -60,7 +60,7 @@ var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 		}
 	})
 
-	ginkgo.Describe("Retroactive StorageClass assignment [Serial][Disruptive][Feature:RetroactiveDefaultStorageClass]", func() {
+	ginkgo.Describe("Retroactive StorageClass assignment [Serial][Disruptive]", func() {
 		ginkgo.It("should assign default SC to PVCs that have no SC set", func(ctx context.Context) {
 
 			// Temporarily set all default storage classes as non-default
@@ -101,10 +101,7 @@ var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 			})
 			_, err = e2epv.CreatePV(client, f.Timeouts, pv)
 			framework.ExpectNoError(err, "Error creating pv %v", err)
-			defer func(c clientset.Interface, pvName string) {
-				err := e2epv.DeletePersistentVolume(c, pvName)
-				framework.ExpectNoError(err)
-			}(client, pv.Name)
+			ginkgo.DeferCleanup(e2epv.DeletePersistentVolume, client, pv.Name)
 
 			// Verify the PVC is bound and has the new default SC
 			claimNames := []string{pvc.Name}

@@ -176,7 +176,7 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 		allErrs = append(allErrs, field.Invalid(specPath.Child("request"), csr.Spec.Request, fmt.Sprintf("%v", err)))
 	}
 	if len(csr.Spec.Usages) == 0 {
-		allErrs = append(allErrs, field.Required(specPath.Child("usages"), "usages must be provided"))
+		allErrs = append(allErrs, field.Required(specPath.Child("usages"), ""))
 	}
 	if !opts.allowUnknownUsages {
 		for i, usage := range csr.Spec.Usages {
@@ -275,7 +275,7 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 func ValidateCertificateSigningRequestSignerName(fldPath *field.Path, signerName string) field.ErrorList {
 	var el field.ErrorList
 	if len(signerName) == 0 {
-		el = append(el, field.Required(fldPath, "signerName must be provided"))
+		el = append(el, field.Required(fldPath, ""))
 		return el
 	}
 

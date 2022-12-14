@@ -37,7 +37,7 @@ var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 	f := framework.NewDefaultFramework("image-id-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should be set to the manifest digest (from RepoDigests) when available", func() {
+	ginkgo.It("should be set to the manifest digest (from RepoDigests) when available", func(ctx context.Context) {
 		podDesc := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-with-repodigest",

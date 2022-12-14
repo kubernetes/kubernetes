@@ -82,7 +82,7 @@ run_resource_aliasing_tests() {
   kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/controller.yaml "${kube_flags[@]}"
   kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/service.yaml "${kube_flags[@]}"
 
-  object="all -l'app=cassandra'"
+  object="all -l app=cassandra"
   request="{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}"
 
   # all 4 cassandra's might not be in the request immediately...

@@ -50,7 +50,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 			framework.ExpectNoError(err)
 		}
 	})
-	ginkgo.It("should delete the token secret when the secret expired", func() {
+	ginkgo.It("should delete the token secret when the secret expired", func(ctx context.Context) {
 		ginkgo.By("create a new expired bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)
@@ -68,7 +68,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should not delete the token secret when the secret is not expired", func() {
+	ginkgo.It("should not delete the token secret when the secret is not expired", func(ctx context.Context) {
 		ginkgo.By("create a new expired bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)

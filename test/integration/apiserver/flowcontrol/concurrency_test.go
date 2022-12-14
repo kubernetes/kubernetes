@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	sharedConcurrencyMetricsName      = "apiserver_flowcontrol_request_concurrency_limit"
+	nominalConcurrencyMetricsName     = "apiserver_flowcontrol_nominal_limit_seats"
 	dispatchedRequestCountMetricsName = "apiserver_flowcontrol_dispatched_requests_total"
 	rejectedRequestCountMetricsName   = "apiserver_flowcontrol_rejected_requests_total"
 	labelPriorityLevel                = "priority_level"
@@ -84,16 +84,16 @@ func TestPriorityLevelIsolation(t *testing.T) {
 		t.Error(err)
 	}
 
-	sharedConcurrency, err := getSharedConcurrencyOfPriorityLevel(loopbackClient)
+	nominalConcurrency, err := getNominalConcurrencyOfPriorityLevel(loopbackClient)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if 1 != sharedConcurrency[priorityLevelNoxu1.Name] {
-		t.Errorf("unexpected shared concurrency %v instead of %v", sharedConcurrency[priorityLevelNoxu1.Name], 1)
+	if 1 != nominalConcurrency[priorityLevelNoxu1.Name] {
+		t.Errorf("unexpected shared concurrency %v instead of %v", nominalConcurrency[priorityLevelNoxu1.Name], 1)
 	}
-	if 1 != sharedConcurrency[priorityLevelNoxu2.Name] {
-		t.Errorf("unexpected shared concurrency %v instead of %v", sharedConcurrency[priorityLevelNoxu2.Name], 1)
+	if 1 != nominalConcurrency[priorityLevelNoxu2.Name] {
+		t.Errorf("unexpected shared concurrency %v instead of %v", nominalConcurrency[priorityLevelNoxu2.Name], 1)
 	}
 
 	stopCh := make(chan struct{})
@@ -164,7 +164,7 @@ func getMetrics(c clientset.Interface) (string, error) {
 	return string(resp), err
 }
 
-func getSharedConcurrencyOfPriorityLevel(c clientset.Interface) (map[string]int, error) {
+func getNominalConcurrencyOfPriorityLevel(c clientset.Interface) (map[string]int, error) {
 	resp, err := getMetrics(c)
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func getSharedConcurrencyOfPriorityLevel(c clientset.Interface) (map[string]int,
 		}
 		for _, metric := range v {
 			switch name := string(metric.Metric[model.MetricNameLabel]); name {
-			case sharedConcurrencyMetricsName:
+			case nominalConcurrencyMetricsName:
 				concurrency[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
 			}
 		}
@@ -230,6 +230,7 @@ func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, map[
 }
 
 func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, username string, concurrencyShares, queuelength int) (*flowcontrol.PriorityLevelConfiguration, *flowcontrol.FlowSchema, error) {
+	i0 := int32(0)
 	pl, err := c.FlowcontrolV1beta3().PriorityLevelConfigurations().Create(context.Background(), &flowcontrol.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: username,
@@ -238,6 +239,7 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				NominalConcurrencyShares: int32(concurrencyShares),
+				BorrowingLimitPercent:    &i0,
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{

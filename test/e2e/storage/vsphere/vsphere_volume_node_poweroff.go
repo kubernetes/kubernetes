@@ -81,18 +81,18 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		11. Delete the PVC
 		12. Delete the StorageClass
 	*/
-	ginkgo.It("verify volume status after node power off", func() {
+	ginkgo.It("verify volume status after node power off", func(ctx context.Context) {
 		ginkgo.By("Creating a Storage Class")
 		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil, "")
 		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-		defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), storageclass.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Creating PVC using the Storage Class")
 		pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "1Gi", storageclass)
 		pvclaim, err := e2epv.CreatePVC(client, namespace, pvclaimSpec)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create PVC with err: %v", err))
-		defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+		ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 		ginkgo.By("Waiting for PVC to be in bound phase")
 		pvclaims := []*v1.PersistentVolumeClaim{pvclaim}
@@ -103,7 +103,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		ginkgo.By("Creating a Deployment")
 		deployment, err := e2edeployment.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
-		defer client.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{})
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AppsV1().Deployments(namespace).Delete), deployment.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Get pod from the deployment")
 		podList, err := e2edeployment.GetPodsForDeployment(client, deployment)
@@ -123,11 +123,9 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 
 		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node1)
 		vm := object.NewVirtualMachine(nodeInfo.VSphere.Client.Client, nodeInfo.VirtualMachineRef)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		_, err = vm.PowerOff(ctx)
 		framework.ExpectNoError(err)
-		defer vm.PowerOn(ctx)
+		ginkgo.DeferCleanup(vm.PowerOn)
 
 		err = vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOff)
 		framework.ExpectNoError(err, "Unable to power off the node")

@@ -60,6 +60,10 @@ type priorityPair struct {
 
 var testExtendedResource = v1.ResourceName("scheduling.k8s.io/foo")
 
+const (
+	testFinalizer = "example.com/test-finalizer"
+)
+
 var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
@@ -84,6 +88,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		for _, node := range nodeList.Items {
 			nodeCopy := node.DeepCopy()
 			delete(nodeCopy.Status.Capacity, testExtendedResource)
+			delete(nodeCopy.Status.Allocatable, testExtendedResource)
 			err := patchNode(cs, &node, nodeCopy)
 			framework.ExpectNoError(err)
 		}
@@ -122,7 +127,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		resources is found, the scheduler MUST preempt a lower priority pod and
 		schedule the high priority pod.
 	*/
-	framework.ConformanceIt("validates basic preemption works", func() {
+	framework.ConformanceIt("validates basic preemption works", func(ctx context.Context) {
 		var podRes v1.ResourceList
 
 		// Create two pods per node that uses a lot of the node's resources.
@@ -134,6 +139,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// Update each node to advertise 3 available extended resources
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("5")
+			nodeCopy.Status.Allocatable[testExtendedResource] = resource.MustParse("5")
 			err := patchNode(cs, &node, nodeCopy)
 			framework.ExpectNoError(err)
 
@@ -215,7 +221,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		resources is found, the scheduler MUST preempt a lower priority pod to
 		schedule the critical pod.
 	*/
-	framework.ConformanceIt("validates lower priority pod preemption by critical pod", func() {
+	framework.ConformanceIt("validates lower priority pod preemption by critical pod", func(ctx context.Context) {
 		var podRes v1.ResourceList
 
 		ginkgo.By("Create pods that use 4/5 of node resources.")
@@ -224,6 +230,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// Update each node to advertise 3 available extended resources
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("5")
+			nodeCopy.Status.Allocatable[testExtendedResource] = resource.MustParse("5")
 			err := patchNode(cs, &node, nodeCopy)
 			framework.ExpectNoError(err)
 
@@ -313,6 +320,76 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		}
 	})
 
+	// 1. Run a low priority pod with finalizer which consumes 1/1 of node resources
+	// 2. Schedule a higher priority pod which also consumes 1/1 of node resources
+	// 3. See if the pod with lower priority is preempted and has the pod disruption condition
+	// 4. Remove the finalizer so that the pod can be deleted by GC
+	ginkgo.It("validates pod disruption condition is added to the preempted pod", func(ctx context.Context) {
+		podRes := v1.ResourceList{testExtendedResource: resource.MustParse("1")}
+
+		ginkgo.By("Select a node to run the lower and higher priority pods")
+		framework.ExpectNotEqual(len(nodeList.Items), 0, "We need at least one node for the test to run")
+		node := nodeList.Items[0]
+		nodeCopy := node.DeepCopy()
+		nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("1")
+		nodeCopy.Status.Allocatable[testExtendedResource] = resource.MustParse("1")
+		err := patchNode(cs, &node, nodeCopy)
+		framework.ExpectNoError(err)
+
+		// prepare node affinity to make sure both the lower and higher priority pods are scheduled on the same node
+		testNodeAffinity := v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchFields: []v1.NodeSelectorRequirement{
+								{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		ginkgo.By("Create a low priority pod that consumes 1/1 of node resources")
+		victimPod := createPausePod(f, pausePodConfig{
+			Name:              "victim-pod",
+			PriorityClassName: lowPriorityClassName,
+			Resources: &v1.ResourceRequirements{
+				Requests: podRes,
+				Limits:   podRes,
+			},
+			Finalizers: []string{testFinalizer},
+			Affinity:   &testNodeAffinity,
+		})
+		framework.Logf("Created pod: %v", victimPod.Name)
+
+		ginkgo.By("Wait for the victim pod to be scheduled")
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, victimPod))
+
+		// Remove the finalizer so that the victim pod can be GCed
+		defer e2epod.NewPodClient(f).RemoveFinalizer(victimPod.Name, testFinalizer)
+
+		ginkgo.By("Create a high priority pod to trigger preemption of the lower priority pod")
+		preemptorPod := createPausePod(f, pausePodConfig{
+			Name:              "preemptor-pod",
+			PriorityClassName: highPriorityClassName,
+			Resources: &v1.ResourceRequirements{
+				Requests: podRes,
+				Limits:   podRes,
+			},
+			Affinity: &testNodeAffinity,
+		})
+		framework.Logf("Created pod: %v", preemptorPod.Name)
+
+		ginkgo.By("Waiting for the victim pod to be terminating")
+		err = e2epod.WaitForPodTerminatingInNamespaceTimeout(f.ClientSet, victimPod.Name, victimPod.Namespace, framework.PodDeleteTimeout)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying the pod has the pod disruption condition")
+		e2epod.VerifyPodHasConditionWithType(f, victimPod, v1.DisruptionTarget)
+	})
+
 	ginkgo.Context("PodTopologySpread Preemption", func() {
 		var nodeNames []string
 		var nodes []*v1.Node
@@ -335,6 +412,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				ginkgo.By(fmt.Sprintf("Apply 10 fake resource to node %v.", node.Name))
 				nodeCopy := node.DeepCopy()
 				nodeCopy.Status.Capacity[fakeRes] = resource.MustParse("10")
+				nodeCopy.Status.Allocatable[fakeRes] = resource.MustParse("10")
 				err = patchNode(cs, node, nodeCopy)
 				framework.ExpectNoError(err)
 				nodes = append(nodes, node)
@@ -347,12 +425,13 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			for _, node := range nodes {
 				nodeCopy := node.DeepCopy()
 				delete(nodeCopy.Status.Capacity, fakeRes)
+				delete(nodeCopy.Status.Allocatable, fakeRes)
 				err := patchNode(cs, node, nodeCopy)
 				framework.ExpectNoError(err)
 			}
 		})
 
-		ginkgo.It("validates proper pods are preempted", func() {
+		ginkgo.It("validates proper pods are preempted", func(ctx context.Context) {
 			podLabel := "e2e-pts-preemption"
 			nodeAffinity := &v1.Affinity{
 				NodeAffinity: &v1.NodeAffinity{
@@ -485,6 +564,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			if node != nil {
 				nodeCopy := node.DeepCopy()
 				delete(nodeCopy.Status.Capacity, fakecpu)
+				delete(nodeCopy.Status.Allocatable, fakecpu)
 				err := patchNode(cs, node, nodeCopy)
 				framework.ExpectNoError(err)
 			}
@@ -517,6 +597,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// update Node API object with a fake resource
 			nodeCopy := node.DeepCopy()
 			nodeCopy.Status.Capacity[fakecpu] = resource.MustParse("1000")
+			nodeCopy.Status.Allocatable[fakecpu] = resource.MustParse("1000")
 			err = patchNode(cs, node, nodeCopy)
 			framework.ExpectNoError(err)
 
@@ -540,7 +621,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			Testname: Pod preemption verification
 			Description: Four levels of Pods in ReplicaSets with different levels of Priority, restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected number of Replicas.
 		*/
-		framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func() {
+		framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func(ctx context.Context) {
 			podNamesSeen := []int32{0, 0, 0}
 			stopCh := make(chan struct{})
 
@@ -730,7 +811,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			either patched or updated it MUST succeed. When any immutable field is either patched or
 			updated it MUST fail.
 		*/
-		framework.ConformanceIt("verify PriorityClass endpoints can be operated with different HTTP methods", func() {
+		framework.ConformanceIt("verify PriorityClass endpoints can be operated with different HTTP methods", func(ctx context.Context) {
 			// 1. Patch/Update on immutable fields will fail.
 			pcCopy := pcs[0].DeepCopy()
 			pcCopy.Value = pcCopy.Value * 10

@@ -49,7 +49,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Testname: Kubelet, log output, default
 			Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 		*/
-		framework.ConformanceIt("should print the output to logs [NodeConformance]", func() {
+		framework.ConformanceIt("should print the output to logs [NodeConformance]", func(ctx context.Context) {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -107,7 +107,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Testname: Kubelet, failed pod, terminated reason
 			Description: Create a Pod with terminated state. Pod MUST have only one container. Container MUST be in terminated state and MUST have an terminated reason.
 		*/
-		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func() {
+		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func(ctx context.Context) {
 			gomega.Eventually(func() error {
 				podData, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 				if err != nil {
@@ -132,7 +132,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Testname: Kubelet, failed pod, delete
 			Description: Create a Pod with terminated state. This terminated pod MUST be able to be deleted.
 		*/
-		framework.ConformanceIt("should be possible to delete [NodeConformance]", func() {
+		framework.ConformanceIt("should be possible to delete [NodeConformance]", func(ctx context.Context) {
 			err := podClient.Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
@@ -145,7 +145,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Testname: Kubelet, hostAliases
 			Description: Create a Pod with hostAliases and a container with command to output /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases to the output of /etc/hosts entries.
 		*/
-		framework.ConformanceIt("should write entries to /etc/hosts [NodeConformance]", func() {
+		framework.ConformanceIt("should write entries to /etc/hosts [NodeConformance]", func(ctx context.Context) {
 			pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil, "etc-hosts")
 			// Don't restart the Pod since it is expected to exit
 			pod.Spec.RestartPolicy = v1.RestartPolicyNever
@@ -181,7 +181,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Description: Create a Pod with security context set with ReadOnlyRootFileSystem set to true. The Pod then tries to write to the /file on the root, write operation to the root filesystem MUST fail as expected.
 			This test is marked LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		framework.ConformanceIt("should not write to root filesystem [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("should not write to root filesystem [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			isReadOnly := true
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

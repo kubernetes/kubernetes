@@ -491,11 +491,10 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string) {
 	ginkgo.By("submitting the pod to kubernetes")
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		ginkgo.By("deleting the pod")
-		defer ginkgo.GinkgoRecover()
-		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
-	}()
+		return podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+	})
 	if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
@@ -519,11 +518,10 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames []string, value string) {
 	ginkgo.By("submitting the pod to kubernetes")
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		ginkgo.By("deleting the pod")
-		defer ginkgo.GinkgoRecover()
-		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
-	}()
+		return podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
+	})
 	if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("ginkgo.Failed to create pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}

@@ -17,6 +17,8 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -96,7 +98,8 @@ func (collector *volumeStatsCollector) DescribeWithStability(ch chan<- *metrics.
 
 // CollectWithStability implements the metrics.StableCollector interface.
 func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	podStats, err := collector.statsProvider.ListPodStats()
+	ctx := context.Background()
+	podStats, err := collector.statsProvider.ListPodStats(ctx)
 	if err != nil {
 		return
 	}

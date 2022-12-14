@@ -17,6 +17,7 @@ limitations under the License.
 package topologycache
 
 import (
+	"fmt"
 	"math"
 
 	v1 "k8s.io/api/core/v1"
@@ -65,6 +66,11 @@ func RemoveHintsFromSlices(si *SliceInfo) ([]*discovery.EndpointSlice, []*discov
 	si.Unchanged = si.Unchanged[:j]
 
 	return si.ToCreate, si.ToUpdate
+}
+
+// FormatWithAddressType foramts a given string by adding an addressType to the end of it.
+func FormatWithAddressType(s string, addressType discovery.AddressType) string {
+	return fmt.Sprintf("%s, addressType: %s", s, addressType)
 }
 
 // redistributeHints redistributes hints based in the provided EndpointSlices.

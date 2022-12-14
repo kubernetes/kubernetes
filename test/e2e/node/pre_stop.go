@@ -51,10 +51,10 @@ func testPreStop(c clientset.Interface, ns string) {
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		ginkgo.By("Deleting the server pod")
-		c.CoreV1().Pods(ns).Delete(context.TODO(), podDescr.Name, metav1.DeleteOptions{})
-	}()
+		return c.CoreV1().Pods(ns).Delete(ctx, podDescr.Name, metav1.DeleteOptions{})
+	})
 
 	ginkgo.By("Waiting for pods to come up.")
 	err = e2epod.WaitForPodRunningInNamespace(c, podDescr)
@@ -97,12 +97,13 @@ func testPreStop(c clientset.Interface, ns string) {
 	deletePreStop := true
 
 	// At the end of the test, clean up by removing the pod.
-	defer func() {
+	ginkgo.DeferCleanup(func(ctx context.Context) error {
 		if deletePreStop {
 			ginkgo.By("Deleting the tester pod")
-			c.CoreV1().Pods(ns).Delete(context.TODO(), preStopDescr.Name, metav1.DeleteOptions{})
+			return c.CoreV1().Pods(ns).Delete(ctx, preStopDescr.Name, metav1.DeleteOptions{})
 		}
-	}()
+		return nil
+	})
 
 	err = e2epod.WaitForPodRunningInNamespace(c, preStopDescr)
 	framework.ExpectNoError(err, "waiting for tester pod to start")
@@ -165,11 +166,11 @@ var _ = SIGDescribe("PreStop", func() {
 		Testname: Pods, prestop hook
 		Description: Create a server pod with a rest endpoint '/write' that changes state.Received field. Create a Pod with a pre-stop handle that posts to the /write endpoint on the server Pod. Verify that the Pod with pre-stop hook is running. Delete the Pod with the pre-stop hook. Before the Pod is deleted, pre-stop handler MUST be called when configured. Verify that the Pod is deleted and a call to prestop hook is verified by checking the status received on the server Pod.
 	*/
-	framework.ConformanceIt("should call prestop when killing a pod ", func() {
+	framework.ConformanceIt("should call prestop when killing a pod ", func(ctx context.Context) {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 
-	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func() {
+	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func(ctx context.Context) {
 		gracefulTerminationPeriodSeconds := int64(30)
 		ginkgo.By("creating the pod")
 		name := "pod-prestop-hook-" + string(uuid.NewUUID())

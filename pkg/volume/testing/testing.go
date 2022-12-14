@@ -451,10 +451,12 @@ func (plugin *FakeVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode
 	return []v1.PersistentVolumeAccessMode{}
 }
 
-func (plugin *FakeVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	return &volume.Spec{
-		Volume: &v1.Volume{
-			Name: volumeName,
+func (plugin *FakeVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
+	return volume.ReconstructedVolume{
+		Spec: &volume.Spec{
+			Volume: &v1.Volume{
+				Name: volumeName,
+			},
 		},
 	}, nil
 }
@@ -526,7 +528,7 @@ func (f *FakeBasicVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return strings.HasPrefix(spec.Name(), f.GetPluginName())
 }
 
-func (f *FakeBasicVolumePlugin) ConstructVolumeSpec(ame, mountPath string) (*volume.Spec, error) {
+func (f *FakeBasicVolumePlugin) ConstructVolumeSpec(ame, mountPath string) (volume.ReconstructedVolume, error) {
 	return f.Plugin.ConstructVolumeSpec(ame, mountPath)
 }
 
@@ -647,8 +649,8 @@ func (plugin *FakeFileVolumePlugin) NewUnmounter(name string, podUID types.UID) 
 	return nil, nil
 }
 
-func (plugin *FakeFileVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	return nil, nil
+func (plugin *FakeFileVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
+	return volume.ReconstructedVolume{}, nil
 }
 
 func NewFakeFileVolumePlugin() []volume.VolumePlugin {

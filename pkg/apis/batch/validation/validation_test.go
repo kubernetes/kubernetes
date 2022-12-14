@@ -118,7 +118,7 @@ func TestValidateJob(t *testing.T) {
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
-										Type:   api.AlphaNoCompatGuaranteeDisruptionTarget,
+										Type:   api.DisruptionTarget,
 										Status: api.ConditionTrue,
 									},
 								},
@@ -456,7 +456,7 @@ func TestValidateJob(t *testing.T) {
 							},
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 								{
-									Type:   api.AlphaNoCompatGuaranteeDisruptionTarget,
+									Type:   api.DisruptionTarget,
 									Status: api.ConditionTrue,
 								},
 							},
@@ -558,7 +558,7 @@ func TestValidateJob(t *testing.T) {
 							Action: batch.PodFailurePolicyActionIgnore,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 								{
-									Type: api.AlphaNoCompatGuaranteeDisruptionTarget,
+									Type: api.DisruptionTarget,
 								},
 							},
 						},
@@ -577,7 +577,7 @@ func TestValidateJob(t *testing.T) {
 							Action: batch.PodFailurePolicyActionIgnore,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 								{
-									Type:   api.AlphaNoCompatGuaranteeDisruptionTarget,
+									Type:   api.DisruptionTarget,
 									Status: "UnknownStatus",
 								},
 							},
@@ -968,7 +968,7 @@ func TestValidateJobUpdate(t *testing.T) {
 							Action: batch.PodFailurePolicyActionIgnore,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 								{
-									Type:   api.AlphaNoCompatGuaranteeDisruptionTarget,
+									Type:   api.DisruptionTarget,
 									Status: api.ConditionTrue,
 								},
 							},
@@ -993,7 +993,7 @@ func TestValidateJobUpdate(t *testing.T) {
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
-										Type:   api.AlphaNoCompatGuaranteeDisruptionTarget,
+										Type:   api.DisruptionTarget,
 										Status: api.ConditionTrue,
 									},
 								},
@@ -1007,7 +1007,7 @@ func TestValidateJobUpdate(t *testing.T) {
 					Action: batch.PodFailurePolicyActionCount,
 					OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 						{
-							Type:   api.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   api.DisruptionTarget,
 							Status: api.ConditionTrue,
 						},
 					},
@@ -1030,7 +1030,7 @@ func TestValidateJobUpdate(t *testing.T) {
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
-										Type:   api.AlphaNoCompatGuaranteeDisruptionTarget,
+										Type:   api.DisruptionTarget,
 										Status: api.ConditionTrue,
 									},
 								},

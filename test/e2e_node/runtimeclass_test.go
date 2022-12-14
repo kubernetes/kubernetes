@@ -95,7 +95,7 @@ var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("PodOverhead cgroup accounting", func() {
 		ginkgo.Context("On running pod with PodOverhead defined", func() {
-			ginkgo.It("Pod cgroup should be sum of overhead and resource limits", func() {
+			ginkgo.It("Pod cgroup should be sum of overhead and resource limits", func(ctx context.Context) {
 				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}

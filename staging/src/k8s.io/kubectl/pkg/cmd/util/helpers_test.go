@@ -19,7 +19,6 @@ package util
 import (
 	goerrors "errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -462,7 +461,7 @@ func testCheckError(t *testing.T, tests []checkErrTestCase) {
 
 func TestDumpReaderToFile(t *testing.T) {
 	testString := "TEST STRING"
-	tempFile, err := ioutil.TempFile(os.TempDir(), "hlpers_test_dump_")
+	tempFile, err := os.CreateTemp(os.TempDir(), "hlpers_test_dump_")
 	if err != nil {
 		t.Errorf("unexpected error setting up a temporary file %v", err)
 	}
@@ -477,7 +476,7 @@ func TestDumpReaderToFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("error in DumpReaderToFile: %v", err)
 	}
-	data, err := ioutil.ReadFile(tempFile.Name())
+	data, err := os.ReadFile(tempFile.Name())
 	if err != nil {
 		t.Errorf("error when reading %s: %v", tempFile.Name(), err)
 	}

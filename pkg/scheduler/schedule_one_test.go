@@ -23,6 +23,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"sync"
 	"testing"
@@ -411,7 +412,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		return true, binding, nil
 	})
 	controllers := make(map[string]string)
-	stopFn := broadcaster.StartEventWatcher(func(obj runtime.Object) {
+	stopFn, err := broadcaster.StartEventWatcher(func(obj runtime.Object) {
 		e, ok := obj.(*eventsv1.Event)
 		if !ok || e.Reason != "Scheduled" {
 			return
@@ -419,6 +420,9 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		controllers[e.Regarding.Name] = e.ReportingController
 		wg.Done()
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer stopFn()
 
 	// Run scheduler.
@@ -597,21 +601,24 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 				return item.mockResult.result, item.mockResult.err
 			}
-			sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo, _ time.Time) {
+			sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, _ *framework.NominatingInfo, _ time.Time) {
 				gotPod = p.Pod
-				gotError = err
+				gotError = status.AsError()
 
-				msg := truncateMessage(err.Error())
+				msg := truncateMessage(gotError.Error())
 				fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 			}
 			called := make(chan struct{})
-			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
+			stopFunc, err := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
 				e, _ := obj.(*eventsv1.Event)
 				if e.Reason != item.eventReason {
 					t.Errorf("got event %v, want %v", e.Reason, item.eventReason)
 				}
 				close(called)
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 			sched.scheduleOne(ctx)
 			<-called
 			if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
@@ -948,13 +955,16 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			fakeVolumeBinder := volumebinding.NewFakeVolumeBinder(item.volumeBinderConfig)
 			s, bindingChan, errChan := setupTestSchedulerWithVolumeBinding(ctx, t, fakeVolumeBinder, eventBroadcaster)
 			eventChan := make(chan struct{})
-			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
+			stopFunc, err := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
 				e, _ := obj.(*eventsv1.Event)
 				if e, a := item.eventReason, e.Reason; e != a {
 					t.Errorf("expected %v, got %v", e, a)
 				}
 				close(eventChan)
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 			s.scheduleOne(ctx)
 			// Wait for pod to succeed or fail scheduling
 			select {
@@ -1261,45 +1271,45 @@ func TestUpdatePod(t *testing.T) {
 func TestSelectHost(t *testing.T) {
 	tests := []struct {
 		name          string
-		list          framework.NodeScoreList
+		list          []framework.NodePluginScores
 		possibleHosts sets.String
 		expectsErr    bool
 	}{
 		{
 			name: "unique properly ordered scores",
-			list: []framework.NodeScore{
-				{Name: "node1.1", Score: 1},
-				{Name: "node2.1", Score: 2},
+			list: []framework.NodePluginScores{
+				{Name: "node1.1", TotalScore: 1},
+				{Name: "node2.1", TotalScore: 2},
 			},
 			possibleHosts: sets.NewString("node2.1"),
 			expectsErr:    false,
 		},
 		{
 			name: "equal scores",
-			list: []framework.NodeScore{
-				{Name: "node1.1", Score: 1},
-				{Name: "node1.2", Score: 2},
-				{Name: "node1.3", Score: 2},
-				{Name: "node2.1", Score: 2},
+			list: []framework.NodePluginScores{
+				{Name: "node1.1", TotalScore: 1},
+				{Name: "node1.2", TotalScore: 2},
+				{Name: "node1.3", TotalScore: 2},
+				{Name: "node2.1", TotalScore: 2},
 			},
 			possibleHosts: sets.NewString("node1.2", "node1.3", "node2.1"),
 			expectsErr:    false,
 		},
 		{
 			name: "out of order scores",
-			list: []framework.NodeScore{
-				{Name: "node1.1", Score: 3},
-				{Name: "node1.2", Score: 3},
-				{Name: "node2.1", Score: 2},
-				{Name: "node3.1", Score: 1},
-				{Name: "node1.3", Score: 3},
+			list: []framework.NodePluginScores{
+				{Name: "node1.1", TotalScore: 3},
+				{Name: "node1.2", TotalScore: 3},
+				{Name: "node2.1", TotalScore: 2},
+				{Name: "node3.1", TotalScore: 1},
+				{Name: "node1.3", TotalScore: 3},
 			},
 			possibleHosts: sets.NewString("node1.1", "node1.2", "node1.3"),
 			expectsErr:    false,
 		},
 		{
 			name:          "empty priority list",
-			list:          []framework.NodeScore{},
+			list:          []framework.NodePluginScores{},
 			possibleHosts: sets.NewString(),
 			expectsErr:    true,
 		},
@@ -2334,9 +2344,177 @@ func TestZeroRequest(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			for _, hp := range list {
-				if hp.Score != test.expectedScore {
+				if hp.TotalScore != test.expectedScore {
 					t.Errorf("expected %d for all priorities, got list %#v", test.expectedScore, list)
 				}
+			}
+		})
+	}
+}
+
+func Test_prioritizeNodes(t *testing.T) {
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		pods                []*v1.Pod
+		nodes               []*v1.Node
+		pluginRegistrations []st.RegisterPluginFunc
+		extenders           []st.FakeExtender
+		want                []framework.NodePluginScores
+	}{
+		{
+			name:  "the score from all plugins should be recorded in PluginToNodeScores",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewBalancedAllocation), 1),
+				st.RegisterScorePlugin("Node2Prioritizer", st.NewNode2PrioritizerPlugin(), 1),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: nil,
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 110,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 200,
+				},
+			},
+		},
+		{
+			name:  "the score from extender should also be recorded in PluginToNodeScores with plugin scores",
+			pod:   &v1.Pod{},
+			nodes: []*v1.Node{makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10), makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10)},
+			pluginRegistrations: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewBalancedAllocation), 1),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: []st.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Weight:       1,
+					Prioritizers: []st.PriorityConfig{
+						{
+							Weight:   3,
+							Function: st.Node1PrioritizerExtender,
+						},
+					},
+				},
+				{
+					ExtenderName: "FakeExtender2",
+					Weight:       1,
+					Prioritizers: []st.PriorityConfig{
+						{
+							Weight:   2,
+							Function: st.Node2PrioritizerExtender,
+						},
+					},
+				},
+			},
+			want: []framework.NodePluginScores{
+				{
+					Name: "node1",
+					Scores: []framework.PluginScore{
+
+						{
+							Name:  "FakeExtender1",
+							Score: 300,
+						},
+						{
+							Name:  "FakeExtender2",
+							Score: 20,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 420,
+				},
+				{
+					Name: "node2",
+					Scores: []framework.PluginScore{
+						{
+							Name:  "FakeExtender1",
+							Score: 30,
+						},
+						{
+							Name:  "FakeExtender2",
+							Score: 200,
+						},
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 100,
+						},
+					},
+					TotalScore: 330,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			fwk, err := st.NewFramework(
+				test.pluginRegistrations, "",
+				ctx.Done(),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+			)
+			if err != nil {
+				t.Fatalf("error creating framework: %+v", err)
+			}
+
+			state := framework.NewCycleState()
+			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
+			var extenders []framework.Extender
+			for ii := range test.extenders {
+				extenders = append(extenders, &test.extenders[ii])
+			}
+			nodesscores, err := prioritizeNodes(ctx, extenders, fwk, state, test.pod, test.nodes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for i := range nodesscores {
+				sort.Slice(nodesscores[i].Scores, func(j, k int) bool {
+					return nodesscores[i].Scores[j].Name < nodesscores[i].Scores[k].Name
+				})
+			}
+
+			if diff := cmp.Diff(test.want, nodesscores); diff != "" {
+				t.Errorf("returned nodes scores (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -2680,7 +2858,8 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 	}
 
 	sched.SchedulePod = sched.schedulePod
-	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo, _ time.Time) {
+	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, _ *framework.NominatingInfo, _ time.Time) {
+		err := status.AsError()
 		errChan <- err
 
 		msg := truncateMessage(err.Error())

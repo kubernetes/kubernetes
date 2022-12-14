@@ -17,6 +17,7 @@ limitations under the License.
 package logging
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -55,7 +56,7 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 	// This can expose problems in your docker configuration (logging), log searching infrastructure, to tune deployments to match high load
 	// scenarios.  TODO jayunit100 add this to the kube CI in a follow on infra patch.
 
-	ginkgo.It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v", kbRateInSeconds, totalLogTime), func() {
+	ginkgo.It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v", kbRateInSeconds, totalLogTime), func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("scaling up to %v pods per node", loggingSoak.Scale))
 		defer ginkgo.GinkgoRecover()
 		var wg sync.WaitGroup

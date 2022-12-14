@@ -313,7 +313,7 @@ func TestReplaceFile(t *testing.T) {
 				return nil
 			},
 			desc: "neither parent nor file exists",
-			err:  missingFileError,
+			err:  missingFolderError,
 		},
 	}
 	for _, c := range cases {

@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"syscall"
 
 	"github.com/emicklei/go-restful/v3"
 )
@@ -63,7 +62,7 @@ func logFileListHandler(req *restful.Request, resp *restful.Response) {
 func logFileNameIsTooLong(filePath string) bool {
 	_, err := os.Stat(filePath)
 	if err != nil {
-		if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENAMETOOLONG {
+		if e, ok := err.(*os.PathError); ok && e.Err == fileNameTooLong {
 			return true
 		}
 	}

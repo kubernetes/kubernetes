@@ -201,7 +201,6 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
-	newCfg.FeatureGates["CPUManager"] = true
 	newCfg.FeatureGates["TopologyManager"] = true
 
 	// Set the Topology Manager policy
@@ -382,7 +381,7 @@ func waitForAllContainerRemoval(podName, podNS string) {
 	rs, _, err := getCRIClient()
 	framework.ExpectNoError(err)
 	gomega.Eventually(func() bool {
-		containers, err := rs.ListContainers(&runtimeapi.ContainerFilter{
+		containers, err := rs.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
 			LabelSelector: map[string]string{
 				types.KubernetesPodNameLabel:      podName,
 				types.KubernetesPodNamespaceLabel: podNS,
@@ -885,7 +884,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		topologymanager.PolicyNone,
 	}
 
-	ginkgo.It("run Topology Manager policy test suite", func() {
+	ginkgo.It("run Topology Manager policy test suite", func(ctx context.Context) {
 		oldCfg, err = getCurrentKubeletConfig()
 		framework.ExpectNoError(err)
 
@@ -902,7 +901,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		}
 	})
 
-	ginkgo.It("run Topology Manager node alignment test suite", func() {
+	ginkgo.It("run Topology Manager node alignment test suite", func(ctx context.Context) {
 		numaNodes, coreCount := hostPrecheck()
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
@@ -911,7 +910,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		framework.ExpectNoError(err)
 
 		sd := setupSRIOVConfigOrFail(f, configMap)
-		defer teardownSRIOVConfigOrFail(f, sd)
+		ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
 
 		scope := containerScopeTopology
 		for _, policy := range policies {
@@ -926,7 +925,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		}
 	})
 
-	ginkgo.It("run the Topology Manager pod scope alignment test suite", func() {
+	ginkgo.It("run the Topology Manager pod scope alignment test suite", func(ctx context.Context) {
 		numaNodes, coreCount := hostPrecheck()
 
 		configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)

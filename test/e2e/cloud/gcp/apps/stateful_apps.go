@@ -17,6 +17,8 @@ limitations under the License.
 package apps
 
 import (
+	"context"
+
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -40,7 +42,7 @@ var _ = SIGDescribe("stateful Upgrade [Feature:StatefulUpgrade]", func() {
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("stateful upgrade", func() {
-		ginkgo.It("should maintain a functioning cluster", func() {
+		ginkgo.It("should maintain a functioning cluster", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(f.ClientSet)
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)

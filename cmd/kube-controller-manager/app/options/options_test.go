@@ -19,13 +19,16 @@ package options
 import (
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/spf13/pflag"
+
 	eventv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cpconfig "k8s.io/cloud-provider/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
@@ -643,6 +646,622 @@ func TestApplyTo(t *testing.T) {
 
 	if !reflect.DeepEqual(expected.ComponentConfig, c.ComponentConfig) {
 		t.Errorf("Got different configuration than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected.ComponentConfig, c.ComponentConfig))
+	}
+}
+
+func TestValidateControllersOptions(t *testing.T) {
+	testCases := []struct {
+		name                   string
+		expectErrors           bool
+		expectedErrorSubString string
+		validate               func() []error
+	}{
+		{
+			name:                   "AttachDetachControllerOptions reconciler sync loop period less than one second",
+			expectErrors:           true,
+			expectedErrorSubString: "duration time must be greater than one second",
+			validate: (&AttachDetachControllerOptions{
+				&attachdetachconfig.AttachDetachControllerConfiguration{
+					ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: time.Second / 2},
+					DisableAttachDetachReconcilerSync: true,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "CSRSigningControllerOptions KubeletServingSignerConfiguration no cert file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify key without cert",
+			validate: (&CSRSigningControllerOptions{
+				&csrsigningconfig.CSRSigningControllerConfiguration{
+					ClusterSigningCertFile: "",
+					ClusterSigningKeyFile:  "",
+					ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+					KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "",
+						KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+					},
+					KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-client/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-client/key-file",
+					},
+					KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+						KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+					},
+					LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-legacy-unknown/cert-file",
+						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+					},
+				},
+			}).Validate,
+		},
+		{
+			name:                   "CSRSigningControllerOptions KubeletServingSignerConfiguration no key file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify cert without key",
+			validate: (&CSRSigningControllerOptions{
+				&csrsigningconfig.CSRSigningControllerConfiguration{
+					ClusterSigningCertFile: "",
+					ClusterSigningKeyFile:  "",
+					ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+					KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-serving/cert-file",
+						KeyFile:  "",
+					},
+					KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-client/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-client/key-file",
+					},
+					KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+						KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+					},
+					LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-legacy-unknown/cert-file",
+						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+					},
+				},
+			}).Validate,
+		},
+		{
+			name:                   "CSRSigningControllerOptions KubeletClientSignerConfiguration no cert file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify key without cert",
+			validate: (&CSRSigningControllerOptions{
+				&csrsigningconfig.CSRSigningControllerConfiguration{
+					ClusterSigningCertFile: "",
+					ClusterSigningKeyFile:  "",
+					ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+					KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-serving/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+					},
+					KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "",
+						KeyFile:  "/cluster-signing-kubelet-client/key-file",
+					},
+					KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+						KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+					},
+					LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-legacy-unknown/cert-file",
+						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+					},
+				},
+			}).Validate,
+		},
+		{
+			name:                   "CSRSigningControllerOptions KubeletClientSignerConfiguration no key file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify cert without key",
+			validate: (&CSRSigningControllerOptions{
+				&csrsigningconfig.CSRSigningControllerConfiguration{
+					ClusterSigningCertFile: "",
+					ClusterSigningKeyFile:  "",
+					ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+					KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-serving/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+					},
+					KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-client/cert-file",
+						KeyFile:  "",
+					},
+					KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+						KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+					},
+					LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-legacy-unknown/cert-file",
+						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+					},
+				},
+			}).Validate,
+		},
+		{
+			name:                   "CSRSigningControllerOptions KubeAPIServerClientSignerConfiguration no cert file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify key without cert",
+			validate: (&CSRSigningControllerOptions{
+				&csrsigningconfig.CSRSigningControllerConfiguration{
+					ClusterSigningCertFile: "",
+					ClusterSigningKeyFile:  "",
+					ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+					KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-serving/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+					},
+					KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-client/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-client/key-file",
+					},
+					KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "",
+						KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+					},
+					LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-legacy-unknown/cert-file",
+						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+					},
+				},
+			}).Validate,
+		},
+		{
+			name:                   "CSRSigningControllerOptions KubeAPIServerClientSignerConfiguration no key file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify cert without key",
+			validate: (&CSRSigningControllerOptions{
+				&csrsigningconfig.CSRSigningControllerConfiguration{
+					ClusterSigningCertFile: "",
+					ClusterSigningKeyFile:  "",
+					ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+					KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-serving/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+					},
+					KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-client/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-client/key-file",
+					},
+					KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+						KeyFile:  "",
+					},
+					LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-legacy-unknown/cert-file",
+						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+					},
+				},
+			}).Validate,
+		},
+		{
+			name:                   "CSRSigningControllerOptions LegacyUnknownSignerConfiguration no cert file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify key without cert",
+			validate: (&CSRSigningControllerOptions{
+				&csrsigningconfig.CSRSigningControllerConfiguration{
+					ClusterSigningCertFile: "",
+					ClusterSigningKeyFile:  "",
+					ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+					KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-serving/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+					},
+					KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-client/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-client/key-file",
+					},
+					KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+						KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+					},
+					LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "",
+						KeyFile:  "/cluster-signing-legacy-unknown/key-file",
+					},
+				},
+			}).Validate,
+		},
+		{
+			name:                   "CSRSigningControllerOptions LegacyUnknownSignerConfiguration no key file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify cert without key",
+			validate: (&CSRSigningControllerOptions{
+				&csrsigningconfig.CSRSigningControllerConfiguration{
+					ClusterSigningCertFile: "",
+					ClusterSigningKeyFile:  "",
+					ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+					KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-serving/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-serving/key-file",
+					},
+					KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-client/cert-file",
+						KeyFile:  "/cluster-signing-kubelet-client/key-file",
+					},
+					KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kube-apiserver-client/cert-file",
+						KeyFile:  "/cluster-signing-kube-apiserver-client/key-file",
+					},
+					LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-legacy-unknown/cert-file",
+						KeyFile:  "",
+					},
+				},
+			}).Validate,
+		},
+		{
+			name:                   "CSRSigningControllerOptions specific file set along with cluster single signing file",
+			expectErrors:           true,
+			expectedErrorSubString: "cannot specify --cluster-signing-{cert,key}-file and other --cluster-signing-*-file flags at the same time",
+			validate: (&CSRSigningControllerOptions{
+				&csrsigningconfig.CSRSigningControllerConfiguration{
+					ClusterSigningCertFile: "/cluster-signing-cert-file",
+					ClusterSigningKeyFile:  "/cluster-signing-key-file",
+					ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
+					KubeletServingSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "/cluster-signing-kubelet-serving/cert-file",
+						KeyFile:  "",
+					},
+					KubeletClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "",
+						KeyFile:  "",
+					},
+					KubeAPIServerClientSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "",
+						KeyFile:  "",
+					},
+					LegacyUnknownSignerConfiguration: csrsigningconfig.CSRSigningConfiguration{
+						CertFile: "",
+						KeyFile:  "",
+					},
+				},
+			}).Validate,
+		},
+		{
+			name:                   "EndpointSliceControllerOptions ConcurrentServiceEndpointSyncs lower than minConcurrentServiceEndpointSyncs (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-service-endpoint-syncs must not be less than 1",
+			validate: (&EndpointSliceControllerOptions{
+				&endpointsliceconfig.EndpointSliceControllerConfiguration{
+					ConcurrentServiceEndpointSyncs: 0,
+					MaxEndpointsPerSlice:           200,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "EndpointSliceControllerOptions ConcurrentServiceEndpointSyncs greater than maxConcurrentServiceEndpointSyncs (50)",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-service-endpoint-syncs must not be more than 50",
+			validate: (&EndpointSliceControllerOptions{
+				&endpointsliceconfig.EndpointSliceControllerConfiguration{
+					ConcurrentServiceEndpointSyncs: 51,
+					MaxEndpointsPerSlice:           200,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "EndpointSliceControllerOptions MaxEndpointsPerSlice lower than minMaxEndpointsPerSlice (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "max-endpoints-per-slice must not be less than 1",
+			validate: (&EndpointSliceControllerOptions{
+				&endpointsliceconfig.EndpointSliceControllerConfiguration{
+					ConcurrentServiceEndpointSyncs: 10,
+					MaxEndpointsPerSlice:           0,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "EndpointSliceControllerOptions MaxEndpointsPerSlice greater than maxMaxEndpointsPerSlice (1000)",
+			expectErrors:           true,
+			expectedErrorSubString: "max-endpoints-per-slice must not be more than 1000",
+			validate: (&EndpointSliceControllerOptions{
+				&endpointsliceconfig.EndpointSliceControllerConfiguration{
+					ConcurrentServiceEndpointSyncs: 10,
+					MaxEndpointsPerSlice:           1001,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "EndpointSliceMirroringControllerOptions MirroringConcurrentServiceEndpointSyncs lower than mirroringMinConcurrentServiceEndpointSyncs (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "mirroring-concurrent-service-endpoint-syncs must not be less than 1",
+			validate: (&EndpointSliceMirroringControllerOptions{
+				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
+					MirroringConcurrentServiceEndpointSyncs: 0,
+					MirroringMaxEndpointsPerSubset:          100,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "EndpointSliceMirroringControllerOptions MirroringConcurrentServiceEndpointSyncs greater than mirroringMaxConcurrentServiceEndpointSyncs (50)",
+			expectErrors:           true,
+			expectedErrorSubString: "mirroring-concurrent-service-endpoint-syncs must not be more than 50",
+			validate: (&EndpointSliceMirroringControllerOptions{
+				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
+					MirroringConcurrentServiceEndpointSyncs: 51,
+					MirroringMaxEndpointsPerSubset:          100,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "EndpointSliceMirroringControllerOptions MirroringMaxEndpointsPerSubset lower than mirroringMinMaxEndpointsPerSubset (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "mirroring-max-endpoints-per-subset must not be less than 1",
+			validate: (&EndpointSliceMirroringControllerOptions{
+				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
+					MirroringConcurrentServiceEndpointSyncs: 10,
+					MirroringMaxEndpointsPerSubset:          0,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "EndpointSliceMirroringControllerOptions MirroringMaxEndpointsPerSubset greater than mirroringMaxMaxEndpointsPerSubset (1000)",
+			expectErrors:           true,
+			expectedErrorSubString: "mirroring-max-endpoints-per-subset must not be more than 1000",
+			validate: (&EndpointSliceMirroringControllerOptions{
+				&endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration{
+					MirroringConcurrentServiceEndpointSyncs: 10,
+					MirroringMaxEndpointsPerSubset:          1001,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "EphemeralVolumeControllerOptions ConcurrentEphemeralVolumeSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-ephemeralvolume-syncs must be greater than 0",
+			validate: (&EphemeralVolumeControllerOptions{
+				&ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
+					ConcurrentEphemeralVolumeSyncs: 0,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "HPAControllerOptions ConcurrentHorizontalPodAutoscalerSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-horizontal-pod-autoscaler-syncs must be greater than 0",
+			validate: (&HPAControllerOptions{
+				&poautosclerconfig.HPAControllerConfiguration{
+					ConcurrentHorizontalPodAutoscalerSyncs:              0,
+					HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
+					HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
+					HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
+					HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
+					HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
+					HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
+					HorizontalPodAutoscalerTolerance:                    0.1,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "NodeIPAMControllerOptions service cluster ip range more than two entries",
+			expectErrors:           true,
+			expectedErrorSubString: "--service-cluster-ip-range can not contain more than two entries",
+			validate: (&NodeIPAMControllerOptions{
+				&nodeipamconfig.NodeIPAMControllerConfiguration{
+					ServiceCIDR:          "10.0.0.0/16,244.0.0.0/16,3000::/108",
+					NodeCIDRMaskSize:     48,
+					NodeCIDRMaskSizeIPv4: 48,
+					NodeCIDRMaskSizeIPv6: 108,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "PersistentVolumeBinderControllerOptions bad cidr deny list",
+			expectErrors:           true,
+			expectedErrorSubString: "bad --volume-host-ip-denylist/--volume-host-allow-local-loopback failed to parse cidr",
+			validate: (&PersistentVolumeBinderControllerOptions{
+				&persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
+					PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+					VolumeConfiguration: persistentvolumeconfig.VolumeConfiguration{
+						EnableDynamicProvisioning:  false,
+						EnableHostPathProvisioning: true,
+						FlexVolumePluginDir:        "/flex-volume-plugin",
+						PersistentVolumeRecyclerConfiguration: persistentvolumeconfig.PersistentVolumeRecyclerConfiguration{
+							MaximumRetry:             3,
+							MinimumTimeoutNFS:        200,
+							IncrementTimeoutNFS:      45,
+							MinimumTimeoutHostPath:   45,
+							IncrementTimeoutHostPath: 45,
+						},
+					},
+					VolumeHostCIDRDenylist:       []string{"127.0.0.1"},
+					VolumeHostAllowLocalLoopback: false,
+				},
+			}).Validate,
+		},
+		{
+			name:                   "StatefulSetControllerOptions ConcurrentStatefulSetSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-statefulset-syncs must be greater than 0",
+			validate: (&StatefulSetControllerOptions{
+				&statefulsetconfig.StatefulSetControllerConfiguration{
+					ConcurrentStatefulSetSyncs: 0,
+				},
+			}).Validate,
+		},
+		/* empty errs */
+		{
+			name:         "CronJobControllerOptions",
+			expectErrors: false,
+			validate: (&CronJobControllerOptions{
+				&cronjobconfig.CronJobControllerConfiguration{
+					ConcurrentCronJobSyncs: 5,
+				},
+			}).Validate,
+		},
+		{
+			name:         "DaemonSetControllerOptions",
+			expectErrors: false,
+			validate: (&DaemonSetControllerOptions{
+				&daemonconfig.DaemonSetControllerConfiguration{
+					ConcurrentDaemonSetSyncs: 2,
+				},
+			}).Validate,
+		},
+		{
+			name:         "DeploymentControllerOptions",
+			expectErrors: false,
+			validate: (&DeploymentControllerOptions{
+				&deploymentconfig.DeploymentControllerConfiguration{
+					ConcurrentDeploymentSyncs: 10,
+				},
+			}).Validate,
+		},
+		{
+			name:         "DeprecatedControllerOptions",
+			expectErrors: false,
+			validate: (&DeprecatedControllerOptions{
+				&kubectrlmgrconfig.DeprecatedControllerConfiguration{},
+			}).Validate,
+		},
+		{
+			name:         "EndpointControllerOptions",
+			expectErrors: false,
+			validate: (&EndpointControllerOptions{
+				&endpointconfig.EndpointControllerConfiguration{
+					ConcurrentEndpointSyncs: 10,
+				},
+			}).Validate,
+		},
+		{
+			name:         "GarbageCollectorControllerOptions",
+			expectErrors: false,
+			validate: (&GarbageCollectorControllerOptions{
+				&garbagecollectorconfig.GarbageCollectorControllerConfiguration{
+					ConcurrentGCSyncs: 30,
+					GCIgnoredResources: []garbagecollectorconfig.GroupResource{
+						{Group: "", Resource: "events"},
+						{Group: eventv1.GroupName, Resource: "events"},
+					},
+					EnableGarbageCollector: false,
+				},
+			}).Validate,
+		},
+		{
+			name:         "JobControllerOptions",
+			expectErrors: false,
+			validate: (&JobControllerOptions{
+				&jobconfig.JobControllerConfiguration{
+					ConcurrentJobSyncs: 5,
+				},
+			}).Validate,
+		},
+		{
+			name:         "NamespaceControllerOptions",
+			expectErrors: false,
+			validate: (&NamespaceControllerOptions{
+				&namespaceconfig.NamespaceControllerConfiguration{
+					NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
+					ConcurrentNamespaceSyncs: 20,
+				},
+			}).Validate,
+		},
+		{
+			name:         "NodeLifecycleControllerOptions",
+			expectErrors: false,
+			validate: (&NodeLifecycleControllerOptions{
+				&nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+					EnableTaintManager:        false,
+					NodeEvictionRate:          0.2,
+					SecondaryNodeEvictionRate: 0.05,
+					NodeMonitorGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
+					NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
+					PodEvictionTimeout:        metav1.Duration{Duration: 2 * time.Minute},
+					LargeClusterSizeThreshold: 100,
+					UnhealthyZoneThreshold:    0.6,
+				},
+			}).Validate,
+		},
+		{
+			name:         "PodGCControllerOptions",
+			expectErrors: false,
+			validate: (&PodGCControllerOptions{
+				&podgcconfig.PodGCControllerConfiguration{
+					TerminatedPodGCThreshold: 12000,
+				},
+			}).Validate,
+		},
+		{
+			name:         "ReplicaSetControllerOptions",
+			expectErrors: false,
+			validate: (&ReplicaSetControllerOptions{
+				&replicasetconfig.ReplicaSetControllerConfiguration{
+					ConcurrentRSSyncs: 10,
+				},
+			}).Validate,
+		},
+		{
+			name:         "ReplicationControllerOptions",
+			expectErrors: false,
+			validate: (&ReplicationControllerOptions{
+				&replicationconfig.ReplicationControllerConfiguration{
+					ConcurrentRCSyncs: 10,
+				},
+			}).Validate,
+		},
+		{
+			name:         "ResourceQuotaControllerOptions",
+			expectErrors: false,
+			validate: (&ResourceQuotaControllerOptions{
+				&resourcequotaconfig.ResourceQuotaControllerConfiguration{
+					ResourceQuotaSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
+					ConcurrentResourceQuotaSyncs: 10,
+				},
+			}).Validate,
+		},
+		{
+			name:         "SAControllerOptions",
+			expectErrors: false,
+			validate: (&SAControllerOptions{
+				&serviceaccountconfig.SAControllerConfiguration{
+					ServiceAccountKeyFile:  "/service-account-private-key",
+					ConcurrentSATokenSyncs: 10,
+				},
+			}).Validate,
+		},
+		{
+			name:         "TTLAfterFinishedControllerOptions",
+			expectErrors: false,
+			validate: (&TTLAfterFinishedControllerOptions{
+				&ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
+					ConcurrentTTLSyncs: 8,
+				},
+			}).Validate,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := tc.validate()
+			if len(errs) > 0 && !tc.expectErrors {
+				t.Errorf("expected no errors, errors found %+v", errs)
+			}
+
+			if len(errs) == 0 && tc.expectErrors {
+				t.Errorf("expected errors, no errors found")
+			}
+
+			if len(errs) > 0 && tc.expectErrors {
+				if !strings.Contains(utilerrors.NewAggregate(errs).Error(), tc.expectedErrorSubString) {
+					t.Errorf("expected error: %s, but no error found", tc.expectedErrorSubString)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateControllerManagerOptions(t *testing.T) {
+	opts, err := NewKubeControllerManagerOptions()
+	if err != nil {
+		t.Errorf("expected no error, error found %+v", err)
+	}
+
+	opts.EndpointSliceController.MaxEndpointsPerSlice = 1001 // max endpoints per slice should be a positive integer <= 1000
+
+	if err := opts.Validate([]string{"*"}, []string{""}); err == nil {
+		t.Error("expected error, no error found")
 	}
 }
 

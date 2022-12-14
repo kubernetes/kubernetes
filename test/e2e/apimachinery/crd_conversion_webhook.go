@@ -122,12 +122,8 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 	servicePort := int32(9443)
 	containerPort := int32(9444)
 
-	var client clientset.Interface
-	var namespaceName string
-
 	ginkgo.BeforeEach(func() {
-		client = f.ClientSet
-		namespaceName = f.Namespace.Name
+		ginkgo.DeferCleanup(cleanCRDWebhookTest, f.ClientSet, f.Namespace.Name)
 
 		ginkgo.By("Setting up server cert")
 		certCtx = setupServerCert(f.Namespace.Name, serviceCRDName)
@@ -136,17 +132,13 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), certCtx, servicePort, containerPort)
 	})
 
-	ginkgo.AfterEach(func() {
-		cleanCRDWebhookTest(client, namespaceName)
-	})
-
 	/*
 		Release: v1.16
 		Testname: Custom Resource Definition Conversion Webhook, conversion custom resource
 		Description: Register a conversion webhook and a custom resource definition. Create a v1 custom
 		resource. Attempts to read it at v2 MUST succeed.
 	*/
-	framework.ConformanceIt("should be able to convert from CR v1 to CR v2", func() {
+	framework.ConformanceIt("should be able to convert from CR v1 to CR v2", func(ctx context.Context) {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.Versions = apiVersions
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
@@ -169,7 +161,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
 		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
 		testCustomResourceConversionWebhook(f, testcrd.Crd, testcrd.DynamicClients)
 	})
@@ -181,7 +173,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		v1. Change the custom resource definition storage to v2. Create a custom resource stored at v2. Attempt to list
 		the custom resources at v2; the list result MUST contain both custom resources at v2.
 	*/
-	framework.ConformanceIt("should be able to convert a non homogeneous list of CRs", func() {
+	framework.ConformanceIt("should be able to convert a non homogeneous list of CRs", func(ctx context.Context) {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.Versions = apiVersions
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
@@ -204,7 +196,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
 		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
 		testCRListConversion(f, testcrd)
 	})
@@ -291,7 +283,6 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 				"crd-conversion-webhook",
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
-				"--alsologtostderr",
 				"-v=4",
 				// Use a non-default port for containers.
 				fmt.Sprintf("--port=%d", containerPort),

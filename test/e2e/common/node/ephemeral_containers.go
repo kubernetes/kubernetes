@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +43,7 @@ var _ = SIGDescribe("Ephemeral Containers [NodeConformance]", func() {
 	// Release: 1.25
 	// Testname: Ephemeral Container Creation
 	// Description: Adding an ephemeral container to pod.spec MUST result in the container running.
-	framework.ConformanceIt("will start an ephemeral container in an existing pod", func() {
+	framework.ConformanceIt("will start an ephemeral container in an existing pod", func(ctx context.Context) {
 		ginkgo.By("creating a target pod")
 		pod := podClient.CreateSync(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "ephemeral-containers-target-pod"},

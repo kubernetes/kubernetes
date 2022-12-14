@@ -53,7 +53,7 @@ func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Ensuring active pods == parallelism")
-	err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, t.namespace, job.Name, 2)
+	err = e2ejob.WaitForJobPodsRunning(f.ClientSet, t.namespace, job.Name, 2)
 	framework.ExpectNoError(err)
 }
 

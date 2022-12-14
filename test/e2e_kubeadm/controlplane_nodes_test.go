@@ -49,7 +49,7 @@ var _ = Describe("control-plane node", func() {
 
 	// Important! please note that this test can't be run on single-node clusters
 	// in case you can skip this test with SKIP=multi-node
-	ginkgo.It("should be labelled and tainted [multi-node]", func() {
+	ginkgo.It("should be labelled and tainted [multi-node]", func(ctx context.Context) {
 		// get all control-plane nodes (and this implicitly checks that node are properly labeled)
 		controlPlanes := getControlPlaneNodes(f.ClientSet)
 

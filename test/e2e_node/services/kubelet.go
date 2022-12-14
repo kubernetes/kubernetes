@@ -198,6 +198,7 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 
 	var killCommand, restartCommand *exec.Cmd
 	var isSystemd bool
+	var unitName string
 	// Apply default kubelet flags.
 	cmdArgs := []string{}
 	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
@@ -226,7 +227,7 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 		cwd, _ := os.Getwd()
 		// Use the timestamp from the current directory to name the systemd unit.
 		unitTimestamp := remote.GetTimestampFromWorkspaceDir(cwd)
-		unitName := fmt.Sprintf("kubelet-%s.service", unitTimestamp)
+		unitName = fmt.Sprintf("kubelet-%s.service", unitTimestamp)
 		cmdArgs = append(cmdArgs,
 			systemdRun,
 			"-p", "Delegate=true",
@@ -299,7 +300,8 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 		[]string{kubeletHealthCheckURL},
 		"kubelet.log",
 		e.monitorParent,
-		restartOnExit)
+		restartOnExit,
+		unitName)
 	return server, server.start()
 }
 

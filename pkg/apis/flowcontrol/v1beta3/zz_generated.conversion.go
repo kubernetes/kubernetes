@@ -459,6 +459,8 @@ func autoConvert_v1beta3_LimitedPriorityLevelConfiguration_To_flowcontrol_Limite
 	if err := Convert_v1beta3_LimitResponse_To_flowcontrol_LimitResponse(&in.LimitResponse, &out.LimitResponse, s); err != nil {
 		return err
 	}
+	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
+	out.BorrowingLimitPercent = (*int32)(unsafe.Pointer(in.BorrowingLimitPercent))
 	return nil
 }
 
@@ -472,6 +474,8 @@ func autoConvert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta3_Limite
 	if err := Convert_flowcontrol_LimitResponse_To_v1beta3_LimitResponse(&in.LimitResponse, &out.LimitResponse, s); err != nil {
 		return err
 	}
+	out.LendablePercent = (*int32)(unsafe.Pointer(in.LendablePercent))
+	out.BorrowingLimitPercent = (*int32)(unsafe.Pointer(in.BorrowingLimitPercent))
 	return nil
 }
 

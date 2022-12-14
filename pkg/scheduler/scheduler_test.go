@@ -238,25 +238,21 @@ func TestFailureHandler(t *testing.T) {
 
 	tests := []struct {
 		name                       string
-		injectErr                  error
 		podUpdatedDuringScheduling bool // pod is updated during a scheduling cycle
 		podDeletedDuringScheduling bool // pod is deleted during a scheduling cycle
 		expect                     *v1.Pod
 	}{
 		{
 			name:                       "pod is updated during a scheduling cycle",
-			injectErr:                  nil,
 			podUpdatedDuringScheduling: true,
 			expect:                     testPodUpdated,
 		},
 		{
-			name:      "pod is not updated during a scheduling cycle",
-			injectErr: nil,
-			expect:    testPod,
+			name:   "pod is not updated during a scheduling cycle",
+			expect: testPod,
 		},
 		{
 			name:                       "pod is deleted during a scheduling cycle",
-			injectErr:                  nil,
 			podDeletedDuringScheduling: true,
 			expect:                     nil,
 		},
@@ -294,7 +290,7 @@ func TestFailureHandler(t *testing.T) {
 			}
 
 			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-			s.FailureHandler(ctx, fwk, testPodInfo, tt.injectErr, v1.PodReasonUnschedulable, nil, time.Now())
+			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable), nil, time.Now())
 
 			var got *v1.Pod
 			if tt.podUpdatedDuringScheduling {
@@ -369,7 +365,7 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 			}
 
 			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-			s.FailureHandler(ctx, fwk, testPodInfo, tt.injectErr, v1.PodReasonUnschedulable, nil, time.Now())
+			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(tt.injectErr), nil, time.Now())
 
 			gotNodes := schedulerCache.Dump().Nodes
 			gotNodeNames := sets.NewString()
@@ -408,7 +404,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 	}
 
 	testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-	s.FailureHandler(ctx, fwk, testPodInfo, fmt.Errorf("binding rejected: timeout"), v1.PodReasonUnschedulable, nil, time.Now())
+	s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
 
 	pod := getPodFromPriorityQueue(queue, testPod)
 	if pod != nil {

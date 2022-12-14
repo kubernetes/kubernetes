@@ -42,6 +42,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.FeatureGates = map[string]bool{c.RandString(): true}
 			obj.HealthzBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
 			obj.IPTables.MasqueradeBit = pointer.Int32(c.Int31())
+			obj.IPTables.LocalhostNodePorts = pointer.Bool(c.RandBool())
 			obj.MetricsBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
 			obj.OOMScoreAdj = pointer.Int32(c.Int31())
 			obj.ClientConnection.ContentType = "bar"

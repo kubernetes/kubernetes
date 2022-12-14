@@ -67,7 +67,6 @@ type csiMountMgr struct {
 	plugin              *csiPlugin
 	driverName          csiDriverName
 	volumeLifecycleMode storage.VolumeLifecycleMode
-	fsGroupPolicy       storage.FSGroupPolicy
 	volumeID            string
 	specVolumeID        string
 	readOnly            bool
@@ -107,14 +106,25 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get CSI client: %v", err))
-
 	}
+
 	ctx, cancel := createCSIOperationContext(c.spec, csiTimeout)
 	defer cancel()
 
 	volSrc, pvSrc, err := getSourceFromSpec(c.spec)
 	if err != nil {
 		return errors.New(log("mounter.SetupAt failed to get CSI persistent source: %v", err))
+	}
+
+	// Check CSIDriver.Spec.Mode to ensure that the CSI driver
+	// supports the current volumeLifecycleMode.
+	if err := c.supportsVolumeLifecycleMode(); err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetupAt failed to check volume lifecycle mode: %s", err))
+	}
+
+	fsGroupPolicy, err := c.getFSGroupPolicy()
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetupAt failed to check fsGroup policy: %s", err))
 	}
 
 	driverName := c.driverName
@@ -231,16 +241,14 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	driverSupportsCSIVolumeMountGroup := false
 	var nodePublishFSGroupArg *int64
-	if utilfeature.DefaultFeatureGate.Enabled(features.DelegateFSGroupToCSIDriver) {
-		driverSupportsCSIVolumeMountGroup, err = csi.NodeSupportsVolumeMountGroup(ctx)
-		if err != nil {
-			return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to determine if the node service has VOLUME_MOUNT_GROUP capability: %v", err))
-		}
+	driverSupportsCSIVolumeMountGroup, err = csi.NodeSupportsVolumeMountGroup(ctx)
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to determine if the node service has VOLUME_MOUNT_GROUP capability: %v", err))
+	}
 
-		if driverSupportsCSIVolumeMountGroup {
-			klog.V(3).Infof("Driver %s supports applying FSGroup (has VOLUME_MOUNT_GROUP node capability). Delegating FSGroup application to the driver through NodePublishVolume.", c.driverName)
-			nodePublishFSGroupArg = mounterArgs.FsGroup
-		}
+	if driverSupportsCSIVolumeMountGroup {
+		klog.V(3).Infof("Driver %s supports applying FSGroup (has VOLUME_MOUNT_GROUP node capability). Delegating FSGroup application to the driver through NodePublishVolume.", c.driverName)
+		nodePublishFSGroupArg = mounterArgs.FsGroup
 	}
 
 	var selinuxLabelMount bool
@@ -249,10 +257,43 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
 		}
-		if support {
+		if support && mounterArgs.SELinuxLabel != "" {
 			mountOptions = util.AddSELinuxMountOption(mountOptions, mounterArgs.SELinuxLabel)
 			selinuxLabelMount = true
 		}
+	}
+
+	// Save volume info in pod dir
+	// persist volume info data for teardown
+	nodeName := string(c.plugin.host.GetNodeName())
+	volData := map[string]string{
+		volDataKey.specVolID:           c.spec.Name(),
+		volDataKey.volHandle:           volumeHandle,
+		volDataKey.driverName:          string(c.driverName),
+		volDataKey.nodeName:            nodeName,
+		volDataKey.volumeLifecycleMode: string(c.volumeLifecycleMode),
+		volDataKey.attachmentID:        getAttachmentName(volumeHandle, string(c.driverName), nodeName),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && selinuxLabelMount {
+		volData[volDataKey.seLinuxMountContext] = mounterArgs.SELinuxLabel
+	}
+
+	err = saveVolumeData(parentDir, volDataFileName, volData)
+	defer func() {
+		// Only if there was an error and volume operation was considered
+		// finished, we should remove the directory.
+		if err != nil && volumetypes.IsOperationFinishedError(err) {
+			// attempt to cleanup volume mount dir
+			if removeerr := removeMountDir(c.plugin, dir); removeerr != nil {
+				klog.Error(log("mounter.SetUpAt failed to remove mount dir after error [%s]: %v", dir, removeerr))
+			}
+		}
+	}()
+	if err != nil {
+		errorMsg := log("mounter.SetUpAt failed to save volume info data: %v", err)
+		klog.Error(errorMsg)
+		return volumetypes.NewTransientOperationFailure(errorMsg)
 	}
 
 	err = csi.NodePublishVolume(
@@ -288,7 +329,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		}
 	}
 
-	if !driverSupportsCSIVolumeMountGroup && c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
+	if !driverSupportsCSIVolumeMountGroup && c.supportsFSGroup(fsType, mounterArgs.FsGroup, fsGroupPolicy) {
 		// Driver doesn't support applying FSGroup. Kubelet must apply it instead.
 
 		// fullPluginName helps to distinguish different driver from csi plugin
@@ -432,6 +473,79 @@ func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolic
 	}
 
 	klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, unsupported volume type"))
+	return false
+}
+
+// getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
+// An error indicates that it isn't supported and explains why.
+func (c *csiMountMgr) getFSGroupPolicy() (storage.FSGroupPolicy, error) {
+	// Retrieve CSIDriver. It's not an error if that isn't
+	// possible (we don't have the lister if CSIDriverRegistry is
+	// disabled) or the driver isn't found (CSIDriver is
+	// optional)
+	var csiDriver *storage.CSIDriver
+	driver := string(c.driverName)
+	if c.plugin.csiDriverLister != nil {
+		c, err := c.plugin.getCSIDriver(driver)
+		if err != nil && !apierrors.IsNotFound(err) {
+			// Some internal error.
+			return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
+		}
+		csiDriver = c
+	}
+
+	// If the csiDriver isn't defined, return the default behavior
+	if csiDriver == nil {
+		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, nil
+	}
+	// If the csiDriver exists but the fsGroupPolicy isn't defined, return an error
+	if csiDriver.Spec.FSGroupPolicy == nil || *csiDriver.Spec.FSGroupPolicy == "" {
+		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, errors.New(log("expected valid fsGroupPolicy, received nil value or empty string"))
+	}
+	return *csiDriver.Spec.FSGroupPolicy, nil
+}
+
+// supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
+// An error indicates that it isn't supported and explains why.
+func (c *csiMountMgr) supportsVolumeLifecycleMode() error {
+	// Retrieve CSIDriver. It's not an error if that isn't
+	// possible (we don't have the lister if CSIDriverRegistry is
+	// disabled) or the driver isn't found (CSIDriver is
+	// optional), but then only persistent volumes are supported.
+	var csiDriver *storage.CSIDriver
+	driver := string(c.driverName)
+	if c.plugin.csiDriverLister != nil {
+		c, err := c.plugin.getCSIDriver(driver)
+		if err != nil && !apierrors.IsNotFound(err) {
+			// Some internal error.
+			return err
+		}
+		csiDriver = c
+	}
+
+	// The right response depends on whether we have information
+	// about the driver and the volume mode.
+	switch {
+	case csiDriver == nil && c.volumeLifecycleMode == storage.VolumeLifecyclePersistent:
+		// No information, but that's okay for persistent volumes (and only those).
+		return nil
+	case csiDriver == nil:
+		return fmt.Errorf("volume mode %q not supported by driver %s (no CSIDriver object)", c.volumeLifecycleMode, driver)
+	case containsVolumeMode(csiDriver.Spec.VolumeLifecycleModes, c.volumeLifecycleMode):
+		// Explicitly listed.
+		return nil
+	default:
+		return fmt.Errorf("volume mode %q not supported by driver %s (only supports %q)", c.volumeLifecycleMode, driver, csiDriver.Spec.VolumeLifecycleModes)
+	}
+}
+
+// containsVolumeMode checks whether the given volume mode is listed.
+func containsVolumeMode(modes []storage.VolumeLifecycleMode, mode storage.VolumeLifecycleMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
 	return false
 }
 

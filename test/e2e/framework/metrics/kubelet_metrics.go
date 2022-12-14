@@ -44,6 +44,8 @@ const (
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	podStartDurationKey = "pod_start_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
+	PodStartSLIDurationKey = "pod_start_sli_duration_seconds"
+	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	cgroupManagerOperationsKey = "cgroup_manager_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	podWorkerStartDurationKey = "pod_worker_start_duration_seconds"
@@ -66,7 +68,6 @@ func NewKubeletMetrics() KubeletMetrics {
 }
 
 // GrabKubeletMetricsWithoutProxy retrieve metrics from the kubelet on the given node using a simple GET over http.
-// Currently only used in integration tests.
 func GrabKubeletMetricsWithoutProxy(nodeName, path string) (KubeletMetrics, error) {
 	resp, err := http.Get(fmt.Sprintf("http://%s%s", nodeName, path))
 	if err != nil {
@@ -175,6 +176,7 @@ func GetDefaultKubeletLatencyMetrics(ms KubeletMetrics) KubeletLatencyMetrics {
 		podWorkerDurationKey,
 		podWorkerStartDurationKey,
 		podStartDurationKey,
+		PodStartSLIDurationKey,
 		cgroupManagerOperationsKey,
 		dockerOperationsLatencyKey,
 		podWorkerStartDurationKey,

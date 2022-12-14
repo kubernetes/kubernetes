@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"
 	kubeversion "k8s.io/client-go/pkg/version"
 	restclient "k8s.io/client-go/rest"
@@ -163,4 +164,8 @@ func (c *FakeDiscovery) OpenAPIV3() openapi.Client {
 // by this client implementation.
 func (c *FakeDiscovery) RESTClient() restclient.Interface {
 	return nil
+}
+
+func (c *FakeDiscovery) WithLegacy() discovery.DiscoveryInterface {
+	panic("unimplemented")
 }

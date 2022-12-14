@@ -18,7 +18,9 @@ package kubelet
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -29,7 +31,11 @@ import (
 	"testing"
 	"time"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
+
+	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	core "k8s.io/client-go/testing"
@@ -45,14 +51,18 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2/ktesting"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
+	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -66,15 +76,18 @@ import (
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
+	"k8s.io/kubernetes/pkg/kubelet/server"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azuredd"
@@ -86,6 +99,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func init() {
@@ -109,7 +123,7 @@ type fakeImageGCManager struct {
 }
 
 func (f *fakeImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
-	return f.fakeImageService.ListImages()
+	return f.fakeImageService.ListImages(context.Background())
 }
 
 type TestKubelet struct {
@@ -244,8 +258,9 @@ func newTestKubeletWithImageList(
 	kubelet.secretManager = secretManager
 	configMapManager := configmap.NewSimpleConfigMapManager(kubelet.kubeClient)
 	kubelet.configMapManager = configMapManager
-	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient, kubelet.secretManager, kubelet.configMapManager)
-	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{})
+	kubelet.podManager = kubepod.NewBasicPodManager(fakeMirrorClient)
+	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
+	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker)
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
@@ -311,7 +326,7 @@ func newTestKubeletWithImageList(
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
-	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, kubelet.podCache, clock.RealClock{})
+	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, make(chan *pleg.PodLifecycleEvent, 100), &pleg.RelistDuration{RelistPeriod: time.Hour, RelistThreshold: genericPlegRelistThreshold}, kubelet.podCache, clock.RealClock{})
 	kubelet.clock = fakeClock
 
 	nodeRef := &v1.ObjectReference{
@@ -408,6 +423,7 @@ func newTestPods(count int) []*v1.Pod {
 }
 
 func TestSyncLoopAbort(t *testing.T) {
+	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -420,11 +436,11 @@ func TestSyncLoopAbort(t *testing.T) {
 	close(ch)
 
 	// sanity check (also prevent this test from hanging in the next step)
-	ok := kubelet.syncLoopIteration(ch, kubelet, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent, 1))
+	ok := kubelet.syncLoopIteration(ctx, ch, kubelet, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent, 1))
 	require.False(t, ok, "Expected syncLoopIteration to return !ok since update chan was closed")
 
 	// this should terminate immediately; if it hangs then the syncLoopIteration isn't aborting properly
-	kubelet.syncLoop(ch, kubelet)
+	kubelet.syncLoop(ctx, ch, kubelet)
 }
 
 func TestSyncPodsStartPod(t *testing.T) {
@@ -445,6 +461,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 }
 
 func TestHandlePodCleanupsPerQOS(t *testing.T) {
+	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -472,7 +489,7 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// within a goroutine so a two second delay should be enough time to
 	// mark the pod as killed (within this test case).
 
-	kubelet.HandlePodCleanups()
+	kubelet.HandlePodCleanups(ctx)
 
 	// assert that unwanted pods were killed
 	if actual, expected := kubelet.podWorkers.(*fakePodWorkers).triggeredDeletion, []types.UID{"12345678"}; !reflect.DeepEqual(actual, expected) {
@@ -483,9 +500,9 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// simulate Runtime.KillPod
 	fakeRuntime.PodList = nil
 
-	kubelet.HandlePodCleanups()
-	kubelet.HandlePodCleanups()
-	kubelet.HandlePodCleanups()
+	kubelet.HandlePodCleanups(ctx)
+	kubelet.HandlePodCleanups(ctx)
+	kubelet.HandlePodCleanups(ctx)
 
 	destroyCount := 0
 	err := wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
@@ -642,6 +659,7 @@ func TestDispatchWorkOfActivePod(t *testing.T) {
 }
 
 func TestHandlePodCleanups(t *testing.T) {
+	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -660,7 +678,7 @@ func TestHandlePodCleanups(t *testing.T) {
 	}
 	kubelet := testKubelet.kubelet
 
-	kubelet.HandlePodCleanups()
+	kubelet.HandlePodCleanups(ctx)
 
 	// assert that unwanted pods were queued to kill
 	if actual, expected := kubelet.podWorkers.(*fakePodWorkers).triggeredDeletion, []types.UID{"12345678"}; !reflect.DeepEqual(actual, expected) {
@@ -1131,6 +1149,7 @@ func TestHandlePluginResources(t *testing.T) {
 
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
+	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -1147,7 +1166,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
 	kl.podManager.SetPods([]*v1.Pod{})
-	kl.HandlePodCleanups()
+	kl.HandlePodCleanups(ctx)
 	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); found {
 		t.Fatalf("expected to not have status cached for pod2")
 	}
@@ -1377,6 +1396,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 }
 
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
+	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -1426,7 +1446,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	}
 
 	// Sync with an empty pod list to delete all mirror pods.
-	kl.HandlePodCleanups()
+	kl.HandlePodCleanups(ctx)
 	assert.Len(t, manager.GetPods(), 0, "Expected 0 mirror pods")
 	for i, pod := range orphanPods {
 		name := kubecontainer.GetPodFullName(pod)
@@ -1445,6 +1465,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 }
 
 func TestGetContainerInfoForMirrorPods(t *testing.T) {
+	ctx := context.Background()
 	// pods contain one static and one mirror pod with the same name but
 	// different UIDs.
 	pods := []*v1.Pod{
@@ -1503,7 +1524,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 
 	kubelet.podManager.SetPods(pods)
 	// Use the mirror pod UID to retrieve the stats.
-	stats, err := kubelet.GetContainerInfo("qux_ns", "5678", "foo", cadvisorReq)
+	stats, err := kubelet.GetContainerInfo(ctx, "qux_ns", "5678", "foo", cadvisorReq)
 	assert.NoError(t, err)
 	require.NotNil(t, stats)
 }
@@ -1664,11 +1685,13 @@ func TestCheckpointContainer(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
 			options := &runtimeapi.CheckpointContainerRequest{}
 			if test.checkpointLocation != "" {
 				options.Location = test.checkpointLocation
 			}
 			status := kubelet.CheckpointContainer(
+				ctx,
 				fakePod.Pod.ID,
 				fmt.Sprintf(
 					"%s_%s",
@@ -1816,6 +1839,7 @@ func podWithUIDNameNsSpec(uid types.UID, name, namespace string, spec v1.PodSpec
 }
 
 func TestDeletePodDirsForDeletedPods(t *testing.T) {
+	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -1833,18 +1857,19 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 
 	// Pod 1 has been deleted and no longer exists.
 	kl.podManager.SetPods([]*v1.Pod{pods[0]})
-	kl.HandlePodCleanups()
+	kl.HandlePodCleanups(ctx)
 	assert.True(t, dirExists(kl.getPodDir(pods[0].UID)), "Expected directory to exist for pod 0")
 	assert.False(t, dirExists(kl.getPodDir(pods[1].UID)), "Expected directory to be deleted for pod 1")
 }
 
 func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod, podsToCheck []*v1.Pod, shouldExist bool) {
+	ctx := context.Background()
 	t.Helper()
 	kl := testKubelet.kubelet
 
 	kl.podManager.SetPods(pods)
 	kl.HandlePodSyncs(pods)
-	kl.HandlePodCleanups()
+	kl.HandlePodCleanups(ctx)
 	for i, pod := range podsToCheck {
 		exist := dirExists(kl.getPodDir(pod.UID))
 		assert.Equal(t, shouldExist, exist, "directory of pod %d", i)
@@ -2703,3 +2728,140 @@ type podsByUID []*v1.Pod
 func (p podsByUID) Len() int           { return len(p) }
 func (p podsByUID) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podsByUID) Less(i, j int) bool { return p[i].UID < p[j].UID }
+
+// createAndStartFakeRemoteRuntime creates and starts fakeremote.RemoteRuntime.
+// It returns the RemoteRuntime, endpoint on success.
+// Users should call fakeRuntime.Stop() to cleanup the server.
+func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, string) {
+	endpoint, err := fakeremote.GenerateEndpoint()
+	require.NoError(t, err)
+
+	fakeRuntime := fakeremote.NewFakeRemoteRuntime()
+	fakeRuntime.Start(endpoint)
+
+	return fakeRuntime, endpoint
+}
+
+func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.RuntimeService {
+	runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
+	require.NoError(t, err)
+	return runtimeService
+}
+
+func TestNewMainKubeletStandAlone(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "logs")
+	ContainerLogsDir = tempDir
+	assert.NoError(t, err)
+	defer os.RemoveAll(ContainerLogsDir)
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		SyncFrequency: metav1.Duration{Duration: time.Minute},
+		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
+		ContainerLogMaxSize:                       "10Mi",
+		ContainerLogMaxFiles:                      5,
+		MemoryThrottlingFactor:                    utilpointer.Float64(0),
+	}
+	var prober volume.DynamicPluginProber
+	tp := oteltrace.NewNoopTracerProvider()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	cadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).AnyTimes()
+	cadvisor.EXPECT().ImagesFsInfo().Return(cadvisorapiv2.FsInfo{
+		Usage:     400,
+		Capacity:  1000,
+		Available: 600,
+	}, nil).AnyTimes()
+	tlsOptions := &server.TLSOptions{
+		Config: &tls.Config{
+			MinVersion: 0,
+		},
+	}
+	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
+	defer func() {
+		fakeRuntime.Stop()
+	}()
+	fakeRecorder := &record.FakeRecorder{}
+	rtSvc := createRemoteRuntimeService(endpoint, t)
+	kubeDep := &Dependencies{
+		Auth:                 nil,
+		CAdvisorInterface:    cadvisor,
+		Cloud:                nil,
+		ContainerManager:     cm.NewStubContainerManager(),
+		KubeClient:           nil, // standalone mode
+		HeartbeatClient:      nil,
+		EventClient:          nil,
+		TracerProvider:       tp,
+		HostUtil:             hostutil.NewFakeHostUtil(nil),
+		Mounter:              mount.NewFakeMounter(nil),
+		Recorder:             fakeRecorder,
+		RemoteRuntimeService: rtSvc,
+		RemoteImageService:   fakeRuntime.ImageService,
+		Subpather:            &subpath.FakeSubpath{},
+		OOMAdjuster:          oom.NewOOMAdjuster(),
+		OSInterface:          kubecontainer.RealOS{},
+		DynamicPluginProber:  prober,
+		TLSOptions:           tlsOptions,
+	}
+	crOptions := &config.ContainerRuntimeOptions{}
+
+	testMainKubelet, err := NewMainKubelet(
+		kubeCfg,
+		kubeDep,
+		crOptions,
+		"hostname",
+		false,
+		"hostname",
+		[]net.IP{},
+		"",
+		"external",
+		"/tmp/cert",
+		"/tmp/rootdir",
+		"",
+		"",
+		false,
+		[]v1.Taint{},
+		[]string{},
+		"",
+		false,
+		false,
+		metav1.Duration{Duration: time.Minute},
+		1024,
+		110,
+		"default",
+		true,
+		true,
+		map[string]string{},
+		1024,
+		false,
+	)
+	assert.NoError(t, err, "NewMainKubelet should succeed")
+	assert.NotNil(t, testMainKubelet, "testMainKubelet should not be nil")
+
+	testMainKubelet.BirthCry()
+	testMainKubelet.StartGarbageCollection()
+	// Nil pointer panic can be reproduced if configmap manager is not nil.
+	// See https://github.com/kubernetes/kubernetes/issues/113492
+	// pod := &v1.Pod{
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		UID:       "12345678",
+	// 		Name:      "bar",
+	// 		Namespace: "foo",
+	// 	},
+	// 	Spec: v1.PodSpec{
+	// 		Containers: []v1.Container{{
+	// 			EnvFrom: []v1.EnvFromSource{{
+	// 				ConfigMapRef: &v1.ConfigMapEnvSource{
+	// 					LocalObjectReference: v1.LocalObjectReference{Name: "config-map"}}},
+	// 			}}},
+	// 		Volumes: []v1.Volume{{
+	// 			VolumeSource: v1.VolumeSource{
+	// 				ConfigMap: &v1.ConfigMapVolumeSource{
+	// 					LocalObjectReference: v1.LocalObjectReference{
+	// 						Name: "config-map"}}}}},
+	// 	},
+	// }
+	// testMainKubelet.configMapManager.RegisterPod(pod)
+	// testMainKubelet.secretManager.RegisterPod(pod)
+	assert.Nil(t, testMainKubelet.configMapManager, "configmap manager should be nil if kubelet is in standalone mode")
+	assert.Nil(t, testMainKubelet.secretManager, "secret manager should be nil if kubelet is in standalone mode")
+}

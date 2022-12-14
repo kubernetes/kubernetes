@@ -423,7 +423,45 @@ type IngressTLS struct {
 type IngressStatus struct {
 	// LoadBalancer contains the current status of the load-balancer.
 	// +optional
-	LoadBalancer api.LoadBalancerStatus
+	LoadBalancer IngressLoadBalancerStatus
+}
+
+// IngressLoadBalancerStatus represents the status of a load-balancer
+type IngressLoadBalancerStatus struct {
+	// Ingress is a list containing ingress points for the load-balancer.
+	// +optional
+	Ingress []IngressLoadBalancerIngress
+}
+
+// IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
+type IngressLoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based.
+	// +optional
+	IP string
+
+	// Hostname is set for load-balancer ingress points that are DNS based.
+	// +optional
+	Hostname string
+
+	// Ports provides information about the ports exposed by this LoadBalancer.
+	// +optional
+	Ports []IngressPortStatus
+}
+
+// IngressPortStatus represents the error condition of an ingress port
+type IngressPortStatus struct {
+	// Port is the port number of the ingress port.
+	Port int32
+
+	// Protocol is the protocol of the ingress port.
+	Protocol api.Protocol
+
+	// Error indicates a problem on this port.
+	// The format of the error must comply with the following rules:
+	// - Kubernetes-defined error values use CamelCase names
+	// - Provider-specific error values must follow label-name style (e.g.
+	//   example.com/name).
+	Error *string
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to

@@ -422,6 +422,10 @@ func (c *fakeFailingDiscovery) OpenAPIV3() openapi.Client {
 	panic("implement me")
 }
 
+func (c *fakeFailingDiscovery) WithLegacy() DiscoveryInterface {
+	panic("implement me")
+}
+
 type fakeCachedDiscoveryInterface struct {
 	invalidateCalls int
 	fresh           bool
@@ -496,6 +500,10 @@ func (c *fakeCachedDiscoveryInterface) OpenAPISchema() (*openapi_v2.Document, er
 }
 
 func (c *fakeCachedDiscoveryInterface) OpenAPIV3() openapi.Client {
+	panic("implement me")
+}
+
+func (c *fakeCachedDiscoveryInterface) WithLegacy() DiscoveryInterface {
 	panic("implement me")
 }
 

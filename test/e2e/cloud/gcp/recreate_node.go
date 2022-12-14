@@ -91,7 +91,7 @@ var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 		}
 	})
 
-	ginkgo.It("recreate nodes and ensure they function upon restart", func() {
+	ginkgo.It("recreate nodes and ensure they function upon restart", func(ctx context.Context) {
 		testRecreate(f.ClientSet, ps, systemNamespace, originalNodes, originalPodNames)
 	})
 })

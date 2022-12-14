@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/pointer"
 )
 
 func newDControllerRef(d *apps.Deployment) *metav1.OwnerReference {
@@ -1247,4 +1248,82 @@ func TestGetDeploymentsForReplicaSet(t *testing.T) {
 		})
 	}
 
+}
+
+func TestMinAvailable(t *testing.T) {
+	maxSurge := func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1))
+	deployment := func(replicas int32, maxUnavailable intstr.IntOrString) *apps.Deployment {
+		return &apps.Deployment{
+			Spec: apps.DeploymentSpec{
+				Replicas: pointer.Int32(replicas),
+				Strategy: apps.DeploymentStrategy{
+					RollingUpdate: &apps.RollingUpdateDeployment{
+						MaxSurge:       maxSurge,
+						MaxUnavailable: &maxUnavailable,
+					},
+					Type: apps.RollingUpdateDeploymentStrategyType,
+				},
+			},
+		}
+	}
+	tests := []struct {
+		name       string
+		deployment *apps.Deployment
+		expected   int32
+	}{
+		{
+			name:       "replicas greater than maxUnavailable",
+			deployment: deployment(10, intstr.FromInt(5)),
+			expected:   5,
+		},
+		{
+			name:       "replicas equal maxUnavailable",
+			deployment: deployment(10, intstr.FromInt(10)),
+			expected:   0,
+		},
+		{
+			name:       "replicas less than maxUnavailable",
+			deployment: deployment(5, intstr.FromInt(10)),
+			expected:   0,
+		},
+		{
+			name:       "replicas is 0",
+			deployment: deployment(0, intstr.FromInt(10)),
+			expected:   0,
+		},
+		{
+			name: "minAvailable with Recreate deployment strategy",
+			deployment: &apps.Deployment{
+				Spec: apps.DeploymentSpec{
+					Replicas: pointer.Int32(10),
+					Strategy: apps.DeploymentStrategy{
+						Type: apps.RecreateDeploymentStrategyType,
+					},
+				},
+			},
+			expected: 0,
+		},
+		{
+			name:       "replicas greater than maxUnavailable with percents",
+			deployment: deployment(10, intstr.FromString("60%")),
+			expected:   4,
+		},
+		{
+			name:       "replicas equal maxUnavailable with percents",
+			deployment: deployment(10, intstr.FromString("100%")),
+			expected:   int32(0),
+		},
+		{
+			name:       "replicas less than maxUnavailable with percents",
+			deployment: deployment(5, intstr.FromString("100%")),
+			expected:   0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MinAvailable(tt.deployment); got != tt.expected {
+				t.Errorf("MinAvailable() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
 }

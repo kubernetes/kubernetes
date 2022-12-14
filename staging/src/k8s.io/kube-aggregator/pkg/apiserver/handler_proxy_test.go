@@ -34,6 +34,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 
 	"golang.org/x/net/websocket"
@@ -790,7 +791,9 @@ func TestNewRequestForProxyWithAuditID(t *testing.T) {
 
 			req = req.WithContext(genericapirequest.WithRequestInfo(req.Context(), &genericapirequest.RequestInfo{Path: req.URL.Path}))
 			if len(test.auditID) > 0 {
-				req = req.WithContext(genericapirequest.WithAuditID(req.Context(), types.UID(test.auditID)))
+				ctx := audit.WithAuditContext(req.Context())
+				audit.WithAuditID(ctx, types.UID(test.auditID))
+				req = req.WithContext(ctx)
 			}
 
 			newReq, _ := newRequestForProxy(req.URL, req)

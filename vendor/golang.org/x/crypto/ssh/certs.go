@@ -251,7 +251,7 @@ type algorithmOpenSSHCertSigner struct {
 // private key is held by signer. It returns an error if the public key in cert
 // doesn't match the key used by signer.
 func NewCertSigner(cert *Certificate, signer Signer) (Signer, error) {
-	if bytes.Compare(cert.Key.Marshal(), signer.PublicKey().Marshal()) != 0 {
+	if !bytes.Equal(cert.Key.Marshal(), signer.PublicKey().Marshal()) {
 		return nil, errors.New("ssh: signer and cert have different public key")
 	}
 
@@ -460,6 +460,8 @@ func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
 
 // certKeyAlgoNames is a mapping from known certificate algorithm names to the
 // corresponding public key signature algorithm.
+//
+// This map must be kept in sync with the one in agent/client.go.
 var certKeyAlgoNames = map[string]string{
 	CertAlgoRSAv01:        KeyAlgoRSA,
 	CertAlgoRSASHA256v01:  KeyAlgoRSASHA256,

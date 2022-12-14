@@ -43,6 +43,7 @@ import (
 	node "k8s.io/client-go/informers/node"
 	policy "k8s.io/client-go/informers/policy"
 	rbac "k8s.io/client-go/informers/rbac"
+	resource "k8s.io/client-go/informers/resource"
 	scheduling "k8s.io/client-go/informers/scheduling"
 	storage "k8s.io/client-go/informers/storage"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -276,6 +277,7 @@ type SharedInformerFactory interface {
 	Node() node.Interface
 	Policy() policy.Interface
 	Rbac() rbac.Interface
+	Resource() resource.Interface
 	Scheduling() scheduling.Interface
 	Storage() storage.Interface
 }
@@ -342,6 +344,10 @@ func (f *sharedInformerFactory) Policy() policy.Interface {
 
 func (f *sharedInformerFactory) Rbac() rbac.Interface {
 	return rbac.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Resource() resource.Interface {
+	return resource.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Scheduling() scheduling.Interface {

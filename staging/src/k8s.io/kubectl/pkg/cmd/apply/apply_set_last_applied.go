@@ -50,7 +50,6 @@ type SetLastAppliedOptions struct {
 	namespace                    string
 	enforceNamespace             bool
 	dryRunStrategy               cmdutil.DryRunStrategy
-	dryRunVerifier               *resource.QueryParamVerifier
 	shortOutput                  bool
 	output                       string
 	patchBufferList              []PatchBuffer
@@ -124,11 +123,6 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.shortOutput = o.output == "name"
 
@@ -207,11 +201,6 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
-			}
-			if o.dryRunStrategy == cmdutil.DryRunServer {
-				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-					return err
-				}
 			}
 			helper := resource.
 				NewHelper(client, mapping).

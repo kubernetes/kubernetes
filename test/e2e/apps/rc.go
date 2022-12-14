@@ -64,11 +64,11 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, run basic image
 		Description: Replication Controller MUST create a Pod with Basic Image and MUST run the service with the provided image. Image MUST be tested by dialing into the service listening through TCP, UDP and HTTP.
 	*/
-	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
+	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func(ctx context.Context) {
 		TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
 
-	ginkgo.It("should serve a basic image on each replica with a private image", func() {
+	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {
 		// requires private images
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
@@ -80,7 +80,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, check for issues like exceeding allocated quota
 		Description: Attempt to create a Replication Controller with pods exceeding the namespace quota. The creation MUST fail
 	*/
-	framework.ConformanceIt("should surface a failure condition on a common issue like exceeded quota", func() {
+	framework.ConformanceIt("should surface a failure condition on a common issue like exceeded quota", func(ctx context.Context) {
 		testReplicationControllerConditionCheck(f)
 	})
 
@@ -89,7 +89,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, adopt matching pods
 		Description: An ownerless Pod is created, then a Replication Controller (RC) is created whose label selector will match the Pod. The RC MUST either adopt the Pod or delete and replace it with a new Pod
 	*/
-	framework.ConformanceIt("should adopt matching pods on creation", func() {
+	framework.ConformanceIt("should adopt matching pods on creation", func(ctx context.Context) {
 		testRCAdoptMatchingOrphans(f)
 	})
 
@@ -98,7 +98,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, release pods
 		Description: A Replication Controller (RC) is created, and its Pods are created. When the labels on one of the Pods change to no longer match the RC's label selector, the RC MUST release the Pod and update the Pod's owner references.
 	*/
-	framework.ConformanceIt("should release no longer matching pods", func() {
+	framework.ConformanceIt("should release no longer matching pods", func(ctx context.Context) {
 		testRCReleaseControlledNotMatching(f)
 	})
 
@@ -107,7 +107,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, lifecycle
 		Description: A Replication Controller (RC) is created, read, patched, and deleted with verification.
 	*/
-	framework.ConformanceIt("should test the lifecycle of a ReplicationController", func() {
+	framework.ConformanceIt("should test the lifecycle of a ReplicationController", func(ctx context.Context) {
 		testRcName := "rc-test"
 		testRcNamespace := ns
 		testRcInitialReplicaCount := int32(1)
@@ -399,7 +399,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		succeed when reading the ReplicationController scale. When updating the
 		ReplicationController scale it MUST succeed and the field MUST equal the new value.
 	*/
-	framework.ConformanceIt("should get and update a ReplicationController scale", func() {
+	framework.ConformanceIt("should get and update a ReplicationController scale", func(ctx context.Context) {
 		rcClient := f.ClientSet.CoreV1().ReplicationControllers(ns)
 		rcName := "e2e-rc-" + utilrand.String(5)
 		initialRCReplicaCount := int32(1)

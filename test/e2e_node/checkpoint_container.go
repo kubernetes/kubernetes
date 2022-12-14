@@ -67,7 +67,7 @@ func proxyPostRequest(c clientset.Interface, node, endpoint string, port int) (r
 var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", func() {
 	f := framework.NewDefaultFramework("checkpoint-container-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	ginkgo.It("will checkpoint a container out of a pod", func() {
+	ginkgo.It("will checkpoint a container out of a pod", func(ctx context.Context) {
 		ginkgo.By("creating a target pod")
 		podClient := e2epod.NewPodClient(f)
 		pod := podClient.CreateSync(&v1.Pod{

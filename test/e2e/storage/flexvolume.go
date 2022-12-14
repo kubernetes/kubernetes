@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"path"
@@ -77,9 +78,9 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 	host := ""
 	var err error
 	if node != nil {
-		host, err = e2enode.GetExternalIP(node)
+		host, err = e2enode.GetSSHExternalIP(node)
 		if err != nil {
-			host, err = e2enode.GetInternalIP(node)
+			host, err = e2enode.GetSSHInternalIP(node)
 		}
 	} else {
 		instanceWithPort := framework.APIAddress()
@@ -109,9 +110,9 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 	host := ""
 	var err error
 	if node != nil {
-		host, err = e2enode.GetExternalIP(node)
+		host, err = e2enode.GetSSHExternalIP(node)
 		if err != nil {
-			host, err = e2enode.GetInternalIP(node)
+			host, err = e2enode.GetSSHInternalIP(node)
 		}
 	} else {
 		instanceWithPort := framework.APIAddress()
@@ -187,7 +188,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		suffix = ns.Name
 	})
 
-	ginkgo.It("should be mountable when non-attachable", func() {
+	ginkgo.It("should be mountable when non-attachable", func(ctx context.Context) {
 		driver := "dummy"
 		driverInstallAs := driver + "-" + suffix
 
@@ -205,7 +206,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		uninstallFlex(cs, node, "k8s", driverInstallAs)
 	})
 
-	ginkgo.It("should be mountable when attachable [Feature:Flexvolumes]", func() {
+	ginkgo.It("should be mountable when attachable [Feature:Flexvolumes]", func(ctx context.Context) {
 		driver := "dummy-attachable"
 		driverInstallAs := driver + "-" + suffix
 

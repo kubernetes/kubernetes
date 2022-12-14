@@ -29,9 +29,12 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -157,57 +160,6 @@ func TestPluginGetPluginName(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/csi" {
 		t.Errorf("unexpected plugin name %v", plug.GetPluginName())
 	}
-}
-
-func TestPluginGetFSGroupPolicy(t *testing.T) {
-	defaultPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
-	testCases := []struct {
-		name                  string
-		defined               bool
-		expectedFSGroupPolicy storage.FSGroupPolicy
-	}{
-		{
-			name:                  "no FSGroupPolicy defined, expect default",
-			defined:               false,
-			expectedFSGroupPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
-		},
-		{
-			name:                  "File FSGroupPolicy defined, expect File",
-			defined:               true,
-			expectedFSGroupPolicy: storage.FileFSGroupPolicy,
-		},
-		{
-			name:                  "None FSGroupPolicy defined, expected None",
-			defined:               true,
-			expectedFSGroupPolicy: storage.NoneFSGroupPolicy,
-		},
-	}
-	for _, tc := range testCases {
-		t.Logf("testing: %s", tc.name)
-		// Define the driver and set the FSGroupPolicy
-		driver := getTestCSIDriver(testDriver, nil, nil, nil)
-		if tc.defined {
-			driver.Spec.FSGroupPolicy = &tc.expectedFSGroupPolicy
-		} else {
-			driver.Spec.FSGroupPolicy = &defaultPolicy
-		}
-
-		// Create the client and register the resources
-		fakeClient := fakeclient.NewSimpleClientset(driver)
-		plug, tmpDir := newTestPlugin(t, fakeClient)
-		defer os.RemoveAll(tmpDir)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.3.0"}, t)
-
-		// Check to see if we can obtain the CSIDriver, along with examining its FSGroupPolicy
-		fsGroup, err := plug.getFSGroupPolicy(testDriver)
-		if err != nil {
-			t.Fatalf("Error attempting to obtain FSGroupPolicy: %v", err)
-		}
-		if fsGroup != *driver.Spec.FSGroupPolicy {
-			t.Fatalf("FSGroupPolicy doesn't match expected value: %v, %v", fsGroup, tc.expectedFSGroupPolicy)
-		}
-	}
-
 }
 
 func TestPluginGetVolumeName(t *testing.T) {
@@ -367,17 +319,20 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
-		name       string
-		originSpec *volume.Spec
-		specVolID  string
-		volHandle  string
-		podUID     types.UID
-		shouldFail bool
+		name                      string
+		seLinuxMountEnabled       bool
+		originSpec                *volume.Spec
+		originSELinuxMountContext string
+		specVolID                 string
+		volHandle                 string
+		expectedSELinuxContext    string
+		podUID                    types.UID
 	}{
 		{
-			name:       "construct spec1 from original persistent spec",
-			specVolID:  "test.vol.id",
-			volHandle:  "testvol-handle1",
+			name:      "construct spec1 from original persistent spec",
+			specVolID: "test.vol.id",
+			volHandle: "testvol-handle1",
+
 			originSpec: volume.NewSpecFromPersistentVolume(makeTestPV("test.vol.id", 20, testDriver, "testvol-handle1"), true),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 		},
@@ -389,11 +344,24 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 		},
 		{
-			name:       "construct spec from original volume spec",
-			specVolID:  "volspec",
-			originSpec: volume.NewSpecFromVolume(makeTestVol("spec2", testDriver)),
-			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			shouldFail: true, // csi inline off
+			name:                      "construct SELinux context from original persistent spec when the feature is enabled",
+			seLinuxMountEnabled:       true,
+			specVolID:                 "spec3",
+			volHandle:                 "handle3",
+			originSELinuxMountContext: "system_u:object_r:container_file_t:s0:c314,c894",
+			originSpec:                volume.NewSpecFromPersistentVolume(makeTestPV("spec3", 20, testDriver, "handle3"), true),
+			expectedSELinuxContext:    "system_u:object_r:container_file_t:s0:c314,c894",
+			podUID:                    types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+		},
+		{
+			name:                      "construct empty SELinux from original persistent spec when the feature is disabled",
+			seLinuxMountEnabled:       false,
+			specVolID:                 "spec4",
+			volHandle:                 "handle4",
+			originSELinuxMountContext: "system_u:object_r:container_file_t:s0:c314,c894",
+			originSpec:                volume.NewSpecFromPersistentVolume(makeTestPV("spec4", 20, testDriver, "handle4"), true),
+			expectedSELinuxContext:    "", // The context is cleared when the feature gate is off
+			podUID:                    types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 		},
 	}
 
@@ -401,16 +369,15 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.seLinuxMountEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, tc.seLinuxMountEnabled)()
+
 			mounter, err := plug.NewMounter(
 				tc.originSpec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
-			if tc.shouldFail && err != nil {
-				t.Log(err)
-				return
-			}
-			if !tc.shouldFail && err != nil {
+			if err != nil {
 				t.Fatal(err)
 			}
 			if mounter == nil {
@@ -418,41 +385,50 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			}
 			csiMounter := mounter.(*csiMountMgr)
 
+			mountPath := filepath.Dir(csiMounter.GetPath())
+			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode), tc.originSELinuxMountContext)
+			if err != nil {
+				t.Fatalf("failed to save fake volume info file: %s", err)
+			}
+
 			// rebuild spec
-			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
+			rec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if spec == nil {
+			if rec.Spec == nil {
 				t.Fatal("nil volume.Spec constructed")
 			}
 
 			// inspect spec
-			if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.CSI == nil {
+			if rec.Spec.PersistentVolume == nil || rec.Spec.PersistentVolume.Spec.CSI == nil {
 				t.Fatal("CSIPersistentVolume not found in constructed spec ")
 			}
 
-			volHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
+			volHandle := rec.Spec.PersistentVolume.Spec.CSI.VolumeHandle
 			if volHandle != tc.originSpec.PersistentVolume.Spec.CSI.VolumeHandle {
 				t.Error("unexpected volumeHandle constructed:", volHandle)
 			}
-			driverName := spec.PersistentVolume.Spec.CSI.Driver
+			driverName := rec.Spec.PersistentVolume.Spec.CSI.Driver
 			if driverName != tc.originSpec.PersistentVolume.Spec.CSI.Driver {
 				t.Error("unexpected driverName constructed:", driverName)
 			}
 
-			if spec.PersistentVolume.Spec.VolumeMode == nil {
+			if rec.Spec.PersistentVolume.Spec.VolumeMode == nil {
 				t.Fatalf("Volume mode has not been set.")
 			}
 
-			if *spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
-				t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
+			if *rec.Spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
+				t.Errorf("Unexpected volume mode %q", *rec.Spec.PersistentVolume.Spec.VolumeMode)
 			}
 
-			if spec.Name() != tc.specVolID {
-				t.Errorf("Unexpected spec name constructed %s", spec.Name())
+			if rec.Spec.Name() != tc.specVolID {
+				t.Errorf("Unexpected spec name constructed %s", rec.Spec.Name())
 			}
 
+			if rec.SELinuxMountContext != tc.expectedSELinuxContext {
+				t.Errorf("Expected SELinux context %q, got %q", tc.expectedSELinuxContext, rec.SELinuxMountContext)
+			}
 		})
 	}
 }
@@ -547,45 +523,51 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			}
 			csiMounter := mounter.(*csiMountMgr)
 
+			mountPath := filepath.Dir(csiMounter.GetPath())
+			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode), "")
+			if err != nil {
+				t.Fatalf("failed to save fake volume info file: %s", err)
+			}
+
 			// rebuild spec
-			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
+			rec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if spec == nil {
+			if rec.Spec == nil {
 				t.Fatal("nil volume.Spec constructed")
 			}
 
-			if spec.Name() != tc.specVolID {
-				t.Errorf("unexpected spec name constructed volume.Spec: %s", spec.Name())
+			if rec.Spec.Name() != tc.specVolID {
+				t.Errorf("unexpected spec name constructed volume.Spec: %s", rec.Spec.Name())
 			}
 
 			switch {
-			case spec.Volume != nil:
-				if spec.Volume.CSI == nil {
+			case rec.Spec.Volume != nil:
+				if rec.Spec.Volume.CSI == nil {
 					t.Error("missing CSIVolumeSource in constructed volume.Spec")
 				}
-				if spec.Volume.CSI.Driver != tc.originSpec.Volume.CSI.Driver {
-					t.Error("unexpected driver in constructed volume source:", spec.Volume.CSI.Driver)
+				if rec.Spec.Volume.CSI.Driver != tc.originSpec.Volume.CSI.Driver {
+					t.Error("unexpected driver in constructed volume source:", rec.Spec.Volume.CSI.Driver)
 				}
 
-			case spec.PersistentVolume != nil:
-				if spec.PersistentVolume.Spec.CSI == nil {
+			case rec.Spec.PersistentVolume != nil:
+				if rec.Spec.PersistentVolume.Spec.CSI == nil {
 					t.Fatal("missing CSIPersistentVolumeSource in constructed volume.spec")
 				}
-				volHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
+				volHandle := rec.Spec.PersistentVolume.Spec.CSI.VolumeHandle
 				if volHandle != tc.originSpec.PersistentVolume.Spec.CSI.VolumeHandle {
 					t.Error("unexpected volumeHandle constructed in persistent volume source:", volHandle)
 				}
-				driverName := spec.PersistentVolume.Spec.CSI.Driver
+				driverName := rec.Spec.PersistentVolume.Spec.CSI.Driver
 				if driverName != tc.originSpec.PersistentVolume.Spec.CSI.Driver {
 					t.Error("unexpected driverName constructed in persistent volume source:", driverName)
 				}
-				if spec.PersistentVolume.Spec.VolumeMode == nil {
+				if rec.Spec.PersistentVolume.Spec.VolumeMode == nil {
 					t.Fatalf("Volume mode has not been set.")
 				}
-				if *spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
-					t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
+				if *rec.Spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
+					t.Errorf("Unexpected volume mode %q", *rec.Spec.PersistentVolume.Spec.VolumeMode)
 				}
 			default:
 				t.Fatal("invalid volume.Spec constructed")
@@ -617,7 +599,7 @@ func TestPluginNewMounter(t *testing.T) {
 			podUID:              types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 			namespace:           "test-ns2",
 			volumeLifecycleMode: storage.VolumeLifecycleEphemeral,
-			shouldFail:          true, // csi inline not enabled
+			shouldFail:          false, // NewMounter works with disabled inline volumes
 		},
 		{
 			name:       "mounter from no spec provided",
@@ -671,36 +653,6 @@ func TestPluginNewMounter(t *testing.T) {
 			}
 			if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 				t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
-			}
-
-			// ensure data file is created
-			dataDir := filepath.Dir(mounter.GetPath())
-			dataFile := filepath.Join(dataDir, volDataFileName)
-			if _, err := os.Stat(dataFile); err != nil {
-				if os.IsNotExist(err) {
-					t.Errorf("data file not created %s", dataFile)
-				} else {
-					t.Fatal(err)
-				}
-			}
-			data, err := loadVolumeData(dataDir, volDataFileName)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if data[volDataKey.specVolID] != csiMounter.spec.Name() {
-				t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
-			}
-			if data[volDataKey.volHandle] != csiMounter.volumeID {
-				t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
-			}
-			if data[volDataKey.driverName] != string(csiMounter.driverName) {
-				t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
-			}
-			if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
-				t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
-			}
-			if data[volDataKey.volumeLifecycleMode] != string(test.volumeLifecycleMode) {
-				t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
 			}
 		})
 	}
@@ -772,10 +724,6 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 
 				// Some test cases are meant to fail because their input data is broken.
 				shouldFail := test.shouldFail
-				// Others fail if the driver does not support the volume mode.
-				if !containsVolumeMode(supported, test.volumeLifecycleMode) {
-					shouldFail = true
-				}
 				if shouldFail != (err != nil) {
 					t.Fatal("Unexpected error:", err)
 				}
@@ -808,36 +756,6 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 				}
 				if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 					t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
-				}
-
-				// ensure data file is created
-				dataDir := filepath.Dir(mounter.GetPath())
-				dataFile := filepath.Join(dataDir, volDataFileName)
-				if _, err := os.Stat(dataFile); err != nil {
-					if os.IsNotExist(err) {
-						t.Errorf("data file not created %s", dataFile)
-					} else {
-						t.Fatal(err)
-					}
-				}
-				data, err := loadVolumeData(dataDir, volDataFileName)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if data[volDataKey.specVolID] != csiMounter.spec.Name() {
-					t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
-				}
-				if data[volDataKey.volHandle] != csiMounter.volumeID {
-					t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
-				}
-				if data[volDataKey.driverName] != string(csiMounter.driverName) {
-					t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
-				}
-				if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
-					t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
-				}
-				if data[volDataKey.volumeLifecycleMode] != string(csiMounter.volumeLifecycleMode) {
-					t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
 				}
 			})
 		}

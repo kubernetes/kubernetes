@@ -87,7 +87,7 @@ func TestGetSpans(t *testing.T) {
 	)
 	ctx := context.Background()
 	rtSvc := createRemoteRuntimeServiceWithTracerProvider(endpoint, tp, t)
-	_, err := rtSvc.Version(apitest.FakeVersion)
+	_, err := rtSvc.Version(ctx, apitest.FakeVersion)
 	require.NoError(t, err)
 	err = tp.ForceFlush(ctx)
 	require.NoError(t, err)
@@ -106,8 +106,9 @@ func TestVersion(t *testing.T) {
 		}
 	}()
 
+	ctx := context.Background()
 	rtSvc := createRemoteRuntimeService(endpoint, t)
-	version, err := rtSvc.Version(apitest.FakeVersion)
+	version, err := rtSvc.Version(ctx, apitest.FakeVersion)
 	require.NoError(t, err)
 	assert.Equal(t, apitest.FakeVersion, version.Version)
 	assert.Equal(t, apitest.FakeRuntimeName, version.RuntimeName)

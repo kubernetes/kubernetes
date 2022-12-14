@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -231,9 +232,20 @@ func unmarshalHeader(v reflect.Value, header string, tag reflect.StructTag) erro
 		}
 		v.Set(reflect.ValueOf(&i))
 	case *float64:
-		f, err := strconv.ParseFloat(header, 64)
-		if err != nil {
-			return err
+		var f float64
+		switch {
+		case strings.EqualFold(header, floatNaN):
+			f = math.NaN()
+		case strings.EqualFold(header, floatInf):
+			f = math.Inf(1)
+		case strings.EqualFold(header, floatNegInf):
+			f = math.Inf(-1)
+		default:
+			var err error
+			f, err = strconv.ParseFloat(header, 64)
+			if err != nil {
+				return err
+			}
 		}
 		v.Set(reflect.ValueOf(&f))
 	case *time.Time:

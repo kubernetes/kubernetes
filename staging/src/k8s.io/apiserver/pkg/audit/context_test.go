@@ -63,20 +63,16 @@ func TestAddAuditAnnotation(t *testing.T) {
 		ctx:         context.Background(),
 		validator:   noopValidator,
 	}, {
-		description: "no annotations context",
-		ctx:         WithAuditContext(context.Background(), newAuditContext(auditinternal.LevelMetadata)),
-		validator:   postEventValidator,
-	}, {
-		description: "no audit context",
-		ctx:         WithAuditAnnotations(context.Background()),
+		description: "empty audit context",
+		ctx:         WithAuditContext(context.Background()),
 		validator:   preEventValidator,
 	}, {
-		description: "both contexts metadata level",
-		ctx:         WithAuditContext(WithAuditAnnotations(context.Background()), newAuditContext(auditinternal.LevelMetadata)),
+		description: "with metadata level",
+		ctx:         withAuditContextAndLevel(context.Background(), auditinternal.LevelMetadata),
 		validator:   postEventValidator,
 	}, {
-		description: "both contexts none level",
-		ctx:         WithAuditContext(WithAuditAnnotations(context.Background()), newAuditContext(auditinternal.LevelNone)),
+		description: "with none level",
+		ctx:         withAuditContextAndLevel(context.Background(), auditinternal.LevelNone),
 		validator:   postEventEmptyValidator,
 	}}
 
@@ -111,10 +107,11 @@ func TestLogAnnotation(t *testing.T) {
 	assert.Equal(t, "", ev.Annotations["qux"], "audit annotation should not be overwritten.")
 }
 
-func newAuditContext(l auditinternal.Level) *AuditContext {
-	return &AuditContext{
-		Event: &auditinternal.Event{
-			Level: l,
-		},
+func withAuditContextAndLevel(ctx context.Context, l auditinternal.Level) context.Context {
+	ctx = WithAuditContext(ctx)
+	ac := AuditContextFrom(ctx)
+	ac.Event = &auditinternal.Event{
+		Level: l,
 	}
+	return ctx
 }

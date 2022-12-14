@@ -121,7 +121,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 	})
 
-	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
+	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func(ctx context.Context) {
 
 		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 
@@ -158,8 +158,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 
 		// make the nodes have balanced cpu,mem usage
-		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
-		defer cleanUp()
+		err = createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
 		framework.ExpectNoError(err)
 		ginkgo.By("Trying to launch the pod with podAntiAffinity.")
 		labelPodName := "pod-with-pod-antiaffinity"
@@ -205,10 +204,9 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		framework.ExpectNotEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
-	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
+	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func(ctx context.Context) {
 		// make the nodes have balanced cpu,mem usage ratio
-		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
-		defer cleanUp()
+		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		framework.ExpectNoError(err)
 		// Apply 10 taints to first node
 		nodeName := nodeList.Items[0].Name
@@ -236,7 +234,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		ginkgo.By("Trying to apply 10 (tolerable) taints on the first node.")
 		// We immediately defer the removal of these taints because addTaintToNode can
 		// panic and RemoveTaintsOffNode does not return an error if the taint does not exist.
-		defer e2enode.RemoveTaintsOffNode(cs, nodeName, tolerableTaints)
+		ginkgo.DeferCleanup(e2enode.RemoveTaintsOffNode, cs, nodeName, tolerableTaints)
 		for _, taint := range tolerableTaints {
 			addTaintToNode(cs, nodeName, taint)
 		}
@@ -244,7 +242,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		ginkgo.By("Adding 10 intolerable taints to all other nodes")
 		for i := 1; i < len(nodeList.Items); i++ {
 			node := nodeList.Items[i]
-			defer e2enode.RemoveTaintsOffNode(cs, node.Name, intolerableTaints[node.Name])
+			ginkgo.DeferCleanup(e2enode.RemoveTaintsOffNode, cs, node.Name, intolerableTaints[node.Name])
 			for _, taint := range intolerableTaints[node.Name] {
 				addTaintToNode(cs, node.Name, taint)
 			}
@@ -285,7 +283,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			}
 		})
 
-		ginkgo.It("validates pod should be preferably scheduled to node which makes the matching pods more evenly distributed", func() {
+		ginkgo.It("validates pod should be preferably scheduled to node which makes the matching pods more evenly distributed", func(ctx context.Context) {
 			var nodes []v1.Node
 			for _, nodeName := range nodeNames {
 				node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
@@ -294,8 +292,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			}
 
 			// Make the nodes have balanced cpu,mem usage.
-			cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodes, podRequestedResource, 0.5)
-			defer cleanUp()
+			err := createBalancedPodForNodes(f, cs, ns, nodes, podRequestedResource, 0.5)
 			framework.ExpectNoError(err)
 
 			replicas := 4
@@ -360,7 +357,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 })
 
 // createBalancedPodForNodes creates a pod per node that asks for enough resources to make all nodes have the same mem/cpu usage ratio.
-func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, ns string, nodes []v1.Node, requestedResource *v1.ResourceRequirements, ratio float64) (func(), error) {
+func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, ns string, nodes []v1.Node, requestedResource *v1.ResourceRequirements, ratio float64) error {
 	cleanUp := func() {
 		// Delete all remaining pods
 		err := cs.CoreV1().Pods(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
@@ -387,6 +384,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 			}
 		}
 	}
+	ginkgo.DeferCleanup(cleanUp)
 
 	// find the max, if the node has the max,use the one, if not,use the ratio parameter
 	var maxCPUFraction, maxMemFraction float64 = ratio, ratio
@@ -473,7 +471,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 		}
 	}
 	if len(errs) > 0 {
-		return cleanUp, errors.NewAggregate(errs)
+		return errors.NewAggregate(errs)
 	}
 
 	nodeNameToPodList = podListForEachNode(cs)
@@ -482,7 +480,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 		computeCPUMemFraction(node, requestedResource, nodeNameToPodList[node.Name])
 	}
 
-	return cleanUp, nil
+	return nil
 }
 
 func podListForEachNode(cs clientset.Interface) map[string][]*v1.Pod {

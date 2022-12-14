@@ -191,9 +191,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 	driverName := driver.GetDriverInfo().Name
 
-	ginkgo.It("should support non-existent path", func() {
+	ginkgo.It("should support non-existent path", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Write the file in the subPath from init container 1
 		setWriteCommand(l.filePathInSubpath, &l.pod.Spec.InitContainers[1])
@@ -202,9 +202,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testReadFile(f, l.filePathInVolume, l.pod, 1)
 	})
 
-	ginkgo.It("should support existing directory", func() {
+	ginkgo.It("should support existing directory", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the directory
 		setInitCommand(l.pod, fmt.Sprintf("mkdir -p %s", l.subPathDir))
@@ -216,9 +216,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testReadFile(f, l.filePathInVolume, l.pod, 1)
 	})
 
-	ginkgo.It("should support existing single file [LinuxOnly]", func() {
+	ginkgo.It("should support existing single file [LinuxOnly]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the file in the init container
 		setInitCommand(l.pod, fmt.Sprintf("mkdir -p %s; echo \"mount-tester new file\" > %s", l.subPathDir, l.filePathInVolume))
@@ -227,9 +227,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testReadFile(f, l.filePathInSubpath, l.pod, 0)
 	})
 
-	ginkgo.It("should support file as subpath [LinuxOnly]", func() {
+	ginkgo.It("should support file as subpath [LinuxOnly]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the file in the init container
 		setInitCommand(l.pod, fmt.Sprintf("echo %s > %s", f.Namespace.Name, l.subPathDir))
@@ -237,9 +237,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		TestBasicSubpath(f, f.Namespace.Name, l.pod)
 	})
 
-	ginkgo.It("should fail if subpath directory is outside the volume [Slow][LinuxOnly]", func() {
+	ginkgo.It("should fail if subpath directory is outside the volume [Slow][LinuxOnly]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the subpath outside the volume
 		var command string
@@ -253,9 +253,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(f, l.pod, false)
 	})
 
-	ginkgo.It("should fail if subpath file is outside the volume [Slow][LinuxOnly]", func() {
+	ginkgo.It("should fail if subpath file is outside the volume [Slow][LinuxOnly]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the subpath outside the volume
 		setInitCommand(l.pod, fmt.Sprintf("ln -s /bin/sh %s", l.subPathDir))
@@ -264,9 +264,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(f, l.pod, false)
 	})
 
-	ginkgo.It("should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]", func() {
+	ginkgo.It("should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the subpath outside the volume
 		setInitCommand(l.pod, fmt.Sprintf("ln -s /bin/notanexistingpath %s", l.subPathDir))
@@ -275,9 +275,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(f, l.pod, false)
 	})
 
-	ginkgo.It("should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]", func() {
+	ginkgo.It("should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the subpath outside the volume
 		var command string
@@ -291,9 +291,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(f, l.pod, false)
 	})
 
-	ginkgo.It("should support creating multiple subpath from same volumes [Slow]", func() {
+	ginkgo.It("should support creating multiple subpath from same volumes [Slow]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		subpathDir1 := filepath.Join(volumePath, "subpath1")
 		subpathDir2 := filepath.Join(volumePath, "subpath2")
@@ -317,9 +317,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testMultipleReads(f, l.pod, 0, filepath1, filepath2)
 	})
 
-	ginkgo.It("should support restarting containers using directory as subpath [Slow]", func() {
+	ginkgo.It("should support restarting containers using directory as subpath [Slow]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the directory
 		var command string
@@ -328,9 +328,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodContainerRestart(f, l.pod)
 	})
 
-	ginkgo.It("should support restarting containers using file as subpath [Slow][LinuxOnly]", func() {
+	ginkgo.It("should support restarting containers using file as subpath [Slow][LinuxOnly]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the file
 		setInitCommand(l.pod, fmt.Sprintf("touch %v; touch %v", l.subPathDir, probeFilePath))
@@ -338,9 +338,10 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodContainerRestart(f, l.pod)
 	})
 
-	ginkgo.It("should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func() {
+	ginkgo.It("should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func(ctx context.Context) {
+		e2eskipper.SkipUnlessSSHKeyPresent()
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		if strings.HasPrefix(driverName, "hostPath") {
 			// TODO: This skip should be removed once #61446 is fixed
@@ -350,9 +351,10 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testSubpathReconstruction(f, l.hostExec, l.pod, false)
 	})
 
-	ginkgo.It("should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func() {
+	ginkgo.It("should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func(ctx context.Context) {
+		e2eskipper.SkipUnlessSSHKeyPresent()
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		if strings.HasPrefix(driverName, "hostPath") {
 			// TODO: This skip should be removed once #61446 is fixed
@@ -362,9 +364,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testSubpathReconstruction(f, l.hostExec, l.pod, true)
 	})
 
-	ginkgo.It("should support readOnly directory specified in the volumeMount", func() {
+	ginkgo.It("should support readOnly directory specified in the volumeMount", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the directory
 		setInitCommand(l.pod, fmt.Sprintf("mkdir -p %s", l.subPathDir))
@@ -377,9 +379,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testReadFile(f, l.filePathInSubpath, l.pod, 0)
 	})
 
-	ginkgo.It("should support readOnly file specified in the volumeMount [LinuxOnly]", func() {
+	ginkgo.It("should support readOnly file specified in the volumeMount [LinuxOnly]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Create the file
 		setInitCommand(l.pod, fmt.Sprintf("touch %s", l.subPathDir))
@@ -392,9 +394,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testReadFile(f, volumePath, l.pod, 0)
 	})
 
-	ginkgo.It("should support existing directories when readOnly specified in the volumeSource", func() {
+	ginkgo.It("should support existing directories when readOnly specified in the volumeSource", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 		if l.roVolSource == nil {
 			e2eskipper.Skipf("Driver %s on volume type %s doesn't support readOnly source", driverName, pattern.VolType)
 		}
@@ -420,9 +422,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testReadFile(f, l.filePathInSubpath, l.pod, 0)
 	})
 
-	ginkgo.It("should verify container cannot write to subpath readonly volumes [Slow]", func() {
+	ginkgo.It("should verify container cannot write to subpath readonly volumes [Slow]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 		if l.roVolSource == nil {
 			e2eskipper.Skipf("Driver %s on volume type %s doesn't support readOnly source", driverName, pattern.VolType)
 		}
@@ -442,9 +444,9 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 	// Set this test linux-only because the test will fail in Windows when
 	// deleting a dir from one container while another container still use it.
-	ginkgo.It("should be able to unmount after the subpath directory is deleted [LinuxOnly]", func() {
+	ginkgo.It("should be able to unmount after the subpath directory is deleted [LinuxOnly]", func(ctx context.Context) {
 		init()
-		defer cleanup()
+		ginkgo.DeferCleanup(cleanup)
 
 		// Change volume container to busybox so we can exec later
 		l.pod.Spec.Containers[1].Image = e2epod.GetDefaultTestImage()
@@ -455,10 +457,10 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		removeUnusedContainers(l.pod)
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), l.pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "while creating pod")
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-			e2epod.DeletePodWithWait(f.ClientSet, pod)
-		}()
+			return e2epod.DeletePodWithWait(f.ClientSet, pod)
+		})
 
 		// Wait for pod to be running
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
@@ -706,9 +708,7 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
-	defer func() {
-		e2epod.DeletePodWithWait(f.ClientSet, pod)
-	}()
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
 	ginkgo.By("Checking for subpath error in container status")
 	err = waitForPodSubpathError(f, pod, allowContainerTerminationError)
 	framework.ExpectNoError(err, "while waiting for subpath failure")
@@ -806,9 +806,7 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
-	defer func() {
-		e2epod.DeletePodWithWait(f.ClientSet, pod)
-	}()
+	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
 	err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
@@ -1002,7 +1000,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec storageutils.Hos
 	}
 	framework.ExpectNotEqual(podNode, nil, "pod node should exist in schedulable nodes")
 
-	storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
+	storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true, nil, volumePath)
 
 	if podNode != nil {
 		mountPoints := globalMountPointsByNode[podNode.Name]

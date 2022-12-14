@@ -95,7 +95,7 @@ var _ = common.SIGDescribe("Events API", func() {
 		The event is updated with a new series, the check MUST have the update series.
 		The event is deleted and MUST NOT show up when listing all events.
 	*/
-	framework.ConformanceIt("should ensure that an event can be fetched, patched, deleted, and listed", func() {
+	framework.ConformanceIt("should ensure that an event can be fetched, patched, deleted, and listed", func(ctx context.Context) {
 		eventName := "event-test"
 
 		ginkgo.By("creating a test event")
@@ -204,7 +204,7 @@ var _ = common.SIGDescribe("Events API", func() {
 		Description: Create a list of events, the events MUST exist.
 		The events are deleted and MUST NOT show up when listing all events.
 	*/
-	framework.ConformanceIt("should delete a collection of events", func() {
+	framework.ConformanceIt("should delete a collection of events", func(ctx context.Context) {
 		eventNames := []string{"test-event-1", "test-event-2", "test-event-3"}
 
 		ginkgo.By("Create set of events")

@@ -19,17 +19,20 @@
 package grpc
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
 
 	"google.golang.org/grpc/balancer"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/internal/balancer/gracefulswitch"
 	"google.golang.org/grpc/internal/buffer"
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/grpcsync"
 	"google.golang.org/grpc/resolver"
+	"google.golang.org/grpc/status"
 )
 
 // ccBalancerWrapper sits between the ClientConn and the Balancer.
@@ -305,7 +308,7 @@ func (ccb *ccBalancerWrapper) NewSubConn(addrs []resolver.Address, opts balancer
 		channelz.Warningf(logger, ccb.cc.channelzID, "acBalancerWrapper: NewSubConn: failed to newAddrConn: %v", err)
 		return nil, err
 	}
-	acbw := &acBalancerWrapper{ac: ac}
+	acbw := &acBalancerWrapper{ac: ac, producers: make(map[balancer.ProducerBuilder]*refCountedProducer)}
 	acbw.ac.mu.Lock()
 	ac.acbw = acbw
 	acbw.ac.mu.Unlock()
@@ -359,8 +362,9 @@ func (ccb *ccBalancerWrapper) Target() string {
 // acBalancerWrapper is a wrapper on top of ac for balancers.
 // It implements balancer.SubConn interface.
 type acBalancerWrapper struct {
-	mu sync.Mutex
-	ac *addrConn
+	mu        sync.Mutex
+	ac        *addrConn
+	producers map[balancer.ProducerBuilder]*refCountedProducer
 }
 
 func (acbw *acBalancerWrapper) UpdateAddresses(addrs []resolver.Address) {
@@ -413,4 +417,65 @@ func (acbw *acBalancerWrapper) getAddrConn() *addrConn {
 	acbw.mu.Lock()
 	defer acbw.mu.Unlock()
 	return acbw.ac
+}
+
+var errSubConnNotReady = status.Error(codes.Unavailable, "SubConn not currently connected")
+
+// NewStream begins a streaming RPC on the addrConn.  If the addrConn is not
+// ready, returns errSubConnNotReady.
+func (acbw *acBalancerWrapper) NewStream(ctx context.Context, desc *StreamDesc, method string, opts ...CallOption) (ClientStream, error) {
+	transport := acbw.ac.getReadyTransport()
+	if transport == nil {
+		return nil, errSubConnNotReady
+	}
+	return newNonRetryClientStream(ctx, desc, method, transport, acbw.ac, opts...)
+}
+
+// Invoke performs a unary RPC.  If the addrConn is not ready, returns
+// errSubConnNotReady.
+func (acbw *acBalancerWrapper) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...CallOption) error {
+	cs, err := acbw.NewStream(ctx, unaryStreamDesc, method, opts...)
+	if err != nil {
+		return err
+	}
+	if err := cs.SendMsg(args); err != nil {
+		return err
+	}
+	return cs.RecvMsg(reply)
+}
+
+type refCountedProducer struct {
+	producer balancer.Producer
+	refs     int    // number of current refs to the producer
+	close    func() // underlying producer's close function
+}
+
+func (acbw *acBalancerWrapper) GetOrBuildProducer(pb balancer.ProducerBuilder) (balancer.Producer, func()) {
+	acbw.mu.Lock()
+	defer acbw.mu.Unlock()
+
+	// Look up existing producer from this builder.
+	pData := acbw.producers[pb]
+	if pData == nil {
+		// Not found; create a new one and add it to the producers map.
+		p, close := pb.Build(acbw)
+		pData = &refCountedProducer{producer: p, close: close}
+		acbw.producers[pb] = pData
+	}
+	// Account for this new reference.
+	pData.refs++
+
+	// Return a cleanup function wrapped in a OnceFunc to remove this reference
+	// and delete the refCountedProducer from the map if the total reference
+	// count goes to zero.
+	unref := func() {
+		acbw.mu.Lock()
+		pData.refs--
+		if pData.refs == 0 {
+			defer pData.close() // Run outside the acbw mutex
+			delete(acbw.producers, pb)
+		}
+		acbw.mu.Unlock()
+	}
+	return pData.producer, grpcsync.OnceFunc(unref)
 }

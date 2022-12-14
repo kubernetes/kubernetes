@@ -54,7 +54,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
 	clocktesting "k8s.io/utils/clock/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 type pdbStates map[string]policy.PodDisruptionBudget
@@ -507,7 +507,7 @@ func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 5, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = utilpointer.Int32Ptr(5)
+	rs.Spec.Replicas = pointer.Int32(5)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(ctx, pdbName)
@@ -533,7 +533,7 @@ func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 4, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = utilpointer.Int32Ptr(3)
+	rs.Spec.Replicas = pointer.Int32(3)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(ctx, pdbName)
@@ -1403,7 +1403,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: now},
 						},
@@ -1413,7 +1413,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute + time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionFalse,
 				},
 			},
@@ -1427,7 +1427,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: now},
 						},
@@ -1437,7 +1437,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute - time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 				},
 			},
@@ -1452,7 +1452,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: now},
 						},
@@ -1462,7 +1462,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute + time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 				},
 			},
@@ -1487,7 +1487,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionFalse,
 						},
 					},
@@ -1496,7 +1496,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute + time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionFalse,
 				},
 			},

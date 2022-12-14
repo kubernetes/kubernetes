@@ -51,7 +51,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		workingDir = GetAndExpectStringEnvVar("VSPHERE_WORKING_DIR")
 	})
 
-	ginkgo.It("node unregister", func() {
+	ginkgo.It("node unregister", func(ctx context.Context) {
 		ginkgo.By("Get total Ready nodes")
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
@@ -68,9 +68,6 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		// Find VM .vmx file path, host, resource pool.
 		// They are required to register a node VM to VC
 		vmxFilePath := getVMXFilePath(vmObject)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 
 		vmHost, err := vmObject.HostSystem(ctx)
 		framework.ExpectNoError(err)

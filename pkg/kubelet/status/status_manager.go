@@ -34,8 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -75,6 +77,8 @@ type manager struct {
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
 	podDeletionSafety PodDeletionSafetyProvider
+
+	podStartupLatencyHelper PodStartupLatencyStateHelper
 }
 
 // PodStatusProvider knows how to provide status for a pod. It's intended to be used by other components
@@ -91,6 +95,11 @@ type PodDeletionSafetyProvider interface {
 	PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool
 	// PodCouldHaveRunningContainers returns true if the pod could have running containers.
 	PodCouldHaveRunningContainers(pod *v1.Pod) bool
+}
+
+type PodStartupLatencyStateHelper interface {
+	RecordStatusUpdated(pod *v1.Pod)
+	DeletePodStartupState(podUID types.UID)
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -124,14 +133,15 @@ type Manager interface {
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider) Manager {
+func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
 	return &manager{
-		kubeClient:        kubeClient,
-		podManager:        podManager,
-		podStatuses:       make(map[types.UID]versionedPodStatus),
-		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
-		apiStatusVersions: make(map[kubetypes.MirrorPodUID]uint64),
-		podDeletionSafety: podDeletionSafety,
+		kubeClient:              kubeClient,
+		podManager:              podManager,
+		podStatuses:             make(map[types.UID]versionedPodStatus),
+		podStatusChannel:        make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
+		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
+		podDeletionSafety:       podDeletionSafety,
+		podStartupLatencyHelper: podStartupLatencyHelper,
 	}
 }
 
@@ -142,7 +152,8 @@ func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podD
 func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	oldCopy := oldStatus.DeepCopy()
 	for _, c := range status.Conditions {
-		if kubetypes.PodConditionByKubelet(c.Type) {
+		// both owned and shared conditions are used for kubelet status equality
+		if kubetypes.PodConditionByKubelet(c.Type) || kubetypes.PodConditionSharedByKubelet(c.Type) {
 			_, oc := podutil.GetPodCondition(oldCopy, c.Type)
 			if oc == nil || oc.Status != c.Status || oc.Message != c.Message || oc.Reason != c.Reason {
 				return false
@@ -493,6 +504,11 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	// Set PodScheduledCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodScheduled)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		// Set DisruptionTarget.LastTransitionTime.
+		updateLastTransitionTime(&status, &oldStatus, v1.DisruptionTarget)
+	}
+
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {
 		status.StartTime = oldStatus.StartTime
@@ -599,6 +615,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	delete(m.podStatuses, uid)
+	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 }
 
 // TODO(filipg): It'd be cleaner if we can do this without signal from user.
@@ -710,6 +727,8 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	} else {
 		klog.V(3).InfoS("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
 		pod = newPod
+		// We pass a new object (result of API call which contains updated ResourceVersion)
+		m.podStartupLatencyHelper.RecordStatusUpdated(pod)
 	}
 
 	// measure how long the status update took to propagate from generation to update on the server
@@ -868,9 +887,30 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 			podConditions = append(podConditions, c)
 		}
 	}
+
+	transitioningToTerminalPhase := !podutil.IsPodPhaseTerminal(oldPodStatus.Phase) && podutil.IsPodPhaseTerminal(newPodStatus.Phase)
+
 	for _, c := range newPodStatus.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
 			podConditions = append(podConditions, c)
+		} else if kubetypes.PodConditionSharedByKubelet(c.Type) {
+			// we replace or append all the "shared by kubelet" conditions
+			if c.Type == v1.DisruptionTarget {
+				// guard the update of the DisruptionTarget condition with a check to ensure
+				// it will only be sent once all containers have terminated and the phase
+				// is terminal. This avoids sending an unnecessary patch request to add
+				// the condition if the actual status phase transition is delayed.
+				if transitioningToTerminalPhase && !couldHaveRunningContainers {
+					// update the LastTransitionTime again here because the older transition
+					// time set in updateStatusInternal is likely stale as sending of
+					// the condition was delayed until all pod's containers have terminated.
+					updateLastTransitionTime(&newPodStatus, &oldPodStatus, c.Type)
+					if _, c := podutil.GetPodConditionFromList(newPodStatus.Conditions, c.Type); c != nil {
+						// for shared conditions we update or append in podConditions
+						podConditions = statusutil.ReplaceOrAppendPodCondition(podConditions, c)
+					}
+				}
+			}
 		}
 	}
 	newPodStatus.Conditions = podConditions
@@ -884,7 +924,7 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 	// the Kubelet exclusively owns must be released prior to a pod being reported terminal,
 	// while resources that have participanting components above the API use the pod's
 	// transition to a terminal phase (or full deletion) to release those resources.
-	if !podutil.IsPodPhaseTerminal(oldPodStatus.Phase) && podutil.IsPodPhaseTerminal(newPodStatus.Phase) {
+	if transitioningToTerminalPhase {
 		if couldHaveRunningContainers {
 			newPodStatus.Phase = oldPodStatus.Phase
 			newPodStatus.Reason = oldPodStatus.Reason

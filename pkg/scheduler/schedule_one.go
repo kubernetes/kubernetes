@@ -92,9 +92,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	scheduleResult, assumedPodInfo, err := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
-	if err != nil {
-		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, err, scheduleResult.reason, scheduleResult.nominatingInfo, start)
+	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, fwk, podInfo, start, podsToActivate)
+	if !status.IsSuccess() {
+		sched.FailureHandler(schedulingCycleCtx, fwk, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (sched *Scheduler) schedulingCycle(
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
-) (ScheduleResult, *framework.QueuedPodInfo, error) {
+) (ScheduleResult, *framework.QueuedPodInfo, *framework.Status) {
 
 	pod := podInfo.Pod
 	scheduleResult, err := sched.SchedulePod(ctx, fwk, state, pod)
@@ -134,8 +134,10 @@ func (sched *Scheduler) schedulingCycle(
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
 		// will fit due to the preemption. It is also possible that a different pod will schedule
 		// into the resources that were preempted, but this is harmless.
-		var nominatingInfo *framework.NominatingInfo
-		reason := v1.PodReasonUnschedulable
+		var (
+			nominatingInfo *framework.NominatingInfo
+			status         *framework.Status
+		)
 		if fitError, ok := err.(*framework.FitError); ok {
 			if !fwk.HasPostFilterPlugins() {
 				klog.V(3).InfoS("No PostFilter plugins are registered, so no preemption will be performed")
@@ -145,22 +147,27 @@ func (sched *Scheduler) schedulingCycle(
 				if status.Code() == framework.Error {
 					klog.ErrorS(nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
 				} else {
-					fitError.Diagnosis.PostFilterMsg = status.Message()
-					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
+					msg := status.Message()
+					fitError.Diagnosis.PostFilterMsg = msg
+					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
 				}
 				if result != nil {
 					nominatingInfo = result.NominatingInfo
 				}
 			}
+			status = framework.NewStatus(framework.Unschedulable).WithError(err)
 		} else if err == ErrNoNodesAvailable {
 			nominatingInfo = clearNominatedNode
+			status = framework.NewStatus(framework.UnschedulableAndUnresolvable).WithError(err)
 		} else {
 			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			nominatingInfo = clearNominatedNode
-			reason = v1.PodReasonSchedulerError
+			status = framework.AsStatus(err)
 		}
-		return ScheduleResult{nominatingInfo: nominatingInfo, reason: reason}, podInfo, err
+
+		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, status
 	}
+
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
@@ -174,9 +181,9 @@ func (sched *Scheduler) schedulingCycle(
 		// This relies on the fact that Error will check if the pod has been bound
 		// to a node and if so will not add it back to the unscheduled pods queue
 		// (otherwise this would cause an infinite loop).
-		return ScheduleResult{nominatingInfo: clearNominatedNode, reason: v1.PodReasonSchedulerError},
+		return ScheduleResult{nominatingInfo: clearNominatedNode},
 			assumedPodInfo,
-			err
+			framework.AsStatus(err)
 	}
 
 	// Run the Reserve method of reserve plugins.
@@ -187,9 +194,9 @@ func (sched *Scheduler) schedulingCycle(
 			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
-		return ScheduleResult{nominatingInfo: clearNominatedNode, reason: v1.PodReasonSchedulerError},
+		return ScheduleResult{nominatingInfo: clearNominatedNode},
 			assumedPodInfo,
-			sts.AsError()
+			sts
 	}
 
 	// Run "permit" plugins.
@@ -201,14 +208,9 @@ func (sched *Scheduler) schedulingCycle(
 			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
-		reason := v1.PodReasonSchedulerError
-		if runPermitStatus.IsUnschedulable() {
-			reason = v1.PodReasonUnschedulable
-		}
-
-		return ScheduleResult{nominatingInfo: clearNominatedNode, reason: reason},
+		return ScheduleResult{nominatingInfo: clearNominatedNode},
 			assumedPodInfo,
-			runPermitStatus.AsError()
+			runPermitStatus
 	}
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
@@ -297,12 +299,7 @@ func (sched *Scheduler) handleBindingCycleError(
 		}
 	}
 
-	reason := v1.PodReasonSchedulerError
-	if status.IsUnschedulable() {
-		reason = v1.PodReasonUnschedulable
-	}
-
-	sched.FailureHandler(ctx, fwk, podInfo, status.AsError(), reason, clearNominatedNode, start)
+	sched.FailureHandler(ctx, fwk, podInfo, status, clearNominatedNode, start)
 }
 
 func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error) {
@@ -406,8 +403,9 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 			return nil, diagnosis, s.AsError()
 		}
 		// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
-		diagnosis.PreFilterMsg = s.Message()
-		klog.V(5).InfoS("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", s)
+		msg := s.Message()
+		diagnosis.PreFilterMsg = msg
+		klog.V(5).InfoS("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
 		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
 		if s.FailedPlugin() != "" {
 			diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
@@ -642,15 +640,15 @@ func prioritizeNodes(
 	state *framework.CycleState,
 	pod *v1.Pod,
 	nodes []*v1.Node,
-) (framework.NodeScoreList, error) {
+) ([]framework.NodePluginScores, error) {
 	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
 	if len(extenders) == 0 && !fwk.HasScorePlugins() {
-		result := make(framework.NodeScoreList, 0, len(nodes))
+		result := make([]framework.NodePluginScores, 0, len(nodes))
 		for i := range nodes {
-			result = append(result, framework.NodeScore{
-				Name:  nodes[i].Name,
-				Score: 1,
+			result = append(result, framework.NodePluginScores{
+				Name:       nodes[i].Name,
+				TotalScore: 1,
 			})
 		}
 		return result, nil
@@ -678,16 +676,12 @@ func prioritizeNodes(
 		}
 	}
 
-	// Summarize all scores.
-	result := make(framework.NodeScoreList, len(nodes))
-	for i, pluginScores := range nodesScores {
-		result[i] = framework.NodeScore{Name: nodes[i].Name, Score: pluginScores.TotalScore}
-	}
-
 	if len(extenders) != 0 && nodes != nil {
+		// allNodeExtendersScores has all extenders scores for all nodes.
+		// It is keyed with node name.
+		allNodeExtendersScores := make(map[string]*framework.NodePluginScores, len(nodes))
 		var mu sync.Mutex
 		var wg sync.WaitGroup
-		combinedScores := make(map[string]int64, len(nodes))
 		for i := range extenders {
 			if !extenders[i].IsInterested(pod) {
 				continue
@@ -708,48 +702,65 @@ func prioritizeNodes(
 					return
 				}
 				mu.Lock()
+				defer mu.Unlock()
 				for i := range *prioritizedList {
-					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
+					nodename := (*prioritizedList)[i].Host
+					score := (*prioritizedList)[i].Score
 					if klogV.Enabled() {
-						klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
+						klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", nodename, "score", score)
 					}
-					combinedScores[host] += score * weight
+
+					// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
+					// therefore we need to scale the score returned by extenders to the score range used by the scheduler.
+					finalscore := score * weight * (framework.MaxNodeScore / extenderv1.MaxExtenderPriority)
+
+					if allNodeExtendersScores[nodename] == nil {
+						allNodeExtendersScores[nodename] = &framework.NodePluginScores{
+							Name:   nodename,
+							Scores: make([]framework.PluginScore, 0, len(extenders)),
+						}
+					}
+					allNodeExtendersScores[nodename].Scores = append(allNodeExtendersScores[nodename].Scores, framework.PluginScore{
+						Name:  extenders[extIndex].Name(),
+						Score: finalscore,
+					})
+					allNodeExtendersScores[nodename].TotalScore += finalscore
 				}
-				mu.Unlock()
 			}(i)
 		}
 		// wait for all go routines to finish
 		wg.Wait()
-		for i := range result {
-			// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
-			// therefore we need to scale the score returned by extenders to the score range used by the scheduler.
-			result[i].Score += combinedScores[result[i].Name] * (framework.MaxNodeScore / extenderv1.MaxExtenderPriority)
+		for i := range nodesScores {
+			if score, ok := allNodeExtendersScores[nodes[i].Name]; ok {
+				nodesScores[i].Scores = append(nodesScores[i].Scores, score.Scores...)
+				nodesScores[i].TotalScore += score.TotalScore
+			}
 		}
 	}
 
 	if klogV.Enabled() {
-		for i := range result {
-			klogV.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", result[i].Name, "score", result[i].Score)
+		for i := range nodesScores {
+			klogV.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", nodesScores[i].Name, "score", nodesScores[i].TotalScore)
 		}
 	}
-	return result, nil
+	return nodesScores, nil
 }
 
 // selectHost takes a prioritized list of nodes and then picks one
 // in a reservoir sampling manner from the nodes that had the highest score.
-func selectHost(nodeScoreList framework.NodeScoreList) (string, error) {
-	if len(nodeScoreList) == 0 {
+func selectHost(nodeScores []framework.NodePluginScores) (string, error) {
+	if len(nodeScores) == 0 {
 		return "", fmt.Errorf("empty priorityList")
 	}
-	maxScore := nodeScoreList[0].Score
-	selected := nodeScoreList[0].Name
+	maxScore := nodeScores[0].TotalScore
+	selected := nodeScores[0].Name
 	cntOfMaxScore := 1
-	for _, ns := range nodeScoreList[1:] {
-		if ns.Score > maxScore {
-			maxScore = ns.Score
+	for _, ns := range nodeScores[1:] {
+		if ns.TotalScore > maxScore {
+			maxScore = ns.TotalScore
 			selected = ns.Name
 			cntOfMaxScore = 1
-		} else if ns.Score == maxScore {
+		} else if ns.TotalScore == maxScore {
 			cntOfMaxScore++
 			if rand.Intn(cntOfMaxScore) == 0 {
 				// Replace the candidate with probability of 1/cntOfMaxScore
@@ -833,7 +844,12 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
-func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo, start time.Time) {
+func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time) {
+	reason := v1.PodReasonSchedulerError
+	if status.IsUnschedulable() {
+		reason = v1.PodReasonUnschedulable
+	}
+
 	switch reason {
 	case v1.PodReasonUnschedulable:
 		metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
@@ -842,12 +858,14 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	}
 
 	pod := podInfo.Pod
+	err := status.AsError()
 	var errMsg string
 	if err != nil {
 		errMsg = err.Error()
 	}
+
 	if err == ErrNoNodesAvailable {
-		klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
+		klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod), "err", err)
 	} else if fitError, ok := err.(*framework.FitError); ok {
 		// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins

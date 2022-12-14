@@ -217,36 +217,28 @@ func TotalReady(c clientset.Interface) (int, error) {
 	return len(nodes.Items), nil
 }
 
-// GetExternalIP returns node external IP concatenated with port 22 for ssh
+// GetSSHExternalIP returns node external IP concatenated with port 22 for ssh
 // e.g. 1.2.3.4:22
-func GetExternalIP(node *v1.Node) (string, error) {
+func GetSSHExternalIP(node *v1.Node) (string, error) {
 	framework.Logf("Getting external IP address for %s", node.Name)
-	host := ""
+
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
+			return net.JoinHostPort(a.Address, sshPort), nil
 		}
 	}
-	if host == "" {
-		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host, nil
+	return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 }
 
-// GetInternalIP returns node internal IP
-func GetInternalIP(node *v1.Node) (string, error) {
-	host := ""
+// GetSSHInternalIP returns node internal IP concatenated with port 22 for ssh
+func GetSSHInternalIP(node *v1.Node) (string, error) {
 	for _, address := range node.Status.Addresses {
 		if address.Type == v1.NodeInternalIP && address.Address != "" {
-			host = net.JoinHostPort(address.Address, sshPort)
-			break
+			return net.JoinHostPort(address.Address, sshPort), nil
 		}
 	}
-	if host == "" {
-		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host, nil
+
+	return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 }
 
 // FirstAddressByTypeAndFamily returns the first address that matches the given type and family of the list of nodes
@@ -375,42 +367,6 @@ func GetRandomReadySchedulableNode(c clientset.Interface) (*v1.Node, error) {
 		return nil, err
 	}
 	return &nodes.Items[rand.Intn(len(nodes.Items))], nil
-}
-
-// GetSubnetPrefix gets first 2 number of an IP in the node subnet. [IPv4]
-// It assumes that the subnet mask is /16.
-func GetSubnetPrefix(c clientset.Interface) ([]string, error) {
-	node, err := GetReadySchedulableWorkerNode(c)
-	if err != nil {
-		return nil, fmt.Errorf("error getting a ready schedulable worker Node, err: %v", err)
-	}
-	internalIP, err := GetInternalIP(node)
-	if err != nil {
-		return nil, fmt.Errorf("error getting Node internal IP, err: %v", err)
-	}
-	splitted := strings.Split(internalIP, ".")
-	if len(splitted) == 4 {
-		return splitted[:2], nil
-	}
-	return nil, fmt.Errorf("invalid IP address format: %s", internalIP)
-}
-
-// GetReadySchedulableWorkerNode gets a single worker node which is available for
-// running pods on. If there are no such available nodes it will return an error.
-func GetReadySchedulableWorkerNode(c clientset.Interface) (*v1.Node, error) {
-	nodes, err := GetReadySchedulableNodes(c)
-	if err != nil {
-		return nil, err
-	}
-	for i := range nodes.Items {
-		node := nodes.Items[i]
-		_, isMaster := node.Labels["node-role.kubernetes.io/master"]
-		_, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]
-		if !isMaster && !isControlPlane {
-			return &node, nil
-		}
-	}
-	return nil, fmt.Errorf("there are currently no ready, schedulable worker nodes in the cluster")
 }
 
 // GetReadyNodesIncludingTainted returns all ready nodes, even those which are tainted.

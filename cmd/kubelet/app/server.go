@@ -41,7 +41,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -99,6 +99,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/flock"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -144,7 +145,7 @@ various mechanisms (primarily through the apiserver) and ensures that the contai
 described in those PodSpecs are running and healthy. The kubelet doesn't manage
 containers which were not created by Kubernetes.
 
-Other than from an PodSpec from the apiserver, there are three ways that a container
+Other than from an PodSpec from the apiserver, there are two ways that a container
 manifest can be provided to the Kubelet.
 
 File: Path passed as a flag on the command line. Files under this path will be monitored
@@ -152,10 +153,7 @@ periodically for updates. The monitoring period is 20s by default and is configu
 via a flag.
 
 HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint
-is checked every 20 seconds (also configurable with a flag).
-
-HTTP server: The kubelet can also listen for HTTP and respond to a simple API
-(underspec'd currently) to submit a new manifest.`,
+is checked every 20 seconds (also configurable with a flag).`,
 		// The Kubelet has special flag parsing requirements to enforce flag precedence rules,
 		// so we do all our parsing manually in Run, below.
 		// DisableFlagParsing=true provides the full set of flags passed to the kubelet in the
@@ -685,11 +683,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 		kubeReserved, err := parseResourceList(s.KubeReserved)
 		if err != nil {
-			return err
+			return fmt.Errorf("--kube-reserved value failed to parse: %w", err)
 		}
 		systemReserved, err := parseResourceList(s.SystemReserved)
 		if err != nil {
-			return err
+			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
 		}
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
@@ -701,18 +699,24 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 		experimentalQOSReserved, err := cm.ParseQOSReserved(s.QOSReserved)
 		if err != nil {
-			return err
+			return fmt.Errorf("--qos-reserved value failed to parse: %w", err)
 		}
 
-		devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
-
 		var cpuManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
-			if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
-				cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
-			} else if s.CPUManagerPolicyOptions != nil {
-				return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
-					s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
+		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
+			cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
+		} else if s.CPUManagerPolicyOptions != nil {
+			return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
+				s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
+		}
+
+		var topologyManagerPolicyOptions map[string]string
+		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManager) {
+			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
+				topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
+			} else if s.TopologyManagerPolicyOptions != nil {
+				return fmt.Errorf("topology manager policy options %v require feature gates %q, %q enabled",
+					s.TopologyManagerPolicyOptions, features.TopologyManager, features.TopologyManagerPolicyOptions)
 			}
 		}
 
@@ -738,25 +742,31 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 					ReservedSystemCPUs:       reservedSystemCPUs,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
-				QOSReserved:                             *experimentalQOSReserved,
-				ExperimentalCPUManagerPolicy:            s.CPUManagerPolicy,
-				ExperimentalCPUManagerPolicyOptions:     cpuManagerPolicyOptions,
-				ExperimentalCPUManagerReconcilePeriod:   s.CPUManagerReconcilePeriod.Duration,
-				ExperimentalMemoryManagerPolicy:         s.MemoryManagerPolicy,
-				ExperimentalMemoryManagerReservedMemory: s.ReservedMemory,
-				ExperimentalPodPidsLimit:                s.PodPidsLimit,
-				EnforceCPULimits:                        s.CPUCFSQuota,
-				CPUCFSQuotaPeriod:                       s.CPUCFSQuotaPeriod.Duration,
-				ExperimentalTopologyManagerPolicy:       s.TopologyManagerPolicy,
-				ExperimentalTopologyManagerScope:        s.TopologyManagerScope,
+				QOSReserved:                              *experimentalQOSReserved,
+				CPUManagerPolicy:                         s.CPUManagerPolicy,
+				CPUManagerPolicyOptions:                  cpuManagerPolicyOptions,
+				CPUManagerReconcilePeriod:                s.CPUManagerReconcilePeriod.Duration,
+				ExperimentalMemoryManagerPolicy:          s.MemoryManagerPolicy,
+				ExperimentalMemoryManagerReservedMemory:  s.ReservedMemory,
+				ExperimentalPodPidsLimit:                 s.PodPidsLimit,
+				EnforceCPULimits:                         s.CPUCFSQuota,
+				CPUCFSQuotaPeriod:                        s.CPUCFSQuotaPeriod.Duration,
+				ExperimentalTopologyManagerPolicy:        s.TopologyManagerPolicy,
+				ExperimentalTopologyManagerScope:         s.TopologyManagerScope,
+				ExperimentalTopologyManagerPolicyOptions: topologyManagerPolicyOptions,
 			},
 			s.FailSwapOn,
-			devicePluginEnabled,
-			kubeDeps.Recorder)
+			kubeDeps.Recorder,
+			kubeDeps.KubeClient,
+		)
 
 		if err != nil {
 			return err
 		}
+	}
+
+	if kubeDeps.PodStartupLatencyTracker == nil {
+		kubeDeps.PodStartupLatencyTracker = kubeletutil.NewPodStartupLatencyTracker()
 	}
 
 	// TODO(vmarmol): Do this through container config.
@@ -1255,7 +1265,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
 			q, err := resource.ParseQuantity(v)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
 			}
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)

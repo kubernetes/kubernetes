@@ -19,7 +19,7 @@ package plugin
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -83,8 +83,8 @@ func addPluginCommands(cmd *cobra.Command) {
 	kubectl := cmd.Root()
 	streams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
-		Out:    ioutil.Discard,
-		ErrOut: ioutil.Discard,
+		Out:    io.Discard,
+		ErrOut: io.Discard,
 	}
 
 	o := &PluginListOptions{IOStreams: streams}

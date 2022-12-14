@@ -64,6 +64,8 @@ const (
 	Node                  GVK = "Node"
 	PersistentVolume      GVK = "PersistentVolume"
 	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
+	PodScheduling         GVK = "PodScheduling"
+	ResourceClaim         GVK = "ResourceClaim"
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	CSINode               GVK = "storage.k8s.io/CSINode"
 	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
@@ -102,6 +104,8 @@ type QueuedPodInfo struct {
 	InitialAttemptTimestamp time.Time
 	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
 	UnschedulablePlugins sets.String
+	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
+	Gated bool
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
@@ -111,6 +115,8 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		Timestamp:               pqi.Timestamp,
 		Attempts:                pqi.Attempts,
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
+		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
+		Gated:                   pqi.Gated,
 	}
 }
 
@@ -331,9 +337,9 @@ func getPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
 			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		// if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
 		//	terms = append(terms, affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		//}
+		// }
 	}
 	return terms
 }
@@ -344,9 +350,9 @@ func getPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm)
 			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		// if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
 		//	terms = append(terms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		//}
+		// }
 	}
 	return terms
 }

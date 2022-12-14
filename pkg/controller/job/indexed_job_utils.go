@@ -53,7 +53,7 @@ type orderedIntervals []interval
 // the indexes that succeeded since the last sync.
 func calculateSucceededIndexes(job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
 	var prevIntervals orderedIntervals
-	withFinalizers := trackingUncountedPods(job)
+	withFinalizers := hasJobTrackingAnnotation(job)
 	if withFinalizers {
 		prevIntervals = succeededIndexesFromJob(job)
 	}

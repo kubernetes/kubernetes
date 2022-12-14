@@ -69,19 +69,19 @@ var _ = utils.SIGDescribe("vsphere statefulset [Feature:vsphere]", func() {
 		Bootstrap(f)
 	})
 
-	ginkgo.It("vsphere statefulset testing", func() {
+	ginkgo.It("vsphere statefulset testing", func(ctx context.Context) {
 		ginkgo.By("Creating StorageClass for Statefulset")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
 		scSpec := getVSphereStorageClassSpec(storageclassname, scParameters, nil, "")
 		sc, err := client.StorageV1().StorageClasses().Create(context.TODO(), scSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		defer client.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, metav1.DeleteOptions{})
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), sc.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Creating statefulset")
 
 		statefulset := e2estatefulset.CreateStatefulSet(client, manifestPath, namespace)
-		defer e2estatefulset.DeleteAllStatefulSets(client, namespace)
+		ginkgo.DeferCleanup(e2estatefulset.DeleteAllStatefulSets, client, namespace)
 		replicas := *(statefulset.Spec.Replicas)
 		// Waiting for pods status to be Ready
 		e2estatefulset.WaitForStatusReadyReplicas(client, statefulset, replicas)

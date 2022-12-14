@@ -645,11 +645,6 @@ func TestStorageRequests(t *testing.T) {
 }
 
 func TestFitScore(t *testing.T) {
-	defaultResources := []config.ResourceSpec{
-		{Name: string(v1.ResourceCPU), Weight: 1},
-		{Name: string(v1.ResourceMemory), Weight: 1},
-	}
-
 	tests := []struct {
 		name                 string
 		requestedPod         *v1.Pod

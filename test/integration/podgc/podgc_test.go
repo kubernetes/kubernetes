@@ -110,11 +110,11 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error: '%v' while updating pod info: '%v'", err, klog.KObj(pod))
 			}
-			_, cond := podutil.GetPodCondition(&pod.Status, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+			_, cond := podutil.GetPodCondition(&pod.Status, v1.DisruptionTarget)
 			if test.enablePodDisruptionConditions == true && cond == nil {
-				t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(pod), v1.AlphaNoCompatGuaranteeDisruptionTarget)
+				t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 			} else if test.enablePodDisruptionConditions == false && cond != nil {
-				t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.AlphaNoCompatGuaranteeDisruptionTarget)
+				t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 			}
 			if pod.Status.Phase != test.wantPhase {
 				t.Errorf("Unexpected phase for pod %q. Got: %q, want: %q", klog.KObj(pod), pod.Status.Phase, test.wantPhase)
@@ -232,9 +232,9 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 				if err != nil {
 					t.Errorf("Error %q while waiting for the pod %q to be in expected phase", err, klog.KObj(pod))
 				}
-				_, cond := podutil.GetPodCondition(&pod.Status, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+				_, cond := podutil.GetPodCondition(&pod.Status, v1.DisruptionTarget)
 				if cond != nil {
-					t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.AlphaNoCompatGuaranteeDisruptionTarget)
+					t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 				}
 			} else {
 				// wait until the pod is deleted

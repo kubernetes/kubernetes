@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"text/tabwriter"
 	"time"
 
@@ -253,7 +254,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 					framework.Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}
-				//ignore failed pods that are controlled by some controller
+				// ignore failed pods that are controlled by some controller
 			}
 		}
 
@@ -326,7 +327,7 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, conditionDesc strin
 	return maybeTimeoutError(err, "waiting for pod %s to be %s", podIdentifier(ns, podName), conditionDesc)
 }
 
-// WaitForPodsCondition waits for the listed pods to match the given condition.
+// WaitForAllPodsCondition waits for the listed pods to match the given condition.
 // To succeed, at least minPods must be listed, and all listed pods must match the condition.
 func WaitForAllPodsCondition(c clientset.Interface, ns string, opts metav1.ListOptions, minPods int, conditionDesc string, timeout time.Duration, condition podCondition) (*v1.PodList, error) {
 	framework.Logf("Waiting up to %v for at least %d pods in namespace %s to be %s", timeout, minPods, ns, conditionDesc)
@@ -362,6 +363,78 @@ func WaitForAllPodsCondition(c clientset.Interface, ns string, opts metav1.ListO
 	return pods, maybeTimeoutError(err, "waiting for at least %d pods to be %s (matched %d)", minPods, conditionDesc, matched)
 }
 
+// WaitForPodsRunning waits for a given `timeout` to evaluate if a certain amount of pods in given `ns` are running.
+func WaitForPodsRunning(c clientset.Interface, ns string, num int, timeout time.Duration) error {
+	matched := 0
+	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return handleWaitingAPIError(err, true, "listing pods")
+		}
+		matched = 0
+		for _, pod := range pods.Items {
+			if ready, _ := testutils.PodRunningReady(&pod); ready {
+				matched++
+			}
+		}
+		if matched == num {
+			return true, nil
+		}
+		framework.Logf("expect %d pods are running, but got %v", num, matched)
+		return false, nil
+	})
+	return maybeTimeoutError(err, "waiting for pods to be running (want %v, matched %d)", num, matched)
+}
+
+// WaitForPodsSchedulingGated waits for a given `timeout` to evaluate if a certain amount of pods in given `ns` stay in scheduling gated state.
+func WaitForPodsSchedulingGated(c clientset.Interface, ns string, num int, timeout time.Duration) error {
+	matched := 0
+	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return handleWaitingAPIError(err, true, "listing pods")
+		}
+		matched = 0
+		for _, pod := range pods.Items {
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == v1.PodScheduled && condition.Reason == v1.PodReasonSchedulingGated {
+					matched++
+				}
+			}
+		}
+		if matched == num {
+			return true, nil
+		}
+		framework.Logf("expect %d pods in scheduling gated state, but got %v", num, matched)
+		return false, nil
+	})
+	return maybeTimeoutError(err, "waiting for pods to be scheduling gated (want %d, matched %d)", num, matched)
+}
+
+// WaitForPodsWithSchedulingGates waits for a given `timeout` to evaluate if a certain amount of pods in given `ns`
+// match the given `schedulingGates`stay in scheduling gated state.
+func WaitForPodsWithSchedulingGates(c clientset.Interface, ns string, num int, timeout time.Duration, schedulingGates []v1.PodSchedulingGate) error {
+	matched := 0
+	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return handleWaitingAPIError(err, true, "listing pods")
+		}
+		matched = 0
+		for _, pod := range pods.Items {
+			if reflect.DeepEqual(pod.Spec.SchedulingGates, schedulingGates) {
+				matched++
+			}
+		}
+		if matched == num {
+			return true, nil
+		}
+		framework.Logf("expect %d pods carry the expected scheduling gates, but got %v", num, matched)
+		return false, nil
+	})
+	return maybeTimeoutError(err, "waiting for pods to carry the expected scheduling gates (want %d, matched %d)", num, matched)
+}
+
 // WaitForPodTerminatedInNamespace returns an error if it takes too long for the pod to terminate,
 // if the pod Get api returns an error (IsNotFound or other), or if the pod failed (and thus did not
 // terminate) with an unexpected reason. Typically called to test that the passed-in pod is fully
@@ -376,6 +449,16 @@ func WaitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 				return true, nil
 			}
 			return true, fmt.Errorf("Expected pod %q in namespace %q to be terminated with reason %q, got reason: %q", podName, namespace, reason, pod.Status.Reason)
+		}
+		return false, nil
+	})
+}
+
+// WaitForPodTerminatingInNamespaceTimeout returns if the pod is terminating, or an error if it is not after the timeout.
+func WaitForPodTerminatingInNamespaceTimeout(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+	return WaitForPodCondition(c, namespace, podName, "is terminating", timeout, func(pod *v1.Pod) (bool, error) {
+		if pod.DeletionTimestamp != nil {
+			return true, nil
 		}
 		return false, nil
 	})
@@ -416,25 +499,6 @@ func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, name
 		}
 		if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 			return true, fmt.Errorf("Expected pod %q in namespace %q to be in phase Pending, but got phase: %v", podName, namespace, pod.Status.Phase)
-		}
-		return false, nil
-	})
-}
-
-// WaitTimeoutForPodNoLongerRunningOrNotFoundInNamespace waits default amount of time (defaultPodDeletionTimeout)
-// for the specified pod to stop running or disappear. Returns an error if timeout occurs first.
-func WaitTimeoutForPodNoLongerRunningOrNotFoundInNamespace(c clientset.Interface, podName, namespace string) error {
-	return wait.PollImmediate(poll, defaultPodDeletionTimeout, func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		if err != nil {
-			return handleWaitingAPIError(err, true, "getting pod %s", podIdentifier(namespace, podName))
-		}
-		switch pod.Status.Phase {
-		case v1.PodFailed, v1.PodSucceeded:
-			return true, nil
 		}
 		return false, nil
 	})

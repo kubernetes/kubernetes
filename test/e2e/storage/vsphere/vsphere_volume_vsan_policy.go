@@ -99,7 +99,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	})
 
 	// Valid policy.
-	ginkgo.It("verify VSAN storage capability with valid hostFailuresToTolerate and cacheReservation values is honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify VSAN storage capability with valid hostFailuresToTolerate and cacheReservation values is honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy hostFailuresToTolerate: %s, cacheReservation: %s", HostFailuresToTolerateCapabilityVal, CacheReservationCapabilityVal))
 		scParameters[PolicyHostFailuresToTolerate] = HostFailuresToTolerateCapabilityVal
 		scParameters[PolicyCacheReservation] = CacheReservationCapabilityVal
@@ -108,7 +108,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	})
 
 	// Valid policy.
-	ginkgo.It("verify VSAN storage capability with valid diskStripes and objectSpaceReservation values is honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify VSAN storage capability with valid diskStripes and objectSpaceReservation values is honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, objectSpaceReservation: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal))
 		scParameters[PolicyDiskStripes] = "1"
 		scParameters[PolicyObjectSpaceReservation] = "30"
@@ -117,7 +117,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	})
 
 	// Valid policy.
-	ginkgo.It("verify VSAN storage capability with valid diskStripes and objectSpaceReservation values and a VSAN datastore is honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify VSAN storage capability with valid diskStripes and objectSpaceReservation values and a VSAN datastore is honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, objectSpaceReservation: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal))
 		scParameters[PolicyDiskStripes] = DiskStripesCapabilityVal
 		scParameters[PolicyObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
@@ -127,7 +127,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	})
 
 	// Valid policy.
-	ginkgo.It("verify VSAN storage capability with valid objectSpaceReservation and iopsLimit values is honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify VSAN storage capability with valid objectSpaceReservation and iopsLimit values is honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy objectSpaceReservation: %s, iopsLimit: %s", ObjectSpaceReservationCapabilityVal, IopsLimitCapabilityVal))
 		scParameters[PolicyObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[PolicyIopsLimit] = IopsLimitCapabilityVal
@@ -136,7 +136,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	})
 
 	// Invalid VSAN storage capabilities parameters.
-	ginkgo.It("verify VSAN storage capability with invalid capability name objectSpaceReserve is not honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify VSAN storage capability with invalid capability name objectSpaceReserve is not honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy objectSpaceReserve: %s, stripeWidth: %s", ObjectSpaceReservationCapabilityVal, StripeWidthCapabilityVal))
 		scParameters["objectSpaceReserve"] = ObjectSpaceReservationCapabilityVal
 		scParameters[PolicyDiskStripes] = StripeWidthCapabilityVal
@@ -151,7 +151,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 
 	// Invalid policy on a VSAN test bed.
 	// diskStripes value has to be between 1 and 12.
-	ginkgo.It("verify VSAN storage capability with invalid diskStripes value is not honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify VSAN storage capability with invalid diskStripes value is not honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, cacheReservation: %s", DiskStripesCapabilityInvalidVal, CacheReservationCapabilityVal))
 		scParameters[PolicyDiskStripes] = DiskStripesCapabilityInvalidVal
 		scParameters[PolicyCacheReservation] = CacheReservationCapabilityVal
@@ -166,7 +166,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 
 	// Invalid policy on a VSAN test bed.
 	// hostFailuresToTolerate value has to be between 0 and 3 including.
-	ginkgo.It("verify VSAN storage capability with invalid hostFailuresToTolerate value is not honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify VSAN storage capability with invalid hostFailuresToTolerate value is not honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy hostFailuresToTolerate: %s", HostFailuresToTolerateCapabilityInvalidVal))
 		scParameters[PolicyHostFailuresToTolerate] = HostFailuresToTolerateCapabilityInvalidVal
 		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
@@ -180,7 +180,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 
 	// Specify a valid VSAN policy on a non-VSAN test bed.
 	// The test should fail.
-	ginkgo.It("verify VSAN storage capability with non-vsan datastore is not honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify VSAN storage capability with non-vsan datastore is not honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, objectSpaceReservation: %s and a non-VSAN datastore: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal, vmfsDatastore))
 		scParameters[PolicyDiskStripes] = DiskStripesCapabilityVal
 		scParameters[PolicyObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
@@ -195,7 +195,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		}
 	})
 
-	ginkgo.It("verify an existing and compatible SPBM policy is honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify an existing and compatible SPBM policy is honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for SPBM policy: %s", policyName))
 		scParameters[SpbmStoragePolicy] = policyName
 		scParameters[DiskFormat] = ThinDisk
@@ -203,7 +203,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
-	ginkgo.It("verify clean up of stale dummy VM for dynamically provisioned pvc using SPBM policy", func() {
+	ginkgo.It("verify clean up of stale dummy VM for dynamically provisioned pvc using SPBM policy", func(ctx context.Context) {
 		scParameters[PolicyDiskStripes] = diskStripesCapabilityMaxVal
 		scParameters[PolicyObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[Datastore] = vsanDatastore
@@ -214,7 +214,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		invokeStaleDummyVMTestWithStoragePolicy(client, controlPlaneNode, namespace, kubernetesClusterName, scParameters)
 	})
 
-	ginkgo.It("verify if a SPBM policy is not honored on a non-compatible datastore for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify if a SPBM policy is not honored on a non-compatible datastore for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for SPBM policy: %s and datastore: %s", tagPolicy, vsanDatastore))
 		scParameters[SpbmStoragePolicy] = tagPolicy
 		scParameters[Datastore] = vsanDatastore
@@ -228,7 +228,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		}
 	})
 
-	ginkgo.It("verify if a non-existing SPBM policy is not honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify if a non-existing SPBM policy is not honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for SPBM policy: %s", BronzeStoragePolicy))
 		scParameters[SpbmStoragePolicy] = BronzeStoragePolicy
 		scParameters[DiskFormat] = ThinDisk
@@ -241,7 +241,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		}
 	})
 
-	ginkgo.It("verify an if a SPBM policy and VSAN capabilities cannot be honored for dynamically provisioned pvc using storageclass", func() {
+	ginkgo.It("verify an if a SPBM policy and VSAN capabilities cannot be honored for dynamically provisioned pvc using storageclass", func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Invoking test for SPBM policy: %s with VSAN storage capabilities", policyName))
 		scParameters[SpbmStoragePolicy] = policyName
 		gomega.Expect(scParameters[SpbmStoragePolicy]).NotTo(gomega.BeEmpty())
@@ -261,12 +261,12 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 	ginkgo.By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	framework.ExpectNoError(err)
-	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
@@ -293,12 +293,12 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 	ginkgo.By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	framework.ExpectNoError(err)
-	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 	ginkgo.By("Waiting for claim to be in bound phase")
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
@@ -315,7 +315,7 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, control
 	ginkgo.By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
-	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), storageclass.Name, metav1.DeleteOptions{})
 
 	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
@@ -330,7 +330,7 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, control
 	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), pvclaim.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	vmName := clusterName + "-dynamic-pvc-" + string(updatedClaim.UID)
-	e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 	// Wait for 6 minutes to let the vSphere Cloud Provider clean up routine delete the dummy VM
 	time.Sleep(6 * time.Minute)
 

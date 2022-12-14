@@ -159,6 +159,11 @@ type Status struct {
 	failedPlugin string
 }
 
+func (s *Status) WithError(err error) *Status {
+	s.err = err
+	return s
+}
+
 // Code returns code of the Status.
 func (s *Status) Code() Code {
 	if s == nil {
@@ -321,6 +326,17 @@ type WaitingPod interface {
 // Plugin is the parent type for all the scheduling framework plugins.
 type Plugin interface {
 	Name() string
+}
+
+// PreEnqueuePlugin is an interface that must be implemented by "PreEnqueue" plugins.
+// These plugins are called prior to adding Pods to activeQ.
+// Note: an preEnqueue plugin is expected to be lightweight and efficient, so it's not expected to
+// involve expensive calls like accessing external endpoints; otherwise it'd block other
+// Pods' enqueuing in event handlers.
+type PreEnqueuePlugin interface {
+	Plugin
+	// PreEnqueue is called prior to adding Pods to activeQ.
+	PreEnqueue(ctx context.Context, p *v1.Pod) *Status
 }
 
 // LessFunc is the function to sort pod info
@@ -521,6 +537,10 @@ type BindPlugin interface {
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	Handle
+
+	// PreEnqueuePlugins returns the registered preEnqueue plugins.
+	PreEnqueuePlugins() []PreEnqueuePlugin
+
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
 

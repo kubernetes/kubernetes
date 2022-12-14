@@ -80,6 +80,7 @@ type TestServer struct {
 
 // Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
 type Logger interface {
+	Helper()
 	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
 	Logf(format string, args ...interface{})

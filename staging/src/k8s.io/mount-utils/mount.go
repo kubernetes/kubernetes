@@ -65,10 +65,10 @@ type Interface interface {
 	// care about such situations, this is a faster alternative to calling List()
 	// and scanning that output.
 	IsLikelyNotMountPoint(file string) (bool, error)
-	// canSafelySkipMountPointCheck indicates whether this mounter returns errors on
+	// CanSafelySkipMountPointCheck indicates whether this mounter returns errors on
 	// operations for targets that are not mount points. If this returns true, no such
 	// errors will be returned.
-	canSafelySkipMountPointCheck() bool
+	CanSafelySkipMountPointCheck() bool
 	// IsMountPoint determines if a directory is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	// IsMountPoint is more expensive than IsLikelyNotMountPoint.
@@ -165,7 +165,15 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 // be used by callers that pass sensitive material (like passwords) as mount
 // options.
 func (mounter *SafeFormatAndMount) FormatAndMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
-	return mounter.formatAndMountSensitive(source, target, fstype, options, sensitiveOptions)
+	return mounter.FormatAndMountSensitiveWithFormatOptions(source, target, fstype, options, sensitiveOptions, nil /* formatOptions */)
+}
+
+// FormatAndMountSensitiveWithFormatOptions behaves exactly the same as
+// FormatAndMountSensitive, but allows for options to be passed when the disk
+// is formatted. These options are NOT validated in any way and should never
+// come directly from untrusted user input as that would be an injection risk.
+func (mounter *SafeFormatAndMount) FormatAndMountSensitiveWithFormatOptions(source string, target string, fstype string, options []string, sensitiveOptions []string, formatOptions []string) error {
+	return mounter.formatAndMountSensitive(source, target, fstype, options, sensitiveOptions, formatOptions)
 }
 
 // getMountRefsByDev finds all references to the device provided

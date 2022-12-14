@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -49,7 +50,7 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 			initialConfig.ContainerLogMaxSize = testContainerLogMaxSize
 		})
 
-		ginkgo.It("should be rotated and limited to a fixed amount of files", func() {
+		ginkgo.It("should be rotated and limited to a fixed amount of files", func(ctx context.Context) {
 			ginkgo.By("create log container")
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -77,7 +78,7 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 			id := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID).ID
 			r, _, err := getCRIClient()
 			framework.ExpectNoError(err)
-			resp, err := r.ContainerStatus(id, false)
+			resp, err := r.ContainerStatus(context.Background(), id, false)
 			framework.ExpectNoError(err)
 			logPath := resp.GetStatus().GetLogPath()
 			ginkgo.By("wait for container log being rotated to max file limit")

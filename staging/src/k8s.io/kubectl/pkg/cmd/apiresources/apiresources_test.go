@@ -34,12 +34,12 @@ func TestAPIResourcesComplete(t *testing.T) {
 	parentCmd.AddCommand(cmd)
 	o := NewAPIResourceOptions(genericclioptions.NewTestIOStreamsDiscard())
 
-	err := o.Complete(cmd, []string{})
+	err := o.Complete(tf, cmd, []string{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	err = o.Complete(cmd, []string{"foo"})
+	err = o.Complete(tf, cmd, []string{"foo"})
 	if err == nil {
 		t.Fatalf("An error was expected but not returned")
 	}

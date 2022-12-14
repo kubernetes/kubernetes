@@ -109,6 +109,9 @@
 - endpoint: getInternalApiserverAPIGroup
   reason: Not eligible for conformance yet
   link: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190802-dynamic-coordinated-storage-version.md
+- endpoint: getResourceAPIGroup
+  reason: still an alpha feature plan for GA 1.31
+  link: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/3063-dynamic-resource-allocation/kep.yaml#L29-L33
 - endpoint: getStorageAPIGroup
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64

@@ -452,7 +452,12 @@
                     },
                     "requests": {
                       "requestsKey": "0"
-                    }
+                    },
+                    "claims": [
+                      {
+                        "name": "nameValue"
+                      }
+                    ]
                   },
                   "volumeName": "volumeNameValue",
                   "storageClassName": "storageClassNameValue",
@@ -465,7 +470,8 @@
                   "dataSourceRef": {
                     "apiGroup": "apiGroupValue",
                     "kind": "kindValue",
-                    "name": "nameValue"
+                    "name": "nameValue",
+                    "namespace": "namespaceValue"
                   }
                 }
               }
@@ -538,7 +544,12 @@
               },
               "requests": {
                 "requestsKey": "0"
-              }
+              },
+              "claims": [
+                {
+                  "name": "nameValue"
+                }
+              ]
             },
             "volumeMounts": [
               {
@@ -810,7 +821,12 @@
               },
               "requests": {
                 "requestsKey": "0"
-              }
+              },
+              "claims": [
+                {
+                  "name": "nameValue"
+                }
+              ]
             },
             "volumeMounts": [
               {
@@ -1082,7 +1098,12 @@
               },
               "requests": {
                 "requestsKey": "0"
-              }
+              },
+              "claims": [
+                {
+                  "name": "nameValue"
+                }
+              ]
             },
             "volumeMounts": [
               {
@@ -1626,7 +1647,21 @@
         "os": {
           "name": "nameValue"
         },
-        "hostUsers": true
+        "hostUsers": true,
+        "schedulingGates": [
+          {
+            "name": "nameValue"
+          }
+        ],
+        "resourceClaims": [
+          {
+            "name": "nameValue",
+            "source": {
+              "resourceClaimName": "resourceClaimNameValue",
+              "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+            }
+          }
+        ]
       }
     },
     "updateStrategy": {

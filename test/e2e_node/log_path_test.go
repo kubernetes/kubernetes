@@ -122,7 +122,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 				err := createAndWaitPod(makeLogPod(logPodName, logString))
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 			})
-			ginkgo.It("should print log to correct log path", func() {
+			ginkgo.It("should print log to correct log path", func(ctx context.Context) {
 
 				logDir := kubelet.ContainerLogsDir
 
@@ -139,7 +139,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCheckPodName)
 			})
 
-			ginkgo.It("should print log to correct cri log path", func() {
+			ginkgo.It("should print log to correct cri log path", func(ctx context.Context) {
 
 				logCRIDir := "/var/log/pods"
 

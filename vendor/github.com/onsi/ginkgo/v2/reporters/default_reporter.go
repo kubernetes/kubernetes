@@ -149,7 +149,7 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 			}
 		} else {
 			header, stream = denoter, true
-			if report.NumAttempts > 1 {
+			if report.NumAttempts > 1 && report.MaxFlakeAttempts > 1 {
 				header, stream = fmt.Sprintf("%s [FLAKEY TEST - TOOK %d ATTEMPTS TO PASS]", r.retryDenoter, report.NumAttempts), false
 			}
 			if report.RunTime > r.conf.SlowSpecThreshold {
@@ -184,6 +184,9 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 		header = fmt.Sprintf("%s! [ABORTED]", denoter)
 	}
 
+	if report.State.Is(types.SpecStateFailureStates) && report.MaxMustPassRepeatedly > 1 {
+		header, stream = fmt.Sprintf("%s DURING REPETITION #%d", header, report.NumAttempts), false
+	}
 	// Emit stream and return
 	if stream {
 		r.emit(r.f(highlightColor + header + "{{/}}"))
@@ -375,6 +378,9 @@ func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 		r.emit(r.f("{{red}}{{bold}}%d Failed{{/}} | ", specs.CountWithState(types.SpecStateFailureStates)))
 		if specs.CountOfFlakedSpecs() > 0 {
 			r.emit(r.f("{{light-yellow}}{{bold}}%d Flaked{{/}} | ", specs.CountOfFlakedSpecs()))
+		}
+		if specs.CountOfRepeatedSpecs() > 0 {
+			r.emit(r.f("{{light-yellow}}{{bold}}%d Repeated{{/}} | ", specs.CountOfRepeatedSpecs()))
 		}
 		r.emit(r.f("{{yellow}}{{bold}}%d Pending{{/}} | ", specs.CountWithState(types.SpecStatePending)))
 		r.emit(r.f("{{cyan}}{{bold}}%d Skipped{{/}}\n", specs.CountWithState(types.SpecStateSkipped)))

@@ -86,7 +86,6 @@ type SetResourcesOptions struct {
 
 	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
-	DryRunVerifier         *resource.QueryParamVerifier
 
 	genericclioptions.IOStreams
 }
@@ -157,11 +156,6 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -286,13 +280,6 @@ func (o *SetResourcesOptions) Run() error {
 				allErrs = append(allErrs, err)
 			}
 			continue
-		}
-
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				allErrs = append(allErrs, fmt.Errorf("failed to patch resources update to pod template %v", err))
-				continue
-			}
 		}
 
 		actual, err := resource.

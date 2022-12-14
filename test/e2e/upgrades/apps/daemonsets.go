@@ -71,7 +71,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 // Test waits until the upgrade has completed and then verifies that the DaemonSet
 // is still running
 func (t *DaemonSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
-	ginkgo.By("Waiting for upgradet to complete before re-validating DaemonSet")
+	ginkgo.By("Waiting for upgrade to complete before re-validating DaemonSet")
 	<-done
 
 	ginkgo.By("validating the DaemonSet is still running after upgrade")

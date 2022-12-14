@@ -105,7 +105,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", itArg.podsNr, itArg.interval)
-			ginkgo.It(desc, func() {
+			ginkgo.It(desc, func(ctx context.Context) {
 				itArg.createMethod = "batch"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
@@ -163,7 +163,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval [Benchmark][NodeSpecialFeature:Benchmark]", itArg.podsNr, itArg.interval)
-			ginkgo.It(desc, func() {
+			ginkgo.It(desc, func(ctx context.Context) {
 				itArg.createMethod = "batch"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
@@ -210,7 +210,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 					// Set new API QPS limit
 					cfg.KubeAPIQPS = int32(itArg.APIQPSLimit)
 				})
-				ginkgo.It(desc, func() {
+				ginkgo.It(desc, func(ctx context.Context) {
 					itArg.createMethod = "batch"
 					testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 					batchLag, e2eLags := runDensityBatchTest(f, rc, itArg, testInfo, true)
@@ -249,7 +249,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods", itArg.podsNr, itArg.bgPodsNr)
-			ginkgo.It(desc, func() {
+			ginkgo.It(desc, func(ctx context.Context) {
 				itArg.createMethod = "sequence"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 				batchlag, e2eLags := runDensitySeqTest(f, rc, itArg, testInfo)
@@ -282,7 +282,7 @@ var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 		for _, testArg := range dTests {
 			itArg := testArg
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods [Benchmark][NodeSpeicalFeature:Benchmark]", itArg.podsNr, itArg.bgPodsNr)
-			ginkgo.It(desc, func() {
+			ginkgo.It(desc, func(ctx context.Context) {
 				itArg.createMethod = "sequence"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 				batchlag, e2eLags := runDensitySeqTest(f, rc, itArg, testInfo)

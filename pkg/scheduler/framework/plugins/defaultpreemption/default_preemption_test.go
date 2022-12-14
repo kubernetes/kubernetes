@@ -328,18 +328,18 @@ func TestPostFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs := clientsetfake.NewSimpleClientset()
+			// index the potential victim pods in the fake client so that the victims deletion logic does not fail
+			podItems := []v1.Pod{}
+			for _, pod := range tt.pods {
+				podItems = append(podItems, *pod)
+			}
+			cs := clientsetfake.NewSimpleClientset(&v1.PodList{Items: podItems})
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			podInformer := informerFactory.Core().V1().Pods().Informer()
 			podInformer.GetStore().Add(tt.pod)
 			for i := range tt.pods {
 				podInformer.GetStore().Add(tt.pods[i])
 			}
-			// As we use a bare clientset above, it's needed to add a reactor here
-			// to not fail Victims deletion logic.
-			cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-				return true, nil, nil
-			})
 			// Register NodeResourceFit as the Filter & PreFilter plugin.
 			registeredPlugins := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1642,6 +1642,11 @@ func TestPreempt(t *testing.T) {
 			}
 
 			deletedPodNames := make(sets.String)
+			patchedPodNames := make(sets.String)
+			client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				patchedPodNames.Insert(action.(clienttesting.PatchAction).GetName())
+				return true, nil, nil
+			})
 			client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				deletedPodNames.Insert(action.(clienttesting.DeleteAction).GetName())
 				return true, nil, nil
@@ -1728,6 +1733,9 @@ func TestPreempt(t *testing.T) {
 			}
 			if len(deletedPodNames) != len(test.expectedPods) {
 				t.Errorf("expected %v pods, got %v.", len(test.expectedPods), len(deletedPodNames))
+			}
+			if diff := cmp.Diff(patchedPodNames.List(), deletedPodNames.List()); diff != "" {
+				t.Errorf("unexpected difference in the set of patched and deleted pods: %s", diff)
 			}
 			for victimName := range deletedPodNames {
 				found := false

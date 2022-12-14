@@ -332,6 +332,7 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-log-runner
   kubeadm
   kubectl
+  kubectl-convert
   kubemark
 )
 

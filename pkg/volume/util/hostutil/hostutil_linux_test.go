@@ -331,3 +331,60 @@ func writeFile(content string) (string, string, error) {
 	}
 	return tempDir, filename, nil
 }
+
+func TestGetSELinuxMountContext(t *testing.T) {
+	info :=
+		`840 60 8:0 / /var/lib/kubelet/pods/d4f3b306-ad4c-4f7a-8983-b5b228039a8c/volumes/kubernetes.io~iscsi/mypv rw,relatime shared:421 - ext4 /dev/sda rw,context="system_u:object_r:container_file_t:s0:c314,c894"
+224 62 253:0 /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+82 62 0:43 / /var/lib/foo rw,relatime shared:32 - tmpfs tmpfs rw
+83 63 0:44 / /var/lib/bar rw,relatime - tmpfs tmpfs rw
+`
+	tempDir, filename, err := writeFile(info)
+	if err != nil {
+		t.Fatalf("cannot create temporary file: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	tests := []struct {
+		name            string
+		mountPoint      string
+		seLinuxEnabled  bool
+		expectedContext string
+	}{
+		{
+			"no context",
+			"/var/lib/foo",
+			true,
+			"",
+		},
+		{
+			"with context with SELinux",
+			"/var/lib/kubelet/pods/d4f3b306-ad4c-4f7a-8983-b5b228039a8c/volumes/kubernetes.io~iscsi/mypv",
+			true,
+			"system_u:object_r:container_file_t:s0:c314,c894",
+		},
+		{
+			"with context with no SELinux",
+			"/var/lib/kubelet/pods/d4f3b306-ad4c-4f7a-8983-b5b228039a8c/volumes/kubernetes.io~iscsi/mypv",
+			false,
+			"",
+		},
+		{
+			"no context with seclabel",
+			"/var/lib/docker/devicemapper/test/shared",
+			true,
+			"",
+		},
+	}
+
+	for _, test := range tests {
+		out, err := getSELinuxMountContext(test.mountPoint, filename, func() bool { return test.seLinuxEnabled })
+		if err != nil {
+			t.Errorf("Test %s failed with error: %s", test.name, err)
+		}
+		if test.expectedContext != out {
+			t.Errorf("Test %s failed: expected %v, got %v", test.name, test.expectedContext, out)
+		}
+	}
+
+}

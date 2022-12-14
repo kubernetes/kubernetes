@@ -82,8 +82,8 @@ kube::test::object_assert() {
 
   for j in $(seq 1 "${tries}"); do
     # shellcheck disable=SC2086
-    # Disabling because "args" needs to allow for expansion here
-    res=$(eval kubectl get "${kube_flags[@]}" ${args} "${object}" -o go-template=\""${request}"\")
+    # Disabling because to allow for expansion here
+    res=$(kubectl get "${kube_flags[@]}" ${args} ${object} -o go-template="${request}")
     if [[ "${res}" =~ ^$expected$ ]]; then
         echo -n "${green}"
         echo "$(kube::test::get_caller 3): Successful get ${object} ${request}: ${res}"
@@ -110,7 +110,9 @@ kube::test::get_object_jsonpath_assert() {
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get "${kube_flags[@]}" "${object}" -o jsonpath=\""${request}"\")
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
+  res=$(kubectl get "${kube_flags[@]}" ${object} -o jsonpath=${request})
 
   if [[ "${res}" =~ ^$expected$ ]]; then
       echo -n "${green}"
@@ -135,7 +137,9 @@ kube::test::describe_object_assert() {
   local object=$2
   local matches=( "${@:3}" )
 
-  result=$(eval kubectl describe "${kube_flags[@]}" "${resource}" "${object}")
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
+  result=$(kubectl describe "${kube_flags[@]}" ${resource} ${object})
 
   for match in "${matches[@]}"; do
     if grep -q "${match}" <<< "${result}"; then
@@ -166,10 +170,12 @@ kube::test::describe_object_events_assert() {
     local object=$2
     local showevents=${3:-"true"}
 
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
     if [[ -z "${3:-}" ]]; then
-        result=$(eval kubectl describe "${kube_flags[@]}" "${resource}" "${object}")
+        result=$(kubectl describe "${kube_flags[@]}" ${resource} ${object})
     else
-        result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" "${resource}" "${object}")
+        result=$(kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" ${resource} ${object})
     fi
 
     if grep -q "No events.\|Events:" <<< "${result}"; then
@@ -203,7 +209,9 @@ kube::test::describe_resource_assert() {
   local resource=$1
   local matches=( "${@:2}" )
 
-  result=$(eval kubectl describe "${kube_flags[@]}" "${resource}")
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
+  result=$(kubectl describe "${kube_flags[@]}" ${resource})
 
   for match in "${matches[@]}"; do
     if grep -q "${match}" <<< "${result}"; then
@@ -233,7 +241,9 @@ kube::test::describe_resource_events_assert() {
     local resource=$1
     local showevents=${2:-"true"}
 
-    result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" "${resource}")
+    # shellcheck disable=SC2086
+    # Disabling to allow for expansion here
+    result=$(kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" ${resource})
 
     if grep -q "No events.\|Events:" <<< "${result}"; then
         local has_events="true"
@@ -273,8 +283,9 @@ kube::test::describe_resource_chunk_size_assert() {
   local expectLists
   IFS="," read -r -a expectLists <<< "${resource},${additionalResources}"
 
-  # Default chunk size
-  defaultResult=$(eval kubectl describe "${resource}" --show-events=true -v=6 "${args}" "${kube_flags[@]}" 2>&1 >/dev/null)
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
+  defaultResult=$(kubectl describe ${resource} --show-events=true -v=6 ${args} "${kube_flags[@]}" 2>&1 >/dev/null)
   for r in "${expectLists[@]}"; do
     if grep -q "${r}?.*limit=500" <<< "${defaultResult}"; then
       echo "query for ${r} had limit param"
@@ -292,8 +303,10 @@ kube::test::describe_resource_chunk_size_assert() {
     fi
   done
 
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
   # Try a non-default chunk size
-  customResult=$(eval kubectl describe "${resource}" --show-events=false --chunk-size=10 -v=6 "${args}" "${kube_flags[@]}" 2>&1 >/dev/null)
+  customResult=$(kubectl describe ${resource} --show-events=false --chunk-size=10 -v=6 ${args} "${kube_flags[@]}" 2>&1 >/dev/null)
   if grep -q "${resource}?limit=10" <<< "${customResult}"; then
     echo "query for ${resource} had user-specified limit param"
   else

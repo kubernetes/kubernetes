@@ -163,7 +163,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Description: A conformant Kubernetes distribution MUST support the creation of DaemonSets. When a DaemonSet
 	  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
 	*/
-	framework.ConformanceIt("should run and stop simple daemon", func() {
+	framework.ConformanceIt("should run and stop simple daemon", func(ctx context.Context) {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
@@ -191,7 +191,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod node selection via label
 	  selectors.
 	*/
-	framework.ConformanceIt("should run and stop complex daemon", func() {
+	framework.ConformanceIt("should run and stop complex daemon", func(ctx context.Context) {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		framework.Logf("Creating daemon %q with a node selector", dsName)
@@ -238,7 +238,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 	// We defer adding this test to conformance pending the disposition of moving DaemonSet scheduling logic to the
 	// default scheduler.
-	ginkgo.It("should run and stop complex daemon with node affinity", func() {
+	ginkgo.It("should run and stop complex daemon with node affinity", func(ctx context.Context) {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		framework.Logf("Creating daemon %q with a node affinity", dsName)
@@ -291,7 +291,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Testname: DaemonSet-FailedPodCreation
 	  Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
 	*/
-	framework.ConformanceIt("should retry creating failed daemon pods", func() {
+	framework.ConformanceIt("should retry creating failed daemon pods", func(ctx context.Context) {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		ginkgo.By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
@@ -321,7 +321,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 	// This test should not be added to conformance. We will consider deprecating OnDelete when the
 	// extensions/v1beta1 and apps/v1beta1 are removed.
-	ginkgo.It("should not update pod when spec was updated and update strategy is OnDelete", func() {
+	ginkgo.It("should not update pod when spec was updated and update strategy is OnDelete", func(ctx context.Context) {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating simple daemon set %s", dsName)
@@ -371,7 +371,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Testname: DaemonSet-RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
 	*/
-	framework.ConformanceIt("should update pod when spec was updated and update strategy is RollingUpdate", func() {
+	framework.ConformanceIt("should update pod when spec was updated and update strategy is RollingUpdate", func(ctx context.Context) {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating simple daemon set %s", dsName)
@@ -429,7 +429,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  Description: A conformant Kubernetes distribution MUST support automated, minimally disruptive
 	  rollback of updates to a DaemonSet.
 	*/
-	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
+	framework.ConformanceIt("should rollback without unnecessary restarts", func(ctx context.Context) {
 		schedulableNodes, err := e2enode.GetReadySchedulableNodes(c)
 		framework.ExpectNoError(err)
 		gomega.Expect(len(schedulableNodes.Items)).To(gomega.BeNumerically(">", 1), "Conformance test suite needs a cluster with at least 2 nodes.")
@@ -501,7 +501,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	// TODO: This test is expected to be promoted to conformance after the feature is promoted
-	ginkgo.It("should surge pods onto nodes when spec was updated and update strategy is RollingUpdate", func() {
+	ginkgo.It("should surge pods onto nodes when spec was updated and update strategy is RollingUpdate", func(ctx context.Context) {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating surge daemon set %s", dsName)
@@ -820,7 +820,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		MUST succeed when listing DaemonSets via a label selector. It
 		MUST succeed when deleting the DaemonSet via deleteCollection.
 	*/
-	framework.ConformanceIt("should list and delete a collection of DaemonSets", func() {
+	framework.ConformanceIt("should list and delete a collection of DaemonSets", func(ctx context.Context) {
 		label := map[string]string{daemonsetNameLabel: dsName}
 		labelSelector := labels.SelectorFromSet(label).String()
 
@@ -859,7 +859,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Attempt to read, update and patch its status sub-resource; all
 		mutating sub-resource operations MUST be visible to subsequent reads.
 	*/
-	framework.ConformanceIt("should verify changes to a daemon set status", func() {
+	framework.ConformanceIt("should verify changes to a daemon set status", func(ctx context.Context) {
 		label := map[string]string{daemonsetNameLabel: dsName}
 		labelSelector := labels.SelectorFromSet(label).String()
 
@@ -919,7 +919,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
 
 		ginkgo.By("watching for the daemon set status to be updated")
-		ctx, cancel := context.WithTimeout(context.Background(), dsRetryTimeout)
+		ctx, cancel := context.WithTimeout(ctx, dsRetryTimeout)
 		defer cancel()
 		_, err = watchtools.Until(ctx, dsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if ds, ok := event.Object.(*appsv1.DaemonSet); ok {

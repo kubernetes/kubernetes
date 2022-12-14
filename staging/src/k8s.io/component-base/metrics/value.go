@@ -47,6 +47,16 @@ func NewLazyConstMetric(desc *Desc, valueType ValueType, value float64, labelVal
 	return prometheus.MustNewConstMetric(desc.toPrometheusDesc(), valueType.toPromValueType(), value, labelValues...)
 }
 
+// NewConstMetric is a helper of NewConstMetric.
+//
+// Note: If the metrics described by the desc is hidden, the metrics will not be created.
+func NewConstMetric(desc *Desc, valueType ValueType, value float64, labelValues ...string) (Metric, error) {
+	if desc.IsHidden() {
+		return nil, nil
+	}
+	return prometheus.NewConstMetric(desc.toPrometheusDesc(), valueType.toPromValueType(), value, labelValues...)
+}
+
 // NewLazyMetricWithTimestamp is a helper of NewMetricWithTimestamp.
 //
 // Warning: the Metric 'm' must be the one created by NewLazyConstMetric(),

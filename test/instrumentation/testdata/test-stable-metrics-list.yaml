@@ -185,6 +185,13 @@
   - 119.20928955078125
   - 298.0232238769531
   - 745.0580596923828
+- name: kubelet_volume_stats_capacity_bytes
+  help: Capacity in bytes of the volume
+  type: Custom
+  stabilityLevel: BETA
+  labels:
+  - namespace
+  - persistentvolumeclaim
 - name: priority_level_seat_utilization
   subsystem: subsystem
   namespace: namespace
@@ -210,6 +217,12 @@
   - 1
   constLabels:
     phase: executing
+- name: test_beta_desc
+  help: Number of volumes in Volume Manager
+  type: Custom
+  stabilityLevel: BETA
+  constLabels:
+    alalala: lalalal
 - name: label
   subsystem: const
   namespace: test
@@ -281,3 +294,10 @@
   - 2.5
   - 5
   - 10
+- name: volume_manager_total_volumes
+  help: Number of volumes in Volume Manager
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - plugin_name
+  - state

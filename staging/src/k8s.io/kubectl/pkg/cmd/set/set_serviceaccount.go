@@ -63,7 +63,6 @@ type SetServiceAccountOptions struct {
 
 	fileNameOptions        resource.FilenameOptions
 	dryRunStrategy         cmdutil.DryRunStrategy
-	dryRunVerifier         *resource.QueryParamVerifier
 	shortOutput            bool
 	all                    bool
 	output                 string
@@ -138,11 +137,6 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	if o.local && o.dryRunStrategy == cmdutil.DryRunServer {
 		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 
@@ -209,12 +203,6 @@ func (o *SetServiceAccountOptions) Run() error {
 				patchErrs = append(patchErrs, err)
 			}
 			continue
-		}
-		if o.dryRunStrategy == cmdutil.DryRunServer {
-			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				patchErrs = append(patchErrs, err)
-				continue
-			}
 		}
 		actual, err := resource.
 			NewHelper(info.Client, info.Mapping).

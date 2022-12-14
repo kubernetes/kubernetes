@@ -32,18 +32,6 @@ import (
 )
 
 func TestLeastAllocatedScoringStrategy(t *testing.T) {
-	defaultResources := []config.ResourceSpec{
-		{Name: string(v1.ResourceCPU), Weight: 1},
-		{Name: string(v1.ResourceMemory), Weight: 1},
-	}
-
-	extendedRes := "abc.com/xyz"
-	extendedResourceLeastAllocatedSet := []config.ResourceSpec{
-		{Name: string(v1.ResourceCPU), Weight: 1},
-		{Name: string(v1.ResourceMemory), Weight: 1},
-		{Name: extendedRes, Weight: 1},
-	}
-
 	tests := []struct {
 		name           string
 		requestedPod   *v1.Pod
@@ -52,6 +40,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 		expectedScores framework.NodeScoreList
 		resources      []config.ResourceSpec
 		wantErrs       field.ErrorList
+		wantStatusCode framework.Code
 	}{
 		{
 			// Node1 scores (remaining resources) on 0-MaxNodeScore scale
@@ -95,7 +84,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			resources:      defaultResources,
 		},
 		{
-			name: "Resources not set, nothing scheduled, resources requested, differently sized nodes",
+			name: "Resources not set, pods scheduled with error",
 			requestedPod: st.MakePod().
 				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
 				Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "3000"}).
@@ -107,6 +96,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			existingPods:   nil,
 			expectedScores: []framework.NodeScore{{Name: "node1", Score: framework.MinNodeScore}, {Name: "node2", Score: framework.MinNodeScore}},
 			resources:      nil,
+			wantStatusCode: framework.Error,
 		},
 		{
 			// Node1 scores on 0-MaxNodeScore scale
@@ -347,7 +337,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000", v1.ResourceName(extendedRes): "4"}).Obj(),
 			},
 			expectedScores: []framework.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 50}},
-			resources:      extendedResourceLeastAllocatedSet,
+			resources:      extendedResourceSet,
 		},
 		{
 			// Honor extended resource if the pod requests.
@@ -368,7 +358,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			},
 			existingPods:   nil,
 			expectedScores: []framework.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 60}},
-			resources:      extendedResourceLeastAllocatedSet,
+			resources:      extendedResourceSet,
 		},
 	}
 
@@ -399,8 +389,8 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
-				if !status.IsSuccess() {
-					t.Errorf("unexpected error: %v", status)
+				if status.Code() != test.wantStatusCode {
+					t.Errorf("unexpected status code, want: %v, got: %v", test.wantStatusCode, status)
 				}
 				gotScores = append(gotScores, framework.NodeScore{Name: n.Name, Score: score})
 			}

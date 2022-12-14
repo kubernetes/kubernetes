@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/diff"
 	"k8s.io/kubectl/pkg/cmd/drain"
 	"k8s.io/kubectl/pkg/cmd/edit"
+	"k8s.io/kubectl/pkg/cmd/events"
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
@@ -330,13 +331,6 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
-	// Sending in 'nil' for the getLanguageFn() results in using
-	// the LANG environment variable.
-	//
-	// TODO: Consider adding a flag or file preference for setting
-	// the language, instead of just loading from the LANG env. variable.
-	i18n.LoadTranslations("kubectl", nil)
-
 	// Proxy command is incompatible with CommandHeaderRoundTripper, so
 	// clear the WrapConfigFn before running proxy command.
 	proxyCmd := proxy.NewCmdProxy(f, o.IOStreams)
@@ -399,6 +393,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 				cp.NewCmdCp(f, o.IOStreams),
 				auth.NewCmdAuth(f, o.IOStreams),
 				debug.NewCmdDebug(f, o.IOStreams),
+				events.NewCmdEvents(f, o.IOStreams),
 			},
 		},
 		{

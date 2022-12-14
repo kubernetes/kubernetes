@@ -1039,12 +1039,12 @@ func AddOrUpdateTaintOnNode(ctx context.Context, c clientset.Interface, nodeName
 		var oldNode *v1.Node
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
+		option := metav1.GetOptions{}
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			option.ResourceVersion = "0"
 			firstTry = false
-		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		}
+		oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, option)
 		if err != nil {
 			return err
 		}
@@ -1096,12 +1096,12 @@ func RemoveTaintOffNode(ctx context.Context, c clientset.Interface, nodeName str
 		var oldNode *v1.Node
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
+		option := metav1.GetOptions{}
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			option.ResourceVersion = "0"
 			firstTry = false
-		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		}
+		oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, option)
 		if err != nil {
 			return err
 		}
@@ -1178,12 +1178,12 @@ func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		var node *v1.Node
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
+		option := metav1.GetOptions{}
 		if firstTry {
-			node, err = kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			option.ResourceVersion = "0"
 			firstTry = false
-		} else {
-			node, err = kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		}
+		node, err = kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, option)
 		if err != nil {
 			return err
 		}

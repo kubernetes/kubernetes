@@ -110,7 +110,7 @@ type LoggerV2 interface {
 // This is a copy of the DepthLoggerV2 defined in the external grpclog package.
 // It is defined here to avoid a circular dependency.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.

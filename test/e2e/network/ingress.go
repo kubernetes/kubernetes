@@ -117,7 +117,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should conform to Ingress spec", func() {
+		ginkgo.It("should conform to Ingress spec", func(ctx context.Context) {
 			conformanceTests = e2eingress.CreateIngressComformanceTests(jig, ns, map[string]string{})
 			for _, t := range conformanceTests {
 				ginkgo.By(t.EntryLog)
@@ -129,7 +129,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 	})
 
-	ginkgo.Describe("GCE [Slow] [Feature:NEG] [Flaky]", func() {
+	ginkgo.Describe("GCE [Slow] [Feature:NEG]", func() {
 		var gceController *gce.IngressController
 
 		// Platform specific setup
@@ -162,7 +162,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should conform to Ingress spec", func() {
+		ginkgo.It("should conform to Ingress spec", func(ctx context.Context) {
 			jig.PollInterval = 5 * time.Second
 			conformanceTests = e2eingress.CreateIngressComformanceTests(jig, ns, map[string]string{
 				e2eingress.NEGAnnotation: `{"ingress": true}`,
@@ -177,7 +177,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		ginkgo.It("should be able to switch between IG and NEG modes", func() {
+		ginkgo.It("should be able to switch between IG and NEG modes", func(ctx context.Context) {
 			var err error
 			propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
 			ginkgo.By("Create a basic HTTP ingress using NEG")
@@ -223,7 +223,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			jig.WaitForIngress(true)
 		})
 
-		ginkgo.It("should be able to create a ClusterIP service", func() {
+		ginkgo.It("should be able to create a ClusterIP service", func(ctx context.Context) {
 			ginkgo.By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "neg-clusterip"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
@@ -237,7 +237,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		ginkgo.It("should sync endpoints to NEG", func() {
+		ginkgo.It("should sync endpoints to NEG", func(ctx context.Context) {
 			name := "hostname"
 			scaleAndValidateNEG := func(num int) {
 				scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(context.TODO(), name, metav1.GetOptions{})
@@ -281,7 +281,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			scaleAndValidateNEG(3)
 		})
 
-		ginkgo.It("rolling update backend pods should not cause service disruption", func() {
+		ginkgo.It("rolling update backend pods should not cause service disruption", func(ctx context.Context) {
 			name := "hostname"
 			replicas := 8
 			ginkgo.By("Create a basic HTTP ingress using NEG")
@@ -319,9 +319,13 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 			err = wait.Poll(10*time.Second, propagationTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
-				framework.ExpectNoError(err)
+				if err != nil {
+					return false, err
+				}
 				deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(context.TODO(), name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				if err != nil {
+					return false, err
+				}
 				if int(deploy.Status.UpdatedReplicas) == replicas {
 					if res.Len() == replicas {
 						return true, nil
@@ -336,7 +340,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should sync endpoints for both Ingress-referenced NEG and standalone NEG", func() {
+		ginkgo.It("should sync endpoints for both Ingress-referenced NEG and standalone NEG", func(ctx context.Context) {
 			name := "hostname"
 			expectedKeys := []int32{80, 443}
 
@@ -420,7 +424,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			scaleAndValidateExposedNEG(3)
 		})
 
-		ginkgo.It("should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise", func() {
+		ginkgo.It("should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise", func(ctx context.Context) {
 			ginkgo.By("Create a basic HTTP ingress using standalone NEG")
 			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
@@ -549,7 +553,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		The ingresses/status resource must support update and patch
 	*/
 
-	framework.ConformanceIt("should support creating Ingress API operations", func() {
+	framework.ConformanceIt("should support creating Ingress API operations", func(ctx context.Context) {
 		// Setup
 		ns := f.Namespace.Name
 		ingVersion := "v1"
@@ -596,7 +600,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 					},
 				},
 			},
-			Status: networkingv1.IngressStatus{LoadBalancer: v1.LoadBalancerStatus{}},
+			Status: networkingv1.IngressStatus{LoadBalancer: networkingv1.IngressLoadBalancerStatus{}},
 		}
 
 		ingress1 := ingTemplate.DeepCopy()
@@ -741,8 +745,8 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		// /status subresource operations
 		ginkgo.By("patching /status")
-		lbStatus := v1.LoadBalancerStatus{
-			Ingress: []v1.LoadBalancerIngress{{IP: "169.1.1.1"}},
+		lbStatus := networkingv1.IngressLoadBalancerStatus{
+			Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "169.1.1.1"}},
 		}
 		lbStatusJSON, err := json.Marshal(lbStatus)
 		framework.ExpectNoError(err)
@@ -760,8 +764,8 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			if err != nil {
 				return err
 			}
-			statusToUpdate.Status.LoadBalancer = v1.LoadBalancerStatus{
-				Ingress: []v1.LoadBalancerIngress{{IP: "169.1.1.2"}},
+			statusToUpdate.Status.LoadBalancer = networkingv1.IngressLoadBalancerStatus{
+				Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "169.1.1.2"}},
 			}
 			updatedStatus, err = ingClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
 			return err

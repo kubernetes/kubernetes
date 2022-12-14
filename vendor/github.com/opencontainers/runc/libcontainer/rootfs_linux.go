@@ -80,6 +80,8 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig, mountFds []int) (err
 		// Therefore, we can access mountFds[i] without any concerns.
 		if mountFds != nil && mountFds[i] != -1 {
 			mountConfig.fd = &mountFds[i]
+		} else {
+			mountConfig.fd = nil
 		}
 
 		if err := mountToRootfs(m, mountConfig); err != nil {

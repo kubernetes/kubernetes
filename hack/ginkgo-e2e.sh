@@ -130,11 +130,6 @@ if [[ "${KUBERNETES_PROVIDER}" == "azure" ]]; then
     fi
 fi
 
-if [[ "${TEST_IGNORE_CLOUDPROVIDER_TAINT:-}" == true ]]; then
-  echo "Found test ignore cloude provider taint, removing NoSchedule taint from all nodes"
-  "${KUBE_ROOT}/cluster/kubectl.sh" taint nodes --all node.cloudprovider.kubernetes.io/uninitialized:NoSchedule-
-fi
-
 # These arguments are understood by both Ginkgo test suite and CLI.
 # Some arguments (like --nodes) are only supported when using the CLI.
 # Those get set below when choosing the program.

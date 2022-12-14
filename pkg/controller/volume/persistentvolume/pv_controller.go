@@ -355,10 +355,12 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 				klog.V(4).Infof("FeatureGate[%s] is enabled, attempting to assign storage class to unbound PersistentVolumeClaim[%s]", features.RetroactiveDefaultStorageClass, claimToClaimKey(claim))
 				updated, err := ctrl.assignDefaultStorageClass(claim)
 				if err != nil {
+					metrics.RecordRetroactiveStorageClassMetric(false)
 					return fmt.Errorf("can't update PersistentVolumeClaim[%q]: %w", claimToClaimKey(claim), err)
 				}
 				if updated {
 					klog.V(4).Infof("PersistentVolumeClaim[%q] update successful, restarting claim sync", claimToClaimKey(claim))
+					metrics.RecordRetroactiveStorageClassMetric(true)
 					return nil
 				}
 			}
@@ -726,7 +728,7 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 				// the user know. Don't overwrite existing Failed status!
 				if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
 					// Also, log this only once:
-					klog.V(2).Infof("dynamically volume %q is released and it will be deleted", volume.Name)
+					klog.V(2).Infof("dynamically provisioned volume %q is released and it will be deleted", volume.Name)
 					if volume, err = ctrl.updateVolumePhase(volume, v1.VolumeReleased, ""); err != nil {
 						// Nothing was saved; we will fall back into the same condition
 						// in the next call to this method

@@ -41,6 +41,7 @@ import (
 )
 
 const (
+	preEnqueuePlugin                  = "preEnqueue-plugin"
 	queueSortPlugin                   = "no-op-queue-sort-plugin"
 	scoreWithNormalizePlugin1         = "score-with-normalize-plugin-1"
 	scoreWithNormalizePlugin2         = "score-with-normalize-plugin-2"
@@ -300,6 +301,18 @@ func (pp *TestPermitPlugin) Name() string {
 }
 func (pp *TestPermitPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
 	return framework.NewStatus(framework.Wait), 10 * time.Second
+}
+
+var _ framework.PreEnqueuePlugin = &TestPreEnqueuePlugin{}
+
+type TestPreEnqueuePlugin struct{}
+
+func (pl *TestPreEnqueuePlugin) Name() string {
+	return preEnqueuePlugin
+}
+
+func (pl *TestPreEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+	return nil
 }
 
 var _ framework.QueueSortPlugin = &TestQueueSortPlugin{}
@@ -979,6 +992,61 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("Unexpected eventToPlugin map (-want,+got):%s", diff)
+			}
+		})
+	}
+}
+
+func TestPreEnqueuePlugins(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins []framework.Plugin
+		want    []framework.PreEnqueuePlugin
+	}{
+		{
+			name: "no PreEnqueuePlugin registered",
+		},
+		{
+			name: "one PreEnqueuePlugin registered",
+			plugins: []framework.Plugin{
+				&TestPreEnqueuePlugin{},
+			},
+			want: []framework.PreEnqueuePlugin{
+				&TestPreEnqueuePlugin{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := Registry{}
+			cfgPls := &config.Plugins{}
+			for _, pl := range tt.plugins {
+				// register all plugins
+				tmpPl := pl
+				if err := registry.Register(pl.Name(),
+					func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+						return tmpPl, nil
+					}); err != nil {
+					t.Fatalf("fail to register preEnqueue plugin (%s)", pl.Name())
+				}
+				// append plugins to filter pluginset
+				cfgPls.PreEnqueue.Enabled = append(
+					cfgPls.PreEnqueue.Enabled,
+					config.Plugin{Name: pl.Name()},
+				)
+			}
+			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, ctx.Done())
+			if err != nil {
+				t.Fatalf("fail to create framework: %s", err)
+			}
+
+			got := f.PreEnqueuePlugins()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("PreEnqueuePlugins(): want %v, but got %v", tt.want, got)
 			}
 		})
 	}

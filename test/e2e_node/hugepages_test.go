@@ -204,7 +204,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 	f := framework.NewDefaultFramework("hugepages-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should remove resources for huge page sizes no longer supported", func() {
+	ginkgo.It("should remove resources for huge page sizes no longer supported", func(ctx context.Context) {
 		ginkgo.By("mimicking support for 9Mi of 3Mi huge page memory by patching the node status")
 		patch := []byte(`[{"op": "add", "path": "/status/capacity/hugepages-3Mi", "value": "9Mi"}, {"op": "add", "path": "/status/allocatable/hugepages-3Mi", "value": "9Mi"}]`)
 		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
@@ -230,7 +230,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 		}, 30*time.Second, framework.Poll).Should(gomega.Equal(false))
 	})
 
-	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func() {
+	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func(ctx context.Context) {
 		ginkgo.By("Stopping kubelet")
 		startKubelet := stopKubelet()
 		ginkgo.By(`Patching away support for hugepage resource "hugepages-2Mi"`)
@@ -320,7 +320,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 		}
 
 		runHugePagesTests := func() {
-			ginkgo.It("should set correct hugetlb mount and limit under the container cgroup", func() {
+			ginkgo.It("should set correct hugetlb mount and limit under the container cgroup", func(ctx context.Context) {
 				ginkgo.By("getting mounts for the test pod")
 				command := []string{"mount"}
 				out := e2epod.ExecCommandInContainer(f, testpod.Name, testpod.Spec.Containers[0].Name, command...)

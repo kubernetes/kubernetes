@@ -128,11 +128,11 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	// Only openapi v3 needs the discovery client.
 	if o.EnableOpenAPIV3 {
-		clientset, err := f.KubernetesClientSet()
+		discoveryClient, err := f.ToDiscoveryClient()
 		if err != nil {
 			return err
 		}
-		o.DiscoveryClient = clientset.DiscoveryClient
+		o.DiscoveryClient = discoveryClient
 	}
 
 	o.args = args

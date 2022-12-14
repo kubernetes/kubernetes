@@ -38,7 +38,7 @@ func findServicePort(svc *v1.Service, port int32) (*v1.ServicePort, error) {
 	return nil, errors.NewServiceUnavailable(fmt.Sprintf("no service port %d found for service %q", port, svc.Name))
 }
 
-// ResourceLocation returns a URL to which one can send traffic for the specified service.
+// ResolveEndpoint returns a URL to which one can send traffic for the specified service.
 func ResolveEndpoint(services listersv1.ServiceLister, endpoints listersv1.EndpointsLister, namespace, id string, port int32) (*url.URL, error) {
 	svc, err := services.Services(namespace).Get(id)
 	if err != nil {

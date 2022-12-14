@@ -114,7 +114,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		})
 	})
 
-	ginkgo.It("vsphere scale tests", func() {
+	ginkgo.It("vsphere scale tests", func(ctx context.Context) {
 		var pvcClaimList []string
 		nodeVolumeMap := make(map[string][]string)
 		// Volumes will be provisioned with each different types of Storage Class
@@ -138,7 +138,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			sc, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(scname, scParams, nil, ""), metav1.CreateOptions{})
 			gomega.Expect(sc).NotTo(gomega.BeNil(), "Storage class is empty")
 			framework.ExpectNoError(err, "Failed to create storage class")
-			defer client.StorageV1().StorageClasses().Delete(context.TODO(), scname, metav1.DeleteOptions{})
+			ginkgo.DeferCleanup(client.StorageV1().StorageClasses().Delete, scname, metav1.DeleteOptions{})
 			scArrays[index] = sc
 		}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -121,7 +122,7 @@ type mockRuntimeService struct {
 	err error
 }
 
-func (rt mockRuntimeService) UpdateContainerResources(id string, resources *runtimeapi.ContainerResources) error {
+func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, id string, resources *runtimeapi.ContainerResources) error {
 	return rt.err
 }
 

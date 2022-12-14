@@ -50,7 +50,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 	   Description: Attempt to create a PodTemplate. Patch the created PodTemplate. Fetching the PodTemplate MUST reflect changes.
 	          By fetching all the PodTemplates via a Label selector it MUST find the PodTemplate by it's static label and updated value. The PodTemplate must be deleted.
 	*/
-	framework.ConformanceIt("should run the lifecycle of PodTemplates", func() {
+	framework.ConformanceIt("should run the lifecycle of PodTemplates", func(ctx context.Context) {
 		testNamespaceName := f.Namespace.Name
 		podTemplateName := "nginx-pod-template-" + string(uuid.NewUUID())
 
@@ -119,7 +119,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 		Description: A set of Pod Templates is created with a label selector which MUST be found when listed.
 		The set of Pod Templates is deleted and MUST NOT show up when listed by its label selector.
 	*/
-	framework.ConformanceIt("should delete a collection of pod templates", func() {
+	framework.ConformanceIt("should delete a collection of pod templates", func(ctx context.Context) {
 		podTemplateNames := []string{"test-podtemplate-1", "test-podtemplate-2", "test-podtemplate-3"}
 
 		ginkgo.By("Create set of pod templates")
@@ -173,7 +173,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 	   Attempt to replace the PodTemplate to include a new annotation
 	   which MUST succeed. The annotation MUST be found in the new PodTemplate.
 	*/
-	framework.ConformanceIt("should replace a pod template", func() {
+	framework.ConformanceIt("should replace a pod template", func(ctx context.Context) {
 		ptClient := f.ClientSet.CoreV1().PodTemplates(f.Namespace.Name)
 		ptName := "podtemplate-" + utilrand.String(5)
 

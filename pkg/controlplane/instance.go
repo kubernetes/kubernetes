@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"strconv"
 	"time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -52,6 +54,7 @@ import (
 	policyapiv1 "k8s.io/api/policy/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
@@ -60,6 +63,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -105,6 +109,7 @@ import (
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 )
@@ -125,6 +130,18 @@ const (
 	KubeAPIServerIdentityLeaseLabelSelector = IdentityLeaseComponentLabelKey + "=" + KubeAPIServer
 	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops
 	repairLoopInterval = 3 * time.Minute
+)
+
+var (
+	// IdentityLeaseGCPeriod is the interval which the lease GC controller checks for expired leases
+	// IdentityLeaseGCPeriod is exposed so integration tests can tune this value.
+	IdentityLeaseGCPeriod = 3600 * time.Second
+	// IdentityLeaseDurationSeconds is the duration of kube-apiserver lease in seconds
+	// IdentityLeaseDurationSeconds is exposed so integration tests can tune this value.
+	IdentityLeaseDurationSeconds = 3600
+	// IdentityLeaseRenewIntervalSeconds is the interval of kube-apiserver renewing its lease in seconds
+	// IdentityLeaseRenewIntervalSeconds is exposed so integration tests can tune this value.
+	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
 )
 
 // ExtraConfig defines extra configuration for the master
@@ -190,9 +207,6 @@ type ExtraConfig struct {
 	ServiceAccountPublicKeys []interface{}
 
 	VersionedInformers informers.SharedInformerFactory
-
-	IdentityLeaseDurationSeconds      int
-	IdentityLeaseRenewIntervalSeconds int
 
 	// RepairServicesInterval interval used by the repair loops for
 	// the Services NodePort and ClusterIP resources
@@ -387,6 +401,14 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
+	clientset, err := kubernetes.NewForConfig(c.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: update to a version that caches success but will recheck on failure, unlike memcache discovery
+	discoveryClientForAdmissionRegistration := clientset.Discovery()
+
 	// The order here is preserved in discovery.
 	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
 	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
@@ -413,8 +435,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.StorageProvider{},
-		admissionregistrationrest.RESTStorageProvider{},
+		admissionregistrationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, DiscoveryClient: discoveryClientForAdmissionRegistration},
 		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
+		resourcerest.RESTStorageProvider{},
 	}
 	if err := m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...); err != nil {
 		return nil, err
@@ -470,13 +493,18 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			if err != nil {
 				return err
 			}
+
+			leaseName := m.GenericAPIServer.APIServerID
+			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
+
 			controller := lease.NewController(
 				clock.RealClock{},
 				kubeClient,
-				m.GenericAPIServer.APIServerID,
-				int32(c.ExtraConfig.IdentityLeaseDurationSeconds),
+				holderIdentity,
+				int32(IdentityLeaseDurationSeconds),
 				nil,
-				time.Duration(c.ExtraConfig.IdentityLeaseRenewIntervalSeconds)*time.Second,
+				IdentityLeaseRenewIntervalPeriod,
+				leaseName,
 				metav1.NamespaceSystem,
 				labelAPIServerHeartbeat)
 			go controller.Run(hookContext.StopCh)
@@ -489,7 +517,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			}
 			go apiserverleasegc.NewAPIServerLeaseGC(
 				kubeClient,
-				time.Duration(c.ExtraConfig.IdentityLeaseDurationSeconds)*time.Second,
+				IdentityLeaseGCPeriod,
 				metav1.NamespaceSystem,
 				KubeAPIServerIdentityLeaseLabelSelector,
 			).Run(hookContext.StopCh)
@@ -515,6 +543,14 @@ func labelAPIServerHeartbeat(lease *coordinationapiv1.Lease) error {
 	}
 	// This label indicates that kube-apiserver owns this identity lease object
 	lease.Labels[IdentityLeaseComponentLabelKey] = KubeAPIServer
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	// convenience label to easily map a lease object to a specific apiserver
+	lease.Labels[apiv1.LabelHostname] = hostname
 	return nil
 }
 
@@ -642,10 +678,7 @@ var (
 	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-architecture/3136-beta-apis-off-by-default
 	// for more details.
 	legacyBetaEnabledByDefaultResources = []schema.GroupVersionResource{
-		autoscalingapiv2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"), // remove in 1.26
 		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"),         // remove in 1.27
-		flowcontrolv1beta1.SchemeGroupVersion.WithResource("flowschemas"),                 // remove in 1.26
-		flowcontrolv1beta1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"), // remove in 1.26
 		flowcontrolv1beta2.SchemeGroupVersion.WithResource("flowschemas"),                 // remove in 1.29
 		flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations"), // remove in 1.29
 		flowcontrolv1beta3.SchemeGroupVersion.WithResource("flowschemas"),                 // deprecate in 1.29, remove in 1.32
@@ -668,8 +701,10 @@ var (
 
 	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have.  They are always disabled by default.
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
+		admissionregistrationv1alpha1.SchemeGroupVersion,
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		authenticationv1alpha1.SchemeGroupVersion,
+		resourcev1alpha1.SchemeGroupVersion,
 		networkingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		flowcontrolv1alpha1.SchemeGroupVersion,

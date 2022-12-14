@@ -50,6 +50,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/controller/util/selectors"
 )
 
 var (
@@ -103,6 +104,10 @@ type HorizontalController struct {
 	scaleUpEventsLock   sync.RWMutex
 	scaleDownEvents     map[string][]timestampedScaleEvent
 	scaleDownEventsLock sync.RWMutex
+
+	// Storage of HPAs and their selectors.
+	hpaSelectors    *selectors.BiMultimap
+	hpaSelectorsMux sync.Mutex
 }
 
 // NewHorizontalController creates a new HorizontalController.
@@ -139,6 +144,7 @@ func NewHorizontalController(
 		scaleUpEventsLock:            sync.RWMutex{},
 		scaleDownEvents:              map[string][]timestampedScaleEvent{},
 		scaleDownEventsLock:          sync.RWMutex{},
+		hpaSelectors:                 selectors.NewBiMultimap(),
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -203,6 +209,15 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	// request for the HPA in the queue then a new request is always dropped. Requests spend resync
 	// interval in queue so HPAs are processed every resync interval.
 	a.queue.AddRateLimited(key)
+
+	// Register HPA in the hpaSelectors map if it's not present yet. Attaching the Nothing selector
+	// that does not select objects. The actual selector is going to be updated
+	// when it's available during the autoscaler reconciliation.
+	a.hpaSelectorsMux.Lock()
+	defer a.hpaSelectorsMux.Unlock()
+	if hpaKey := selectors.Parse(key); !a.hpaSelectors.SelectorExists(hpaKey) {
+		a.hpaSelectors.PutSelector(hpaKey, labels.Nothing())
+	}
 }
 
 func (a *HorizontalController) deleteHPA(obj interface{}) {
@@ -214,6 +229,11 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 
 	// TODO: could we leak if we fail to get the key?
 	a.queue.Forget(key)
+
+	// Remove HPA and attached selector.
+	a.hpaSelectorsMux.Lock()
+	defer a.hpaSelectorsMux.Unlock()
+	a.hpaSelectors.DeleteSelector(selectors.Parse(key))
 }
 
 func (a *HorizontalController) worker(ctx context.Context) {
@@ -254,19 +274,10 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 // all metrics computed.
 func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler, scale *autoscalingv1.Scale,
 	metricSpecs []autoscalingv2.MetricSpec) (replicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error) {
-	if scale.Status.Selector == "" {
-		errMsg := "selector is required"
-		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
-		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", "the HPA target's scale is missing a selector")
-		return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
-	}
 
-	selector, err := labels.Parse(scale.Status.Selector)
+	selector, err := a.validateAndParseSelector(hpa, scale.Status.Selector)
 	if err != nil {
-		errMsg := fmt.Sprintf("couldn't convert selector into a corresponding internal selector object: %v", err)
-		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
-		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", errMsg)
-		return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
+		return 0, "", nil, time.Time{}, err
 	}
 
 	specReplicas := scale.Spec.Replicas
@@ -303,6 +314,80 @@ func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hp
 	}
 	setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionTrue, "ValidMetricFound", "the HPA was able to successfully calculate a replica count from %s", metric)
 	return replicas, metric, statuses, timestamp, nil
+}
+
+// hpasControllingPodsUnderSelector returns a list of keys of all HPAs that control a given list of pods.
+func (a *HorizontalController) hpasControllingPodsUnderSelector(pods []*v1.Pod) []selectors.Key {
+	a.hpaSelectorsMux.Lock()
+	defer a.hpaSelectorsMux.Unlock()
+
+	hpas := map[selectors.Key]struct{}{}
+	for _, p := range pods {
+		podKey := selectors.Key{Name: p.Name, Namespace: p.Namespace}
+		a.hpaSelectors.Put(podKey, p.Labels)
+
+		selectingHpas, ok := a.hpaSelectors.ReverseSelect(podKey)
+		if !ok {
+			continue
+		}
+		for _, hpa := range selectingHpas {
+			hpas[hpa] = struct{}{}
+		}
+	}
+	// Clean up all added pods.
+	a.hpaSelectors.KeepOnly([]selectors.Key{})
+
+	hpaList := []selectors.Key{}
+	for hpa := range hpas {
+		hpaList = append(hpaList, hpa)
+	}
+	return hpaList
+}
+
+// validateAndParseSelector verifies that:
+// - selector is not empty;
+// - selector format is valid;
+// - all pods by current selector are controlled by only one HPA.
+// Returns an error if the check has failed or the parsed selector if succeeded.
+// In case of an error the ScalingActive is set to false with the corresponding reason.
+func (a *HorizontalController) validateAndParseSelector(hpa *autoscalingv2.HorizontalPodAutoscaler, selector string) (labels.Selector, error) {
+	if selector == "" {
+		errMsg := "selector is required"
+		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", "the HPA target's scale is missing a selector")
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	parsedSelector, err := labels.Parse(selector)
+	if err != nil {
+		errMsg := fmt.Sprintf("couldn't convert selector into a corresponding internal selector object: %v", err)
+		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+	a.hpaSelectorsMux.Lock()
+	if a.hpaSelectors.SelectorExists(hpaKey) {
+		// Update HPA selector only if the HPA was registered in enqueueHPA.
+		a.hpaSelectors.PutSelector(hpaKey, parsedSelector)
+	}
+	a.hpaSelectorsMux.Unlock()
+
+	pods, err := a.podLister.Pods(hpa.Namespace).List(parsedSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	selectingHpas := a.hpasControllingPodsUnderSelector(pods)
+	if len(selectingHpas) > 1 {
+		errMsg := fmt.Sprintf("pods by selector %v are controlled by multiple HPAs: %v", selector, selectingHpas)
+		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "AmbiguousSelector", errMsg)
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "AmbiguousSelector", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	return parsedSelector, nil
 }
 
 // Computes the desired number of replicas for a specific hpa and metric specification,

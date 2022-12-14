@@ -17,13 +17,32 @@ limitations under the License.
 package v2
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"text/template"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+type Generator interface {
+	AddTemplate(name string, contents string) error
+
+	Render(
+		// Template to use for rendering
+		templateName string,
+		// Self-Contained OpenAPI Document Containing all schemas used by $ref
+		// Only OpenAPI V3 documents are supported
+		document map[string]interface{},
+		// Resource within OpenAPI document for which to render explain schema
+		gvr schema.GroupVersionResource,
+		// Field path of child of resource to focus output onto
+		fieldSelector []string,
+		// Boolean indicating whether the fields should be rendered recursively/deeply
+		recursive bool,
+		// Output writer
+		writer io.Writer,
+	) error
+}
 
 type TemplateContext struct {
 	GVR       schema.GroupVersionResource
@@ -36,22 +55,14 @@ type generator struct {
 	templates map[string]*template.Template
 }
 
-func NewGenerator() *generator {
+func NewGenerator() Generator {
 	return &generator{
 		templates: make(map[string]*template.Template),
 	}
 }
 
 func (g *generator) AddTemplate(name string, contents string) error {
-	compiled, err := template.
-		New(name).
-		Funcs(map[string]interface{}{
-			"toJson": func(obj any) (string, error) {
-				res, err := json.Marshal(obj)
-				return string(res), err
-			},
-		}).
-		Parse(contents)
+	compiled, err := WithBuiltinTemplateFuncs(template.New(name)).Parse(contents)
 
 	if err != nil {
 		return err

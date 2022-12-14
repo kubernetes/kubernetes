@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"reflect"
@@ -240,8 +241,8 @@ func Example_minifyAndShorten() {
 	// users:
 	//   red-user:
 	//     LocationOfOrigin: ""
-	//     client-certificate-data: REDACTED
-	//     client-key-data: REDACTED
+	//     client-certificate-data: DATA+OMITTED
+	//     client-key-data: DATA+OMITTED
 	//     token: REDACTED
 }
 
@@ -274,7 +275,6 @@ func TestShortenSuccess(t *testing.T) {
 		t.Errorf("expected %v, got %v", startingConfig.Contexts, mutatingConfig.Contexts)
 	}
 
-	redacted := string(redactedBytes)
 	dataOmitted := string(dataOmittedBytes)
 	if len(mutatingConfig.Clusters) != 2 {
 		t.Errorf("unexpected clusters: %v", mutatingConfig.Clusters)
@@ -292,13 +292,65 @@ func TestShortenSuccess(t *testing.T) {
 	if !reflect.DeepEqual(startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo]) {
 		t.Errorf("expected %v, got %v", startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo])
 	}
-	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData) != redacted {
-		t.Errorf("expected %v, got %v", redacted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData))
+	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData) != dataOmitted {
+		t.Errorf("expected %v, got %v", dataOmitted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData))
 	}
-	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData) != redacted {
-		t.Errorf("expected %v, got %v", redacted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData))
+	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData) != dataOmitted {
+		t.Errorf("expected %v, got %v", dataOmitted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData))
+	}
+	if mutatingConfig.AuthInfos[changingAuthInfo].Token != "REDACTED" {
+		t.Errorf("expected REDACTED, got %q", mutatingConfig.AuthInfos[changingAuthInfo].Token)
+	}
+}
+
+func TestRedactSecrets(t *testing.T) {
+	certFile, _ := os.CreateTemp("", "")
+	defer os.Remove(certFile.Name())
+	keyFile, _ := os.CreateTemp("", "")
+	defer os.Remove(keyFile.Name())
+	caFile, _ := os.CreateTemp("", "")
+	defer os.Remove(caFile.Name())
+
+	certData := "cert"
+	keyData := "key"
+	caData := "ca"
+
+	unchangingCluster := "chicken-cluster"
+	unchangingAuthInfo := "blue-user"
+	changingAuthInfo := "red-user"
+
+	startingConfig := newMergedConfig(certFile.Name(), certData, keyFile.Name(), keyData, caFile.Name(), caData, t)
+	mutatingConfig := startingConfig
+
+	err := RedactSecrets(&mutatingConfig)
+	if err != nil {
+		t.Errorf("unexpected error redacting secrets:\n%v", err)
+	}
+
+	if len(mutatingConfig.Contexts) != 2 {
+		t.Errorf("unexpected contexts: %v", mutatingConfig.Contexts)
+	}
+	if !reflect.DeepEqual(startingConfig.Contexts, mutatingConfig.Contexts) {
+		t.Errorf("expected %v, got %v", startingConfig.Contexts, mutatingConfig.Contexts)
+	}
+
+	if len(mutatingConfig.Clusters) != 2 {
+		t.Errorf("unexpected clusters: %v", mutatingConfig.Clusters)
+	}
+	if !reflect.DeepEqual(startingConfig.Clusters[unchangingCluster], mutatingConfig.Clusters[unchangingCluster]) {
+		t.Errorf("expected %v, got %v", startingConfig.Clusters[unchangingCluster], mutatingConfig.Clusters[unchangingCluster])
+	}
+
+	if len(mutatingConfig.AuthInfos) != 2 {
+		t.Errorf("unexpected users: %v", mutatingConfig.AuthInfos)
+	}
+	if !reflect.DeepEqual(startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo]) {
+		t.Errorf("expected %v, got %v", startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo])
 	}
 	if mutatingConfig.AuthInfos[changingAuthInfo].Token != "REDACTED" {
 		t.Errorf("expected REDACTED, got %v", mutatingConfig.AuthInfos[changingAuthInfo].Token)
+	}
+	if !bytes.Equal(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData, []byte("REDACTED")) {
+		t.Errorf("expected REDACTED, got %s", mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData)
 	}
 }

@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
@@ -241,17 +242,8 @@ func SetStacktracePredicate(ctx context.Context, pred StacktracePred) {
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
-	auditID := request.GetAuditIDTruncated(rl.req.Context())
-
-	verb := rl.req.Method
-	if requestInfo, ok := request.RequestInfoFrom(rl.req.Context()); ok {
-		// If we can find a requestInfo, we can get a scope, and then
-		// we can convert GETs to LISTs when needed.
-		scope := metrics.CleanScope(requestInfo)
-		verb = metrics.CanonicalVerb(strings.ToUpper(verb), scope)
-	}
-	// mark APPLY requests and WATCH requests correctly.
-	verb = metrics.CleanVerb(verb, rl.req)
+	auditID := audit.GetAuditIDTruncated(rl.req.Context())
+	verb := metrics.NormalizedVerb(rl.req)
 
 	keysAndValues := []interface{}{
 		"verb", verb,

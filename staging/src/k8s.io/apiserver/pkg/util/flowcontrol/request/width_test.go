@@ -410,6 +410,33 @@ func TestWorkEstimator(t *testing.T) {
 			finalSeatsExpected:        3,
 			additionalLatencyExpected: 5 * time.Millisecond,
 		},
+		{
+			name:       "creating token for service account",
+			requestURI: "http://server/api/v1/namespaces/foo/serviceaccounts/default/token",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:        "create",
+				APIGroup:    "v1",
+				Resource:    "serviceaccounts",
+				Subresource: "token",
+			},
+			watchCount:                5777,
+			initialSeatsExpected:      minimumSeats,
+			finalSeatsExpected:        0,
+			additionalLatencyExpected: 0,
+		},
+		{
+			name:       "creating service account",
+			requestURI: "http://server/api/v1/namespaces/foo/serviceaccounts",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "create",
+				APIGroup: "v1",
+				Resource: "serviceaccounts",
+			},
+			watchCount:                1000,
+			initialSeatsExpected:      1,
+			finalSeatsExpected:        maximumSeats,
+			additionalLatencyExpected: 50 * time.Millisecond,
+		},
 	}
 
 	for _, test := range tests {

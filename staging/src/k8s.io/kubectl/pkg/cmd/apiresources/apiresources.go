@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/client-go/discovery"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -68,6 +69,11 @@ type APIResourceOptions struct {
 	Cached     bool
 	Categories []string
 
+	groupChanged bool
+	nsChanged    bool
+
+	discoveryClient discovery.CachedDiscoveryInterface
+
 	genericclioptions.IOStreams
 }
 
@@ -87,7 +93,7 @@ func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *APIResourceOp
 }
 
 // NewCmdAPIResources creates the `api-resources` command
-func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAPIResourceOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -96,9 +102,9 @@ func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 		Long:    i18n.T("Print the supported API resources on the server."),
 		Example: apiresourcesExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(cmd, args))
+			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.RunAPIResources(cmd, f))
+			cmdutil.CheckErr(o.RunAPIResources())
 		},
 	}
 
@@ -130,38 +136,40 @@ func (o *APIResourceOptions) Validate() error {
 }
 
 // Complete adapts from the command line args and validates them
-func (o *APIResourceOptions) Complete(cmd *cobra.Command, args []string) error {
+func (o *APIResourceOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
 	}
+
+	discoveryClient, err := restClientGetter.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.discoveryClient = discoveryClient
+
+	o.groupChanged = cmd.Flags().Changed("api-group")
+	o.nsChanged = cmd.Flags().Changed("namespaced")
+
 	return nil
 }
 
 // RunAPIResources does the work
-func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Factory) error {
+func (o *APIResourceOptions) RunAPIResources() error {
 	w := printers.GetNewTabWriter(o.Out)
 	defer w.Flush()
 
-	discoveryclient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-
 	if !o.Cached {
 		// Always request fresh data from the server
-		discoveryclient.Invalidate()
+		o.discoveryClient.Invalidate()
 	}
 
 	errs := []error{}
-	lists, err := discoveryclient.ServerPreferredResources()
+	lists, err := o.discoveryClient.ServerPreferredResources()
 	if err != nil {
 		errs = append(errs, err)
 	}
 
 	resources := []groupResource{}
-
-	groupChanged := cmd.Flags().Changed("api-group")
-	nsChanged := cmd.Flags().Changed("namespaced")
 
 	for _, list := range lists {
 		if len(list.APIResources) == 0 {
@@ -176,11 +184,11 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 				continue
 			}
 			// filter apiGroup
-			if groupChanged && o.APIGroup != gv.Group {
+			if o.groupChanged && o.APIGroup != gv.Group {
 				continue
 			}
 			// filter namespaced
-			if nsChanged && o.Namespaced != resource.Namespaced {
+			if o.nsChanged && o.Namespaced != resource.Namespaced {
 				continue
 			}
 			// filter to resources that support the specified verbs

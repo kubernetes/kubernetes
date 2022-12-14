@@ -31,6 +31,21 @@ func GetJob(c clientset.Interface, ns, name string) (*batchv1.Job, error) {
 	return c.BatchV1().Jobs(ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
+// GetAllRunningJobPods returns a list of all running Pods belonging to a Job.
+func GetAllRunningJobPods(c clientset.Interface, ns, jobName string) ([]v1.Pod, error) {
+	if podList, err := GetJobPods(c, ns, jobName); err != nil {
+		return nil, err
+	} else {
+		pods := []v1.Pod{}
+		for _, pod := range podList.Items {
+			if pod.Status.Phase == v1.PodRunning {
+				pods = append(pods, pod)
+			}
+		}
+		return pods, nil
+	}
+}
+
 // GetJobPods returns a list of Pods belonging to a Job.
 func GetJobPods(c clientset.Interface, ns, jobName string) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))

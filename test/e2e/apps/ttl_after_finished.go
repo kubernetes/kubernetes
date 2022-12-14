@@ -45,7 +45,7 @@ var _ = SIGDescribe("TTLAfterFinished", func() {
 	f := framework.NewDefaultFramework("ttlafterfinished")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	ginkgo.It("job should be deleted once it finishes after TTL seconds", func() {
+	ginkgo.It("job should be deleted once it finishes after TTL seconds", func(ctx context.Context) {
 		testFinishedJob(f)
 	})
 })
@@ -78,7 +78,7 @@ func testFinishedJob(f *framework.Framework) {
 	job := e2ejob.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 	job.Spec.TTLSecondsAfterFinished = &ttl
 	job.ObjectMeta.Finalizers = []string{dummyFinalizer}
-	defer cleanupJob(f, job)
+	ginkgo.DeferCleanup(cleanupJob, f, job)
 
 	framework.Logf("Create a Job %s/%s with TTL", ns, job.Name)
 	job, err := e2ejob.CreateJob(c, ns, job)
