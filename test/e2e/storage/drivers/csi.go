@@ -148,7 +148,6 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapOfflineExpansion:             true,
 		storageframework.CapOnlineExpansion:              true,
 		storageframework.CapSingleNodeVolume:             true,
-		storageframework.CapFilesystemResizeNotSupported: true,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`

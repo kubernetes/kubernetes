@@ -414,9 +414,83 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.testCase.TestDynamicProvisioning(ctx)
 	})
 
-	ginkgo.It("should use existing filesystem size when restoring snapshot to larger size pvc when in ROX mode [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
-		//TODO: remove skip when issue is resolved - https://github.com/kubernetes/kubernetes/issues/113359
+	ginkgo.It("ROX should provision storage with pvc data source [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
 
+		if !dInfo.Capabilities[storageframework.CapPVCDataSource] {
+			e2eskipper.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
+		}
+		init()
+
+		if l.config.ClientNodeSelection.Name == "" {
+			// Schedule all pods to the same topology segment (e.g. a cloud availability zone), some
+			// drivers don't support cloning across them.
+			if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 1); err != nil {
+				framework.Failf("Error setting topology requirements: %v", err)
+			}
+		}
+		testConfig := storageframework.ConvertTestConfig(l.config)
+		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
+		l.sourcePVC.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
+		dataSource := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
+		l.pvc.Spec.DataSource = dataSource
+		l.testCase.NodeSelection = testConfig.ClientNodeSelection
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
+			ginkgo.By("checking whether the created volume has the pre-populated data")
+			tests := []e2evolume.Test{
+				{
+					Volume:          *storageutils.CreateVolumeSource(claim.Name, false /* readOnly */),
+					Mode:            pattern.VolMode,
+					File:            "index.html",
+					ExpectedContent: expectedContent,
+				},
+			}
+			e2evolume.TestVolumeClientSlow(f, testConfig, nil, "", tests)
+		}
+		// Cloning fails if the source disk is still in the process of detaching, so we wait for the VolumeAttachment to be removed before cloning.
+		volumeAttachment := e2evolume.GetVolumeAttachmentName(f.ClientSet, testConfig, l.testCase.Provisioner, dataSource.Name, l.sourcePVC.Namespace)
+		e2evolume.WaitForVolumeAttachmentTerminated(volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision)
+
+
+		originalSize := l.testCase.Claim.Spec.Resources.Limits.Storage()
+		biggerSize := originalSize.DeepCopy()
+		biggerSize.Add(*resource.NewQuantity(1, resource.BinarySI))
+
+		// Create bigger claim
+		biggerClaim := l.testCase.Claim.DeepCopy()
+		biggerClaim.Name = "claim1"
+		biggerClaim.Spec.Resources.Requests = v1.ResourceList{
+			v1.ResourceStorage: biggerSize,
+		}
+
+		sameSizeClaim := l.testCase.Claim.DeepCopy()
+		sameSizeClaim.Name = "claim2"
+
+		for _, claim := range []*v1.PersistentVolumeClaim{biggerClaim, sameSizeClaim} {
+			ginkgo.By(fmt.Sprintf("creating claim=%+v", claim))
+			claim, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			defer func() {
+				framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
+				// typically this claim has already been deleted
+				err = l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+				if err != nil && !apierrors.IsNotFound(err) {
+					framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
+				}
+			}()
+
+			ginkgo.By("checking the claim")
+			pv, err := getBoundPV(ctx, l.testCase.Client, claim)
+			framework.ExpectNoError(err)
+
+			pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+			gomega.Expect(pvCapacity.Value()).To(gomega.BeNumerically("=", originalSize.Value()), "pvCapacity of pv for claim %s (%d) is not equal to original pvc size", claim.Name, pvCapacity, originalSize)
+
+			claimCapacity := biggerClaim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+			gomega.Expect(claimCapacity.Value()).To(gomega.BeNumerically("=", originalSize.Value()), "claimCapacity for claim %s (%d) is not equal to original pvc size", claim.Name, claimCapacity, originalSize)
+		}
+	})
+
+	ginkgo.It("ROX should use existing filesystem size when restoring snapshot to larger size pvc when in ROX mode [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
 		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("Test is not valid Windows - skipping")
 		}
@@ -425,9 +499,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			e2eskipper.Skipf("Test is not valid for Block volume mode - skipping")
 		}
 
-		if dInfo.Capabilities[storageframework.CapFilesystemResizeNotSupported] {
-			e2eskipper.Skipf("Driver %q does not support filesystem resizing - skipping", dInfo.Name)
-		}
 
 		if !dInfo.Capabilities[storageframework.CapSnapshotDataSource] {
 			e2eskipper.Skipf("Driver %q does not support populating data from snapshot - skipping", dInfo.Name)
@@ -498,48 +569,11 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
 
 		// Filesystem of a restored volume should be larger than the origin.
-		msg := fmt.Sprintf("Filesystem resize failed when restoring from snapshot to PVC with larger size. "+
-			"Restored fs size: %v bytes is not larger than origin fs size: %v bytes.\n"+
-			"HINT: Your driver needs to check the volume in NodeStageVolume and resize fs if needed.\n"+
-			"HINT: For an example patch see: https://github.com/kubernetes/cloud-provider-openstack/pull/1563/files",
+		msg := fmt.Sprintf("Filesystem resize occurred even though it is readonly. "+
+			"Restored fs size: %v bytes is not the same as origin fs size: %v bytes.\n"+
+			"HINT: Your driver needs to check the volume and skip resize if it's readonly.",
 			restoredFSSize, originFSSize)
 		gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
-	})
-
-	ginkgo.It("should provision storage with pvc data source", func(ctx context.Context) {
-		if !dInfo.Capabilities[storageframework.CapPVCDataSource] {
-			e2eskipper.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
-		}
-		init()
-
-		if l.config.ClientNodeSelection.Name == "" {
-			// Schedule all pods to the same topology segment (e.g. a cloud availability zone), some
-			// drivers don't support cloning across them.
-			if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 1); err != nil {
-				framework.Failf("Error setting topology requirements: %v", err)
-			}
-		}
-		testConfig := storageframework.ConvertTestConfig(l.config)
-		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
-		dataSource := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
-		l.pvc.Spec.DataSource = dataSource
-		l.testCase.NodeSelection = testConfig.ClientNodeSelection
-		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
-			ginkgo.By("checking whether the created volume has the pre-populated data")
-			tests := []e2evolume.Test{
-				{
-					Volume:          *storageutils.CreateVolumeSource(claim.Name, false /* readOnly */),
-					Mode:            pattern.VolMode,
-					File:            "index.html",
-					ExpectedContent: expectedContent,
-				},
-			}
-			e2evolume.TestVolumeClientSlow(f, testConfig, nil, "", tests)
-		}
-		// Cloning fails if the source disk is still in the process of detaching, so we wait for the VolumeAttachment to be removed before cloning.
-		volumeAttachment := e2evolume.GetVolumeAttachmentName(f.ClientSet, testConfig, l.testCase.Provisioner, dataSource.Name, l.sourcePVC.Namespace)
-		e2evolume.WaitForVolumeAttachmentTerminated(volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision)
-		l.testCase.TestDynamicProvisioning(ctx)
 	})
 
 	ginkgo.It("should provision storage with pvc data source in parallel [Slow]", func(ctx context.Context) {
