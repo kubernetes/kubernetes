@@ -54,7 +54,7 @@ func init() {
 
 func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
 	timeout := storagebackend.DefaultHealthcheckTimeout
-	if c.HealthcheckTimeout != time.Duration(0) {
+	if c.HealthcheckTimeout != 0 {
 		timeout = c.HealthcheckTimeout
 	}
 	return newETCD3Check(c, timeout, stopCh)
@@ -62,7 +62,7 @@ func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func(
 
 func newETCD3ReadyCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
 	timeout := storagebackend.DefaultReadinessTimeout
-	if c.ReadycheckTimeout != time.Duration(0) {
+	if c.ReadycheckTimeout != 0 {
 		timeout = c.ReadycheckTimeout
 	}
 	return newETCD3Check(c, timeout, stopCh)
@@ -152,7 +152,7 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 		if limiter.Allow() == false {
 			return lastError.Load()
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := context.WithTimeout(client.Ctx(), timeout)
 		defer cancel()
 		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
 		now := time.Now()
@@ -208,7 +208,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 			compactors[key] = compactor
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(compactorClient.Ctx())
 
 		compactor.interval = interval
 		compactor.cancel = cancel
@@ -244,10 +244,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 		return nil, nil, err
 	}
 
-	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client, c.DBMetricPollInterval)
-	if err != nil {
-		return nil, nil, err
-	}
+	stopDBSizeMonitor := startDBSizeMonitorPerEndpoint(client, c.DBMetricPollInterval)
 
 	var once sync.Once
 	destroyFunc := func() {
@@ -268,14 +265,14 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 
 // startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the
 // corresponding metric etcd_db_total_size_in_bytes for each etcd server endpoint.
-func startDBSizeMonitorPerEndpoint(client *clientv3.Client, interval time.Duration) (func(), error) {
+func startDBSizeMonitorPerEndpoint(client *clientv3.Client, interval time.Duration) func() {
 	if interval == 0 {
-		return func() {}, nil
+		return func() {}
 	}
 	dbMetricsMonitorsMu.Lock()
 	defer dbMetricsMonitorsMu.Unlock()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(client.Ctx())
 	for _, ep := range client.Endpoints() {
 		if _, found := dbMetricsMonitors[ep]; found {
 			continue
@@ -294,7 +291,5 @@ func startDBSizeMonitorPerEndpoint(client *clientv3.Client, interval time.Durati
 		}, interval, dbMetricsMonitorJitter, true)
 	}
 
-	return func() {
-		cancel()
-	}, nil
+	return cancel
 }
