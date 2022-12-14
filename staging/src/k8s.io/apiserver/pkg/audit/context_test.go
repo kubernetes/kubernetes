@@ -27,25 +27,53 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestEnabled(t *testing.T) {
+	tests := []struct {
+		name          string
+		ctx           *AuditContext
+		expectEnabled bool
+	}{{
+		name:          "nil context",
+		expectEnabled: false,
+	}, {
+		name:          "empty context",
+		ctx:           &AuditContext{},
+		expectEnabled: true, // An AuditContext should be considered enabled before the level is set
+	}, {
+		name:          "level None",
+		ctx:           &AuditContext{RequestAuditConfig: RequestAuditConfig{Level: auditinternal.LevelNone}},
+		expectEnabled: false,
+	}, {
+		name:          "level Metadata",
+		ctx:           &AuditContext{RequestAuditConfig: RequestAuditConfig{Level: auditinternal.LevelMetadata}},
+		expectEnabled: true,
+	}, {
+		name:          "level RequestResponse",
+		ctx:           &AuditContext{RequestAuditConfig: RequestAuditConfig{Level: auditinternal.LevelRequestResponse}},
+		expectEnabled: true,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expectEnabled, test.ctx.Enabled())
+		})
+	}
+}
+
 func TestAddAuditAnnotation(t *testing.T) {
 	const (
 		annotationKeyTemplate = "test-annotation-%d"
 		annotationValue       = "test-annotation-value"
+		annotationExtraValue  = "test-existing-annotation"
 		numAnnotations        = 10
 	)
 
 	expectAnnotations := func(t *testing.T, annotations map[string]string) {
 		assert.Len(t, annotations, numAnnotations)
 	}
-	noopValidator := func(_ *testing.T, _ context.Context) {}
-	eventValidator := func(t *testing.T, ctx context.Context) {
-		ev := AuditContextFrom(ctx).Event
-		expectAnnotations(t, ev.Annotations)
-	}
-	eventEmptyValidator := func(t *testing.T, ctx context.Context) {
-		ev := AuditContextFrom(ctx).Event
-		assert.Empty(t, ev.Annotations)
-	}
+
+	ctxWithAnnotation := withAuditContextAndLevel(context.Background(), auditinternal.LevelMetadata)
+	AddAuditAnnotation(ctxWithAnnotation, fmt.Sprintf(annotationKeyTemplate, 0), annotationExtraValue)
 
 	tests := []struct {
 		description string
@@ -54,15 +82,30 @@ func TestAddAuditAnnotation(t *testing.T) {
 	}{{
 		description: "no audit",
 		ctx:         context.Background(),
-		validator:   noopValidator,
+		validator:   func(_ *testing.T, _ context.Context) {},
 	}, {
 		description: "with metadata level",
 		ctx:         withAuditContextAndLevel(context.Background(), auditinternal.LevelMetadata),
-		validator:   eventValidator,
+		validator: func(t *testing.T, ctx context.Context) {
+			ev := AuditContextFrom(ctx).Event
+			expectAnnotations(t, ev.Annotations)
+		},
 	}, {
 		description: "with none level",
 		ctx:         withAuditContextAndLevel(context.Background(), auditinternal.LevelNone),
-		validator:   eventEmptyValidator,
+		validator: func(t *testing.T, ctx context.Context) {
+			ev := AuditContextFrom(ctx).Event
+			assert.Empty(t, ev.Annotations)
+		},
+	}, {
+		description: "with overlapping annotations",
+		ctx:         ctxWithAnnotation,
+		validator: func(t *testing.T, ctx context.Context) {
+			ev := AuditContextFrom(ctx).Event
+			expectAnnotations(t, ev.Annotations)
+			// Verify that the pre-existing annotation is not overwritten.
+			assert.Equal(t, annotationExtraValue, ev.Annotations[fmt.Sprintf(annotationKeyTemplate, 0)])
+		},
 	}}
 
 	for _, test := range tests {

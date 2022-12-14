@@ -48,6 +48,8 @@ type AuditContext struct {
 
 // Enabled checks whether auditing is enabled for this audit context.
 func (ac *AuditContext) Enabled() bool {
+	// Note: An unset Level should be considered Enabled, so that request data (e.g. annotations)
+	// can still be captured before the audit policy is evaluated.
 	return ac != nil && ac.RequestAuditConfig.Level != auditinternal.LevelNone
 }
 
@@ -151,17 +153,15 @@ func WithAuditID(ctx context.Context, auditID types.UID) {
 	if auditID == "" {
 		return
 	}
-	ac := AuditContextFrom(ctx)
-	if !ac.Enabled() {
-		return
+	if ac := AuditContextFrom(ctx); ac != nil {
+		ac.Event.AuditID = auditID
 	}
-	ac.Event.AuditID = auditID
 }
 
 // AuditIDFrom returns the value of the audit ID from the request context, along with whether
 // auditing is enabled.
 func AuditIDFrom(ctx context.Context) (types.UID, bool) {
-	if ac := AuditContextFrom(ctx); ac.Enabled() {
+	if ac := AuditContextFrom(ctx); ac != nil {
 		return ac.Event.AuditID, true
 	}
 	return "", false
