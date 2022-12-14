@@ -41,6 +41,7 @@ var AllCustomResourceValidators = []string{
 	network.PluginName,
 	apirequestcount.PluginName,
 	node.PluginName,
+	route.DefaultingPluginName,
 	route.PluginName,
 
 	// the kubecontrollermanager operator resource has to exist in order to run deployments to deploy admission webhooks.
@@ -84,4 +85,5 @@ func RegisterCustomResourceValidation(plugins *admission.Plugins) {
 	// served via CRD. Most OpenShift flavors (including vanilla) will continue to do validation
 	// and defaulting inside openshift-apiserver.
 	route.Register(plugins)
+	route.RegisterDefaulting(plugins)
 }
