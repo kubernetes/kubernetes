@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -32,7 +33,6 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	oteltrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
@@ -73,8 +73,8 @@ type TransportConfig struct {
 	// The TracerProvider can add tracing the connection
 	TracerProvider oteltrace.TracerProvider
 
-	complete bool
-	client   *clientv3.Client
+	complete  bool
+	getClient func() (*clientv3.Client, error)
 }
 
 // Config is configuration for creating a storage backend.
@@ -183,6 +183,38 @@ func (c *TransportConfig) Complete(ctx context.Context) error {
 		return fmt.Errorf("TransportConfig.Complete called more than once")
 	}
 
+	var (
+		once   sync.Once
+		client *clientv3.Client
+		err    error
+	)
+	c.getClient = func() (*clientv3.Client, error) {
+		once.Do(func() {
+			client, err = getClient(ctx, c)
+		})
+		return client, err
+	}
+	c.complete = true
+
+	return nil
+}
+
+func (c *TransportConfig) Client() (*clientv3.Client, error) {
+	if !c.complete {
+		return nil, fmt.Errorf("TransportConfig.Client called without completion")
+	}
+
+	return c.getClient()
+}
+
+func (c *TransportConfig) ShallowCopyAndResetComplete() TransportConfig {
+	out := *c
+	out.complete = false
+	out.getClient = nil
+	return out
+}
+
+func getClient(ctx context.Context, c *TransportConfig) (*clientv3.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
 		KeyFile:       c.KeyFile,
@@ -190,7 +222,7 @@ func (c *TransportConfig) Complete(ctx context.Context) error {
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// NOTE: Client relies on nil tlsConfig
 	// for non-secure connections, update the implicit variable
@@ -202,7 +234,7 @@ func (c *TransportConfig) Complete(ctx context.Context) error {
 	if c.EgressLookup != nil {
 		egressDialer, err = c.EgressLookup(networkContext)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	dialOptions := []grpc.DialOption{
@@ -243,7 +275,7 @@ func (c *TransportConfig) Complete(ctx context.Context) error {
 
 	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
 	if err != nil {
-		l = zap.NewNop()
+		return nil, err
 	}
 	etcd3ClientLogger := l.Named("etcd-client")
 
@@ -259,7 +291,7 @@ func (c *TransportConfig) Complete(ctx context.Context) error {
 
 	client, err := clientv3.New(cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// decorate the KV instance so we can track etcd latency per request.
@@ -272,22 +304,5 @@ func (c *TransportConfig) Complete(ctx context.Context) error {
 		_ = client.Close()
 	}()
 
-	c.client = client
-	c.complete = true
-	return nil
-}
-
-func (c *TransportConfig) Client() (*clientv3.Client, error) {
-	if !c.complete {
-		return nil, fmt.Errorf("TransportConfig.Client called without completion")
-	}
-
-	return c.client, nil
-}
-
-func (c *TransportConfig) ShallowCopyAndResetComplete() TransportConfig {
-	out := *c
-	out.complete = false
-	out.client = nil
-	return out
+	return client, nil
 }
