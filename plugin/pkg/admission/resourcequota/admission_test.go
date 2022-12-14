@@ -2017,7 +2017,7 @@ func TestAdmitZeroDeltaUsageWithoutCoveringQuota(t *testing.T) {
 		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
 	}
 
-	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.CreateOptions{}, false, nil), nil)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

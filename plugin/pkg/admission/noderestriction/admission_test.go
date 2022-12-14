@@ -680,7 +680,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid delete of normal pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreotherpod.Namespace, coreotherpod.Name, podResource, "", admission.Delete, &metav1.UpdateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(nil, nil, podKind, coreotherpod.Namespace, coreotherpod.Name, podResource, "", admission.Delete, &metav1.DeleteOptions{}, false, mynode),
 			err:        "spec.nodeName set to itself",
 		},
 		{
@@ -716,7 +716,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "forbid delete of eviction for normal pod bound to another",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(otherpodEviction, nil, evictionKind, otherpodEviction.Namespace, otherpodEviction.Name, podResource, "eviction", admission.Delete, &metav1.UpdateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(otherpodEviction, nil, evictionKind, otherpodEviction.Namespace, otherpodEviction.Name, podResource, "eviction", admission.Delete, &metav1.DeleteOptions{}, false, mynode),
 			err:        "forbidden: unexpected operation",
 		},
 		{
