@@ -150,6 +150,11 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	initRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
+		if cmd.Flags().Lookup(options.NodeCRISocket) == nil {
+			// avoid CRI detection
+			// assume that the command execution does not depend on CRISocket when --cri-socket flag is not set
+			initOptions.externalInitCfg.NodeRegistration.CRISocket = kubeadmconstants.UnknownCRISocket
+		}
 		data, err := newInitData(cmd, args, initOptions, out)
 		if err != nil {
 			return nil, err
