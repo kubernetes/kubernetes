@@ -2492,9 +2492,6 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should respect internalTrafficPolicy=Local Pod to Pod [Feature:ServiceInternalTrafficPolicy]", func(ctx context.Context) {
-		// windows kube-proxy does not support this feature yet
-		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		// This behavior is not supported if Kube-proxy is in "userspace" mode.
 		// So we check the kube-proxy mode and skip this test if that's the case.
@@ -2762,8 +2759,6 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should fail health check node port if there are only terminating endpoints [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
-		// windows kube-proxy does not support this feature yet
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		// This behavior is not supported if Kube-proxy is in "userspace" mode.
 		// So we check the kube-proxy mode and skip this test if that's the case.
@@ -3032,8 +3027,6 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
-		// windows kube-proxy does not support this feature yet
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		// This behavior is not supported if Kube-proxy is in "userspace" mode.
 		// So we check the kube-proxy mode and skip this test if that's the case.
@@ -3117,8 +3110,6 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
-		// windows kube-proxy does not support this feature yet
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		// This behavior is not supported if Kube-proxy is in "userspace" mode.
 		// So we check the kube-proxy mode and skip this test if that's the case.
