@@ -33,6 +33,22 @@ type diskInfoResult struct {
 	SerialNumber string
 }
 
+func unmarshallDiskJson(bytes []byte) ([]diskInfoResult, error) {
+	var data []diskInfoResult
+	err := json.Unmarshal(bytes, &data)
+	if err == nil {
+		return data, nil
+	}
+
+	if bytes[0] != '[' {
+		arrBytes := append([]byte{'['}, bytes...)
+		arrBytes = append(arrBytes, ']')
+		err = json.Unmarshal(arrBytes, &data)
+	}
+
+	return data, err
+}
+
 func verifyDevicePath(path string) (string, error) {
 	if !strings.Contains(path, diskByIDPath) {
 		// If this volume has already been mounted then
@@ -47,8 +63,8 @@ func verifyDevicePath(path string) (string, error) {
 		return "", err
 	}
 
-	var results []diskInfoResult
-	if err = json.Unmarshal(output, &results); err != nil {
+	results, err := unmarshallDiskJson(output)
+	if err != nil {
 		klog.Errorf("Failed to unmarshal Get-Disk json, output: %q", string(output))
 		return "", err
 	}

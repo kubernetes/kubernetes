@@ -40,6 +40,22 @@ func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	}
 }
 
+func unmarshallDiskJson(bytes []byte) ([]map[string]interface{}, error) {
+	var data []map[string]interface{}
+	err := json.Unmarshal(bytes, &data)
+	if err == nil {
+		return data, nil
+	}
+
+	if bytes[0] != '[' {
+		arrBytes := append([]byte{'['}, bytes...)
+		arrBytes = append(arrBytes, ']')
+		err = json.Unmarshal(arrBytes, &data)
+	}
+
+	return data, err
+}
+
 // search Windows disk number by LUN
 func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (string, error) {
 	cmd := `Get-Disk | select number, location | ConvertTo-Json`
@@ -53,8 +69,8 @@ func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (strin
 		return "", fmt.Errorf("Get-Disk output is too short, output: %q", string(output))
 	}
 
-	var data []map[string]interface{}
-	if err = json.Unmarshal(output, &data); err != nil {
+	data, err := unmarshallDiskJson(output)
+	if err != nil {
 		klog.Errorf("Get-Disk output is not a json array, output: %q", string(output))
 		return "", err
 	}

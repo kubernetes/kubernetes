@@ -204,9 +204,10 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	m, ch, p1, _ := setupInProbeMode(t, devs, nil, socketName, pluginSocketName)
 
 	// Wait for the first callback to be issued.
+	// NOTE: on Windows, Unix sockets may take a bit to become active.
 	select {
 	case <-ch:
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.FailNow()
 	}
 	capacity, allocatable, _ := m.GetCapacity()
@@ -221,7 +222,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	// Wait for the second callback to be issued.
 	select {
 	case <-ch:
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.FailNow()
 	}
 
@@ -238,7 +239,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	// Wait for the third callback to be issued.
 	select {
 	case <-ch:
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		t.FailNow()
 	}
 

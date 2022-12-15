@@ -20,42 +20,29 @@ limitations under the License.
 package rbd
 
 import (
-	"fmt"
-	"os/exec"
 	"strconv"
-	"strings"
+
+	"k8s.io/mount-utils"
 )
 
 func (fake *fakeDiskManager) AttachDisk(b rbdMounter) (string, error) {
 	fake.mutex.Lock()
 	defer fake.mutex.Unlock()
-	fake.rbdMapIndex++
 
-	// Windows expects Disk Numbers.
-	volIds, err := listVolumesOnDisk(strconv.Itoa(fake.rbdMapIndex))
+	// Windows expects Disk Numbers. We start with rbdMapIndex 0, referring to the first Disk.
+	volIds, err := mount.ListVolumesOnDisk(strconv.Itoa(fake.rbdMapIndex))
 	if err != nil {
 		return "", err
 	}
 	fake.rbdDevices[volIds[0]] = true
 	devicePath := strconv.Itoa(fake.rbdMapIndex)
+	fake.rbdMapIndex++
 	return devicePath, nil
-}
-
-// listVolumesOnDisk - returns back list of volumes(volumeIDs) in the disk (requested in diskID) on Windows.
-func listVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
-	cmd := fmt.Sprintf("(Get-Disk -DeviceId %s | Get-Partition | Get-Volume).UniqueId", diskID)
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	if err != nil {
-		return []string{}, fmt.Errorf("error list volumes on disk. cmd: %s, output: %s, error: %v", cmd, string(output), err)
-	}
-
-	volumeIds := strings.Split(strings.TrimSpace(string(output)), "\r\n")
-	return volumeIds, nil
 }
 
 func getLoggedSource(devicePath string) (string, error) {
 	// Windows mounter is mounting based on the Disk's Unique ID.
-	volIds, err := listVolumesOnDisk(devicePath)
+	volIds, err := mount.ListVolumesOnDisk(devicePath)
 	if err != nil {
 		return "", err
 	}

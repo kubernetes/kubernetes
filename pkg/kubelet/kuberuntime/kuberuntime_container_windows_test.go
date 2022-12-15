@@ -29,10 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
@@ -88,6 +85,11 @@ func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedCpuMax := ((10000 * 3000) / int64(runtime.NumCPU()) / 1000)
+	// Above, we're setting the limit to 3 CPUs. But we can't expect more than 100% of the CPUs
+	// we have. (e.g.: if we only have 2 CPUs, we can't have 150% CPU max).
+	if expectedCpuMax > 10000 {
+		expectedCpuMax = 10000
+	}
 	expectedWindowsConfig := &runtimeapi.WindowsContainerConfig{
 		Resources: &runtimeapi.WindowsContainerResources{
 			CpuMaximum:         expectedCpuMax,
