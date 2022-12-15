@@ -2024,6 +2024,7 @@ type EnvVar struct {
 	// Escaped references will never be expanded, regardless of whether the variable
 	// exists or not.
 	// Defaults to "".
+	// You cannot set both value and valueFrom.
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 	// Source for this environment variable's value. You cannot set both value and valueFrom.
