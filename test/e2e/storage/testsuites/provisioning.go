@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/klog/v2"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 
 	"github.com/onsi/ginkgo/v2"
@@ -480,7 +481,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}()
 
 			ginkgo.By(fmt.Sprintf( "checking the claim %+v", claim))
-			pv, err := getBoundPV(ctx, l.testCase.Client, claim)
+			pv, err := getBoundPV(ctx, l.testCase.Client, claim, l.testCase.Timeouts.ClaimProvision)
 			framework.ExpectNoError(err)
 
 
@@ -492,91 +493,91 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 	})
 
-	ginkgo.It("ROX should use existing filesystem size when restoring snapshot to larger size pvc when in ROX mode [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
-		if framework.NodeOSDistroIs("windows") {
-			e2eskipper.Skipf("Test is not valid Windows - skipping")
-		}
+	// ginkgo.It("ROX should use existing filesystem size when restoring snapshot to larger size pvc when in ROX mode [Feature:VolumeSnapshotDataSource]", func(ctx context.Context) {
+	// 	if framework.NodeOSDistroIs("windows") {
+	// 		e2eskipper.Skipf("Test is not valid Windows - skipping")
+	// 	}
 
-		if pattern.VolMode == "Block" {
-			e2eskipper.Skipf("Test is not valid for Block volume mode - skipping")
-		}
+	// 	if pattern.VolMode == "Block" {
+	// 		e2eskipper.Skipf("Test is not valid for Block volume mode - skipping")
+	// 	}
 
 
-		if !dInfo.Capabilities[storageframework.CapSnapshotDataSource] {
-			e2eskipper.Skipf("Driver %q does not support populating data from snapshot - skipping", dInfo.Name)
-		}
+	// 	if !dInfo.Capabilities[storageframework.CapSnapshotDataSource] {
+	// 		e2eskipper.Skipf("Driver %q does not support populating data from snapshot - skipping", dInfo.Name)
+	// 	}
 
-		if !dInfo.SupportedFsType.Has(pattern.FsType) {
-			e2eskipper.Skipf("Driver %q does not support %q fs type - skipping", dInfo.Name, pattern.FsType)
-		}
+	// 	if !dInfo.SupportedFsType.Has(pattern.FsType) {
+	// 		e2eskipper.Skipf("Driver %q does not support %q fs type - skipping", dInfo.Name, pattern.FsType)
+	// 	}
 
-		sDriver, ok := driver.(storageframework.SnapshottableTestDriver)
-		if !ok {
-			framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
-		}
+	// 	sDriver, ok := driver.(storageframework.SnapshottableTestDriver)
+	// 	if !ok {
+	// 		framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
+	// 	}
 
-		init()
+	// 	init()
 
-		pvc2 := l.pvc.DeepCopy()
-		l.pvc.Name = "pvc-origin"
-		dc := l.config.Framework.DynamicClient
-		testConfig := storageframework.ConvertTestConfig(l.config)
-		dataSource := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
-		localDataSource := &v1.TypedLocalObjectReference{
-			APIGroup: dataSource.APIGroup,
-			Kind:     dataSource.Kind,
-			Name:     dataSource.Name,
-		}
-		pvc2.Spec.DataSource = localDataSource
+	// 	pvc2 := l.pvc.DeepCopy()
+	// 	l.pvc.Name = "pvc-origin"
+	// 	dc := l.config.Framework.DynamicClient
+	// 	testConfig := storageframework.ConvertTestConfig(l.config)
+	// 	dataSource := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
+	// 	localDataSource := &v1.TypedLocalObjectReference{
+	// 		APIGroup: dataSource.APIGroup,
+	// 		Kind:     dataSource.Kind,
+	// 		Name:     dataSource.Name,
+	// 	}
+	// 	pvc2.Spec.DataSource = localDataSource
 
-		// Get the created PVC and record the actual size of the pv (from pvc status).
-		c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Failed to get pvc: %v", err)
-		actualPVSize := c.Status.Capacity.Storage().Value()
+	// 	// Get the created PVC and record the actual size of the pv (from pvc status).
+	// 	c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
+	// 	framework.ExpectNoError(err, "Failed to get pvc: %v", err)
+	// 	actualPVSize := c.Status.Capacity.Storage().Value()
 
-		createdClaims := []*v1.PersistentVolumeClaim{c}
-		pod, err := e2epod.CreatePod(l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
-		framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	// 	createdClaims := []*v1.PersistentVolumeClaim{c}
+	// 	pod, err := e2epod.CreatePod(l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
+	// 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
-		// Mount path should not be empty.
-		mountpath := findVolumeMountPath(pod, c)
-		gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
+	// 	// Mount path should not be empty.
+	// 	mountpath := findVolumeMountPath(pod, c)
+	// 	gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
 
-		// Save filesystem size of the origin volume.
-		originFSSize, err := getFilesystemSizeBytes(pod, mountpath)
-		framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
+	// 	// Save filesystem size of the origin volume.
+	// 	originFSSize, err := getFilesystemSizeBytes(pod, mountpath)
+	// 	framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
 
-		// For the new PVC, request a size that is larger than the origin PVC actually provisioned.
-		storageRequest := resource.NewQuantity(actualPVSize, resource.BinarySI)
-		storageRequest.Add(resource.MustParse("1Gi"))
-		pvc2.Spec.Resources.Requests = v1.ResourceList{
-			v1.ResourceStorage: *storageRequest,
-		}
+	// 	// For the new PVC, request a size that is larger than the origin PVC actually provisioned.
+	// 	storageRequest := resource.NewQuantity(actualPVSize, resource.BinarySI)
+	// 	storageRequest.Add(resource.MustParse("1Gi"))
+	// 	pvc2.Spec.Resources.Requests = v1.ResourceList{
+	// 		v1.ResourceStorage: *storageRequest,
+	// 	}
 
-		pvc2.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
+	// 	pvc2.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
 
-		// Create a new claim and a pod that will use the new PVC.
-		c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
-		createdClaims2 := []*v1.PersistentVolumeClaim{c2}
-		pod2, err := e2epod.CreatePod(l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
-		framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	// 	// Create a new claim and a pod that will use the new PVC.
+	// 	c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
+	// 	framework.ExpectNoError(err, "Failed to create pvc: %v", err)
+	// 	createdClaims2 := []*v1.PersistentVolumeClaim{c2}
+	// 	pod2, err := e2epod.CreatePod(l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
+	// 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
-		// Mount path should not be empty.
-		mountpath2 := findVolumeMountPath(pod2, c2)
-		gomega.Expect(mountpath2).ShouldNot(gomega.BeEmpty())
+	// 	// Mount path should not be empty.
+	// 	mountpath2 := findVolumeMountPath(pod2, c2)
+	// 	gomega.Expect(mountpath2).ShouldNot(gomega.BeEmpty())
 
-		// Get actual size of the restored filesystem.
-		restoredFSSize, err := getFilesystemSizeBytes(pod2, mountpath2)
-		framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
+	// 	// Get actual size of the restored filesystem.
+	// 	restoredFSSize, err := getFilesystemSizeBytes(pod2, mountpath2)
+	// 	framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
 
-		// Filesystem of a restored volume should be larger than the origin.
-		msg := fmt.Sprintf("Filesystem resize occurred even though it is readonly. "+
-			"Restored fs size: %v bytes is not the same as origin fs size: %v bytes.\n"+
-			"HINT: Your driver needs to check the volume and skip resize if it's readonly.",
-			restoredFSSize, originFSSize)
-		gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
-	})
+	// 	// Filesystem of a restored volume should be larger than the origin.
+	// 	msg := fmt.Sprintf("Filesystem resize occurred even though it is readonly. "+
+	// 		"Restored fs size: %v bytes is not the same as origin fs size: %v bytes.\n"+
+	// 		"HINT: Your driver needs to check the volume and skip resize if it's readonly.",
+	// 		restoredFSSize, originFSSize)
+	// 	gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
+	// })
 
 	ginkgo.It("should provision storage with pvc data source in parallel [Slow]", func(ctx context.Context) {
 		// Test cloning a single volume multiple times.
@@ -774,13 +775,19 @@ func (t StorageClassTest) TestDynamicProvisioning(ctx context.Context) *v1.Persi
 }
 
 // getBoundPV returns a PV details.
-func getBoundPV(ctx context.Context, client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+func getBoundPV(ctx context.Context, client clientset.Interface, pvc *v1.PersistentVolumeClaim, claimProvisionTimeout time.Duration) (*v1.PersistentVolume, error) {
 	// Get new copy of the claim
+	klog.Errorf("pvc = %v+",pvc)
 	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
+	// make sure claim did bind
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, claimProvisionTimeout)
+		framework.ExpectNoError(err)
+
+	klog.Errorf("claim = %v+",claim)
 	// Get the bound PV
 	pv, err := client.CoreV1().PersistentVolumes().Get(ctx, claim.Spec.VolumeName, metav1.GetOptions{})
 	return pv, err
@@ -792,7 +799,7 @@ func (t StorageClassTest) checkProvisioning(ctx context.Context, client clientse
 	framework.ExpectNoError(err)
 
 	ginkgo.By("checking the claim")
-	pv, err := getBoundPV(ctx, client, claim)
+	pv, err := getBoundPV(ctx, client, claim, t.Timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 
 	// Check sizes
@@ -867,7 +874,7 @@ func PVWriteReadSingleNodeCheck(ctx context.Context, client clientset.Interface,
 	pod = nil // Don't stop twice.
 
 	// Get a new copy of the PV
-	e2evolume, err := getBoundPV(ctx, client, claim)
+	e2evolume, err := getBoundPV(ctx, client, claim, timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("checking the created volume has the correct mount options, is readable and retains data on the same node %q", actualNodeName))
@@ -1347,7 +1354,7 @@ func MultiplePVMountSingleNodeCheck(ctx context.Context, client clientset.Interf
 	ginkgo.By(fmt.Sprintf("Created Pod %s/%s on node %s", pod1.Namespace, pod1.Name, pod1.Spec.NodeName))
 
 	// Create new PV which points to the same underlying storage. Retain policy is used so that deletion of second PVC does not trigger the deletion of its bound PV and underlying storage.
-	e2evolume, err := getBoundPV(ctx, client, claim)
+	e2evolume, err := getBoundPV(ctx, client, claim, timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 	pv2Config := e2epv.PersistentVolumeConfig{
 		NamePrefix:       fmt.Sprintf("%s-", "pv"),
