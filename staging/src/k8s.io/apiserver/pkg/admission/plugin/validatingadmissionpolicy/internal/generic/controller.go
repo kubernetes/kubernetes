@@ -185,8 +185,8 @@ func (c *controller[T]) Run(ctx context.Context) error {
 	for i := uint(0); i < c.options.Workers; i++ {
 		waitGroup.Add(1)
 		go func() {
+			defer waitGroup.Done()
 			wait.Until(c.runWorker, time.Second, ctx.Done())
-			waitGroup.Done()
 		}()
 	}
 
