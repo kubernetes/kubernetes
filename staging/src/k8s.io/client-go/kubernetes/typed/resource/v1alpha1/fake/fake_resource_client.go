@@ -47,6 +47,5 @@ func (c *FakeResourceV1alpha1) ResourceClasses() v1alpha1.ResourceClassInterface
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeResourceV1alpha1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

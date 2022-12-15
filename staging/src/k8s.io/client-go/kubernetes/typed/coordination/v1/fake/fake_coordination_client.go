@@ -35,6 +35,5 @@ func (c *FakeCoordinationV1) Leases(namespace string) v1.LeaseInterface {
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeCoordinationV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

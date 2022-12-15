@@ -35,6 +35,5 @@ func (c *FakeExample) TestTypes(namespace string) internalversion.TestTypeInterf
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeExample) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

@@ -35,6 +35,5 @@ func (c *FakeAuthenticationV1alpha1) SelfSubjectReviews() v1alpha1.SelfSubjectRe
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAuthenticationV1alpha1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

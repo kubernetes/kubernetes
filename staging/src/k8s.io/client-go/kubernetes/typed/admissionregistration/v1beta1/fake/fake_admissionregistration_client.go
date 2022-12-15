@@ -39,6 +39,5 @@ func (c *FakeAdmissionregistrationV1beta1) ValidatingWebhookConfigurations() v1b
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAdmissionregistrationV1beta1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

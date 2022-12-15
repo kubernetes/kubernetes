@@ -35,6 +35,5 @@ func (c *FakeAutoscalingV1) HorizontalPodAutoscalers(namespace string) v1.Horizo
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAutoscalingV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

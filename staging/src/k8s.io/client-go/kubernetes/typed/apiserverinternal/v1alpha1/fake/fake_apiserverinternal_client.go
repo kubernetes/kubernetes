@@ -35,6 +35,5 @@ func (c *FakeInternalV1alpha1) StorageVersions() v1alpha1.StorageVersionInterfac
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeInternalV1alpha1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

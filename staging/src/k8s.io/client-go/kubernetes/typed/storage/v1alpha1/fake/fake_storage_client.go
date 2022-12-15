@@ -39,6 +39,5 @@ func (c *FakeStorageV1alpha1) VolumeAttachments() v1alpha1.VolumeAttachmentInter
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeStorageV1alpha1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

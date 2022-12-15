@@ -95,6 +95,5 @@ func (c *FakeCoreV1) ServiceAccounts(namespace string) v1.ServiceAccountInterfac
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeCoreV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

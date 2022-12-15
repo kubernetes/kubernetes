@@ -39,6 +39,5 @@ func (c *FakePolicyV1) PodDisruptionBudgets(namespace string) v1.PodDisruptionBu
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakePolicyV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

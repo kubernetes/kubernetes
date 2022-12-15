@@ -35,6 +35,5 @@ func (c *FakeCertificatesV1) CertificateSigningRequests() v1.CertificateSigningR
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeCertificatesV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

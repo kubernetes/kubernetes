@@ -39,6 +39,5 @@ func (c *FakeMetricsV1alpha1) PodMetricses(namespace string) v1alpha1.PodMetrics
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeMetricsV1alpha1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

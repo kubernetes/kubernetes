@@ -39,6 +39,5 @@ func (c *FakeWardleV1alpha1) Flunders(namespace string) v1alpha1.FlunderInterfac
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeWardleV1alpha1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

@@ -43,6 +43,5 @@ func (c *FakePolicyV1beta1) PodSecurityPolicies() v1beta1.PodSecurityPolicyInter
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakePolicyV1beta1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

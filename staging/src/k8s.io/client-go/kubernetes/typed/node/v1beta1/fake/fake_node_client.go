@@ -35,6 +35,5 @@ func (c *FakeNodeV1beta1) RuntimeClasses() v1beta1.RuntimeClassInterface {
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeNodeV1beta1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

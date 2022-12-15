@@ -39,6 +39,5 @@ func (c *FakeFlowcontrolV1beta1) PriorityLevelConfigurations() v1beta1.PriorityL
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeFlowcontrolV1beta1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

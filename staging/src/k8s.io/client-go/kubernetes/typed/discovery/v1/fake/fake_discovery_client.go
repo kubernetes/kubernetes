@@ -35,6 +35,5 @@ func (c *FakeDiscoveryV1) EndpointSlices(namespace string) v1.EndpointSliceInter
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeDiscoveryV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

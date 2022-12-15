@@ -47,6 +47,5 @@ func (c *FakeRbacV1alpha1) RoleBindings(namespace string) v1alpha1.RoleBindingIn
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeRbacV1alpha1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

@@ -51,6 +51,5 @@ func (c *FakeAppsV1) StatefulSets(namespace string) v1.StatefulSetInterface {
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAppsV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

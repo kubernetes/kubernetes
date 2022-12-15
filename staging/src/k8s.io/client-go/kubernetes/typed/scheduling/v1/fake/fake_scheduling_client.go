@@ -35,6 +35,5 @@ func (c *FakeSchedulingV1) PriorityClasses() v1.PriorityClassInterface {
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeSchedulingV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }

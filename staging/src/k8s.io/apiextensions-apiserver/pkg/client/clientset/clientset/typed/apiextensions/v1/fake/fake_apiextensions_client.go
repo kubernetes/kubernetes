@@ -35,6 +35,5 @@ func (c *FakeApiextensionsV1) CustomResourceDefinitions() v1.CustomResourceDefin
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeApiextensionsV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
-	return ret
+	return &rest.RESTClient{}
 }
