@@ -136,30 +136,40 @@ func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
 }
 
 func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (string, volume.DeviceMountableVolumePlugin) {
-	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
-	if err != nil {
-		t.Fatalf("can't make a temp dir: %v", err)
+	var (
+		source string
+		err    error
+	)
+
+	if isBlockDevice && runtime.GOOS == "windows" {
+		// On Windows, block devices are referenced by the disk number, which is validated by the mounter,
+		source = "0"
+	} else {
+		source, err = utiltesting.MkTmpdir("localVolumeTest")
+		if err != nil {
+			t.Fatalf("can't make a temp dir: %v", err)
+		}
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
 	var pathToFSType map[string]hostutil.FileType
 	if isBlockDevice {
 		pathToFSType = map[string]hostutil.FileType{
-			tmpDir: hostutil.FileTypeBlockDev,
+			source: hostutil.FileTypeBlockDev,
 		}
 	}
 
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHostWithMounterFSType(t, tmpDir, nil, nil, pathToFSType))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHostWithMounterFSType(t, source, nil, nil, pathToFSType))
 
 	plug, err := plugMgr.FindDeviceMountablePluginByName(localVolumePluginName)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		os.RemoveAll(source)
 		t.Fatalf("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != localVolumePluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
-	return tmpDir, plug
+	return source, plug
 }
 
 func getTestVolume(readOnly bool, path string, isBlock bool, mountOptions []string) *volume.Spec {
@@ -244,11 +254,6 @@ func TestInvalidLocalPath(t *testing.T) {
 }
 
 func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
 	// Block device global mount path testing
 	tmpBlockDir, plug := getDeviceMountablePluginWithBlockPath(t, true)
 	defer os.RemoveAll(tmpBlockDir)
