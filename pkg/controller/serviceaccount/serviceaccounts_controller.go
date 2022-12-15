@@ -68,18 +68,18 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount"),
 	}
 
-	saInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	saHandler, _ := saInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.serviceAccountDeleted,
 	}, options.ServiceAccountResync)
 	e.saLister = saInformer.Lister()
-	e.saListerSynced = saInformer.Informer().HasSynced
+	e.saListerSynced = saHandler.HasSynced
 
-	nsInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	nsHandler, _ := nsInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
 	}, options.NamespaceResync)
 	e.nsLister = nsInformer.Lister()
-	e.nsListerSynced = nsInformer.Informer().HasSynced
+	e.nsListerSynced = nsHandler.HasSynced
 
 	e.syncHandler = e.syncNamespace
 

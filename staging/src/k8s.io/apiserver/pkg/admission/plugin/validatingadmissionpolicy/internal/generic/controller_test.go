@@ -106,6 +106,7 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 	controller generic.Controller[*unstructured.Unstructured],
 	informer *testInformer,
 	waitForReconcile func(runtime.Object) error,
+	verifyNoMoreEvents func() bool,
 ) {
 	tracker = clienttesting.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	reconciledObjects := make(chan runtime.Object)
@@ -127,7 +128,11 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 		if customReconciler != nil {
 			err = customReconciler(namespace, name, newObj)
 		}
-		reconciledObjects <- copied
+		select {
+		case reconciledObjects <- copied:
+		case <-ctx.Done():
+			panic("timed out attempting to deliver reconcile event")
+		}
 		return err
 	}
 
@@ -149,23 +154,24 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 		generic.ControllerOptions{},
 	)
 
-	go func() {
-		<-ctx.Done()
-		close(reconciledObjects)
-
+	verifyNoMoreEvents = func() bool {
+		close(reconciledObjects) // closing means that a future attempt to send will crash
 		for leftover := range reconciledObjects {
 			panic(fmt.Errorf("leftover object which was not anticipated by test: %v", leftover))
 		}
-	}()
+		// TODO(alexzielenski): this effectively doesn't test anything since the
+		// controller drops any pending events when it shuts down.
+		return true
+	}
 
-	return tracker, myController, informer, waitForReconcile
+	return tracker, myController, informer, waitForReconcile, verifyNoMoreEvents
 }
 
 func TestReconcile(t *testing.T) {
 	testContext, testCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer testCancel()
 
-	tracker, myController, informer, waitForReconcile := setupTest(testContext, nil)
+	tracker, myController, informer, waitForReconcile, verifyNoMoreEvents := setupTest(testContext, nil)
 
 	// Add object to informer
 	initialObject := &unstructured.Unstructured{}
@@ -196,10 +202,15 @@ func TestReconcile(t *testing.T) {
 		require.ErrorIs(t, stopReason, context.Canceled)
 	}()
 
-	require.True(t, cache.WaitForCacheSync(testContext.Done(), myController.HasSynced))
+	// The controller is blocked because the reconcile function sends on an
+	// unbuffered channel.
+	require.False(t, myController.HasSynced())
 
 	// Wait for all enqueued reconciliations
 	require.NoError(t, waitForReconcile(initialObject))
+
+	// Now it is safe to wait for it to Sync
+	require.True(t, cache.WaitForCacheSync(testContext.Done(), myController.HasSynced))
 
 	// Updated object
 	updatedObject := &unstructured.Unstructured{}
@@ -220,13 +231,15 @@ func TestReconcile(t *testing.T) {
 
 	testCancel()
 	wg.Wait()
+
+	verifyNoMoreEvents()
 }
 
 func TestShutdown(t *testing.T) {
 	testContext, testCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer testCancel()
 
-	_, myController, informer, _ := setupTest(testContext, nil)
+	_, myController, informer, _, verifyNoMoreEvents := setupTest(testContext, nil)
 
 	wg := sync.WaitGroup{}
 
@@ -256,6 +269,8 @@ func TestShutdown(t *testing.T) {
 
 	// Ensure the event handler was cleaned up
 	require.Empty(t, informer.registrations)
+
+	verifyNoMoreEvents()
 }
 
 // Show an error is thrown informer isn't started when the controller runs
@@ -263,7 +278,7 @@ func TestInformerNeverStarts(t *testing.T) {
 	testContext, testCancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
 	defer testCancel()
 
-	_, myController, informer, _ := setupTest(testContext, nil)
+	_, myController, informer, _, verifyNoMoreEvents := setupTest(testContext, nil)
 
 	wg := sync.WaitGroup{}
 
@@ -283,6 +298,8 @@ func TestInformerNeverStarts(t *testing.T) {
 
 	// Ensure there are no event handlers
 	require.Empty(t, informer.registrations)
+
+	verifyNoMoreEvents()
 }
 
 // Shows that if RV does not change, the reconciler does not get called
@@ -290,7 +307,7 @@ func TestIgnoredUpdate(t *testing.T) {
 	testContext, testCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer testCancel()
 
-	tracker, myController, informer, waitForReconcile := setupTest(testContext, nil)
+	tracker, myController, informer, waitForReconcile, verifyNoMoreEvents := setupTest(testContext, nil)
 
 	// Add object to informer
 	initialObject := &unstructured.Unstructured{}
@@ -321,10 +338,15 @@ func TestIgnoredUpdate(t *testing.T) {
 		require.ErrorIs(t, stopReason, context.Canceled)
 	}()
 
-	require.True(t, cache.WaitForCacheSync(testContext.Done(), myController.HasSynced))
+	// The controller is blocked because the reconcile function sends on an
+	// unbuffered channel.
+	require.False(t, myController.HasSynced())
 
 	// Wait for all enqueued reconciliations
 	require.NoError(t, waitForReconcile(initialObject))
+
+	// Now it is safe to wait for it to Sync
+	require.True(t, cache.WaitForCacheSync(testContext.Done(), myController.HasSynced))
 
 	// Send update with the same object
 	require.NoError(t, tracker.Update(fakeGVR, initialObject, ""))
@@ -334,8 +356,9 @@ func TestIgnoredUpdate(t *testing.T) {
 	testCancel()
 	wg.Wait()
 
-	// Test infrastructure has logic to panic if there are any reconciled objects
-	// that weren't "expected"
+	// TODO(alexzielenski): Find a better way to test this since the
+	// controller drops any pending events when it shuts down.
+	verifyNoMoreEvents()
 }
 
 // Shows that an object which fails reconciliation will retry
@@ -345,7 +368,7 @@ func TestReconcileRetry(t *testing.T) {
 
 	calls := atomic.Uint64{}
 	success := atomic.Bool{}
-	tracker, myController, _, waitForReconcile := setupTest(testContext, func(s1, s2 string, o runtime.Object) error {
+	tracker, myController, _, waitForReconcile, verifyNoMoreEvents := setupTest(testContext, func(s1, s2 string, o runtime.Object) error {
 
 		if calls.Add(1) > 2 {
 			// Suddenly start liking the object
@@ -390,13 +413,14 @@ func TestReconcileRetry(t *testing.T) {
 	require.True(t, success.Load(), "last call to reconcile should return success")
 	testCancel()
 	wg.Wait()
+
+	verifyNoMoreEvents()
 }
 
 func TestInformerList(t *testing.T) {
 	testContext, testCancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer testCancel()
 
-	tracker, myController, _, _ := setupTest(testContext, nil)
+	tracker, myController, _, _, _ := setupTest(testContext, nil)
 
 	wg := sync.WaitGroup{}
 
@@ -406,7 +430,12 @@ func TestInformerList(t *testing.T) {
 		myController.Informer().Run(testContext.Done())
 	}()
 
-	require.True(t, cache.WaitForCacheSync(testContext.Done(), myController.HasSynced))
+	defer func() {
+		testCancel()
+		wg.Wait()
+	}()
+
+	require.True(t, cache.WaitForCacheSync(testContext.Done(), myController.Informer().HasSynced))
 
 	object1 := &unstructured.Unstructured{}
 	object1.SetUnstructuredContent(map[string]interface{}{
