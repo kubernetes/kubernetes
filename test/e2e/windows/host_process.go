@@ -68,8 +68,11 @@ const (
 		Write-Output $c
 		throw "Contents of /etc/secret/foo.txt are not as expected"
 	}
-	if ($env:NODE_NAME_TEST -ne $env:COMPUTERNAME) {
-		throw "NODE_NAME_TEST env var ($env:NODE_NAME_TEST) does not equal COMPUTERNAME ($env:COMPUTERNAME)"
+	# Windows ComputerNames cannot exceed 15 characters, which means that the $env:COMPUTERNAME
+	# can only be a substring of $env:NODE_NAME_TEST. We compare it with the hostname instead.
+	# The following comparison is case insensitive.
+	if ($env:NODE_NAME_TEST -ine "$(hostname)") {
+		throw "NODE_NAME_TEST env var ($env:NODE_NAME_TEST) does not equal hostname"
 	}
 	Write-Output "SUCCESS"`
 )
@@ -99,6 +102,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		ginkgo.By("scheduling a pod with a container that verifies %COMPUTERNAME% matches selected node name")
 		image := imageutils.GetConfig(imageutils.BusyBox)
 		podName := "host-process-test-pod"
+		// We're passing this to powershell.exe -Command. Inside, we must use apostrophes for strings.
+		command := fmt.Sprintf(`& {if ('%s' -ine "$(hostname)") { exit -1 }}`, targetNode.Name)
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
@@ -115,7 +120,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 					{
 						Image:   image.GetE2EImage(),
 						Name:    "computer-name-test",
-						Command: []string{"cmd.exe", "/K", "IF", "NOT", "%COMPUTERNAME%", "==", targetNode.Name, "(", "exit", "-1", ")"},
+						Command: []string{"powershell.exe", "-Command", command},
 					},
 				},
 				RestartPolicy: v1.RestartPolicyNever,
