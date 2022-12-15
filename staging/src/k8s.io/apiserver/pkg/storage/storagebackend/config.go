@@ -19,21 +19,17 @@ package storagebackend
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	oteltrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -164,22 +160,6 @@ const (
 	dialTimeout = 20 * time.Second
 )
 
-// etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.
-// NOTE(negz): This is a copy of a private etcd client function:
-// https://github.com/etcd-io/etcd/blob/v3.5.4/client/v3/logger.go#L47
-func etcdClientDebugLevel() zapcore.Level {
-	envLevel := os.Getenv("ETCD_CLIENT_DEBUG")
-	if envLevel == "" || envLevel == "true" {
-		return zapcore.InfoLevel
-	}
-	var l zapcore.Level
-	if err := l.Set(envLevel); err == nil {
-		log.Printf("Deprecated env ETCD_CLIENT_DEBUG value. Using default level: 'info'")
-		return zapcore.InfoLevel
-	}
-	return l
-}
-
 func (c *TransportConfig) Complete(ctx context.Context) error {
 	if c.complete {
 		return fmt.Errorf("TransportConfig.Complete called more than once")
@@ -297,12 +277,6 @@ func getClient(ctx context.Context, c TransportConfig) (*clientv3.Client, error)
 		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
 	}
 
-	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
-	if err != nil {
-		return nil, err
-	}
-	etcd3ClientLogger := l.Named("etcd-client")
-
 	cfg := clientv3.Config{
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
@@ -310,7 +284,6 @@ func getClient(ctx context.Context, c TransportConfig) (*clientv3.Client, error)
 		DialOptions:          dialOptions,
 		Endpoints:            c.ServerList,
 		TLS:                  tlsConfig,
-		Logger:               etcd3ClientLogger,
 	}
 
 	client, err := clientv3.New(cfg)
