@@ -838,7 +838,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		err = e2edaemonset.CheckDaemonStatus(f, dsName)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("listing all DeamonSets")
+		ginkgo.By("listing all DaemonSets")
 		dsList, err := cs.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 		framework.ExpectNoError(err, "failed to list Daemon Sets")
 		framework.ExpectEqual(len(dsList.Items), 1, "filtered list wasn't found")
