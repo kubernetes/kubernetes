@@ -60,12 +60,18 @@ type legacyPrivateClaims struct {
 	Namespace          string `json:"kubernetes.io/serviceaccount/namespace"`
 }
 
-func NewLegacyValidator(lookup bool, getter ServiceAccountTokenGetter, secretsWriter typedv1core.SecretsGetter) Validator {
+func NewLegacyValidator(lookup bool, getter ServiceAccountTokenGetter, secretsWriter typedv1core.SecretsGetter) (Validator, error) {
+	if lookup && getter == nil {
+		return nil, errors.New("ServiceAccountTokenGetter must be provided")
+	}
+	if lookup && secretsWriter == nil {
+		return nil, errors.New("SecretsWriter must be provided")
+	}
 	return &legacyValidator{
 		lookup:        lookup,
 		getter:        getter,
 		secretsWriter: secretsWriter,
-	}
+	}, nil
 }
 
 type legacyValidator struct {
