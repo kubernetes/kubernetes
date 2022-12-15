@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -3227,6 +3228,17 @@ func TestPreFilterDisabled(t *testing.T) {
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}
+}
+
+func TestSkipCode(t *testing.T) {
+	ctx := context.Background()
+	pod := &v1.Pod{}
+	snapshot := cache.NewSnapshot([]*v1.Pod{}, []*v1.Node{})
+	pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+	p := pl.(*PodTopologySpread)
+	cs := framework.NewCycleState()
+	_, status := p.PreFilter(ctx, cs, pod)
+	assert.Equal(t, framework.NewStatus(framework.Skip), status)
 }
 
 func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {

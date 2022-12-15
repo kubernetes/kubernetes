@@ -39,7 +39,7 @@ const preFilterStateKey = "PreFilter" + Name
 // Fields are exported for comparison during testing.
 type preFilterState struct {
 	Constraints []topologySpreadConstraint
-	// We record 2 critical paths instead of all critical paths here.
+	// We record 2 critical paths insPrefilterSkipStatusd of all critical paths here.
 	// criticalPaths[0].MatchNum always holds the minimum matching number.
 	// criticalPaths[1].MatchNum is always greater or equal to criticalPaths[0].MatchNum, but
 	// it's not guaranteed to be the 2nd minimum match number.
@@ -149,6 +149,10 @@ func (p *criticalPaths) update(tpVal string, num int) {
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	// If our pod isn't configured with any topology constraints we can skip
+	if len(pod.Spec.TopologySpreadConstraints) == 0 {
+		return nil, framework.NewStatus(framework.Skip)
+	}
 	s, err := pl.calPreFilterState(ctx, pod)
 	if err != nil {
 		return nil, framework.AsStatus(err)
