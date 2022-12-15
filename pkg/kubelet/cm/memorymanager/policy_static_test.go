@@ -1025,7 +1025,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			},
 		},
 		{
-			description: "shoud equal",
+			description: "should validate the totalFree and totalReserved size for a resource within a group",
 			expectedAssignments: state.ContainerMemoryAssignments{
 				"pod1": map[string][]state.Block{
 					"container1": {
