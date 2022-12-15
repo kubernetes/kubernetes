@@ -2026,7 +2026,7 @@ type EnvVar struct {
 	// Defaults to "".
 	// +optional
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
-	// Source for the environment variable's value. Only used if value is empty.
+	// Source for this environment variable's value. You cannot set both value and valueFrom.
 	// +optional
 	ValueFrom *EnvVarSource `json:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
 }
