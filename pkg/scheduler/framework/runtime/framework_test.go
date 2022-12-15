@@ -1506,7 +1506,6 @@ func TestFilterPlugins(t *testing.T) {
 					name: "TestPlugin1",
 					inj:  injectedResult{FilterStatus: int(framework.Error)},
 				},
-
 				{
 					name: "TestPlugin2",
 					inj:  injectedResult{FilterStatus: int(framework.Error)},
@@ -1515,6 +1514,23 @@ func TestFilterPlugins(t *testing.T) {
 			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
 			wantStatusMap: framework.PluginToStatus{
 				"TestPlugin1": framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
+			},
+		},
+		{
+			name: "UnschedulableAndUnschedulableFilters",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(framework.Unschedulable)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(framework.Unschedulable)},
+				},
+			},
+			wantStatus: framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin1"),
+			wantStatusMap: framework.PluginToStatus{
+				"TestPlugin1": framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin1"),
 			},
 		},
 		{
