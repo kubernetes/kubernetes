@@ -86,6 +86,11 @@ func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
 
 	limit := int64(3000)
 	expectedCpuMax := 10 * limit / int64(winstats.ProcessorCount())
+	// Above, we're setting the limit to 3 CPUs. But we can't expect more than 100% of the CPUs
+	// we have. (e.g.: if we only have 2 CPUs, we can't have 150% CPU max).
+	if expectedCpuMax > 10000 {
+		expectedCpuMax = 10000
+	}
 	expectedWindowsConfig := &runtimeapi.WindowsContainerConfig{
 		Resources: &runtimeapi.WindowsContainerResources{
 			CpuMaximum:         expectedCpuMax,

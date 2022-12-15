@@ -19,12 +19,7 @@ package validation
 import (
 	_ "time/tzdata"
 
-	"archive/zip"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -44,10 +39,10 @@ var (
 	timeZoneEmpty      = ""
 	timeZoneLocal      = "LOCAL"
 	timeZoneUTC        = "UTC"
-	timeZoneCorrect    = "Continent/Zone"
-	timeZoneBadPrefix  = " Continent/Zone"
-	timeZoneBadSuffix  = "Continent/Zone "
-	timeZoneBadName    = "Continent/InvalidZone"
+	timeZoneCorrect    = "Europe/Rome"
+	timeZoneBadPrefix  = " Europe/Rome"
+	timeZoneBadSuffix  = "Europe/Rome "
+	timeZoneBadName    = "Europe/InvalidRome"
 	timeZoneEmptySpace = " "
 )
 
@@ -1444,12 +1439,6 @@ func TestValidateCronJob(t *testing.T) {
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
 	validPodTemplateSpec.Labels = map[string]string{}
 
-	zoneDir := t.TempDir()
-	if err := setupFakeTimeZoneDatabase(zoneDir); err != nil {
-		t.Fatalf("Unexpected error setting up fake timezone database: %v", err)
-	}
-	t.Setenv("ZONEINFO", zoneDir)
-
 	successCases := map[string]batch.CronJob{
 		"basic scheduled job": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -1940,42 +1929,6 @@ func TestValidateCronJob(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Sets up fake timezone database in a zoneDir directory with a single valid
-// time zone called "Continent/Zone" by copying UTC metadata from golang's
-// built-in databse. Returns an error in case of problems.
-func setupFakeTimeZoneDatabase(zoneDir string) error {
-	reader, err := zip.OpenReader(runtime.GOROOT() + "/lib/time/zoneinfo.zip")
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	if err := os.Mkdir(filepath.Join(zoneDir, "Continent"), os.ModePerm); err != nil {
-		return err
-	}
-	zoneFile, err := os.OpenFile(filepath.Join(zoneDir, "Continent", "Zone"), os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	defer zoneFile.Close()
-
-	for _, file := range reader.File {
-		if file.Name != "UTC" {
-			continue
-		}
-		rc, err := file.Open()
-		if err != nil {
-			return err
-		}
-		if _, err := io.Copy(zoneFile, rc); err != nil {
-			return err
-		}
-		rc.Close()
-		break
-	}
-	return nil
 }
 
 func TestValidateCronJobSpec(t *testing.T) {
