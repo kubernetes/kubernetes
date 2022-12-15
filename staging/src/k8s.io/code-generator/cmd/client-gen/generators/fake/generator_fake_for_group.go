@@ -126,3 +126,4 @@ var getRESTClient = `
 func (c *Fake$.GroupGoName$$.Version$) RESTClient() $.RESTClientInterface|raw$ {
 	return &$.RESTClient|raw${}
 }
+`
