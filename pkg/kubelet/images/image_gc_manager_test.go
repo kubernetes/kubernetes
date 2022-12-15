@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -463,6 +464,13 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 				makeContainer(1),
 			},
 		}},
+	}
+	// manager.detectImages uses time.Now() to update the image's lastUsed field.
+	// On Windows, consecutive time.Now() calls can return the same timestamp, which would mean
+	// that the second image is NOT newer than the first one.
+	// time.Sleep will result in the timestamp to be updated as well.
+	if goruntime.GOOS == "windows" {
+		time.Sleep(time.Millisecond)
 	}
 	_, err = manager.detectImages(ctx, time.Now())
 	require.NoError(t, err)
