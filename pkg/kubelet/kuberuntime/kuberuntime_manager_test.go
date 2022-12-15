@@ -914,7 +914,7 @@ func TestComputePodActions(t *testing.T) {
 		actions        podActions
 		resetStatusFn  func(*kubecontainer.PodStatus)
 	}{
-		"everying is good; do nothing": {
+		"everything is good; do nothing": {
 			actions: noAction,
 		},
 		"start pod sandbox and all containers for a new pod": {
