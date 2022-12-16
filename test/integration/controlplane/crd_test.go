@@ -33,6 +33,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -349,6 +350,24 @@ func TestCRDsSingleEtcdClient(t *testing.T) {
 
 	// creating CRDs should not cause the creation of new etcd clients
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(result.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+
+	gvr := schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}
+	stub := etcd.GetEtcdStorageData()[gvr].Stub
+	dynamicClient, obj, err := etcd.JSONToUnstructured(stub, "", &meta.RESTMapping{
+		Resource:         gvr,
+		GroupVersionKind: gvr.GroupVersion().WithKind("Panda"),
+		Scope:            meta.RESTScopeRoot,
+	}, dynamic.NewForConfigOrDie(result.ClientConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = dynamicClient.Create(ctx, obj, metav1.CreateOptions{}) // make sure CRD storage is fully initialized
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if got := atomic.LoadUint64(&calls); got != 1 {
 		t.Fatalf("expected one call to storagebackend.CreateEtcdClient but got %d", got)
