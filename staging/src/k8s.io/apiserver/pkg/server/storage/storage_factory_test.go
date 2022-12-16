@@ -108,7 +108,7 @@ func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv runtime
 
 func TestConfigurableStorageFactory(t *testing.T) {
 	ns := &fakeNegotiater{types: []string{"test/test"}}
-	f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
+	f := NewDefaultStorageFactory(testContext(t), storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
 	f.AddCohabitatingResources(example.Resource("test"), schema.GroupResource{Resource: "test2", Group: "2"})
 	called := false
 	testEncoderChain := func(e runtime.Encoder) runtime.Encoder {
@@ -116,7 +116,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 		return e
 	}
 	f.AddSerializationChains(testEncoderChain, nil, example.Resource("test"))
-	f.SetEtcdLocation(testContext(t), example.Resource("*"), []string{"/server2"})
+	f.SetEtcdLocation(example.Resource("*"), []string{"/server2"})
 	f.SetEtcdPrefix(example.Resource("test"), "/prefix_for_test")
 
 	config, err := f.NewConfig(example.Resource("test"))
@@ -160,8 +160,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 				ServerList: defaultEtcdLocation,
 			},
 		}
-		storageFactory := NewDefaultStorageFactory(defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
-		storageFactory.SetEtcdLocation(testContext(t), test.resource, test.servers)
+		storageFactory := NewDefaultStorageFactory(testContext(t), defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
+		storageFactory.SetEtcdLocation(test.resource, test.servers)
 
 		var err error
 		config, err := storageFactory.NewConfig(test.resource)

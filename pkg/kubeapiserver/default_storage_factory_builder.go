@@ -113,8 +113,11 @@ type completedStorageFactoryConfig struct {
 
 // New returns a new storage factory created from the completed storage factory configuration.
 func (c *completedStorageFactoryConfig) New(stopCh <-chan struct{}) (*serverstorage.DefaultStorageFactory, error) {
+	ctxServer, _ := wait.ContextForChannel(stopCh) // explicitly ignore cancel here because we do not own the server's lifecycle
+
 	resourceEncodingConfig := resourceconfig.MergeResourceEncodingConfigs(c.DefaultResourceEncoding, c.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(
+		ctxServer,
 		c.StorageConfig,
 		c.DefaultStorageMediaType,
 		c.Serializer,
@@ -131,7 +134,6 @@ func (c *completedStorageFactoryConfig) New(stopCh <-chan struct{}) (*serverstor
 	storageFactory.AddCohabitatingResources(policy.Resource("podsecuritypolicies"), extensions.Resource("podsecuritypolicies"))
 	storageFactory.AddCohabitatingResources(networking.Resource("ingresses"), extensions.Resource("ingresses"))
 
-	ctxServer, _ := wait.ContextForChannel(stopCh) // explicitly ignore cancel here because we do not own the server's lifecycle
 	for _, override := range c.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		apiresource := strings.Split(tokens[0], "/")
@@ -141,7 +143,7 @@ func (c *completedStorageFactoryConfig) New(stopCh <-chan struct{}) (*serverstor
 		groupResource := schema.GroupResource{Group: group, Resource: resource}
 
 		servers := strings.Split(tokens[1], ";")
-		storageFactory.SetEtcdLocation(ctxServer, groupResource, servers)
+		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 	return storageFactory, nil
 }

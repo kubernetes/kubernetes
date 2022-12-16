@@ -88,13 +88,17 @@ type DefaultStorageFactory struct {
 	// newStorageCodecFn exists to be overwritten for unit testing.
 	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, encodeVersioner runtime.GroupVersioner, err error)
 
+	// transportCtx is used to lifecycle storagebackend.TransportConfig.Complete calls associated with custom etcdLocation overrides.
+	transportCtx context.Context
+	// transportCacheLock guards transportCache as this map may be mutated duration concurrent rest storage construction.
 	transportCacheLock sync.Mutex
-	transportCache     map[string]storagebackend.TransportConfig
+	// transportCache maps customs etcdLocation overrides to their completed storagebackend.TransportConfig.
+	// this is required because NewConfig can be called for the same resource across different parts of the codebase
+	// and if that resource has a custom etcdLocation override, we would create duplicate transports for it.
+	transportCache map[string]storagebackend.TransportConfig
 }
 
 type groupResourceOverrides struct {
-	// etcdCtx is used to lifecycle etcd clients associated with custom etcdLocation overrides.
-	etcdCtx context.Context
 	// etcdLocation contains the list of "special" locations that are used for particular GroupResources
 	// These are merged on top of the StorageConfig when requesting the storage.Interface for a given GroupResource
 	etcdLocation []string
@@ -122,9 +126,13 @@ type groupResourceOverrides struct {
 }
 
 // Apply overrides the provided config and options if the override has a value in that position
-func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *StorageCodecConfig, getTransportConfig func(ctx context.Context, etcdLocation []string, base storagebackend.TransportConfig) storagebackend.TransportConfig) error {
+func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *StorageCodecConfig, getTransportConfig func(etcdLocation []string) (storagebackend.TransportConfig, error)) error {
 	if len(o.etcdLocation) > 0 {
-		config.Transport = getTransportConfig(o.etcdCtx, o.etcdLocation, config.Transport)
+		transportConfig, err := getTransportConfig(o.etcdLocation)
+		if err != nil {
+			return err
+		}
+		config.Transport = transportConfig
 	}
 	if len(o.etcdPrefix) > 0 {
 		config.Prefix = o.etcdPrefix
@@ -153,6 +161,7 @@ var _ StorageFactory = &DefaultStorageFactory{}
 const AllResources = "*"
 
 func NewDefaultStorageFactory(
+	ctx context.Context,
 	config storagebackend.Config,
 	defaultMediaType string,
 	defaultSerializer runtime.StorageSerializer,
@@ -174,14 +183,15 @@ func NewDefaultStorageFactory(
 		DefaultResourcePrefixes: specialDefaultResourcePrefixes,
 
 		newStorageCodecFn: NewStorageCodec,
-		transportCache:    map[string]storagebackend.TransportConfig{},
+
+		transportCtx:   ctx,
+		transportCache: map[string]storagebackend.TransportConfig{},
 	}
 }
 
-func (s *DefaultStorageFactory) SetEtcdLocation(ctx context.Context, groupResource schema.GroupResource, location []string) {
+func (s *DefaultStorageFactory) SetEtcdLocation(groupResource schema.GroupResource, location []string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdLocation = location
-	overrides.etcdCtx = ctx
 	s.Overrides[groupResource] = overrides
 }
 
@@ -259,12 +269,12 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	}
 
 	if override, ok := s.Overrides[getAllResourcesAlias(chosenStorageResource)]; ok {
-		if err := override.Apply(&storageConfig, &codecConfig); err != nil {
+		if err := override.Apply(&storageConfig, &codecConfig, s.getTransportConfig); err != nil {
 			return nil, err
 		}
 	}
 	if override, ok := s.Overrides[chosenStorageResource]; ok {
-		if err := override.Apply(&storageConfig, &codecConfig); err != nil {
+		if err := override.Apply(&storageConfig, &codecConfig, s.getTransportConfig); err != nil {
 			return nil, err
 		}
 	}
@@ -295,24 +305,24 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 	return backends(s.StorageConfig, s.Overrides)
 }
 
-func (s *DefaultStorageFactory) getTransportConfig(ctx context.Context, etcdLocation []string, base storagebackend.TransportConfig) storagebackend.TransportConfig {
+func (s *DefaultStorageFactory) getTransportConfig(etcdLocation []string) (storagebackend.TransportConfig, error) {
 	s.transportCacheLock.Lock()
 	defer s.transportCacheLock.Unlock()
 
-	key := strings.Join(sets.NewString(etcdLocation...).List(), "|||")
+	key := strings.Join(sets.NewString(etcdLocation...).List(), "|||") // sort and duplicate
 	if val, ok := s.transportCache[key]; ok {
-		return val
+		return val, nil
 	}
 
-	base = base.ShallowCopyAndResetComplete()
-	base.ServerList = etcdLocation
+	transportConfig := s.StorageConfig.Transport.ShallowCopyAndResetComplete()
+	transportConfig.ServerList = etcdLocation
 	// this transport will make a new client now so we are responsible for its lifecycle
-	if err := base.Complete(ctx); err != nil {
-		panic(err)
+	if err := transportConfig.Complete(s.transportCtx); err != nil {
+		return storagebackend.TransportConfig{}, err
 	}
 
-	s.transportCache[key] = base
-	return base
+	s.transportCache[key] = transportConfig
+	return transportConfig, nil
 }
 
 // Backends returns all backends for all registered storage destinations.
