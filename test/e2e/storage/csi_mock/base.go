@@ -89,14 +89,15 @@ type testParameters struct {
 	enableResizing      bool   // enable resizing for both CSI mock driver and storageClass.
 	enableNodeExpansion bool   // enable node expansion for CSI mock driver
 	// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
-	disableResizingOnDriver bool
-	enableSnapshot          bool
-	enableVolumeMountGroup  bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
-	hooks                   *drivers.Hooks
-	tokenRequests           []storagev1.TokenRequest
-	requiresRepublish       *bool
-	fsGroupPolicy           *storagev1.FSGroupPolicy
-	enableSELinuxMount      *bool
+	disableResizingOnDriver       bool
+	enableSnapshot                bool
+	enableVolumeMountGroup        bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
+	hooks                         *drivers.Hooks
+	tokenRequests                 []storagev1.TokenRequest
+	requiresRepublish             *bool
+	fsGroupPolicy                 *storagev1.FSGroupPolicy
+	enableSELinuxMount            *bool
+	enableRecoverExpansionFailure bool
 }
 
 type mockDriverSetup struct {
@@ -148,20 +149,21 @@ func (m *mockDriverSetup) init(tp testParameters) {
 
 	var err error
 	driverOpts := drivers.CSIMockDriverOpts{
-		RegisterDriver:         tp.registerDriver,
-		PodInfo:                tp.podInfo,
-		StorageCapacity:        tp.storageCapacity,
-		EnableTopology:         tp.enableTopology,
-		AttachLimit:            tp.attachLimit,
-		DisableAttach:          tp.disableAttach,
-		EnableResizing:         tp.enableResizing,
-		EnableNodeExpansion:    tp.enableNodeExpansion,
-		EnableSnapshot:         tp.enableSnapshot,
-		EnableVolumeMountGroup: tp.enableVolumeMountGroup,
-		TokenRequests:          tp.tokenRequests,
-		RequiresRepublish:      tp.requiresRepublish,
-		FSGroupPolicy:          tp.fsGroupPolicy,
-		EnableSELinuxMount:     tp.enableSELinuxMount,
+		RegisterDriver:                tp.registerDriver,
+		PodInfo:                       tp.podInfo,
+		StorageCapacity:               tp.storageCapacity,
+		EnableTopology:                tp.enableTopology,
+		AttachLimit:                   tp.attachLimit,
+		DisableAttach:                 tp.disableAttach,
+		EnableResizing:                tp.enableResizing,
+		EnableNodeExpansion:           tp.enableNodeExpansion,
+		EnableSnapshot:                tp.enableSnapshot,
+		EnableVolumeMountGroup:        tp.enableVolumeMountGroup,
+		TokenRequests:                 tp.tokenRequests,
+		RequiresRepublish:             tp.requiresRepublish,
+		FSGroupPolicy:                 tp.fsGroupPolicy,
+		EnableSELinuxMount:            tp.enableSELinuxMount,
+		EnableRecoverExpansionFailure: tp.enableRecoverExpansionFailure,
 	}
 
 	// At the moment, only tests which need hooks are
