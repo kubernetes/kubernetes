@@ -27,13 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	internaltesting "k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal/testing"
 	"sigs.k8s.io/yaml"
 )
 
 func TestLastAppliedUpdater(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
+	f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
 		"",
 		func(m internal.Manager) internal.Manager {
 			return internal.NewLastAppliedUpdater(m)
@@ -190,7 +190,7 @@ func TestLargeLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"),
+			f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"),
 				"",
 				func(m internal.Manager) internal.Manager {
 					return internal.NewLastAppliedUpdater(m)
