@@ -78,9 +78,13 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		}
 		src := filepath.Join(kubeletDir, constants.KubeletConfigurationFileName)
 		dest := filepath.Join(backupDir, constants.KubeletConfigurationFileName)
-		fmt.Printf("[upgrade] backing up kubelet config file to %s\n", dest)
-		if err := os.Rename(src, dest); err != nil {
-			return errors.Wrap(err, "error backing up the kubelet config file")
+		if !dryRun {
+			fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
+			if err := os.Rename(src, dest); err != nil {
+				return errors.Wrap(err, "error backing up the kubelet config file")
+			}
+		} else {
+			fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
 		}
 		// Store the kubelet component configuration.
 		if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, data.PatchesDir(), data.OutputWriter()); err != nil {
