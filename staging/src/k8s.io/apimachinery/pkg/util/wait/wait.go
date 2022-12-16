@@ -696,14 +696,16 @@ func poller(interval, timeout time.Duration) WaitWithContextFunc {
 			tick := time.NewTicker(interval)
 			defer tick.Stop()
 
-			var after <-chan time.Time
+			var (
+				timer *time.Timer
+				after <-chan time.Time
+			)
 			if timeout != 0 {
 				// time.After is more convenient, but it
 				// potentially leaves timers around much longer
 				// than necessary if we exit early.
-				timer := time.NewTimer(timeout)
+				timer = time.NewTimer(timeout)
 				after = timer.C
-				defer timer.Stop()
 			}
 
 			for {
@@ -718,6 +720,9 @@ func poller(interval, timeout time.Duration) WaitWithContextFunc {
 				case <-after:
 					return
 				case <-ctx.Done():
+					if timer != nil && !timer.Stop() {
+						<-after
+					}
 					return
 				}
 			}
@@ -745,11 +750,14 @@ func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, conditi
 			break
 		}
 
-		waitBeforeRetry := backoff.Step()
+		retryTimer := time.NewTimer(backoff.Step())
 		select {
 		case <-ctx.Done():
+			if !retryTimer.Stop() {
+				<-retryTimer.C
+			}
 			return ctx.Err()
-		case <-time.After(waitBeforeRetry):
+		case <-retryTimer.C:
 		}
 	}
 
