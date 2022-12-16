@@ -24,16 +24,16 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	internaltesting "k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal/testing"
 	"sigs.k8s.io/yaml"
 )
 
 func TestNoUpdateBeforeFirstApply(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
+	f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
 		return internal.NewSkipNonAppliedManager(
 			m,
-			fieldmanagertest.NewFakeObjectCreater(),
+			internaltesting.NewFakeObjectCreater(),
 			schema.FromAPIVersionAndKind("v1", "Pod"),
 		)
 	})
@@ -70,10 +70,10 @@ func TestNoUpdateBeforeFirstApply(t *testing.T) {
 }
 
 func TestUpdateBeforeFirstApply(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
+	f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "", func(m internal.Manager) internal.Manager {
 		return internal.NewSkipNonAppliedManager(
 			m,
-			fieldmanagertest.NewFakeObjectCreater(),
+			internaltesting.NewFakeObjectCreater(),
 			schema.FromAPIVersionAndKind("v1", "Pod"),
 		)
 	})

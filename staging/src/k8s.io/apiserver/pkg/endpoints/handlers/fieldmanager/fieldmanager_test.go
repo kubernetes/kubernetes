@@ -63,7 +63,7 @@ var fakeTypeConverter = func() fieldmanager.TypeConverter {
 // TestUpdateApplyConflict tests that applying to an object, which
 // wasn't created by apply, will give conflicts
 func TestUpdateApplyConflict(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	patch := []byte(`{
 		"apiVersion": "apps/v1",
@@ -124,7 +124,7 @@ func TestUpdateApplyConflict(t *testing.T) {
 }
 
 func TestApplyStripsFields(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	newObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -156,7 +156,7 @@ func TestApplyStripsFields(t *testing.T) {
 }
 
 func TestVersionCheck(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -196,7 +196,7 @@ func TestVersionCheck(t *testing.T) {
 	}
 }
 func TestVersionCheckDoesNotPanic(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -235,7 +235,7 @@ func TestVersionCheckDoesNotPanic(t *testing.T) {
 }
 
 func TestApplyDoesNotStripLabels(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -289,7 +289,7 @@ func TestApplyNewObject(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.gvk.String(), func(t *testing.T) {
-			f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, test.gvk)
+			f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, test.gvk)
 
 			appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 			if err := yaml.Unmarshal(test.obj, &appliedObj.Object); err != nil {
@@ -327,7 +327,7 @@ func BenchmarkNewObject(b *testing.B) {
 	}
 	for _, test := range tests {
 		b.Run(test.gvk.Kind, func(b *testing.B) {
-			f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, test.gvk)
+			f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, test.gvk)
 
 			decoder := serializer.NewCodecFactory(scheme).UniversalDecoder(test.gvk.GroupVersion())
 			newObj, err := runtime.Decode(decoder, test.obj)
@@ -540,7 +540,7 @@ func BenchmarkCompare(b *testing.B) {
 }
 
 func BenchmarkRepeatedUpdate(b *testing.B) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 	podBytes := getObjectBytes("pod.yaml")
 
 	var obj *corev1.Pod
@@ -579,7 +579,7 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 }
 
 func TestApplyFailsWithManagedFields(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -604,7 +604,7 @@ func TestApplyFailsWithManagedFields(t *testing.T) {
 }
 
 func TestApplySuccessWithNoManagedFields(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -627,7 +627,7 @@ func TestApplySuccessWithNoManagedFields(t *testing.T) {
 
 // Run an update and apply, and make sure that nothing has changed.
 func TestNoOpChanges(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -678,7 +678,7 @@ func TestNoOpChanges(t *testing.T) {
 // Tests that one can reset the managedFields by sending either an empty
 // list
 func TestResetManagedFieldsEmptyList(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -719,7 +719,7 @@ func TestResetManagedFieldsEmptyList(t *testing.T) {
 
 // Tests that one can reset the managedFields by sending either a list with one empty item.
 func TestResetManagedFieldsEmptyItem(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -759,7 +759,7 @@ func TestResetManagedFieldsEmptyItem(t *testing.T) {
 }
 
 func TestServerSideApplyWithInvalidLastApplied(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	// create object with client-side apply
 	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
@@ -838,7 +838,7 @@ spec:
 }
 
 func TestInteropForClientSideApplyAndServerSideApply(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	// create object with client-side apply
 	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
@@ -922,7 +922,7 @@ spec:
 }
 
 func TestNoTrackManagedFieldsForClientSideApply(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	// create object
 	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
@@ -1102,7 +1102,7 @@ func getLastApplied(obj runtime.Object) (string, error) {
 }
 
 func TestUpdateViaSubresources(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "scale", nil)
+	f := fieldmanagertest.NewTestFieldManagerSubresource(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"), "scale")
 
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -1157,7 +1157,7 @@ func TestUpdateViaSubresources(t *testing.T) {
 // Ensures that a no-op Apply does not mutate managed fields
 func TestApplyDoesNotChangeManagedFields(t *testing.T) {
 	originalManagedFields := []metav1.ManagedFieldsEntry{}
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter,
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter,
 		schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 	newObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{},
@@ -1251,7 +1251,7 @@ func TestApplyDoesNotChangeManagedFields(t *testing.T) {
 // Ensures that a no-op Update does not mutate managed fields
 func TestUpdateDoesNotChangeManagedFields(t *testing.T) {
 	originalManagedFields := []metav1.ManagedFieldsEntry{}
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter,
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter,
 		schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 	newObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{},
@@ -1323,7 +1323,7 @@ func TestUpdateDoesNotChangeManagedFields(t *testing.T) {
 // This test makes sure that the liveObject during a patch does not mutate
 // its managed fields.
 func TestLiveObjectManagedFieldsNotRemoved(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter,
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter,
 		schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 	newObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{},
