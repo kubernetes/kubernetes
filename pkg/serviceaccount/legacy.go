@@ -64,7 +64,7 @@ func NewLegacyValidator(lookup bool, getter ServiceAccountTokenGetter, secretsWr
 	if lookup && getter == nil {
 		return nil, errors.New("ServiceAccountTokenGetter must be provided")
 	}
-	if lookup && secretsWriter == nil {
+	if lookup && secretsWriter == nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenTracking) {
 		return nil, errors.New("SecretsWriter must be provided")
 	}
 	return &legacyValidator{
