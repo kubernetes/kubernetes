@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1beta3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -244,18 +244,14 @@ func TestGetDNSImage(t *testing.T) {
 			expected: "foo.io/coredns:v1.10.0",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
-				},
+				DNS:             kubeadmapi.DNS{},
 			},
 		},
 		{
-			expected: kubeadmapiv1beta2.DefaultImageRepository + "/coredns/coredns:v1.10.0",
+			expected: kubeadmapiv1beta3.DefaultImageRepository + "/coredns/coredns:v1.10.0",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				ImageRepository: kubeadmapiv1beta2.DefaultImageRepository,
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
-				},
+				ImageRepository: kubeadmapiv1beta3.DefaultImageRepository,
+				DNS:             kubeadmapi.DNS{},
 			},
 		},
 		{
@@ -263,7 +259,6 @@ func TestGetDNSImage(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
 				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
 					ImageMeta: kubeadmapi.ImageMeta{
 						ImageRepository: "foo.io/coredns",
 					},
@@ -275,7 +270,6 @@ func TestGetDNSImage(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io/coredns",
 				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
 					ImageMeta: kubeadmapi.ImageMeta{
 						ImageTag: "v1.11.0",
 					},

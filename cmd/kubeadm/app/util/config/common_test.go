@@ -21,17 +21,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/lithammer/dedent"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const KubeadmGroupName = "kubeadm.k8s.io"
@@ -202,206 +198,209 @@ func TestVerifyAPIServerBindAddress(t *testing.T) {
 	}
 }
 
-func TestMigrateOldConfigFromFile(t *testing.T) {
-	tests := []struct {
-		desc          string
-		oldCfg        string
-		expectedKinds []string
-		expectErr     bool
-	}{
-		{
-			desc:      "empty file produces empty result",
-			oldCfg:    "",
-			expectErr: false,
-		},
-		{
-			desc: "bad config produces error",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectErr: true,
-		},
-		{
-			desc: "InitConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			kind: InitConfiguration
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectedKinds: []string{
-				constants.InitConfigurationKind,
-				constants.ClusterConfigurationKind,
-			},
-			expectErr: false,
-		},
-		{
-			desc: "ClusterConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			kind: ClusterConfiguration
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectedKinds: []string{
-				constants.InitConfigurationKind,
-				constants.ClusterConfigurationKind,
-			},
-			expectErr: false,
-		},
-		{
-			desc: "JoinConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			kind: JoinConfiguration
-			discovery:
-			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
-			    apiServerEndpoint: kube-apiserver:6443
-			    unsafeSkipCAVerification: true
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectedKinds: []string{
-				constants.JoinConfigurationKind,
-			},
-			expectErr: false,
-		},
-		{
-			desc: "Init + Cluster Configurations are migrated",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			kind: InitConfiguration
-			---
-			apiVersion: %[1]s
-			kind: ClusterConfiguration
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectedKinds: []string{
-				constants.InitConfigurationKind,
-				constants.ClusterConfigurationKind,
-			},
-			expectErr: false,
-		},
-		{
-			desc: "Init + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			kind: InitConfiguration
-			---
-			apiVersion: %[1]s
-			kind: JoinConfiguration
-			discovery:
-			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
-			    apiServerEndpoint: kube-apiserver:6443
-			    unsafeSkipCAVerification: true
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectedKinds: []string{
-				constants.InitConfigurationKind,
-				constants.ClusterConfigurationKind,
-				constants.JoinConfigurationKind,
-			},
-			expectErr: false,
-		},
-		{
-			desc: "Cluster + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			kind: ClusterConfiguration
-			---
-			apiVersion: %[1]s
-			kind: JoinConfiguration
-			discovery:
-			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
-			    apiServerEndpoint: kube-apiserver:6443
-			    unsafeSkipCAVerification: true
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectedKinds: []string{
-				constants.InitConfigurationKind,
-				constants.ClusterConfigurationKind,
-				constants.JoinConfigurationKind,
-			},
-			expectErr: false,
-		},
-		{
-			desc: "Init + Cluster + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			kind: InitConfiguration
-			---
-			apiVersion: %[1]s
-			kind: ClusterConfiguration
-			---
-			apiVersion: %[1]s
-			kind: JoinConfiguration
-			discovery:
-			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
-			    apiServerEndpoint: kube-apiserver:6443
-			    unsafeSkipCAVerification: true
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectedKinds: []string{
-				constants.InitConfigurationKind,
-				constants.ClusterConfigurationKind,
-				constants.JoinConfigurationKind,
-			},
-			expectErr: false,
-		},
-		{
-			desc: "component configs are not migrated",
-			oldCfg: dedent.Dedent(fmt.Sprintf(`
-			apiVersion: %s
-			kind: InitConfiguration
-			---
-			apiVersion: %[1]s
-			kind: ClusterConfiguration
-			---
-			apiVersion: %[1]s
-			kind: JoinConfiguration
-			discovery:
-			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
-			    apiServerEndpoint: kube-apiserver:6443
-			    unsafeSkipCAVerification: true
-			---
-			apiVersion: kubeproxy.config.k8s.io/v1alpha1
-			kind: KubeProxyConfiguration
-			---
-			apiVersion: kubelet.config.k8s.io/v1beta1
-			kind: KubeletConfiguration
-			`, kubeadmapiv1old.SchemeGroupVersion.String())),
-			expectedKinds: []string{
-				constants.InitConfigurationKind,
-				constants.ClusterConfigurationKind,
-				constants.JoinConfigurationKind,
-			},
-			expectErr: false,
-		},
-	}
+// TODO: re-include TestMigrateOldConfigFromFile once a new API version is added after v1beta3.
+// see <link-to-commit-foo> of how this unit test function
+// looked before it was removed with the removal of v1beta2.
+// func TestMigrateOldConfigFromFile(t *testing.T) {
+// 	tests := []struct {
+// 		desc          string
+// 		oldCfg        string
+// 		expectedKinds []string
+// 		expectErr     bool
+// 	}{
+// 		{
+// 			desc:      "empty file produces empty result",
+// 			oldCfg:    "",
+// 			expectErr: false,
+// 		},
+// 		{
+// 			desc: "bad config produces error",
+// 			oldCfg: dedent.Dedent(fmt.Sprintf(`
+// 			apiVersion: %s
+// 			`, kubeadmapiv1old.SchemeGroupVersion.String())),
+// 			expectErr: true,
+// 		},
+// 		{
+// 			desc: "InitConfiguration only gets migrated",
+// 			oldCfg: dedent.Dedent(fmt.Sprintf(`
+// 			apiVersion: %s
+// 			kind: InitConfiguration
+// 			`, kubeadmapiv1old.SchemeGroupVersion.String())),
+// 			expectedKinds: []string{
+// 				constants.InitConfigurationKind,
+// 				constants.ClusterConfigurationKind,
+// 			},
+// 			expectErr: false,
+// 		},
+// 		{
+// 			desc: "ClusterConfiguration only gets migrated",
+// 			oldCfg: dedent.Dedent(fmt.Sprintf(`
+// 			apiVersion: %s
+// 			kind: ClusterConfiguration
+// 			`, kubeadmapiv1old.SchemeGroupVersion.String())),
+// 			expectedKinds: []string{
+// 				constants.InitConfigurationKind,
+// 				constants.ClusterConfigurationKind,
+// 			},
+// 			expectErr: false,
+// 		},
+// 		{
+// 			desc: "JoinConfiguration only gets migrated",
+// 			oldCfg: dedent.Dedent(fmt.Sprintf(`
+// 			apiVersion: %s
+// 			kind: JoinConfiguration
+// 			discovery:
+// 			  bootstrapToken:
+// 			    token: abcdef.0123456789abcdef
+// 			    apiServerEndpoint: kube-apiserver:6443
+// 			    unsafeSkipCAVerification: true
+// 			`, kubeadmapiv1old.SchemeGroupVersion.String())),
+// 			expectedKinds: []string{
+// 				constants.JoinConfigurationKind,
+// 			},
+// 			expectErr: false,
+// 		},
+// 		{
+// 			desc: "Init + Cluster Configurations are migrated",
+// 			oldCfg: dedent.Dedent(fmt.Sprintf(`
+// 			apiVersion: %s
+// 			kind: InitConfiguration
+// 			---
+// 			apiVersion: %[1]s
+// 			kind: ClusterConfiguration
+// 			`, kubeadmapiv1old.SchemeGroupVersion.String())),
+// 			expectedKinds: []string{
+// 				constants.InitConfigurationKind,
+// 				constants.ClusterConfigurationKind,
+// 			},
+// 			expectErr: false,
+// 		},
+// 		{
+// 			desc: "Init + Join Configurations are migrated",
+// 			oldCfg: dedent.Dedent(fmt.Sprintf(`
+// 			apiVersion: %s
+// 			kind: InitConfiguration
+// 			---
+// 			apiVersion: %[1]s
+// 			kind: JoinConfiguration
+// 			discovery:
+// 			  bootstrapToken:
+// 			    token: abcdef.0123456789abcdef
+// 			    apiServerEndpoint: kube-apiserver:6443
+// 			    unsafeSkipCAVerification: true
+// 			`, kubeadmapiv1old.SchemeGroupVersion.String())),
+// 			expectedKinds: []string{
+// 				constants.InitConfigurationKind,
+// 				constants.ClusterConfigurationKind,
+// 				constants.JoinConfigurationKind,
+// 			},
+// 			expectErr: false,
+// 		},
+// 		{
+// 			desc: "Cluster + Join Configurations are migrated",
+// 			oldCfg: dedent.Dedent(fmt.Sprintf(`
+// 			apiVersion: %s
+// 			kind: ClusterConfiguration
+// 			---
+// 			apiVersion: %[1]s
+// 			kind: JoinConfiguration
+// 			discovery:
+// 			  bootstrapToken:
+// 			    token: abcdef.0123456789abcdef
+// 			    apiServerEndpoint: kube-apiserver:6443
+// 			    unsafeSkipCAVerification: true
+// 			`, kubeadmapiv1old.SchemeGroupVersion.String())),
+// 			expectedKinds: []string{
+// 				constants.InitConfigurationKind,
+// 				constants.ClusterConfigurationKind,
+// 				constants.JoinConfigurationKind,
+// 			},
+// 			expectErr: false,
+// 		},
+// 		{
+// 			desc: "Init + Cluster + Join Configurations are migrated",
+// 			oldCfg: dedent.Dedent(fmt.Sprintf(`
+// 			apiVersion: %s
+// 			kind: InitConfiguration
+// 			---
+// 			apiVersion: %[1]s
+// 			kind: ClusterConfiguration
+// 			---
+// 			apiVersion: %[1]s
+// 			kind: JoinConfiguration
+// 			discovery:
+// 			  bootstrapToken:
+// 			    token: abcdef.0123456789abcdef
+// 			    apiServerEndpoint: kube-apiserver:6443
+// 			    unsafeSkipCAVerification: true
+// 			`, kubeadmapiv1old.SchemeGroupVersion.String())),
+// 			expectedKinds: []string{
+// 				constants.InitConfigurationKind,
+// 				constants.ClusterConfigurationKind,
+// 				constants.JoinConfigurationKind,
+// 			},
+// 			expectErr: false,
+// 		},
+// 		{
+// 			desc: "component configs are not migrated",
+// 			oldCfg: dedent.Dedent(fmt.Sprintf(`
+// 			apiVersion: %s
+// 			kind: InitConfiguration
+// 			---
+// 			apiVersion: %[1]s
+// 			kind: ClusterConfiguration
+// 			---
+// 			apiVersion: %[1]s
+// 			kind: JoinConfiguration
+// 			discovery:
+// 			  bootstrapToken:
+// 			    token: abcdef.0123456789abcdef
+// 			    apiServerEndpoint: kube-apiserver:6443
+// 			    unsafeSkipCAVerification: true
+// 			---
+// 			apiVersion: kubeproxy.config.k8s.io/v1alpha1
+// 			kind: KubeProxyConfiguration
+// 			---
+// 			apiVersion: kubelet.config.k8s.io/v1beta1
+// 			kind: KubeletConfiguration
+// 			`, kubeadmapiv1old.SchemeGroupVersion.String())),
+// 			expectedKinds: []string{
+// 				constants.InitConfigurationKind,
+// 				constants.ClusterConfigurationKind,
+// 				constants.JoinConfigurationKind,
+// 			},
+// 			expectErr: false,
+// 		},
+// 	}
 
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			b, err := MigrateOldConfig([]byte(test.oldCfg))
-			if test.expectErr {
-				if err == nil {
-					t.Fatalf("unexpected success:\n%s", b)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("unexpected failure: %v", err)
-				}
-				gvks, err := kubeadmutil.GroupVersionKindsFromBytes(b)
-				if err != nil {
-					t.Fatalf("unexpected error returned by GroupVersionKindsFromBytes: %v", err)
-				}
-				if len(gvks) != len(test.expectedKinds) {
-					t.Fatalf("length mismatch between resulting gvks and expected kinds:\n\tlen(gvks)=%d\n\tlen(expectedKinds)=%d",
-						len(gvks), len(test.expectedKinds))
-				}
-				for _, expectedKind := range test.expectedKinds {
-					if !kubeadmutil.GroupVersionKindsHasKind(gvks, expectedKind) {
-						t.Fatalf("migration failed to produce config kind: %s", expectedKind)
-					}
-				}
-			}
-		})
-	}
-}
+// 	for _, test := range tests {
+// 		t.Run(test.desc, func(t *testing.T) {
+// 			b, err := MigrateOldConfig([]byte(test.oldCfg))
+// 			if test.expectErr {
+// 				if err == nil {
+// 					t.Fatalf("unexpected success:\n%s", b)
+// 				}
+// 			} else {
+// 				if err != nil {
+// 					t.Fatalf("unexpected failure: %v", err)
+// 				}
+// 				gvks, err := kubeadmutil.GroupVersionKindsFromBytes(b)
+// 				if err != nil {
+// 					t.Fatalf("unexpected error returned by GroupVersionKindsFromBytes: %v", err)
+// 				}
+// 				if len(gvks) != len(test.expectedKinds) {
+// 					t.Fatalf("length mismatch between resulting gvks and expected kinds:\n\tlen(gvks)=%d\n\tlen(expectedKinds)=%d",
+// 						len(gvks), len(test.expectedKinds))
+// 				}
+// 				for _, expectedKind := range test.expectedKinds {
+// 					if !kubeadmutil.GroupVersionKindsHasKind(gvks, expectedKind) {
+// 						t.Fatalf("migration failed to produce config kind: %s", expectedKind)
+// 					}
+// 				}
+// 			}
+// 		})
+// 	}
+// }
 
 func TestIsKubeadmPrereleaseVersion(t *testing.T) {
 	validVersionInfo := &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0-alpha.1"}

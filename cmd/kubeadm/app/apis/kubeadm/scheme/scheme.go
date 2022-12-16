@@ -24,7 +24,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 )
 
@@ -42,7 +41,6 @@ func init() {
 // AddToScheme builds the kubeadm scheme using all known versions of the kubeadm api.
 func AddToScheme(scheme *runtime.Scheme) {
 	utilruntime.Must(kubeadm.AddToScheme(scheme))
-	utilruntime.Must(v1beta2.AddToScheme(scheme))
 	utilruntime.Must(v1beta3.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(v1beta3.SchemeGroupVersion))
 }
