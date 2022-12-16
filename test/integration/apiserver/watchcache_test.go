@@ -53,7 +53,10 @@ func multiEtcdSetup(t *testing.T) (clientset.Interface, framework.TearDownFunc) 
 	etcdOptions := framework.DefaultEtcdOptions()
 	// Overwrite etcd setup to our custom etcd instances.
 	etcdOptions.StorageConfig.Transport.ServerList = []string{etcd0URL}
-	etcdOptions.EtcdServersOverrides = []string{fmt.Sprintf("/events#%s", etcd1URL)}
+	etcdOptions.EtcdServersOverrides = []string{
+		fmt.Sprintf("/events#%s", etcd1URL),
+		fmt.Sprintf("/services#%s", etcd0URL), // this override should not cause the creation of a new client
+	}
 	etcdOptions.EnableWatchCache = true
 
 	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
