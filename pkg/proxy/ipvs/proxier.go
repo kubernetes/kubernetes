@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"reflect"
@@ -643,7 +642,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	if err == os.ErrNotExist {
 		klog.ErrorS(err, "Failed to read file /proc/modules, assuming this is a kernel without loadable modules support enabled")
 		kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
-		kConfig, err := ioutil.ReadFile(kernelConfigFile)
+		kConfig, err := os.ReadFile(kernelConfigFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read Kernel Config file %s with error %w", kernelConfigFile, err)
 		}
@@ -665,7 +664,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	}
 
 	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
-	b, err := ioutil.ReadFile(builtinModsFilePath)
+	b, err := os.ReadFile(builtinModsFilePath)
 	if err != nil {
 		klog.ErrorS(err, "Failed to read builtin modules file, you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "filePath", builtinModsFilePath)
 	}
@@ -693,7 +692,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 // getFirstColumn reads all the content from r into memory and return a
 // slice which consists of the first word from each line.
 func getFirstColumn(r io.Reader) ([]string, error) {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
@@ -712,7 +711,7 @@ func getFirstColumn(r io.Reader) ([]string, error) {
 // GetKernelVersion returns currently running kernel version.
 func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 	kernelVersionFile := "/proc/sys/kernel/osrelease"
-	fileContent, err := ioutil.ReadFile(kernelVersionFile)
+	fileContent, err := os.ReadFile(kernelVersionFile)
 	if err != nil {
 		return "", fmt.Errorf("error reading osrelease file %q: %v", kernelVersionFile, err)
 	}
