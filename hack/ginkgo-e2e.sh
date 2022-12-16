@@ -134,7 +134,6 @@ fi
 # Some arguments (like --nodes) are only supported when using the CLI.
 # Those get set below when choosing the program.
 ginkgo_args=(
-  "--slow-spec-threshold=${GINKGO_SLOW_SPEC_THRESHOLD:-300s}"
   "--poll-progress-after=${GINKGO_POLL_PROGRESS_AFTER:-300s}"
   "--poll-progress-interval=${GINKGO_POLL_PROGRESS_INTERVAL:-20s}"
   "--source-root=${KUBE_ROOT}"
