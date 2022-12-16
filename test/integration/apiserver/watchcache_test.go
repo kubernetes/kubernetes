@@ -55,7 +55,7 @@ func multiEtcdSetup(t *testing.T) (clientset.Interface, framework.TearDownFunc) 
 	etcdOptions.StorageConfig.Transport.ServerList = []string{etcd0URL}
 	etcdOptions.EtcdServersOverrides = []string{
 		fmt.Sprintf("/events#%s", etcd1URL),
-		fmt.Sprintf("/services#%s", etcd0URL), // this override should not cause the creation of a new client
+		fmt.Sprintf("/services#%s", etcd0URL), // this override should not cause the creation of a new etcd client
 	}
 	etcdOptions.EnableWatchCache = true
 
