@@ -62,8 +62,8 @@ func (nfs *NamedFlagSets) FlagSet(name string) *pflag.FlagSet {
 func MergeNamedFlagSets(nfss ...NamedFlagSets) NamedFlagSets {
 	newNFS := NamedFlagSets{}
 	for _, nfs := range nfss {
-		for _, flagName := range nfs.Order {
-			*newNFS.FlagSet(flagName) = *nfs.FlagSet(flagName)
+		for _, flagSetName := range nfs.Order {
+			newNFS.FlagSet(flagSetName).AddFlagSet(nfs.FlagSet(flagSetName))
 		}
 	}
 	return newNFS
