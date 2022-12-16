@@ -58,8 +58,14 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				case batch.PodFailurePolicyActionCount:
 					return nil, true, &count
 				case batch.PodFailurePolicyActionFailJob:
-					msg := fmt.Sprintf("Pod %s/%s has condition %v matching %v rule at index %d",
-						failedPod.Namespace, failedPod.Name, podCondition.Type, podFailurePolicyRule.Action, index)
+					var msg string = ""
+					if failedPod.Status.Phase == v1.PodPending {
+						msg = fmt.Sprintf("Pod %s/%s has condition for pending %v matching %v rule at index %d",
+							failedPod.Namespace, failedPod.Name, podCondition.Type, podFailurePolicyRule.Action, index)
+					} else {
+						msg = fmt.Sprintf("Pod %s/%s has condition %v matching %v rule at index %d",
+							failedPod.Namespace, failedPod.Name, podCondition.Type, podFailurePolicyRule.Action, index)
+					}
 					return &msg, true, &failJob
 				}
 			}

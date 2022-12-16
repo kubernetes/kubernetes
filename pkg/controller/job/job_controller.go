@@ -22,6 +22,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -795,7 +796,11 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		deleted, err := jm.deleteActivePods(ctx, &job, activePods)
 		if uncounted == nil {
 			// Legacy behavior: pretend all active pods were successfully removed.
-			deleted = active
+			if strings.Contains(finishedCondition.Message, "has condition for pending") {
+				failed = 0
+			} else {
+				deleted = active
+			}
 		} else if deleted != active || !satisfiedExpectations {
 			// Can't declare the Job as finished yet, as there might be remaining
 			// pod finalizers or pods that are not in the informer's cache yet.
@@ -1742,6 +1747,11 @@ func isPodFailed(p *v1.Pod, job *batch.Job, wFinalizers bool) bool {
 		// TODO(#113855): Stop limiting this behavior to Jobs with podFailurePolicy.
 		// For now, we do so to avoid affecting all running Jobs without the
 		// avaibility to opt-out into the old behavior.
+		if p.Status.Phase == v1.PodPending {
+			_, _, action := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
+			failJob := batch.PodFailurePolicyActionFailJob
+			return *action == failJob
+		}
 		return p.Status.Phase == v1.PodFailed
 	}
 	if p.Status.Phase == v1.PodFailed {

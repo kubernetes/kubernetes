@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/pointer"
 )
 
@@ -2912,6 +2913,110 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusFailed:    1,
 			wantStatusSucceeded: 0,
 		},
+		"fail job based on OnPodConditions PodHasNetWork for Pending Case": {
+			enableJobPodFailurePolicy: true,
+			enablePodDisruptionConditions: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   kubetypes.PodHasNetwork,
+										Status: v1.ConditionFalse,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.Pod{
+				{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+						Conditions: []v1.PodCondition{
+							{
+								Type:   kubetypes.PodHasNetwork,
+								Status: v1.ConditionFalse,
+							},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Pod default/mypod-0 has condition for pending PodHasNetwork matching FailJob rule at index 0",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"fail job based on OnPodConditions PodScheduled for Pending Case": {
+			enableJobPodFailurePolicy: true,
+			enablePodDisruptionConditions: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.PodScheduled,
+										Status: v1.ConditionFalse,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.Pod{
+				{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodScheduled,
+								Status: v1.ConditionFalse,
+					},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Pod default/mypod-0 has condition for pending PodScheduled matching FailJob rule at index 0",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
 		"terminating Pod considered failed when PodDisruptionConditions is disabled": {
 			wFinalizersExclusive:      pointer.Bool(true),
 			enableJobPodFailurePolicy: true,
@@ -3002,6 +3107,9 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				}
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
+				// KEP for adding PodHasNetworkConditon
+				// Allows for testing if ContainerCreated state failed
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodHasNetworkCondition, true)
 				clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 				manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 				fakePodControl := controller.FakePodControl{}

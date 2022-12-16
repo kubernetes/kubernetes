@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/pointer"
 )
 
@@ -582,6 +583,66 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: nil,
 			wantCountFailed:       true,
+		},
+		"job fail rule matched for pod conditions in pending due to PodHasNetwork": {
+			podFailurePolicy: &batch.PodFailurePolicy{
+				Rules: []batch.PodFailurePolicyRule{
+					{
+						Action: batch.PodFailurePolicyActionFailJob,
+						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+							{
+								Type:   kubetypes.PodHasNetwork,
+								Status: v1.ConditionFalse,
+							},
+						},
+					},
+				},
+			},
+			failedPod: &v1.Pod{
+				ObjectMeta: validPodObjectMeta,
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   kubetypes.PodHasNetwork,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			wantJobFailureMessage: pointer.String("Pod default/mypod has condition for pending PodHasNetwork matching FailJob rule at index 0"),
+			wantCountFailed:       true,
+			wantAction:            &failJob,
+		},
+		"job fail rule matched for pod conditions in pending due to Scheduled": {
+			podFailurePolicy: &batch.PodFailurePolicy{
+				Rules: []batch.PodFailurePolicyRule{
+					{
+						Action: batch.PodFailurePolicyActionFailJob,
+						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+							{
+								Type:   v1.PodScheduled,
+								Status: v1.ConditionFalse,
+							},
+						},
+					},
+				},
+			},
+			failedPod: &v1.Pod{
+				ObjectMeta: validPodObjectMeta,
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodScheduled,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			wantJobFailureMessage: pointer.String("Pod default/mypod has condition for pending PodScheduled matching FailJob rule at index 0"),
+			wantCountFailed:       true,
+			wantAction:            &failJob,
 		},
 		"job fail rule matched for pod conditions": {
 			podFailurePolicy: &batch.PodFailurePolicy{
