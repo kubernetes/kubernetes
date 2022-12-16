@@ -19,12 +19,16 @@ package apiserver
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -84,10 +88,27 @@ func multiEtcdSetup(t *testing.T) (clientset.Interface, framework.TearDownFunc) 
 }
 
 func TestWatchCacheUpdatedByEtcd(t *testing.T) {
-	c, closeFn := multiEtcdSetup(t)
-	defer closeFn()
+	originalCreateEtcdClient := storagebackend.CreateEtcdClient
+	t.Cleanup(func() {
+		storagebackend.CreateEtcdClient = originalCreateEtcdClient
+	})
+	var calls uint64
+	storagebackend.CreateEtcdClient = func(cfg clientv3.Config) (*clientv3.Client, error) {
+		client, err := originalCreateEtcdClient(cfg)
+		if err == nil {
+			atomic.AddUint64(&calls, 1)
+		}
+		return client, err
+	}
 
-	ctx := context.Background()
+	c, closeFn := multiEtcdSetup(t)
+	t.Cleanup(closeFn)
+
+	if got := atomic.LoadUint64(&calls); got != 3 {
+		t.Errorf("expected three calls to storagebackend.CreateEtcdClient but got %d", got)
+	}
+
+	ctx := context.TODO()
 
 	makeConfigMap := func(name string) *v1.ConfigMap {
 		return &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}}

@@ -161,6 +161,10 @@ const (
 	dialTimeout = 20 * time.Second
 )
 
+// CreateEtcdClient creates an etcd client based on the given config.
+// It is exposed so integration tests can tune this value.
+var CreateEtcdClient = clientv3.New
+
 // Complete can only be called once and must be called before making any calls to Client.
 // Callers must not mutate TransportConfig after calling Complete.  For the exceptional
 // cases where such functionality is needed, use the ShallowCopyAndResetComplete method.
@@ -307,7 +311,7 @@ func getClient(ctx context.Context, c TransportConfig) (*clientv3.Client, error)
 		TLS:                  tlsConfig,
 	}
 
-	client, err := clientv3.New(cfg)
+	client, err := CreateEtcdClient(cfg)
 	if err != nil {
 		return nil, err
 	}
