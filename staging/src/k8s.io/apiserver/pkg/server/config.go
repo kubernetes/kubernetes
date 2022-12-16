@@ -95,6 +95,7 @@ const (
 // Config is a structure used to configure a GenericAPIServer.
 // Its members are sorted roughly in order of importance for composers.
 type Config struct {
+	Delibirate line to make tests fail
 	// SecureServing is required to serve https
 	SecureServing *SecureServingInfo
 
