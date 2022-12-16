@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"io/ioutil"
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -86,6 +87,9 @@ type DefaultStorageFactory struct {
 
 	// newStorageCodecFn exists to be overwritten for unit testing.
 	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, encodeVersioner runtime.GroupVersioner, err error)
+
+	transportCacheLock sync.Mutex
+	transportCache     map[string]storagebackend.TransportConfig
 }
 
 type groupResourceOverrides struct {
@@ -118,14 +122,9 @@ type groupResourceOverrides struct {
 }
 
 // Apply overrides the provided config and options if the override has a value in that position
-func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *StorageCodecConfig) error {
+func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *StorageCodecConfig, getTransportConfig func(ctx context.Context, etcdLocation []string, base storagebackend.TransportConfig) storagebackend.TransportConfig) error {
 	if len(o.etcdLocation) > 0 {
-		config.Transport = config.Transport.ShallowCopyAndResetComplete()
-		config.Transport.ServerList = o.etcdLocation
-		// this transport will make a new client now so we are responsible for its lifecycle
-		if err := config.Transport.Complete(o.etcdCtx); err != nil {
-			return err
-		}
+		config.Transport = getTransportConfig(o.etcdCtx, o.etcdLocation, config.Transport)
 	}
 	if len(o.etcdPrefix) > 0 {
 		config.Prefix = o.etcdPrefix
@@ -175,6 +174,7 @@ func NewDefaultStorageFactory(
 		DefaultResourcePrefixes: specialDefaultResourcePrefixes,
 
 		newStorageCodecFn: NewStorageCodec,
+		transportCache:    map[string]storagebackend.TransportConfig{},
 	}
 }
 
@@ -293,6 +293,26 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 // Used for getting all instances for health validations.
 func (s *DefaultStorageFactory) Backends() []Backend {
 	return backends(s.StorageConfig, s.Overrides)
+}
+
+func (s *DefaultStorageFactory) getTransportConfig(ctx context.Context, etcdLocation []string, base storagebackend.TransportConfig) storagebackend.TransportConfig {
+	s.transportCacheLock.Lock()
+	defer s.transportCacheLock.Unlock()
+
+	key := strings.Join(sets.NewString(etcdLocation...).List(), "|||")
+	if val, ok := s.transportCache[key]; ok {
+		return val
+	}
+
+	base = base.ShallowCopyAndResetComplete()
+	base.ServerList = etcdLocation
+	// this transport will make a new client now so we are responsible for its lifecycle
+	if err := base.Complete(ctx); err != nil {
+		panic(err)
+	}
+
+	s.transportCache[key] = base
+	return base
 }
 
 // Backends returns all backends for all registered storage destinations.
