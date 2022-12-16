@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
@@ -47,44 +49,24 @@ var _ CELPolicyEvaluator = &celAdmissionController{}
 // celAdmissionController is the top-level controller for admission control using CEL
 // it is responsible for watching policy definitions, bindings, and config param CRDs
 type celAdmissionController struct {
-	// Context under which the controller runs
-	runningContext context.Context
+	// Controller which manages book-keeping for the cluster's dynamic policy
+	// information.
+	policyController *policyController
 
-	policyDefinitionsController generic.Controller[*v1alpha1.ValidatingAdmissionPolicy]
-	policyBindingController     generic.Controller[*v1alpha1.ValidatingAdmissionPolicyBinding]
+	// atomic []policyData
+	// list of every known policy definition, and all informatoin required to
+	// validate its bindings against an object.
+	// A snapshot of the current policy configuration is synced with this field
+	// asynchronously
+	definitions atomic.Value
+}
 
-	// dynamicclient used to create informers to watch the param crd types
-	dynamicClient dynamic.Interface
-	restMapper    meta.RESTMapper
-
-	// Provided to the policy's Compile function as an injected dependency to
-	// assist with compiling its expressions to CEL
-	validatorCompiler ValidatorCompiler
-
-	// Lock which protects:
-	//	- definitionInfo
-	//  - bindingInfos
-	//  - paramCRDControllers
-	//  - definitionsToBindings
-	// All other fields should be assumed constant
-	mutex sync.RWMutex
-
-	// controller and metadata
-	paramsCRDControllers map[v1alpha1.ParamKind]*paramInfo
-
-	// Index for each definition namespace/name, contains all binding
-	// namespace/names known to exist for that definition
-	definitionInfo map[namespacedName]*definitionInfo
-
-	// Index for each bindings namespace/name. Contains compiled templates
-	// for the binding depending on the policy/param combination.
-	bindingInfos map[namespacedName]*bindingInfo
-
-	// Map from namespace/name of a definition to a set of namespace/name
-	// of bindings which depend on it.
-	// All keys must have at least one dependent binding
-	// All binding names MUST exist as a key bindingInfos
-	definitionsToBindings map[namespacedName]sets.Set[namespacedName]
+// Everything someone might need to validate a single ValidatingPolicyDefinition
+// against all of its registered bindings.
+type policyData struct {
+	definitionInfo
+	paramController generic.Controller[*unstructured.Unstructured]
+	bindings        []bindingInfo
 }
 
 // namespaceName is used as a key in definitionInfo and bindingInfos
@@ -105,7 +87,7 @@ type definitionInfo struct {
 
 type bindingInfo struct {
 	// Compiled CEL expression turned into an validator
-	validator atomic.Pointer[Validator]
+	validator Validator
 
 	// Last value seen by this controller to be used in policy enforcement
 	// May not be nil
@@ -130,66 +112,44 @@ func NewAdmissionController(
 	restMapper meta.RESTMapper,
 	dynamicClient dynamic.Interface,
 ) CELPolicyEvaluator {
-	matcher := matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)
-	validatorCompiler := &CELValidatorCompiler{
-		Matcher: matcher,
+	return &celAdmissionController{
+		definitions: atomic.Value{},
+		policyController: newPolicyController(
+			restMapper,
+			dynamicClient,
+			&CELValidatorCompiler{
+				Matcher: matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client),
+			},
+			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](
+				informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer()),
+			generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicyBinding](
+				informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicyBindings().Informer()),
+		),
 	}
-	c := &celAdmissionController{
-		definitionInfo:        make(map[namespacedName]*definitionInfo),
-		bindingInfos:          make(map[namespacedName]*bindingInfo),
-		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
-		definitionsToBindings: make(map[namespacedName]sets.Set[namespacedName]),
-		dynamicClient:         dynamicClient,
-		validatorCompiler:     validatorCompiler,
-		restMapper:            restMapper,
-	}
-
-	c.policyDefinitionsController = generic.NewController(
-		generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](
-			informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer()),
-		c.reconcilePolicyDefinition,
-		generic.ControllerOptions{
-			Workers: 1,
-			Name:    "cel-policy-definitions",
-		},
-	)
-	c.policyBindingController = generic.NewController(
-		generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicyBinding](
-			informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicyBindings().Informer()),
-		c.reconcilePolicyBinding,
-		generic.ControllerOptions{
-			Workers: 1,
-			Name:    "cel-policy-bindings",
-		},
-	)
-	return c
 }
 
 func (c *celAdmissionController) Run(stopCh <-chan struct{}) {
-	// TODO: Doesn't this comparison need a lock?
-	if c.runningContext != nil {
-		return
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
-
-	c.runningContext = ctx
-	defer func() {
-		c.runningContext = nil
-	}()
-
 	wg := sync.WaitGroup{}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		c.policyDefinitionsController.Run(ctx)
+		c.policyController.Run(ctx)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		c.policyBindingController.Run(ctx)
+
+		// Wait indefinitely until policies/bindings are listed & handled before
+		// allowing policies to be refreshed
+		if !cache.WaitForNamedCacheSync("cel-admission-controller", ctx.Done(), c.policyController.HasSynced) {
+			return
+		}
+
+		// Loop every 1 second until context is cancelled, refreshing policies
+		wait.Until(c.refreshPolicies, 1*time.Second, ctx.Done())
 	}()
 
 	<-stopCh
@@ -202,8 +162,9 @@ func (c *celAdmissionController) Validate(
 	a admission.Attributes,
 	o admission.ObjectInterfaces,
 ) (err error) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	if !c.HasSynced() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+	}
 
 	var deniedDecisions []policyDecisionWithMetadata
 
@@ -247,9 +208,11 @@ func (c *celAdmissionController) Validate(
 			})
 		}
 	}
-	for definitionNamespacedName, definitionInfo := range c.definitionInfo {
+	policyDatas := c.definitions.Load().([]policyData)
+
+	for _, definitionInfo := range policyDatas {
 		definition := definitionInfo.lastReconciledValue
-		matches, matchKind, err := c.validatorCompiler.DefinitionMatches(a, o, definition)
+		matches, matchKind, err := c.policyController.DefinitionMatches(a, o, definition)
 		if err != nil {
 			// Configuration error.
 			addConfigError(err, definition, nil)
@@ -264,17 +227,11 @@ func (c *celAdmissionController) Validate(
 			continue
 		}
 
-		dependentBindings := c.definitionsToBindings[definitionNamespacedName]
-		if len(dependentBindings) == 0 {
-			continue
-		}
-
-		for namespacedBindingName := range dependentBindings {
+		for _, bindingInfo := range definitionInfo.bindings {
 			// If the key is inside dependentBindings, there is guaranteed to
 			// be a bindingInfo for it
-			bindingInfo := c.bindingInfos[namespacedBindingName]
 			binding := bindingInfo.lastReconciledValue
-			matches, err := c.validatorCompiler.BindingMatches(a, o, binding)
+			matches, err := c.policyController.BindingMatches(a, o, binding)
 			if err != nil {
 				// Configuration error.
 				addConfigError(err, definition, binding)
@@ -291,11 +248,8 @@ func (c *celAdmissionController) Validate(
 			paramKind := definition.Spec.ParamKind
 			paramRef := binding.Spec.ParamRef
 			if paramKind != nil && paramRef != nil {
-
-				// Find the params referred by the binding by looking its name up
-				// in our informer for its CRD
-				paramInfo, ok := c.paramsCRDControllers[*paramKind]
-				if !ok {
+				paramController := definitionInfo.paramController
+				if paramController == nil {
 					addConfigError(fmt.Errorf("paramKind kind `%v` not known",
 						paramKind.String()), definition, binding)
 					continue
@@ -304,19 +258,19 @@ func (c *celAdmissionController) Validate(
 				// If the param informer for this admission policy has not yet
 				// had time to perform an initial listing, don't attempt to use
 				// it.
-				//!TODO(alexzielenski): Add a shorter timeout
-				// than "forever" to this wait.
+				timeoutCtx, cancel := context.WithTimeout(c.policyController.context, 1*time.Second)
+				defer cancel()
 
-				if !cache.WaitForCacheSync(c.runningContext.Done(), paramInfo.controller.HasSynced) {
+				if !cache.WaitForCacheSync(timeoutCtx.Done(), paramController.HasSynced) {
 					addConfigError(fmt.Errorf("paramKind kind `%v` not yet synced to use for admission",
 						paramKind.String()), definition, binding)
 					continue
 				}
 
 				if len(paramRef.Namespace) == 0 {
-					param, err = paramInfo.controller.Informer().Get(paramRef.Name)
+					param, err = paramController.Informer().Get(paramRef.Name)
 				} else {
-					param, err = paramInfo.controller.Informer().Namespaced(paramRef.Namespace).Get(paramRef.Name)
+					param, err = paramController.Informer().Namespaced(paramRef.Namespace).Get(paramRef.Name)
 				}
 
 				if err != nil {
@@ -338,17 +292,7 @@ func (c *celAdmissionController) Validate(
 					continue
 				}
 			}
-
-			validator := bindingInfo.validator.Load()
-			if validator == nil {
-				// Compile policy definition using binding
-				newValidator := c.validatorCompiler.Compile(definition)
-				validator = &newValidator
-
-				bindingInfo.validator.Store(validator)
-			}
-
-			decisions, err := (*validator).Validate(a, o, param, matchKind)
+			decisions, err := bindingInfo.validator.Validate(a, o, param, matchKind)
 			if err != nil {
 				// runtime error. Apply failure policy
 				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)
@@ -400,10 +344,13 @@ func (c *celAdmissionController) Validate(
 }
 
 func (c *celAdmissionController) HasSynced() bool {
-	return c.policyBindingController.HasSynced() &&
-		c.policyDefinitionsController.HasSynced()
+	return c.policyController.HasSynced() && c.definitions.Load() != nil
 }
 
 func (c *celAdmissionController) ValidateInitialization() error {
-	return c.validatorCompiler.ValidateInitialization()
+	return c.policyController.ValidateInitialization()
+}
+
+func (c *celAdmissionController) refreshPolicies() {
+	c.definitions.Store(c.policyController.latestPolicyData())
 }
