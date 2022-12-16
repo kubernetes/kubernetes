@@ -75,11 +75,9 @@ var (
 
 	debugExample = templates.Examples(i18n.T(`
 		# Create an interactive debugging session in pod mypod and immediately attach to it.
-		# (requires the EphemeralContainers feature to be enabled in the cluster)
 		kubectl debug mypod -it --image=busybox
 
 		# Create a debug container named debugger using a custom automated debugging image.
-		# (requires the EphemeralContainers feature to be enabled in the cluster)
 		kubectl debug --image=myproj/debug-tools -c debugger mypod
 
 		# Create a copy of mypod adding a debug container and attach to it
@@ -296,9 +294,6 @@ func (o *DebugOptions) Validate() error {
 			return fmt.Errorf("--target is incompatible with --copy-to. Use --share-processes instead.")
 		}
 		if !o.Quiet {
-			// If the runtime doesn't support container namespace targeting this will fail silently, which has caused
-			// some confusion (ex: https://issues.k8s.io/98362), so print a warning. This can be removed when
-			// EphemeralContainers are generally available.
 			fmt.Fprintf(o.Out, "Targeting container %q. If you don't see processes from this container it may be because the container runtime doesn't support this feature.\n", o.TargetContainer)
 			// TODO(verb): Add a list of supported container runtimes to https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/ and then link here.
 		}
@@ -447,7 +442,7 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 		// The apiserver will return a 404 when the EphemeralContainers feature is disabled because the `/ephemeralcontainers` subresource
 		// is missing. Unlike the 404 returned by a missing pod, the status details will be empty.
 		if serr, ok := err.(*errors.StatusError); ok && serr.Status().Reason == metav1.StatusReasonNotFound && serr.ErrStatus.Details.Name == "" {
-			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q).", err)
+			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q)", err)
 		}
 
 		// The Kind used for the /ephemeralcontainers subresource changed in 1.22. When presented with an unexpected

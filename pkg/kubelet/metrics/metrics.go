@@ -496,7 +496,7 @@ var (
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           ManagedEphemeralContainersKey,
-			Help:           "Current number of ephemeral containers in pods managed by this kubelet. Ephemeral containers will be ignored if disabled by the EphemeralContainers feature gate, and this number will be 0.",
+			Help:           "Current number of ephemeral containers in pods managed by this kubelet.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
