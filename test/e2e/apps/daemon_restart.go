@@ -114,7 +114,9 @@ func (r *RestartDaemonConfig) waitUp() {
 	}
 	err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
 		result, err := e2essh.NodeExec(r.nodeName, healthzCheck, framework.TestContext.Provider)
-		framework.ExpectNoError(err)
+		if err != nil {
+			return false, err
+		}
 		if result.Code == 0 {
 			httpCode, err := strconv.Atoi(result.Stdout)
 			if err != nil {
