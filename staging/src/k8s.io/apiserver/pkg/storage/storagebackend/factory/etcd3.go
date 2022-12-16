@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -158,10 +160,28 @@ type runningCompactor struct {
 	refs     int
 }
 
+// transportConfigKey is the subset of storagebackend.TransportConfig fields used for equality comparisons.
+// Different keys identity different transports.  Each distinct transport is expected to have a single compactor.
+type transportConfigKey struct {
+	serverList    string // join storagebackend.TransportConfig.ServerList after deduplication and sorting
+	keyFile       string
+	certFile      string
+	trustedCAFile string
+}
+
+func makeTransportConfigKey(c storagebackend.TransportConfig) transportConfigKey {
+	return transportConfigKey{
+		serverList:    strings.Join(sets.NewString(c.ServerList...).List(), "|||"),
+		keyFile:       c.KeyFile,
+		certFile:      c.CertFile,
+		trustedCAFile: c.TrustedCAFile,
+	}
+}
+
 var (
 	// compactorsMu guards access to compactors map
 	compactorsMu sync.Mutex
-	compactors   = map[string]*runningCompactor{}
+	compactors   = map[transportConfigKey]*runningCompactor{}
 	// dbMetricsMonitorsMu guards access to dbMetricsMonitors map
 	dbMetricsMonitorsMu sync.Mutex
 	dbMetricsMonitors   map[string]struct{}
@@ -174,7 +194,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	compactorsMu.Lock()
 	defer compactorsMu.Unlock()
 
-	key := fmt.Sprintf("%v", c) // gives: {[server1 server2] keyFile certFile caFile}  // TODO does this make sense?
+	key := makeTransportConfigKey(c)
 	if compactor, foundBefore := compactors[key]; !foundBefore || compactor.interval > interval {
 		compactorClient, err := newETCD3Client(c)
 		if err != nil {
