@@ -194,7 +194,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	compactorsMu.Lock()
 	defer compactorsMu.Unlock()
 
-	key := makeTransportConfigKey(c)
+	key := makeTransportConfigKey(c) // TODO(enj): the logic in this func and etcd3.StartCompactor do not make sense when used together
 	if compactor, foundBefore := compactors[key]; !foundBefore || compactor.interval > interval {
 		compactorClient, err := newETCD3Client(c)
 		if err != nil {

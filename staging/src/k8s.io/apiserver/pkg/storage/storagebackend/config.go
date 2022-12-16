@@ -71,6 +71,7 @@ type TransportConfig struct {
 	// The TracerProvider can add tracing the connection
 	TracerProvider oteltrace.TracerProvider
 
+	// complete guards getClient and makes sure it is only set once via Complete (see that method for more details).
 	complete  bool
 	getClient func() (*clientv3.Client, error)
 }
@@ -160,11 +161,24 @@ const (
 	dialTimeout = 20 * time.Second
 )
 
+// Complete can only be called once and must be called before making any calls to Client.
+// Callers must not mutate TransportConfig after calling Complete.  For the exceptional
+// cases where such functionality is needed, use the ShallowCopyAndResetComplete method.
+// This method does not attempt to create an etcd client - the client is lazily initialized
+// on the first call to Client.
 func (c *TransportConfig) Complete(ctx context.Context) error {
 	if c.complete {
 		return fmt.Errorf("TransportConfig.Complete called more than once")
 	}
 
+	// we need TransportConfig.Client to be go routine safe and we need to only
+	// create a single etcd client per transport config, so we use sync.Once to
+	// guard the local state created in this method.  capturing this state via
+	// a closure allows us to lazily initialize the client which makes it far
+	// easier to keep existing unit tests passing (because most of them do not
+	// actually want to create an etcd client).  this also prevents us from
+	// creating a client that is not used (i.e. if Complete is called but then
+	// Client is not called such as code paths involving ShallowCopyAndResetComplete).
 	var (
 		once   sync.Once
 		client *clientv3.Client
@@ -181,6 +195,9 @@ func (c *TransportConfig) Complete(ctx context.Context) error {
 	return nil
 }
 
+// Client returns the etcd client associated with this transport.
+// It is safe to call concurrently and will always return the same etcd client.
+// It blocks forever until it can successfully create a client.
 func (c *TransportConfig) Client() (*clientv3.Client, error) {
 	if !c.complete {
 		return nil, fmt.Errorf("TransportConfig.Client called without completion")
@@ -298,6 +315,7 @@ func getClient(ctx context.Context, c TransportConfig) (*clientv3.Client, error)
 	// decorate the KV instance so we can track etcd latency per request.
 	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
 
+	// lifecycle the etcd client via ctx
 	go func() {
 		defer utilruntime.HandleCrash()
 
