@@ -309,7 +309,13 @@ func (s *DefaultStorageFactory) getTransportConfig(etcdLocation []string) (stora
 	s.transportCacheLock.Lock()
 	defer s.transportCacheLock.Unlock()
 
-	key := strings.Join(sets.NewString(etcdLocation...).List(), "|||") // sort and duplicate
+	key := etcdLocationKey(etcdLocation)
+
+	// the custom etcdLocation is the same as the default so no need to make a new transport config
+	if baseKey := etcdLocationKey(s.StorageConfig.Transport.ServerList); baseKey == key {
+		return s.StorageConfig.Transport, nil
+	}
+
 	if val, ok := s.transportCache[key]; ok {
 		return val, nil
 	}
@@ -323,6 +329,10 @@ func (s *DefaultStorageFactory) getTransportConfig(etcdLocation []string) (stora
 
 	s.transportCache[key] = transportConfig
 	return transportConfig, nil
+}
+
+func etcdLocationKey(etcdLocation []string) string {
+	return strings.Join(sets.NewString(etcdLocation...).List(), "|||") // sort and duplicate
 }
 
 // Backends returns all backends for all registered storage destinations.
