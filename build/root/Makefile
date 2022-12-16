@@ -193,6 +193,7 @@ define TEST_IT_HELP_INFO
 #
 # Example:
 #   make test-integration
+#   make test-integration WHAT=./test/integration/kubelet GOFLAGS="-v -coverpkg=./pkg/kubelet/..." KUBE_COVER="y"
 endef
 .PHONY: test-integration
 ifeq ($(PRINT_HELP),y)
