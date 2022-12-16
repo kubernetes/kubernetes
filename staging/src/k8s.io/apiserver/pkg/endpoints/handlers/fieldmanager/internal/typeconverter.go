@@ -74,17 +74,13 @@ func (c *typeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, 
 	return valueToObject(value.AsValue())
 }
 
+type deducedTypeConverter struct{}
+
 // DeducedTypeConverter is a TypeConverter for CRDs that don't have a
 // schema. It does implement the same interface though (and create the
 // same types of objects), so that everything can still work the same.
 // CRDs are merged with all their fields being "atomic" (lists
 // included).
-//
-// Note that this is not going to be sufficient for converting to/from
-// CRDs that have a schema defined (we don't support that schema yet).
-// TODO(jennybuckley): Use the schema provided by a CRD if it exists.
-type deducedTypeConverter struct{}
-
 func NewDeducedTypeConverter() TypeConverter {
 	return deducedTypeConverter{}
 }
