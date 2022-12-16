@@ -147,10 +147,20 @@ func (p *criticalPaths) update(tpVal string, num int) {
 	}
 }
 
+func hasAllRequiredConstraintsDefined(pod *v1.Pod) bool {
+	for _, constraint := range pod.Spec.TopologySpreadConstraints {
+		if constraint.MaxSkew == 0 || constraint.TopologyKey == "" || constraint.WhenUnsatisfiable == "" {
+			return false
+		}
+	}
+
+	return true
+}
+
 // PreFilter invoked at the prefilter extension point.
 func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	// If our pod isn't configured with any topology constraints we can skip
-	if len(pod.Spec.TopologySpreadConstraints) == 0 {
+	if !hasAllRequiredConstraintsDefined(pod) {
 		return nil, framework.NewStatus(framework.Skip)
 	}
 	s, err := pl.calPreFilterState(ctx, pod)
