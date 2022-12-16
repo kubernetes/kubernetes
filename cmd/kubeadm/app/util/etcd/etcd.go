@@ -368,6 +368,7 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 	var (
 		lastError   error
 		respMembers []*etcdserverpb.Member
+		learnerID   uint64
 	)
 	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
 		cli, err := clientv3.New(clientv3.Config{
@@ -388,18 +389,23 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		defer cancel()
 		var resp *clientv3.MemberAddResponse
 		if isLearner {
-			klog.V(1).Infof("[etcd] Adding etcd member as learner: %016x", peerAddrs)
-			resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
-			if err == nil {
-				learnerID := resp.Member.ID
-				err = memberPromoteWithRety(ctx, cli, learnerID)
+			// if learnerID is set, it means the etcd member is already added successfully.
+			if learnerID == 0 {
+				klog.V(1).Infof("[etcd] Adding etcd member as learner: %016x", peerAddrs)
+				resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
 				if err != nil {
 					lastError = err
-					return false, lastError
+					return false, nil
 				}
-				respMembers = resp.Members
-				return true, nil
+				learnerID = resp.Member.ID
 			}
+			err = memberPromote(ctx, cli, learnerID)
+			if err != nil {
+				lastError = err
+				return false, nil
+			}
+			respMembers = resp.Members
+			return true, nil
 		}
 
 		resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
@@ -453,23 +459,20 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 	return ret, nil
 }
 
-func memberPromoteWithRety(ctx context.Context, cli *clientv3.Client, learnerID uint64) error {
+func memberPromote(ctx context.Context, cli *clientv3.Client, learnerID uint64) error {
 	klog.V(1).Infof("[etcd] Promoting a learner as a voting member: %016x", learnerID)
-	err := wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
-		// TODO: warning logs from etcd client should be removed.
-		// The warning logs are printed by etcd client code for several reasons, including
-		// 1. can not promote yet(no synced)
-		// 2. context deadline exceeded
-		// 3. peer URLs already exists
-		// Once the client provides a way to check if the etcd learner is ready to promote, the retry logic can be revisited.
-		_, err := cli.MemberPromote(ctx, learnerID)
-		if err == nil {
-			klog.V(1).Infof("[etcd] The learner was promoted as a voting member: %016x", learnerID)
-			return true, nil
-		}
-		klog.V(4).Infof("[etcd] Promoting the learner %016x failed: %v", learnerID, err)
-		return false, nil
-	})
+	// TODO: warning logs from etcd client should be removed.
+	// The warning logs are printed by etcd client code for several reasons, including
+	// 1. can not promote yet(no synced)
+	// 2. context deadline exceeded
+	// 3. peer URLs already exists
+	// Once the client provides a way to check if the etcd learner is ready to promote, the retry logic can be revisited.
+	_, err := cli.MemberPromote(ctx, learnerID)
+	if err == nil {
+		klog.V(1).Infof("[etcd] The learner was promoted as a voting member: %016x", learnerID)
+		return nil
+	}
+	klog.V(5).Infof("[etcd] Promoting the learner %016x failed: %v", learnerID, err)
 	return err
 }
 
