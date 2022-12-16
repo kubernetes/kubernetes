@@ -104,8 +104,9 @@ func TestWatchCacheUpdatedByEtcd(t *testing.T) {
 	c, closeFn := multiEtcdSetup(t)
 	t.Cleanup(closeFn)
 
-	if got := atomic.LoadUint64(&calls); got != 3 {
-		t.Errorf("expected three calls to storagebackend.CreateEtcdClient but got %d", got)
+	// multiEtcdSetup sets up two etcd backends so we should have two clients
+	if got := atomic.LoadUint64(&calls); got != 2 {
+		t.Errorf("expected two calls to storagebackend.CreateEtcdClient but got %d", got)
 	}
 
 	ctx := context.TODO()
