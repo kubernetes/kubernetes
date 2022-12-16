@@ -21,20 +21,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
-
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	clientv3 "go.etcd.io/etcd/client/v3"
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -325,5 +327,30 @@ func crdDefinitionName(crd *apiextensionsv1.CustomResourceDefinition) string {
 func reverse(s []string) {
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
+	}
+}
+
+func TestCRDsSingleEtcdClient(t *testing.T) {
+	originalCreateEtcdClient := storagebackend.CreateEtcdClient
+	t.Cleanup(func() {
+		storagebackend.CreateEtcdClient = originalCreateEtcdClient
+	})
+	var calls uint64
+	storagebackend.CreateEtcdClient = func(cfg clientv3.Config) (*clientv3.Client, error) {
+		client, err := originalCreateEtcdClient(cfg)
+		if err == nil {
+			atomic.AddUint64(&calls, 1)
+		}
+		return client, err
+	}
+
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	t.Cleanup(result.TearDownFn)
+
+	// creating CRDs should not cause the creation of new etcd clients
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(result.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+
+	if got := atomic.LoadUint64(&calls); got != 1 {
+		t.Fatalf("expected one call to storagebackend.CreateEtcdClient but got %d", got)
 	}
 }
