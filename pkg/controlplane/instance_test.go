@@ -89,6 +89,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 		t.Fatal(err)
 	}
 
+	// set up the storage factory after completing the etcd options because we need the completed etcdOptions.StorageConfig and not the starting storageConfig
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
 	resourceEncoding := resourceconfig.MergeResourceEncodingConfigs(storageFactoryConfig.DefaultResourceEncoding, storageFactoryConfig.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(), nil)

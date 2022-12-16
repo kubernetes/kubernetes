@@ -89,6 +89,7 @@ type DefaultStorageFactory struct {
 }
 
 type groupResourceOverrides struct {
+	// etcdCtx is used to lifecycle etcd clients associated with custom etcdLocation overrides.
 	etcdCtx context.Context
 	// etcdLocation contains the list of "special" locations that are used for particular GroupResources
 	// These are merged on top of the StorageConfig when requesting the storage.Interface for a given GroupResource
@@ -121,6 +122,7 @@ func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *St
 	if len(o.etcdLocation) > 0 {
 		config.Transport = config.Transport.ShallowCopyAndResetComplete()
 		config.Transport.ServerList = o.etcdLocation
+		// this transport will make a new client now so we are responsible for its lifecycle
 		if err := config.Transport.Complete(o.etcdCtx); err != nil {
 			return err
 		}

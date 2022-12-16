@@ -189,6 +189,10 @@ func (c *TransportConfig) Client() (*clientv3.Client, error) {
 	return c.getClient()
 }
 
+// ShallowCopyAndResetComplete allows an already completed TransportConfig to be re-used in a different context.
+// For example, in situations where you need to mutate an already completed TransportConfig to change ServerList
+// and then create a new etcd client.  This method should be used with care as it allows an unbounded amount of
+// etcd clients to be created.
 func (c *TransportConfig) ShallowCopyAndResetComplete() TransportConfig {
 	out := *c
 	out.complete = false
