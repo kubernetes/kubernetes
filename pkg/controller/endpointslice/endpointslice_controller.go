@@ -317,14 +317,15 @@ func (c *Controller) syncService(key string) error {
 
 	service, err := c.serviceLister.Services(namespace).Get(name)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			c.triggerTimeTracker.DeleteService(namespace, name)
-			c.reconciler.deleteService(namespace, name)
-			c.endpointSliceTracker.DeleteService(namespace, name)
-			// The service has been deleted, return nil so that it won't be retried.
-			return nil
+		if !apierrors.IsNotFound(err) {
+			return err
 		}
-		return err
+
+		c.triggerTimeTracker.DeleteService(namespace, name)
+		c.reconciler.deleteService(namespace, name)
+		c.endpointSliceTracker.DeleteService(namespace, name)
+		// The service has been deleted, return nil so that it won't be retried.
+		return nil
 	}
 
 	if service.Spec.Selector == nil {

@@ -449,15 +449,14 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	// See if there's actually an update here.
 	currentEndpoints, err := e.endpointsLister.Endpoints(service.Namespace).Get(service.Name)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			currentEndpoints = &v1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   service.Name,
-					Labels: service.Labels,
-				},
-			}
-		} else {
+		if !errors.IsNotFound(err) {
 			return err
+		}
+		currentEndpoints = &v1.Endpoints{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   service.Name,
+				Labels: service.Labels,
+			},
 		}
 	}
 
@@ -604,13 +603,12 @@ func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.Endpoint
 }
 
 func endpointPortFromServicePort(servicePort *v1.ServicePort, portNum int) *v1.EndpointPort {
-	epp := &v1.EndpointPort{
+	return &v1.EndpointPort{
 		Name:        servicePort.Name,
 		Port:        int32(portNum),
 		Protocol:    servicePort.Protocol,
 		AppProtocol: servicePort.AppProtocol,
 	}
-	return epp
 }
 
 // capacityAnnotationSetCorrectly returns false if number of endpoints is greater than maxCapacity or
