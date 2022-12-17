@@ -605,7 +605,7 @@ export TLS_CIPHER_SUITES=""
 
 # CLOUD_PROVIDER_FLAG defines the cloud-provider value presented to KCM, apiserver,
 # and kubelet
-export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-gce}"
+export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-external}"
 
 # When ENABLE_AUTH_PROVIDER_GCP is set, following flags for out-of-tree credential provider for GCP
 # are presented to kubelet:
