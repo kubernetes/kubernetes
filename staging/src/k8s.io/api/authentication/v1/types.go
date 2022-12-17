@@ -56,20 +56,20 @@ type TokenReview struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec holds information about the request being evaluated
+	// spec holds information about the request being evaluated
 	Spec TokenReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status is filled in by the server and indicates whether the request can be authenticated.
+	// status is filled in by the server and indicates whether the request can be authenticated.
 	// +optional
 	Status TokenReviewStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
-	// Token is the opaque bearer token.
+	// token is the opaque bearer token.
 	// +optional
 	Token string `json:"token,omitempty" protobuf:"bytes,1,opt,name=token"`
-	// Audiences is a list of the identifiers that the resource server presented
+	// audiences is a list of the identifiers that the resource server presented
 	// with the token identifies as. Audience-aware token authenticators will
 	// verify that the token was intended for at least one of the audiences in
 	// this list. If no audiences are provided, the audience will default to the
@@ -80,13 +80,13 @@ type TokenReviewSpec struct {
 
 // TokenReviewStatus is the result of the token authentication request.
 type TokenReviewStatus struct {
-	// Authenticated indicates that the token was associated with a known user.
+	// authenticated indicates that the token was associated with a known user.
 	// +optional
 	Authenticated bool `json:"authenticated,omitempty" protobuf:"varint,1,opt,name=authenticated"`
-	// User is the UserInfo associated with the provided token.
+	// user is the UserInfo associated with the provided token.
 	// +optional
 	User UserInfo `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
-	// Audiences are audience identifiers chosen by the authenticator that are
+	// audiences are audience identifiers chosen by the authenticator that are
 	// compatible with both the TokenReview and token. An identifier is any
 	// identifier in the intersection of the TokenReviewSpec audiences and the
 	// token's audiences. A client of the TokenReview API that sets the
@@ -97,7 +97,7 @@ type TokenReviewStatus struct {
 	// valid against the audience of the Kubernetes API server.
 	// +optional
 	Audiences []string `json:"audiences,omitempty" protobuf:"bytes,4,rep,name=audiences"`
-	// Error indicates that the token couldn't be checked
+	// error indicates that the token couldn't be checked
 	// +optional
 	Error string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
 }
@@ -105,18 +105,19 @@ type TokenReviewStatus struct {
 // UserInfo holds the information about the user needed to implement the
 // user.Info interface.
 type UserInfo struct {
-	// The name that uniquely identifies this user among all active users.
+	// username is the name that uniquely identifies this user among all active
+	// users.
 	// +optional
 	Username string `json:"username,omitempty" protobuf:"bytes,1,opt,name=username"`
-	// A unique value that identifies this user across time. If this user is
-	// deleted and another user by the same name is added, they will have
+	// uid is a unique value that identifies this user across time. If this user
+	// is deleted and another user by the same name is added, they will have
 	// different UIDs.
 	// +optional
 	UID string `json:"uid,omitempty" protobuf:"bytes,2,opt,name=uid"`
-	// The names of groups this user is a part of.
+	// groups are the the names of groups this user is a part of.
 	// +optional
 	Groups []string `json:"groups,omitempty" protobuf:"bytes,3,rep,name=groups"`
-	// Any additional information provided by the authenticator.
+	// extra is any additional information provided by the authenticator.
 	// +optional
 	Extra map[string]ExtraValue `json:"extra,omitempty" protobuf:"bytes,4,rep,name=extra"`
 }
@@ -140,17 +141,17 @@ type TokenRequest struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec holds information about the request being evaluated
+	// spec holds information about the request being evaluated
 	Spec TokenRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status is filled in by the server and indicates whether the token can be authenticated.
+	// status is filled in by the server and indicates whether the token can be authenticated.
 	// +optional
 	Status TokenRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // TokenRequestSpec contains client provided parameters of a token request.
 type TokenRequestSpec struct {
-	// Audiences are the intendend audiences of the token. A recipient of a
+	// audiences are the intendend audiences of the token. A recipient of a
 	// token must identify themself with an identifier in the list of
 	// audiences of the token, and otherwise should reject the token. A
 	// token issued for multiple audiences may be used to authenticate
@@ -158,13 +159,13 @@ type TokenRequestSpec struct {
 	// trust between the target audiences.
 	Audiences []string `json:"audiences" protobuf:"bytes,1,rep,name=audiences"`
 
-	// ExpirationSeconds is the requested duration of validity of the request. The
+	// expirationSeconds is the requested duration of validity of the request. The
 	// token issuer may return a token with a different validity duration so a
 	// client needs to check the 'expiration' field in a response.
 	// +optional
 	ExpirationSeconds *int64 `json:"expirationSeconds" protobuf:"varint,4,opt,name=expirationSeconds"`
 
-	// BoundObjectRef is a reference to an object that the token will be bound to.
+	// boundObjectRef is a reference to an object that the token will be bound to.
 	// The token will only be valid for as long as the bound object exists.
 	// NOTE: The API server's TokenReview endpoint will validate the
 	// BoundObjectRef, but other audiences may not. Keep ExpirationSeconds
@@ -175,25 +176,25 @@ type TokenRequestSpec struct {
 
 // TokenRequestStatus is the result of a token request.
 type TokenRequestStatus struct {
-	// Token is the opaque bearer token.
+	// token is the opaque bearer token.
 	Token string `json:"token" protobuf:"bytes,1,opt,name=token"`
-	// ExpirationTimestamp is the time of expiration of the returned token.
+	// expirationTimestamp is the time of expiration of the returned token.
 	ExpirationTimestamp metav1.Time `json:"expirationTimestamp" protobuf:"bytes,2,opt,name=expirationTimestamp"`
 }
 
 // BoundObjectReference is a reference to an object that a token is bound to.
 type BoundObjectReference struct {
-	// Kind of the referent. Valid kinds are 'Pod' and 'Secret'.
+	// kind of the referent. Valid kinds are 'Pod' and 'Secret'.
 	// +optional
 	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
-	// API version of the referent.
+	// apiVersion of the referent.
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
 
-	// Name of the referent.
+	// name of the referent.
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
-	// UID of the referent.
+	// uid of the referent.
 	// +optional
 	UID types.UID `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uID,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }

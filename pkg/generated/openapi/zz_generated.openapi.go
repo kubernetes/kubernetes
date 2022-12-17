@@ -7985,28 +7985,28 @@ func schema_k8sio_api_authentication_v1_BoundObjectReference(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind of the referent. Valid kinds are 'Pod' and 'Secret'.",
+							Description: "kind of the referent. Valid kinds are 'Pod' and 'Secret'.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "API version of the referent.",
+							Description: "apiVersion of the referent.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the referent.",
+							Description: "name of the referent.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UID of the referent.",
+							Description: "uid of the referent.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -8047,14 +8047,14 @@ func schema_k8sio_api_authentication_v1_TokenRequest(ref common.ReferenceCallbac
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the request being evaluated",
+							Description: "spec holds information about the request being evaluated",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authentication/v1.TokenRequestSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server and indicates whether the token can be authenticated.",
+							Description: "status is filled in by the server and indicates whether the token can be authenticated.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authentication/v1.TokenRequestStatus"),
 						},
@@ -8077,7 +8077,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"audiences": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Audiences are the intendend audiences of the token. A recipient of a token must identify themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
+							Description: "audiences are the intendend audiences of the token. A recipient of a token must identify themself with an identifier in the list of audiences of the token, and otherwise should reject the token. A token issued for multiple audiences may be used to authenticate against any of the audiences listed but implies a high degree of trust between the target audiences.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8092,14 +8092,14 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 					},
 					"expirationSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExpirationSeconds is the requested duration of validity of the request. The token issuer may return a token with a different validity duration so a client needs to check the 'expiration' field in a response.",
+							Description: "expirationSeconds is the requested duration of validity of the request. The token issuer may return a token with a different validity duration so a client needs to check the 'expiration' field in a response.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"boundObjectRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BoundObjectRef is a reference to an object that the token will be bound to. The token will only be valid for as long as the bound object exists. NOTE: The API server's TokenReview endpoint will validate the BoundObjectRef, but other audiences may not. Keep ExpirationSeconds small if you want prompt revocation.",
+							Description: "boundObjectRef is a reference to an object that the token will be bound to. The token will only be valid for as long as the bound object exists. NOTE: The API server's TokenReview endpoint will validate the BoundObjectRef, but other audiences may not. Keep ExpirationSeconds small if you want prompt revocation.",
 							Ref:         ref("k8s.io/api/authentication/v1.BoundObjectReference"),
 						},
 					},
@@ -8121,7 +8121,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestStatus(ref common.ReferenceC
 				Properties: map[string]spec.Schema{
 					"token": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Token is the opaque bearer token.",
+							Description: "token is the opaque bearer token.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -8129,7 +8129,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestStatus(ref common.ReferenceC
 					},
 					"expirationTimestamp": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ExpirationTimestamp is the time of expiration of the returned token.",
+							Description: "expirationTimestamp is the time of expiration of the returned token.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
@@ -8173,14 +8173,14 @@ func schema_k8sio_api_authentication_v1_TokenReview(ref common.ReferenceCallback
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the request being evaluated",
+							Description: "spec holds information about the request being evaluated",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authentication/v1.TokenReviewSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server and indicates whether the request can be authenticated.",
+							Description: "status is filled in by the server and indicates whether the request can be authenticated.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authentication/v1.TokenReviewStatus"),
 						},
@@ -8203,14 +8203,14 @@ func schema_k8sio_api_authentication_v1_TokenReviewSpec(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"token": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Token is the opaque bearer token.",
+							Description: "token is the opaque bearer token.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"audiences": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
+							Description: "audiences is a list of the identifiers that the resource server presented with the token identifies as. Audience-aware token authenticators will verify that the token was intended for at least one of the audiences in this list. If no audiences are provided, the audience will default to the audience of the Kubernetes apiserver.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8238,21 +8238,21 @@ func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"authenticated": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Authenticated indicates that the token was associated with a known user.",
+							Description: "authenticated indicates that the token was associated with a known user.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User is the UserInfo associated with the provided token.",
+							Description: "user is the UserInfo associated with the provided token.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authentication/v1.UserInfo"),
 						},
 					},
 					"audiences": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is \"true\", the token is valid against the audience of the Kubernetes API server.",
+							Description: "audiences are audience identifiers chosen by the authenticator that are compatible with both the TokenReview and token. An identifier is any identifier in the intersection of the TokenReviewSpec audiences and the token's audiences. A client of the TokenReview API that sets the spec.audiences field should validate that a compatible audience identifier is returned in the status.audiences field to ensure that the TokenReview server is audience aware. If a TokenReview returns an empty status.audience field where status.authenticated is \"true\", the token is valid against the audience of the Kubernetes API server.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8267,7 +8267,7 @@ func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCa
 					},
 					"error": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Error indicates that the token couldn't be checked",
+							Description: "error indicates that the token couldn't be checked",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -8289,21 +8289,21 @@ func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) c
 				Properties: map[string]spec.Schema{
 					"username": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The name that uniquely identifies this user among all active users.",
+							Description: "username is the name that uniquely identifies this user among all active users.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "A unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
+							Description: "uid is a unique value that identifies this user across time. If this user is deleted and another user by the same name is added, they will have different UIDs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"groups": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The names of groups this user is a part of.",
+							Description: "groups are the the names of groups this user is a part of.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8318,7 +8318,7 @@ func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) c
 					},
 					"extra": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Any additional information provided by the authenticator.",
+							Description: "extra is any additional information provided by the authenticator.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -8642,14 +8642,14 @@ func schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref common.Refer
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted.",
+							Description: "spec holds information about the request being evaluated.  spec.namespace must be equal to the namespace you made the request against.  If empty, it is defaulted.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authorization/v1.SubjectAccessReviewSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server and indicates whether the request is allowed or not",
+							Description: "status is filled in by the server and indicates whether the request is allowed or not",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authorization/v1.SubjectAccessReviewStatus"),
 						},
@@ -8672,14 +8672,14 @@ func schema_k8sio_api_authorization_v1_NonResourceAttributes(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"path": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Path is the URL path of the request",
+							Description: "path is the URL path of the request",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"verb": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Verb is the standard HTTP verb",
+							Description: "verb is the standard HTTP verb",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -8699,7 +8699,7 @@ func schema_k8sio_api_authorization_v1_NonResourceRule(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"verbs": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  \"*\" means all.",
+							Description: "verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  \"*\" means all.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8714,7 +8714,7 @@ func schema_k8sio_api_authorization_v1_NonResourceRule(ref common.ReferenceCallb
 					},
 					"nonResourceURLs": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
+							Description: "nonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8743,49 +8743,49 @@ func schema_k8sio_api_authorization_v1_ResourceAttributes(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
+							Description: "namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces \"\" (empty) is defaulted for LocalSubjectAccessReviews \"\" (empty) is empty for cluster-scoped resources \"\" (empty) means \"all\" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"verb": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+							Description: "verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Group is the API Group of the Resource.  \"*\" means all.",
+							Description: "group is the API Group of the Resource.  \"*\" means all.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"version": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Version is the API Version of the Resource.  \"*\" means all.",
+							Description: "version is the API Version of the Resource.  \"*\" means all.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"resource": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Resource is one of the existing resource types.  \"*\" means all.",
+							Description: "resource is one of the existing resource types.  \"*\" means all.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"subresource": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Subresource is one of the existing resource types.  \"\" means none.",
+							Description: "subresource is one of the existing resource types.  \"\" means none.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
+							Description: "name is the name of the resource being requested for a \"get\" or deleted for a \"delete\". \"\" (empty) means all.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -8805,7 +8805,7 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"verbs": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
+							Description: "verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8820,7 +8820,7 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 					},
 					"apiGroups": {
 						SchemaProps: spec.SchemaProps{
-							Description: "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all.",
+							Description: "apiGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8835,7 +8835,7 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 					},
 					"resources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
+							Description: "resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8850,7 +8850,7 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 					},
 					"resourceNames": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
+							Description: "resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -8900,14 +8900,14 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReview(ref common.Refere
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the request being evaluated.  user and groups must be empty",
+							Description: "spec holds information about the request being evaluated.  user and groups must be empty",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authorization/v1.SelfSubjectAccessReviewSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server and indicates whether the request is allowed or not",
+							Description: "status is filled in by the server and indicates whether the request is allowed or not",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authorization/v1.SubjectAccessReviewStatus"),
 						},
@@ -8930,13 +8930,13 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref common.Re
 				Properties: map[string]spec.Schema{
 					"resourceAttributes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceAuthorizationAttributes describes information for a resource access request",
+							Description: "resourceAuthorizationAttributes describes information for a resource access request",
 							Ref:         ref("k8s.io/api/authorization/v1.ResourceAttributes"),
 						},
 					},
 					"nonResourceAttributes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NonResourceAttributes describes information for a non-resource access request",
+							Description: "nonResourceAttributes describes information for a non-resource access request",
 							Ref:         ref("k8s.io/api/authorization/v1.NonResourceAttributes"),
 						},
 					},
@@ -8978,14 +8978,14 @@ func schema_k8sio_api_authorization_v1_SelfSubjectRulesReview(ref common.Referen
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the request being evaluated.",
+							Description: "spec holds information about the request being evaluated.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authorization/v1.SelfSubjectRulesReviewSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server and indicates the set of actions a user can perform.",
+							Description: "status is filled in by the server and indicates the set of actions a user can perform.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authorization/v1.SubjectRulesReviewStatus"),
 						},
@@ -9008,7 +9008,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectRulesReviewSpec(ref common.Ref
 				Properties: map[string]spec.Schema{
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Namespace to evaluate rules for. Required.",
+							Description: "namespace to evaluate rules for. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -9049,14 +9049,14 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReview(ref common.ReferenceC
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec holds information about the request being evaluated",
+							Description: "spec holds information about the request being evaluated",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authorization/v1.SubjectAccessReviewSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status is filled in by the server and indicates whether the request is allowed or not",
+							Description: "status is filled in by the server and indicates whether the request is allowed or not",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/authorization/v1.SubjectAccessReviewStatus"),
 						},
@@ -9079,26 +9079,26 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"resourceAttributes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceAuthorizationAttributes describes information for a resource access request",
+							Description: "resourceAuthorizationAttributes describes information for a resource access request",
 							Ref:         ref("k8s.io/api/authorization/v1.ResourceAttributes"),
 						},
 					},
 					"nonResourceAttributes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NonResourceAttributes describes information for a non-resource access request",
+							Description: "nonResourceAttributes describes information for a non-resource access request",
 							Ref:         ref("k8s.io/api/authorization/v1.NonResourceAttributes"),
 						},
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
+							Description: "user is the user you're testing for. If you specify \"User\" but not \"Groups\", then is it interpreted as \"What if User were not a member of any groups",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"groups": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Groups is the groups you're testing for.",
+							Description: "groups is the groups you're testing for.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -9113,7 +9113,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 					},
 					"extra": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
+							Description: "extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer it needs a reflection here.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -9136,7 +9136,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UID information about the requesting user.",
+							Description: "uid information about the requesting user.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -9158,7 +9158,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 				Properties: map[string]spec.Schema{
 					"allowed": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Allowed is required. True if the action would be allowed, false otherwise.",
+							Description: "allowed is required. True if the action would be allowed, false otherwise.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -9166,21 +9166,21 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 					},
 					"denied": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
+							Description: "denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Reason is optional.  It indicates why a request was allowed or denied.",
+							Description: "reason is optional.  It indicates why a request was allowed or denied.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"evaluationError": {
 						SchemaProps: spec.SchemaProps{
-							Description: "EvaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
+							Description: "evaluationError is an indication that some error occurred during the authorization check. It is entirely possible to get an error and be able to continue determine authorization status in spite of it. For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -9201,7 +9201,7 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"resourceRules": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+							Description: "resourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -9215,7 +9215,7 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 					},
 					"nonResourceRules": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
+							Description: "nonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -9229,7 +9229,7 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 					},
 					"incomplete": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Incomplete is true when the rules returned by this call are incomplete. This is most commonly encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.",
+							Description: "incomplete is true when the rules returned by this call are incomplete. This is most commonly encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -9237,7 +9237,7 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 					},
 					"evaluationError": {
 						SchemaProps: spec.SchemaProps{
-							Description: "EvaluationError can appear in combination with Rules. It indicates an error occurred during rule evaluation, such as an authorizer that doesn't support rule evaluation, and that ResourceRules and/or NonResourceRules may be incomplete.",
+							Description: "evaluationError can appear in combination with Rules. It indicates an error occurred during rule evaluation, such as an authorizer that doesn't support rule evaluation, and that ResourceRules and/or NonResourceRules may be incomplete.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
