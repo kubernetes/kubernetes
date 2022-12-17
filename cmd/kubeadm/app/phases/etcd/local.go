@@ -149,7 +149,11 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 		fmt.Printf("[etcd] Would add etcd member: %s\n", etcdPeerAddress)
 	} else {
 		klog.V(1).Infof("[etcd] Adding etcd member: %s", etcdPeerAddress)
-		cluster, err = etcdClient.AddMember(nodeName, etcdPeerAddress)
+		if features.Enabled(cfg.FeatureGates, features.EtcdLearnerMode) {
+			cluster, err = etcdClient.AddMemberAsLeanerAndPromote(nodeName, etcdPeerAddress)
+		} else {
+			cluster, err = etcdClient.AddMember(nodeName, etcdPeerAddress)
+		}
 		if err != nil {
 			return err
 		}
