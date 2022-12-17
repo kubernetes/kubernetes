@@ -21,7 +21,6 @@ package subpath
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -148,7 +147,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		// A file is enough for all possible targets (symlink, device, pipe,
 		// socket, ...), bind-mounting them into a file correctly changes type
 		// of the target file.
-		if err = ioutil.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
+		if err = os.WriteFile(bindPathTarget, []byte{}, 0640); err != nil {
 			return false, "", fmt.Errorf("error creating file %s: %s", bindPathTarget, err)
 		}
 	}
@@ -243,7 +242,7 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
 	klog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
 
-	containerDirs, err := ioutil.ReadDir(subPathDir)
+	containerDirs, err := os.ReadDir(subPathDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil

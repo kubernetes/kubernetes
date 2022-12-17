@@ -21,7 +21,6 @@ package azuredd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -166,12 +165,12 @@ type ioHandler interface {
 
 type osIOHandler struct{}
 
-func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+func (handler *osIOHandler) ReadDir(dirname string) ([]os.DirEntry, error) {
+	return os.ReadDir(dirname)
 }
 
 func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	return ioutil.WriteFile(filename, data, perm)
+	return os.WriteFile(filename, data, perm)
 }
 
 func (handler *osIOHandler) Readlink(name string) (string, error) {
@@ -179,7 +178,7 @@ func (handler *osIOHandler) Readlink(name string) (string, error) {
 }
 
 func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
 
 func getDiskController(host volume.VolumeHost) (DiskController, error) {
