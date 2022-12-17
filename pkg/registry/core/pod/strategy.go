@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
@@ -44,7 +45,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
@@ -105,12 +106,18 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, nil, &pod.ObjectMeta, nil)
-	return validation.ValidatePodCreate(pod, opts)
+	return corevalidation.ValidatePodCreate(pod, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (podStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return podutil.GetWarningsForPod(ctx, obj.(*api.Pod), nil)
+	newPod := obj.(*api.Pod)
+	var warnings []string
+	if msgs := utilvalidation.IsDNS1123Label(newPod.Name); len(msgs) != 0 {
+		warnings = append(warnings, fmt.Sprintf("metadata.name: this is used in Pod names and hostnames, which can result in surprising behavior; a DNS label is recommended: %v", msgs))
+	}
+	warnings = append(warnings, podutil.GetWarningsForPod(ctx, newPod, nil)...)
+	return warnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -128,7 +135,7 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	pod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
-	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	return corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -213,7 +220,7 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 
-	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	return corevalidation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -251,7 +258,7 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
-	return validation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+	return corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
