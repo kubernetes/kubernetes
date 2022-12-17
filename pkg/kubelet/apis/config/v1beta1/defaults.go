@@ -90,10 +90,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.Authorization.Webhook.CacheUnauthorizedTTL = metav1.Duration{Duration: 30 * time.Second}
 	}
 	if obj.RegistryPullQPS == nil {
-		obj.RegistryPullQPS = utilpointer.Int32Ptr(5)
+		obj.RegistryPullQPS = utilpointer.Int32Ptr(20)
 	}
 	if obj.RegistryBurst == 0 {
-		obj.RegistryBurst = 10
+		obj.RegistryBurst = 40
 	}
 	if obj.EventRecordQPS == nil {
 		obj.EventRecordQPS = utilpointer.Int32Ptr(5)
@@ -206,7 +206,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.KubeAPIBurst = 10
 	}
 	if obj.SerializeImagePulls == nil {
-		obj.SerializeImagePulls = utilpointer.BoolPtr(true)
+		obj.SerializeImagePulls = utilpointer.BoolPtr(false)
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}

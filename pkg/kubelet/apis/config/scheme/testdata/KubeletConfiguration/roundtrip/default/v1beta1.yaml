@@ -70,12 +70,12 @@ oomScoreAdj: -999
 podPidsLimit: -1
 port: 10250
 registerNode: true
-registryBurst: 10
-registryPullQPS: 5
+registryBurst: 40
+registryPullQPS: 20
 resolvConf: /etc/resolv.conf
 runtimeRequestTimeout: 2m0s
 seccompDefault: false
-serializeImagePulls: true
+serializeImagePulls: false
 shutdownGracePeriod: 0s
 shutdownGracePeriodCriticalPods: 0s
 streamingConnectionIdleTimeout: 4h0m0s
