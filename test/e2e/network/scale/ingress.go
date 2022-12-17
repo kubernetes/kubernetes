@@ -110,7 +110,7 @@ func NewIngressScaleFramework(cs clientset.Interface, ns string, cloudConfig fra
 }
 
 // PrepareScaleTest prepares framework for ingress scale testing.
-func (f *IngressScaleFramework) PrepareScaleTest() error {
+func (f *IngressScaleFramework) PrepareScaleTest(ctx context.Context) error {
 	f.Logger.Infof("Initializing ingress test suite and gce controller...")
 	f.Jig = e2eingress.NewIngressTestJig(f.Clientset)
 	f.Jig.Logger = f.Logger
@@ -119,7 +119,7 @@ func (f *IngressScaleFramework) PrepareScaleTest() error {
 		Client: f.Clientset,
 		Cloud:  f.CloudConfig,
 	}
-	if err := f.GCEController.Init(); err != nil {
+	if err := f.GCEController.Init(ctx); err != nil {
 		return fmt.Errorf("failed to initialize GCE controller: %v", err)
 	}
 
@@ -130,13 +130,13 @@ func (f *IngressScaleFramework) PrepareScaleTest() error {
 }
 
 // CleanupScaleTest cleans up framework for ingress scale testing.
-func (f *IngressScaleFramework) CleanupScaleTest() []error {
+func (f *IngressScaleFramework) CleanupScaleTest(ctx context.Context) []error {
 	var errs []error
 
 	f.Logger.Infof("Cleaning up ingresses...")
 	for _, ing := range f.ScaleTestIngs {
 		if ing != nil {
-			if err := f.Clientset.NetworkingV1().Ingresses(ing.Namespace).Delete(context.TODO(), ing.Name, metav1.DeleteOptions{}); err != nil {
+			if err := f.Clientset.NetworkingV1().Ingresses(ing.Namespace).Delete(ctx, ing.Name, metav1.DeleteOptions{}); err != nil {
 				errs = append(errs, fmt.Errorf("error while deleting ingress %s/%s: %v", ing.Namespace, ing.Name, err))
 			}
 		}
@@ -144,20 +144,20 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 	f.Logger.Infof("Cleaning up services...")
 	for _, svc := range f.ScaleTestSvcs {
 		if svc != nil {
-			if err := f.Clientset.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{}); err != nil {
+			if err := f.Clientset.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{}); err != nil {
 				errs = append(errs, fmt.Errorf("error while deleting service %s/%s: %v", svc.Namespace, svc.Name, err))
 			}
 		}
 	}
 	if f.ScaleTestDeploy != nil {
 		f.Logger.Infof("Cleaning up deployment %s...", f.ScaleTestDeploy.Name)
-		if err := f.Clientset.AppsV1().Deployments(f.ScaleTestDeploy.Namespace).Delete(context.TODO(), f.ScaleTestDeploy.Name, metav1.DeleteOptions{}); err != nil {
+		if err := f.Clientset.AppsV1().Deployments(f.ScaleTestDeploy.Namespace).Delete(ctx, f.ScaleTestDeploy.Name, metav1.DeleteOptions{}); err != nil {
 			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
 		}
 	}
 
 	f.Logger.Infof("Cleaning up cloud resources...")
-	if err := f.GCEController.CleanupIngressControllerWithTimeout(ingressesCleanupTimeout); err != nil {
+	if err := f.GCEController.CleanupIngressControllerWithTimeout(ctx, ingressesCleanupTimeout); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -165,12 +165,12 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 }
 
 // RunScaleTest runs ingress scale testing.
-func (f *IngressScaleFramework) RunScaleTest() []error {
+func (f *IngressScaleFramework) RunScaleTest(ctx context.Context) []error {
 	var errs []error
 
 	testDeploy := generateScaleTestBackendDeploymentSpec(scaleTestNumBackends)
 	f.Logger.Infof("Creating deployment %s...", testDeploy.Name)
-	testDeploy, err := f.Jig.Client.AppsV1().Deployments(f.Namespace).Create(context.TODO(), testDeploy, metav1.CreateOptions{})
+	testDeploy, err := f.Jig.Client.AppsV1().Deployments(f.Namespace).Create(ctx, testDeploy, metav1.CreateOptions{})
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to create deployment %s: %v", testDeploy.Name, err))
 		return errs
@@ -179,7 +179,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 
 	if f.EnableTLS {
 		f.Logger.Infof("Ensuring TLS secret %s...", scaleTestSecretName)
-		if err := f.Jig.PrepareTLSSecret(f.Namespace, scaleTestSecretName, scaleTestHostname); err != nil {
+		if err := f.Jig.PrepareTLSSecret(ctx, f.Namespace, scaleTestSecretName, scaleTestHostname); err != nil {
 			errs = append(errs, fmt.Errorf("failed to prepare TLS secret %s: %v", scaleTestSecretName, err))
 			return errs
 		}
@@ -188,7 +188,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 	// numIngsCreated keeps track of how many ingresses have been created.
 	numIngsCreated := 0
 
-	prepareIngsFunc := func(numIngsNeeded int) {
+	prepareIngsFunc := func(ctx context.Context, numIngsNeeded int) {
 		var ingWg sync.WaitGroup
 		numIngsToCreate := numIngsNeeded - numIngsCreated
 		ingWg.Add(numIngsToCreate)
@@ -203,7 +203,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 				defer ingWg.Done()
 
 				start := time.Now()
-				svcCreated, ingCreated, err := f.createScaleTestServiceIngress(suffix, f.EnableTLS)
+				svcCreated, ingCreated, err := f.createScaleTestServiceIngress(ctx, suffix, f.EnableTLS)
 				svcQueue <- svcCreated
 				ingQueue <- ingCreated
 				if err != nil {
@@ -211,7 +211,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 					return
 				}
 				f.Logger.Infof("Waiting for ingress %s to come up...", ingCreated.Name)
-				if err := f.Jig.WaitForGivenIngressWithTimeout(ingCreated, false, waitForIngressMaxTimeout); err != nil {
+				if err := f.Jig.WaitForGivenIngressWithTimeout(ctx, ingCreated, false, waitForIngressMaxTimeout); err != nil {
 					errQueue <- err
 					return
 				}
@@ -251,10 +251,10 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		f.BatchDurations = append(f.BatchDurations, elapsed)
 	}
 
-	measureCreateUpdateFunc := func() {
+	measureCreateUpdateFunc := func(ctx context.Context) {
 		f.Logger.Infof("Create one more ingress and wait for it to come up")
 		start := time.Now()
-		svcCreated, ingCreated, err := f.createScaleTestServiceIngress(fmt.Sprintf("%d", numIngsCreated), f.EnableTLS)
+		svcCreated, ingCreated, err := f.createScaleTestServiceIngress(ctx, fmt.Sprintf("%d", numIngsCreated), f.EnableTLS)
 		numIngsCreated = numIngsCreated + 1
 		f.ScaleTestSvcs = append(f.ScaleTestSvcs, svcCreated)
 		f.ScaleTestIngs = append(f.ScaleTestIngs, ingCreated)
@@ -264,7 +264,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		}
 
 		f.Logger.Infof("Waiting for ingress %s to come up...", ingCreated.Name)
-		if err := f.Jig.WaitForGivenIngressWithTimeout(ingCreated, false, waitForIngressMaxTimeout); err != nil {
+		if err := f.Jig.WaitForGivenIngressWithTimeout(ctx, ingCreated, false, waitForIngressMaxTimeout); err != nil {
 			errs = append(errs, err)
 			return
 		}
@@ -273,20 +273,20 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		f.StepCreateLatencies = append(f.StepCreateLatencies, elapsed)
 
 		f.Logger.Infof("Updating ingress and wait for change to take effect")
-		ingToUpdate, err := f.Clientset.NetworkingV1().Ingresses(f.Namespace).Get(context.TODO(), ingCreated.Name, metav1.GetOptions{})
+		ingToUpdate, err := f.Clientset.NetworkingV1().Ingresses(f.Namespace).Get(ctx, ingCreated.Name, metav1.GetOptions{})
 		if err != nil {
 			errs = append(errs, err)
 			return
 		}
 		addTestPathToIngress(ingToUpdate)
 		start = time.Now()
-		ingToUpdate, err = f.Clientset.NetworkingV1().Ingresses(f.Namespace).Update(context.TODO(), ingToUpdate, metav1.UpdateOptions{})
+		ingToUpdate, err = f.Clientset.NetworkingV1().Ingresses(f.Namespace).Update(ctx, ingToUpdate, metav1.UpdateOptions{})
 		if err != nil {
 			errs = append(errs, err)
 			return
 		}
 
-		if err := f.Jig.WaitForGivenIngressWithTimeout(ingToUpdate, false, waitForIngressMaxTimeout); err != nil {
+		if err := f.Jig.WaitForGivenIngressWithTimeout(ctx, ingToUpdate, false, waitForIngressMaxTimeout); err != nil {
 			errs = append(errs, err)
 			return
 		}
@@ -299,9 +299,9 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 
 	for _, num := range f.NumIngressesTest {
 		f.Logger.Infof("Create more ingresses until we reach %d ingresses", num)
-		prepareIngsFunc(num)
+		prepareIngsFunc(ctx, num)
 		f.Logger.Infof("Measure create and update latency with %d ingresses", num)
-		measureCreateUpdateFunc()
+		measureCreateUpdateFunc(ctx)
 
 		if len(errs) != 0 {
 			return errs
@@ -371,12 +371,12 @@ func addTestPathToIngress(ing *networkingv1.Ingress) {
 		})
 }
 
-func (f *IngressScaleFramework) createScaleTestServiceIngress(suffix string, enableTLS bool) (*v1.Service, *networkingv1.Ingress, error) {
-	svcCreated, err := f.Clientset.CoreV1().Services(f.Namespace).Create(context.TODO(), generateScaleTestServiceSpec(suffix), metav1.CreateOptions{})
+func (f *IngressScaleFramework) createScaleTestServiceIngress(ctx context.Context, suffix string, enableTLS bool) (*v1.Service, *networkingv1.Ingress, error) {
+	svcCreated, err := f.Clientset.CoreV1().Services(f.Namespace).Create(ctx, generateScaleTestServiceSpec(suffix), metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
-	ingCreated, err := f.Clientset.NetworkingV1().Ingresses(f.Namespace).Create(context.TODO(), generateScaleTestIngressSpec(suffix, enableTLS), metav1.CreateOptions{})
+	ingCreated, err := f.Clientset.NetworkingV1().Ingresses(f.Namespace).Create(ctx, generateScaleTestIngressSpec(suffix, enableTLS), metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, err
 	}

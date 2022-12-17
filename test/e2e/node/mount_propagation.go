@@ -94,7 +94,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		ginkgo.DeferCleanup(hostExec.Cleanup)
 
 		// Pick a node where all pods will run.
-		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 
 		// Fail the test if the namespace is not set. We expect that the
@@ -110,19 +110,19 @@ var _ = SIGDescribe("Mount propagation", func() {
 		hostDir := "/var/lib/kubelet/" + f.Namespace.Name
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			cleanCmd := fmt.Sprintf("rm -rf %q", hostDir)
-			return hostExec.IssueCommand(cleanCmd, node)
+			return hostExec.IssueCommand(ctx, cleanCmd, node)
 		})
 
 		podClient := e2epod.NewPodClient(f)
 		bidirectional := v1.MountPropagationBidirectional
-		master := podClient.CreateSync(preparePod("master", node, &bidirectional, hostDir))
+		master := podClient.CreateSync(ctx, preparePod("master", node, &bidirectional, hostDir))
 
 		hostToContainer := v1.MountPropagationHostToContainer
-		slave := podClient.CreateSync(preparePod("slave", node, &hostToContainer, hostDir))
+		slave := podClient.CreateSync(ctx, preparePod("slave", node, &hostToContainer, hostDir))
 
 		none := v1.MountPropagationNone
-		private := podClient.CreateSync(preparePod("private", node, &none, hostDir))
-		defaultPropagation := podClient.CreateSync(preparePod("default", node, nil, hostDir))
+		private := podClient.CreateSync(ctx, preparePod("private", node, &none, hostDir))
+		defaultPropagation := podClient.CreateSync(ctx, preparePod("default", node, nil, hostDir))
 
 		// Check that the pods sees directories of each other. This just checks
 		// that they have the same HostPath, not the mount propagation.
@@ -130,14 +130,14 @@ var _ = SIGDescribe("Mount propagation", func() {
 		for _, podName := range podNames {
 			for _, dirName := range podNames {
 				cmd := fmt.Sprintf("test -d /mnt/test/%s", dirName)
-				e2epod.ExecShellInPod(f, podName, cmd)
+				e2epod.ExecShellInPod(ctx, f, podName, cmd)
 			}
 		}
 
 		// Each pod mounts one tmpfs to /mnt/test/<podname> and puts a file there.
 		for _, podName := range podNames {
 			cmd := fmt.Sprintf("mount -t tmpfs e2e-mount-propagation-%[1]s /mnt/test/%[1]s; echo %[1]s > /mnt/test/%[1]s/file", podName)
-			e2epod.ExecShellInPod(f, podName, cmd)
+			e2epod.ExecShellInPod(ctx, f, podName, cmd)
 
 			// unmount tmpfs when the test finishes
 			cmd = fmt.Sprintf("umount /mnt/test/%s", podName)
@@ -147,12 +147,12 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// The host mounts one tmpfs to testdir/host and puts a file there so we
 		// can check mount propagation from the host to pods.
 		cmd := fmt.Sprintf("mkdir %[1]q/host; mount -t tmpfs e2e-mount-propagation-host %[1]q/host; echo host > %[1]q/host/file", hostDir)
-		err = hostExec.IssueCommand(cmd, node)
+		err = hostExec.IssueCommand(ctx, cmd, node)
 		framework.ExpectNoError(err)
 
 		ginkgo.DeferCleanup(func(ctx context.Context) error {
 			cmd := fmt.Sprintf("umount %q/host", hostDir)
-			return hostExec.IssueCommand(cmd, node)
+			return hostExec.IssueCommand(ctx, cmd, node)
 		})
 
 		// Now check that mounts are propagated to the right containers.
@@ -172,7 +172,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		for podName, mounts := range expectedMounts {
 			for _, mountName := range dirNames {
 				cmd := fmt.Sprintf("cat /mnt/test/%s/file", mountName)
-				stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(f, podName, cmd)
+				stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, podName, cmd)
 				framework.Logf("pod %s mount %s: stdout: %q, stderr: %q error: %v", podName, mountName, stdout, stderr, err)
 				msg := fmt.Sprintf("When checking pod %s and directory %s", podName, mountName)
 				shouldBeVisible := mounts.Has(mountName)
@@ -188,7 +188,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 
 		// Find the kubelet PID to ensure we're working with the kubelet's mount namespace
 		cmd = "pidof kubelet"
-		kubeletPid, err := hostExec.IssueCommandWithResult(cmd, node)
+		kubeletPid, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
 		framework.ExpectNoError(err, "Checking kubelet pid")
 		kubeletPid = strings.TrimSuffix(kubeletPid, "\n")
 		framework.ExpectEqual(strings.Count(kubeletPid, " "), 0, "kubelet should only have a single PID in the system (pidof returned %q)", kubeletPid)
@@ -197,7 +197,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Check that the master and host mounts are propagated to the container runtime's mount namespace
 		for _, mountName := range []string{"host", master.Name} {
 			cmd := fmt.Sprintf("%s cat \"%s/%s/file\"", enterKubeletMountNS, hostDir, mountName)
-			output, err := hostExec.IssueCommandWithResult(cmd, node)
+			output, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
 			framework.ExpectNoError(err, "host container namespace should see mount from %s: %s", mountName, output)
 			output = strings.TrimSuffix(output, "\n")
 			framework.ExpectEqual(output, mountName, "host container namespace should see mount contents from %s", mountName)
@@ -206,7 +206,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Check that the slave, private, and default mounts are not propagated to the container runtime's mount namespace
 		for _, podName := range []string{slave.Name, private.Name, defaultPropagation.Name} {
 			cmd := fmt.Sprintf("%s test ! -e \"%s/%s/file\"", enterKubeletMountNS, hostDir, podName)
-			output, err := hostExec.IssueCommandWithResult(cmd, node)
+			output, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
 			framework.ExpectNoError(err, "host container namespace shouldn't see mount from %s: %s", podName, output)
 		}
 	})

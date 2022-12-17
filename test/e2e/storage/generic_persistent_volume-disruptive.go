@@ -72,29 +72,29 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			pvc       *v1.PersistentVolumeClaim
 			pv        *v1.PersistentVolume
 		)
-		ginkgo.BeforeEach(func() {
-			e2epv.SkipIfNoDefaultStorageClass(c)
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 			framework.Logf("Initializing pod and pvcs for test")
-			clientPod, pvc, pv = createPodPVCFromSC(f, c, ns)
+			clientPod, pvc, pv = createPodPVCFromSC(ctx, f, c, ns)
 		})
 		for _, test := range disruptiveTestTable {
 			func(t disruptiveTest) {
 				ginkgo.It(t.testItStmt, func(ctx context.Context) {
 					e2eskipper.SkipUnlessSSHKeyPresent()
 					ginkgo.By("Executing Spec")
-					t.runTest(c, f, clientPod, e2epod.VolumeMountPath1)
+					t.runTest(ctx, c, f, clientPod, e2epod.VolumeMountPath1)
 				})
 			}(test)
 		}
-		ginkgo.AfterEach(func() {
+		ginkgo.AfterEach(func(ctx context.Context) {
 			framework.Logf("Tearing down test spec")
-			tearDownTestCase(c, f, ns, clientPod, pvc, pv, false)
+			tearDownTestCase(ctx, c, f, ns, clientPod, pvc, pv, false)
 			pvc, clientPod = nil, nil
 		})
 	})
 })
 
-func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string) (*v1.Pod, *v1.PersistentVolumeClaim, *v1.PersistentVolume) {
+func createPodPVCFromSC(ctx context.Context, f *framework.Framework, c clientset.Interface, ns string) (*v1.Pod, *v1.PersistentVolumeClaim, *v1.PersistentVolume) {
 	var err error
 	test := testsuites.StorageClassTest{
 		Name:      "default",
@@ -105,10 +105,10 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		ClaimSize:  test.ClaimSize,
 		VolumeMode: &test.VolumeMode,
 	}, ns)
-	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating pvc")
 	pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+	pvs, err := e2epv.WaitForPVClaimBoundPhase(ctx, c, pvcClaims, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 	framework.ExpectEqual(len(pvs), 1)
 
@@ -118,7 +118,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		PVCs:         pvcClaims,
 		SeLinuxLabel: e2epv.SELinuxLabel,
 	}
-	pod, err := e2epod.CreateSecPod(c, &podConfig, f.Timeouts.PodStart)
+	pod, err := e2epod.CreateSecPod(ctx, c, &podConfig, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 	return pod, pvc, pvs[0]
 }

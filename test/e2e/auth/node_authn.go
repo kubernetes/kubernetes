@@ -41,10 +41,10 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var ns string
 	var nodeIPs []string
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		ns = f.Namespace.Name
 
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, 1)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, 1)
 		framework.ExpectNoError(err)
 
 		family := v1.IPv4Protocol
@@ -57,7 +57,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 	})
 
 	ginkgo.It("The kubelet's main port 10250 should reject requests with no credentials", func(ctx context.Context) {
-		pod := createNodeAuthTestPod(f)
+		pod := createNodeAuthTestPod(ctx, f)
 		for _, nodeIP := range nodeIPs {
 			// Anonymous authentication is disabled by default
 			host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
@@ -76,10 +76,10 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 			},
 			AutomountServiceAccountToken: &trueValue,
 		}
-		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(context.TODO(), newSA, metav1.CreateOptions{})
+		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(ctx, newSA, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create service account (%s:%s)", ns, newSA.Name)
 
-		pod := createNodeAuthTestPod(f)
+		pod := createNodeAuthTestPod(ctx, f)
 
 		for _, nodeIP := range nodeIPs {
 			host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
@@ -94,8 +94,8 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 	})
 })
 
-func createNodeAuthTestPod(f *framework.Framework) *v1.Pod {
+func createNodeAuthTestPod(ctx context.Context, f *framework.Framework) *v1.Pod {
 	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "agnhost-pod", nil, nil, nil)
 	pod.ObjectMeta.GenerateName = "test-node-authn-"
-	return e2epod.NewPodClient(f).CreateSync(pod)
+	return e2epod.NewPodClient(f).CreateSync(ctx, pod)
 }

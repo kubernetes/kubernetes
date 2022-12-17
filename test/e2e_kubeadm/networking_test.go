@@ -89,7 +89,7 @@ var _ = Describe("networking [setup-networking]", func() {
 					netCC := cc["networking"].(map[interface{}]interface{})
 					if ps, ok := netCC["podSubnet"]; ok {
 						// Check that the pod CIDR allocated to the node(s) is within the kubeadm-config podCIDR.
-						nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+						nodes, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 						framework.ExpectNoError(err, "error listing nodes")
 						for _, node := range nodes.Items {
 							if !subnetWithinSubnet(ps.(string), node.Spec.PodCIDR) {
@@ -114,7 +114,7 @@ var _ = Describe("networking [setup-networking]", func() {
 					if ss, ok := netCC["serviceSubnet"]; ok {
 						// Get the kubernetes service in the default namespace.
 						// Check that service CIDR allocated is within the serviceSubnet range.
-						svc, err := f.ClientSet.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+						svc, err := f.ClientSet.CoreV1().Services("default").Get(ctx, "kubernetes", metav1.GetOptions{})
 						framework.ExpectNoError(err, "error getting Service %q from namespace %q", "kubernetes", "default")
 						if !ipWithinSubnet(ss.(string), svc.Spec.ClusterIP) {
 							framework.Failf("failed due to service(%v) cluster-IP %v not inside configured service subnet: %s", svc.Name, svc.Spec.ClusterIP, ss)
@@ -137,7 +137,7 @@ var _ = Describe("networking [setup-networking]", func() {
 				if _, ok := cc["networking"]; ok {
 					netCC := cc["networking"].(map[interface{}]interface{})
 					if ps, ok := netCC["podSubnet"]; ok {
-						nodes, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+						nodes, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 						framework.ExpectNoError(err, "error listing nodes")
 						// Check that the pod CIDRs allocated to the node(s) are within the kubeadm-config podCIDR.
 						var found bool

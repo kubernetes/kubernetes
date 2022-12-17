@@ -43,7 +43,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 		ginkgo.It("should report attach limit when limit is bigger than 0 [Slow]", func(ctx context.Context) {
 			// define volume limit to be 2 for this test
 			var err error
-			m.init(testParameters{attachLimit: 2})
+			m.init(ctx, testParameters{attachLimit: 2})
 			ginkgo.DeferCleanup(m.cleanup)
 
 			nodeName := m.config.ClientNodeSelection.Name
@@ -54,19 +54,19 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 2))
 
-			_, _, pod1 := m.createPod(pvcReference)
+			_, _, pod1 := m.createPod(ctx, pvcReference)
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating first pod")
 
-			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
+			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod1.Name, pod1.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
-			_, _, pod2 := m.createPod(pvcReference)
+			_, _, pod2 := m.createPod(ctx, pvcReference)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating second pod")
 
-			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod2.Name, pod2.Namespace)
+			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod2.Name, pod2.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod2: %v", err)
 
-			_, _, pod3 := m.createPod(pvcReference)
+			_, _, pod3 := m.createPod(ctx, pvcReference)
 			gomega.Expect(pod3).NotTo(gomega.BeNil(), "while creating third pod")
 			err = waitForMaxVolumeCondition(pod3, m.cs)
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod3)
@@ -75,7 +75,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 		ginkgo.It("should report attach limit for generic ephemeral volume when persistent volume is attached [Slow]", func(ctx context.Context) {
 			// define volume limit to be 2 for this test
 			var err error
-			m.init(testParameters{attachLimit: 1})
+			m.init(ctx, testParameters{attachLimit: 1})
 			ginkgo.DeferCleanup(m.cleanup)
 
 			nodeName := m.config.ClientNodeSelection.Name
@@ -86,13 +86,13 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 1))
 
-			_, _, pod1 := m.createPod(pvcReference)
+			_, _, pod1 := m.createPod(ctx, pvcReference)
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating pod with persistent volume")
 
-			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
+			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod1.Name, pod1.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
-			_, _, pod2 := m.createPod(genericEphemeral)
+			_, _, pod2 := m.createPod(ctx, genericEphemeral)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod with ephemeral volume")
 			err = waitForMaxVolumeCondition(pod2, m.cs)
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
@@ -101,7 +101,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 		ginkgo.It("should report attach limit for persistent volume when generic ephemeral volume is attached [Slow]", func(ctx context.Context) {
 			// define volume limit to be 2 for this test
 			var err error
-			m.init(testParameters{attachLimit: 1})
+			m.init(ctx, testParameters{attachLimit: 1})
 			ginkgo.DeferCleanup(m.cleanup)
 
 			nodeName := m.config.ClientNodeSelection.Name
@@ -112,13 +112,13 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 1))
 
-			_, _, pod1 := m.createPod(genericEphemeral)
+			_, _, pod1 := m.createPod(ctx, genericEphemeral)
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating pod with persistent volume")
 
-			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
+			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod1.Name, pod1.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
-			_, _, pod2 := m.createPod(pvcReference)
+			_, _, pod2 := m.createPod(ctx, pvcReference)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod with ephemeral volume")
 			err = waitForMaxVolumeCondition(pod2, m.cs)
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)

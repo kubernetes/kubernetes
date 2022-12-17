@@ -62,7 +62,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		4. Create a POD using the PVC.
 		5. Verify Disk and Attached to the node.
 	*/
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		c = f.ClientSet
@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		clientPod = nil
 		pvc = nil
 		pv = nil
-		nodeInfo = GetReadySchedulableRandomNodeInfo()
+		nodeInfo = GetReadySchedulableRandomNodeInfo(ctx)
 
 		volLabel = labels.Set{e2epv.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
@@ -97,29 +97,29 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 			StorageClassName: &emptyStorageClass,
 		}
 		ginkgo.By("Creating the PV and PVC")
-		pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
+		pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(func() {
-			framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "AfterEach: failed to delete PV ", pv.Name)
+			framework.ExpectNoError(e2epv.DeletePersistentVolume(ctx, c, pv.Name), "AfterEach: failed to delete PV ", pv.Name)
 		})
 		ginkgo.DeferCleanup(func() {
-			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "AfterEach: failed to delete PVC ", pvc.Name)
+			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(ctx, c, pvc.Name, ns), "AfterEach: failed to delete PVC ", pvc.Name)
 		})
-		framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
+		framework.ExpectNoError(e2epv.WaitOnPVandPVC(ctx, c, f.Timeouts, ns, pv, pvc))
 
 		ginkgo.By("Creating the Client Pod")
-		clientPod, err = e2epod.CreateClientPod(c, ns, pvc)
+		clientPod, err = e2epod.CreateClientPod(ctx, c, ns, pvc)
 		framework.ExpectNoError(err)
 		node = clientPod.Spec.NodeName
 		ginkgo.DeferCleanup(func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
 		})
 		ginkgo.DeferCleanup(func() {
-			framework.ExpectNoError(waitForVSphereDiskToDetach(volumePath, node), "wait for vsphere disk to detach")
+			framework.ExpectNoError(waitForVSphereDiskToDetach(ctx, volumePath, node), "wait for vsphere disk to detach")
 		})
 
 		ginkgo.By("Verify disk should be attached to the node")
-		isAttached, err := diskIsAttached(volumePath, node)
+		isAttached, err := diskIsAttached(ctx, volumePath, node)
 		framework.ExpectNoError(err)
 		if !isAttached {
 			framework.Failf("Disk %s is not attached with the node", volumePath)
@@ -128,11 +128,11 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 
 	ginkgo.It("should test that deleting a PVC before the pod does not cause pod deletion to fail on vsphere volume detach", func(ctx context.Context) {
 		ginkgo.By("Deleting the Claim")
-		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
+		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(ctx, c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 		pvc = nil
 
 		ginkgo.By("Deleting the Pod")
-		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
+		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, clientPod), "Failed to delete pod ", clientPod.Name)
 	})
 
 	/*
@@ -144,11 +144,11 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 	*/
 	ginkgo.It("should test that deleting the PV before the pod does not cause pod deletion to fail on vsphere volume detach", func(ctx context.Context) {
 		ginkgo.By("Deleting the Persistent Volume")
-		framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
+		framework.ExpectNoError(e2epv.DeletePersistentVolume(ctx, c, pv.Name), "Failed to delete PV ", pv.Name)
 		pv = nil
 
 		ginkgo.By("Deleting the pod")
-		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
+		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, clientPod), "Failed to delete pod ", clientPod.Name)
 	})
 	/*
 		This test verifies that a volume mounted to a pod remains mounted after a kubelet restarts.
@@ -159,7 +159,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 	*/
 	ginkgo.It("should test that a file written to the vsphere volume mount before kubelet restart can be read after restart [Disruptive]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
-		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod, e2epod.VolumeMountPath1)
+		utils.TestKubeletRestartsAndRestoresMount(ctx, c, f, clientPod, e2epod.VolumeMountPath1)
 	})
 
 	/*
@@ -175,7 +175,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 	*/
 	ginkgo.It("should test that a vsphere volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
-		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod, e2epod.VolumeMountPath1)
+		utils.TestVolumeUnmountsFromDeletedPod(ctx, c, f, clientPod, e2epod.VolumeMountPath1)
 	})
 
 	/*
@@ -188,13 +188,14 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 	*/
 	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of vsphere volume", func(ctx context.Context) {
 		ginkgo.By("Deleting the Namespace")
-		err := c.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
+		err := c.CoreV1().Namespaces().Delete(ctx, ns, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 
-		err = framework.WaitForNamespacesDeleted(c, []string{ns}, 3*time.Minute)
+		err = framework.WaitForNamespacesDeleted(ctx, c, []string{ns}, 3*time.Minute)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying Persistent Disk detaches")
-		waitForVSphereDiskToDetach(volumePath, node)
+		err = waitForVSphereDiskToDetach(ctx, volumePath, node)
+		framework.ExpectNoError(err)
 	})
 })

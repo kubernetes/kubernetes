@@ -52,11 +52,11 @@ var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 			},
 		}
 
-		pod := e2epod.NewPodClient(f).Create(podDesc)
+		pod := e2epod.NewPodClient(f).Create(ctx, podDesc)
 
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx,
 			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
-		runningPod, err := e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		runningPod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		status := runningPod.Status

@@ -55,7 +55,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/podname")
 
-		e2epodoutput.TestContainerOutput(f, "downward API volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
 		})
 	})
@@ -71,7 +71,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		defaultMode := int32(0400)
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", nil, &defaultMode)
 
-		e2epodoutput.TestContainerOutput(f, "downward API volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			"mode of file \"/etc/podinfo/podname\": -r--------",
 		})
 	})
@@ -87,7 +87,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		mode := int32(0400)
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)
 
-		e2epodoutput.TestContainerOutput(f, "downward API volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			"mode of file \"/etc/podinfo/podname\": -r--------",
 		})
 	})
@@ -102,7 +102,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 			FSGroup: &gid,
 		}
 		setPodNonRootUser(pod)
-		e2epodoutput.TestContainerOutput(f, "downward API volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
 		})
 	})
@@ -118,7 +118,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 			FSGroup: &gid,
 		}
 		setPodNonRootUser(pod)
-		e2epodoutput.TestContainerOutput(f, "downward API volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			"mode of file \"/etc/podinfo/podname\": -r--r-----",
 		})
 	})
@@ -137,20 +137,20 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		pod := projectedDownwardAPIVolumePodForUpdateTest(podName, labels, map[string]string{}, "/etc/podinfo/labels")
 		containerName := "client-container"
 		ginkgo.By("Creating the pod")
-		podClient.CreateSync(pod)
+		podClient.CreateSync(ctx, pod)
 
-		gomega.Eventually(func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
+		gomega.Eventually(ctx, func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
 
 		//modify labels
-		podClient.Update(podName, func(pod *v1.Pod) {
+		podClient.Update(ctx, podName, func(pod *v1.Pod) {
 			pod.Labels["key3"] = "value3"
 		})
 
-		gomega.Eventually(func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+		gomega.Eventually(ctx, func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key3=\"value3\"\n"))
 	})
@@ -168,20 +168,20 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 
 		containerName := "client-container"
 		ginkgo.By("Creating the pod")
-		pod = podClient.CreateSync(pod)
+		pod = podClient.CreateSync(ctx, pod)
 
-		gomega.Eventually(func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+		gomega.Eventually(ctx, func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"bar\"\n"))
 
 		//modify annotations
-		podClient.Update(podName, func(pod *v1.Pod) {
+		podClient.Update(ctx, podName, func(pod *v1.Pod) {
 			pod.Annotations["builder"] = "foo"
 		})
 
-		gomega.Eventually(func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+		gomega.Eventually(ctx, func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"foo\"\n"))
 	})
@@ -195,7 +195,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_limit")
 
-		e2epodoutput.TestContainerOutput(f, "downward API volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("2\n"),
 		})
 	})
@@ -209,7 +209,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_limit")
 
-		e2epodoutput.TestContainerOutput(f, "downward API volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("67108864\n"),
 		})
 	})
@@ -223,7 +223,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_request")
 
-		e2epodoutput.TestContainerOutput(f, "downward API volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("1\n"),
 		})
 	})
@@ -237,7 +237,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_request")
 
-		e2epodoutput.TestContainerOutput(f, "downward API volume plugin", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("33554432\n"),
 		})
 	})
@@ -251,7 +251,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/podinfo/cpu_limit")
 
-		e2epodoutput.TestContainerOutputRegexp(f, "downward API volume plugin", pod, 0, []string{"[1-9]"})
+		e2epodoutput.TestContainerOutputRegexp(ctx, f, "downward API volume plugin", pod, 0, []string{"[1-9]"})
 	})
 
 	/*
@@ -263,7 +263,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/podinfo/memory_limit")
 
-		e2epodoutput.TestContainerOutputRegexp(f, "downward API volume plugin", pod, 0, []string{"[1-9]"})
+		e2epodoutput.TestContainerOutputRegexp(ctx, f, "downward API volume plugin", pod, 0, []string{"[1-9]"})
 	})
 })
 

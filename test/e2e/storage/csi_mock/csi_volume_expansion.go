@@ -114,22 +114,22 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					tp.registerDriver = true
 				}
 
-				m.init(tp)
+				m.init(ctx, tp)
 				ginkgo.DeferCleanup(m.cleanup)
 
-				sc, pvc, pod := m.createPod(pvcReference)
+				sc, pvc, pod := m.createPod(ctx, pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
 				if !*sc.AllowVolumeExpansion {
 					framework.Fail("failed creating sc with allowed expansion")
 				}
 
-				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
-				newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, m.cs)
+				newPVC, err := testsuites.ExpandPVCSize(ctx, pvc, newSize, m.cs)
 				framework.ExpectNoError(err, "While updating pvc for more size")
 				pvc = newPVC
 				gomega.Expect(pvc).NotTo(gomega.BeNil())
@@ -139,18 +139,18 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					framework.Failf("error updating pvc size %q", pvc.Name)
 				}
 				if test.expectFailure {
-					err = testsuites.WaitForResizingCondition(pvc, m.cs, csiResizingConditionWait)
+					err = testsuites.WaitForResizingCondition(ctx, pvc, m.cs, csiResizingConditionWait)
 					framework.ExpectError(err, "unexpected resizing condition on PVC")
 					return
 				}
 
 				ginkgo.By("Waiting for persistent volume resize to finish")
-				err = testsuites.WaitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
+				err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
 				framework.ExpectNoError(err, "While waiting for CSI PV resize to finish")
 
 				checkPVCSize := func() {
 					ginkgo.By("Waiting for PVC resize to finish")
-					pvc, err = testsuites.WaitForFSResize(pvc, m.cs)
+					pvc, err = testsuites.WaitForFSResize(ctx, pvc, m.cs)
 					framework.ExpectNoError(err, "while waiting for PVC resize to finish")
 
 					pvcConditions := pvc.Status.Conditions
@@ -162,7 +162,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					checkPVCSize()
 				} else {
 					ginkgo.By("Checking for conditions on pvc")
-					npvc, err := testsuites.WaitForPendingFSResizeCondition(pvc, m.cs)
+					npvc, err := testsuites.WaitForPendingFSResizeCondition(ctx, pvc, m.cs)
 					framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
 					pvc = npvc
 
@@ -172,7 +172,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					}
 
 					ginkgo.By("Deleting the previously created pod")
-					err = e2epod.DeletePodWithWait(m.cs, pod)
+					err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
 					framework.ExpectNoError(err, "while deleting pod for resizing")
 
 					ginkgo.By("Creating a new pod with same volume")
@@ -208,22 +208,22 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					params.registerDriver = true
 				}
 
-				m.init(params)
+				m.init(ctx, params)
 				ginkgo.DeferCleanup(m.cleanup)
 
-				sc, pvc, pod := m.createPod(pvcReference)
+				sc, pvc, pod := m.createPod(ctx, pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
 				if !*sc.AllowVolumeExpansion {
 					framework.Fail("failed creating sc with allowed expansion")
 				}
 
-				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
-				newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, m.cs)
+				newPVC, err := testsuites.ExpandPVCSize(ctx, pvc, newSize, m.cs)
 				framework.ExpectNoError(err, "While updating pvc for more size")
 				pvc = newPVC
 				gomega.Expect(pvc).NotTo(gomega.BeNil())
@@ -234,11 +234,11 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				}
 
 				ginkgo.By("Waiting for persistent volume resize to finish")
-				err = testsuites.WaitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
+				err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
 				framework.ExpectNoError(err, "While waiting for PV resize to finish")
 
 				ginkgo.By("Waiting for PVC resize to finish")
-				pvc, err = testsuites.WaitForFSResize(pvc, m.cs)
+				pvc, err = testsuites.WaitForFSResize(ctx, pvc, m.cs)
 				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				pvcConditions := pvc.Status.Conditions
@@ -285,22 +285,22 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					params.hooks = createExpansionHook(test.simulatedCSIDriverError)
 				}
 
-				m.init(params)
+				m.init(ctx, params)
 				ginkgo.DeferCleanup(m.cleanup)
 
-				sc, pvc, pod := m.createPod(pvcReference)
+				sc, pvc, pod := m.createPod(ctx, pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
 				if !*sc.AllowVolumeExpansion {
 					framework.Fail("failed creating sc with allowed expansion")
 				}
 
-				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 				ginkgo.By("Expanding current pvc")
 				newSize := resource.MustParse(test.pvcRequestSize)
-				newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, m.cs)
+				newPVC, err := testsuites.ExpandPVCSize(ctx, pvc, newSize, m.cs)
 				framework.ExpectNoError(err, "While updating pvc for more size")
 				pvc = newPVC
 				gomega.Expect(pvc).NotTo(gomega.BeNil())
@@ -311,9 +311,9 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				}
 
 				if test.simulatedCSIDriverError == expansionSuccess {
-					validateExpansionSuccess(pvc, m, test, test.allocatedResource)
+					validateExpansionSuccess(ctx, pvc, m, test, test.allocatedResource)
 				} else {
-					validateRecoveryBehaviour(pvc, m, test)
+					validateRecoveryBehaviour(ctx, pvc, m, test)
 				}
 			})
 		}
@@ -321,7 +321,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 	})
 })
 
-func validateRecoveryBehaviour(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
+func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
 	var err error
 	ginkgo.By("Waiting for resizer to set allocated resource")
 	err = waitForAllocatedResource(pvc, m, test.allocatedResource)
@@ -332,7 +332,7 @@ func validateRecoveryBehaviour(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup
 	framework.ExpectNoError(err, "While waiting for resize status to be set")
 
 	ginkgo.By("Recover pvc size")
-	newPVC, err := testsuites.ExpandPVCSize(pvc, test.recoverySize, m.cs)
+	newPVC, err := testsuites.ExpandPVCSize(ctx, pvc, test.recoverySize, m.cs)
 	framework.ExpectNoError(err, "While updating pvc for more size")
 	pvc = newPVC
 	gomega.Expect(pvc).NotTo(gomega.BeNil())
@@ -344,7 +344,7 @@ func validateRecoveryBehaviour(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup
 
 	// if expansion failed on controller with final error, then recovery should be possible
 	if test.simulatedCSIDriverError == expansionFailedOnController {
-		validateExpansionSuccess(pvc, m, test, test.recoverySize.String())
+		validateExpansionSuccess(ctx, pvc, m, test, test.recoverySize.String())
 		return
 	}
 
@@ -369,14 +369,14 @@ func validateRecoveryBehaviour(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup
 	}
 }
 
-func validateExpansionSuccess(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest, expectedAllocatedSize string) {
+func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest, expectedAllocatedSize string) {
 	var err error
 	ginkgo.By("Waiting for persistent volume resize to finish")
-	err = testsuites.WaitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
+	err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
 	framework.ExpectNoError(err, "While waiting for PV resize to finish")
 
 	ginkgo.By("Waiting for PVC resize to finish")
-	pvc, err = testsuites.WaitForFSResize(pvc, m.cs)
+	pvc, err = testsuites.WaitForFSResize(ctx, pvc, m.cs)
 	framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 	pvcConditions := pvc.Status.Conditions

@@ -48,11 +48,11 @@ var (
 )
 
 // WaitForSnapshotReady waits for a VolumeSnapshot to be ready to use or until timeout occurs, whichever comes first.
-func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, poll, timeout time.Duration) error {
+func WaitForSnapshotReady(ctx context.Context, c dynamic.Interface, ns string, snapshotName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
 
 	if successful := WaitUntil(poll, timeout, func() bool {
-		snapshot, err := c.Resource(SnapshotGVR).Namespace(ns).Get(context.TODO(), snapshotName, metav1.GetOptions{})
+		snapshot, err := c.Resource(SnapshotGVR).Namespace(ns).Get(ctx, snapshotName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Failed to get snapshot %q, retrying in %v. Error: %v", snapshotName, poll, err)
 			return false
@@ -80,12 +80,12 @@ func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, p
 
 // GetSnapshotContentFromSnapshot returns the VolumeSnapshotContent object Bound to a
 // given VolumeSnapshot
-func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured.Unstructured, timeout time.Duration) *unstructured.Unstructured {
+func GetSnapshotContentFromSnapshot(ctx context.Context, dc dynamic.Interface, snapshot *unstructured.Unstructured, timeout time.Duration) *unstructured.Unstructured {
 	defer ginkgo.GinkgoRecover()
-	err := WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, timeout)
+	err := WaitForSnapshotReady(ctx, dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, timeout)
 	framework.ExpectNoError(err)
 
-	vs, err := dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
+	vs, err := dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(ctx, snapshot.GetName(), metav1.GetOptions{})
 
 	snapshotStatus := vs.Object["status"].(map[string]interface{})
 	snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
@@ -93,7 +93,7 @@ func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured
 	framework.Logf("snapshotContentName %s", snapshotContentName)
 	framework.ExpectNoError(err)
 
-	vscontent, err := dc.Resource(SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
+	vscontent, err := dc.Resource(SnapshotContentGVR).Get(ctx, snapshotContentName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	return vscontent
@@ -101,9 +101,9 @@ func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured
 }
 
 // DeleteSnapshotWithoutWaiting deletes a VolumeSnapshot and return directly without waiting
-func DeleteSnapshotWithoutWaiting(dc dynamic.Interface, ns string, snapshotName string) error {
+func DeleteSnapshotWithoutWaiting(ctx context.Context, dc dynamic.Interface, ns string, snapshotName string) error {
 	ginkgo.By("deleting the snapshot")
-	err := dc.Resource(SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
+	err := dc.Resource(SnapshotGVR).Namespace(ns).Delete(ctx, snapshotName, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -111,15 +111,15 @@ func DeleteSnapshotWithoutWaiting(dc dynamic.Interface, ns string, snapshotName 
 }
 
 // DeleteAndWaitSnapshot deletes a VolumeSnapshot and waits for it to be deleted or until timeout occurs, whichever comes first
-func DeleteAndWaitSnapshot(dc dynamic.Interface, ns string, snapshotName string, poll, timeout time.Duration) error {
+func DeleteAndWaitSnapshot(ctx context.Context, dc dynamic.Interface, ns string, snapshotName string, poll, timeout time.Duration) error {
 	var err error
-	err = DeleteSnapshotWithoutWaiting(dc, ns, snapshotName)
+	err = DeleteSnapshotWithoutWaiting(ctx, dc, ns, snapshotName)
 	if err != nil {
 		return err
 	}
 
 	ginkgo.By("checking the Snapshot has been deleted")
-	err = WaitForNamespacedGVRDeletion(dc, SnapshotGVR, ns, snapshotName, poll, timeout)
+	err = WaitForNamespacedGVRDeletion(ctx, dc, SnapshotGVR, ns, snapshotName, poll, timeout)
 
 	return err
 }

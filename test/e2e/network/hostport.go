@@ -69,7 +69,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 			family = v1.IPv6Protocol
 		}
 		// Get a node where to schedule the pods
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 1)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 1)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
 			framework.Failf("No nodes available")
@@ -86,13 +86,13 @@ var _ = common.SIGDescribe("HostPort", func() {
 
 		// Create pods with the same HostPort
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod1) with hostport %v and hostIP %s and expect scheduled", port, localhost))
-		createHostPortPodOnNode(f, "pod1", ns, localhost, port, v1.ProtocolTCP, randomNode.Name)
+		createHostPortPodOnNode(ctx, f, "pod1", ns, localhost, port, v1.ProtocolTCP, randomNode.Name)
 
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod2) with hostport %v but hostIP %s on the node which pod1 resides and expect scheduled", port, hostIP))
-		createHostPortPodOnNode(f, "pod2", ns, hostIP, port, v1.ProtocolTCP, randomNode.Name)
+		createHostPortPodOnNode(ctx, f, "pod2", ns, hostIP, port, v1.ProtocolTCP, randomNode.Name)
 
 		ginkgo.By(fmt.Sprintf("Trying to create a third pod(pod3) with hostport %v, hostIP %s but use UDP protocol on the node which pod2 resides", port, hostIP))
-		createHostPortPodOnNode(f, "pod3", ns, hostIP, port, v1.ProtocolUDP, randomNode.Name)
+		createHostPortPodOnNode(ctx, f, "pod3", ns, hostIP, port, v1.ProtocolUDP, randomNode.Name)
 
 		// check that the port is being actually exposed to each container
 		// create a pod on the host network in the same node
@@ -112,7 +112,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 				},
 			},
 		}
-		e2epod.NewPodClient(f).CreateSync(hostExecPod)
+		e2epod.NewPodClient(f).CreateSync(ctx, hostExecPod)
 
 		// use a 5 seconds timeout per connection
 		timeout := 5
@@ -164,7 +164,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 
 // create pod which using hostport on the specified node according to the nodeSelector
 // it starts an http server on the exposed port
-func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeName string) {
+func createHostPortPodOnNode(ctx context.Context, f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeName string) {
 
 	var netexecArgs []string
 	var readinessProbePort int32
@@ -211,11 +211,11 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 			NodeName: nodeName,
 		},
 	}
-	if _, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), hostPortPod, metav1.CreateOptions{}); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(ns).Create(ctx, hostPortPod, metav1.CreateOptions{}); err != nil {
 		framework.Failf("error creating pod %s, err:%v", podName, err)
 	}
 
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, ns, framework.PodStartTimeout); err != nil {
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, podName, ns, framework.PodStartTimeout); err != nil {
 		framework.Failf("wait for pod %s timeout, err:%v", podName, err)
 	}
 }

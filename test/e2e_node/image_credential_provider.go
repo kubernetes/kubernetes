@@ -63,6 +63,6 @@ var _ = SIGDescribe("ImageCredentialProvider [Feature:KubeletCredentialProviders
 		}
 
 		// CreateSync tests that the Pod is running and ready
-		podClient.CreateSync(pod)
+		podClient.CreateSync(ctx, pod)
 	})
 })

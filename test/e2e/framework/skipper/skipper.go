@@ -103,9 +103,9 @@ func SkipIfFeatureGateEnabled(gate featuregate.Feature) {
 }
 
 // SkipIfMissingResource skips if the gvr resource is missing.
-func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
+func SkipIfMissingResource(ctx context.Context, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
 	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
-	_, err := resourceClient.List(context.TODO(), metav1.ListOptions{})
+	_, err := resourceClient.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		// not all resources support list, so we ignore those
 		if apierrors.IsMethodNotSupported(err) || apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
@@ -144,8 +144,8 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 }
 
 // SkipUnlessMultizone skips if the cluster does not have multizone.
-func SkipUnlessMultizone(c clientset.Interface) {
-	zones, err := e2enode.GetClusterZones(c)
+func SkipUnlessMultizone(ctx context.Context, c clientset.Interface) {
+	zones, err := e2enode.GetClusterZones(ctx, c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}
@@ -155,8 +155,8 @@ func SkipUnlessMultizone(c clientset.Interface) {
 }
 
 // SkipIfMultizone skips if the cluster has multizone.
-func SkipIfMultizone(c clientset.Interface) {
-	zones, err := e2enode.GetClusterZones(c)
+func SkipIfMultizone(ctx context.Context, c clientset.Interface) {
+	zones, err := e2enode.GetClusterZones(ctx, c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}
@@ -243,11 +243,11 @@ func RunIfSystemSpecNameIs(names ...string) {
 }
 
 // SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem run if the component run as pods and client can delete them
-func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(componentName string, c clientset.Interface, ns string, labelSet labels.Set) {
+func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(ctx context.Context, componentName string, c clientset.Interface, ns string, labelSet labels.Set) {
 	// verify if component run as pod
 	label := labels.SelectorFromSet(labelSet)
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), listOpts)
+	pods, err := c.CoreV1().Pods(ns).List(ctx, listOpts)
 	framework.Logf("SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem: %v, %v", pods, err)
 	if err != nil {
 		skipInternalf(1, "Skipped because client failed to get component:%s pod err:%v", componentName, err)
@@ -259,7 +259,7 @@ func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(componentName string, c
 
 	// verify if client can delete pod
 	pod := pods.Items[0]
-	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
+	if err := c.CoreV1().Pods(ns).Delete(ctx, pod.Name, metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
 		skipInternalf(1, "Skipped because client failed to delete component:%s pod, err:%v", componentName, err)
 	}
 }

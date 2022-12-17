@@ -184,7 +184,7 @@ func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPat
 	}
 }
 
-func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
@@ -200,25 +200,25 @@ func (h *hostpathCSIDriver) GetCSIDriverName(config *storageframework.PerTestCon
 	return config.GetUniqueDriverName()
 }
 
-func (h *hostpathCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
+func (h *hostpathCSIDriver) GetSnapshotClass(ctx context.Context, config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
 	snapshotter := config.GetUniqueDriverName()
 	ns := config.Framework.Namespace.Name
 
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
+func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	// Create secondary namespace which will be used for creating driver
-	driverNamespace := utils.CreateDriverNamespace(f)
+	driverNamespace := utils.CreateDriverNamespace(ctx, f)
 	driverns := driverNamespace.Name
 	testns := f.Namespace.Name
 
 	ginkgo.By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
-	cancelLogging := utils.StartPodLogs(f, driverNamespace)
+	cancelLogging := utils.StartPodLogs(ctx, f, driverNamespace)
 	cs := f.ClientSet
 
 	// The hostpath CSI driver only works when everything runs on the same node.
-	node, err := e2enode.GetRandomReadySchedulableNode(cs)
+	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
 	framework.ExpectNoError(err)
 	config := &storageframework.PerTestConfig{
 		Driver:              h,
@@ -246,7 +246,7 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) *storageframewor
 		NodeName:                 node.Name,
 	}
 
-	err = utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
+	err = utils.CreateFromManifests(ctx, config.Framework, driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
 			return err
 		}
@@ -338,7 +338,7 @@ type MockCSITestDriver interface {
 
 	// GetCalls returns all currently observed gRPC calls. Only valid
 	// after PrepareTest.
-	GetCalls() ([]MockCSICall, error)
+	GetCalls(ctx context.Context) ([]MockCSICall, error)
 }
 
 // CSIMockDriverOpts defines options used for csi driver
@@ -524,7 +524,7 @@ func (m *mockCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
 func (m *mockCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 }
 
-func (m *mockCSIDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (m *mockCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
@@ -532,18 +532,18 @@ func (m *mockCSIDriver) GetDynamicProvisionStorageClass(config *storageframework
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
-func (m *mockCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
+func (m *mockCSIDriver) GetSnapshotClass(ctx context.Context, config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
 	snapshotter := m.driverInfo.Name + "-" + config.Framework.UniqueName
 	ns := config.Framework.Namespace.Name
 
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
+func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	m.clientSet = f.ClientSet
 
 	// Create secondary namespace which will be used for creating driver
-	m.driverNamespace = utils.CreateDriverNamespace(f)
+	m.driverNamespace = utils.CreateDriverNamespace(ctx, f)
 	driverns := m.driverNamespace.Name
 	testns := f.Namespace.Name
 
@@ -552,11 +552,11 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.Pe
 	} else {
 		ginkgo.By("deploying csi mock driver")
 	}
-	cancelLogging := utils.StartPodLogs(f, m.driverNamespace)
+	cancelLogging := utils.StartPodLogs(ctx, f, m.driverNamespace)
 	cs := f.ClientSet
 
 	// pods should be scheduled on the node
-	node, err := e2enode.GetRandomReadySchedulableNode(cs)
+	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
 	framework.ExpectNoError(err)
 
 	embeddedCleanup := func() {}
@@ -574,6 +574,9 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.Pe
 		// this process.
 		podname := "csi-mockplugin-0"
 		containername := "mock"
+
+		// Must keep running even after the test context is cancelled
+		// for cleanup callbacks.
 		ctx, cancel := context.WithCancel(context.Background())
 		serviceConfig := mockservice.Config{
 			DisableAttach:            !m.attachable,
@@ -596,7 +599,6 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.Pe
 			Node:       s,
 		}
 		m.embeddedCSIDriver = mockdriver.NewCSIDriver(servers)
-
 		l, err := proxy.Listen(ctx, f.ClientSet, f.ClientConfig(),
 			proxy.Addr{
 				Namespace:     m.driverNamespace.Name,
@@ -605,6 +607,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.Pe
 				Port:          9000,
 			},
 		)
+
 		framework.ExpectNoError(err, "start connecting to proxy pod")
 		err = m.embeddedCSIDriver.Start(l, m.interceptGRPC)
 		framework.ExpectNoError(err, "start mock driver")
@@ -669,7 +672,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.Pe
 	if m.enableRecoverExpansionFailure {
 		o.Features["csi-resizer"] = []string{"RecoverVolumeExpansionFailure=true"}
 	}
-	err = utils.CreateFromManifests(f, m.driverNamespace, func(item interface{}) error {
+	err = utils.CreateFromManifests(ctx, f, m.driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
 			return err
 		}
@@ -704,7 +707,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.Pe
 
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		embeddedCleanup()
-		driverCleanupFunc()
+		driverCleanupFunc(ctx)
 	})
 
 	return config
@@ -731,7 +734,7 @@ func (m *mockCSIDriver) interceptGRPC(ctx context.Context, req interface{}, info
 	return
 }
 
-func (m *mockCSIDriver) GetCalls() ([]MockCSICall, error) {
+func (m *mockCSIDriver) GetCalls(ctx context.Context) ([]MockCSICall, error) {
 	if m.embedded {
 		return m.calls.Get(), nil
 	}
@@ -746,7 +749,7 @@ func (m *mockCSIDriver) GetCalls() ([]MockCSICall, error) {
 	driverContainerName := "mock"
 
 	// Load logs of driver pod
-	log, err := e2epod.GetPodLogs(m.clientSet, m.driverNamespace.Name, driverPodName, driverContainerName)
+	log, err := e2epod.GetPodLogs(ctx, m.clientSet, m.driverNamespace.Name, driverPodName, driverContainerName)
 	if err != nil {
 		return nil, fmt.Errorf("could not load CSI driver logs: %s", err)
 	}
@@ -854,7 +857,7 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPatter
 	}
 }
 
-func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	ns := config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
 
@@ -867,14 +870,14 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *storageframewor
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
-func (g *gcePDCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
+func (g *gcePDCSIDriver) GetSnapshotClass(ctx context.Context, config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
 	snapshotter := g.driverInfo.Name
 	ns := config.Framework.Namespace.Name
 
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
+func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	testns := f.Namespace.Name
 	cfg := &storageframework.PerTestConfig{
 		Driver:    g,
@@ -889,10 +892,10 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) *storageframework.P
 
 	ginkgo.By("deploying csi gce-pd driver")
 	// Create secondary namespace which will be used for creating driver
-	driverNamespace := utils.CreateDriverNamespace(f)
+	driverNamespace := utils.CreateDriverNamespace(ctx, f)
 	driverns := driverNamespace.Name
 
-	cancelLogging := utils.StartPodLogs(f, driverNamespace)
+	cancelLogging := utils.StartPodLogs(ctx, f, driverNamespace)
 	// It would be safer to rename the gcePD driver, but that
 	// hasn't been done before either and attempts to do so now led to
 	// errors during driver registration, therefore it is disabled
@@ -915,12 +918,12 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) *storageframework.P
 		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	}
 
-	err := utils.CreateFromManifests(f, driverNamespace, nil, manifests...)
+	err := utils.CreateFromManifests(ctx, f, driverNamespace, nil, manifests...)
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}
 
-	if err = WaitForCSIDriverRegistrationOnAllNodes(GCEPDCSIDriverName, f.ClientSet); err != nil {
+	if err = WaitForCSIDriverRegistrationOnAllNodes(ctx, GCEPDCSIDriverName, f.ClientSet); err != nil {
 		framework.Failf("waiting for csi driver node registration on: %v", err)
 	}
 
@@ -942,13 +945,13 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) *storageframework.P
 
 // WaitForCSIDriverRegistrationOnAllNodes waits for the CSINode object to be updated
 // with the given driver on all schedulable nodes.
-func WaitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Interface) error {
-	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+func WaitForCSIDriverRegistrationOnAllNodes(ctx context.Context, driverName string, cs clientset.Interface) error {
+	nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 	if err != nil {
 		return err
 	}
 	for _, node := range nodes.Items {
-		if err := WaitForCSIDriverRegistrationOnNode(node.Name, driverName, cs); err != nil {
+		if err := WaitForCSIDriverRegistrationOnNode(ctx, node.Name, driverName, cs); err != nil {
 			return err
 		}
 	}
@@ -956,7 +959,7 @@ func WaitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Inte
 }
 
 // WaitForCSIDriverRegistrationOnNode waits for the CSINode object generated by the node-registrar on a certain node
-func WaitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs clientset.Interface) error {
+func WaitForCSIDriverRegistrationOnNode(ctx context.Context, nodeName string, driverName string, cs clientset.Interface) error {
 	framework.Logf("waiting for CSIDriver %v to register on node %v", driverName, nodeName)
 
 	// About 8.6 minutes timeout
@@ -967,7 +970,7 @@ func WaitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs c
 	}
 
 	waitErr := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		csiNode, err := cs.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		csiNode, err := cs.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -1001,21 +1004,21 @@ func tryFunc(f func()) error {
 func generateDriverCleanupFunc(
 	f *framework.Framework,
 	driverName, testns, driverns string,
-	cancelLogging func()) func() {
+	cancelLogging func()) func(ctx context.Context) {
 
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
-	cleanupFunc := func() {
+	cleanupFunc := func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", testns))
 		// Delete the primary namespace but it's okay to fail here because this namespace will
 		// also be deleted by framework.Aftereach hook
-		tryFunc(func() { f.DeleteNamespace(testns) })
+		_ = tryFunc(func() { f.DeleteNamespace(ctx, testns) })
 
 		ginkgo.By(fmt.Sprintf("uninstalling csi %s driver", driverName))
 		_ = tryFunc(cancelLogging)
 
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", driverns))
-		tryFunc(func() { f.DeleteNamespace(driverns) })
+		_ = tryFunc(func() { f.DeleteNamespace(ctx, driverns) })
 	}
 
 	return cleanupFunc

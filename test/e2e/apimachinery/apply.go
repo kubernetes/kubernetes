@@ -56,11 +56,11 @@ var _ = SIGDescribe("ServerSideApply", func() {
 		ns = f.Namespace.Name
 	})
 
-	ginkgo.AfterEach(func() {
-		_ = client.AppsV1().Deployments(ns).Delete(context.TODO(), "deployment", metav1.DeleteOptions{})
-		_ = client.AppsV1().Deployments(ns).Delete(context.TODO(), "deployment-shared-unset", metav1.DeleteOptions{})
-		_ = client.AppsV1().Deployments(ns).Delete(context.TODO(), "deployment-shared-map-item-removal", metav1.DeleteOptions{})
-		_ = client.CoreV1().Pods(ns).Delete(context.TODO(), "test-pod", metav1.DeleteOptions{})
+	ginkgo.AfterEach(func(ctx context.Context) {
+		_ = client.AppsV1().Deployments(ns).Delete(ctx, "deployment", metav1.DeleteOptions{})
+		_ = client.AppsV1().Deployments(ns).Delete(ctx, "deployment-shared-unset", metav1.DeleteOptions{})
+		_ = client.AppsV1().Deployments(ns).Delete(ctx, "deployment-shared-map-item-removal", metav1.DeleteOptions{})
+		_ = client.CoreV1().Pods(ns).Delete(ctx, "test-pod", metav1.DeleteOptions{})
 	})
 
 	/*
@@ -119,13 +119,13 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				Name(tc.name).
 				Param("fieldManager", "apply_test").
 				Body([]byte(tc.body)).
-				Do(context.TODO()).
+				Do(ctx).
 				Get()
 			if err != nil {
 				framework.Failf("Failed to create object using Apply patch: %v", err)
 			}
 
-			_, err = client.CoreV1().RESTClient().Get().Namespace(ns).Resource(tc.resource).Name(tc.name).Do(context.TODO()).Get()
+			_, err = client.CoreV1().RESTClient().Get().Namespace(ns).Resource(tc.resource).Name(tc.name).Do(ctx).Get()
 			if err != nil {
 				framework.Failf("Failed to retrieve object: %v", err)
 			}
@@ -137,7 +137,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				Name(tc.name).
 				Param("fieldManager", "apply_test_2").
 				Body([]byte(tc.body)).
-				Do(context.TODO()).
+				Do(ctx).
 				Get()
 			if err != nil {
 				framework.Failf("Failed to re-apply object using Apply patch: %v", err)
@@ -203,13 +203,13 @@ var _ = SIGDescribe("ServerSideApply", func() {
 					Name(tc.name).
 					Param("fieldManager", "apply_test").
 					Body([]byte(tc.body)).
-					Do(context.TODO()).
+					Do(ctx).
 					Get()
 				if err != nil {
 					framework.Failf("Failed to create object using Apply patch: %v", err)
 				}
 
-				_, err = client.CoreV1().RESTClient().Get().Namespace(ns).Resource(tc.resource).Name(tc.name).Do(context.TODO()).Get()
+				_, err = client.CoreV1().RESTClient().Get().Namespace(ns).Resource(tc.resource).Name(tc.name).Do(ctx).Get()
 				if err != nil {
 					framework.Failf("Failed to retrieve object: %v", err)
 				}
@@ -221,12 +221,12 @@ var _ = SIGDescribe("ServerSideApply", func() {
 					Name(tc.name).
 					Param("fieldManager", "apply_test2").
 					Body([]byte(tc.statusPatch)).
-					Do(context.TODO()).
+					Do(ctx).
 					Get()
 				if err != nil {
 					framework.Failf("Failed to Apply Status using Apply patch: %v", err)
 				}
-				pod, err := client.CoreV1().Pods(ns).Get(context.TODO(), "test-pod", metav1.GetOptions{})
+				pod, err := client.CoreV1().Pods(ns).Get(ctx, "test-pod", metav1.GetOptions{})
 				framework.ExpectNoError(err, "retrieving test pod")
 				for _, c := range pod.Status.Conditions {
 					if c.Type == "MyStatus" {
@@ -242,13 +242,13 @@ var _ = SIGDescribe("ServerSideApply", func() {
 					Name(tc.name).
 					Param("fieldManager", "apply_test2").
 					Body([]byte(tc.statusPatch)).
-					Do(context.TODO()).
+					Do(ctx).
 					Get()
 				if err != nil {
 					framework.Failf("Failed to Apply Status using Apply patch: %v", err)
 				}
 
-				pod, err = client.CoreV1().Pods(ns).Get(context.TODO(), "test-pod", metav1.GetOptions{})
+				pod, err = client.CoreV1().Pods(ns).Get(ctx, "test-pod", metav1.GetOptions{})
 				framework.ExpectNoError(err, "retrieving test pod")
 
 				myStatusFound := false
@@ -311,7 +311,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Resource("deployments").
 			Name("deployment").
 			Param("fieldManager", "apply_test").
-			Body(obj).Do(context.TODO()).Get()
+			Body(obj).Do(ctx).Get()
 		if err != nil {
 			framework.Failf("Failed to create object using Apply patch: %v", err)
 		}
@@ -352,12 +352,12 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Resource("deployments").
 			Name("deployment").
 			Param("fieldManager", "apply_test").
-			Body(obj).Do(context.TODO()).Get()
+			Body(obj).Do(ctx).Get()
 		if err != nil {
 			framework.Failf("Failed to remove container port using Apply patch: %v", err)
 		}
 
-		deployment, err := client.AppsV1().Deployments(ns).Get(context.TODO(), "deployment", metav1.GetOptions{})
+		deployment, err := client.AppsV1().Deployments(ns).Get(ctx, "deployment", metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to retrieve object: %v", err)
 		}
@@ -415,7 +415,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				Name("deployment-shared-unset").
 				Param("fieldManager", fieldManager).
 				Body(apply).
-				Do(context.TODO()).
+				Do(ctx).
 				Get()
 			if err != nil {
 				framework.Failf("Failed to create object using Apply patch: %v", err)
@@ -459,7 +459,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Name("deployment-shared-unset").
 			Param("fieldManager", "shared_owner_1").
 			Body(apply).
-			Do(context.TODO()).
+			Do(ctx).
 			Get()
 		if err != nil {
 			framework.Failf("Failed to create object using Apply patch: %v", err)
@@ -518,7 +518,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Resource("deployments").
 			Name("deployment").
 			Param("fieldManager", "apply_test").
-			Body(obj).Do(context.TODO()).Get()
+			Body(obj).Do(ctx).Get()
 		if err != nil {
 			framework.Failf("Failed to create object using Apply patch: %v", err)
 		}
@@ -528,7 +528,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Namespace(ns).
 			Resource("deployments").
 			Name("deployment").
-			Body([]byte(`{"spec":{"replicas": 5}}`)).Do(context.TODO()).Get()
+			Body([]byte(`{"spec":{"replicas": 5}}`)).Do(ctx).Get()
 		if err != nil {
 			framework.Failf("Failed to patch object: %v", err)
 		}
@@ -539,7 +539,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Resource("deployments").
 			Name("deployment").
 			Param("fieldManager", "apply_test").
-			Body(obj).Do(context.TODO()).Get()
+			Body(obj).Do(ctx).Get()
 		if err == nil {
 			framework.Failf("Expecting to get conflicts when applying object")
 		}
@@ -558,7 +558,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Name("deployment").
 			Param("force", "true").
 			Param("fieldManager", "apply_test").
-			Body(obj).Do(context.TODO()).Get()
+			Body(obj).Do(ctx).Get()
 		if err != nil {
 			framework.Failf("Failed to apply object with force: %v", err)
 		}
@@ -678,7 +678,7 @@ spec:
 			Name(name).
 			Param("fieldManager", "apply_test").
 			Body(yamlBody).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 		}
@@ -706,7 +706,7 @@ spec:
 			Name(name).
 			Param("fieldManager", "apply_test").
 			Body(yamlBodyBeta).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 		}
@@ -719,7 +719,7 @@ spec:
 				AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 				Name(name).
 				Body([]byte(`{"metadata":{"finalizers":[]}}`)).
-				DoRaw(context.TODO())
+				DoRaw(ctx)
 			if err != nil {
 				framework.Failf("failed to reset finalizers: %v:\n%v", err, string(result))
 			}
@@ -730,7 +730,7 @@ spec:
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 			Name(name).
 			Body([]byte(`{"metadata":{"finalizers":["test-finalizer","another-one"]}}`)).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Failf("failed to add finalizer with merge patch: %v:\n%v", err, string(result))
 		}
@@ -745,7 +745,7 @@ spec:
 			Param("fieldManager", "apply_test").
 			SetHeader("Accept", "application/json").
 			Body(yamlBody).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Failf("failed to apply same config after adding a finalizer: %v:\n%v", err, string(result))
 		}
@@ -758,7 +758,7 @@ spec:
 			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
 			Name(name).
 			Body([]byte(`{"spec":{"replicas": 5}}`)).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Failf("failed to update number of replicas with merge patch: %v:\n%v", err, string(result))
 		}
@@ -770,7 +770,7 @@ spec:
 			Name(name).
 			Param("fieldManager", "apply_test").
 			Body(yamlBody).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err == nil {
 			framework.Failf("Expecting to get conflicts when applying object after updating replicas, got no error: %s", result)
 		}
@@ -789,7 +789,7 @@ spec:
 			Param("force", "true").
 			Param("fieldManager", "apply_test").
 			Body(yamlBody).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Failf("failed to apply object with force after updating replicas: %v:\n%v", err, string(result))
 		}
@@ -810,7 +810,7 @@ spec:
   - name: "y"
     containerPort: 80
     protocol: TCP`, apiVersion, kind, name))).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err == nil {
 			framework.Failf("Expecting to get conflicts when a different applier updates existing list item, got no error: %s", result)
 		}
@@ -838,7 +838,7 @@ spec:
     containerPort: 8080
     protocol: TCP`, apiVersion, kind, name))).
 			SetHeader("Accept", "application/json").
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Failf("failed to add a new list item to the object as a different applier: %v:\n%v", err, string(result))
 		}
@@ -872,7 +872,7 @@ spec:
 			Name("should-not-exist").
 			Param("fieldManager", "apply_test").
 			Body(notExistingYAMLBody).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("create on update should fail with notFound, got %v", err)
 		}
@@ -932,7 +932,7 @@ spec:
 			Name(name).
 			Param("fieldManager", "apply_test").
 			Body(crdYamlBody).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 		}
@@ -953,7 +953,7 @@ spec:
 			Param("fieldManager", "apply_test_2").
 			Param("force", "true").
 			Body(crdYamlBody).
-			DoRaw(context.TODO())
+			DoRaw(ctx)
 		if err != nil {
 			framework.Failf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 		}
@@ -1006,7 +1006,7 @@ spec:
 			Name("deployment-shared-map-item-removal").
 			Param("fieldManager", "test_applier").
 			Body(apply).
-			Do(context.TODO()).
+			Do(ctx).
 			Get()
 		if err != nil {
 			framework.Failf("Failed to create object using Apply patch: %v", err)
@@ -1055,7 +1055,7 @@ spec:
 			Name("deployment-shared-map-item-removal").
 			Param("fieldManager", "test_applier").
 			Body(apply).
-			Do(context.TODO()).
+			Do(ctx).
 			Get()
 		if err != nil {
 			framework.Failf("Failed to create object using Apply patch: %v", err)

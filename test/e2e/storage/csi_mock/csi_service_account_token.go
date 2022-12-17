@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 			test := test
 			csiServiceAccountTokenEnabled := test.tokenRequests != nil
 			ginkgo.It(test.desc, func(ctx context.Context) {
-				m.init(testParameters{
+				m.init(ctx, testParameters{
 					registerDriver:    test.deployCSIDriverObject,
 					tokenRequests:     test.tokenRequests,
 					requiresRepublish: &csiServiceAccountTokenEnabled,
@@ -71,11 +71,11 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 
 				ginkgo.DeferCleanup(m.cleanup)
 
-				_, _, pod := m.createPod(pvcReference)
+				_, _, pod := m.createPod(ctx, pvcReference)
 				if pod == nil {
 					return
 				}
-				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				// sleep to make sure RequiresRepublish triggers more than 1 NodePublishVolume
@@ -86,11 +86,11 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 				}
 
 				ginkgo.By("Deleting the previously created pod")
-				err = e2epod.DeletePodWithWait(m.cs, pod)
+				err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Checking CSI driver logs")
-				err = checkPodLogs(m.driver.GetCalls, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled, numNodePublishVolume)
+				err = checkPodLogs(ctx, m.driver.GetCalls, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled, numNodePublishVolume)
 				framework.ExpectNoError(err)
 			})
 		}

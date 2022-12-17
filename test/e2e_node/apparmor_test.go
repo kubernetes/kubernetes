@@ -58,11 +58,11 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject an unloaded profile", func(ctx context.Context) {
-				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
+				status := runAppArmorTest(ctx, f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
 				gomega.Expect(status.ContainerStatuses[0].State.Waiting.Message).To(gomega.ContainSubstring("apparmor"))
 			})
 			ginkgo.It("should enforce a profile blocking writes", func(ctx context.Context) {
-				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
+				status := runAppArmorTest(ctx, f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
@@ -73,7 +73,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 
 			})
 			ginkgo.It("should enforce a permissive profile", func(ctx context.Context) {
-				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
+				status := runAppArmorTest(ctx, f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
@@ -89,7 +89,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject a pod with an AppArmor profile", func(ctx context.Context) {
-				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileRuntimeDefault)
+				status := runAppArmorTest(ctx, f, false, v1.AppArmorBetaProfileRuntimeDefault)
 				expectSoftRejection(status)
 			})
 		})
@@ -149,11 +149,11 @@ func loadTestProfiles() error {
 	return nil
 }
 
-func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.PodStatus {
-	pod := createPodWithAppArmor(f, profile)
+func runAppArmorTest(ctx context.Context, f *framework.Framework, shouldRun bool, profile string) v1.PodStatus {
+	pod := createPodWithAppArmor(ctx, f, profile)
 	if shouldRun {
 		// The pod needs to start before it stops, so wait for the longer start timeout.
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(ctx,
 			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
 	} else {
 		// Pod should remain in the pending state. Wait for the Reason to be set to "AppArmor".
@@ -161,11 +161,11 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 		w := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
-				return e2epod.NewPodClient(f).List(context.TODO(), options)
+				return e2epod.NewPodClient(f).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = fieldSelector
-				return e2epod.NewPodClient(f).Watch(context.TODO(), options)
+				return e2epod.NewPodClient(f).Watch(ctx, options)
 			},
 		}
 		preconditionFunc := func(store cache.Store) (bool, error) {
@@ -181,7 +181,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 
 			return false, nil
 		}
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, framework.PodStartTimeout)
 		defer cancel()
 		_, err := watchtools.UntilWithSync(ctx, w, &v1.Pod{}, preconditionFunc, func(e watch.Event) (bool, error) {
 			switch e.Type {
@@ -202,12 +202,12 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 		})
 		framework.ExpectNoError(err)
 	}
-	p, err := e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	p, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return p.Status
 }
 
-func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
+func createPodWithAppArmor(ctx context.Context, f *framework.Framework, profile string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("test-apparmor-%s", strings.Replace(profile, "/", "-", -1)),
@@ -224,7 +224,7 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
-	return e2epod.NewPodClient(f).Create(pod)
+	return e2epod.NewPodClient(f).Create(ctx, pod)
 }
 
 func expectSoftRejection(status v1.PodStatus) {

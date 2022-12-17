@@ -50,9 +50,9 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 	})
 
 	ginkgo.Context("when create a system-node-critical pod", func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			diskConsumed := resource.MustParse("200Mi")
-			summary := eventuallyGetSummary()
+			summary := eventuallyGetSummary(ctx)
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -63,7 +63,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 			var staticPodName, mirrorPodName, podPath string
 			ns := kubeapi.NamespaceSystem
 
-			ginkgo.BeforeEach(func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
 				ginkgo.By("create a static system-node-critical pod")
 				staticPodName = "static-disk-hog-" + string(uuid.NewUUID())
 				mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
@@ -77,25 +77,25 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 				ginkgo.By("wait for the mirror pod to be running")
-				gomega.Eventually(func() error {
-					return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
-				}, time.Minute, time.Second*2).Should(gomega.BeNil())
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				}, time.Minute, time.Second*2).Should(gomega.Succeed())
 			})
 
 			ginkgo.It("should not be evicted upon DiskPressure", func(ctx context.Context) {
 				ginkgo.By("wait for the node to have DiskPressure condition")
-				gomega.Eventually(func() error {
-					if hasNodeCondition(f, v1.NodeDiskPressure) {
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					if hasNodeCondition(ctx, f, v1.NodeDiskPressure) {
 						return nil
 					}
 					msg := fmt.Sprintf("NodeCondition: %s not encountered yet", v1.NodeDiskPressure)
 					framework.Logf(msg)
 					return fmt.Errorf(msg)
-				}, time.Minute*2, time.Second*4).Should(gomega.BeNil())
+				}, time.Minute*2, time.Second*4).Should(gomega.Succeed())
 
 				ginkgo.By("check if it's running all the time")
-				gomega.Consistently(func() error {
-					err := checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					err := checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 					if err == nil {
 						framework.Logf("mirror pod %q is running", mirrorPodName)
 					} else {
@@ -104,7 +104,7 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 					return err
 				}, time.Minute*8, time.Second*4).ShouldNot(gomega.HaveOccurred())
 			})
-			ginkgo.AfterEach(func() {
+			ginkgo.AfterEach(func(ctx context.Context) {
 				defer func() {
 					if framework.TestContext.PrepullImages {
 						// The test may cause the prepulled images to be evicted,
@@ -117,17 +117,17 @@ var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFea
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
 				ginkgo.By("wait for the mirror pod to disappear")
-				gomega.Eventually(func() error {
-					return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
-				}, time.Minute, time.Second*2).Should(gomega.BeNil())
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
+				}, time.Minute, time.Second*2).Should(gomega.Succeed())
 
 				ginkgo.By("making sure that node no longer has DiskPressure")
-				gomega.Eventually(func() error {
-					if hasNodeCondition(f, v1.NodeDiskPressure) {
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					if hasNodeCondition(ctx, f, v1.NodeDiskPressure) {
 						return fmt.Errorf("Conditions haven't returned to normal, node still has DiskPressure")
 					}
 					return nil
-				}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
+				}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.Succeed())
 			})
 		})
 	})

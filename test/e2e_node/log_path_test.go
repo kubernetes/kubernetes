@@ -110,16 +110,16 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 				}
 			}
 
-			createAndWaitPod := func(pod *v1.Pod) error {
-				podClient.Create(pod)
-				return e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+			createAndWaitPod := func(ctx context.Context, pod *v1.Pod) error {
+				podClient.Create(ctx, pod)
+				return e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 			}
 
 			var logPodName string
-			ginkgo.BeforeEach(func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
 				podClient = e2epod.NewPodClient(f)
 				logPodName = "log-pod-" + string(uuid.NewUUID())
-				err := createAndWaitPod(makeLogPod(logPodName, logString))
+				err := createAndWaitPod(ctx, makeLogPod(logPodName, logString))
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 			})
 			ginkgo.It("should print log to correct log path", func(ctx context.Context) {
@@ -127,7 +127,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 				logDir := kubelet.ContainerLogsDir
 
 				// get containerID from created Pod
-				createdLogPod, err := podClient.Get(context.TODO(), logPodName, metav1.GetOptions{})
+				createdLogPod, err := podClient.Get(ctx, logPodName, metav1.GetOptions{})
 				logContainerID := kubecontainer.ParseContainerID(createdLogPod.Status.ContainerStatuses[0].ContainerID)
 				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 
@@ -135,7 +135,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 				expectedlogFile := logDir + "/" + logPodName + "_" + f.Namespace.Name + "_" + logContainerName + "-" + logContainerID.ID + ".log"
 
 				logCheckPodName := "log-check-" + string(uuid.NewUUID())
-				err = createAndWaitPod(makeLogCheckPod(logCheckPodName, logString, expectedlogFile))
+				err = createAndWaitPod(ctx, makeLogCheckPod(logCheckPodName, logString, expectedlogFile))
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCheckPodName)
 			})
 
@@ -144,7 +144,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 				logCRIDir := "/var/log/pods"
 
 				// get podID from created Pod
-				createdLogPod, err := podClient.Get(context.TODO(), logPodName, metav1.GetOptions{})
+				createdLogPod, err := podClient.Get(ctx, logPodName, metav1.GetOptions{})
 				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 				podNs := createdLogPod.Namespace
 				podName := createdLogPod.Name
@@ -154,7 +154,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 				expectedCRILogFile := logCRIDir + "/" + podNs + "_" + podName + "_" + podID + "/" + logContainerName + "/0.log"
 
 				logCRICheckPodName := "log-cri-check-" + string(uuid.NewUUID())
-				err = createAndWaitPod(makeLogCheckPod(logCRICheckPodName, logString, expectedCRILogFile))
+				err = createAndWaitPod(ctx, makeLogCheckPod(logCRICheckPodName, logString, expectedCRILogFile))
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCRICheckPodName)
 			})
 		})

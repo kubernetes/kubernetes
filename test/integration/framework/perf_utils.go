@@ -58,7 +58,7 @@ func NewIntegrationTestNodePreparerWithNodeSpec(client clientset.Interface, coun
 }
 
 // PrepareNodes prepares countToStrategy test nodes.
-func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
+func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNodeIndex int) error {
 	numNodes := 0
 	for _, v := range p.countToStrategy {
 		numNodes += v.Count
@@ -89,7 +89,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 	for i := 0; i < numNodes; i++ {
 		var err error
 		for retry := 0; retry < retries; retry++ {
-			_, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode, metav1.CreateOptions{})
+			_, err = p.client.CoreV1().Nodes().Create(ctx, baseNode, metav1.CreateOptions{})
 			if err == nil {
 				break
 			}
@@ -106,7 +106,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 	index := nextNodeIndex
 	for _, v := range p.countToStrategy {
 		for i := 0; i < v.Count; i, index = i+1, index+1 {
-			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
+			if err := testutils.DoPrepareNode(ctx, p.client, &nodes.Items[index], v.Strategy); err != nil {
 				klog.Errorf("Aborting node preparation: %v", err)
 				return err
 			}
@@ -116,7 +116,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 }
 
 // CleanupNodes deletes existing test nodes.
-func (p *IntegrationTestNodePreparer) CleanupNodes() error {
+func (p *IntegrationTestNodePreparer) CleanupNodes(ctx context.Context) error {
 	// TODO(#93794): make CleanupNodes only clean up the nodes created by this
 	// IntegrationTestNodePreparer to make this more intuitive.
 	nodes, err := waitListAllNodes(p.client)
@@ -125,7 +125,7 @@ func (p *IntegrationTestNodePreparer) CleanupNodes() error {
 	}
 	var errRet error
 	for i := range nodes.Items {
-		if err := p.client.CoreV1().Nodes().Delete(context.TODO(), nodes.Items[i].Name, metav1.DeleteOptions{}); err != nil {
+		if err := p.client.CoreV1().Nodes().Delete(ctx, nodes.Items[i].Name, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Error while deleting Node: %v", err)
 			errRet = err
 		}

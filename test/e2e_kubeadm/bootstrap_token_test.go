@@ -54,7 +54,7 @@ var _ = Describe("bootstrap token", func() {
 	ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 		secrets, err := f.ClientSet.CoreV1().
 			Secrets(kubeSystemNamespace).
-			List(context.TODO(), metav1.ListOptions{})
+			List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading Secrets")
 
 		tokenNum := 0

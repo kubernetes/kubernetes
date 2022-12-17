@@ -53,13 +53,13 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		namespace string
 	)
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
-		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, framework.TestContext.NodeSchedulableTimeout))
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		if len(nodeList.Items) < 2 {
 			framework.Failf("At least 2 nodes are required for this test, got instead: %v", len(nodeList.Items))
@@ -84,36 +84,36 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 	ginkgo.It("verify volume status after node power off", func(ctx context.Context) {
 		ginkgo.By("Creating a Storage Class")
 		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil, "")
-		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), storageClassSpec, metav1.CreateOptions{})
+		storageclass, err := client.StorageV1().StorageClasses().Create(ctx, storageClassSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 		ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), storageclass.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Creating PVC using the Storage Class")
 		pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "1Gi", storageclass)
-		pvclaim, err := e2epv.CreatePVC(client, namespace, pvclaimSpec)
+		pvclaim, err := e2epv.CreatePVC(ctx, client, namespace, pvclaimSpec)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create PVC with err: %v", err))
 		ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 		ginkgo.By("Waiting for PVC to be in bound phase")
 		pvclaims := []*v1.PersistentVolumeClaim{pvclaim}
-		pvs, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, f.Timeouts.ClaimProvision)
+		pvs, err := e2epv.WaitForPVClaimBoundPhase(ctx, client, pvclaims, f.Timeouts.ClaimProvision)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to wait until PVC phase set to bound: %v", err))
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 
 		ginkgo.By("Creating a Deployment")
-		deployment, err := e2edeployment.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
+		deployment, err := e2edeployment.CreateDeployment(ctx, client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
 		ginkgo.DeferCleanup(framework.IgnoreNotFound(client.AppsV1().Deployments(namespace).Delete), deployment.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Get pod from the deployment")
-		podList, err := e2edeployment.GetPodsForDeployment(client, deployment)
+		podList, err := e2edeployment.GetPodsForDeployment(ctx, client, deployment)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod from the deployment with err: %v", err))
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
 		node1 := pod.Spec.NodeName
 
 		ginkgo.By(fmt.Sprintf("Verify disk is attached to the node: %v", node1))
-		isAttached, err := diskIsAttached(volumePath, node1)
+		isAttached, err := diskIsAttached(ctx, volumePath, node1)
 		framework.ExpectNoError(err)
 		if !isAttached {
 			framework.Failf("Volume: %s is not attached to the node: %v", volumePath, node1)
@@ -131,15 +131,15 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		framework.ExpectNoError(err, "Unable to power off the node")
 
 		// Waiting for the pod to be failed over to a different node
-		node2, err := waitForPodToFailover(client, deployment, node1)
+		node2, err := waitForPodToFailover(ctx, client, deployment, node1)
 		framework.ExpectNoError(err, "Pod did not fail over to a different node")
 
 		ginkgo.By(fmt.Sprintf("Waiting for disk to be attached to the new node: %v", node2))
-		err = waitForVSphereDiskToAttach(volumePath, node2)
+		err = waitForVSphereDiskToAttach(ctx, volumePath, node2)
 		framework.ExpectNoError(err, "Disk is not attached to the node")
 
 		ginkgo.By(fmt.Sprintf("Waiting for disk to be detached from the previous node: %v", node1))
-		err = waitForVSphereDiskToDetach(volumePath, node1)
+		err = waitForVSphereDiskToDetach(ctx, volumePath, node1)
 		framework.ExpectNoError(err, "Disk is not detached from the node")
 
 		ginkgo.By(fmt.Sprintf("Power on the previous node: %v", node1))
@@ -150,14 +150,14 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 })
 
 // Wait until the pod failed over to a different node, or time out after 3 minutes
-func waitForPodToFailover(client clientset.Interface, deployment *appsv1.Deployment, oldNode string) (string, error) {
+func waitForPodToFailover(ctx context.Context, client clientset.Interface, deployment *appsv1.Deployment, oldNode string) (string, error) {
 	var (
 		timeout  = 3 * time.Minute
 		pollTime = 10 * time.Second
 	)
 
-	waitErr := wait.Poll(pollTime, timeout, func() (bool, error) {
-		currentNode, err := getNodeForDeployment(client, deployment)
+	waitErr := wait.PollWithContext(ctx, pollTime, timeout, func(ctx context.Context) (bool, error) {
+		currentNode, err := getNodeForDeployment(ctx, client, deployment)
 		if err != nil {
 			return true, err
 		}
@@ -178,12 +178,12 @@ func waitForPodToFailover(client clientset.Interface, deployment *appsv1.Deploym
 		return "", fmt.Errorf("pod did not fail over from %q: %v", oldNode, waitErr)
 	}
 
-	return getNodeForDeployment(client, deployment)
+	return getNodeForDeployment(ctx, client, deployment)
 }
 
 // getNodeForDeployment returns node name for the Deployment
-func getNodeForDeployment(client clientset.Interface, deployment *appsv1.Deployment) (string, error) {
-	podList, err := e2edeployment.GetPodsForDeployment(client, deployment)
+func getNodeForDeployment(ctx context.Context, client clientset.Interface, deployment *appsv1.Deployment) (string, error) {
+	podList, err := e2edeployment.GetPodsForDeployment(ctx, client, deployment)
 	if err != nil {
 		return "", err
 	}

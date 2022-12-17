@@ -39,12 +39,12 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c, ec clientset.Interface
 	var grabber *e2emetrics.Grabber
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		var err error
 		c = f.ClientSet
 		ec = f.KubemarkExternalClusterClientSet
-		gomega.Eventually(func() error {
-			grabber, err = e2emetrics.NewMetricsGrabber(c, ec, f.ClientConfig(), true, true, true, true, true, true)
+		gomega.Eventually(ctx, func() error {
+			grabber, err = e2emetrics.NewMetricsGrabber(ctx, c, ec, f.ClientConfig(), true, true, true, true, true, true)
 			if err != nil {
 				return fmt.Errorf("failed to create metrics grabber: %v", err)
 			}
@@ -54,7 +54,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 
 	ginkgo.It("should grab all metrics from API server.", func(ctx context.Context) {
 		ginkgo.By("Connecting to /metrics endpoint")
-		response, err := grabber.GrabFromAPIServer()
+		response, err := grabber.GrabFromAPIServer(ctx)
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
@@ -64,19 +64,19 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 
 	ginkgo.It("should grab all metrics from a Kubelet.", func(ctx context.Context) {
 		ginkgo.By("Proxying to Node through the API server")
-		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
 		framework.ExpectNoError(err)
-		response, err := grabber.GrabFromKubelet(node.Name)
+		response, err := grabber.GrabFromKubelet(ctx, node.Name)
 		framework.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
 
 	ginkgo.It("should grab all metrics from a Scheduler.", func(ctx context.Context) {
 		ginkgo.By("Proxying to Pod through the API server")
-		response, err := grabber.GrabFromScheduler()
+		response, err := grabber.GrabFromScheduler(ctx)
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
@@ -86,7 +86,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 
 	ginkgo.It("should grab all metrics from a ControllerManager.", func(ctx context.Context) {
 		ginkgo.By("Proxying to Pod through the API server")
-		response, err := grabber.GrabFromControllerManager()
+		response, err := grabber.GrabFromControllerManager(ctx)
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}

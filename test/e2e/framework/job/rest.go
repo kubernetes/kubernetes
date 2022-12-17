@@ -27,13 +27,13 @@ import (
 )
 
 // GetJob uses c to get the Job in namespace ns named name. If the returned error is nil, the returned Job is valid.
-func GetJob(c clientset.Interface, ns, name string) (*batchv1.Job, error) {
-	return c.BatchV1().Jobs(ns).Get(context.TODO(), name, metav1.GetOptions{})
+func GetJob(ctx context.Context, c clientset.Interface, ns, name string) (*batchv1.Job, error) {
+	return c.BatchV1().Jobs(ns).Get(ctx, name, metav1.GetOptions{})
 }
 
 // GetAllRunningJobPods returns a list of all running Pods belonging to a Job.
-func GetAllRunningJobPods(c clientset.Interface, ns, jobName string) ([]v1.Pod, error) {
-	if podList, err := GetJobPods(c, ns, jobName); err != nil {
+func GetAllRunningJobPods(ctx context.Context, c clientset.Interface, ns, jobName string) ([]v1.Pod, error) {
+	if podList, err := GetJobPods(ctx, c, ns, jobName); err != nil {
 		return nil, err
 	} else {
 		pods := []v1.Pod{}
@@ -47,20 +47,20 @@ func GetAllRunningJobPods(c clientset.Interface, ns, jobName string) ([]v1.Pod, 
 }
 
 // GetJobPods returns a list of Pods belonging to a Job.
-func GetJobPods(c clientset.Interface, ns, jobName string) (*v1.PodList, error) {
+func GetJobPods(ctx context.Context, c clientset.Interface, ns, jobName string) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
-	return c.CoreV1().Pods(ns).List(context.TODO(), options)
+	return c.CoreV1().Pods(ns).List(ctx, options)
 }
 
 // CreateJob uses c to create job in namespace ns. If the returned error is nil, the returned Job is valid and has
 // been created.
-func CreateJob(c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
-	return c.BatchV1().Jobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
+func CreateJob(ctx context.Context, c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
+	return c.BatchV1().Jobs(ns).Create(ctx, job, metav1.CreateOptions{})
 }
 
 // CreateJob uses c to update a job in namespace ns. If the returned error is
 // nil, the returned Job is valid and has been updated.
-func UpdateJob(c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
-	return c.BatchV1().Jobs(ns).Update(context.TODO(), job, metav1.UpdateOptions{})
+func UpdateJob(ctx context.Context, c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
+	return c.BatchV1().Jobs(ns).Update(ctx, job, metav1.UpdateOptions{})
 }

@@ -62,16 +62,16 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce", "local")
 		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, framework.TestContext.NodeSchedulableTimeout))
 
-		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		nodeName = node.Name
 
@@ -89,7 +89,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 			Provisioner:          "flex-expand",
 		}
 
-		resizableSc, err = c.StorageV1().StorageClasses().Create(context.TODO(), newStorageClass(test, ns, "resizing"), metav1.CreateOptions{})
+		resizableSc, err = c.StorageV1().StorageClasses().Create(ctx, newStorageClass(test, ns, "resizing"), metav1.CreateOptions{})
 		if err != nil {
 			fmt.Printf("storage class creation error: %v\n", err)
 		}
@@ -102,11 +102,11 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 			StorageClassName: &(resizableSc.Name),
 			ClaimSize:        "2Gi",
 		}, ns)
-		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating pvc")
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
-			if errs := e2epv.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
+			if errs := e2epv.PVPVCCleanup(ctx, c, ns, nil, pvc); len(errs) > 0 {
 				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 		})
@@ -115,9 +115,9 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 	ginkgo.It("Should verify mounted flex volumes can be resized", func(ctx context.Context) {
 		driver := "dummy-attachable"
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driver))
-		installFlex(c, node, "k8s", driver, path.Join(driverDir, driver))
+		installFlex(ctx, c, node, "k8s", driver, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on (master) node %s as %s", path.Join(driverDir, driver), node.Name, driver))
-		installFlex(c, nil, "k8s", driver, path.Join(driverDir, driver))
+		installFlex(ctx, c, nil, "k8s", driver, path.Join(driverDir, driver))
 
 		pv := e2epv.MakePersistentVolume(e2epv.PersistentVolumeConfig{
 			PVSource: v1.PersistentVolumeSource{
@@ -129,25 +129,25 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 			VolumeMode:       pvc.Spec.VolumeMode,
 		})
 
-		_, err = e2epv.CreatePV(c, f.Timeouts, pv)
+		_, err = e2epv.CreatePV(ctx, c, f.Timeouts, pv)
 		framework.ExpectNoError(err, "Error creating pv %v", err)
 
 		ginkgo.By("Waiting for PVC to be in bound phase")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		var pvs []*v1.PersistentVolume
 
-		pvs, err = e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+		pvs, err = e2epv.WaitForPVClaimBoundPhase(ctx, c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 		framework.ExpectEqual(len(pvs), 1)
 
 		ginkgo.By("Creating a deployment with the provisioned volume")
-		deployment, err := e2edeployment.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
+		deployment, err := e2edeployment.CreateDeployment(ctx, c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
 		ginkgo.DeferCleanup(c.AppsV1().Deployments(ns).Delete, deployment.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
-		newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, c)
+		newPVC, err := testsuites.ExpandPVCSize(ctx, pvc, newSize, c)
 		framework.ExpectNoError(err, "While updating pvc for more size")
 		pvc = newPVC
 		gomega.Expect(pvc).NotTo(gomega.BeNil())
@@ -158,25 +158,25 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		}
 
 		ginkgo.By("Waiting for cloudprovider resize to finish")
-		err = testsuites.WaitForControllerVolumeResize(pvc, c, totalResizeWaitPeriod)
+		err = testsuites.WaitForControllerVolumeResize(ctx, pvc, c, totalResizeWaitPeriod)
 		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 		ginkgo.By("Getting a pod from deployment")
-		podList, err := e2edeployment.GetPodsForDeployment(c, deployment)
+		podList, err := e2edeployment.GetPodsForDeployment(ctx, c, deployment)
 		framework.ExpectNoError(err, "While getting pods from deployment")
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
 
 		ginkgo.By("Deleting the pod from deployment")
-		err = e2epod.DeletePodWithWait(c, &pod)
+		err = e2epod.DeletePodWithWait(ctx, c, &pod)
 		framework.ExpectNoError(err, "while deleting pod for resizing")
 
 		ginkgo.By("Waiting for deployment to create new pod")
-		pod, err = waitForDeploymentToRecreatePod(c, deployment)
+		pod, err = waitForDeploymentToRecreatePod(ctx, c, deployment)
 		framework.ExpectNoError(err, "While waiting for pod to be recreated")
 
 		ginkgo.By("Waiting for file system resize to finish")
-		pvc, err = testsuites.WaitForFSResize(pvc, c)
+		pvc, err = testsuites.WaitForFSResize(ctx, pvc, c)
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions

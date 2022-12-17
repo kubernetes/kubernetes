@@ -69,7 +69,7 @@ var _ = SIGDescribe("Lock contention [Slow] [Disruptive] [NodeSpecialFeature:Loc
 		ginkgo.By("verifying the kubelet is not healthy as there was a lock contention.")
 		// Once the lock is acquired, check if the kubelet is in healthy state or not.
 		// It should not be as the lock contention forces the kubelet to stop.
-		gomega.Eventually(func() bool {
+		gomega.Eventually(ctx, func() bool {
 			return kubeletHealthCheck(kubeletHealthCheckURL)
 		}, 10*time.Second, time.Second).Should(gomega.BeFalse())
 	})

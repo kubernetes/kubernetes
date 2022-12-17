@@ -46,7 +46,7 @@ var _ = SIGDescribe("Security Context", func() {
 	ginkgo.Context("[NodeConformance][LinuxOnly] Container PID namespace sharing", func() {
 		ginkgo.It("containers in pods using isolated PID namespaces should all receive PID 1", func(ctx context.Context) {
 			ginkgo.By("Create a pod with isolated PID namespaces.")
-			e2epod.NewPodClient(f).CreateSync(&v1.Pod{
+			e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "isolated-pid-ns-test-pod"},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -75,7 +75,7 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("processes in containers sharing a pod namespace should be able to see each other", func(ctx context.Context) {
 			ginkgo.By("Create a pod with shared PID namespace.")
-			e2epod.NewPodClient(f).CreateSync(&v1.Pod{
+			e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "shared-pid-ns-test-pod"},
 				Spec: v1.PodSpec{
 					ShareProcessNamespace: &[]bool{true}[0],
@@ -123,20 +123,20 @@ var _ = SIGDescribe("Security Context", func() {
 				},
 			}
 		}
-		createAndWaitHostPidPod := func(podName string, hostPID bool) {
-			podClient.Create(makeHostPidPod(podName,
+		createAndWaitHostPidPod := func(ctx context.Context, podName string, hostPID bool) {
+			podClient.Create(ctx, makeHostPidPod(podName,
 				busyboxImage,
 				[]string{"sh", "-c", "pidof nginx || true"},
 				hostPID,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(ctx, podName, framework.PodStartTimeout)
 		}
 
 		nginxPid := ""
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			nginxPodName := "nginx-hostpid-" + string(uuid.NewUUID())
-			podClient.CreateSync(makeHostPidPod(nginxPodName,
+			podClient.CreateSync(ctx, makeHostPidPod(nginxPodName,
 				imageutils.GetE2EImage(imageutils.Nginx),
 				nil,
 				true,
@@ -149,8 +149,8 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("should show its pid in the host PID namespace [NodeFeature:HostAccess]", func(ctx context.Context) {
 			busyboxPodName := "busybox-hostpid-" + string(uuid.NewUUID())
-			createAndWaitHostPidPod(busyboxPodName, true)
-			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			createAndWaitHostPidPod(ctx, busyboxPodName, true)
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
 			if err != nil {
 				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}
@@ -169,8 +169,8 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("should not show its pid in the non-hostpid containers [NodeFeature:HostAccess]", func(ctx context.Context) {
 			busyboxPodName := "busybox-non-hostpid-" + string(uuid.NewUUID())
-			createAndWaitHostPidPod(busyboxPodName, false)
-			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			createAndWaitHostPidPod(ctx, busyboxPodName, false)
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
 			if err != nil {
 				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}
@@ -203,14 +203,14 @@ var _ = SIGDescribe("Security Context", func() {
 				},
 			}
 		}
-		createAndWaitHostIPCPod := func(podName string, hostNetwork bool) {
-			podClient.Create(makeHostIPCPod(podName,
+		createAndWaitHostIPCPod := func(ctx context.Context, podName string, hostNetwork bool) {
+			podClient.Create(ctx, makeHostIPCPod(podName,
 				imageutils.GetE2EImage(imageutils.IpcUtils),
 				[]string{"sh", "-c", "ipcs -m | awk '{print $2}'"},
 				hostNetwork,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(ctx, podName, framework.PodStartTimeout)
 		}
 
 		hostSharedMemoryID := ""
@@ -225,8 +225,8 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("should show the shared memory ID in the host IPC containers [NodeFeature:HostAccess]", func(ctx context.Context) {
 			ipcutilsPodName := "ipcutils-hostipc-" + string(uuid.NewUUID())
-			createAndWaitHostIPCPod(ipcutilsPodName, true)
-			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
+			createAndWaitHostIPCPod(ctx, ipcutilsPodName, true)
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
 			if err != nil {
 				framework.Failf("GetPodLogs for pod %q failed: %v", ipcutilsPodName, err)
 			}
@@ -240,8 +240,8 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("should not show the shared memory ID in the non-hostIPC containers [NodeFeature:HostAccess]", func(ctx context.Context) {
 			ipcutilsPodName := "ipcutils-non-hostipc-" + string(uuid.NewUUID())
-			createAndWaitHostIPCPod(ipcutilsPodName, false)
-			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
+			createAndWaitHostIPCPod(ctx, ipcutilsPodName, false)
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
 			if err != nil {
 				framework.Failf("GetPodLogs for pod %q failed: %v", ipcutilsPodName, err)
 			}
@@ -283,14 +283,14 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 		listListeningPortsCommand := []string{"sh", "-c", "netstat -ln"}
-		createAndWaitHostNetworkPod := func(podName string, hostNetwork bool) {
-			podClient.Create(makeHostNetworkPod(podName,
+		createAndWaitHostNetworkPod := func(ctx context.Context, podName string, hostNetwork bool) {
+			podClient.Create(ctx, makeHostNetworkPod(podName,
 				busyboxImage,
 				listListeningPortsCommand,
 				hostNetwork,
 			))
 
-			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+			podClient.WaitForSuccess(ctx, podName, framework.PodStartTimeout)
 		}
 
 		listeningPort := ""
@@ -308,8 +308,8 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("should listen on same port in the host network containers [NodeFeature:HostAccess]", func(ctx context.Context) {
 			busyboxPodName := "busybox-hostnetwork-" + string(uuid.NewUUID())
-			createAndWaitHostNetworkPod(busyboxPodName, true)
-			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			createAndWaitHostNetworkPod(ctx, busyboxPodName, true)
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
 			if err != nil {
 				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}
@@ -322,8 +322,8 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("shouldn't show the same port in the non-hostnetwork containers [NodeFeature:HostAccess]", func(ctx context.Context) {
 			busyboxPodName := "busybox-non-hostnetwork-" + string(uuid.NewUUID())
-			createAndWaitHostNetworkPod(busyboxPodName, false)
-			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			createAndWaitHostNetworkPod(ctx, busyboxPodName, false)
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
 			if err != nil {
 				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}

@@ -166,23 +166,26 @@ func main() {
 		f.NumIngressesTest = numIngressesTest
 	}
 
+	// This could be used to set a deadline.
+	ctx := context.Background()
+
 	// Real test begins.
 	if cleanup {
 		defer func() {
-			if errs := f.CleanupScaleTest(); len(errs) != 0 {
+			if errs := f.CleanupScaleTest(ctx); len(errs) != 0 {
 				klog.Errorf("Failed to cleanup scale test: %v", errs)
 				testSuccessFlag = false
 			}
 		}()
 	}
-	err = f.PrepareScaleTest()
+	err = f.PrepareScaleTest(ctx)
 	if err != nil {
 		klog.Errorf("Failed to prepare scale test: %v", err)
 		testSuccessFlag = false
 		return
 	}
 
-	if errs := f.RunScaleTest(); len(errs) != 0 {
+	if errs := f.RunScaleTest(ctx); len(errs) != 0 {
 		klog.Errorf("Failed while running scale test: %v", errs)
 		testSuccessFlag = false
 	}

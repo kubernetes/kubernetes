@@ -83,13 +83,13 @@ var _ = common.SIGDescribe("Proxy", func() {
 			Test for Proxy, logs port endpoint
 			Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs endpoint. This endpoint MUST be reachable.
 		*/
-		ginkgo.It("should proxy logs on node with explicit kubelet port using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
+		ginkgo.It("should proxy logs on node with explicit kubelet port using proxy subresource ", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", ":10250/proxy/logs/") })
 
 		/*
 			Test for Proxy, logs endpoint
 			Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs endpoint. This endpoint MUST be reachable.
 		*/
-		ginkgo.It("should proxy logs on node using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
+		ginkgo.It("should proxy logs on node using proxy subresource ", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", "/proxy/logs/") })
 
 		// using the porter image to serve content, access the content
 		// (of multiple pods?) from multiple (endpoints/services?)
@@ -101,7 +101,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 		framework.ConformanceIt("should proxy through a service and a pod ", func(ctx context.Context) {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
-			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), &v1.Service{
+			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "proxy-service-",
 				},
@@ -176,11 +176,11 @@ var _ = common.SIGDescribe("Proxy", func() {
 				Labels:      labels,
 				CreatedPods: &pods,
 			}
-			err = e2erc.RunRC(cfg)
+			err = e2erc.RunRC(ctx, cfg)
 			framework.ExpectNoError(err)
 			ginkgo.DeferCleanup(e2erc.DeleteRCAndWaitForGC, f.ClientSet, f.Namespace.Name, cfg.Name)
 
-			err = waitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
+			err = waitForEndpoint(ctx, f.ClientSet, f.Namespace.Name, service.Name)
 			framework.ExpectNoError(err)
 
 			// table constructors
@@ -238,7 +238,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 					go func(i int, path, val string) {
 						defer wg.Done()
 						// this runs the test case
-						body, status, d, err := doProxy(f, path, i)
+						body, status, d, err := doProxy(ctx, f, path, i)
 
 						if err != nil {
 							if serr, ok := err.(*apierrors.StatusError); ok {
@@ -264,7 +264,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			}
 
 			if len(errs) != 0 {
-				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do(context.TODO()).Raw()
+				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do(ctx).Raw()
 				if err != nil {
 					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
@@ -310,12 +310,12 @@ var _ = common.SIGDescribe("Proxy", func() {
 					}},
 					RestartPolicy: v1.RestartPolicyNever,
 				}}
-			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+			_, err := f.ClientSet.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Pod didn't start within time out period")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "Pod didn't start within time out period")
 
 			framework.Logf("Creating service...")
-			_, err = f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
+			_, err = f.ClientSet.CoreV1().Services(ns).Create(ctx, &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testSvcName,
 					Namespace: ns,
@@ -404,12 +404,12 @@ var _ = common.SIGDescribe("Proxy", func() {
 					}},
 					RestartPolicy: v1.RestartPolicyNever,
 				}}
-			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+			_, err := f.ClientSet.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Pod didn't start within time out period")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "Pod didn't start within time out period")
 
 			framework.Logf("Creating service...")
-			_, err = f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
+			_, err = f.ClientSet.CoreV1().Services(ns).Create(ctx, &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testSvcName,
 					Namespace: ns,
@@ -544,7 +544,7 @@ func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb st
 	}
 }
 
-func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCode int, d time.Duration, err error) {
+func doProxy(ctx context.Context, f *framework.Framework, path string, i int) (body []byte, statusCode int, d time.Duration, err error) {
 	// About all of the proxy accesses in this file:
 	// * AbsPath is used because it preserves the trailing '/'.
 	// * Do().Raw() is used (instead of DoRaw()) because it will turn an
@@ -552,7 +552,7 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	//   chance of the things we are talking to being confused for an error
 	//   that apiserver would have emitted.
 	start := time.Now()
-	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do(context.TODO()).StatusCode(&statusCode).Raw()
+	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do(ctx).StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
 		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
@@ -571,16 +571,16 @@ func truncate(b []byte, maxLen int) []byte {
 	return b2
 }
 
-func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
+func nodeProxyTest(ctx context.Context, f *framework.Framework, prefix, nodeDest string) {
 	// TODO: investigate why it doesn't work on master Node.
-	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+	node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
 
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
 	for i := 0; i < proxyAttempts; i++ {
-		_, status, d, err := doProxy(f, prefix+node.Name+nodeDest, i)
+		_, status, d, err := doProxy(ctx, f, prefix+node.Name+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
 			framework.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
@@ -599,11 +599,11 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 }
 
 // waitForEndpoint waits for the specified endpoint to be ready.
-func waitForEndpoint(c clientset.Interface, ns, name string) error {
+func waitForEndpoint(ctx context.Context, c clientset.Interface, ns, name string) error {
 	// registerTimeout is how long to wait for an endpoint to be registered.
 	registerTimeout := time.Minute
 	for t := time.Now(); time.Since(t) < registerTimeout; time.Sleep(framework.Poll) {
-		endpoint, err := c.CoreV1().Endpoints(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		endpoint, err := c.CoreV1().Endpoints(ns).Get(ctx, name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue

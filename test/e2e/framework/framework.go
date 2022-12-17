@@ -128,7 +128,7 @@ type Framework struct {
 
 // DumpAllNamespaceInfoAction is called after each failed test for namespaces
 // created for the test.
-type DumpAllNamespaceInfoAction func(f *Framework, namespace string)
+type DumpAllNamespaceInfoAction func(ctx context.Context, f *Framework, namespace string)
 
 // TestDataSummary is an interface for managing test data.
 type TestDataSummary interface {
@@ -184,7 +184,7 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 }
 
 // BeforeEach gets a client and makes a namespace.
-func (f *Framework) BeforeEach() {
+func (f *Framework) BeforeEach(ctx context.Context) {
 	// DeferCleanup, in contrast to AfterEach, triggers execution in
 	// first-in-last-out order. This ensures that the framework instance
 	// remains valid as long as possible.
@@ -235,7 +235,7 @@ func (f *Framework) BeforeEach() {
 
 	if !f.SkipNamespaceCreation {
 		ginkgo.By(fmt.Sprintf("Building a namespace api object, basename %s", f.BaseName))
-		namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
+		namespace, err := f.CreateNamespace(ctx, f.BaseName, map[string]string{
 			"e2e-framework": f.BaseName,
 		})
 		ExpectNoError(err)
@@ -244,10 +244,10 @@ func (f *Framework) BeforeEach() {
 
 		if TestContext.VerifyServiceAccount {
 			ginkgo.By("Waiting for a default service account to be provisioned in namespace")
-			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
+			err = WaitForDefaultServiceAccountInNamespace(ctx, f.ClientSet, namespace.Name)
 			ExpectNoError(err)
 			ginkgo.By("Waiting for kube-root-ca.crt to be provisioned in namespace")
-			err = WaitForKubeRootCAInNamespace(f.ClientSet, namespace.Name)
+			err = WaitForKubeRootCAInNamespace(ctx, f.ClientSet, namespace.Name)
 			ExpectNoError(err)
 		} else {
 			Logf("Skipping waiting for service account")
@@ -261,7 +261,7 @@ func (f *Framework) BeforeEach() {
 	f.flakeReport = NewFlakeReport()
 }
 
-func (f *Framework) dumpNamespaceInfo() {
+func (f *Framework) dumpNamespaceInfo(ctx context.Context) {
 	if !ginkgo.CurrentSpecReport().Failed() {
 		return
 	}
@@ -274,7 +274,7 @@ func (f *Framework) dumpNamespaceInfo() {
 	ginkgo.By("dump namespace information after failure", func() {
 		if !f.SkipNamespaceCreation {
 			for _, ns := range f.namespacesToDelete {
-				f.DumpAllNamespaceInfo(f, ns.Name)
+				f.DumpAllNamespaceInfo(ctx, f, ns.Name)
 			}
 		}
 	})
@@ -318,7 +318,7 @@ func printSummaries(summaries []TestDataSummary, testBaseName string) {
 }
 
 // AfterEach deletes the namespace, after reading its events.
-func (f *Framework) AfterEach() {
+func (f *Framework) AfterEach(ctx context.Context) {
 	// This should not happen. Given ClientSet is a public field a test must have updated it!
 	// Error out early before any API calls during cleanup.
 	if f.ClientSet == nil {
@@ -335,13 +335,13 @@ func (f *Framework) AfterEach() {
 		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentSpecReport().Failed()) {
 			for _, ns := range f.namespacesToDelete {
 				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
-				if err := f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{}); err != nil {
+				if err := f.ClientSet.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{}); err != nil {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
 
 						// Dump namespace if we are unable to delete the namespace and the dump was not already performed.
 						if !ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure && f.DumpAllNamespaceInfo != nil {
-							f.DumpAllNamespaceInfo(f, ns.Name)
+							f.DumpAllNamespaceInfo(ctx, f, ns.Name)
 						}
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
@@ -388,14 +388,14 @@ func (f *Framework) AfterEach() {
 // DeleteNamespace can be used to delete a namespace. Additionally it can be used to
 // dump namespace information so as it can be used as an alternative of framework
 // deleting the namespace towards the end.
-func (f *Framework) DeleteNamespace(name string) {
+func (f *Framework) DeleteNamespace(ctx context.Context, name string) {
 	defer func() {
-		err := f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), name, metav1.DeleteOptions{})
+		err := f.ClientSet.CoreV1().Namespaces().Delete(ctx, name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			Logf("error deleting namespace %s: %v", name, err)
 			return
 		}
-		err = WaitForNamespacesDeleted(f.ClientSet, []string{name}, DefaultNamespaceDeletionTimeout)
+		err = WaitForNamespacesDeleted(ctx, f.ClientSet, []string{name}, DefaultNamespaceDeletionTimeout)
 		if err != nil {
 			Logf("error deleting namespace %s: %v", name, err)
 			return
@@ -412,13 +412,13 @@ func (f *Framework) DeleteNamespace(name string) {
 	}()
 	// if current test failed then we should dump namespace information
 	if !f.SkipNamespaceCreation && ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure && f.DumpAllNamespaceInfo != nil {
-		f.DumpAllNamespaceInfo(f, name)
+		f.DumpAllNamespaceInfo(ctx, f, name)
 	}
 
 }
 
 // CreateNamespace creates a namespace for e2e testing.
-func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*v1.Namespace, error) {
+func (f *Framework) CreateNamespace(ctx context.Context, baseName string, labels map[string]string) (*v1.Namespace, error) {
 	createTestingNS := TestContext.CreateTestingNS
 	if createTestingNS == nil {
 		createTestingNS = CreateTestingNS
@@ -440,7 +440,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	}
 	labels[admissionapi.EnforceLevelLabel] = string(enforceLevel)
 
-	ns, err := createTestingNS(baseName, f.ClientSet, labels)
+	ns, err := createTestingNS(ctx, baseName, f.ClientSet, labels)
 	// check ns instead of err to see if it's nil as we may
 	// fail to create serviceAccount in it.
 	f.AddNamespacesToDelete(ns)
@@ -599,7 +599,7 @@ func passesPhasesFilter(pod v1.Pod, validPhases []v1.PodPhase) bool {
 }
 
 // filterLabels returns a list of pods which have labels.
-func filterLabels(selectors map[string]string, cli clientset.Interface, ns string) (*v1.PodList, error) {
+func filterLabels(ctx context.Context, selectors map[string]string, cli clientset.Interface, ns string) (*v1.PodList, error) {
 	var err error
 	var selector labels.Selector
 	var pl *v1.PodList
@@ -608,9 +608,9 @@ func filterLabels(selectors map[string]string, cli clientset.Interface, ns strin
 	if len(selectors) > 0 {
 		selector = labels.SelectorFromSet(labels.Set(selectors))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pl, err = cli.CoreV1().Pods(ns).List(context.TODO(), options)
+		pl, err = cli.CoreV1().Pods(ns).List(ctx, options)
 	} else {
-		pl, err = cli.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+		pl, err = cli.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 	}
 	return pl, err
 }
@@ -618,13 +618,13 @@ func filterLabels(selectors map[string]string, cli clientset.Interface, ns strin
 // filter filters pods which pass a filter.  It can be used to compose
 // the more useful abstractions like ForEach, WaitFor, and so on, which
 // can be used directly by tests.
-func (p *PodStateVerification) filter(c clientset.Interface, namespace *v1.Namespace) ([]v1.Pod, error) {
+func (p *PodStateVerification) filter(ctx context.Context, c clientset.Interface, namespace *v1.Namespace) ([]v1.Pod, error) {
 	if len(p.ValidPhases) == 0 || namespace == nil {
 		panic(fmt.Errorf("Need to specify a valid pod phases (%v) and namespace (%v). ", p.ValidPhases, namespace))
 	}
 
 	ns := namespace.Name
-	pl, err := filterLabels(p.Selectors, c, ns) // Build an v1.PodList to operate against.
+	pl, err := filterLabels(ctx, p.Selectors, c, ns) // Build an v1.PodList to operate against.
 	Logf("Selector matched %v pods for %v", len(pl.Items), p.Selectors)
 	if len(pl.Items) == 0 || err != nil {
 		return pl.Items, err
@@ -652,12 +652,12 @@ ReturnPodsSoFar:
 
 // WaitFor waits for some minimum number of pods to be verified, according to the PodStateVerification
 // definition.
-func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1.Pod, error) {
+func (cl *ClusterVerification) WaitFor(ctx context.Context, atLeast int, timeout time.Duration) ([]v1.Pod, error) {
 	pods := []v1.Pod{}
 	var returnedErr error
 
-	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
-		pods, returnedErr = cl.podState.filter(cl.client, cl.namespace)
+	err := wait.PollWithContext(ctx, 1*time.Second, timeout, func(ctx context.Context) (bool, error) {
+		pods, returnedErr = cl.podState.filter(ctx, cl.client, cl.namespace)
 
 		// Failure
 		if returnedErr != nil {
@@ -680,8 +680,8 @@ func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1
 }
 
 // WaitForOrFail provides a shorthand WaitFor with failure as an option if anything goes wrong.
-func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration) {
-	pods, err := cl.WaitFor(atLeast, timeout)
+func (cl *ClusterVerification) WaitForOrFail(ctx context.Context, atLeast int, timeout time.Duration) {
+	pods, err := cl.WaitFor(ctx, atLeast, timeout)
 	if err != nil || len(pods) < atLeast {
 		Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
 	}
@@ -692,8 +692,8 @@ func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration)
 //
 // For example, if you require at least 5 pods to be running before your test will pass,
 // its smart to first call "clusterVerification.WaitFor(5)" before you call clusterVerification.ForEach.
-func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
-	pods, err := cl.podState.filter(cl.client, cl.namespace)
+func (cl *ClusterVerification) ForEach(ctx context.Context, podFunc func(v1.Pod)) error {
+	pods, err := cl.podState.filter(ctx, cl.client, cl.namespace)
 	if err == nil {
 		if len(pods) == 0 {
 			Failf("No pods matched the filter.")

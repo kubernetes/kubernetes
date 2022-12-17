@@ -17,6 +17,7 @@ limitations under the License.
 package rc
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
@@ -70,20 +71,21 @@ func ByNameContainer(name string, replicas int32, labels map[string]string, c v1
 }
 
 // DeleteRCAndWaitForGC deletes only the Replication Controller and waits for GC to delete the pods.
-func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
-	return e2eresource.DeleteResourceAndWaitForGC(c, schema.GroupKind{Kind: "ReplicationController"}, ns, name)
+func DeleteRCAndWaitForGC(ctx context.Context, c clientset.Interface, ns, name string) error {
+	// TODO (pohly): context support
+	return e2eresource.DeleteResourceAndWaitForGC(ctx, c, schema.GroupKind{Kind: "ReplicationController"}, ns, name)
 }
 
 // ScaleRC scales Replication Controller to be desired size.
-func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
-	return e2eresource.ScaleResource(clientset, scalesGetter, ns, name, size, wait, schema.GroupKind{Kind: "ReplicationController"}, v1.SchemeGroupVersion.WithResource("replicationcontrollers"))
+func ScaleRC(ctx context.Context, clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
+	return e2eresource.ScaleResource(ctx, clientset, scalesGetter, ns, name, size, wait, schema.GroupKind{Kind: "ReplicationController"}, v1.SchemeGroupVersion.WithResource("replicationcontrollers"))
 }
 
 // RunRC Launches (and verifies correctness) of a Replication Controller
 // and will wait for all pods it spawns to become "Running".
-func RunRC(config testutils.RCConfig) error {
+func RunRC(ctx context.Context, config testutils.RCConfig) error {
 	ginkgo.By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
 	config.NodeDumpFunc = e2edebug.DumpNodeDebugInfo
 	config.ContainerDumpFunc = e2ekubectl.LogFailedContainers
-	return testutils.RunRC(config)
+	return testutils.RunRC(ctx, config)
 }

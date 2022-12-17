@@ -17,7 +17,6 @@ limitations under the License.
 package skipper_test
 
 import (
-	"context"
 	"flag"
 	"testing"
 
@@ -47,10 +46,11 @@ import (
 //
 //
 //
+//
 // This must be line #50.
 
 var _ = ginkgo.Describe("e2e", func() {
-	ginkgo.It("skips", func(ctx context.Context) {
+	ginkgo.It("skips", func() {
 		e2eskipper.Skipf("skipping %d, %d, %d", 1, 3, 4)
 	})
 })

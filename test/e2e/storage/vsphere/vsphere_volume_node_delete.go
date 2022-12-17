@@ -41,19 +41,19 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		err        error
 	)
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, client, framework.TestContext.NodeSchedulableTimeout))
 		framework.ExpectNoError(err)
 		workingDir = GetAndExpectStringEnvVar("VSPHERE_WORKING_DIR")
 	})
 
 	ginkgo.It("node unregister", func(ctx context.Context) {
 		ginkgo.By("Get total Ready nodes")
-		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		if len(nodeList.Items) < 2 {
 			framework.Failf("At least 2 nodes are required for this test, got instead: %v", len(nodeList.Items))
@@ -67,7 +67,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 
 		// Find VM .vmx file path, host, resource pool.
 		// They are required to register a node VM to VC
-		vmxFilePath := getVMXFilePath(vmObject)
+		vmxFilePath := getVMXFilePath(ctx, vmObject)
 
 		vmHost, err := vmObject.HostSystem(ctx)
 		framework.ExpectNoError(err)
@@ -77,13 +77,13 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 
 		// Unregister Node VM
 		ginkgo.By("Unregister a node VM")
-		unregisterNodeVM(nodeVM.ObjectMeta.Name, vmObject)
+		unregisterNodeVM(ctx, nodeVM.ObjectMeta.Name, vmObject)
 
 		// Ready nodes should be 1 less
 		ginkgo.By("Verifying the ready node counts")
-		framework.ExpectEqual(verifyReadyNodeCount(f.ClientSet, totalNodesCount-1), true, "Unable to verify expected ready node count")
+		framework.ExpectEqual(verifyReadyNodeCount(ctx, f.ClientSet, totalNodesCount-1), true, "Unable to verify expected ready node count")
 
-		nodeList, err = e2enode.GetReadySchedulableNodes(client)
+		nodeList, err = e2enode.GetReadySchedulableNodes(ctx, client)
 		framework.ExpectNoError(err)
 
 		var nodeNameList []string
@@ -94,13 +94,13 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 
 		// Register Node VM
 		ginkgo.By("Register back the node VM")
-		registerNodeVM(nodeVM.ObjectMeta.Name, workingDir, vmxFilePath, vmPool, vmHost)
+		registerNodeVM(ctx, nodeVM.ObjectMeta.Name, workingDir, vmxFilePath, vmPool, vmHost)
 
 		// Ready nodes should be equal to earlier count
 		ginkgo.By("Verifying the ready node counts")
-		framework.ExpectEqual(verifyReadyNodeCount(f.ClientSet, totalNodesCount), true, "Unable to verify expected ready node count")
+		framework.ExpectEqual(verifyReadyNodeCount(ctx, f.ClientSet, totalNodesCount), true, "Unable to verify expected ready node count")
 
-		nodeList, err = e2enode.GetReadySchedulableNodes(client)
+		nodeList, err = e2enode.GetReadySchedulableNodes(ctx, client)
 		framework.ExpectNoError(err)
 
 		nodeNameList = nodeNameList[:0]
@@ -114,6 +114,6 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		scParameters := make(map[string]string)
 		storagePolicy := GetAndExpectStringEnvVar("VSPHERE_SPBM_GOLD_POLICY")
 		scParameters[SpbmStoragePolicy] = storagePolicy
-		invokeValidPolicyTest(f, client, namespace, scParameters)
+		invokeValidPolicyTest(ctx, f, client, namespace, scParameters)
 	})
 })

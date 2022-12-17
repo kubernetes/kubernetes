@@ -45,17 +45,17 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 		ginkgo.It("should not be exceeded after waiting 2 minutes", func(ctx context.Context) {
 			ginkgo.By("Creating one pod with limit set to '0.5'")
 			podsDecimal := newCPUBurnPods(1, powershellImage, "0.5", "1Gi")
-			e2epod.NewPodClient(f).CreateBatch(podsDecimal)
+			e2epod.NewPodClient(f).CreateBatch(ctx, podsDecimal)
 			ginkgo.By("Creating one pod with limit set to '500m'")
 			podsMilli := newCPUBurnPods(1, powershellImage, "500m", "1Gi")
-			e2epod.NewPodClient(f).CreateBatch(podsMilli)
+			e2epod.NewPodClient(f).CreateBatch(ctx, podsMilli)
 			ginkgo.By("Waiting 2 minutes")
 			time.Sleep(2 * time.Minute)
 			ginkgo.By("Ensuring pods are still running")
 			var allPods [](*v1.Pod)
 			for _, p := range podsDecimal {
 				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
-					context.TODO(),
+					ctx,
 					p.Name,
 					metav1.GetOptions{})
 				framework.ExpectNoError(err, "Error retrieving pod")
@@ -64,7 +64,7 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 			}
 			for _, p := range podsMilli {
 				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
-					context.TODO(),
+					ctx,
 					p.Name,
 					metav1.GetOptions{})
 				framework.ExpectNoError(err, "Error retrieving pod")
@@ -74,7 +74,7 @@ var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {
 			ginkgo.By("Ensuring cpu doesn't exceed limit by >5%")
 			for _, p := range allPods {
 				ginkgo.By("Gathering node summary stats")
-				nodeStats, err := e2ekubelet.GetStatsSummary(f.ClientSet, p.Spec.NodeName)
+				nodeStats, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, p.Spec.NodeName)
 				framework.ExpectNoError(err, "Error grabbing node summary stats")
 				found := false
 				cpuUsage := float64(0)

@@ -107,7 +107,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		ginkgo.By("Creating a custom resource with values that are allowed by the validation rules set on the custom resource definition")
 		crClient, gvr := customResourceClient(crd)
 		name1 := names.SimpleNameGenerator.GenerateName("cr-1")
-		_, err = crClient.Namespace(f.Namespace.Name).Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
+		_, err = crClient.Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": gvr.Group + "/" + gvr.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{
@@ -137,7 +137,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		ginkgo.By("Creating a custom resource with values that fail the validation rules set on the custom resource definition")
 		crClient, gvr := customResourceClient(crd)
 		name1 := names.SimpleNameGenerator.GenerateName("cr-1")
-		_, err = crClient.Namespace(f.Namespace.Name).Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
+		_, err = crClient.Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": gvr.Group + "/" + gvr.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{
@@ -248,7 +248,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		ginkgo.By("Attempting to create a custom resource that will exceed the runtime cost limit")
 		crClient, gvr := customResourceClient(crd)
 		name1 := names.SimpleNameGenerator.GenerateName("cr-1")
-		_, err = crClient.Namespace(f.Namespace.Name).Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
+		_, err = crClient.Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": gvr.Group + "/" + gvr.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{
@@ -294,7 +294,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		ginkgo.By("Attempting to create a custom resource")
 		crClient, gvr := customResourceClient(crd)
 		name1 := names.SimpleNameGenerator.GenerateName("cr-1")
-		unstruct, err := crClient.Namespace(f.Namespace.Name).Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
+		unstruct, err := crClient.Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": gvr.Group + "/" + gvr.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{
@@ -307,7 +307,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "transition rules do not apply to create operations")
 		ginkgo.By("Updating a custom resource with a value that does not satisfy an x-kubernetes-validations transition rule")
-		_, err = crClient.Namespace(f.Namespace.Name).Update(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
+		_, err = crClient.Namespace(f.Namespace.Name).Update(ctx, &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": gvr.Group + "/" + gvr.Version,
 			"kind":       crd.Spec.Names.Kind,
 			"metadata": map[string]interface{}{

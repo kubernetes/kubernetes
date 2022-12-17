@@ -43,9 +43,9 @@ type podCondition func(pod *v1.Pod) (bool, error)
 
 // waitForPodsCondition waits for `podCount` number of pods to match a specific pod condition within a timeout duration.
 // If the timeout is hit, it returns the list of currently running pods.
-func waitForPodsCondition(f *framework.Framework, podCount int, timeout time.Duration, condition podCondition) (runningPods []*v1.Pod) {
+func waitForPodsCondition(ctx context.Context, f *framework.Framework, podCount int, timeout time.Duration, condition podCondition) (runningPods []*v1.Pod) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-		podList, err := e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{})
+		podList, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Failed to list pods on node: %v", err)
 			continue
@@ -91,12 +91,12 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			ginkgo.It("should recover from ip leak", func(ctx context.Context) {
 				pods := newTestPods(podCount, false, imageutils.GetPauseImageName(), "restart-container-runtime-test")
 				ginkgo.By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
-				createBatchPodWithRateControl(f, pods, podCreationInterval)
+				createBatchPodWithRateControl(ctx, f, pods, podCreationInterval)
 				ginkgo.DeferCleanup(deletePodsSync, f, pods)
 
 				// Give the node some time to stabilize, assume pods that enter RunningReady within
 				// startTimeout fit on the node and the node is now saturated.
-				runningPods := waitForPodsCondition(f, podCount, startTimeout, testutils.PodRunningReadyOrSucceeded)
+				runningPods := waitForPodsCondition(ctx, f, podCount, startTimeout, testutils.PodRunningReadyOrSucceeded)
 				if len(runningPods) < minPods {
 					framework.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
 				}
@@ -105,7 +105,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 					ginkgo.By(fmt.Sprintf("Killing container runtime iteration %d", i))
 					// Wait for container runtime to be running
 					var pid int
-					gomega.Eventually(func() error {
+					gomega.Eventually(ctx, func() error {
 						runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
 						if err != nil {
 							return err
@@ -128,7 +128,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				}
 
 				ginkgo.By("Checking currently Running/Ready pods")
-				postRestartRunningPods := waitForPodsCondition(f, len(runningPods), recoverTimeout, testutils.PodRunningReadyOrSucceeded)
+				postRestartRunningPods := waitForPodsCondition(ctx, f, len(runningPods), recoverTimeout, testutils.PodRunningReadyOrSucceeded)
 				if len(postRestartRunningPods) == 0 {
 					framework.Failf("Failed to start *any* pods after container runtime restart, this might indicate an IP leak")
 				}
@@ -156,10 +156,10 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			preRestartPodCount := 2
 			ginkgo.By(fmt.Sprintf("creating %d RestartAlways pods on node", preRestartPodCount))
 			restartAlwaysPods := newTestPods(preRestartPodCount, false, imageutils.GetPauseImageName(), "restart-dbus-test")
-			createBatchPodWithRateControl(f, restartAlwaysPods, podCreationInterval)
+			createBatchPodWithRateControl(ctx, f, restartAlwaysPods, podCreationInterval)
 			ginkgo.DeferCleanup(deletePodsSync, f, restartAlwaysPods)
 
-			allPods := waitForPodsCondition(f, preRestartPodCount, startTimeout, testutils.PodRunningReadyOrSucceeded)
+			allPods := waitForPodsCondition(ctx, f, preRestartPodCount, startTimeout, testutils.PodRunningReadyOrSucceeded)
 			if len(allPods) < preRestartPodCount {
 				framework.Failf("Failed to run sufficient restartAlways pods, got %d but expected %d", len(allPods), preRestartPodCount)
 			}
@@ -176,8 +176,8 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			})
 
 			ginkgo.By("verifying restartAlways pods stay running", func() {
-				for start := time.Now(); time.Since(start) < startTimeout; time.Sleep(10 * time.Second) {
-					postRestartRunningPods := waitForPodsCondition(f, preRestartPodCount, recoverTimeout, testutils.PodRunningReadyOrSucceeded)
+				for start := time.Now(); time.Since(start) < startTimeout && ctx.Err() == nil; time.Sleep(10 * time.Second) {
+					postRestartRunningPods := waitForPodsCondition(ctx, f, preRestartPodCount, recoverTimeout, testutils.PodRunningReadyOrSucceeded)
 					if len(postRestartRunningPods) < preRestartPodCount {
 						framework.Failf("fewer pods are running after systemd restart, got %d but expected %d", len(postRestartRunningPods), preRestartPodCount)
 					}
@@ -187,10 +187,10 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			ginkgo.By("verifying new pods can be started after a dbus restart")
 			postRestartPodCount := 2
 			postRestartPods := newTestPods(postRestartPodCount, false, imageutils.GetPauseImageName(), "restart-dbus-test")
-			createBatchPodWithRateControl(f, postRestartPods, podCreationInterval)
+			createBatchPodWithRateControl(ctx, f, postRestartPods, podCreationInterval)
 			ginkgo.DeferCleanup(deletePodsSync, f, postRestartPods)
 
-			allPods = waitForPodsCondition(f, preRestartPodCount+postRestartPodCount, startTimeout, testutils.PodRunningReadyOrSucceeded)
+			allPods = waitForPodsCondition(ctx, f, preRestartPodCount+postRestartPodCount, startTimeout, testutils.PodRunningReadyOrSucceeded)
 			if len(allPods) < preRestartPodCount+postRestartPodCount {
 				framework.Failf("Failed to run pods after restarting dbus, got %d but expected %d", len(allPods), preRestartPodCount+postRestartPodCount)
 			}
@@ -199,7 +199,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should correctly account for terminated pods after restart", func(ctx context.Context) {
-			node := getLocalNode(f)
+			node := getLocalNode(ctx, f)
 			cpus := node.Status.Allocatable[v1.ResourceCPU]
 			numCpus := int((&cpus).Value())
 			if numCpus < 1 {
@@ -223,9 +223,9 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 					v1.ResourceCPU: resource.MustParse("950m"), // leave a little room for other workloads
 				}
 			}
-			createBatchPodWithRateControl(f, restartNeverPods, podCreationInterval)
+			createBatchPodWithRateControl(ctx, f, restartNeverPods, podCreationInterval)
 			ginkgo.DeferCleanup(deletePodsSync, f, restartNeverPods)
-			completedPods := waitForPodsCondition(f, podCountRestartNever, startTimeout, testutils.PodSucceeded)
+			completedPods := waitForPodsCondition(ctx, f, podCountRestartNever, startTimeout, testutils.PodSucceeded)
 
 			if len(completedPods) < podCountRestartNever {
 				framework.Failf("Failed to run sufficient restartNever pods, got %d but expected %d", len(completedPods), podCountRestartNever)
@@ -239,11 +239,11 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 					v1.ResourceCPU: resource.MustParse("1"),
 				}
 			}
-			createBatchPodWithRateControl(f, restartAlwaysPods, podCreationInterval)
+			createBatchPodWithRateControl(ctx, f, restartAlwaysPods, podCreationInterval)
 			ginkgo.DeferCleanup(deletePodsSync, f, restartAlwaysPods)
 
 			numAllPods := podCountRestartNever + podCountRestartAlways
-			allPods := waitForPodsCondition(f, numAllPods, startTimeout, testutils.PodRunningReadyOrSucceeded)
+			allPods := waitForPodsCondition(ctx, f, numAllPods, startTimeout, testutils.PodRunningReadyOrSucceeded)
 			if len(allPods) < numAllPods {
 				framework.Failf("Failed to run sufficient restartAlways pods, got %d but expected %d", len(allPods), numAllPods)
 			}
@@ -258,8 +258,8 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 			// restart may think these old pods are consuming CPU and we
 			// will get an OutOfCpu error.
 			ginkgo.By("verifying restartNever pods succeed and restartAlways pods stay running")
-			for start := time.Now(); time.Since(start) < startTimeout; time.Sleep(10 * time.Second) {
-				postRestartRunningPods := waitForPodsCondition(f, numAllPods, recoverTimeout, testutils.PodRunningReadyOrSucceeded)
+			for start := time.Now(); time.Since(start) < startTimeout && ctx.Err() == nil; time.Sleep(10 * time.Second) {
+				postRestartRunningPods := waitForPodsCondition(ctx, f, numAllPods, recoverTimeout, testutils.PodRunningReadyOrSucceeded)
 				if len(postRestartRunningPods) < numAllPods {
 					framework.Failf("less pods are running after node restart, got %d but expected %d", len(postRestartRunningPods), numAllPods)
 				}

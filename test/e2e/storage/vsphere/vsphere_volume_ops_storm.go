@@ -65,12 +65,12 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		err               error
 		volumeOpsScale    int
 	)
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		gomega.Expect(GetReadySchedulableNodeInfos()).NotTo(gomega.BeEmpty())
+		gomega.Expect(GetReadySchedulableNodeInfos(ctx)).NotTo(gomega.BeEmpty())
 		if scale := os.Getenv("VOLUME_OPS_SCALE"); scale != "" {
 			volumeOpsScale, err = strconv.Atoi(scale)
 			framework.ExpectNoError(err)
@@ -79,13 +79,13 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		}
 		pvclaims = make([]*v1.PersistentVolumeClaim, volumeOpsScale)
 	})
-	ginkgo.AfterEach(func() {
+	ginkgo.AfterEach(func(ctx context.Context) {
 		ginkgo.By("Deleting PVCs")
 		for _, claim := range pvclaims {
-			e2epv.DeletePersistentVolumeClaim(client, claim.Name, namespace)
+			_ = e2epv.DeletePersistentVolumeClaim(ctx, client, claim.Name, namespace)
 		}
 		ginkgo.By("Deleting StorageClass")
-		err = client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+		err = client.StorageV1().StorageClasses().Delete(ctx, storageclass.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 	})
 
@@ -94,34 +94,34 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		ginkgo.By("Creating Storage Class")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
-		storageclass, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("thinsc", scParameters, nil, ""), metav1.CreateOptions{})
+		storageclass, err = client.StorageV1().StorageClasses().Create(ctx, getVSphereStorageClassSpec("thinsc", scParameters, nil, ""), metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating PVCs using the Storage Class")
 		count := 0
 		for count < volumeOpsScale {
-			pvclaims[count], err = e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
+			pvclaims[count], err = e2epv.CreatePVC(ctx, client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 			framework.ExpectNoError(err)
 			count++
 		}
 
 		ginkgo.By("Waiting for all claims to be in bound phase")
-		persistentvolumes, err = e2epv.WaitForPVClaimBoundPhase(client, pvclaims, f.Timeouts.ClaimProvision)
+		persistentvolumes, err = e2epv.WaitForPVClaimBoundPhase(ctx, client, pvclaims, f.Timeouts.ClaimProvision)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating pod to attach PVs to the node")
-		pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, "")
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verify all volumes are accessible and available in the pod")
-		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
+		verifyVSphereVolumesAccessible(ctx, client, pod, persistentvolumes)
 
 		ginkgo.By("Deleting pod")
-		framework.ExpectNoError(e2epod.DeletePodWithWait(client, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, client, pod))
 
 		ginkgo.By("Waiting for volumes to be detached from the node")
 		for _, pv := range persistentvolumes {
-			waitForVSphereDiskToDetach(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
+			framework.ExpectNoError(waitForVSphereDiskToDetach(ctx, pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
 		}
 	})
 })

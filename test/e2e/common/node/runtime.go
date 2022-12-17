@@ -104,32 +104,32 @@ while true; do sleep 1; done
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
 					}
-					terminateContainer.Create()
+					terminateContainer.Create(ctx)
 					ginkgo.DeferCleanup(framework.IgnoreNotFound(terminateContainer.Delete))
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'RestartCount'", testContainer.Name))
-					gomega.Eventually(func() (int32, error) {
-						status, err := terminateContainer.GetStatus()
+					gomega.Eventually(ctx, func() (int32, error) {
+						status, err := terminateContainer.GetStatus(ctx)
 						return status.RestartCount, err
 					}, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(testCase.RestartCount))
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'Phase'", testContainer.Name))
-					gomega.Eventually(terminateContainer.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(testCase.Phase))
+					gomega.Eventually(ctx, terminateContainer.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(testCase.Phase))
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'Ready' condition", testContainer.Name))
-					isReady, err := terminateContainer.IsReady()
+					isReady, err := terminateContainer.IsReady(ctx)
 					framework.ExpectEqual(isReady, testCase.Ready)
 					framework.ExpectNoError(err)
 
-					status, err := terminateContainer.GetStatus()
+					status, err := terminateContainer.GetStatus(ctx)
 					framework.ExpectNoError(err)
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'State'", testContainer.Name))
 					framework.ExpectEqual(GetContainerState(status.State), testCase.State)
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should be possible to delete [NodeConformance]", testContainer.Name))
-					gomega.Expect(terminateContainer.Delete()).To(gomega.Succeed())
-					gomega.Eventually(terminateContainer.Present, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.BeFalse())
+					gomega.Expect(terminateContainer.Delete(ctx)).To(gomega.Succeed())
+					gomega.Eventually(ctx, terminateContainer.Present, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.BeFalse())
 				}
 			})
 		})
@@ -141,7 +141,7 @@ while true; do sleep 1; done
 			nonAdminUserName := "ContainerUser"
 
 			// Create and then terminate the container under defined PodPhase to verify if termination message matches the expected output. Lastly delete the created container.
-			matchTerminationMessage := func(container v1.Container, expectedPhase v1.PodPhase, expectedMsg gomegatypes.GomegaMatcher) {
+			matchTerminationMessage := func(ctx context.Context, container v1.Container, expectedPhase v1.PodPhase, expectedMsg gomegatypes.GomegaMatcher) {
 				container.Name = "termination-message-container"
 				c := ConformanceContainer{
 					PodClient:     e2epod.NewPodClient(f),
@@ -150,14 +150,14 @@ while true; do sleep 1; done
 				}
 
 				ginkgo.By("create the container")
-				c.Create()
+				c.Create(ctx)
 				ginkgo.DeferCleanup(framework.IgnoreNotFound(c.Delete))
 
 				ginkgo.By(fmt.Sprintf("wait for the container to reach %s", expectedPhase))
-				gomega.Eventually(c.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(expectedPhase))
+				gomega.Eventually(ctx, c.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(expectedPhase))
 
 				ginkgo.By("get the container status")
-				status, err := c.GetStatus()
+				status, err := c.GetStatus(ctx)
 				framework.ExpectNoError(err)
 
 				ginkgo.By("the container should be terminated")
@@ -168,7 +168,7 @@ while true; do sleep 1; done
 				gomega.Expect(status.State.Terminated.Message).Should(expectedMsg)
 
 				ginkgo.By("delete the container")
-				gomega.Expect(c.Delete()).To(gomega.Succeed())
+				gomega.Expect(c.Delete(ctx)).To(gomega.Succeed())
 			}
 
 			ginkgo.It("should report termination message if TerminationMessagePath is set [NodeConformance]", func(ctx context.Context) {
@@ -184,7 +184,7 @@ while true; do sleep 1; done
 				} else {
 					container.SecurityContext.RunAsUser = &rootUser
 				}
-				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
+				matchTerminationMessage(ctx, container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
 
 			/*
@@ -205,7 +205,7 @@ while true; do sleep 1; done
 				} else {
 					container.SecurityContext.RunAsUser = &nonRootUser
 				}
-				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
+				matchTerminationMessage(ctx, container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
 
 			/*
@@ -221,7 +221,7 @@ while true; do sleep 1; done
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 				}
-				matchTerminationMessage(container, v1.PodFailed, gomega.Equal("DONE"))
+				matchTerminationMessage(ctx, container, v1.PodFailed, gomega.Equal("DONE"))
 			})
 
 			/*
@@ -237,7 +237,7 @@ while true; do sleep 1; done
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 				}
-				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal(""))
+				matchTerminationMessage(ctx, container, v1.PodSucceeded, gomega.Equal(""))
 			})
 
 			/*
@@ -253,7 +253,7 @@ while true; do sleep 1; done
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 				}
-				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("OK"))
+				matchTerminationMessage(ctx, container, v1.PodSucceeded, gomega.Equal("OK"))
 			})
 		})
 
@@ -262,7 +262,7 @@ while true; do sleep 1; done
 			// Images used for ConformanceContainer are not added into NodePrePullImageList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
 			// is v1.PullAlways, so it won't be blocked by framework image pre-pull list check.
-			imagePullTest := func(image string, hasSecret bool, expectedPhase v1.PodPhase, expectedPullStatus bool, windowsImage bool) {
+			imagePullTest := func(ctx context.Context, image string, hasSecret bool, expectedPhase v1.PodPhase, expectedPullStatus bool, windowsImage bool) {
 				command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 				if windowsImage {
 					// -t: Ping the specified host until stopped.
@@ -301,14 +301,14 @@ while true; do sleep 1; done
 					}
 					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
 					ginkgo.By("create image pull secret")
-					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
+					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{})
 					framework.ExpectNoError(err)
 					ginkgo.DeferCleanup(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete, secret.Name, metav1.DeleteOptions{})
 					container.ImagePullSecrets = []string{secret.Name}
 				}
 				// checkContainerStatus checks whether the container status matches expectation.
-				checkContainerStatus := func() error {
-					status, err := container.GetStatus()
+				checkContainerStatus := func(ctx context.Context) error {
+					status, err := container.GetStatus(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get container status: %v", err)
 					}
@@ -333,7 +333,7 @@ while true; do sleep 1; done
 						}
 					}
 					// Check pod phase
-					phase, err := container.GetPhase()
+					phase, err := container.GetPhase(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get pod phase: %v", err)
 					}
@@ -348,15 +348,15 @@ while true; do sleep 1; done
 				for i := 1; i <= flakeRetry; i++ {
 					var err error
 					ginkgo.By("create the container")
-					container.Create()
+					container.Create(ctx)
 					ginkgo.By("check the container status")
 					for start := time.Now(); time.Since(start) < ContainerStatusRetryTimeout; time.Sleep(ContainerStatusPollInterval) {
-						if err = checkContainerStatus(); err == nil {
+						if err = checkContainerStatus(ctx); err == nil {
 							break
 						}
 					}
 					ginkgo.By("delete the container")
-					container.Delete()
+					_ = container.Delete(ctx)
 					if err == nil {
 						break
 					}
@@ -370,18 +370,18 @@ while true; do sleep 1; done
 
 			ginkgo.It("should not be able to pull image from invalid registry [NodeConformance]", func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
-				imagePullTest(image, false, v1.PodPending, true, false)
+				imagePullTest(ctx, image, false, v1.PodPending, true, false)
 			})
 
 			ginkgo.It("should be able to pull image [NodeConformance]", func(ctx context.Context) {
 				// NOTE(claudiub): The agnhost image is supposed to work on both Linux and Windows.
 				image := imageutils.GetE2EImage(imageutils.Agnhost)
-				imagePullTest(image, false, v1.PodRunning, false, false)
+				imagePullTest(ctx, image, false, v1.PodRunning, false, false)
 			})
 
 			ginkgo.It("should not be able to pull from private registry without secret [NodeConformance]", func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
-				imagePullTest(image, false, v1.PodPending, true, false)
+				imagePullTest(ctx, image, false, v1.PodPending, true, false)
 			})
 
 			ginkgo.It("should be able to pull from private registry with secret [NodeConformance]", func(ctx context.Context) {
@@ -391,7 +391,7 @@ while true; do sleep 1; done
 					image = imageutils.GetE2EImage(imageutils.AuthenticatedWindowsNanoServer)
 					isWindows = true
 				}
-				imagePullTest(image, true, v1.PodRunning, false, isWindows)
+				imagePullTest(ctx, image, true, v1.PodRunning, false, isWindows)
 			})
 		})
 	})

@@ -74,7 +74,7 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].Command = []string{"id", "-G"}
 		pod.Spec.SecurityContext.SupplementalGroups = []int64{1234, 5678}
 		groups := []string{"1234", "5678"}
-		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
+		e2eoutput.TestContainerOutput(ctx, f, "pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
 	})
 
 	ginkgo.When("if the container's primary UID belongs to some groups in the image [LinuxOnly]", func() {
@@ -100,6 +100,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// $ id -G
 			// 1000 50000 60000
 			e2eoutput.TestContainerOutput(
+				ctx,
 				f,
 				"pod.Spec.SecurityContext.SupplementalGroups with pre-defined-group in the image",
 				pod, 0,
@@ -114,7 +115,7 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.SecurityContext.RunAsUser = &userID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
-		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		e2eoutput.TestContainerOutput(ctx, f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("uid=%v", userID),
 			fmt.Sprintf("gid=%v", 0),
 		})
@@ -134,7 +135,7 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.SecurityContext.RunAsGroup = &groupID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
-		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		e2eoutput.TestContainerOutput(ctx, f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("uid=%v", userID),
 			fmt.Sprintf("gid=%v", groupID),
 		})
@@ -149,7 +150,7 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
-		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		e2eoutput.TestContainerOutput(ctx, f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("uid=%v", overrideUserID),
 			fmt.Sprintf("gid=%v", 0),
 		})
@@ -174,22 +175,22 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].SecurityContext.RunAsGroup = &overrideGroupID
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
-		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+		e2eoutput.TestContainerOutput(ctx, f, "pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
 			fmt.Sprintf("uid=%v", overrideUserID),
 			fmt.Sprintf("gid=%v", overrideGroupID),
 		})
 	})
 
 	ginkgo.It("should support volume SELinux relabeling [Flaky] [LinuxOnly]", func(ctx context.Context) {
-		testPodSELinuxLabeling(f, false, false)
+		testPodSELinuxLabeling(ctx, f, false, false)
 	})
 
 	ginkgo.It("should support volume SELinux relabeling when using hostIPC [Flaky] [LinuxOnly]", func(ctx context.Context) {
-		testPodSELinuxLabeling(f, true, false)
+		testPodSELinuxLabeling(ctx, f, true, false)
 	})
 
 	ginkgo.It("should support volume SELinux relabeling when using hostPID [Flaky] [LinuxOnly]", func(ctx context.Context) {
-		testPodSELinuxLabeling(f, false, true)
+		testPodSELinuxLabeling(ctx, f, false, true)
 	})
 
 	ginkgo.It("should support seccomp unconfined on the container [LinuxOnly]", func(ctx context.Context) {
@@ -197,31 +198,31 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		e2eoutput.TestContainerOutput(f, "seccomp unconfined container", pod, 0, []string{"0"}) // seccomp disabled
+		e2eoutput.TestContainerOutput(ctx, f, "seccomp unconfined container", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	ginkgo.It("should support seccomp unconfined on the pod [LinuxOnly]", func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		e2eoutput.TestContainerOutput(f, "seccomp unconfined pod", pod, 0, []string{"0"}) // seccomp disabled
+		e2eoutput.TestContainerOutput(ctx, f, "seccomp unconfined pod", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	ginkgo.It("should support seccomp runtime/default [LinuxOnly]", func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		e2eoutput.TestContainerOutput(f, "seccomp runtime/default", pod, 0, []string{"2"}) // seccomp filtered
+		e2eoutput.TestContainerOutput(ctx, f, "seccomp runtime/default", pod, 0, []string{"2"}) // seccomp filtered
 	})
 
 	ginkgo.It("should support seccomp default which is unconfined [LinuxOnly]", func(ctx context.Context) {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		e2eoutput.TestContainerOutput(f, "seccomp default unconfined", pod, 0, []string{"0"}) // seccomp disabled
+		e2eoutput.TestContainerOutput(ctx, f, "seccomp default unconfined", pod, 0, []string{"0"}) // seccomp disabled
 	})
 })
 
-func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) {
+func testPodSELinuxLabeling(ctx context.Context, f *framework.Framework, hostIPC bool, hostPID bool) {
 	// Write and read a file with an empty_dir volume
 	// with a pod with the MCS label s0:c0,c1
 	pod := scTestPod(hostIPC, hostPID)
@@ -249,10 +250,10 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
 
 	client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	pod, err := client.Create(context.TODO(), pod, metav1.CreateOptions{})
+	pod, err := client.Create(ctx, pod, metav1.CreateOptions{})
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 
 	testContent := "hello"
 	testFilePath := mountPath + "/TEST"
@@ -263,7 +264,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	framework.ExpectNoError(err)
 	gomega.Expect(content).To(gomega.ContainSubstring(testContent))
 
-	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	// Confirm that the file can be accessed from a second
@@ -294,7 +295,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c0,c1",
 	}
-	e2eoutput.TestContainerOutput(f, "Pod with same MCS label reading test file", pod, 0, []string{testContent})
+	e2eoutput.TestContainerOutput(ctx, f, "Pod with same MCS label reading test file", pod, 0, []string{testContent})
 
 	// Confirm that the same pod with a different MCS
 	// label cannot access the volume
@@ -306,10 +307,10 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	pod.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{
 		Level: "s0:c2,c3",
 	}
-	_, err = client.Create(context.TODO(), pod, metav1.CreateOptions{})
+	_, err = client.Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
 
-	err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+	err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 	framework.ExpectNoError(err, "Error waiting for pod to run %v", pod)
 
 	// for this to work, SELinux should be in enforcing mode, so let's check that
