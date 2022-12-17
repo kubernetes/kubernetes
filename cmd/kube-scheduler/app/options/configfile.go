@@ -93,6 +93,7 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 	}
 
 	if klog.V(2).Enabled() {
+		// nolint:logcheck // Ignore unstructured log lines in release branch
 		klog.Info("Using component config", "\n-------------------------Configuration File Contents Start Here---------------------- \n", buf.String(), "\n------------------------------------Configuration File Contents End Here---------------------------------\n")
 	}
 

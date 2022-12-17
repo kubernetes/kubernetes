@@ -46,6 +46,7 @@ func (d *CacheDumper) dumpNodes() {
 	dump := d.cache.Dump()
 	klog.InfoS("Dump of cached NodeInfo")
 	for name, nodeInfo := range dump.Nodes {
+		// nolint:logcheck // Ignore unstructured log lines in release branch
 		klog.Info(d.printNodeInfo(name, nodeInfo))
 	}
 }
@@ -57,6 +58,7 @@ func (d *CacheDumper) dumpSchedulingQueue() {
 	for _, p := range pendingPods {
 		podData.WriteString(printPod(p))
 	}
+	// nolint:logcheck // Ignore unstructured log lines in release branch
 	klog.Infof("Dump of scheduling queue:\n%s", podData.String())
 }
 
