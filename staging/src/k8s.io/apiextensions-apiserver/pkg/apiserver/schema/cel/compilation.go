@@ -96,7 +96,7 @@ func getBaseEnv() (*cel.Env, error) {
 // CompilationResult for each ValidationRule, or an error. declType is expected to be a CEL DeclType corresponding
 // to the structural schema.
 // Each CompilationResult may contain:
-// / - non-nil Program, nil Error: The program was compiled successfully
+//   - non-nil Program, nil Error: The program was compiled successfully
 //   - nil Program, non-nil Error: Compilation resulted in an error
 //   - nil Program, nil Error: The provided rule was empty so compilation was not attempted
 //

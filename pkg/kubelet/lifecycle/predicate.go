@@ -185,8 +185,7 @@ func rejectPodAdmissionBasedOnOSSelector(pod *v1.Pod, node *v1.Node) bool {
 
 // rejectPodAdmissionBasedOnOSField rejects pods if their OS field doesn't match runtime.GOOS.
 // TODO: Relax this restriction when we start supporting LCOW in kubernetes where podOS may not match
-//
-//	node's OS.
+// node's OS.
 func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
 	if pod.Spec.OS == nil {
 		return false

@@ -108,11 +108,12 @@ const epsilon = 0.0000001
 // if possible otherwise returns an error saying why it is impossible.
 // `allocs` sums to `requiredSum`.
 // For each J in [0, len(classes)):
-// (1) `classes[J].lowerBound <= allocs[J] <= classes[J].upperBound` and
-// (2) exactly one of the following is true:
-// (2a) `allocs[J] == fairProp * classes[J].target`,
-// (2b) `allocs[J] == classes[J].lowerBound && classes[J].lowerBound > fairProp * classes[J].target`, or
-// (2c) `allocs[J] == classes[J].upperBound && classes[J].upperBound < fairProp * classes[J].target`.
+//  1. `classes[J].lowerBound <= allocs[J] <= classes[J].upperBound` and
+//  2. exactly one of the following is true:
+//     2a. `allocs[J] == fairProp * classes[J].target`,
+//     2b. `allocs[J] == classes[J].lowerBound && classes[J].lowerBound > fairProp * classes[J].target`, or
+//     2c. `allocs[J] == classes[J].upperBound && classes[J].upperBound < fairProp * classes[J].target`.
+//
 // Each allocProblemItem is required to have `target >= lowerBound >= 0` and `upperBound >= lowerBound`.
 // A target smaller than MinTarget is treated as if it were MinTarget.
 func computeConcurrencyAllocation(requiredSum int, classes []allocProblemItem) ([]float64, float64, error) {
