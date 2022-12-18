@@ -149,14 +149,12 @@ type Requirement struct {
 
 // NewRequirement is the constructor for a Requirement.
 // If any of these rules is violated, an error is returned:
-// (1) The operator can only be In, NotIn, Equals, DoubleEquals, Gt, Lt, NotEquals, Exists, or DoesNotExist.
-// (2) If the operator is In or NotIn, the values set must be non-empty.
-// (3) If the operator is Equals, DoubleEquals, or NotEquals, the values set must contain one value.
-// (4) If the operator is Exists or DoesNotExist, the value set must be empty.
-// (5) If the operator is Gt or Lt, the values set must contain only one value, which will be interpreted as an integer.
-// (6) The key is invalid due to its length, or sequence
-//
-//	of characters. See validateLabelKey for more details.
+//  1. The operator can only be In, NotIn, Equals, DoubleEquals, Gt, Lt, NotEquals, Exists, or DoesNotExist.
+//  2. If the operator is In or NotIn, the values set must be non-empty.
+//  3. If the operator is Equals, DoubleEquals, or NotEquals, the values set must contain one value.
+//  4. If the operator is Exists or DoesNotExist, the value set must be empty.
+//  5. If the operator is Gt or Lt, the values set must contain only one value, which will be interpreted as an integer.
+//  6. The key is invalid due to its length, or sequence of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
 // Returned error, if not nil, is guaranteed to be an aggregated field.ErrorList
@@ -213,22 +211,15 @@ func (r *Requirement) hasValue(value string) bool {
 
 // Matches returns true if the Requirement matches the input Labels.
 // There is a match in the following cases:
-// (1) The operator is Exists and Labels has the Requirement's key.
-// (2) The operator is In, Labels has the Requirement's key and Labels'
-//
-//	value for that key is in Requirement's value set.
-//
-// (3) The operator is NotIn, Labels has the Requirement's key and
-//
-//	Labels' value for that key is not in Requirement's value set.
-//
-// (4) The operator is DoesNotExist or NotIn and Labels does not have the
-//
-//	Requirement's key.
-//
-// (5) The operator is GreaterThanOperator or LessThanOperator, and Labels has
-//
-//	the Requirement's key and the corresponding value satisfies mathematical inequality.
+//  1. The operator is Exists and Labels has the Requirement's key.
+//  2. The operator is In, Labels has the Requirement's key and Labels'
+//     value for that key is in Requirement's value set.
+//  3. The operator is NotIn, Labels has the Requirement's key and
+//     Labels' value for that key is not in Requirement's value set.
+//  4. The operator is DoesNotExist or NotIn and Labels does not have the
+//     Requirement's key.
+//  5. The operator is GreaterThanOperator or LessThanOperator, and Labels has
+//     the Requirement's key and the corresponding value satisfies mathematical inequality.
 func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
 	case selection.In, selection.Equals, selection.DoubleEquals:
@@ -872,15 +863,14 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 //	"x in (foo,,baz),y,z notin ()"
 //
 // Note:
-//
-//	(1) Inclusion - " in " - denotes that the KEY exists and is equal to any of the
-//	    VALUEs in its requirement
-//	(2) Exclusion - " notin " - denotes that the KEY is not equal to any
-//	    of the VALUEs in its requirement or does not exist
-//	(3) The empty string is a valid VALUE
-//	(4) A requirement with just a KEY - as in "y" above - denotes that
-//	    the KEY exists and can be any VALUE.
-//	(5) A requirement with just !KEY requires that the KEY not exist.
+//  1. Inclusion - " in " - denotes that the KEY exists and is equal to any of the
+//     VALUEs in its requirement
+//  2. Exclusion - " notin " - denotes that the KEY is not equal to any
+//     of the VALUEs in its requirement or does not exist
+//  3. The empty string is a valid VALUE
+//  4. A requirement with just a KEY - as in "y" above - denotes that
+//     the KEY exists and can be any VALUE.
+//  5. A requirement with just !KEY requires that the KEY not exist.
 func Parse(selector string, opts ...field.PathOption) (Selector, error) {
 	parsedSelector, err := parse(selector, field.ToPath(opts...))
 	if err == nil {

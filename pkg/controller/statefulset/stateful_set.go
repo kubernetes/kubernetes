@@ -290,8 +290,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 // It also reconciles ControllerRef by adopting/orphaning.
 //
 // NOTE: Returned Pods are pointers to objects from the cache.
-//
-//	If you need to modify one, you need to copy it first.
+// If you need to modify one, you need to copy it first.
 func (ssc *StatefulSetController) getPodsForStatefulSet(ctx context.Context, set *apps.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
 	// List all pods to include the pods that don't match the selector anymore but
 	// has a ControllerRef pointing to this StatefulSet.

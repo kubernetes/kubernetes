@@ -150,8 +150,8 @@ func podMatchesAllAffinityTerms(terms []framework.AffinityTerm, pod *v1.Pod) boo
 }
 
 // calculates the following for each existing pod on each node:
-// (1) Whether it has PodAntiAffinity
-// (2) Whether any AffinityTerm matches the incoming pod
+//  1. Whether it has PodAntiAffinity
+//  2. Whether any AffinityTerm matches the incoming pod
 func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, pod *v1.Pod, nsLabels labels.Set, nodes []*framework.NodeInfo) topologyToMatchedTermCount {
 	topoMaps := make([]topologyToMatchedTermCount, len(nodes))
 	index := int32(-1)

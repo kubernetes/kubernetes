@@ -165,12 +165,10 @@ type podStateProvider interface {
 // VolumeManager interface.
 //
 // kubeClient - kubeClient is the kube API client used by DesiredStateOfWorldPopulator
-//
-//	to communicate with the API server to fetch PV and PVC objects
+// to communicate with the API server to fetch PV and PVC objects
 //
 // volumePluginMgr - the volume plugin manager used to access volume plugins.
-//
-//	Must be pre-initialized.
+// Must be pre-initialized.
 func NewVolumeManager(
 	controllerAttachDetachEnabled bool,
 	nodeName k8stypes.NodeName,

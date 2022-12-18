@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -387,8 +388,7 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 type InitFunc func(ctx context.Context, controllerCtx ControllerContext) (controller controller.Interface, enabled bool, err error)
 
 // ControllerInitializersFunc is used to create a collection of initializers
-//
-//	given the loopMode.
+// given the loopMode.
 type ControllerInitializersFunc func(loopMode ControllerLoopMode) (initializers map[string]InitFunc)
 
 var _ ControllerInitializersFunc = NewControllerInitializers
@@ -746,8 +746,7 @@ func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionC
 }
 
 // createInitializersFunc creates a initializersFunc that returns all initializer
-//
-//	with expected as the result after filtering through filterFunc.
+// with expected as the result after filtering through filterFunc.
 func createInitializersFunc(filterFunc leadermigration.FilterFunc, expected leadermigration.FilterResult) ControllerInitializersFunc {
 	return func(loopMode ControllerLoopMode) map[string]InitFunc {
 		initializers := make(map[string]InitFunc)
