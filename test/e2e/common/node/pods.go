@@ -256,12 +256,12 @@ var _ = SIGDescribe("Pods", func() {
 		lw := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = selector.String()
-				podList, err := podClient.List(ctx, options)
+				podList, err := podClient.List(context.Background(), options)
 				return podList, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = selector.String()
-				return podClient.Watch(ctx, options)
+				return podClient.Watch(context.Background(), options)
 			},
 		}
 		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.Pod{})

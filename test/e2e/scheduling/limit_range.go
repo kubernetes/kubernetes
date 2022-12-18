@@ -82,12 +82,12 @@ var _ = SIGDescribe("LimitRange", func() {
 		lw := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = selector.String()
-				limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(ctx, options)
+				limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(context.Background(), options)
 				return limitRanges, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = selector.String()
-				return f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Watch(ctx, options)
+				return f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Watch(context.Background(), options)
 			},
 		}
 		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.LimitRange{})

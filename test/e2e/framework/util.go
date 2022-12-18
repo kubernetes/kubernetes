@@ -266,11 +266,11 @@ func waitForConfigMapInNamespace(ctx context.Context, c clientset.Interface, ns,
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
 			options.FieldSelector = fieldSelector
-			return c.CoreV1().ConfigMaps(ns).List(ctx, options)
+			return c.CoreV1().ConfigMaps(ns).List(context.Background(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
 			options.FieldSelector = fieldSelector
-			return c.CoreV1().ConfigMaps(ns).Watch(ctx, options)
+			return c.CoreV1().ConfigMaps(ns).Watch(context.Background(), options)
 		},
 	}
 	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ConfigMap{}, nil, func(event watch.Event) (bool, error) {
@@ -292,11 +292,11 @@ func waitForServiceAccountInNamespace(ctx context.Context, c clientset.Interface
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
 			options.FieldSelector = fieldSelector
-			return c.CoreV1().ServiceAccounts(ns).List(ctx, options)
+			return c.CoreV1().ServiceAccounts(ns).List(context.Background(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
 			options.FieldSelector = fieldSelector
-			return c.CoreV1().ServiceAccounts(ns).Watch(ctx, options)
+			return c.CoreV1().ServiceAccounts(ns).Watch(context.Background(), options)
 		},
 	}
 	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ServiceAccount{}, nil, func(event watch.Event) (bool, error) {

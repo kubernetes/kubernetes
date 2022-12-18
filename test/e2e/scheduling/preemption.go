@@ -629,11 +629,11 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			_, podController := cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-						obj, err := f.ClientSet.CoreV1().Pods(ns).List(ctx, options)
+						obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.Background(), options)
 						return runtime.Object(obj), err
 					},
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-						return f.ClientSet.CoreV1().Pods(ns).Watch(ctx, options)
+						return f.ClientSet.CoreV1().Pods(ns).Watch(context.Background(), options)
 					},
 				},
 				&v1.Pod{},

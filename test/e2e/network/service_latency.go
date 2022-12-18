@@ -300,11 +300,11 @@ func startEndpointWatcher(ctx context.Context, f *framework.Framework, q *endpoi
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(ctx, options)
+				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(context.Background(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(ctx, options)
+				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(context.Background(), options)
 			},
 		},
 		&v1.Endpoints{},

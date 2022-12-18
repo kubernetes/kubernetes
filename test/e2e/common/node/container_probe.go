@@ -756,12 +756,12 @@ func newInformerWatchPod(ctx context.Context, c clientset.Interface, podNamespac
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
-				obj, err := c.CoreV1().Pods(podNamespace).List(ctx, options)
+				obj, err := c.CoreV1().Pods(podNamespace).List(context.Background(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
-				return c.CoreV1().Pods(podNamespace).Watch(ctx, options)
+				return c.CoreV1().Pods(podNamespace).Watch(context.Background(), options)
 			},
 		},
 		&v1.Pod{},

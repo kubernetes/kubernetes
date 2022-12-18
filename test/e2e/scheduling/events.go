@@ -67,13 +67,13 @@ func observeEventAfterAction(ctx context.Context, c clientset.Interface, ns stri
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				ls, err := c.CoreV1().Events(ns).List(ctx, options)
+				ls, err := c.CoreV1().Events(ns).List(context.Background(), options)
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				// Signal parent goroutine that watching has begun.
 				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
-				w, err := c.CoreV1().Events(ns).Watch(ctx, options)
+				w, err := c.CoreV1().Events(ns).Watch(context.Background(), options)
 				return w, err
 			},
 		},

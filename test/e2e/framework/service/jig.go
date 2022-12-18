@@ -366,12 +366,12 @@ func (j *TestJig) waitForAvailableEndpoint(ctx context.Context, timeout time.Dur
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = endpointSelector.String()
-				obj, err := j.Client.CoreV1().Endpoints(j.Namespace).List(ctx, options)
+				obj, err := j.Client.CoreV1().Endpoints(j.Namespace).List(context.Background(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = endpointSelector.String()
-				return j.Client.CoreV1().Endpoints(j.Namespace).Watch(ctx, options)
+				return j.Client.CoreV1().Endpoints(j.Namespace).Watch(context.Background(), options)
 			},
 		},
 		&v1.Endpoints{},
@@ -404,12 +404,12 @@ func (j *TestJig) waitForAvailableEndpoint(ctx context.Context, timeout time.Dur
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = "kubernetes.io/service-name=" + j.Name
-				obj, err := j.Client.DiscoveryV1().EndpointSlices(j.Namespace).List(ctx, options)
+				obj, err := j.Client.DiscoveryV1().EndpointSlices(j.Namespace).List(context.Background(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = "kubernetes.io/service-name=" + j.Name
-				return j.Client.DiscoveryV1().EndpointSlices(j.Namespace).Watch(ctx, options)
+				return j.Client.DiscoveryV1().EndpointSlices(j.Namespace).Watch(context.Background(), options)
 			},
 		},
 		&discoveryv1.EndpointSlice{},
