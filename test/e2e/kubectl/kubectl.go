@@ -480,7 +480,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
 				proxyLogs.Reset()
 				ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
-				output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, "httpd", "--", "echo", "running", "in", "container").
+				output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
 					WithEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
 					ExecOrDie(ns)
 
@@ -516,7 +516,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By("Running kubectl via kubectl proxy using " + host)
 			output := e2ekubectl.NewKubectlCommand(
 				ns, host,
-				"exec", podRunningTimeoutArg, "httpd", "--", "echo", "running", "in", "container",
+				"exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container",
 			).ExecOrDie(ns)
 
 			// Verify we got the normal output captured by the exec server
@@ -528,12 +528,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 		ginkgo.Context("should return command exit codes", func() {
 			ginkgo.It("execing into a container with a successful command", func(ctx context.Context) {
-				_, err := e2ekubectl.NewKubectlCommand(ns, "exec", "httpd", podRunningTimeoutArg, "--", "/bin/sh", "-c", "exit 0").Exec()
+				_, err := e2ekubectl.NewKubectlCommand(ns, "exec", simplePodName, podRunningTimeoutArg, "--", "/bin/sh", "-c", "exit 0").Exec()
 				framework.ExpectNoError(err)
 			})
 
 			ginkgo.It("execing into a container with a failing command", func(ctx context.Context) {
-				_, err := e2ekubectl.NewKubectlCommand(ns, "exec", "httpd", podRunningTimeoutArg, "--", "/bin/sh", "-c", "exit 42").Exec()
+				_, err := e2ekubectl.NewKubectlCommand(ns, "exec", simplePodName, podRunningTimeoutArg, "--", "/bin/sh", "-c", "exit 42").Exec()
 				ee, ok := err.(uexec.ExitError)
 				if !ok {
 					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
