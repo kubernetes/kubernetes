@@ -541,6 +541,158 @@ var _ = SIGDescribe("Kubectl client", func() {
 				framework.ExpectEqual(ee.ExitStatus(), 42)
 			})
 
+			ginkgo.It("should support port-forward", func(ctx context.Context) {
+				ginkgo.By("forwarding the container port to a local port")
+				cmd := runPortForward(ns, simplePodName, simplePodPort)
+				defer cmd.Stop()
+
+				ginkgo.By("curling local port output")
+				localAddr := fmt.Sprintf("http://localhost:%d", cmd.port)
+				body, err := curl(localAddr)
+				framework.Logf("got: %s", body)
+				if err != nil {
+					framework.Failf("Failed http.Get of forwarded port (%s): %v", localAddr, err)
+				}
+				if !strings.Contains(body, httpdDefaultOutput) {
+					framework.Failf("Container port output missing expected value. Wanted:'%s', got: %s", httpdDefaultOutput, body)
+				}
+			})
+
+			ginkgo.It("should handle in-cluster config", func(ctx context.Context) {
+				// This test does not work for dynamically linked kubectl binaries; only statically linked ones. The
+				// problem happens when the kubectl binary is copied to a pod in the cluster. For dynamically linked
+				// binaries, the necessary libraries are not also copied. For this reason, the test can not be
+				// guaranteed to work with GKE, which sometimes run tests using a dynamically linked kubectl.
+				e2eskipper.SkipIfProviderIs("gke")
+				// TODO: Find a way to download and copy the appropriate kubectl binary, or maybe a multi-arch kubectl image
+				// for now this only works on amd64
+				e2eskipper.SkipUnlessNodeOSArchIs("amd64")
+
+				ginkgo.By("adding rbac permissions")
+				// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
+				err := e2eauth.BindClusterRole(ctx, f.ClientSet.RbacV1(), "view", f.Namespace.Name,
+					rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+				framework.ExpectNoError(err)
+
+				err = e2eauth.WaitForAuthorizationUpdate(ctx, f.ClientSet.AuthorizationV1(),
+					serviceaccount.MakeUsername(f.Namespace.Name, "default"),
+					f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("overriding icc with values provided by flags")
+				kubectlPath := framework.TestContext.KubectlPath
+				// we need the actual kubectl binary, not the script wrapper
+				kubectlPathNormalizer := exec.Command("which", kubectlPath)
+				if strings.HasSuffix(kubectlPath, "kubectl.sh") {
+					kubectlPathNormalizer = exec.Command(kubectlPath, "path")
+				}
+				kubectlPathNormalized, err := kubectlPathNormalizer.Output()
+				framework.ExpectNoError(err)
+				kubectlPath = strings.TrimSpace(string(kubectlPathNormalized))
+
+				inClusterHost := strings.TrimSpace(e2eoutput.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_HOST"))
+				inClusterPort := strings.TrimSpace(e2eoutput.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_PORT"))
+				inClusterURL := net.JoinHostPort(inClusterHost, inClusterPort)
+				framework.Logf("copying %s to the %s pod", kubectlPath, simplePodName)
+				e2ekubectl.RunKubectlOrDie(ns, "cp", kubectlPath, ns+"/"+simplePodName+":/tmp/")
+
+				// Build a kubeconfig file that will make use of the injected ca and token,
+				// but point at the DNS host and the default namespace
+				tmpDir, err := os.MkdirTemp("", "icc-override")
+				overrideKubeconfigName := "icc-override.kubeconfig"
+				framework.ExpectNoError(err)
+				defer func() { os.Remove(tmpDir) }()
+				framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, overrideKubeconfigName), []byte(`
+kind: Config
+apiVersion: v1
+clusters:
+- cluster:
+    api-version: v1
+    server: https://kubernetes.default.svc:443
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  name: kubeconfig-cluster
+contexts:
+- context:
+    cluster: kubeconfig-cluster
+    namespace: default
+    user: kubeconfig-user
+  name: kubeconfig-context
+current-context: kubeconfig-context
+users:
+- name: kubeconfig-user
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+`), os.FileMode(0755)))
+				framework.Logf("copying override kubeconfig to the %s pod", simplePodName)
+				e2ekubectl.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/")
+
+				framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), []byte(`
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: "configmap with namespace and invalid name"
+  namespace: configmap-namespace
+`), os.FileMode(0755)))
+				framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), []byte(`
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: "configmap without namespace and invalid name"
+`), os.FileMode(0755)))
+				framework.Logf("copying configmap manifests to the %s pod", simplePodName)
+				e2ekubectl.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
+				e2ekubectl.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
+
+				ginkgo.By("getting pods with in-cluster configs")
+				execOutput := e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --v=6 2>&1")
+				gomega.Expect(execOutput).To(gomega.MatchRegexp("httpd +1/1 +Running"))
+				gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster namespace"))
+				gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
+
+				ginkgo.By("creating an object containing a namespace with in-cluster config")
+				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-with-namespace.yaml --v=6 2>&1")
+				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
+				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
+
+				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/configmap-namespace/configmaps", inClusterURL)))
+
+				ginkgo.By("creating an object not containing a namespace with in-cluster config")
+				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-without-namespace.yaml --v=6 2>&1")
+				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
+				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
+				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/%s/configmaps", inClusterURL, f.Namespace.Name)))
+
+				ginkgo.By("trying to use kubectl with invalid token")
+				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
+				framework.Logf("got err %v", err)
+				framework.ExpectError(err)
+				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
+				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
+				gomega.Expect(err).To(gomega.ContainSubstring("Response Status: 401 Unauthorized"))
+
+				ginkgo.By("trying to use kubectl with invalid server")
+				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
+				framework.Logf("got err %v", err)
+				framework.ExpectError(err)
+				gomega.Expect(err).To(gomega.ContainSubstring("Unable to connect to the server"))
+				gomega.Expect(err).To(gomega.ContainSubstring("GET http://invalid/api"))
+
+				ginkgo.By("trying to use kubectl with invalid namespace")
+				execOutput = e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --namespace=invalid --v=6 2>&1")
+				gomega.Expect(execOutput).To(gomega.ContainSubstring("No resources found"))
+				gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster namespace"))
+				gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
+				gomega.Expect(execOutput).To(gomega.MatchRegexp(fmt.Sprintf("GET http[s]?://[\\[]?%s[\\]]?:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort)))
+
+				ginkgo.By("trying to use kubectl with kubeconfig")
+				execOutput = e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --kubeconfig=/tmp/"+overrideKubeconfigName+" --v=6 2>&1")
+				gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster namespace"))
+				gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster configuration"))
+				gomega.Expect(execOutput).To(gomega.ContainSubstring("GET https://kubernetes.default.svc:443/api/v1/namespaces/default/pods"))
+			})
+		})
+
+		ginkgo.Describe("Kubectl run", func() {
 			ginkgo.It("running a successful command", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "success", "--", "/bin/sh", "-c", "exit 0").Exec()
 				framework.ExpectNoError(err)
@@ -662,156 +814,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			logOutput := e2ekubectl.RunKubectlOrDie(ns, "logs", "-f", "run-log-test")
 			gomega.Expect(logOutput).To(gomega.ContainSubstring("EOF"))
-		})
-
-		ginkgo.It("should support port-forward", func(ctx context.Context) {
-			ginkgo.By("forwarding the container port to a local port")
-			cmd := runPortForward(ns, simplePodName, simplePodPort)
-			defer cmd.Stop()
-
-			ginkgo.By("curling local port output")
-			localAddr := fmt.Sprintf("http://localhost:%d", cmd.port)
-			body, err := curl(localAddr)
-			framework.Logf("got: %s", body)
-			if err != nil {
-				framework.Failf("Failed http.Get of forwarded port (%s): %v", localAddr, err)
-			}
-			if !strings.Contains(body, httpdDefaultOutput) {
-				framework.Failf("Container port output missing expected value. Wanted:'%s', got: %s", httpdDefaultOutput, body)
-			}
-		})
-
-		ginkgo.It("should handle in-cluster config", func(ctx context.Context) {
-			// This test does not work for dynamically linked kubectl binaries; only statically linked ones. The
-			// problem happens when the kubectl binary is copied to a pod in the cluster. For dynamically linked
-			// binaries, the necessary libraries are not also copied. For this reason, the test can not be
-			// guaranteed to work with GKE, which sometimes run tests using a dynamically linked kubectl.
-			e2eskipper.SkipIfProviderIs("gke")
-			// TODO: Find a way to download and copy the appropriate kubectl binary, or maybe a multi-arch kubectl image
-			// for now this only works on amd64
-			e2eskipper.SkipUnlessNodeOSArchIs("amd64")
-
-			ginkgo.By("adding rbac permissions")
-			// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
-			err := e2eauth.BindClusterRole(ctx, f.ClientSet.RbacV1(), "view", f.Namespace.Name,
-				rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
-			framework.ExpectNoError(err)
-
-			err = e2eauth.WaitForAuthorizationUpdate(ctx, f.ClientSet.AuthorizationV1(),
-				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
-				f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
-			framework.ExpectNoError(err)
-
-			ginkgo.By("overriding icc with values provided by flags")
-			kubectlPath := framework.TestContext.KubectlPath
-			// we need the actual kubectl binary, not the script wrapper
-			kubectlPathNormalizer := exec.Command("which", kubectlPath)
-			if strings.HasSuffix(kubectlPath, "kubectl.sh") {
-				kubectlPathNormalizer = exec.Command(kubectlPath, "path")
-			}
-			kubectlPathNormalized, err := kubectlPathNormalizer.Output()
-			framework.ExpectNoError(err)
-			kubectlPath = strings.TrimSpace(string(kubectlPathNormalized))
-
-			inClusterHost := strings.TrimSpace(e2eoutput.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_HOST"))
-			inClusterPort := strings.TrimSpace(e2eoutput.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_PORT"))
-			inClusterURL := net.JoinHostPort(inClusterHost, inClusterPort)
-			framework.Logf("copying %s to the %s pod", kubectlPath, simplePodName)
-			e2ekubectl.RunKubectlOrDie(ns, "cp", kubectlPath, ns+"/"+simplePodName+":/tmp/")
-
-			// Build a kubeconfig file that will make use of the injected ca and token,
-			// but point at the DNS host and the default namespace
-			tmpDir, err := os.MkdirTemp("", "icc-override")
-			overrideKubeconfigName := "icc-override.kubeconfig"
-			framework.ExpectNoError(err)
-			defer func() { os.Remove(tmpDir) }()
-			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, overrideKubeconfigName), []byte(`
-kind: Config
-apiVersion: v1
-clusters:
-- cluster:
-    api-version: v1
-    server: https://kubernetes.default.svc:443
-    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-  name: kubeconfig-cluster
-contexts:
-- context:
-    cluster: kubeconfig-cluster
-    namespace: default
-    user: kubeconfig-user
-  name: kubeconfig-context
-current-context: kubeconfig-context
-users:
-- name: kubeconfig-user
-  user:
-    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-`), os.FileMode(0755)))
-			framework.Logf("copying override kubeconfig to the %s pod", simplePodName)
-			e2ekubectl.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/")
-
-			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), []byte(`
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: "configmap with namespace and invalid name"
-  namespace: configmap-namespace
-`), os.FileMode(0755)))
-			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), []byte(`
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: "configmap without namespace and invalid name"
-`), os.FileMode(0755)))
-			framework.Logf("copying configmap manifests to the %s pod", simplePodName)
-			e2ekubectl.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
-			e2ekubectl.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
-
-			ginkgo.By("getting pods with in-cluster configs")
-			execOutput := e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --v=6 2>&1")
-			gomega.Expect(execOutput).To(gomega.MatchRegexp("httpd +1/1 +Running"))
-			gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster namespace"))
-			gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
-
-			ginkgo.By("creating an object containing a namespace with in-cluster config")
-			_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-with-namespace.yaml --v=6 2>&1")
-			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
-			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
-
-			gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/configmap-namespace/configmaps", inClusterURL)))
-
-			ginkgo.By("creating an object not containing a namespace with in-cluster config")
-			_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-without-namespace.yaml --v=6 2>&1")
-			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
-			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
-			gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/%s/configmaps", inClusterURL, f.Namespace.Name)))
-
-			ginkgo.By("trying to use kubectl with invalid token")
-			_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
-			framework.Logf("got err %v", err)
-			framework.ExpectError(err)
-			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
-			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
-			gomega.Expect(err).To(gomega.ContainSubstring("Response Status: 401 Unauthorized"))
-
-			ginkgo.By("trying to use kubectl with invalid server")
-			_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
-			framework.Logf("got err %v", err)
-			framework.ExpectError(err)
-			gomega.Expect(err).To(gomega.ContainSubstring("Unable to connect to the server"))
-			gomega.Expect(err).To(gomega.ContainSubstring("GET http://invalid/api"))
-
-			ginkgo.By("trying to use kubectl with invalid namespace")
-			execOutput = e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --namespace=invalid --v=6 2>&1")
-			gomega.Expect(execOutput).To(gomega.ContainSubstring("No resources found"))
-			gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster namespace"))
-			gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
-			gomega.Expect(execOutput).To(gomega.MatchRegexp(fmt.Sprintf("GET http[s]?://[\\[]?%s[\\]]?:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort)))
-
-			ginkgo.By("trying to use kubectl with kubeconfig")
-			execOutput = e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --kubeconfig=/tmp/"+overrideKubeconfigName+" --v=6 2>&1")
-			gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster namespace"))
-			gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster configuration"))
-			gomega.Expect(execOutput).To(gomega.ContainSubstring("GET https://kubernetes.default.svc:443/api/v1/namespaces/default/pods"))
 		})
 	})
 
