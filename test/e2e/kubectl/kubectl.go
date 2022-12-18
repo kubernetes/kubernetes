@@ -579,7 +579,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				if !strings.Contains(ee.String(), "timed out") {
 					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
 				}
-				framework.ExpectNoError(e2epod.WaitForPodToDisappear(ctx, f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout))
+				framework.ExpectNoError(e2epod.WaitForPodToDisappear(ctx, f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, 2*v1.DefaultTerminationGracePeriodSeconds*time.Second))
 			})
 
 			ginkgo.It("[Slow] running a failing command with --leave-stdin-open", func(ctx context.Context) {
