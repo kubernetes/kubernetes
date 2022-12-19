@@ -674,6 +674,36 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			wantCountFailed:       true,
 			wantAction:            &failJob,
 		},
+		"job fail rule different condition on pending": {
+			podFailurePolicy: &batch.PodFailurePolicy{
+				Rules: []batch.PodFailurePolicyRule{
+					{
+						Action: batch.PodFailurePolicyActionFailJob,
+						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+							{
+								Type:   v1.DisruptionTarget,
+								Status: v1.ConditionFalse,
+							},
+						},
+					},
+				},
+			},
+			failedPod: &v1.Pod{
+				ObjectMeta: validPodObjectMeta,
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodScheduled,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantJobFailureMessage: nil,
+			wantCountFailed:       true,
+			wantAction:            nil,
+		},
 		"count rule matched for pod conditions": {
 			podFailurePolicy: &batch.PodFailurePolicy{
 				Rules: []batch.PodFailurePolicyRule{

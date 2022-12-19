@@ -2965,6 +2965,50 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusFailed:    1,
 			wantStatusSucceeded: 0,
 		},
+		"Wrong Condition Match for Pending Pod Condition": {
+			enableJobPodFailurePolicy: true,
+			enablePodDisruptionConditions: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   kubetypes.PodHasNetwork,
+										Status: v1.ConditionFalse,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.Pod{
+				{
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodScheduled,
+								Status: v1.ConditionFalse,
+							},
+						},
+					},
+				},
+			},
+			wantStatusActive:    1,
+			wantStatusFailed:    0,
+			wantStatusSucceeded: 0,
+		},
 		"fail job based on OnPodConditions PodScheduled for Pending Case": {
 			enableJobPodFailurePolicy: true,
 			enablePodDisruptionConditions: true,
@@ -3013,6 +3057,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					Message: "Pod default/mypod-0 has condition for pending PodScheduled matching FailJob rule at index 0",
 				},
 			},
+
 			wantStatusActive:    0,
 			wantStatusFailed:    1,
 			wantStatusSucceeded: 0,

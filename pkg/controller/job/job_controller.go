@@ -1750,7 +1750,7 @@ func isPodFailed(p *v1.Pod, job *batch.Job, wFinalizers bool) bool {
 		if p.Status.Phase == v1.PodPending {
 			_, _, action := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
 			failJob := batch.PodFailurePolicyActionFailJob
-			return *action == failJob
+			return action != nil && *action == failJob
 		}
 		return p.Status.Phase == v1.PodFailed
 	}
