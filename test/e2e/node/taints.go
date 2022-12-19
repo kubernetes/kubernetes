@@ -122,7 +122,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 
 // Creates and starts a controller (informer) that watches updates on a pod in given namespace with given name. It puts a new
 // struct into observedDeletion channel for every deletion it sees.
-func createTestController(ctx context.Context, cs clientset.Interface, observedDeletions chan string, stopCh chan struct{}, podLabel, ns string) {
+func createTestController(ctx context.Context, cs clientset.Interface, observedDeletions chan string, podLabel, ns string) {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -148,7 +148,7 @@ func createTestController(ctx context.Context, cs clientset.Interface, observedD
 		},
 	)
 	framework.Logf("Starting informer...")
-	go controller.Run(stopCh)
+	go controller.Run(ctx.Done())
 }
 
 const (
@@ -184,8 +184,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		podName := "taint-eviction-1"
 		pod := createPodForTaintsTest(false, 0, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
-		stopCh := make(chan struct{})
-		createTestController(ctx, cs, observedDeletions, stopCh, podName, ns)
+		createTestController(ctx, cs, observedDeletions, podName, ns)
 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
@@ -216,8 +215,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		podName := "taint-eviction-2"
 		pod := createPodForTaintsTest(true, 0, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
-		stopCh := make(chan struct{})
-		createTestController(ctx, cs, observedDeletions, stopCh, podName, ns)
+		createTestController(ctx, cs, observedDeletions, podName, ns)
 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
@@ -249,8 +247,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		podName := "taint-eviction-3"
 		pod := createPodForTaintsTest(true, kubeletPodDeletionDelaySeconds+2*additionalWaitPerDeleteSeconds, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
-		stopCh := make(chan struct{})
-		createTestController(ctx, cs, observedDeletions, stopCh, podName, ns)
+		createTestController(ctx, cs, observedDeletions, podName, ns)
 
 		ginkgo.By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(ctx, cs, pod, 2*time.Minute)
@@ -294,8 +291,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		podName := "taint-eviction-4"
 		pod := createPodForTaintsTest(true, 2*additionalWaitPerDeleteSeconds, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
-		stopCh := make(chan struct{})
-		createTestController(ctx, cs, observedDeletions, stopCh, podName, ns)
+		createTestController(ctx, cs, observedDeletions, podName, ns)
 
 		// 1. Run a pod with short toleration
 		ginkgo.By("Starting pod...")
@@ -396,8 +392,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 	ginkgo.It("only evicts pods without tolerations from tainted nodes", func(ctx context.Context) {
 		podGroup := "taint-eviction-a"
 		observedDeletions := make(chan string, 100)
-		stopCh := make(chan struct{})
-		createTestController(ctx, cs, observedDeletions, stopCh, podGroup, ns)
+		createTestController(ctx, cs, observedDeletions, podGroup, ns)
 
 		pod1 := createPodForTaintsTest(false, 0, podGroup+"1", podGroup, ns)
 		pod2 := createPodForTaintsTest(true, 0, podGroup+"2", podGroup, ns)
@@ -455,8 +450,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 	framework.ConformanceIt("evicts pods with minTolerationSeconds [Disruptive]", func(ctx context.Context) {
 		podGroup := "taint-eviction-b"
 		observedDeletions := make(chan string, 100)
-		stopCh := make(chan struct{})
-		createTestController(ctx, cs, observedDeletions, stopCh, podGroup, ns)
+		createTestController(ctx, cs, observedDeletions, podGroup, ns)
 
 		// 1. Run two pods both with toleration; one with tolerationSeconds=5, the other with 25
 		pod1 := createPodForTaintsTest(true, additionalWaitPerDeleteSeconds, podGroup+"1", podGroup, ns)
