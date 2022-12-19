@@ -125,7 +125,7 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 			framework.ExpectNoError(err)
 
 			hash := sha256.Sum256([]byte(hostname))
-			leaseName := "kube-apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
+			leaseName := "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 
 			lease, err := client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), leaseName, metav1.GetOptions{})
 			framework.ExpectNoError(err)

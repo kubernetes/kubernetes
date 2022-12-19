@@ -346,7 +346,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		}
 
 		hash := sha256.Sum256([]byte(hostname))
-		id = "kube-apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
+		id = "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 	}
 	lifecycleSignals := newLifecycleSignals()
 
