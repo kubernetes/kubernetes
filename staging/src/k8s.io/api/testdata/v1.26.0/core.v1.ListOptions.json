@@ -1,0 +1,13 @@
+{
+  "kind": "ListOptions",
+  "apiVersion": "v1",
+  "labelSelector": "labelSelectorValue",
+  "fieldSelector": "fieldSelectorValue",
+  "watch": true,
+  "allowWatchBookmarks": true,
+  "resourceVersion": "resourceVersionValue",
+  "resourceVersionMatch": "resourceVersionMatchValue",
+  "timeoutSeconds": 5,
+  "limit": 7,
+  "continue": "continueValue"
+}
