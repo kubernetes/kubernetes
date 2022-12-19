@@ -282,7 +282,7 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 	if err != nil {
 		return nil, err
 	}
-	validator, err := f.Validator(validationDirective, fieldValidationVerifier)
+	validator, err := f.Validator(validationDirective)
 	if err != nil {
 		return nil, err
 	}
