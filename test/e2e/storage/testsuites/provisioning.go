@@ -449,12 +449,12 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			e2eskipper.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
 		}
 
-		init()
+		init(ctx)
 
 		if l.config.ClientNodeSelection.Name == "" {
 			// Schedule all pods to the same topology segment (e.g. a cloud availability zone), some
 			// drivers don't support cloning across them.
-			if err := ensureTopologyRequirements(&l.config.ClientNodeSelection, l.cs, dInfo, 1); err != nil {
+			if err := ensureTopologyRequirements(ctx, &l.config.ClientNodeSelection, l.cs, dInfo, 1); err != nil {
 				framework.Failf("Error setting topology requirements: %v", err)
 			}
 		}
@@ -472,8 +472,8 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.testCase.NodeSelection = testConfig.ClientNodeSelection
 
 		// Cloning fails if the source disk is still in the process of detaching, so we wait for the VolumeAttachment to be removed before cloning.
-		volumeAttachment := e2evolume.GetVolumeAttachmentName(f.ClientSet, testConfig, l.testCase.Provisioner, localDataSource.Name, l.sourcePVC.Namespace)
-		e2evolume.WaitForVolumeAttachmentTerminated(volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision)
+		volumeAttachment := e2evolume.GetVolumeAttachmentName(ctx, f.ClientSet, testConfig, l.testCase.Provisioner, localDataSource.Name, l.sourcePVC.Namespace)
+		e2evolume.WaitForVolumeAttachmentTerminated(ctx, volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision)
 
 		klog.Errorf("HEREHERE %v", l.sourcePVC.Name)
 		claim, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.sourcePVC.Name, metav1.GetOptions{})
@@ -482,7 +482,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		var originFSSize int
 		if pattern.VolMode != "Block" {
 			createdClaims := []*v1.PersistentVolumeClaim{claim}
-			pod, err := e2epod.CreatePod(l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
+			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
 			framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
 			// Mount path should not be empty.
@@ -541,7 +541,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			//framework.ExpectNoError(err, "Failed to get pvc: %v", err)
 
 			createdClaims := []*v1.PersistentVolumeClaim{claim}
-			pod, err := e2epod.CreatePod(l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
+			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
 			framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
 			// Mount path should not be empty.
@@ -584,7 +584,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
 		}
 
-		init()
+		init(ctx)
 
 		pvc2 := l.pvc.DeepCopy()
 	  l.pvc.Name = "pvc-origin"
@@ -604,7 +604,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		actualPVSize := c.Status.Capacity.Storage().Value()
 
 		createdClaims := []*v1.PersistentVolumeClaim{c}
-		pod, err := e2epod.CreatePod(l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
+		pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
 		framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
 		// Mount path should not be empty.
@@ -618,7 +618,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		// For the new PVC, request a size that is larger than the origin PVC actually provisioned.
 		storageRequest := resource.NewQuantity(actualPVSize, resource.BinarySI)
 		storageRequest.Add(resource.MustParse("1Gi"))
-	pvc2.Spec.Resources.Requests = v1.ResourceList{
+	  pvc2.Spec.Resources.Requests = v1.ResourceList{
 			v1.ResourceStorage: *storageRequest,
 		}
 
@@ -628,7 +628,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
 		createdClaims2 := []*v1.PersistentVolumeClaim{c2}
-		pod2, err := e2epod.CreatePod(l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
+		pod2, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
 		framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
 		// Mount path should not be empty.
@@ -956,7 +956,7 @@ func getBoundPV(ctx context.Context, client clientset.Interface, pvc *v1.Persist
 	}
 
 	// make sure claim did bind
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, claimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, claimProvisionTimeout)
 		framework.ExpectNoError(err)
 
 	klog.Errorf("claim = %v+",claim)
