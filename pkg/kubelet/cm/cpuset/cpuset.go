@@ -95,25 +95,12 @@ func (s CPUSet) Equals(s2 CPUSet) bool {
 	return reflect.DeepEqual(s.elems, s2.elems)
 }
 
-// Filter returns a new CPU set that contains all of the elements from this
+// filter returns a new CPU set that contains all of the elements from this
 // set that match the supplied predicate, without mutating the source set.
-func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
+func (s CPUSet) filter(predicate func(int) bool) CPUSet {
 	b := NewBuilder()
 	for cpu := range s.elems {
 		if predicate(cpu) {
-			b.Add(cpu)
-		}
-	}
-	return b.Result()
-}
-
-// FilterNot returns a new CPU set that contains all of the elements from this
-// set that do not match the supplied predicate, without mutating the source
-// set.
-func (s CPUSet) FilterNot(predicate func(int) bool) CPUSet {
-	b := NewBuilder()
-	for cpu := range s.elems {
-		if !predicate(cpu) {
 			b.Add(cpu)
 		}
 	}
@@ -152,14 +139,14 @@ func (s CPUSet) Union(s2 ...CPUSet) CPUSet {
 // that are present in both this set and the supplied set, without mutating
 // either source set.
 func (s CPUSet) Intersection(s2 CPUSet) CPUSet {
-	return s.Filter(func(cpu int) bool { return s2.Contains(cpu) })
+	return s.filter(func(cpu int) bool { return s2.Contains(cpu) })
 }
 
 // Difference returns a new CPU set that contains all of the elements that
 // are present in this set and not the supplied set, without mutating either
 // source set.
 func (s CPUSet) Difference(s2 CPUSet) CPUSet {
-	return s.FilterNot(func(cpu int) bool { return s2.Contains(cpu) })
+	return s.filter(func(cpu int) bool { return !s2.Contains(cpu) })
 }
 
 // List returns a slice of integers that contains all elements from
