@@ -192,7 +192,7 @@ type CertificateSigningRequestList struct {
 	Items []CertificateSigningRequest
 }
 
-// KeyUsages specifies valid usage contexts for keys.
+// KeyUsage specifies valid usage contexts for keys.
 // See:
 //
 //	https://tools.ietf.org/html/rfc5280#section-4.2.1.3

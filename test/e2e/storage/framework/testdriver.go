@@ -157,7 +157,7 @@ const (
 	CapSnapshotDataSource Capability = "snapshotDataSource" // support populate data from snapshot
 	CapPVCDataSource      Capability = "pvcDataSource"      // support populate data from pvc
 
-	// multiple pods on a node can use the same volume concurrently;
+	// CapMultiPODs on a node can use the same volume concurrently;
 	// for CSI, see:
 	// - https://github.com/container-storage-interface/spec/pull/150
 	// - https://github.com/container-storage-interface/spec/issues/178

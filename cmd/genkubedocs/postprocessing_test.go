@@ -27,7 +27,7 @@ func TestCleanupForInclude(t *testing.T) {
 	}{
 		{ // first line is removed
 			// Nb. first line is the title of the document, and by removing it you get
-			//     more flexibility for include, e.g. include in tabs
+			// more flexibility for include, e.g. include in tabs
 			markdown: "line 1\n" +
 				"line 2\n" +
 				"line 3",
