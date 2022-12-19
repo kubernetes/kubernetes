@@ -37,14 +37,12 @@ run_wait_tests() {
 
     # wait with jsonpath will timout for busybox deployment
     set +o errexit
-
     # Command: Wait with jsonpath support fields not exist in the first place
-    output_message=$(kubectl wait --for=jsonpath=.status.readyReplicas=1 deploy/test-1)
-    
+    output_message=$(kubectl wait --for=jsonpath=.status.readyReplicas=1 deploy/test-1 2>&1)
+    set -o errexit
+
     # Post-Condition: Wait failed
     kube::test::if_has_string "${output_message}" 'timed out'
-
-    set -o errexit
 
     # Delete all deployments async to kubectl wait
     ( sleep 2 && kubectl delete deployment --all ) &

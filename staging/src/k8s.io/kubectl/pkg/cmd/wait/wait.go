@@ -391,7 +391,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 	intr := interrupt.New(nil, cancel)
 	err := intr.Run(func() error {
 		_, err := watchtools.UntilWithSync(intrCtx, lw, &unstructured.Unstructured{}, preconditionFunc, Wait{errOut: o.ErrOut}.IsDeleted)
-		if errors.As(err, &context.DeadlineExceeded) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return errWaitTimeoutWithName
 		}
 		return err
@@ -498,7 +498,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 		if ev != nil {
 			result = ev.Object
 		}
-		if errors.As(err, &context.DeadlineExceeded) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return errWaitTimeoutWithName
 		}
 		return err
