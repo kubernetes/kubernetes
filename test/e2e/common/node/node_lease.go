@@ -42,8 +42,8 @@ var _ = SIGDescribe("NodeLease", func() {
 	f := framework.NewDefaultFramework("node-lease-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.BeforeEach(func() {
-		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		nodeName = node.Name
 	})
@@ -56,8 +56,8 @@ var _ = SIGDescribe("NodeLease", func() {
 				lease *coordinationv1.Lease
 			)
 			ginkgo.By("check that lease for this Kubelet exists in the kube-node-lease namespace")
-			gomega.Eventually(func() error {
-				lease, err = leaseClient.Get(context.TODO(), nodeName, metav1.GetOptions{})
+			gomega.Eventually(ctx, func() error {
+				lease, err = leaseClient.Get(ctx, nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -67,8 +67,8 @@ var _ = SIGDescribe("NodeLease", func() {
 			gomega.Expect(expectLease(lease, nodeName)).To(gomega.BeNil())
 
 			ginkgo.By("check that node lease is updated at least once within the lease duration")
-			gomega.Eventually(func() error {
-				newLease, err := leaseClient.Get(context.TODO(), nodeName, metav1.GetOptions{})
+			gomega.Eventually(ctx, func() error {
+				newLease, err := leaseClient.Get(ctx, nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -93,8 +93,8 @@ var _ = SIGDescribe("NodeLease", func() {
 				err       error
 				leaseList *coordinationv1.LeaseList
 			)
-			gomega.Eventually(func() error {
-				leaseList, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
+			gomega.Eventually(ctx, func() error {
+				leaseList, err = leaseClient.List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return err
 				}
@@ -113,13 +113,13 @@ var _ = SIGDescribe("NodeLease", func() {
 
 		ginkgo.It("the kubelet should report node status infrequently", func(ctx context.Context) {
 			ginkgo.By("wait until node is ready")
-			e2enode.WaitForNodeToBeReady(f.ClientSet, nodeName, 5*time.Minute)
+			e2enode.WaitForNodeToBeReady(ctx, f.ClientSet, nodeName, 5*time.Minute)
 
 			ginkgo.By("wait until there is node lease")
 			var err error
 			var lease *coordinationv1.Lease
-			gomega.Eventually(func() error {
-				lease, err = f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease).Get(context.TODO(), nodeName, metav1.GetOptions{})
+			gomega.Eventually(ctx, func() error {
+				lease, err = f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease).Get(ctx, nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -134,10 +134,10 @@ var _ = SIGDescribe("NodeLease", func() {
 			// enough time has passed. So for here, keep checking the time diff
 			// between 2 NodeStatus report, until it is longer than lease duration
 			// (the same as nodeMonitorGracePeriod), or it doesn't change for at least leaseDuration
-			lastHeartbeatTime, lastStatus := getHeartbeatTimeAndStatus(f.ClientSet, nodeName)
+			lastHeartbeatTime, lastStatus := getHeartbeatTimeAndStatus(ctx, f.ClientSet, nodeName)
 			lastObserved := time.Now()
 			err = wait.Poll(time.Second, 5*time.Minute, func() (bool, error) {
-				currentHeartbeatTime, currentStatus := getHeartbeatTimeAndStatus(f.ClientSet, nodeName)
+				currentHeartbeatTime, currentStatus := getHeartbeatTimeAndStatus(ctx, f.ClientSet, nodeName)
 				currentObserved := time.Now()
 
 				if currentHeartbeatTime == lastHeartbeatTime {
@@ -178,7 +178,7 @@ var _ = SIGDescribe("NodeLease", func() {
 			// This check on node status is only meaningful when this e2e test is
 			// running as cluster e2e test, because node e2e test does not create and
 			// run controller manager, i.e., no node lifecycle controller.
-			node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 			framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
@@ -186,8 +186,8 @@ var _ = SIGDescribe("NodeLease", func() {
 	})
 })
 
-func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (time.Time, v1.NodeStatus) {
-	node, err := clientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+func getHeartbeatTimeAndStatus(ctx context.Context, clientSet clientset.Interface, nodeName string) (time.Time, v1.NodeStatus) {
+	node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 	framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)

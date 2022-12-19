@@ -48,41 +48,41 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 
 	ginkgo.Describe("[Serial] [Slow] Deployment (Pod Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
-			scaleUp("test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, false, f)
+			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, false, f)
 		})
 		ginkgo.It(titleDown+titleAverageUtilization, func(ctx context.Context) {
-			scaleDown("test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, false, f)
+			scaleDown(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, false, f)
 		})
 		ginkgo.It(titleUp+titleAverageValue, func(ctx context.Context) {
-			scaleUp("test-deployment", e2eautoscaling.KindDeployment, cpuResource, valueMetricType, false, f)
+			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, valueMetricType, false, f)
 		})
 	})
 
 	ginkgo.Describe("[Serial] [Slow] Deployment (Container Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
-			scaleUpContainerResource("test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, f)
+			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, f)
 		})
 		ginkgo.It(titleUp+titleAverageValue, func(ctx context.Context) {
-			scaleUpContainerResource("test-deployment", e2eautoscaling.KindDeployment, cpuResource, valueMetricType, f)
+			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, valueMetricType, f)
 		})
 	})
 
 	ginkgo.Describe("[Serial] [Slow] ReplicaSet", func() {
 		ginkgo.It(titleUp, func(ctx context.Context) {
-			scaleUp("rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
+			scaleUp(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
 		})
 		ginkgo.It(titleDown, func(ctx context.Context) {
-			scaleDown("rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
+			scaleDown(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
 		})
 	})
 
 	// These tests take ~20 minutes each.
 	ginkgo.Describe("[Serial] [Slow] ReplicationController", func() {
 		ginkgo.It(titleUp+" and verify decision stability", func(ctx context.Context) {
-			scaleUp("rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
+			scaleUp(ctx, "rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
 		})
 		ginkgo.It(titleDown+" and verify decision stability", func(ctx context.Context) {
-			scaleDown("rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
+			scaleDown(ctx, "rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
 		})
 	})
 
@@ -99,7 +99,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 				resourceType:     cpuResource,
 				metricTargetType: utilizationMetricType,
 			}
-			st.run("rc-light", e2eautoscaling.KindRC, f)
+			st.run(ctx, "rc-light", e2eautoscaling.KindRC, f)
 		})
 		ginkgo.It("[Slow] Should scale from 2 pods to 1 pod", func(ctx context.Context) {
 			st := &HPAScaleTest{
@@ -113,19 +113,19 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 				resourceType:     cpuResource,
 				metricTargetType: utilizationMetricType,
 			}
-			st.run("rc-light", e2eautoscaling.KindRC, f)
+			st.run(ctx, "rc-light", e2eautoscaling.KindRC, f)
 		})
 	})
 
 	ginkgo.Describe("[Serial] [Slow] ReplicaSet with idle sidecar (ContainerResource use case)", func() {
 		// ContainerResource CPU autoscaling on idle sidecar
 		ginkgo.It(titleUp+" on a busy application with an idle sidecar container", func(ctx context.Context) {
-			scaleOnIdleSideCar("rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
+			scaleOnIdleSideCar(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
 		})
 
 		// ContainerResource CPU autoscaling on busy sidecar
 		ginkgo.It("Should not scale up on a busy sidecar with an idle application", func(ctx context.Context) {
-			doNotScaleOnBusySidecar("rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, true, f)
+			doNotScaleOnBusySidecar(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, true, f)
 		})
 	})
 
@@ -142,7 +142,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 				resourceType:     cpuResource,
 				metricTargetType: utilizationMetricType,
 			}
-			scaleTest.run("foo-crd", e2eautoscaling.KindCRD, f)
+			scaleTest.run(ctx, "foo-crd", e2eautoscaling.KindCRD, f)
 		})
 	})
 })
@@ -153,19 +153,19 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: M
 
 	ginkgo.Describe("[Serial] [Slow] Deployment (Pod Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
-			scaleUp("test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, false, f)
+			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, false, f)
 		})
 		ginkgo.It(titleUp+titleAverageValue, func(ctx context.Context) {
-			scaleUp("test-deployment", e2eautoscaling.KindDeployment, memResource, valueMetricType, false, f)
+			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, valueMetricType, false, f)
 		})
 	})
 
 	ginkgo.Describe("[Serial] [Slow] Deployment (Container Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
-			scaleUpContainerResource("test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, f)
+			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, f)
 		})
 		ginkgo.It(titleUp+titleAverageValue, func(ctx context.Context) {
-			scaleUpContainerResource("test-deployment", e2eautoscaling.KindDeployment, memResource, valueMetricType, f)
+			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, valueMetricType, f)
 		})
 	})
 })
@@ -194,7 +194,7 @@ type HPAScaleTest struct {
 // The first state change is due to the CPU being consumed initially, which HPA responds to by changing pod counts.
 // The second state change (optional) is due to the CPU burst parameter, which HPA again responds to.
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
-func (st *HPAScaleTest) run(name string, kind schema.GroupVersionKind, f *framework.Framework) {
+func (st *HPAScaleTest) run(ctx context.Context, name string, kind schema.GroupVersionKind, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
 	initCPUTotal, initMemTotal := 0, 0
 	if st.resourceType == cpuResource {
@@ -202,26 +202,26 @@ func (st *HPAScaleTest) run(name string, kind schema.GroupVersionKind, f *framew
 	} else if st.resourceType == memResource {
 		initMemTotal = st.initMemTotal
 	}
-	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perPodCPURequest, st.perPodMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perPodCPURequest, st.perPodMemRequest, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
 	ginkgo.DeferCleanup(rc.CleanUp)
-	hpa := e2eautoscaling.CreateResourceHorizontalPodAutoscaler(rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
+	hpa := e2eautoscaling.CreateResourceHorizontalPodAutoscaler(ctx, rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
 	ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, rc, hpa.Name)
 
-	rc.WaitForReplicas(st.firstScale, timeToWait)
+	rc.WaitForReplicas(ctx, st.firstScale, timeToWait)
 	if st.firstScaleStasis > 0 {
-		rc.EnsureDesiredReplicasInRange(st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
+		rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
 	}
 	if st.resourceType == cpuResource && st.cpuBurst > 0 && st.secondScale > 0 {
 		rc.ConsumeCPU(st.cpuBurst)
-		rc.WaitForReplicas(int(st.secondScale), timeToWait)
+		rc.WaitForReplicas(ctx, int(st.secondScale), timeToWait)
 	}
 	if st.resourceType == memResource && st.memBurst > 0 && st.secondScale > 0 {
 		rc.ConsumeMem(st.memBurst)
-		rc.WaitForReplicas(int(st.secondScale), timeToWait)
+		rc.WaitForReplicas(ctx, int(st.secondScale), timeToWait)
 	}
 }
 
-func scaleUp(name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, checkStability bool, f *framework.Framework) {
+func scaleUp(ctx context.Context, name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, checkStability bool, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute
@@ -247,10 +247,10 @@ func scaleUp(name string, kind schema.GroupVersionKind, resourceType v1.Resource
 		st.initMemTotal = 250
 		st.memBurst = 700
 	}
-	st.run(name, kind, f)
+	st.run(ctx, name, kind, f)
 }
 
-func scaleDown(name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, checkStability bool, f *framework.Framework) {
+func scaleDown(ctx context.Context, name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, checkStability bool, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute
@@ -277,7 +277,7 @@ func scaleDown(name string, kind schema.GroupVersionKind, resourceType v1.Resour
 		st.initMemTotal = 325
 		st.memBurst = 10
 	}
-	st.run(name, kind, f)
+	st.run(ctx, name, kind, f)
 }
 
 type HPAContainerResourceScaleTest struct {
@@ -302,7 +302,7 @@ type HPAContainerResourceScaleTest struct {
 	metricTargetType       autoscalingv2.MetricTargetType
 }
 
-func (st *HPAContainerResourceScaleTest) run(name string, kind schema.GroupVersionKind, f *framework.Framework) {
+func (st *HPAContainerResourceScaleTest) run(ctx context.Context, name string, kind schema.GroupVersionKind, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
 	initCPUTotal, initMemTotal := 0, 0
 	if st.resourceType == cpuResource {
@@ -310,32 +310,32 @@ func (st *HPAContainerResourceScaleTest) run(name string, kind schema.GroupVersi
 	} else if st.resourceType == memResource {
 		initMemTotal = st.initMemTotal
 	}
-	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perContainerCPURequest, st.perContainerMemRequest, f.ClientSet, f.ScalesGetter, st.sidecarStatus, st.sidecarType)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, name, f.Namespace.Name, kind, st.initPods, initCPUTotal, initMemTotal, 0, st.perContainerCPURequest, st.perContainerMemRequest, f.ClientSet, f.ScalesGetter, st.sidecarStatus, st.sidecarType)
 	ginkgo.DeferCleanup(rc.CleanUp)
-	hpa := e2eautoscaling.CreateContainerResourceHorizontalPodAutoscaler(rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
+	hpa := e2eautoscaling.CreateContainerResourceHorizontalPodAutoscaler(ctx, rc, st.resourceType, st.metricTargetType, st.targetValue, st.minPods, st.maxPods)
 	ginkgo.DeferCleanup(e2eautoscaling.DeleteContainerResourceHPA, rc, hpa.Name)
 
 	if st.noScale {
 		if st.noScaleStasis > 0 {
-			rc.EnsureDesiredReplicasInRange(st.initPods, st.initPods, st.noScaleStasis, hpa.Name)
+			rc.EnsureDesiredReplicasInRange(ctx, st.initPods, st.initPods, st.noScaleStasis, hpa.Name)
 		}
 	} else {
-		rc.WaitForReplicas(st.firstScale, timeToWait)
+		rc.WaitForReplicas(ctx, st.firstScale, timeToWait)
 		if st.firstScaleStasis > 0 {
-			rc.EnsureDesiredReplicasInRange(st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
+			rc.EnsureDesiredReplicasInRange(ctx, st.firstScale, st.firstScale+1, st.firstScaleStasis, hpa.Name)
 		}
 		if st.resourceType == cpuResource && st.cpuBurst > 0 && st.secondScale > 0 {
 			rc.ConsumeCPU(st.cpuBurst)
-			rc.WaitForReplicas(int(st.secondScale), timeToWait)
+			rc.WaitForReplicas(ctx, int(st.secondScale), timeToWait)
 		}
 		if st.resourceType == memResource && st.memBurst > 0 && st.secondScale > 0 {
 			rc.ConsumeMem(st.memBurst)
-			rc.WaitForReplicas(int(st.secondScale), timeToWait)
+			rc.WaitForReplicas(ctx, int(st.secondScale), timeToWait)
 		}
 	}
 }
 
-func scaleUpContainerResource(name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, f *framework.Framework) {
+func scaleUpContainerResource(ctx context.Context, name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, f *framework.Framework) {
 	st := &HPAContainerResourceScaleTest{
 		initPods:               1,
 		perContainerCPURequest: 500,
@@ -359,10 +359,10 @@ func scaleUpContainerResource(name string, kind schema.GroupVersionKind, resourc
 		st.initMemTotal = 250
 		st.memBurst = 700
 	}
-	st.run(name, kind, f)
+	st.run(ctx, name, kind, f)
 }
 
-func scaleOnIdleSideCar(name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, checkStability bool, f *framework.Framework) {
+func scaleOnIdleSideCar(ctx context.Context, name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, checkStability bool, f *framework.Framework) {
 	// Scale up on a busy application with an idle sidecar container
 	stasis := 0 * time.Minute
 	if checkStability {
@@ -384,10 +384,10 @@ func scaleOnIdleSideCar(name string, kind schema.GroupVersionKind, resourceType 
 		sidecarStatus:          e2eautoscaling.Enable,
 		sidecarType:            e2eautoscaling.Idle,
 	}
-	st.run(name, kind, f)
+	st.run(ctx, name, kind, f)
 }
 
-func doNotScaleOnBusySidecar(name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, checkStability bool, f *framework.Framework) {
+func doNotScaleOnBusySidecar(ctx context.Context, name string, kind schema.GroupVersionKind, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, checkStability bool, f *framework.Framework) {
 	// Do not scale up on a busy sidecar with an idle application
 	stasis := 0 * time.Minute
 	if checkStability {
@@ -408,7 +408,7 @@ func doNotScaleOnBusySidecar(name string, kind schema.GroupVersionKind, resource
 		noScale:                true,
 		noScaleStasis:          stasis,
 	}
-	st.run(name, kind, f)
+	st.run(ctx, name, kind, f)
 }
 
 func getTargetValueByType(averageValueTarget, averageUtilizationTarget int, targetType autoscalingv2.MetricTargetType) int32 {

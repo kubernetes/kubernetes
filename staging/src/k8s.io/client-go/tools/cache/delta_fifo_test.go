@@ -125,7 +125,7 @@ func TestDeltaFIFO_requeueOnPop(t *testing.T) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
 
 	f.Add(mkFifoObj("foo", 10))
-	_, err := f.Pop(func(obj interface{}) error {
+	_, err := f.Pop(func(obj interface{}, isInInitialList bool) error {
 		if obj.(Deltas)[0].Object.(testFifoObject).name != "foo" {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
@@ -138,7 +138,7 @@ func TestDeltaFIFO_requeueOnPop(t *testing.T) {
 		t.Fatalf("object should have been requeued: %t %v", ok, err)
 	}
 
-	_, err = f.Pop(func(obj interface{}) error {
+	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
 		if obj.(Deltas)[0].Object.(testFifoObject).name != "foo" {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
@@ -151,7 +151,7 @@ func TestDeltaFIFO_requeueOnPop(t *testing.T) {
 		t.Fatalf("object should have been requeued: %t %v", ok, err)
 	}
 
-	_, err = f.Pop(func(obj interface{}) error {
+	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
 		if obj.(Deltas)[0].Object.(testFifoObject).name != "foo" {
 			t.Fatalf("unexpected object: %#v", obj)
 		}
@@ -480,6 +480,18 @@ func TestDeltaFIFO_UpdateResyncRace(t *testing.T) {
 	}
 }
 
+// pop2 captures both parameters, unlike Pop().
+func pop2[T any](queue Queue) (T, bool) {
+	var result interface{}
+	var isList bool
+	queue.Pop(func(obj interface{}, isInInitialList bool) error {
+		result = obj
+		isList = isInInitialList
+		return nil
+	})
+	return result.(T), isList
+}
+
 func TestDeltaFIFO_HasSyncedCorrectOnDeletion(t *testing.T) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KeyFunction: testFifoObjectKeyFunc,
@@ -501,9 +513,12 @@ func TestDeltaFIFO_HasSyncedCorrectOnDeletion(t *testing.T) {
 		if f.HasSynced() {
 			t.Errorf("Expected HasSynced to be false")
 		}
-		cur := Pop(f).(Deltas)
+		cur, initial := pop2[Deltas](f)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
+		}
+		if initial != true {
+			t.Error("Expected initial list item")
 		}
 	}
 	if !f.HasSynced() {
@@ -676,7 +691,7 @@ func TestDeltaFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 	const jobs = 10
 	for i := 0; i < jobs; i++ {
 		go func() {
-			f.Pop(func(obj interface{}) error {
+			f.Pop(func(obj interface{}, isInInitialList bool) error {
 				return nil
 			})
 			c <- struct{}{}

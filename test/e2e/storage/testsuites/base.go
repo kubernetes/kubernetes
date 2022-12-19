@@ -108,14 +108,14 @@ func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) op
 	return totOps
 }
 
-func getVolumeOpCounts(c clientset.Interface, config *rest.Config, pluginName string) opCounts {
+func getVolumeOpCounts(ctx context.Context, c clientset.Interface, config *rest.Config, pluginName string) opCounts {
 	if !framework.ProviderIs("gce", "gke", "aws") {
 		return opCounts{}
 	}
 
 	nodeLimit := 25
 
-	metricsGrabber, err := e2emetrics.NewMetricsGrabber(c, nil, config, true, false, true, false, false, false)
+	metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, c, nil, config, true, false, true, false, false, false)
 
 	if err != nil {
 		framework.ExpectNoError(err, "Error creating metrics grabber: %v", err)
@@ -126,19 +126,19 @@ func getVolumeOpCounts(c clientset.Interface, config *rest.Config, pluginName st
 		return opCounts{}
 	}
 
-	controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+	controllerMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
 	framework.ExpectNoError(err, "Error getting c-m metrics : %v", err)
 	totOps := getVolumeOpsFromMetricsForPlugin(testutil.Metrics(controllerMetrics), pluginName)
 
 	framework.Logf("Node name not specified for getVolumeOpCounts, falling back to listing nodes from API Server")
-	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err, "Error listing nodes: %v", err)
 	if len(nodes.Items) <= nodeLimit {
 		// For large clusters with > nodeLimit nodes it is too time consuming to
 		// gather metrics from all nodes. We just ignore the node metrics
 		// for those clusters
 		for _, node := range nodes.Items {
-			nodeMetrics, err := metricsGrabber.GrabFromKubelet(node.GetName())
+			nodeMetrics, err := metricsGrabber.GrabFromKubelet(ctx, node.GetName())
 			framework.ExpectNoError(err, "Error getting Kubelet %v metrics: %v", node.GetName(), err)
 			totOps = addOpCounts(totOps, getVolumeOpsFromMetricsForPlugin(testutil.Metrics(nodeMetrics), pluginName))
 		}
@@ -164,7 +164,7 @@ func addOpCounts(o1 opCounts, o2 opCounts) opCounts {
 	return totOps
 }
 
-func getMigrationVolumeOpCounts(cs clientset.Interface, config *rest.Config, pluginName string) (opCounts, opCounts) {
+func getMigrationVolumeOpCounts(ctx context.Context, cs clientset.Interface, config *rest.Config, pluginName string) (opCounts, opCounts) {
 	if len(pluginName) > 0 {
 		var migratedOps opCounts
 		l := csitrans.New()
@@ -174,16 +174,16 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, config *rest.Config, plu
 			migratedOps = opCounts{}
 		} else {
 			csiName = "kubernetes.io/csi:" + csiName
-			migratedOps = getVolumeOpCounts(cs, config, csiName)
+			migratedOps = getVolumeOpCounts(ctx, cs, config, csiName)
 		}
-		return getVolumeOpCounts(cs, config, pluginName), migratedOps
+		return getVolumeOpCounts(ctx, cs, config, pluginName), migratedOps
 	}
 	// Not an in-tree driver
 	framework.Logf("Test running for native CSI Driver, not checking metrics")
 	return opCounts{}, opCounts{}
 }
 
-func newMigrationOpCheck(cs clientset.Interface, config *rest.Config, pluginName string) *migrationOpCheck {
+func newMigrationOpCheck(ctx context.Context, cs clientset.Interface, config *rest.Config, pluginName string) *migrationOpCheck {
 	moc := migrationOpCheck{
 		cs:         cs,
 		config:     config,
@@ -223,16 +223,16 @@ func newMigrationOpCheck(cs clientset.Interface, config *rest.Config, pluginName
 		return &moc
 	}
 
-	moc.oldInTreeOps, moc.oldMigratedOps = getMigrationVolumeOpCounts(cs, config, pluginName)
+	moc.oldInTreeOps, moc.oldMigratedOps = getMigrationVolumeOpCounts(ctx, cs, config, pluginName)
 	return &moc
 }
 
-func (moc *migrationOpCheck) validateMigrationVolumeOpCounts() {
+func (moc *migrationOpCheck) validateMigrationVolumeOpCounts(ctx context.Context) {
 	if moc.skipCheck {
 		return
 	}
 
-	newInTreeOps, _ := getMigrationVolumeOpCounts(moc.cs, moc.config, moc.pluginName)
+	newInTreeOps, _ := getMigrationVolumeOpCounts(ctx, moc.cs, moc.config, moc.pluginName)
 
 	for op, count := range newInTreeOps {
 		if count != moc.oldInTreeOps[op] {

@@ -35,8 +35,7 @@ import (
 //   - Replies with 304 Not Modified, if If-None-Match header matches hash
 //
 // hash should be the value of calculateETag on object. If hash is empty, then
-//
-//	the object is simply serialized without E-Tag functionality
+// the object is simply serialized without E-Tag functionality
 func ServeHTTPWithETag(
 	object runtime.Object,
 	hash string,

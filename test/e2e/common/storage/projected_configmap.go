@@ -45,7 +45,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func(ctx context.Context) {
-		doProjectedConfigMapE2EWithoutMappings(f, false, 0, nil)
+		doProjectedConfigMapE2EWithoutMappings(ctx, f, false, 0, nil)
 	})
 
 	/*
@@ -56,14 +56,14 @@ var _ = SIGDescribe("Projected configMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		defaultMode := int32(0400)
-		doProjectedConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
+		doProjectedConfigMapE2EWithoutMappings(ctx, f, false, 0, &defaultMode)
 	})
 
 	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		doProjectedConfigMapE2EWithoutMappings(f, true, 1001, &defaultMode)
+		doProjectedConfigMapE2EWithoutMappings(ctx, f, true, 1001, &defaultMode)
 	})
 
 	/*
@@ -72,13 +72,13 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap as non-root user with uid 1000. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r--r--.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func(ctx context.Context) {
-		doProjectedConfigMapE2EWithoutMappings(f, true, 0, nil)
+		doProjectedConfigMapE2EWithoutMappings(ctx, f, true, 0, nil)
 	})
 
 	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-		doProjectedConfigMapE2EWithoutMappings(f, true, 1001, nil)
+		doProjectedConfigMapE2EWithoutMappings(ctx, f, true, 1001, nil)
 	})
 
 	/*
@@ -87,7 +87,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap with default permission mode. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -rw-r--r--.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func(ctx context.Context) {
-		doProjectedConfigMapE2EWithMappings(f, false, 0, nil)
+		doProjectedConfigMapE2EWithMappings(ctx, f, false, 0, nil)
 	})
 
 	/*
@@ -98,7 +98,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		mode := int32(0400)
-		doProjectedConfigMapE2EWithMappings(f, false, 0, &mode)
+		doProjectedConfigMapE2EWithMappings(ctx, f, false, 0, &mode)
 	})
 
 	/*
@@ -107,13 +107,13 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap as non-root user with uid 1000. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r--r--r--.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func(ctx context.Context) {
-		doProjectedConfigMapE2EWithMappings(f, true, 0, nil)
+		doProjectedConfigMapE2EWithMappings(ctx, f, true, 0, nil)
 	})
 
 	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
-		doProjectedConfigMapE2EWithMappings(f, true, 1001, nil)
+		doProjectedConfigMapE2EWithMappings(ctx, f, true, 1001, nil)
 	})
 
 	/*
@@ -122,7 +122,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap and performs a create and update to new value. Pod MUST be able to create the configMap with value-1. Pod MUST be able to update the value in the confgiMap to value-2.
 	*/
 	framework.ConformanceIt("updates should be reflected in volume [NodeConformance]", func(ctx context.Context) {
-		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
 		name := "projected-configmap-test-upd-" + string(uuid.NewUUID())
@@ -140,7 +140,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating projection with configMap that has name %s", configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -148,22 +148,22 @@ var _ = SIGDescribe("Projected configMap", func() {
 			"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1")
 
 		ginkgo.By("Creating the pod")
-		e2epod.NewPodClient(f).CreateSync(pod)
+		e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 		pollLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		}
 
-		gomega.Eventually(pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(ctx, pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 
 		ginkgo.By(fmt.Sprintf("Updating configmap %v", configMap.Name))
 		configMap.ResourceVersion = "" // to force update
 		configMap.Data["data-1"] = "value-2"
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, configMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "Failed to update configmap %q in namespace %q", configMap.Name, f.Namespace.Name)
 
 		ginkgo.By("waiting to observe update in volume")
-		gomega.Eventually(pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-2"))
+		gomega.Eventually(ctx, pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-2"))
 	})
 
 	/*
@@ -172,7 +172,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	   Description: Create a Pod with three containers with ConfigMaps namely a create, update and delete container. Create Container when started MUST not have configMap, update and delete containers MUST be created with a ConfigMap value as 'value-1'. Create a configMap in the create container, the Pod MUST be able to read the configMap from the create container. Update the configMap in the update container, Pod MUST be able to read the updated configMap value. Delete the configMap in the delete container. Pod MUST fail to read the configMap from the delete container.
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func(ctx context.Context) {
-		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
 		volumeMountPath := "/etc/projected-configmap-volumes"
@@ -218,12 +218,12 @@ var _ = SIGDescribe("Projected configMap", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", deleteConfigMap.Name))
 		var err error
-		if deleteConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), deleteConfigMap, metav1.CreateOptions{}); err != nil {
+		if deleteConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, deleteConfigMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", deleteConfigMap.Name, err)
 		}
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", updateConfigMap.Name))
-		if updateConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), updateConfigMap, metav1.CreateOptions{}); err != nil {
+		if updateConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, updateConfigMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", updateConfigMap.Name, err)
 		}
 
@@ -327,44 +327,44 @@ var _ = SIGDescribe("Projected configMap", func() {
 			},
 		}
 		ginkgo.By("Creating the pod")
-		e2epod.NewPodClient(f).CreateSync(pod)
+		e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 		pollCreateLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
 		}
-		gomega.Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/create/data-1"))
+		gomega.Eventually(ctx, pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/create/data-1"))
 
 		pollUpdateLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
 		}
-		gomega.Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/update/data-3"))
+		gomega.Eventually(ctx, pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/update/data-3"))
 
 		pollDeleteLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
 		}
-		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(ctx, pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 
 		ginkgo.By(fmt.Sprintf("Deleting configmap %v", deleteConfigMap.Name))
-		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), deleteConfigMap.Name, metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, deleteConfigMap.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete configmap %q in namespace %q", deleteConfigMap.Name, f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Updating configmap %v", updateConfigMap.Name))
 		updateConfigMap.ResourceVersion = "" // to force update
 		delete(updateConfigMap.Data, "data-1")
 		updateConfigMap.Data["data-3"] = "value-3"
-		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), updateConfigMap, metav1.UpdateOptions{})
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, updateConfigMap, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "Failed to update configmap %q in namespace %q", updateConfigMap.Name, f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", createConfigMap.Name))
-		if createConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), createConfigMap, metav1.CreateOptions{}); err != nil {
+		if createConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, createConfigMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", createConfigMap.Name, err)
 		}
 
 		ginkgo.By("waiting to observe update in volume")
 
-		gomega.Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
-		gomega.Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-3"))
-		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/delete/data-1"))
+		gomega.Eventually(ctx, pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(ctx, pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-3"))
+		gomega.Eventually(ctx, pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/delete/data-1"))
 	})
 
 	/*
@@ -384,7 +384,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -451,7 +451,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 			},
 		}
 
-		e2epodoutput.TestContainerOutput(f, "consume configMaps", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "consume configMaps", pod, 0, []string{
 			"content of file \"/etc/projected-configmap-volume/data-1\": value-1",
 		})
 
@@ -462,7 +462,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	//Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/projected-configmap-volumes"
-		pod, err := createNonOptionalConfigMapPod(f, volumeMountPath)
+		pod, err := createNonOptionalConfigMapPod(ctx, f, volumeMountPath)
 		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
 	})
 
@@ -471,12 +471,12 @@ var _ = SIGDescribe("Projected configMap", func() {
 	//Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
-		pod, err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath)
+		pod, err := createNonOptionalConfigMapPodWithConfig(ctx, f, volumeMountPath)
 		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
 	})
 })
 
-func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool, fsGroup int64, defaultMode *int32) {
+func doProjectedConfigMapE2EWithoutMappings(ctx context.Context, f *framework.Framework, asUser bool, fsGroup int64, defaultMode *int32) {
 	groupID := int64(fsGroup)
 
 	var (
@@ -488,7 +488,7 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool,
 
 	ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 	var err error
-	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
@@ -513,10 +513,10 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool,
 		"content of file \"/etc/projected-configmap-volume/data-1\": value-1",
 		fileModeRegexp,
 	}
-	e2epodoutput.TestContainerOutputRegexp(f, "consume configMaps", pod, 0, output)
+	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume configMaps", pod, 0, output)
 }
 
-func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int64, itemMode *int32) {
+func doProjectedConfigMapE2EWithMappings(ctx context.Context, f *framework.Framework, asUser bool, fsGroup int64, itemMode *int32) {
 	groupID := int64(fsGroup)
 
 	var (
@@ -529,7 +529,7 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fs
 	ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 
 	var err error
-	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
@@ -564,7 +564,7 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fs
 		fileModeRegexp := getFileModeRegex("/etc/projected-configmap-volume/path/to/data-2", itemMode)
 		output = append(output, fileModeRegexp)
 	}
-	e2epodoutput.TestContainerOutputRegexp(f, "consume configMaps", pod, 0, output)
+	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume configMaps", pod, 0, output)
 }
 
 func createProjectedConfigMapMounttestPod(namespace, volumeName, referenceName, mountPath string, mounttestArgs ...string) *v1.Pod {

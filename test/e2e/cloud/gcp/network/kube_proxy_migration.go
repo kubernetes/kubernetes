@@ -69,7 +69,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(true)
 			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, kubeProxyUpgradeTest, extraEnvs, extraEnvs)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, upgradeTestFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(ctx, upgCtx, upgradeTests, upgradeTestFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -87,7 +87,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(false)
 			upgradeFunc := common.ClusterDowngradeFunc(f, upgCtx, kubeProxyDowngradeTest, extraEnvs, extraEnvs)
-			upgrades.RunUpgradeSuite(upgCtx, downgradeTests, downgradeTestsFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(ctx, upgCtx, downgradeTests, downgradeTestsFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })

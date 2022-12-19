@@ -68,7 +68,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		restMapper.Reset()
 		apiVersionsGetter := customclient.NewAvailableAPIsGetter(discoveryClient)
 		customMetricsClient := customclient.NewForConfig(config, restMapper, apiVersionsGetter)
-		testCustomMetrics(f, kubeClient, customMetricsClient, discoveryClient, AdapterForOldResourceModel)
+		testCustomMetrics(ctx, f, kubeClient, customMetricsClient, discoveryClient, AdapterForOldResourceModel)
 	})
 
 	ginkgo.It("should run Custom Metrics - Stackdriver Adapter for new resource model [Feature:StackdriverCustomMetrics]", func(ctx context.Context) {
@@ -83,7 +83,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		restMapper.Reset()
 		apiVersionsGetter := customclient.NewAvailableAPIsGetter(discoveryClient)
 		customMetricsClient := customclient.NewForConfig(config, restMapper, apiVersionsGetter)
-		testCustomMetrics(f, kubeClient, customMetricsClient, discoveryClient, AdapterForNewResourceModel)
+		testCustomMetrics(ctx, f, kubeClient, customMetricsClient, discoveryClient, AdapterForNewResourceModel)
 	})
 
 	ginkgo.It("should run Custom Metrics - Stackdriver Adapter for external metrics [Feature:StackdriverExternalMetrics]", func(ctx context.Context) {
@@ -93,14 +93,13 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 			framework.Failf("Failed to load config: %s", err)
 		}
 		externalMetricsClient := externalclient.NewForConfigOrDie(config)
-		testExternalMetrics(f, kubeClient, externalMetricsClient)
+		testExternalMetrics(ctx, f, kubeClient, externalMetricsClient)
 	})
 })
 
-func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, customMetricsClient customclient.CustomMetricsClient, discoveryClient *discovery.DiscoveryClient, adapterDeployment string) {
+func testCustomMetrics(ctx context.Context, f *framework.Framework, kubeClient clientset.Interface, customMetricsClient customclient.CustomMetricsClient, discoveryClient *discovery.DiscoveryClient, adapterDeployment string) {
 	projectID := framework.TestContext.CloudConfig.ProjectID
 
-	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
 	framework.ExpectNoError(err)
 
@@ -122,14 +121,14 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 	}
 	ginkgo.DeferCleanup(CleanupAdapter, adapterDeployment)
 
-	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), HPAPermissions, metav1.CreateOptions{})
+	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(ctx, HPAPermissions, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create ClusterRoleBindings: %v", err)
 	}
 	ginkgo.DeferCleanup(kubeClient.RbacV1().ClusterRoleBindings().Delete, HPAPermissions.Name, metav1.DeleteOptions{})
 
 	// Run application that exports the metric
-	_, err = createSDExporterPods(f, kubeClient)
+	_, err = createSDExporterPods(ctx, f, kubeClient)
 	if err != nil {
 		framework.Failf("Failed to create stackdriver-exporter pod: %s", err)
 	}
@@ -144,10 +143,9 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 }
 
 // TODO(kawych): migrate this test to new resource model
-func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface, externalMetricsClient externalclient.ExternalMetricsClient) {
+func testExternalMetrics(ctx context.Context, f *framework.Framework, kubeClient clientset.Interface, externalMetricsClient externalclient.ExternalMetricsClient) {
 	projectID := framework.TestContext.CloudConfig.ProjectID
 
-	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
 	framework.ExpectNoError(err)
 
@@ -170,14 +168,14 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 	}
 	ginkgo.DeferCleanup(CleanupAdapter, AdapterForOldResourceModel)
 
-	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(context.TODO(), HPAPermissions, metav1.CreateOptions{})
+	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(ctx, HPAPermissions, metav1.CreateOptions{})
 	if err != nil {
 		framework.Failf("Failed to create ClusterRoleBindings: %v", err)
 	}
 	ginkgo.DeferCleanup(kubeClient.RbacV1().ClusterRoleBindings().Delete, HPAPermissions.Name, metav1.DeleteOptions{})
 
 	// Run application that exports the metric
-	pod, err := createSDExporterPods(f, kubeClient)
+	pod, err := createSDExporterPods(ctx, f, kubeClient)
 	if err != nil {
 		framework.Failf("Failed to create stackdriver-exporter pod: %s", err)
 	}
@@ -259,22 +257,22 @@ func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetric
 	}
 }
 
-func cleanupSDExporterPod(f *framework.Framework, cs clientset.Interface) {
-	err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod1, metav1.DeleteOptions{})
+func cleanupSDExporterPod(ctx context.Context, f *framework.Framework, cs clientset.Interface) {
+	err := cs.CoreV1().Pods(f.Namespace.Name).Delete(ctx, stackdriverExporterPod1, metav1.DeleteOptions{})
 	if err != nil {
 		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod1, err)
 	}
-	err = cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), stackdriverExporterPod2, metav1.DeleteOptions{})
+	err = cs.CoreV1().Pods(f.Namespace.Name).Delete(ctx, stackdriverExporterPod2, metav1.DeleteOptions{})
 	if err != nil {
 		framework.Logf("Failed to delete %s pod: %v", stackdriverExporterPod2, err)
 	}
 }
 
-func createSDExporterPods(f *framework.Framework, cs clientset.Interface) (*v1.Pod, error) {
-	pod, err := cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), StackdriverExporterPod(stackdriverExporterPod1, f.Namespace.Name, stackdriverExporterLabel, CustomMetricName, CustomMetricValue), metav1.CreateOptions{})
+func createSDExporterPods(ctx context.Context, f *framework.Framework, cs clientset.Interface) (*v1.Pod, error) {
+	pod, err := cs.CoreV1().Pods(f.Namespace.Name).Create(ctx, StackdriverExporterPod(stackdriverExporterPod1, f.Namespace.Name, stackdriverExporterLabel, CustomMetricName, CustomMetricValue), metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
-	_, err = cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), StackdriverExporterPod(stackdriverExporterPod2, f.Namespace.Name, stackdriverExporterLabel, UnusedMetricName, UnusedMetricValue), metav1.CreateOptions{})
+	_, err = cs.CoreV1().Pods(f.Namespace.Name).Create(ctx, StackdriverExporterPod(stackdriverExporterPod2, f.Namespace.Name, stackdriverExporterLabel, UnusedMetricName, UnusedMetricValue), metav1.CreateOptions{})
 	return pod, err
 }

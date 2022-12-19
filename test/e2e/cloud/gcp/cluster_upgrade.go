@@ -72,7 +72,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest)
 
 			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, masterUpgradeTest, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(ctx, upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -86,7 +86,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, clusterUpgradeTest)
 
 			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, clusterUpgradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(ctx, upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -106,7 +106,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, clusterDowngradeTest)
 
 			upgradeFunc := common.ClusterDowngradeFunc(f, upgCtx, clusterDowngradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(ctx, upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })

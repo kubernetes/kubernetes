@@ -143,9 +143,8 @@ type PodControllerRefManager struct {
 // If CanAdopt() returns a non-nil error, all adoptions will fail.
 //
 // NOTE: Once CanAdopt() is called, it will not be called again by the same
-//
-//	PodControllerRefManager instance. Create a new instance if it makes
-//	sense to check CanAdopt() again (e.g. in a different sync pass).
+// PodControllerRefManager instance. Create a new instance if it makes
+// sense to check CanAdopt() again (e.g. in a different sync pass).
 func NewPodControllerRefManager(
 	podControl PodControlInterface,
 	controller metav1.Object,
@@ -284,9 +283,8 @@ type ReplicaSetControllerRefManager struct {
 // If CanAdopt() returns a non-nil error, all adoptions will fail.
 //
 // NOTE: Once CanAdopt() is called, it will not be called again by the same
-//
-//	ReplicaSetControllerRefManager instance. Create a new instance if it
-//	makes sense to check CanAdopt() again (e.g. in a different sync pass).
+// ReplicaSetControllerRefManager instance. Create a new instance if it
+// makes sense to check CanAdopt() again (e.g. in a different sync pass).
 func NewReplicaSetControllerRefManager(
 	rsControl RSControlInterface,
 	controller metav1.Object,
@@ -423,9 +421,8 @@ type ControllerRevisionControllerRefManager struct {
 // If canAdopt() returns a non-nil error, all adoptions will fail.
 //
 // NOTE: Once canAdopt() is called, it will not be called again by the same
-//
-//	ControllerRevisionControllerRefManager instance. Create a new instance if it
-//	makes sense to check canAdopt() again (e.g. in a different sync pass).
+// ControllerRevisionControllerRefManager instance. Create a new instance if it
+// makes sense to check canAdopt() again (e.g. in a different sync pass).
 func NewControllerRevisionControllerRefManager(
 	crControl ControllerRevisionControlInterface,
 	controller metav1.Object,

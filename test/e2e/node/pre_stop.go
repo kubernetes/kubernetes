@@ -43,11 +43,11 @@ type State struct {
 	Received map[string]int
 }
 
-func testPreStop(c clientset.Interface, ns string) {
+func testPreStop(ctx context.Context, c clientset.Interface, ns string) {
 	// This is the server that will receive the preStop notification
 	podDescr := e2epod.NewAgnhostPod(ns, "server", nil, nil, []v1.ContainerPort{{ContainerPort: 8080}}, "nettest")
 	ginkgo.By(fmt.Sprintf("Creating server pod %s in namespace %s", podDescr.Name, ns))
-	podDescr, err := c.CoreV1().Pods(ns).Create(context.TODO(), podDescr, metav1.CreateOptions{})
+	podDescr, err := c.CoreV1().Pods(ns).Create(ctx, podDescr, metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
@@ -57,12 +57,12 @@ func testPreStop(c clientset.Interface, ns string) {
 	})
 
 	ginkgo.By("Waiting for pods to come up.")
-	err = e2epod.WaitForPodRunningInNamespace(c, podDescr)
+	err = e2epod.WaitForPodRunningInNamespace(ctx, c, podDescr)
 	framework.ExpectNoError(err, "waiting for server pod to start")
 
 	val := "{\"Source\": \"prestop\"}"
 
-	podOut, err := c.CoreV1().Pods(ns).Get(context.TODO(), podDescr.Name, metav1.GetOptions{})
+	podOut, err := c.CoreV1().Pods(ns).Get(ctx, podDescr.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "getting pod info")
 
 	podURL := net.JoinHostPort(podOut.Status.PodIP, "8080")
@@ -92,7 +92,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	}
 
 	ginkgo.By(fmt.Sprintf("Creating tester pod %s in namespace %s", preStopDescr.Name, ns))
-	preStopDescr, err = c.CoreV1().Pods(ns).Create(context.TODO(), preStopDescr, metav1.CreateOptions{})
+	preStopDescr, err = c.CoreV1().Pods(ns).Create(ctx, preStopDescr, metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", preStopDescr.Name))
 	deletePreStop := true
 
@@ -105,12 +105,12 @@ func testPreStop(c clientset.Interface, ns string) {
 		return nil
 	})
 
-	err = e2epod.WaitForPodRunningInNamespace(c, preStopDescr)
+	err = e2epod.WaitForPodRunningInNamespace(ctx, c, preStopDescr)
 	framework.ExpectNoError(err, "waiting for tester pod to start")
 
 	// Delete the pod with the preStop handler.
 	ginkgo.By("Deleting pre-stop pod")
-	if err := c.CoreV1().Pods(ns).Delete(context.TODO(), preStopDescr.Name, metav1.DeleteOptions{}); err == nil {
+	if err := c.CoreV1().Pods(ns).Delete(ctx, preStopDescr.Name, metav1.DeleteOptions{}); err == nil {
 		deletePreStop = false
 	}
 	framework.ExpectNoError(err, fmt.Sprintf("deleting pod: %s", preStopDescr.Name))
@@ -118,7 +118,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	// Validate that the server received the web poke.
 	err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
 
-		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		ctx, cancel := context.WithTimeout(ctx, framework.SingleCallTimeout)
 		defer cancel()
 
 		var body []byte
@@ -167,7 +167,7 @@ var _ = SIGDescribe("PreStop", func() {
 		Description: Create a server pod with a rest endpoint '/write' that changes state.Received field. Create a Pod with a pre-stop handle that posts to the /write endpoint on the server Pod. Verify that the Pod with pre-stop hook is running. Delete the Pod with the pre-stop hook. Before the Pod is deleted, pre-stop handler MUST be called when configured. Verify that the Pod is deleted and a call to prestop hook is verified by checking the status received on the server Pod.
 	*/
 	framework.ConformanceIt("should call prestop when killing a pod ", func(ctx context.Context) {
-		testPreStop(f.ClientSet, f.Namespace.Name)
+		testPreStop(ctx, f.ClientSet, f.Namespace.Name)
 	})
 
 	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func(ctx context.Context) {
@@ -177,17 +177,17 @@ var _ = SIGDescribe("PreStop", func() {
 		pod := getPodWithpreStopLifeCycle(name)
 
 		ginkgo.By("submitting the pod to kubernetes")
-		podClient.Create(pod)
+		podClient.Create(ctx, pod)
 
 		ginkgo.By("waiting for pod running")
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
 
 		var err error
-		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		ginkgo.By("deleting the pod gracefully")
-		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
+		err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
 		framework.ExpectNoError(err, "failed to delete pod")
 
 		// wait for less than the gracePeriod termination ensuring the
@@ -197,7 +197,7 @@ var _ = SIGDescribe("PreStop", func() {
 		ginkgo.By("verifying the pod is running while in the graceful period termination")
 		result := &v1.PodList{}
 		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
-			client, err := e2ekubelet.ProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
+			client, err := e2ekubelet.ProxyRequest(ctx, f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
 			framework.ExpectNoError(err, "failed to get the pods of the node")
 			err = client.Into(result)
 			framework.ExpectNoError(err, "failed to parse the pods of the node")

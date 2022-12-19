@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -28,23 +29,23 @@ import (
 )
 
 // AfterSuiteActions are actions that are run on ginkgo's SynchronizedAfterSuite
-func AfterSuiteActions() {
+func AfterSuiteActions(ctx context.Context) {
 	// Run only Ginkgo on node 1
 	framework.Logf("Running AfterSuite actions on node 1")
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 	}
 	if framework.TestContext.GatherSuiteMetricsAfterTest {
-		if err := gatherTestSuiteMetrics(); err != nil {
+		if err := gatherTestSuiteMetrics(ctx); err != nil {
 			framework.Logf("Error gathering metrics: %v", err)
 		}
 	}
-	if framework.TestContext.NodeKiller.Enabled {
-		close(framework.TestContext.NodeKiller.NodeKillerStopCh)
+	if framework.TestContext.NodeKiller.NodeKillerStop != nil {
+		framework.TestContext.NodeKiller.NodeKillerStop()
 	}
 }
 
-func gatherTestSuiteMetrics() error {
+func gatherTestSuiteMetrics(ctx context.Context) error {
 	framework.Logf("Gathering metrics")
 	config, err := framework.LoadConfig()
 	if err != nil {
@@ -56,12 +57,12 @@ func gatherTestSuiteMetrics() error {
 	}
 
 	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case) and cluster autoscaler (optionally).
-	grabber, err := e2emetrics.NewMetricsGrabber(c, nil, config, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
+	grabber, err := e2emetrics.NewMetricsGrabber(ctx, c, nil, config, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
 	if err != nil {
 		return fmt.Errorf("failed to create MetricsGrabber: %v", err)
 	}
 
-	received, err := grabber.Grab()
+	received, err := grabber.Grab(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to grab metrics: %v", err)
 	}

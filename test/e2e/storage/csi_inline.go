@@ -82,33 +82,33 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		}
 
 		ginkgo.By("creating")
-		createdDriver1, err := client.Create(context.TODO(), driver1, metav1.CreateOptions{})
+		createdDriver1, err := client.Create(ctx, driver1, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		createdDriver2, err := client.Create(context.TODO(), driver2, metav1.CreateOptions{})
+		createdDriver2, err := client.Create(ctx, driver2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		_, err = client.Create(context.TODO(), driver1, metav1.CreateOptions{})
+		_, err = client.Create(ctx, driver1, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
 			framework.Failf("expected 409, got %#v", err)
 		}
 
 		ginkgo.By("getting")
-		retrievedDriver1, err := client.Get(context.TODO(), createdDriver1.Name, metav1.GetOptions{})
+		retrievedDriver1, err := client.Get(ctx, createdDriver1.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(retrievedDriver1.UID, createdDriver1.UID)
-		retrievedDriver2, err := client.Get(context.TODO(), createdDriver2.Name, metav1.GetOptions{})
+		retrievedDriver2, err := client.Get(ctx, createdDriver2.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(retrievedDriver2.UID, createdDriver2.UID)
 
 		ginkgo.By("listing")
-		driverList, err := client.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		driverList, err := client.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(driverList.Items), 2, "filtered list should have 2 items, got: %s", driverList)
 
 		ginkgo.By("deleting")
 		for _, driver := range driverList.Items {
-			err := client.Delete(context.TODO(), driver.Name, metav1.DeleteOptions{})
+			err := client.Delete(ctx, driver.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-			retrievedDriver, err := client.Get(context.TODO(), driver.Name, metav1.GetOptions{})
+			retrievedDriver, err := client.Get(ctx, driver.Name, metav1.GetOptions{})
 			switch {
 			case apierrors.IsNotFound(err):
 				// Okay, normal case.
@@ -188,32 +188,32 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		}
 
 		ginkgo.By("creating")
-		createdPod, err := client.Create(context.TODO(), pod, metav1.CreateOptions{})
+		createdPod, err := client.Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		_, err = client.Create(context.TODO(), pod, metav1.CreateOptions{})
+		_, err = client.Create(ctx, pod, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
 			framework.Failf("expected 409, got %#v", err)
 		}
 
 		ginkgo.By("getting")
-		retrievedPod, err := client.Get(context.TODO(), podName, metav1.GetOptions{})
+		retrievedPod, err := client.Get(ctx, podName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(retrievedPod.UID, createdPod.UID)
 
 		ginkgo.By("listing in namespace")
-		podList, err := client.List(context.TODO(), metav1.ListOptions{})
+		podList, err := client.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(podList.Items), 1, "list should have 1 items, got: %s", podList)
 
 		ginkgo.By("patching")
-		patchedPod, err := client.Patch(context.TODO(), createdPod.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
+		patchedPod, err := client.Patch(ctx, createdPod.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(patchedPod.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("deleting")
-		err = client.Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
+		err = client.Delete(ctx, createdPod.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
-		retrievedPod, err = client.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})
+		retrievedPod, err = client.Get(ctx, createdPod.Name, metav1.GetOptions{})
 		switch {
 		case apierrors.IsNotFound(err):
 			// Okay, normal case.

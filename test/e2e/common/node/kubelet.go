@@ -50,7 +50,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 		*/
 		framework.ConformanceIt("should print the output to logs [NodeConformance]", func(ctx context.Context) {
-			podClient.CreateSync(&v1.Pod{
+			podClient.CreateSync(ctx, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
@@ -66,9 +66,9 @@ var _ = SIGDescribe("Kubelet", func() {
 					},
 				},
 			})
-			gomega.Eventually(func() string {
+			gomega.Eventually(ctx, func() string {
 				sinceTime := metav1.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream(context.TODO())
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream(ctx)
 				if err != nil {
 					return ""
 				}
@@ -82,9 +82,9 @@ var _ = SIGDescribe("Kubelet", func() {
 	ginkgo.Context("when scheduling a busybox command that always fails in a pod", func() {
 		var podName string
 
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			podName = "bin-false" + string(uuid.NewUUID())
-			podClient.Create(&v1.Pod{
+			podClient.Create(ctx, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
@@ -108,8 +108,8 @@ var _ = SIGDescribe("Kubelet", func() {
 			Description: Create a Pod with terminated state. Pod MUST have only one container. Container MUST be in terminated state and MUST have an terminated reason.
 		*/
 		framework.ConformanceIt("should have an terminated reason [NodeConformance]", func(ctx context.Context) {
-			gomega.Eventually(func() error {
-				podData, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
+			gomega.Eventually(ctx, func() error {
+				podData, err := podClient.Get(ctx, podName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -133,7 +133,7 @@ var _ = SIGDescribe("Kubelet", func() {
 			Description: Create a Pod with terminated state. This terminated pod MUST be able to be deleted.
 		*/
 		framework.ConformanceIt("should be possible to delete [NodeConformance]", func(ctx context.Context) {
-			err := podClient.Delete(context.TODO(), podName, metav1.DeleteOptions{})
+			err := podClient.Delete(ctx, podName, metav1.DeleteOptions{})
 			gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})
@@ -156,12 +156,12 @@ var _ = SIGDescribe("Kubelet", func() {
 				},
 			}
 
-			pod = podClient.Create(pod)
+			pod = podClient.Create(ctx, pod)
 			ginkgo.By("Waiting for pod completion")
-			err := e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 			framework.ExpectNoError(err)
 
-			rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
+			rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 			framework.ExpectNoError(err)
 			defer rc.Close()
 			buf := new(bytes.Buffer)
@@ -183,7 +183,7 @@ var _ = SIGDescribe("Kubelet", func() {
 		*/
 		framework.ConformanceIt("should not write to root filesystem [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 			isReadOnly := true
-			podClient.CreateSync(&v1.Pod{
+			podClient.CreateSync(ctx, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},
@@ -202,8 +202,8 @@ var _ = SIGDescribe("Kubelet", func() {
 					},
 				},
 			})
-			gomega.Eventually(func() string {
-				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(context.TODO())
+			gomega.Eventually(ctx, func() string {
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 				if err != nil {
 					return ""
 				}

@@ -303,7 +303,7 @@ var annotationsToSkip = map[string]bool{
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
 // TODO: How to decide which annotations should / should not be copied?
 //
-//	See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
+// See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
 func skipCopyAnnotation(key string) bool {
 	return annotationsToSkip[key]
 }

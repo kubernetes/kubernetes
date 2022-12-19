@@ -49,7 +49,7 @@ var _ = Describe("nodes", func() {
 
 	ginkgo.It("should have CRI annotation", func(ctx context.Context) {
 		nodes, err := f.ClientSet.CoreV1().Nodes().
-			List(context.TODO(), metav1.ListOptions{})
+			List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading nodes")
 
 		// Checks that the nodes have the CRI socket annotation

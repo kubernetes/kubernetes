@@ -74,8 +74,8 @@ func mysqlKubectlCreate(ns, file string) {
 	e2ekubectl.RunKubectlOrDieInput(ns, input, "create", "-f", "-")
 }
 
-func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
-	svc, err := f.ClientSet.CoreV1().Services(ns).Get(context.TODO(), svcName, metav1.GetOptions{})
+func (t *MySQLUpgradeTest) getServiceIP(ctx context.Context, f *framework.Framework, ns, svcName string) string {
+	svc, err := f.ClientSet.CoreV1().Services(ns).Get(ctx, svcName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
@@ -88,7 +88,7 @@ func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName stri
 // from the db. It then connects to the db with the write Service and populates the db with a table
 // and a few entries. Finally, it connects to the db with the read Service, and confirms the data is
 // available. The db connections are left open to be used later in the test.
-func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
+func (t *MySQLUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	ns := f.Namespace.Name
 	statefulsetPoll := 30 * time.Second
 	statefulsetTimeout := 10 * time.Minute
@@ -97,14 +97,14 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 	mysqlKubectlCreate(ns, "configmap.yaml")
 
 	ginkgo.By("Creating a mysql StatefulSet")
-	e2estatefulset.CreateStatefulSet(f.ClientSet, mysqlManifestPath, ns)
+	e2estatefulset.CreateStatefulSet(ctx, f.ClientSet, mysqlManifestPath, ns)
 
 	ginkgo.By("Creating a mysql-test-server deployment")
 	mysqlKubectlCreate(ns, "tester.yaml")
 
 	ginkgo.By("Getting the ingress IPs from the test-service")
-	err := wait.PollImmediate(statefulsetPoll, statefulsetTimeout, func() (bool, error) {
-		if t.ip = t.getServiceIP(f, ns, "test-server"); t.ip == "" {
+	err := wait.PollImmediateWithContext(ctx, statefulsetPoll, statefulsetTimeout, func(ctx context.Context) (bool, error) {
+		if t.ip = t.getServiceIP(ctx, f, ns, "test-server"); t.ip == "" {
 			return false, nil
 		}
 		if _, err := t.countNames(); err != nil {
@@ -130,7 +130,7 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 
 // Test continually polls the db using the read and write connections, inserting data, and checking
 // that all the data is readable.
-func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
+func (t *MySQLUpgradeTest) Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	var writeSuccess, readSuccess, writeFailure, readFailure int
 	ginkgo.By("Continuously polling the database during upgrade.")
 	go wait.Until(func() {
@@ -174,7 +174,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 }
 
 // Teardown performs one final check of the data's availability.
-func (t *MySQLUpgradeTest) Teardown(f *framework.Framework) {
+func (t *MySQLUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	count, err := t.countNames()
 	framework.ExpectNoError(err)
 	gomega.Expect(count).To(gomega.BeNumerically(">=", t.successfulWrites), "count is too small")

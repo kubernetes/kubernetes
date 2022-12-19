@@ -69,15 +69,14 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should have cluster metrics [Feature:StackdriverMonitoring]", func(ctx context.Context) {
-		testStackdriverMonitoring(f, 1, 100, 200)
+		testStackdriverMonitoring(ctx, f, 1, 100, 200)
 	})
 
 })
 
-func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, perPodCPU int64) {
+func testStackdriverMonitoring(ctx context.Context, f *framework.Framework, pods, allPodsCPU int, perPodCPU int64) {
 	projectID := framework.TestContext.CloudConfig.ProjectID
 
-	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
 	framework.ExpectNoError(err)
 
@@ -105,10 +104,10 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 
 	framework.ExpectNoError(err)
 
-	rc := e2eautoscaling.NewDynamicResourceConsumer(rcName, f.Namespace.Name, e2eautoscaling.KindDeployment, pods, allPodsCPU, memoryUsed, 0, perPodCPU, memoryLimit, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
+	rc := e2eautoscaling.NewDynamicResourceConsumer(ctx, rcName, f.Namespace.Name, e2eautoscaling.KindDeployment, pods, allPodsCPU, memoryUsed, 0, perPodCPU, memoryLimit, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
 	ginkgo.DeferCleanup(rc.CleanUp)
 
-	rc.WaitForReplicas(pods, 15*time.Minute)
+	rc.WaitForReplicas(ctx, pods, 15*time.Minute)
 
 	metricsMap := map[string]bool{}
 	pollingFunction := checkForMetrics(projectID, gcmService, time.Now(), metricsMap, allPodsCPU, perPodCPU)

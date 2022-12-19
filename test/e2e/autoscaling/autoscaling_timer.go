@@ -39,9 +39,9 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 	var experiment *gmeasure.Experiment
 
 	ginkgo.Describe("Autoscaling a service", func() {
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			// Check if Cloud Autoscaler is enabled by trying to get its ConfigMap.
-			_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "cluster-autoscaler-status", metav1.GetOptions{})
+			_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get(ctx, "cluster-autoscaler-status", metav1.GetOptions{})
 			if err != nil {
 				e2eskipper.Skipf("test expects Cluster Autoscaler to be enabled")
 			}
@@ -54,7 +54,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 			var nodeGroupName string // Set by BeforeEach, used by AfterEach to scale this node group down after the test.
 			var nodes *v1.NodeList   // Set by BeforeEach, used by Measure to calculate CPU request based on node's sizes.
 
-			ginkgo.BeforeEach(func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
 				// Make sure there is only 1 node group, otherwise this test becomes useless.
 				nodeGroups := strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",")
 				if len(nodeGroups) != 1 {
@@ -70,19 +70,19 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				}
 
 				// Make sure all nodes are schedulable, otherwise we are in some kind of a problem state.
-				nodes, err = e2enode.GetReadySchedulableNodes(f.ClientSet)
+				nodes, err = e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 				framework.ExpectNoError(err)
 				schedulableCount := len(nodes.Items)
 				framework.ExpectEqual(schedulableCount, nodeGroupSize, "not all nodes are schedulable")
 			})
 
-			ginkgo.AfterEach(func() {
+			ginkgo.AfterEach(func(ctx context.Context) {
 				// Attempt cleanup only if a node group was targeted for scale up.
 				// Otherwise the test was probably skipped and we'll get a gcloud error due to invalid parameters.
 				if len(nodeGroupName) > 0 {
 					// Scale down back to only 'nodesNum' nodes, as expected at the start of the test.
 					framework.ExpectNoError(framework.ResizeGroup(nodeGroupName, nodesNum))
-					framework.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, nodesNum, 15*time.Minute))
+					framework.ExpectNoError(e2enode.WaitForReadyNodes(ctx, f.ClientSet, nodesNum, 15*time.Minute))
 				}
 			})
 
@@ -102,21 +102,21 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				nodeMemoryMB := (&nodeMemoryBytes).Value() / 1024 / 1024
 				memRequestMB := nodeMemoryMB / 10 // Ensure each pod takes not more than 10% of node's allocatable memory.
 				replicas := 1
-				resourceConsumer := e2eautoscaling.NewDynamicResourceConsumer("resource-consumer", f.Namespace.Name, e2eautoscaling.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
+				resourceConsumer := e2eautoscaling.NewDynamicResourceConsumer(ctx, "resource-consumer", f.Namespace.Name, e2eautoscaling.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
 				ginkgo.DeferCleanup(resourceConsumer.CleanUp)
-				resourceConsumer.WaitForReplicas(replicas, 1*time.Minute) // Should finish ~immediately, so 1 minute is more than enough.
+				resourceConsumer.WaitForReplicas(ctx, replicas, 1*time.Minute) // Should finish ~immediately, so 1 minute is more than enough.
 
 				// Enable Horizontal Pod Autoscaler with 50% target utilization and
 				// scale up the CPU usage to trigger autoscaling to 8 pods for target to be satisfied.
 				targetCPUUtilizationPercent := int32(50)
-				hpa := e2eautoscaling.CreateCPUResourceHorizontalPodAutoscaler(resourceConsumer, targetCPUUtilizationPercent, 1, 10)
+				hpa := e2eautoscaling.CreateCPUResourceHorizontalPodAutoscaler(ctx, resourceConsumer, targetCPUUtilizationPercent, 1, 10)
 				ginkgo.DeferCleanup(e2eautoscaling.DeleteHorizontalPodAutoscaler, resourceConsumer, hpa.Name)
 				cpuLoad := 8 * cpuRequestMillis * int64(targetCPUUtilizationPercent) / 100 // 8 pods utilized to the target level
 				resourceConsumer.ConsumeCPU(int(cpuLoad))
 
 				// Measure the time it takes for the service to scale to 8 pods with 50% CPU utilization each.
 				experiment.SampleDuration("total scale-up time", func(idx int) {
-					resourceConsumer.WaitForReplicas(8, timeToWait)
+					resourceConsumer.WaitForReplicas(ctx, 8, timeToWait)
 				}, gmeasure.SamplingConfig{N: 1})
 			}) // Increase to run the test more than once.
 		})

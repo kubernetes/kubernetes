@@ -18,6 +18,7 @@ package network
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"regexp"
@@ -58,10 +59,10 @@ func GetHTTPContent(host string, port int, timeout time.Duration, url string) (s
 }
 
 // GetHTTPContentFromTestContainer returns the content of the given url by HTTP via a test container.
-func GetHTTPContentFromTestContainer(config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, dialCmd string) (string, error) {
+func GetHTTPContentFromTestContainer(ctx context.Context, config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, dialCmd string) (string, error) {
 	var body string
 	pollFn := func() (bool, error) {
-		resp, err := config.GetResponseFromTestContainer("http", dialCmd, host, port)
+		resp, err := config.GetResponseFromTestContainer(ctx, "http", dialCmd, host, port)
 		if err != nil || len(resp.Errors) > 0 || len(resp.Responses) == 0 {
 			return false, nil
 		}
@@ -87,14 +88,14 @@ func DescribeSvc(ns string) {
 // For security reasons, and also to allow clusters to use userspace SCTP implementations,
 // we require that just creating an SCTP Pod/Service/NetworkPolicy must not do anything
 // that would cause the sctp kernel module to be loaded.
-func CheckSCTPModuleLoadedOnNodes(f *framework.Framework, nodes *v1.NodeList) bool {
+func CheckSCTPModuleLoadedOnNodes(ctx context.Context, f *framework.Framework, nodes *v1.NodeList) bool {
 	hostExec := utils.NewHostExec(f)
 	ginkgo.DeferCleanup(hostExec.Cleanup)
 	re := regexp.MustCompile(`^\s*sctp\s+`)
 	cmd := "lsmod | grep sctp"
 	for _, node := range nodes.Items {
 		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-		result, err := hostExec.IssueCommandWithResult(cmd, &node)
+		result, err := hostExec.IssueCommandWithResult(ctx, cmd, &node)
 		if err != nil {
 			framework.Logf("sctp module is not loaded or error occurred while executing command %s on node: %v", cmd, err)
 		}
@@ -181,7 +182,7 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 }
 
 // createSecondNodePortService creates a service with the same selector as config.NodePortService and same HTTP Port
-func createSecondNodePortService(f *framework.Framework, config *e2enetwork.NetworkingTestConfig) (*v1.Service, int) {
+func createSecondNodePortService(ctx context.Context, f *framework.Framework, config *e2enetwork.NetworkingTestConfig) (*v1.Service, int) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secondNodePortSvcName,
@@ -200,9 +201,9 @@ func createSecondNodePortService(f *framework.Framework, config *e2enetwork.Netw
 		},
 	}
 
-	createdService := config.CreateService(svc)
+	createdService := config.CreateService(ctx, svc)
 
-	err := framework.WaitForServiceEndpointsNum(f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	err := framework.WaitForServiceEndpointsNum(ctx, f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
 	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", secondNodePortSvcName, config.Namespace)
 
 	var httpPort int

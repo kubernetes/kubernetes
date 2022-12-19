@@ -100,8 +100,8 @@ func (tk *TestKubeconfig) KubectlCmd(args ...string) *exec.Cmd {
 }
 
 // LogFailedContainers runs `kubectl logs` on a failed containers.
-func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{})) {
-	podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+func LogFailedContainers(ctx context.Context, c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{})) {
+	podList, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		logFunc("Error getting pods in namespace '%s': %v", ns, err)
 		return
@@ -109,18 +109,18 @@ func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm stri
 	logFunc("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := testutils.PodRunningReady(&pod); !res || err != nil {
-			kubectlLogPod(c, pod, "", framework.Logf)
+			kubectlLogPod(ctx, c, pod, "", framework.Logf)
 		}
 	}
 }
 
-func kubectlLogPod(c clientset.Interface, pod v1.Pod, containerNameSubstr string, logFunc func(ftm string, args ...interface{})) {
+func kubectlLogPod(ctx context.Context, c clientset.Interface, pod v1.Pod, containerNameSubstr string, logFunc func(ftm string, args ...interface{})) {
 	for _, container := range pod.Spec.Containers {
 		if strings.Contains(container.Name, containerNameSubstr) {
 			// Contains() matches all strings if substr is empty
-			logs, err := e2epod.GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
+			logs, err := e2epod.GetPodLogs(ctx, c, pod.Namespace, pod.Name, container.Name)
 			if err != nil {
-				logs, err = e2epod.GetPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+				logs, err = e2epod.GetPreviousPodLogs(ctx, c, pod.Namespace, pod.Name, container.Name)
 				if err != nil {
 					logFunc("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
 				}

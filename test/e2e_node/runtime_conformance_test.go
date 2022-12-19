@@ -89,8 +89,8 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					defer os.Remove(configFile)
 
 					// checkContainerStatus checks whether the container status matches expectation.
-					checkContainerStatus := func() error {
-						status, err := container.GetStatus()
+					checkContainerStatus := func(ctx context.Context) error {
+						status, err := container.GetStatus(ctx)
 						if err != nil {
 							return fmt.Errorf("failed to get container status: %v", err)
 						}
@@ -116,7 +116,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 							}
 						}
 						// Check pod phase
-						phase, err := container.GetPhase()
+						phase, err := container.GetPhase(ctx)
 						if err != nil {
 							return fmt.Errorf("failed to get pod phase: %v", err)
 						}
@@ -131,15 +131,15 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 					for i := 1; i <= flakeRetry; i++ {
 						var err error
 						ginkgo.By("create the container")
-						container.Create()
+						container.Create(ctx)
 						ginkgo.By("check the container status")
 						for start := time.Now(); time.Since(start) < node.ContainerStatusRetryTimeout; time.Sleep(node.ContainerStatusPollInterval) {
-							if err = checkContainerStatus(); err == nil {
+							if err = checkContainerStatus(ctx); err == nil {
 								break
 							}
 						}
 						ginkgo.By("delete the container")
-						container.Delete()
+						_ = container.Delete(ctx)
 						if err == nil {
 							break
 						}

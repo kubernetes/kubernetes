@@ -19,6 +19,8 @@ limitations under the License.
 package init
 
 import (
+	"context"
+
 	"github.com/onsi/ginkgo/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -28,8 +30,8 @@ import (
 func init() {
 	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions,
 		func(f *framework.Framework) {
-			ginkgo.BeforeEach(func() {
-				metrics := e2emetrics.GrabBeforeEach(f)
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				metrics := e2emetrics.GrabBeforeEach(ctx, f)
 				ginkgo.DeferCleanup(e2emetrics.GrabAfterEach, f, metrics)
 			})
 		},

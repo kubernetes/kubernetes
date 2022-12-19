@@ -761,67 +761,67 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 	var tests = []struct {
 		ignorePreflightErrorsFromCLI        []string
 		ignorePreflightErrorsFromConfigFile []string
-		expectedSet                         sets.String
+		expectedSet                         sets.Set[string]
 		expectedError                       bool
 	}{
 		{ // empty lists in CLI and config file
 			[]string{},
 			[]string{},
-			sets.NewString(),
+			sets.New[string](),
 			false,
 		},
 		{ // empty list in CLI only
 			[]string{},
 			[]string{"a"},
-			sets.NewString("a"),
+			sets.New("a"),
 			false,
 		},
 		{ // empty list in config file only
 			[]string{"a"},
 			[]string{},
-			sets.NewString("a"),
+			sets.New("a"),
 			false,
 		},
 		{ // no duplicates, no overlap
 			[]string{"a", "b"},
 			[]string{"c", "d"},
-			sets.NewString("a", "b", "c", "d"),
+			sets.New("a", "b", "c", "d"),
 			false,
 		},
 		{ // some duplicates, with some overlapping duplicates
 			[]string{"a", "b", "a"},
 			[]string{"c", "b"},
-			sets.NewString("a", "b", "c"),
+			sets.New("a", "b", "c"),
 			false,
 		},
 		{ // non-duplicate, but 'all' present together with individual checks in CLI
 			[]string{"a", "b", "all"},
 			[]string{},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // empty list in CLI, but 'all' present in config file, which is forbidden
 			[]string{},
 			[]string{"all"},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // non-duplicate, but 'all' present in config file, which is forbidden
 			[]string{"a", "b"},
 			[]string{"all"},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // non-duplicate, but 'all' present in CLI, while values are in config file, which is forbidden
 			[]string{"all"},
 			[]string{"a", "b"},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // skip all checks
 			[]string{"all"},
 			[]string{},
-			sets.NewString("all"),
+			sets.New("all"),
 			false,
 		},
 	}

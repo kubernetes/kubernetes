@@ -78,12 +78,12 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		serviceName := "firewall-test-loadbalancer"
 
 		ginkgo.By("Getting cluster ID")
-		clusterID, err := gce.GetClusterID(cs)
+		clusterID, err := gce.GetClusterID(ctx, cs)
 		framework.ExpectNoError(err)
 		framework.Logf("Got cluster ID: %v", clusterID)
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, e2eservice.MaxNodesForEndpointsTests)
 		framework.ExpectNoError(err)
 
 		nodesNames := []string{}
@@ -93,22 +93,22 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		nodesSet := sets.NewString(nodesNames...)
 
 		ginkgo.By("Creating a LoadBalancer type service with ExternalTrafficPolicy=Global")
-		svc, err := jig.CreateLoadBalancerService(e2eservice.GetServiceLoadBalancerCreationTimeout(cs), func(svc *v1.Service) {
+		svc, err := jig.CreateLoadBalancerService(ctx, e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs), func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: firewallTestHTTPPort}}
 			svc.Spec.LoadBalancerSourceRanges = firewallTestSourceRanges
 		})
 		framework.ExpectNoError(err)
 		defer func() {
-			_, err = jig.UpdateService(func(svc *v1.Service) {
+			_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeNodePort
 				svc.Spec.LoadBalancerSourceRanges = nil
 			})
 			framework.ExpectNoError(err)
-			err = cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			err = cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 			ginkgo.By("Waiting for the local traffic health check firewall rule to be deleted")
 			localHCFwName := gce.MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), false)
-			_, err := gce.WaitForFirewallRule(gceCloud, localHCFwName, false, e2eservice.LoadBalancerCleanupTimeout)
+			_, err := gce.WaitForFirewallRule(ctx, gceCloud, localHCFwName, false, e2eservice.LoadBalancerCleanupTimeout)
 			framework.ExpectNoError(err)
 		}()
 		svcExternalIP := svc.Status.LoadBalancer.Ingress[0].IP
@@ -129,18 +129,18 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 
 		// OnlyLocal service is needed to examine which exact nodes the requests are being forwarded to by the Load Balancer on GCE
 		ginkgo.By("Updating LoadBalancer service to ExternalTrafficPolicy=Local")
-		svc, err = jig.UpdateService(func(svc *v1.Service) {
+		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the nodes health check firewall rule to be deleted")
-		_, err = gce.WaitForFirewallRule(gceCloud, nodesHCFw.Name, false, e2eservice.LoadBalancerCleanupTimeout)
+		_, err = gce.WaitForFirewallRule(ctx, gceCloud, nodesHCFw.Name, false, e2eservice.LoadBalancerCleanupTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the correct local traffic health check firewall rule to be created")
 		localHCFw := gce.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, false)
-		fw, err = gce.WaitForFirewallRule(gceCloud, localHCFw.Name, true, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+		fw, err = gce.WaitForFirewallRule(ctx, gceCloud, localHCFw.Name, true, e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs))
 		framework.ExpectNoError(err)
 		err = gce.VerifyFirewallRule(fw, localHCFw, cloudConfig.Network, false)
 		framework.ExpectNoError(err)
@@ -158,21 +158,21 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 			nodeSelection := e2epod.NodeSelection{Name: nodeName}
 			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 			pod.Spec.HostNetwork = true
-			_, err := cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+			_, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, framework.PodStartTimeout))
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name, framework.PodStartTimeout))
 			framework.Logf("Netexec pod %q in namespace %q running", podName, ns)
 
 			defer func() {
 				framework.Logf("Cleaning up the netexec pod: %v", podName)
-				err = cs.CoreV1().Pods(ns).Delete(context.TODO(), podName, metav1.DeleteOptions{})
+				err = cs.CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 			}()
 		}
 
 		// Send requests from outside of the cluster because internal traffic is allowlisted
 		ginkgo.By("Accessing the external service ip from outside, all non-master nodes should be reached")
-		err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet)
+		err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs), nodesSet)
 		framework.ExpectNoError(err)
 
 		// Check if there are overlapping tags on the firewall that extend beyond just the vms in our cluster
@@ -195,12 +195,12 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 			nodesSet.Insert(nodesNames[0])
 			gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
-			err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet)
+			err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs), nodesSet)
 			framework.ExpectNoError(err)
 		}()
 
 		ginkgo.By("Accessing service through the external ip and examine got no response from the node without tags")
-		err = testHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet, 15)
+		err = testHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs), nodesSet, 15)
 		framework.ExpectNoError(err)
 	})
 
@@ -215,7 +215,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 	})
 
 	ginkgo.It("control plane should not expose well-known ports", func(ctx context.Context) {
-		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking well known ports on master and nodes are not exposed externally")
@@ -226,7 +226,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
 		}
 
-		controlPlaneAddresses := framework.GetControlPlaneAddresses(cs)
+		controlPlaneAddresses := framework.GetControlPlaneAddresses(ctx, cs)
 		for _, instanceAddress := range controlPlaneAddresses {
 			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", ports.KubeControllerManagerPort, firewallTestTCPTimeout, true)
 			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", kubeschedulerconfig.DefaultKubeSchedulerPort, firewallTestTCPTimeout, true)

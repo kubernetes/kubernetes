@@ -47,7 +47,7 @@ var _ = SIGDescribe("StorageVersion resources [Feature:StorageVersionAPI]", func
 				GenerateName: svName,
 			},
 		}
-		createdSV, err := client.InternalV1alpha1().StorageVersions().Create(context.TODO(), sv, metav1.CreateOptions{})
+		createdSV, err := client.InternalV1alpha1().StorageVersions().Create(ctx, sv, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating storage version")
 
 		// update the created sv with server storage version
@@ -63,14 +63,14 @@ var _ = SIGDescribe("StorageVersion resources [Feature:StorageVersionAPI]", func
 			CommonEncodingVersion: &version,
 		}
 		_, err = client.InternalV1alpha1().StorageVersions().UpdateStatus(
-			context.TODO(), createdSV, metav1.UpdateOptions{})
+			ctx, createdSV, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "updating storage version")
 
 		// wait for sv to be GC'ed
 		framework.Logf("Waiting for storage version %v to be garbage collected", createdSV.Name)
 		err = wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 			_, err := client.InternalV1alpha1().StorageVersions().Get(
-				context.TODO(), createdSV.Name, metav1.GetOptions{})
+				ctx, createdSV.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}

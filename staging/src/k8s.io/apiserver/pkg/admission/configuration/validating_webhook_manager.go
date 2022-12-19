@@ -36,11 +36,6 @@ type validatingWebhookConfigurationManager struct {
 	configuration *atomic.Value
 	lister        admissionregistrationlisters.ValidatingWebhookConfigurationLister
 	hasSynced     func() bool
-	// initialConfigurationSynced tracks if
-	// the existing webhook configs have been synced (honored) by the
-	// manager at startup-- the informer has synced and either has no items
-	// or has finished executing updateConfiguration() once.
-	initialConfigurationSynced *atomic.Bool
 }
 
 var _ generic.Source = &validatingWebhookConfigurationManager{}
@@ -48,22 +43,24 @@ var _ generic.Source = &validatingWebhookConfigurationManager{}
 func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
 	informer := f.Admissionregistration().V1().ValidatingWebhookConfigurations()
 	manager := &validatingWebhookConfigurationManager{
-		configuration:              &atomic.Value{},
-		lister:                     informer.Lister(),
-		hasSynced:                  informer.Informer().HasSynced,
-		initialConfigurationSynced: &atomic.Bool{},
+		configuration: &atomic.Value{},
+		lister:        informer.Lister(),
 	}
 
 	// Start with an empty list
 	manager.configuration.Store([]webhook.WebhookAccessor{})
-	manager.initialConfigurationSynced.Store(false)
 
 	// On any change, rebuild the config
-	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	// TODO: the initial sync for this is N ^ 2, ideally we should make it N.
+	handle, _ := informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(_ interface{}) { manager.updateConfiguration() },
 		UpdateFunc: func(_, _ interface{}) { manager.updateConfiguration() },
 		DeleteFunc: func(_ interface{}) { manager.updateConfiguration() },
 	})
+
+	// Since our processing is synchronous, this is all we need to do to
+	// see if we have processed everything or not.
+	manager.hasSynced = handle.HasSynced
 
 	return manager
 }
@@ -73,29 +70,9 @@ func (v *validatingWebhookConfigurationManager) Webhooks() []webhook.WebhookAcce
 	return v.configuration.Load().([]webhook.WebhookAccessor)
 }
 
-// HasSynced returns true when the manager is synced with existing webhookconfig
-// objects at startup-- which means the informer is synced and either has no items
-// or updateConfiguration() has completed.
-func (v *validatingWebhookConfigurationManager) HasSynced() bool {
-	if !v.hasSynced() {
-		return false
-	}
-	if v.initialConfigurationSynced.Load() {
-		// the informer has synced and configuration has been updated
-		return true
-	}
-	if configurations, err := v.lister.List(labels.Everything()); err == nil && len(configurations) == 0 {
-		// the empty list we initially stored is valid to use.
-		// Setting initialConfigurationSynced to true, so subsequent checks
-		// would be able to take the fast path on the atomic boolean in a
-		// cluster without any admission webhooks configured.
-		v.initialConfigurationSynced.Store(true)
-		// the informer has synced and we don't have any items
-		return true
-	}
-	return false
-
-}
+// HasSynced returns true if the initial set of mutating webhook configurations
+// has been loaded.
+func (v *validatingWebhookConfigurationManager) HasSynced() bool { return v.hasSynced() }
 
 func (v *validatingWebhookConfigurationManager) updateConfiguration() {
 	configurations, err := v.lister.List(labels.Everything())
@@ -104,7 +81,6 @@ func (v *validatingWebhookConfigurationManager) updateConfiguration() {
 		return
 	}
 	v.configuration.Store(mergeValidatingWebhookConfigurations(configurations))
-	v.initialConfigurationSynced.Store(true)
 }
 
 func mergeValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {

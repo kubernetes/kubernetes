@@ -60,7 +60,7 @@ var _ = SIGDescribe("HostPath", func() {
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
-		e2epodoutput.TestContainerOutputRegexp(f, "hostPath mode", pod, 0, []string{
+		e2epodoutput.TestContainerOutputRegexp(ctx, f, "hostPath mode", pod, 0, []string{
 			"mode of file \"/test-volume\": dg?trwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
 		})
 	})
@@ -89,7 +89,7 @@ var _ = SIGDescribe("HostPath", func() {
 		}
 		//Read the content of the file with the second container to
 		//verify volumes  being shared properly among containers within the pod.
-		e2epodoutput.TestContainerOutput(f, "hostPath r/w", pod, 1, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "hostPath r/w", pod, 1, []string{
 			"content of file \"/test-volume/test-file\": mount-tester new file",
 		})
 	})
@@ -126,7 +126,7 @@ var _ = SIGDescribe("HostPath", func() {
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
 
-		e2epodoutput.TestContainerOutput(f, "hostPath subPath", pod, 1, []string{
+		e2epodoutput.TestContainerOutput(ctx, f, "hostPath subPath", pod, 1, []string{
 			"content of file \"" + filePathInReader + "\": mount-tester new file",
 		})
 	})

@@ -37,7 +37,7 @@ var _ = SIGDescribe("PodOSRejection [NodeConformance]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
-			linuxNode, err := findLinuxNode(f)
+			linuxNode, err := findLinuxNode(ctx, f)
 			framework.ExpectNoError(err)
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -57,18 +57,18 @@ var _ = SIGDescribe("PodOSRejection [NodeConformance]", func() {
 					NodeName: linuxNode.Name, // Set the node to an node which doesn't support
 				},
 			}
-			pod = e2epod.NewPodClient(f).Create(pod)
+			pod = e2epod.NewPodClient(f).Create(ctx, pod)
 			// Check the pod is still not running
-			err = e2epod.WaitForPodFailedReason(f.ClientSet, pod, "PodOSNotSupported", f.Timeouts.PodStartShort)
+			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "PodOSNotSupported", f.Timeouts.PodStartShort)
 			framework.ExpectNoError(err)
 		})
 	})
 })
 
 // findLinuxNode finds a Linux node that is Ready and Schedulable
-func findLinuxNode(f *framework.Framework) (v1.Node, error) {
+func findLinuxNode(ctx context.Context, f *framework.Framework) (v1.Node, error) {
 	selector := labels.Set{"kubernetes.io/os": "linux"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 
 	if err != nil {
 		return v1.Node{}, err

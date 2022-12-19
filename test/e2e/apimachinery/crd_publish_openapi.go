@@ -138,7 +138,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -179,7 +179,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -220,7 +220,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -262,7 +262,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -292,10 +292,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v1"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdFoo); err != nil {
+		if err := cleanupCRD(ctx, f, crdFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdWaldo); err != nil {
+		if err := cleanupCRD(ctx, f, crdWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -318,7 +318,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdMultiVer); err != nil {
+		if err := cleanupCRD(ctx, f, crdMultiVer); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -340,10 +340,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v4"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdFoo); err != nil {
+		if err := cleanupCRD(ctx, f, crdFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdWaldo); err != nil {
+		if err := cleanupCRD(ctx, f, crdWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -373,10 +373,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v6"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdFoo); err != nil {
+		if err := cleanupCRD(ctx, f, crdFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := cleanupCRD(f, crdWaldo); err != nil {
+		if err := cleanupCRD(ctx, f, crdWaldo); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -406,7 +406,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			{"op":"test","path":"/spec/versions/1/name","value":"v3"},
 			{"op": "replace", "path": "/spec/versions/1/name", "value": "v4"}
 		]`)
-		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(context.TODO(), crdMultiVer.Crd.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
+		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(ctx, crdMultiVer.Crd.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
 		if err != nil {
 			framework.Failf("%v", err)
 		}
@@ -427,7 +427,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		// TestCrd.Versions is different from TestCrd.Crd.Versions, we have to manually
 		// update the name there. Used by cleanupCRD
 		crdMultiVer.Crd.Spec.Versions[1].Name = "v4"
-		if err := cleanupCRD(f, crdMultiVer); err != nil {
+		if err := cleanupCRD(ctx, f, crdMultiVer); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -454,12 +454,12 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 
 		ginkgo.By("mark a version not serverd")
-		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Crd.Name, metav1.GetOptions{})
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Crd.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("%v", err)
 		}
 		crd.Crd.Spec.Versions[1].Served = false
-		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd.Crd, metav1.UpdateOptions{})
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd.Crd, metav1.UpdateOptions{})
 		if err != nil {
 			framework.Failf("%v", err)
 		}
@@ -473,7 +473,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crd); err != nil {
+		if err := cleanupCRD(ctx, f, crd); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -497,11 +497,11 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		}
 
 		if err := verifyKubectlExplain(f.Namespace.Name, customServiceShortName+".spec", `(?s)DESCRIPTION:.*Specification of CustomService.*FIELDS:.*dummy.*<string>.*Dummy property`); err != nil {
-			_ = cleanupCRD(f, crdSvc) // need to remove the crd since its name is unchanged
+			_ = cleanupCRD(ctx, f, crdSvc) // need to remove the crd since its name is unchanged
 			framework.Failf("%v", err)
 		}
 
-		if err := cleanupCRD(f, crdSvc); err != nil {
+		if err := cleanupCRD(ctx, f, crdSvc); err != nil {
 			framework.Failf("%v", err)
 		}
 	})
@@ -572,8 +572,8 @@ func setupCRDAndVerifySchemaWithOptions(f *framework.Framework, schema, expect [
 	return crd, nil
 }
 
-func cleanupCRD(f *framework.Framework, crd *crd.TestCrd) error {
-	crd.CleanUp()
+func cleanupCRD(ctx context.Context, f *framework.Framework, crd *crd.TestCrd) error {
+	_ = crd.CleanUp(ctx)
 	for _, v := range crd.Crd.Spec.Versions {
 		name := definitionName(crd, v.Name)
 		if err := waitForDefinitionCleanup(f.ClientSet, name); err != nil {

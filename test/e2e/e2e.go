@@ -74,21 +74,21 @@ const (
 
 var progressReporter = &e2ereporters.ProgressReporter{}
 
-var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
+var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
 	progressReporter.SetStartMsg()
-	setupSuite()
+	setupSuite(ctx)
 	return nil
-}, func(data []byte) {
+}, func(ctx context.Context, data []byte) {
 	// Run on all Ginkgo nodes
-	setupSuitePerGinkgoNode()
+	setupSuitePerGinkgoNode(ctx)
 })
 
 var _ = ginkgo.SynchronizedAfterSuite(func() {
 	progressReporter.SetEndMsg()
-}, func() {
-	AfterSuiteActions()
+}, func(ctx context.Context) {
+	AfterSuiteActions(ctx)
 })
 
 // RunE2ETests checks configuration parameters (specified through flags) and then runs
@@ -132,9 +132,9 @@ func RunE2ETests(t *testing.T) {
 // This unequivocally identifies the default IP family because services are single family
 // TODO: dual-stack may support multiple families per service
 // but we can detect if a cluster is dual stack because pods have two addresses (one per family)
-func getDefaultClusterIPFamily(c clientset.Interface) string {
+func getDefaultClusterIPFamily(ctx context.Context, c clientset.Interface) string {
 	// Get the ClusterIP of the kubernetes service created in the default namespace
-	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get kubernetes service ClusterIP: %v", err)
 	}
@@ -150,7 +150,7 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 // daemonset are ready).
 //
 // If allowedNotReadyNodes is -1, this method returns immediately without waiting.
-func waitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes int32, timeout time.Duration) error {
+func waitForDaemonSets(ctx context.Context, c clientset.Interface, ns string, allowedNotReadyNodes int32, timeout time.Duration) error {
 	if allowedNotReadyNodes == -1 {
 		return nil
 	}
@@ -159,8 +159,8 @@ func waitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes in
 	framework.Logf("Waiting up to %v for all daemonsets in namespace '%s' to start",
 		timeout, ns)
 
-	return wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		dsList, err := c.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
+	return wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+		dsList, err := c.AppsV1().DaemonSets(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Error getting daemonsets in namespace: '%s': %v", ns, err)
 			return false, err
@@ -191,7 +191,7 @@ func waitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes in
 // This function takes two parameters: one function which runs on only the first Ginkgo node,
 // returning an opaque byte array, and then a second function which runs on all Ginkgo nodes,
 // accepting the byte array.
-func setupSuite() {
+func setupSuite(ctx context.Context) {
 	// Run only on Ginkgo node 1
 
 	switch framework.TestContext.Provider {
@@ -207,7 +207,7 @@ func setupSuite() {
 	// Delete any namespaces except those created by the system. This ensures no
 	// lingering resources are left over from a previous test run.
 	if framework.TestContext.CleanStart {
-		deleted, err := framework.DeleteNamespaces(c, nil, /* deleteFilter */
+		deleted, err := framework.DeleteNamespaces(ctx, c, nil, /* deleteFilter */
 			[]string{
 				metav1.NamespaceSystem,
 				metav1.NamespaceDefault,
@@ -217,7 +217,7 @@ func setupSuite() {
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
 		}
-		if err := framework.WaitForNamespacesDeleted(c, deleted, namespaceCleanupTimeout); err != nil {
+		if err := framework.WaitForNamespacesDeleted(ctx, c, deleted, namespaceCleanupTimeout); err != nil {
 			framework.Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
 		}
 	}
@@ -225,11 +225,11 @@ func setupSuite() {
 	// In large clusters we may get to this point but still have a bunch
 	// of nodes without Routes created. Since this would make a node
 	// unschedulable, we need to wait until all of them are schedulable.
-	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, framework.TestContext.NodeSchedulableTimeout))
 
 	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
 	if framework.TestContext.CloudConfig.NumNodes == framework.DefaultNumNodes {
-		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)
 		framework.TestContext.CloudConfig.NumNodes = len(nodes.Items)
 	}
@@ -243,19 +243,19 @@ func setupSuite() {
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
-		e2edebug.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
-		e2ekubectl.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
+	if err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
+		e2edebug.DumpAllNamespaceInfo(ctx, c, metav1.NamespaceSystem)
+		e2ekubectl.LogFailedContainers(ctx, c, metav1.NamespaceSystem, framework.Logf)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
-	if err := waitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
+	if err := waitForDaemonSets(ctx, c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
 		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 
 	if framework.TestContext.PrepullImages {
 		framework.Logf("Pre-pulling images so that they are cached for the tests.")
-		prepullImages(c)
+		prepullImages(ctx, c)
 	}
 
 	// Log the version of the server and this client.
@@ -273,7 +273,7 @@ func setupSuite() {
 
 	if framework.TestContext.NodeKiller.Enabled {
 		nodeKiller := e2enode.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
-		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCh)
+		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCtx)
 	}
 }
 
@@ -387,7 +387,7 @@ func lookupClusterImageSources() (string, string, error) {
 // such as making some global variables accessible to all parallel executions
 // Because of the way Ginkgo runs tests in parallel, we must use SynchronizedBeforeSuite
 // Ref: https://onsi.github.io/ginkgo/#parallel-specs
-func setupSuitePerGinkgoNode() {
+func setupSuitePerGinkgoNode(ctx context.Context) {
 	// Obtain the default IP family of the cluster
 	// Some e2e test are designed to work on IPv4 only, this global variable
 	// allows to adapt those tests to work on both IPv4 and IPv6
@@ -398,12 +398,12 @@ func setupSuitePerGinkgoNode() {
 	if err != nil {
 		klog.Fatal("Error loading client: ", err)
 	}
-	framework.TestContext.IPFamily = getDefaultClusterIPFamily(c)
+	framework.TestContext.IPFamily = getDefaultClusterIPFamily(ctx, c)
 	framework.Logf("Cluster IP family: %s", framework.TestContext.IPFamily)
 }
 
-func prepullImages(c clientset.Interface) {
-	namespace, err := framework.CreateTestingNS("img-puller", c, map[string]string{
+func prepullImages(ctx context.Context, c clientset.Interface) {
+	namespace, err := framework.CreateTestingNS(ctx, "img-puller", c, map[string]string{
 		"e2e-framework": "img-puller",
 	})
 	framework.ExpectNoError(err)
@@ -421,7 +421,7 @@ func prepullImages(c clientset.Interface) {
 		dsName := fmt.Sprintf("img-pull-%s", strings.ReplaceAll(strings.ReplaceAll(img, "/", "-"), ":", "-"))
 
 		dsSpec := daemonset.NewDaemonSet(dsName, img, label, nil, nil, nil)
-		ds, err := c.AppsV1().DaemonSets(ns).Create(context.TODO(), dsSpec, metav1.CreateOptions{})
+		ds, err := c.AppsV1().DaemonSets(ns).Create(ctx, dsSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		imgPullers = append(imgPullers, ds)
 	}
@@ -432,11 +432,11 @@ func prepullImages(c clientset.Interface) {
 	dsRetryTimeout := 5 * time.Minute
 
 	for _, imgPuller := range imgPullers {
-		checkDaemonset := func() (bool, error) {
-			return daemonset.CheckPresentOnNodes(c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
+		checkDaemonset := func(ctx context.Context) (bool, error) {
+			return daemonset.CheckPresentOnNodes(ctx, c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
 		}
 		framework.Logf("Waiting for %s", imgPuller.Name)
-		err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonset)
+		err := wait.PollImmediateWithContext(ctx, dsRetryPeriod, dsRetryTimeout, checkDaemonset)
 		framework.ExpectNoError(err, "error waiting for image to be pulled")
 	}
 }

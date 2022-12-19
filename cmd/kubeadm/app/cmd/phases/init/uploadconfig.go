@@ -96,6 +96,7 @@ func NewUploadConfigPhase() workflow.Phase {
 func getUploadConfigPhaseFlags() []string {
 	return []string{
 		options.CfgPath,
+		options.NodeCRISocket,
 		options.KubeconfigPath,
 		options.DryRun,
 	}

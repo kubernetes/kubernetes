@@ -39,7 +39,7 @@ var _ = SIGDescribe("crictl", func() {
 	})
 
 	ginkgo.It("should be able to run crictl on the node", func(ctx context.Context) {
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
 		framework.ExpectNoError(err)
 
 		testCases := []string{
@@ -53,7 +53,7 @@ var _ = SIGDescribe("crictl", func() {
 			for _, node := range nodes.Items {
 				ginkgo.By(fmt.Sprintf("Testing %q on node %q ", testCase, node.GetName()))
 
-				res, err := hostExec.Execute(testCase, &node)
+				res, err := hostExec.Execute(ctx, testCase, &node)
 				framework.ExpectNoError(err)
 
 				if res.Stdout == "" && res.Stderr == "" {

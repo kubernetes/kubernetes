@@ -89,28 +89,28 @@ type testParameters struct {
 	enableResizing      bool   // enable resizing for both CSI mock driver and storageClass.
 	enableNodeExpansion bool   // enable node expansion for CSI mock driver
 	// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
-	disableResizingOnDriver bool
-	enableSnapshot          bool
-	enableVolumeMountGroup  bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
-	hooks                   *drivers.Hooks
-	tokenRequests           []storagev1.TokenRequest
-	requiresRepublish       *bool
-	fsGroupPolicy           *storagev1.FSGroupPolicy
-	enableSELinuxMount      *bool
+	disableResizingOnDriver       bool
+	enableSnapshot                bool
+	enableVolumeMountGroup        bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
+	hooks                         *drivers.Hooks
+	tokenRequests                 []storagev1.TokenRequest
+	requiresRepublish             *bool
+	fsGroupPolicy                 *storagev1.FSGroupPolicy
+	enableSELinuxMount            *bool
+	enableRecoverExpansionFailure bool
 }
 
 type mockDriverSetup struct {
-	cs           clientset.Interface
-	config       *storageframework.PerTestConfig
-	testCleanups []func()
-	pods         []*v1.Pod
-	pvcs         []*v1.PersistentVolumeClaim
-	sc           map[string]*storagev1.StorageClass
-	vsc          map[string]*unstructured.Unstructured
-	driver       drivers.MockCSITestDriver
-	provisioner  string
-	tp           testParameters
-	f            *framework.Framework
+	cs          clientset.Interface
+	config      *storageframework.PerTestConfig
+	pods        []*v1.Pod
+	pvcs        []*v1.PersistentVolumeClaim
+	sc          map[string]*storagev1.StorageClass
+	vsc         map[string]*unstructured.Unstructured
+	driver      drivers.MockCSITestDriver
+	provisioner string
+	tp          testParameters
+	f           *framework.Framework
 }
 
 type volumeType string
@@ -143,26 +143,27 @@ func newMockDriverSetup(f *framework.Framework) *mockDriverSetup {
 	}
 }
 
-func (m *mockDriverSetup) init(tp testParameters) {
+func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 	m.cs = m.f.ClientSet
 	m.tp = tp
 
 	var err error
 	driverOpts := drivers.CSIMockDriverOpts{
-		RegisterDriver:         tp.registerDriver,
-		PodInfo:                tp.podInfo,
-		StorageCapacity:        tp.storageCapacity,
-		EnableTopology:         tp.enableTopology,
-		AttachLimit:            tp.attachLimit,
-		DisableAttach:          tp.disableAttach,
-		EnableResizing:         tp.enableResizing,
-		EnableNodeExpansion:    tp.enableNodeExpansion,
-		EnableSnapshot:         tp.enableSnapshot,
-		EnableVolumeMountGroup: tp.enableVolumeMountGroup,
-		TokenRequests:          tp.tokenRequests,
-		RequiresRepublish:      tp.requiresRepublish,
-		FSGroupPolicy:          tp.fsGroupPolicy,
-		EnableSELinuxMount:     tp.enableSELinuxMount,
+		RegisterDriver:                tp.registerDriver,
+		PodInfo:                       tp.podInfo,
+		StorageCapacity:               tp.storageCapacity,
+		EnableTopology:                tp.enableTopology,
+		AttachLimit:                   tp.attachLimit,
+		DisableAttach:                 tp.disableAttach,
+		EnableResizing:                tp.enableResizing,
+		EnableNodeExpansion:           tp.enableNodeExpansion,
+		EnableSnapshot:                tp.enableSnapshot,
+		EnableVolumeMountGroup:        tp.enableVolumeMountGroup,
+		TokenRequests:                 tp.tokenRequests,
+		RequiresRepublish:             tp.requiresRepublish,
+		FSGroupPolicy:                 tp.fsGroupPolicy,
+		EnableSELinuxMount:            tp.enableSELinuxMount,
+		EnableRecoverExpansionFailure: tp.enableRecoverExpansionFailure,
 	}
 
 	// At the moment, only tests which need hooks are
@@ -189,7 +190,7 @@ func (m *mockDriverSetup) init(tp testParameters) {
 	}
 
 	m.driver = drivers.InitMockCSIDriver(driverOpts)
-	config := m.driver.PrepareTest(m.f)
+	config := m.driver.PrepareTest(ctx, m.f)
 	m.config = config
 	m.provisioner = config.GetUniqueDriverName()
 
@@ -201,17 +202,17 @@ func (m *mockDriverSetup) init(tp testParameters) {
 
 	// Wait for the CSIDriver actually get deployed and CSINode object to be generated.
 	// This indicates the mock CSI driver pod is up and running healthy.
-	err = drivers.WaitForCSIDriverRegistrationOnNode(m.config.ClientNodeSelection.Name, m.config.GetUniqueDriverName(), m.cs)
+	err = drivers.WaitForCSIDriverRegistrationOnNode(ctx, m.config.ClientNodeSelection.Name, m.config.GetUniqueDriverName(), m.cs)
 	framework.ExpectNoError(err, "Failed to register CSIDriver %v", m.config.GetUniqueDriverName())
 }
 
-func (m *mockDriverSetup) cleanup() {
+func (m *mockDriverSetup) cleanup(ctx context.Context) {
 	cs := m.f.ClientSet
 	var errs []error
 
 	for _, pod := range m.pods {
 		ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-		errs = append(errs, e2epod.DeletePodWithWait(cs, pod))
+		errs = append(errs, e2epod.DeletePodWithWait(ctx, cs, pod))
 	}
 
 	for _, claim := range m.pvcs {
@@ -222,7 +223,7 @@ func (m *mockDriverSetup) cleanup() {
 				errs = append(errs, err)
 			}
 			if claim.Spec.VolumeName != "" {
-				errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute))
+				errs = append(errs, e2epv.WaitForPersistentVolumeDeleted(ctx, cs, claim.Spec.VolumeName, framework.Poll, 2*time.Minute))
 			}
 		}
 	}
@@ -236,20 +237,16 @@ func (m *mockDriverSetup) cleanup() {
 		ginkgo.By(fmt.Sprintf("Deleting volumesnapshotclass %s", vsc.GetName()))
 		m.config.Framework.DynamicClient.Resource(utils.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
 	}
-	ginkgo.By("Cleaning up resources")
-	for _, cleanupFunc := range m.testCleanups {
-		cleanupFunc()
-	}
 
 	err := utilerrors.NewAggregate(errs)
 	framework.ExpectNoError(err, "while cleaning up after test")
 }
 
-func (m *mockDriverSetup) createPod(withVolume volumeType) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
+func (m *mockDriverSetup) createPod(ctx context.Context, withVolume volumeType) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
 	ginkgo.By("Creating pod")
 	f := m.f
 
-	sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
+	sc := m.driver.GetDynamicProvisionStorageClass(ctx, m.config, "")
 	scTest := testsuites.StorageClassTest{
 		Name:                 m.driver.GetDriverInfo().Name,
 		Timeouts:             f.Timeouts,
@@ -278,7 +275,7 @@ func (m *mockDriverSetup) createPod(withVolume volumeType) (class *storagev1.Sto
 			},
 		}
 	case pvcReference:
-		class, claim, pod = startPausePod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name)
+		class, claim, pod = startPausePod(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name)
 		if class != nil {
 			m.sc[class.Name] = class
 		}
@@ -303,12 +300,12 @@ func (m *mockDriverSetup) createPodWithPVC(pvc *v1.PersistentVolumeClaim) (*v1.P
 	return pod, err
 }
 
-func (m *mockDriverSetup) createPodWithFSGroup(fsGroup *int64) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func (m *mockDriverSetup) createPodWithFSGroup(ctx context.Context, fsGroup *int64) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	f := m.f
 
 	ginkgo.By("Creating pod with fsGroup")
 	nodeSelection := m.config.ClientNodeSelection
-	sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
+	sc := m.driver.GetDynamicProvisionStorageClass(ctx, m.config, "")
 	scTest := testsuites.StorageClassTest{
 		Name:                 m.driver.GetDriverInfo().Name,
 		Provisioner:          sc.Provisioner,
@@ -318,7 +315,7 @@ func (m *mockDriverSetup) createPodWithFSGroup(fsGroup *int64) (*storagev1.Stora
 		DelayBinding:         m.tp.lateBinding,
 		AllowVolumeExpansion: m.tp.enableResizing,
 	}
-	class, claim, pod := startBusyBoxPod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, fsGroup)
+	class, claim, pod := startBusyBoxPod(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, fsGroup)
 
 	if class != nil {
 		m.sc[class.Name] = class
@@ -334,11 +331,11 @@ func (m *mockDriverSetup) createPodWithFSGroup(fsGroup *int64) (*storagev1.Stora
 	return class, claim, pod
 }
 
-func (m *mockDriverSetup) createPodWithSELinux(accessModes []v1.PersistentVolumeAccessMode, mountOptions []string, seLinuxOpts *v1.SELinuxOptions) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes []v1.PersistentVolumeAccessMode, mountOptions []string, seLinuxOpts *v1.SELinuxOptions) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	ginkgo.By("Creating pod with SELinux context")
 	f := m.f
 	nodeSelection := m.config.ClientNodeSelection
-	sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
+	sc := m.driver.GetDynamicProvisionStorageClass(ctx, m.config, "")
 	scTest := testsuites.StorageClassTest{
 		Name:                 m.driver.GetDriverInfo().Name,
 		Provisioner:          sc.Provisioner,
@@ -349,7 +346,7 @@ func (m *mockDriverSetup) createPodWithSELinux(accessModes []v1.PersistentVolume
 		AllowVolumeExpansion: m.tp.enableResizing,
 		MountOptions:         mountOptions,
 	}
-	class, claim := createClaim(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, accessModes)
+	class, claim := createClaim(ctx, f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, accessModes)
 	pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts)
 	framework.ExpectNoError(err, "Failed to create pause pod with SELinux context %s: %v", seLinuxOpts, err)
 
@@ -477,7 +474,7 @@ func createSC(cs clientset.Interface, t testsuites.StorageClassTest, scName, ns 
 	return class
 }
 
-func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, accessModes []v1.PersistentVolumeAccessMode) (*storagev1.StorageClass, *v1.PersistentVolumeClaim) {
+func createClaim(ctx context.Context, cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, accessModes []v1.PersistentVolumeAccessMode) (*storagev1.StorageClass, *v1.PersistentVolumeClaim) {
 	class := createSC(cs, t, scName, ns)
 	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 		ClaimSize:        t.ClaimSize,
@@ -490,22 +487,22 @@ func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2e
 
 	if !t.DelayBinding {
 		pvcClaims := []*v1.PersistentVolumeClaim{claim}
-		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
+		_, err = e2epv.WaitForPVClaimBoundPhase(ctx, cs, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound: %v", err)
 	}
 	return class, claim
 }
 
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
-	class, claim := createClaim(cs, t, node, scName, ns, nil)
+func startPausePod(ctx context.Context, cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+	class, claim := createClaim(ctx, cs, t, node, scName, ns, nil)
 
 	pod, err := startPausePodWithClaim(cs, claim, node, ns)
 	framework.ExpectNoError(err, "Failed to create pause pod: %v", err)
 	return class, claim, pod
 }
 
-func startBusyBoxPod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, fsGroup *int64) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
-	class, claim := createClaim(cs, t, node, scName, ns, nil)
+func startBusyBoxPod(ctx context.Context, cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, fsGroup *int64) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+	class, claim := createClaim(ctx, cs, t, node, scName, ns, nil)
 	pod, err := startBusyBoxPodWithClaim(cs, claim, node, ns, fsGroup)
 	framework.ExpectNoError(err, "Failed to create busybox pod: %v", err)
 	return class, claim, pod
@@ -671,7 +668,7 @@ func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentV
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
-func checkPodLogs(getCalls func() ([]drivers.MockCSICall, error), pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled, csiServiceAccountTokenEnabled bool, expectedNumNodePublish int) error {
+func checkPodLogs(ctx context.Context, getCalls func(ctx context.Context) ([]drivers.MockCSICall, error), pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled, csiServiceAccountTokenEnabled bool, expectedNumNodePublish int) error {
 	expectedAttributes := map[string]string{}
 	if expectPodInfo {
 		expectedAttributes["csi.storage.k8s.io/pod.name"] = pod.Name
@@ -693,7 +690,7 @@ func checkPodLogs(getCalls func() ([]drivers.MockCSICall, error), pod *v1.Pod, e
 	foundAttributes := sets.NewString()
 	numNodePublishVolume := 0
 	numNodeUnpublishVolume := 0
-	calls, err := getCalls()
+	calls, err := getCalls(ctx)
 	if err != nil {
 		return err
 	}
@@ -779,8 +776,8 @@ func createPreHook(method string, callback func(counter int64) error) *drivers.H
 //
 // Only permanent errors are returned. Other errors are logged and no
 // calls are returned. The caller is expected to retry.
-func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, getCalls func() ([]drivers.MockCSICall, error)) ([]drivers.MockCSICall, int, error) {
-	allCalls, err := getCalls()
+func compareCSICalls(ctx context.Context, trackedCalls []string, expectedCallSequence []csiCall, getCalls func(ctx context.Context) ([]drivers.MockCSICall, error)) ([]drivers.MockCSICall, int, error) {
+	allCalls, err := getCalls(ctx)
 	if err != nil {
 		framework.Logf("intermittent (?) log retrieval error, proceeding without output: %v", err)
 		return nil, 0, nil

@@ -123,7 +123,7 @@ var _ = SIGDescribe("Discovery", func() {
 
 		// get list of APIGroup endpoints
 		list := &metav1.APIGroupList{}
-		err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(context.TODO()).Into(list)
+		err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(ctx).Into(list)
 		framework.ExpectNoError(err, "Failed to find /apis/")
 		framework.ExpectNotEqual(len(list.Groups), 0, "Missing APIGroups")
 
@@ -137,7 +137,7 @@ var _ = SIGDescribe("Discovery", func() {
 			// locate APIGroup endpoint
 			checkGroup := &metav1.APIGroup{}
 			apiPath := "/apis/" + group.Name + "/"
-			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(context.TODO()).Into(checkGroup)
+			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(ctx).Into(checkGroup)
 			framework.ExpectNoError(err, "Fail to access: %s", apiPath)
 			framework.ExpectNotEqual(len(checkGroup.Versions), 0, "No version found for %v", group.Name)
 			framework.Logf("PreferredVersion.GroupVersion: %s", checkGroup.PreferredVersion.GroupVersion)

@@ -156,15 +156,6 @@ func (fake *fakeDiskManager) MakeGlobalVDPDName(rbd rbd) string {
 	return makePDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
 }
 
-func (fake *fakeDiskManager) AttachDisk(b rbdMounter) (string, error) {
-	fake.mutex.Lock()
-	defer fake.mutex.Unlock()
-	fake.rbdMapIndex++
-	devicePath := fmt.Sprintf("/dev/rbd%d", fake.rbdMapIndex)
-	fake.rbdDevices[devicePath] = true
-	return devicePath, nil
-}
-
 func (fake *fakeDiskManager) DetachDisk(r *rbdPlugin, deviceMountPath string, device string) error {
 	fake.mutex.Lock()
 	defer fake.mutex.Unlock()
@@ -292,7 +283,11 @@ func doTestPlugin(t *testing.T, c *testcase) {
 			t.Errorf("Attacher.MountDevice() failed: %v", err)
 		}
 	}
-	checkMounterLog(t, fakeMounter, 1, mount.FakeAction{Action: "mount", Target: c.expectedDeviceMountPath, Source: devicePath, FSType: "ext4"})
+	loggedSource, err := getLoggedSource(devicePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkMounterLog(t, fakeMounter, 1, mount.FakeAction{Action: "mount", Target: c.expectedDeviceMountPath, Source: loggedSource, FSType: "ext4"})
 
 	// mounter
 	mounter, err := plug.(*rbdPlugin).newMounterInternal(c.spec, c.pod.UID, fdm, "secrets")
@@ -317,7 +312,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	checkMounterLog(t, fakeMounter, 2, mount.FakeAction{Action: "mount", Target: c.expectedPodMountPath, Source: devicePath, FSType: ""})
+	checkMounterLog(t, fakeMounter, 2, mount.FakeAction{Action: "mount", Target: c.expectedPodMountPath, Source: loggedSource, FSType: ""})
 
 	// unmounter
 	unmounter, err := plug.(*rbdPlugin).newUnmounterInternal(c.spec.Name(), c.pod.UID, fdm)
@@ -374,6 +369,12 @@ func TestPlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expectedDevicePath := "/dev/rbd1"
+	if runtime.GOOS == "windows" {
+		// Windows expects Disk Numbers.
+		expectedDevicePath = "1"
+	}
+
 	podUID := uuid.NewUUID()
 	var cases []*testcase
 	cases = append(cases, &testcase{
@@ -396,7 +397,7 @@ func TestPlugin(t *testing.T) {
 				UID:       podUID,
 			},
 		},
-		expectedDevicePath:      "/dev/rbd1",
+		expectedDevicePath:      expectedDevicePath,
 		expectedDeviceMountPath: filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/mounts/pool1-image-image1"),
 		expectedPodMountPath:    filepath.Join(tmpDir, "pods", string(podUID), "volumes/kubernetes.io~rbd/vol1"),
 	})
@@ -425,7 +426,7 @@ func TestPlugin(t *testing.T) {
 				UID:       podUID,
 			},
 		},
-		expectedDevicePath:      "/dev/rbd1",
+		expectedDevicePath:      expectedDevicePath,
 		expectedDeviceMountPath: filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/mounts/pool2-image-image2"),
 		expectedPodMountPath:    filepath.Join(tmpDir, "pods", string(podUID), "volumes/kubernetes.io~rbd/vol2"),
 	})

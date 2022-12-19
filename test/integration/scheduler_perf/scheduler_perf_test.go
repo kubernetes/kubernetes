@@ -687,11 +687,11 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			if err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			if err := nodePreparer.PrepareNodes(nextNodeIndex); err != nil {
+			if err := nodePreparer.PrepareNodes(ctx, nextNodeIndex); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			b.Cleanup(func() {
-				nodePreparer.CleanupNodes()
+				_ = nodePreparer.CleanupNodes(ctx)
 			})
 			nextNodeIndex += concreteOp.Count
 
@@ -742,7 +742,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 					go collector.run(collectorCtx)
 				}
 			}
-			if err := createPods(b, namespace, concreteOp, client); err != nil {
+			if err := createPods(ctx, b, namespace, concreteOp, client); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			if concreteOp.SkipWaitToCompletion {
@@ -958,7 +958,7 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 	), nil
 }
 
-func createPods(b *testing.B, namespace string, cpo *createPodsOp, clientset clientset.Interface) error {
+func createPods(ctx context.Context, b *testing.B, namespace string, cpo *createPodsOp, clientset clientset.Interface) error {
 	strategy, err := getPodStrategy(cpo)
 	if err != nil {
 		return err
@@ -967,7 +967,7 @@ func createPods(b *testing.B, namespace string, cpo *createPodsOp, clientset cli
 	config := testutils.NewTestPodCreatorConfig()
 	config.AddStrategy(namespace, cpo.Count, strategy)
 	podCreator := testutils.NewTestPodCreator(clientset, config)
-	return podCreator.CreatePods()
+	return podCreator.CreatePods(ctx)
 }
 
 // waitUntilPodsScheduledInNamespace blocks until all pods in the given

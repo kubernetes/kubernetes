@@ -103,7 +103,7 @@ var _ = SIGDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Seri
 		var lookback time.Duration
 		var eventListOptions metav1.ListOptions
 
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("Calculate Lookback duration")
 			var err error
 
@@ -189,7 +189,7 @@ current-context: local-context
 			eventListOptions = metav1.ListOptions{FieldSelector: selector}
 
 			ginkgo.By("Create config map for the node problem detector")
-			_, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
+			_, err = c.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
 				Data: map[string]string{
 					path.Base(configFile):     config,
@@ -201,7 +201,7 @@ current-context: local-context
 			ginkgo.By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
 			*hostPathType = v1.HostPathFileOrCreate
-			pod := e2epod.NewPodClient(f).CreateSync(&v1.Pod{
+			pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
@@ -401,47 +401,47 @@ current-context: local-context
 				}
 
 				ginkgo.By(fmt.Sprintf("Wait for %d temp events generated", test.tempEvents))
-				gomega.Eventually(func() error {
-					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.tempEvents, tempReason, tempMessage)
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return verifyEvents(ctx, c.CoreV1().Events(eventNamespace), eventListOptions, test.tempEvents, tempReason, tempMessage)
 				}, pollTimeout, pollInterval).Should(gomega.Succeed())
 				ginkgo.By(fmt.Sprintf("Wait for %d total events generated", test.totalEvents))
-				gomega.Eventually(func() error {
-					return verifyTotalEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return verifyTotalEvents(ctx, c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
 				}, pollTimeout, pollInterval).Should(gomega.Succeed())
 				ginkgo.By(fmt.Sprintf("Make sure only %d total events generated", test.totalEvents))
-				gomega.Consistently(func() error {
-					return verifyTotalEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					return verifyTotalEvents(ctx, c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
 				}, pollConsistent, pollInterval).Should(gomega.Succeed())
 
 				ginkgo.By(fmt.Sprintf("Make sure node condition %q is set", condition))
-				gomega.Eventually(func() error {
-					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return verifyNodeCondition(ctx, c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollTimeout, pollInterval).Should(gomega.Succeed())
 				ginkgo.By(fmt.Sprintf("Make sure node condition %q is stable", condition))
-				gomega.Consistently(func() error {
-					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					return verifyNodeCondition(ctx, c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollConsistent, pollInterval).Should(gomega.Succeed())
 			}
 		})
 
-		ginkgo.AfterEach(func() {
+		ginkgo.AfterEach(func(ctx context.Context) {
 			if ginkgo.CurrentSpecReport().Failed() && framework.TestContext.DumpLogsOnFailure {
 				ginkgo.By("Get node problem detector log")
-				log, err := e2epod.GetPodLogs(c, ns, name, name)
+				log, err := e2epod.GetPodLogs(ctx, c, ns, name, name)
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 				framework.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			ginkgo.By("Delete the node problem detector")
-			e2epod.NewPodClient(f).Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
+			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, name, *metav1.NewDeleteOptions(0)))
 			ginkgo.By("Wait for the node problem detector to disappear")
-			gomega.Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(gomega.Succeed())
+			gomega.Expect(e2epod.WaitForPodToDisappear(ctx, c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(gomega.Succeed())
 			ginkgo.By("Delete the config map")
-			c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configName, metav1.DeleteOptions{})
+			framework.ExpectNoError(c.CoreV1().ConfigMaps(ns).Delete(ctx, configName, metav1.DeleteOptions{}))
 			ginkgo.By("Clean up the events")
-			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(context.TODO(), *metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
+			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(ctx, *metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
 			ginkgo.By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
-			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
+			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(ctx)
 		})
 	})
 })
@@ -463,8 +463,8 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 }
 
 // verifyEvents verifies there are num specific events generated with given reason and message.
-func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int, reason, message string) error {
-	events, err := e.List(context.TODO(), options)
+func verifyEvents(ctx context.Context, e coreclientset.EventInterface, options metav1.ListOptions, num int, reason, message string) error {
+	events, err := e.List(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -482,8 +482,8 @@ func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, nu
 }
 
 // verifyTotalEvents verifies there are num events in total.
-func verifyTotalEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int) error {
-	events, err := e.List(context.TODO(), options)
+func verifyTotalEvents(ctx context.Context, e coreclientset.EventInterface, options metav1.ListOptions, num int) error {
+	events, err := e.List(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -498,8 +498,8 @@ func verifyTotalEvents(e coreclientset.EventInterface, options metav1.ListOption
 }
 
 // verifyNodeCondition verifies specific node condition is generated, if reason and message are empty, they will not be checked
-func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
-	node, err := n.Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+func verifyNodeCondition(ctx context.Context, n coreclientset.NodeInterface, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
+	node, err := n.Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

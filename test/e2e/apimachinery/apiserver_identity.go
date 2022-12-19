@@ -37,7 +37,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-func getControlPlaneHostname(node *v1.Node) (string, error) {
+func getControlPlaneHostname(ctx context.Context, node *v1.Node) (string, error) {
 	nodeAddresses := e2enode.GetAddresses(node, v1.NodeExternalIP)
 	if len(nodeAddresses) == 0 {
 		return "", errors.New("no valid addresses to use for SSH")
@@ -46,7 +46,7 @@ func getControlPlaneHostname(node *v1.Node) (string, error) {
 	controlPlaneAddress := nodeAddresses[0]
 
 	host := controlPlaneAddress + ":" + e2essh.SSHPort
-	result, err := e2essh.SSH("hostname", host, framework.TestContext.Provider)
+	result, err := e2essh.SSH(ctx, "hostname", host, framework.TestContext.Provider)
 	if err != nil {
 		return "", err
 	}
@@ -59,7 +59,7 @@ func getControlPlaneHostname(node *v1.Node) (string, error) {
 }
 
 // restartAPIServer attempts to restart the kube-apiserver on a node
-func restartAPIServer(node *v1.Node) error {
+func restartAPIServer(ctx context.Context, node *v1.Node) error {
 	nodeAddresses := e2enode.GetAddresses(node, v1.NodeExternalIP)
 	if len(nodeAddresses) == 0 {
 		return errors.New("no valid addresses to use for SSH")
@@ -68,7 +68,7 @@ func restartAPIServer(node *v1.Node) error {
 	controlPlaneAddress := nodeAddresses[0]
 	cmd := "pidof kube-apiserver | xargs sudo kill"
 	framework.Logf("Restarting kube-apiserver via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(controlPlaneAddress, e2essh.SSHPort), framework.TestContext.Provider)
+	result, err := e2essh.SSH(ctx, cmd, net.JoinHostPort(controlPlaneAddress, e2essh.SSHPort), framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart kube-apiserver: %v", err)
@@ -121,7 +121,7 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 		framework.ExpectEqual(len(leases.Items), len(controlPlaneNodes), "unexpected number of leases")
 
 		for _, node := range controlPlaneNodes {
-			hostname, err := getControlPlaneHostname(&node)
+			hostname, err := getControlPlaneHostname(ctx, &node)
 			framework.ExpectNoError(err)
 
 			hash := sha256.Sum256([]byte(hostname))
@@ -132,7 +132,7 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 			oldHolderIdentity := lease.Spec.HolderIdentity
 			lastRenewedTime := lease.Spec.RenewTime
 
-			err = restartAPIServer(&node)
+			err = restartAPIServer(ctx, &node)
 			framework.ExpectNoError(err)
 
 			err = wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {

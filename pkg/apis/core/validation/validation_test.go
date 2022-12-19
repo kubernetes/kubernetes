@@ -3230,9 +3230,21 @@ func TestValidateVolumes(t *testing.T) {
 			}},
 		},
 		{
-			name: "name not a DNS label",
+			name: "name has dots",
 			vol: core.Volume{
 				Name:         "a.b.c",
+				VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+			},
+			errs: []verr{{
+				etype:  field.ErrorTypeInvalid,
+				field:  "name",
+				detail: "must not contain dots",
+			}},
+		},
+		{
+			name: "name not a DNS label",
+			vol: core.Volume{
+				Name:         "Not a DNS label!",
 				VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
 			},
 			errs: []verr{{
@@ -5042,13 +5054,13 @@ func TestValidateVolumes(t *testing.T) {
 			for i, err := range errs {
 				expErr := tc.errs[i]
 				if err.Type != expErr.etype {
-					t.Errorf("unexpected error type: got %v, want %v", expErr.etype, err.Type)
+					t.Errorf("unexpected error type:\n\twant: %q\n\t got: %q", expErr.etype, err.Type)
 				}
 				if !strings.HasSuffix(err.Field, "."+expErr.field) {
-					t.Errorf("unexpected error field: got %v, want %v", expErr.field, err.Field)
+					t.Errorf("unexpected error field:\n\twant: %q\n\t got: %q", expErr.field, err.Field)
 				}
 				if !strings.Contains(err.Detail, expErr.detail) {
-					t.Errorf("unexpected error detail: got %v, want %v", expErr.detail, err.Detail)
+					t.Errorf("unexpected error detail:\n\twant: %q\n\t got: %q", expErr.detail, err.Detail)
 				}
 			}
 		})

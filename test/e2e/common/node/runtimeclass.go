@@ -54,15 +54,15 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	*/
 	framework.ConformanceIt("should reject a Pod requesting a non-existent RuntimeClass [NodeConformance]", func(ctx context.Context) {
 		rcName := f.Namespace.Name + "-nonexistent"
-		expectPodRejection(f, e2enode.NewRuntimeClassPod(rcName))
+		expectPodRejection(ctx, f, e2enode.NewRuntimeClassPod(rcName))
 	})
 
 	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler not being installed.
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]", func(ctx context.Context) {
 		handler := f.Namespace.Name + "-handler"
-		rcName := createRuntimeClass(f, "unconfigured-handler", handler, nil)
+		rcName := createRuntimeClass(ctx, f, "unconfigured-handler", handler, nil)
 		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
-		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
+		pod := e2epod.NewPodClient(f).Create(ctx, e2enode.NewRuntimeClassPod(rcName))
 		eventSelector := fields.Set{
 			"involvedObject.kind":      "Pod",
 			"involvedObject.name":      pod.Name,
@@ -70,12 +70,12 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			"reason":                   events.FailedCreatePodSandBox,
 		}.AsSelector().String()
 		// Events are unreliable, don't depend on the event. It's used only to speed up the test.
-		err := e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, handler, framework.PodEventTimeout)
+		err := e2eevents.WaitTimeoutForEvent(ctx, f.ClientSet, f.Namespace.Name, eventSelector, handler, framework.PodEventTimeout)
 		if err != nil {
 			framework.Logf("Warning: did not get event about FailedCreatePodSandBox. Err: %v", err)
 		}
 		// Check the pod is still not running
-		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
 		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 	})
@@ -87,10 +87,10 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
 		e2eskipper.SkipUnlessProviderIs("gce")
 
-		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
+		rcName := createRuntimeClass(ctx, f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
 		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
-		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
-		expectPodSuccess(f, pod)
+		pod := e2epod.NewPodClient(f).Create(ctx, e2enode.NewRuntimeClassPod(rcName))
+		expectPodSuccess(ctx, f, pod)
 	})
 
 	/*
@@ -102,12 +102,12 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		is not being tested here.
 	*/
 	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass without PodOverhead [NodeConformance]", func(ctx context.Context) {
-		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
+		rcName := createRuntimeClass(ctx, f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, nil)
 		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
-		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
+		pod := e2epod.NewPodClient(f).Create(ctx, e2enode.NewRuntimeClassPod(rcName))
 		// there is only one pod in the namespace
 		label := labels.SelectorFromSet(labels.Set(map[string]string{}))
-		pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
+		pods, err := e2epod.WaitForPodsWithLabelScheduled(ctx, f.ClientSet, f.Namespace.Name, label)
 		framework.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
 
 		framework.ExpectEqual(len(pods.Items), 1)
@@ -127,17 +127,17 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		is not being tested here.
 	*/
 	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass and initialize its Overhead [NodeConformance]", func(ctx context.Context) {
-		rcName := createRuntimeClass(f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, &nodev1.Overhead{
+		rcName := createRuntimeClass(ctx, f, "preconfigured-handler", e2enode.PreconfiguredRuntimeClassHandler, &nodev1.Overhead{
 			PodFixed: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10m"),
 				v1.ResourceName(v1.ResourceMemory): resource.MustParse("1Mi"),
 			},
 		})
 		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
-		pod := e2epod.NewPodClient(f).Create(e2enode.NewRuntimeClassPod(rcName))
+		pod := e2epod.NewPodClient(f).Create(ctx, e2enode.NewRuntimeClassPod(rcName))
 		// there is only one pod in the namespace
 		label := labels.SelectorFromSet(labels.Set(map[string]string{}))
-		pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
+		pods, err := e2epod.WaitForPodsWithLabelScheduled(ctx, f.ClientSet, f.Namespace.Name, label)
 		framework.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
 
 		framework.ExpectEqual(len(pods.Items), 1)
@@ -154,16 +154,16 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		Description: Pod requesting the deleted RuntimeClass must be rejected.
 	*/
 	framework.ConformanceIt("should reject a Pod requesting a deleted RuntimeClass [NodeConformance]", func(ctx context.Context) {
-		rcName := createRuntimeClass(f, "delete-me", "runc", nil)
+		rcName := createRuntimeClass(ctx, f, "delete-me", "runc", nil)
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
 
 		ginkgo.By("Deleting RuntimeClass "+rcName, func() {
-			err := rcClient.Delete(context.TODO(), rcName, metav1.DeleteOptions{})
+			err := rcClient.Delete(ctx, rcName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete RuntimeClass %s", rcName)
 
 			ginkgo.By("Waiting for the RuntimeClass to disappear")
 			framework.ExpectNoError(wait.PollImmediate(framework.Poll, time.Minute, func() (bool, error) {
-				_, err := rcClient.Get(context.TODO(), rcName, metav1.GetOptions{})
+				_, err := rcClient.Get(ctx, rcName, metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
 					return true, nil // done
 				}
@@ -174,7 +174,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			}))
 		})
 
-		expectPodRejection(f, e2enode.NewRuntimeClassPod(rcName))
+		expectPodRejection(ctx, f, e2enode.NewRuntimeClassPod(rcName))
 	})
 
 	/*
@@ -227,7 +227,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		ginkgo.By("getting /apis/node.k8s.io")
 		{
 			group := &metav1.APIGroup{}
-			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/node.k8s.io").Do(context.TODO()).Into(group)
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/node.k8s.io").Do(ctx).Into(group)
 			framework.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
@@ -260,43 +260,43 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		// Main resource create/read/update/watch operations
 
 		ginkgo.By("creating")
-		createdRC, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
+		createdRC, err := rcClient.Create(ctx, rc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		_, err = rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
+		_, err = rcClient.Create(ctx, rc, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
 			framework.Failf("expected 409, got %#v", err)
 		}
-		_, err = rcClient.Create(context.TODO(), rc2, metav1.CreateOptions{})
+		_, err = rcClient.Create(ctx, rc2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
-		rcWatch, err := rcClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		rcWatch, err := rcClient.Watch(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 
 		// added for a watch
-		_, err = rcClient.Create(context.TODO(), rc3, metav1.CreateOptions{})
+		_, err = rcClient.Create(ctx, rc3, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("getting")
-		gottenRC, err := rcClient.Get(context.TODO(), rc.Name, metav1.GetOptions{})
+		gottenRC, err := rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(gottenRC.UID, createdRC.UID)
 
 		ginkgo.By("listing")
-		rcs, err := rcClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		rcs, err := rcClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(rcs.Items), 3, "filtered list should have 3 items")
 
 		ginkgo.By("patching")
-		patchedRC, err := rcClient.Patch(context.TODO(), createdRC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
+		patchedRC, err := rcClient.Patch(ctx, createdRC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(patchedRC.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		csrToUpdate := patchedRC.DeepCopy()
 		csrToUpdate.Annotations["updated"] = "true"
-		updatedRC, err := rcClient.Update(context.TODO(), csrToUpdate, metav1.UpdateOptions{})
+		updatedRC, err := rcClient.Update(ctx, csrToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(updatedRC.Annotations["updated"], "true", "updated object should have the applied annotation")
 
@@ -338,43 +338,43 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		// main resource delete operations
 
 		ginkgo.By("deleting")
-		err = rcClient.Delete(context.TODO(), createdRC.Name, metav1.DeleteOptions{})
+		err = rcClient.Delete(ctx, createdRC.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
-		_, err = rcClient.Get(context.TODO(), createdRC.Name, metav1.GetOptions{})
+		_, err = rcClient.Get(ctx, createdRC.Name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("expected 404, got %#v", err)
 		}
-		rcs, err = rcClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		rcs, err = rcClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(rcs.Items), 2, "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
-		err = rcClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		err = rcClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		rcs, err = rcClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		rcs, err = rcClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(rcs.Items), 0, "filtered list should have 0 items")
 	})
 })
 
-func deleteRuntimeClass(f *framework.Framework, name string) {
-	err := f.ClientSet.NodeV1().RuntimeClasses().Delete(context.TODO(), name, metav1.DeleteOptions{})
+func deleteRuntimeClass(ctx context.Context, f *framework.Framework, name string) {
+	err := f.ClientSet.NodeV1().RuntimeClasses().Delete(ctx, name, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "failed to delete RuntimeClass resource")
 }
 
 // createRuntimeClass generates a RuntimeClass with the desired handler and a "namespaced" name,
 // synchronously creates it, and returns the generated name.
-func createRuntimeClass(f *framework.Framework, name, handler string, overhead *nodev1.Overhead) string {
+func createRuntimeClass(ctx context.Context, f *framework.Framework, name, handler string, overhead *nodev1.Overhead) string {
 	uniqueName := fmt.Sprintf("%s-%s", f.Namespace.Name, name)
 	rc := runtimeclasstest.NewRuntimeClass(uniqueName, handler)
 	rc.Overhead = overhead
-	rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
+	rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 	return rc.GetName()
 }
 
-func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
-	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+func expectPodRejection(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
+	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectError(err, "should be forbidden")
 	if !apierrors.IsForbidden(err) {
 		framework.Failf("expected forbidden error, got %#v", err)
@@ -382,7 +382,7 @@ func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
 }
 
 // expectPodSuccess waits for the given pod to terminate successfully.
-func expectPodSuccess(f *framework.Framework, pod *v1.Pod) {
+func expectPodSuccess(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
-		f.ClientSet, pod.Name, f.Namespace.Name))
+		ctx, f.ClientSet, pod.Name, f.Namespace.Name))
 }

@@ -42,10 +42,10 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		c = f.ClientSet
 	})
 
-	ginkgo.AfterEach(func() {
+	ginkgo.AfterEach(func(ctx context.Context) {
 		if len(secretNeedClean) > 0 {
 			ginkgo.By("delete the bootstrap token secret")
-			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), secretNeedClean, metav1.DeleteOptions{})
+			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(ctx, secretNeedClean, metav1.DeleteOptions{})
 			secretNeedClean = ""
 			framework.ExpectNoError(err)
 		}
@@ -59,7 +59,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 
 		secret := newTokenSecret(tokenID, tokenSecret)
 		addSecretExpiration(secret, TimeStringFromNow(-time.Hour))
-		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret, metav1.CreateOptions{})
+		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(ctx, secret, metav1.CreateOptions{})
 
 		framework.ExpectNoError(err)
 
@@ -76,7 +76,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		framework.ExpectNoError(err)
 		secret := newTokenSecret(tokenID, tokenSecret)
 		addSecretExpiration(secret, TimeStringFromNow(time.Hour))
-		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret, metav1.CreateOptions{})
+		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(ctx, secret, metav1.CreateOptions{})
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenID
 		framework.ExpectNoError(err)
 

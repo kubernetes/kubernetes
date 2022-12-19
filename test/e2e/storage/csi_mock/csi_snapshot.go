@@ -67,7 +67,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				if test.createSnapshotHook != nil {
 					hooks = createPreHook("CreateSnapshot", test.createSnapshotHook)
 				}
-				m.init(testParameters{
+				m.init(ctx, testParameters{
 					disableAttach:  true,
 					registerDriver: true,
 					enableSnapshot: true,
@@ -82,7 +82,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				defer cancel()
 				ginkgo.DeferCleanup(m.cleanup)
 
-				sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
+				sc := m.driver.GetDynamicProvisionStorageClass(ctx, m.config, "")
 				ginkgo.By("Creating storage class")
 				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create class: %v", err)
@@ -96,7 +96,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				ginkgo.By("Creating snapshot")
 				// TODO: Test VolumeSnapshots with Retain policy
 				parameters := map[string]string{}
-				snapshotClass, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts, parameters)
+				snapshotClass, snapshot := storageframework.CreateSnapshot(ctx, sDriver, m.config, storageframework.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts, parameters)
 				framework.ExpectNoError(err, "failed to create snapshot")
 				m.vsc[snapshotClass.GetName()] = snapshotClass
 				volumeSnapshotName := snapshot.GetName()
@@ -110,11 +110,11 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Wait for PVC to be Bound")
-				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{claim}, 1*time.Minute)
+				_, err = e2epv.WaitForPVClaimBoundPhase(ctx, m.cs, []*v1.PersistentVolumeClaim{claim}, 1*time.Minute)
 				framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				ginkgo.By(fmt.Sprintf("Delete PVC %s", claim.Name))
-				err = e2epv.DeletePersistentVolumeClaim(m.cs, claim.Name, claim.Namespace)
+				err = e2epv.DeletePersistentVolumeClaim(ctx, m.cs, claim.Name, claim.Namespace)
 				framework.ExpectNoError(err, "failed to delete pvc")
 
 				ginkgo.By("Get PVC from API server and verify deletion timestamp is set")
@@ -129,7 +129,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				}
 
 				ginkgo.By(fmt.Sprintf("Get VolumeSnapshotContent bound to VolumeSnapshot %s", snapshot.GetName()))
-				snapshotContent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot, f.Timeouts.SnapshotCreate)
+				snapshotContent := utils.GetSnapshotContentFromSnapshot(ctx, m.config.Framework.DynamicClient, snapshot, f.Timeouts.SnapshotCreate)
 				volumeSnapshotContentName := snapshotContent.GetName()
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshotContent %s contains finalizer %s", snapshot.GetName(), volumeSnapshotContentFinalizer))
@@ -153,7 +153,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				// Refer https://github.com/kubernetes/kubernetes/pull/99167#issuecomment-781670012
 				if claim != nil && claim.Spec.VolumeName != "" {
 					ginkgo.By(fmt.Sprintf("Wait for PV %s to be deleted", claim.Spec.VolumeName))
-					err = e2epv.WaitForPersistentVolumeDeleted(m.cs, claim.Spec.VolumeName, framework.Poll, 3*time.Minute)
+					err = e2epv.WaitForPersistentVolumeDeleted(ctx, m.cs, claim.Spec.VolumeName, framework.Poll, 3*time.Minute)
 					framework.ExpectNoError(err, fmt.Sprintf("failed to delete PV %s", claim.Spec.VolumeName))
 				}
 
@@ -162,11 +162,11 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Delete VolumeSnapshot")
-				err = utils.DeleteAndWaitSnapshot(m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
+				err = utils.DeleteAndWaitSnapshot(ctx, m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshot %s", volumeSnapshotName))
 
 				ginkgo.By(fmt.Sprintf("Wait for VolumeSnapshotContent %s to be deleted", volumeSnapshotContentName))
-				err = utils.WaitForGVRDeletion(m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, framework.Poll, framework.SnapshotDeleteTimeout)
+				err = utils.WaitForGVRDeletion(ctx, m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshotContent %s", volumeSnapshotContentName))
 			})
 		}
@@ -208,7 +208,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 			test := test
 			ginkgo.It(test.name, func(ctx context.Context) {
 				hooks := createPreHook("CreateSnapshot", test.createSnapshotHook)
-				m.init(testParameters{
+				m.init(ctx, testParameters{
 					disableAttach:  true,
 					registerDriver: true,
 					enableSnapshot: true,
@@ -223,7 +223,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 
 				var sc *storagev1.StorageClass
 				if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
-					sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
+					sc = dDriver.GetDynamicProvisionStorageClass(ctx, m.config, "")
 				}
 				ginkgo.By("Creating storage class")
 				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
@@ -239,7 +239,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				ginkgo.By("Wait for PVC to be Bound")
-				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
+				_, err = e2epv.WaitForPVClaimBoundPhase(ctx, m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
 				framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				m.pvcs = append(m.pvcs, pvc)
@@ -265,9 +265,9 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 					CSISnapshotterSecretNamespaceAnnotation: f.Namespace.Name,
 				}
 
-				_, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
+				_, snapshot := storageframework.CreateSnapshot(ctx, sDriver, m.config, storageframework.DynamicSnapshotDelete, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
 				framework.ExpectNoError(err, "failed to create snapshot")
-				snapshotcontent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot, f.Timeouts.SnapshotCreate)
+				snapshotcontent := utils.GetSnapshotContentFromSnapshot(ctx, m.config.Framework.DynamicClient, snapshot, f.Timeouts.SnapshotCreate)
 				if annotations, ok = snapshotcontent.Object["metadata"].(map[string]interface{})["annotations"]; !ok {
 					framework.Failf("Unable to get volume snapshot content annotations")
 				}
@@ -298,7 +298,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 		for _, test := range tests {
 			test := test
 			ginkgo.It(test.name, func(ctx context.Context) {
-				m.init(testParameters{
+				m.init(ctx, testParameters{
 					disableAttach:  true,
 					registerDriver: true,
 					enableSnapshot: true,
@@ -310,13 +310,13 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				}
 				ginkgo.DeferCleanup(m.cleanup)
 
-				metricsGrabber, err := e2emetrics.NewMetricsGrabber(m.config.Framework.ClientSet, nil, f.ClientConfig(), false, false, false, false, false, true)
+				metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, m.config.Framework.ClientSet, nil, f.ClientConfig(), false, false, false, false, false, true)
 				if err != nil {
 					framework.Failf("Error creating metrics grabber : %v", err)
 				}
 
 				// Grab initial metrics - if this fails, snapshot controller metrics are not setup. Skip in this case.
-				_, err = metricsGrabber.GrabFromSnapshotController(framework.TestContext.SnapshotControllerPodName, framework.TestContext.SnapshotControllerHTTPPort)
+				_, err = metricsGrabber.GrabFromSnapshotController(ctx, framework.TestContext.SnapshotControllerPodName, framework.TestContext.SnapshotControllerHTTPPort)
 				if err != nil {
 					e2eskipper.Skipf("Snapshot controller metrics not found -- skipping")
 				}
@@ -330,19 +330,19 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 					"",
 					test.pattern)
 				createSnapshotMetrics := newSnapshotControllerMetrics(metricsTestConfig, metricsGrabber)
-				originalCreateSnapshotCount, _ := createSnapshotMetrics.getSnapshotControllerMetricValue()
+				originalCreateSnapshotCount, _ := createSnapshotMetrics.getSnapshotControllerMetricValue(ctx)
 				metricsTestConfig.operationName = "CreateSnapshotAndReady"
 				createSnapshotAndReadyMetrics := newSnapshotControllerMetrics(metricsTestConfig, metricsGrabber)
-				originalCreateSnapshotAndReadyCount, _ := createSnapshotAndReadyMetrics.getSnapshotControllerMetricValue()
+				originalCreateSnapshotAndReadyCount, _ := createSnapshotAndReadyMetrics.getSnapshotControllerMetricValue(ctx)
 
 				metricsTestConfig.operationName = "DeleteSnapshot"
 				deleteSnapshotMetrics := newSnapshotControllerMetrics(metricsTestConfig, metricsGrabber)
-				originalDeleteSnapshotCount, _ := deleteSnapshotMetrics.getSnapshotControllerMetricValue()
+				originalDeleteSnapshotCount, _ := deleteSnapshotMetrics.getSnapshotControllerMetricValue(ctx)
 
 				ginkgo.By("Creating storage class")
 				var sc *storagev1.StorageClass
 				if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
-					sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
+					sc = dDriver.GetDynamicProvisionStorageClass(ctx, m.config, "")
 				}
 				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
 				framework.ExpectNoError(err, "Failed to create storage class: %v", err)
@@ -357,28 +357,28 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				ginkgo.By("Wait for PVC to be Bound")
-				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
+				_, err = e2epv.WaitForPVClaimBoundPhase(ctx, m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
 				framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
 				ginkgo.By("Creating snapshot")
 				parameters := map[string]string{}
-				sr := storageframework.CreateSnapshotResource(sDriver, m.config, test.pattern, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
+				sr := storageframework.CreateSnapshotResource(ctx, sDriver, m.config, test.pattern, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
 				framework.ExpectNoError(err, "failed to create snapshot")
 
 				ginkgo.By("Checking for CreateSnapshot metrics")
-				createSnapshotMetrics.waitForSnapshotControllerMetric(originalCreateSnapshotCount+1.0, f.Timeouts.SnapshotControllerMetrics)
+				createSnapshotMetrics.waitForSnapshotControllerMetric(ctx, originalCreateSnapshotCount+1.0, f.Timeouts.SnapshotControllerMetrics)
 
 				ginkgo.By("Checking for CreateSnapshotAndReady metrics")
-				err = utils.WaitForSnapshotReady(m.config.Framework.DynamicClient, pvc.Namespace, sr.Vs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate)
+				err = utils.WaitForSnapshotReady(ctx, m.config.Framework.DynamicClient, pvc.Namespace, sr.Vs.GetName(), framework.Poll, f.Timeouts.SnapshotCreate)
 				framework.ExpectNoError(err, "failed to wait for snapshot ready")
-				createSnapshotAndReadyMetrics.waitForSnapshotControllerMetric(originalCreateSnapshotAndReadyCount+1.0, f.Timeouts.SnapshotControllerMetrics)
+				createSnapshotAndReadyMetrics.waitForSnapshotControllerMetric(ctx, originalCreateSnapshotAndReadyCount+1.0, f.Timeouts.SnapshotControllerMetrics)
 
 				// delete the snapshot and check if the snapshot is deleted
 				deleteSnapshot(m.cs, m.config, sr.Vs)
 
 				ginkgo.By("check for delete metrics")
 				metricsTestConfig.operationName = "DeleteSnapshot"
-				deleteSnapshotMetrics.waitForSnapshotControllerMetric(originalDeleteSnapshotCount+1.0, f.Timeouts.SnapshotControllerMetrics)
+				deleteSnapshotMetrics.waitForSnapshotControllerMetric(ctx, originalDeleteSnapshotCount+1.0, f.Timeouts.SnapshotControllerMetrics)
 			})
 		}
 	})
@@ -489,11 +489,11 @@ func newSnapshotControllerMetrics(cfg snapshotMetricsTestConfig, metricsGrabber 
 	}
 }
 
-func (scm *snapshotControllerMetrics) waitForSnapshotControllerMetric(expectedValue float64, timeout time.Duration) {
+func (scm *snapshotControllerMetrics) waitForSnapshotControllerMetric(ctx context.Context, expectedValue float64, timeout time.Duration) {
 	metricKey := scm.getMetricKey()
 	if successful := utils.WaitUntil(10*time.Second, timeout, func() bool {
 		// get metric value
-		actualValue, err := scm.getSnapshotControllerMetricValue()
+		actualValue, err := scm.getSnapshotControllerMetricValue(ctx)
 		if err != nil {
 			return false
 		}
@@ -513,11 +513,11 @@ func (scm *snapshotControllerMetrics) waitForSnapshotControllerMetric(expectedVa
 	framework.Failf("Unable to get valid snapshot controller metrics after %v", timeout)
 }
 
-func (scm *snapshotControllerMetrics) getSnapshotControllerMetricValue() (float64, error) {
+func (scm *snapshotControllerMetrics) getSnapshotControllerMetricValue(ctx context.Context) (float64, error) {
 	metricKey := scm.getMetricKey()
 
 	// grab and parse into readable format
-	err := scm.grabSnapshotControllerMetrics()
+	err := scm.grabSnapshotControllerMetrics(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -556,9 +556,9 @@ func (scm *snapshotControllerMetrics) showMetricsFailure(metricKey string) {
 	}
 }
 
-func (scm *snapshotControllerMetrics) grabSnapshotControllerMetrics() error {
+func (scm *snapshotControllerMetrics) grabSnapshotControllerMetrics(ctx context.Context) error {
 	// pull all metrics
-	metrics, err := scm.metricsGrabber.GrabFromSnapshotController(framework.TestContext.SnapshotControllerPodName, framework.TestContext.SnapshotControllerHTTPPort)
+	metrics, err := scm.metricsGrabber.GrabFromSnapshotController(ctx, framework.TestContext.SnapshotControllerPodName, framework.TestContext.SnapshotControllerHTTPPort)
 	if err != nil {
 		return err
 	}

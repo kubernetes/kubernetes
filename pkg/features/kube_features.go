@@ -285,25 +285,6 @@ const (
 	// Lock to default and remove after v1.22 based on user feedback that should be reflected in KEP #1972 update
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
-	// owner: @gnufied
-	// alpha: v1.14
-	// beta: v1.16
-	// GA: 1.24
-	// Ability to expand CSI volumes
-	ExpandCSIVolumes featuregate.Feature = "ExpandCSIVolumes"
-
-	// owner: @mlmhl @gnufied
-	// beta: v1.15
-	// GA: 1.24
-	// Ability to expand persistent volumes' file system without unmounting volumes.
-	ExpandInUsePersistentVolumes featuregate.Feature = "ExpandInUsePersistentVolumes"
-
-	// owner: @gnufied
-	// beta: v1.11
-	// GA: 1.24
-	// Ability to Expand persistent volumes
-	ExpandPersistentVolumes featuregate.Feature = "ExpandPersistentVolumes"
-
 	// owner: @gjkim42
 	// kep: https://kep.k8s.io/2595
 	// alpha: v1.22
@@ -490,6 +471,7 @@ const (
 	// owner: @zshihang
 	// kep: https://kep.k8s.io/2800
 	// beta: v1.24
+	// ga: v1.26
 	//
 	// Stop auto-generation of secret-based service account tokens.
 	LegacyServiceAccountTokenNoAutoGeneration featuregate.Feature = "LegacyServiceAccountTokenNoAutoGeneration"
@@ -925,12 +907,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 
-	ExpandCSIVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
-
-	ExpandInUsePersistentVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
-
-	ExpandPersistentVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
-
 	ExpandedDNSConfig: {Default: true, PreRelease: featuregate.Beta},
 
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
@@ -981,7 +957,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KubeletTracing: {Default: false, PreRelease: featuregate.Alpha},
 
-	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.GA},
+	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	LegacyServiceAccountTokenTracking: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -997,7 +973,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MemoryQoS: {Default: false, PreRelease: featuregate.Alpha},
 
-	MinDomainsInPodTopologySpread: {Default: false, PreRelease: featuregate.Beta},
+	MinDomainsInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
 	MinimizeIPTablesRestore: {Default: false, PreRelease: featuregate.Alpha},
 

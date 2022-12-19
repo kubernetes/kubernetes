@@ -95,7 +95,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
 				}
 				var nodeStageMountOpts, nodePublishMountOpts []string
-				m.init(testParameters{
+				m.init(ctx, testParameters{
 					disableAttach:      true,
 					registerDriver:     true,
 					enableSELinuxMount: &t.seLinuxEnabled,
@@ -110,8 +110,8 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 					podSELinuxOpts = &seLinuxOpts
 				}
 
-				_, _, pod := m.createPodWithSELinux(accessModes, t.mountOptions, podSELinuxOpts)
-				err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				_, _, pod := m.createPodWithSELinux(ctx, accessModes, t.mountOptions, podSELinuxOpts)
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "failed to start pod")
 
 				framework.ExpectEqual(nodeStageMountOpts, t.expectedMountOptions, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume. to equal %q; got: %q", t.expectedMountOptions, nodeStageMountOpts)

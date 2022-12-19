@@ -43,7 +43,7 @@ var _ = SIGDescribe("stateful Upgrade [Feature:StatefulUpgrade]", func() {
 
 	ginkgo.Describe("stateful upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func(ctx context.Context) {
-			e2epv.SkipIfNoDefaultStorageClass(f.ClientSet)
+			e2epv.SkipIfNoDefaultStorageClass(ctx, f.ClientSet)
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
@@ -52,7 +52,7 @@ var _ = SIGDescribe("stateful Upgrade [Feature:StatefulUpgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, statefulUpgradeTest)
 
 			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, statefulUpgradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(ctx, upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })

@@ -95,7 +95,7 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 		}
 
 		sysNs := "kube-system"
-		_, err := cs.AppsV1().DaemonSets(sysNs).Create(context.TODO(), ds, metav1.CreateOptions{})
+		_, err := cs.AppsV1().DaemonSets(sysNs).Create(ctx, ds, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating Windows testing Pod")
@@ -104,10 +104,10 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 		windowsPod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
 			"microsoft.com/directx": resource.MustParse("1"),
 		}
-		windowsPod, err = cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), windowsPod, metav1.CreateOptions{})
+		windowsPod, err = cs.CoreV1().Pods(f.Namespace.Name).Create(ctx, windowsPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Waiting for the pod Running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, windowsPod.Name, f.Namespace.Name, testSlowMultiplier*framework.PodStartTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, windowsPod.Name, f.Namespace.Name, testSlowMultiplier*framework.PodStartTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying device access in Windows testing Pod")

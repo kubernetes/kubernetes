@@ -53,11 +53,12 @@ func scheduleFailureEvent(podName string) func(*v1.Event) bool {
 }
 
 // Action is a function to be performed by the system.
-type Action func() error
+type Action func(ctx context.Context) error
 
 // observeEventAfterAction returns true if an event matching the predicate was emitted
 // from the system after performing the supplied action.
-func observeEventAfterAction(c clientset.Interface, ns string, eventPredicate func(*v1.Event) bool, action Action) (bool, error) {
+func observeEventAfterAction(ctx context.Context, c clientset.Interface, ns string, eventPredicate func(*v1.Event) bool, action Action) (bool, error) {
+	// TODO (pohly): add context support
 	observedMatchingEvent := false
 	informerStartedChan := make(chan struct{})
 	var informerStartedGuard sync.Once
@@ -66,13 +67,13 @@ func observeEventAfterAction(c clientset.Interface, ns string, eventPredicate fu
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				ls, err := c.CoreV1().Events(ns).List(context.TODO(), options)
+				ls, err := c.CoreV1().Events(ns).List(ctx, options)
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				// Signal parent goroutine that watching has begun.
 				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
-				w, err := c.CoreV1().Events(ns).Watch(context.TODO(), options)
+				w, err := c.CoreV1().Events(ns).Watch(ctx, options)
 				return w, err
 			},
 		},
@@ -99,7 +100,7 @@ func observeEventAfterAction(c clientset.Interface, ns string, eventPredicate fu
 	<-informerStartedChan
 
 	// Invoke the action function.
-	err := action()
+	err := action(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -108,7 +109,7 @@ func observeEventAfterAction(c clientset.Interface, ns string, eventPredicate fu
 	// Wait up 2 minutes polling every second.
 	timeout := 2 * time.Minute
 	interval := 1 * time.Second
-	err = wait.Poll(interval, timeout, func() (bool, error) {
+	err = wait.PollWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
 		return observedMatchingEvent, nil
 	})
 	return err == nil, err

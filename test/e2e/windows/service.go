@@ -51,11 +51,11 @@ var _ = SIGDescribe("Services", func() {
 		ns := f.Namespace.Name
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		nodeIP, err := e2enode.PickIP(jig.Client)
+		nodeIP, err := e2enode.PickIP(ctx, jig.Client)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
-		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
+		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
 		framework.ExpectNoError(err)
@@ -69,20 +69,20 @@ var _ = SIGDescribe("Services", func() {
 				"kubernetes.io/os": "windows",
 			}
 		}
-		_, err = jig.Run(windowsNodeSelectorTweak)
+		_, err = jig.Run(ctx, windowsNodeSelectorTweak)
 		framework.ExpectNoError(err)
 
 		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")
 		testPod := createTestPod(f, windowsBusyBoximage, windowsOS)
-		testPod = e2epod.NewPodClient(f).CreateSync(testPod)
+		testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
 
 		ginkgo.By("verifying that pod has the correct nodeSelector")
 		// Admission controllers may sometimes do the wrong thing
 		framework.ExpectEqual(testPod.Spec.NodeSelector["kubernetes.io/os"], "windows")
 
 		ginkgo.By(fmt.Sprintf("checking connectivity Pod to curl http://%s:%d", nodeIP, nodePort))
-		assertConsistentConnectivity(f, testPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s", net.JoinHostPort(nodeIP, strconv.Itoa(nodePort)))))
+		assertConsistentConnectivity(ctx, f, testPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s", net.JoinHostPort(nodeIP, strconv.Itoa(nodePort)))))
 
 	})
 

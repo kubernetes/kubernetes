@@ -68,8 +68,11 @@ const (
 		Write-Output $c
 		throw "Contents of /etc/secret/foo.txt are not as expected"
 	}
-	if ($env:NODE_NAME_TEST -ne $env:COMPUTERNAME) {
-		throw "NODE_NAME_TEST env var ($env:NODE_NAME_TEST) does not equal COMPUTERNAME ($env:COMPUTERNAME)"
+	# Windows ComputerNames cannot exceed 15 characters, which means that the $env:COMPUTERNAME
+	# can only be a substring of $env:NODE_NAME_TEST. We compare it with the hostname instead.
+	# The following comparison is case insensitive.
+	if ($env:NODE_NAME_TEST -ine "$(hostname)") {
+		throw "NODE_NAME_TEST env var ($env:NODE_NAME_TEST) does not equal hostname"
 	}
 	Write-Output "SUCCESS"`
 )
@@ -92,13 +95,15 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 	ginkgo.It("should run as a process on the host/node", func(ctx context.Context) {
 
 		ginkgo.By("selecting a Windows node")
-		targetNode, err := findWindowsNode(f)
+		targetNode, err := findWindowsNode(ctx, f)
 		framework.ExpectNoError(err, "Error finding Windows node")
 		framework.Logf("Using node: %v", targetNode.Name)
 
 		ginkgo.By("scheduling a pod with a container that verifies %COMPUTERNAME% matches selected node name")
 		image := imageutils.GetConfig(imageutils.BusyBox)
 		podName := "host-process-test-pod"
+		// We're passing this to powershell.exe -Command. Inside, we must use apostrophes for strings.
+		command := fmt.Sprintf(`& {if ('%s' -ine "$(hostname)") { exit -1 }}`, targetNode.Name)
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
@@ -115,7 +120,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 					{
 						Image:   image.GetE2EImage(),
 						Name:    "computer-name-test",
-						Command: []string{"cmd.exe", "/K", "IF", "NOT", "%COMPUTERNAME%", "==", targetNode.Name, "(", "exit", "-1", ")"},
+						Command: []string{"powershell.exe", "-Command", command},
 					},
 				},
 				RestartPolicy: v1.RestartPolicyNever,
@@ -123,14 +128,14 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		e2epod.NewPodClient(f).Create(pod)
+		e2epod.NewPodClient(f).Create(ctx, pod)
 
 		ginkgo.By("Waiting for pod to run")
-		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(ctx, podName, 3*time.Minute)
 
 		ginkgo.By("Then ensuring pod finished running successfully")
 		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
-			context.TODO(),
+			ctx,
 			podName,
 			metav1.GetOptions{})
 
@@ -175,21 +180,21 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		e2epod.NewPodClient(f).Create(pod)
+		e2epod.NewPodClient(f).Create(ctx, pod)
 
 		ginkgo.By("Waiting for pod to run")
-		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(ctx, podName, 3*time.Minute)
 
 		ginkgo.By("Then ensuring pod finished running successfully")
 		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
-			context.TODO(),
+			ctx,
 			podName,
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
 
 		if p.Status.Phase != v1.PodSucceeded {
-			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, "read-configuration")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, "read-configuration")
 			if err != nil {
 				framework.Logf("Error pulling logs: %v", err)
 			}
@@ -207,7 +212,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-windows/1981-windows-privileged-container-support/README.md
 		// for more details.
 		ginkgo.By("Ensuring Windows nodes are running containerd v1.6.x")
-		windowsNode, err := findWindowsNode(f)
+		windowsNode, err := findWindowsNode(ctx, f)
 		framework.ExpectNoError(err, "error finding Windows node")
 		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
 		framework.ExpectNoError(err, "error getting node container runtime and version")
@@ -413,14 +418,14 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 					},
 				},
 			}
-			e2epod.NewPodClient(f).Create(pod)
+			e2epod.NewPodClient(f).Create(ctx, pod)
 
 			ginkgo.By(fmt.Sprintf("Waiting for pod '%s' to run", podName))
-			e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
+			e2epod.NewPodClient(f).WaitForFinish(ctx, podName, 3*time.Minute)
 
 			ginkgo.By("Then ensuring pod finished running successfully")
 			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
-				context.TODO(),
+				ctx,
 				podName,
 				metav1.GetOptions{})
 
@@ -435,7 +440,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 						"involvedObject.namespace": f.Namespace.Name,
 					}.AsSelector().String(),
 				}
-				events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), options)
+				events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, options)
 				framework.ExpectNoError(err, "Error getting events for failed pod")
 				for _, event := range events.Items {
 					framework.Logf("%s: %s", event.Reason, event.Message)
@@ -463,7 +468,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 				"validation-script": validation_script,
 			},
 		}
-		_, err := f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
+		_, err := f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(ctx, configMap, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "unable to create create configmap")
 
 		ginkgo.By("Creating a secret containing test data")
@@ -480,7 +485,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 				"foo": []byte("bar"),
 			},
 		}
-		_, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
+		_, err = f.ClientSet.CoreV1().Secrets(ns.Name).Create(ctx, secret, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "unable to create secret")
 
 		ginkgo.By("Creating a pod with a HostProcess container that uses various types of volume mounts")
@@ -488,18 +493,18 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		podAndContainerName := "host-process-volume-mounts"
 		pod := makeTestPodWithVolumeMounts(podAndContainerName)
 
-		e2epod.NewPodClient(f).Create(pod)
+		e2epod.NewPodClient(f).Create(ctx, pod)
 
 		ginkgo.By("Waiting for pod to run")
-		e2epod.NewPodClient(f).WaitForFinish(podAndContainerName, 3*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(ctx, podAndContainerName, 3*time.Minute)
 
-		logs, err := e2epod.GetPodLogs(f.ClientSet, ns.Name, podAndContainerName, podAndContainerName)
+		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns.Name, podAndContainerName, podAndContainerName)
 		framework.ExpectNoError(err, "Error getting pod logs")
 		framework.Logf("Container logs: %s", logs)
 
 		ginkgo.By("Then ensuring pod finished running successfully")
 		p, err := f.ClientSet.CoreV1().Pods(ns.Name).Get(
-			context.TODO(),
+			ctx,
 			podAndContainerName,
 			metav1.GetOptions{})
 
@@ -509,12 +514,12 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 	ginkgo.It("metrics should report count of started and failed to start HostProcess containers", func(ctx context.Context) {
 		ginkgo.By("Selecting a Windows node")
-		targetNode, err := findWindowsNode(f)
+		targetNode, err := findWindowsNode(ctx, f)
 		framework.ExpectNoError(err, "Error finding Windows node")
 		framework.Logf("Using node: %v", targetNode.Name)
 
 		ginkgo.By("Getting initial kubelet metrics values")
-		beforeMetrics, err := getCurrentHostProcessMetrics(f, targetNode.Name)
+		beforeMetrics, err := getCurrentHostProcessMetrics(ctx, f, targetNode.Name)
 		framework.ExpectNoError(err, "Error getting initial kubelet metrics for node")
 		framework.Logf("Initial HostProcess container metrics -- StartedContainers: %v, StartedContainersErrors: %v, StartedInitContainers: %v, StartedInitContainersErrors: %v",
 			beforeMetrics.StartedContainersCount, beforeMetrics.StartedContainersErrorCount, beforeMetrics.StartedInitContainersCount, beforeMetrics.StartedInitContainersErrorCount)
@@ -560,8 +565,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		e2epod.NewPodClient(f).Create(pod)
-		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).Create(ctx, pod)
+		e2epod.NewPodClient(f).WaitForFinish(ctx, podName, 3*time.Minute)
 
 		ginkgo.By("Scheduling a pod with a HostProcess container that will fail")
 		podName = "host-process-metrics-pod-failing-container"
@@ -594,12 +599,12 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		e2epod.NewPodClient(f).Create(pod)
-		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).Create(ctx, pod)
+		e2epod.NewPodClient(f).WaitForFinish(ctx, podName, 3*time.Minute)
 
 		ginkgo.By("Getting subsequent kubelet metrics values")
 
-		afterMetrics, err := getCurrentHostProcessMetrics(f, targetNode.Name)
+		afterMetrics, err := getCurrentHostProcessMetrics(ctx, f, targetNode.Name)
 		framework.ExpectNoError(err, "Error getting subsequent kubelet metrics for node")
 		framework.Logf("Subsequent HostProcess container metrics -- StartedContainers: %v, StartedContainersErrors: %v, StartedInitContainers: %v, StartedInitContainersErrors: %v",
 			afterMetrics.StartedContainersCount, afterMetrics.StartedContainersErrorCount, afterMetrics.StartedInitContainersCount, afterMetrics.StartedInitContainersErrorCount)
@@ -615,7 +620,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 	ginkgo.It("container stats validation", func(ctx context.Context) {
 		ginkgo.By("selecting a Windows node")
-		targetNode, err := findWindowsNode(f)
+		targetNode, err := findWindowsNode(ctx, f)
 		framework.ExpectNoError(err, "Error finding Windows node")
 		framework.Logf("Using node: %v", targetNode.Name)
 
@@ -646,14 +651,14 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		e2epod.NewPodClient(f).Create(pod)
+		e2epod.NewPodClient(f).Create(ctx, pod)
 
 		ginkgo.By("Waiting for the pod to start running")
 		timeout := 3 * time.Minute
-		e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 1, 0, timeout, make(map[string]string))
+		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, timeout, make(map[string]string))
 
 		ginkgo.By("Getting container stats for pod")
-		nodeStats, err := e2ekubelet.GetStatsSummary(f.ClientSet, targetNode.Name)
+		nodeStats, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, targetNode.Name)
 		framework.ExpectNoError(err, "Error getting node stats")
 
 		statsChecked := false
@@ -695,7 +700,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 	ginkgo.It("should support querying api-server using in-cluster config", func(ctx context.Context) {
 		// This functionality is only support on containerd  v1.7+
 		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
-		windowsNode, err := findWindowsNode(f)
+		windowsNode, err := findWindowsNode(ctx, f)
 		framework.ExpectNoError(err, "error finding Windows node")
 		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
 		framework.ExpectNoError(err, "error getting node container runtime and version")
@@ -743,10 +748,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		}
 
 		pc := e2epod.NewPodClient(f)
-		pc.Create(pod)
+		pc.Create(ctx, pod)
 
 		ginkgo.By("Waiting for pod to run")
-		e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 1, 0, 3*time.Minute, make(map[string]string))
+		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, 3*time.Minute, make(map[string]string))
 
 		ginkgo.By("Waiting for 60 seconds")
 		// We wait an additional 60 seconds after the pod is Running because the
@@ -755,7 +760,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		time.Sleep(60 * time.Second)
 
 		ginkgo.By("Ensuring the test app was able to successfully query the api-server")
-		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, "hpc-agnhost")
+		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, "hpc-agnhost")
 		framework.ExpectNoError(err, "Error getting pod logs")
 
 		framework.Logf("Logs: %s\n", logs)
@@ -774,7 +779,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 	ginkgo.It("should run as localgroup accounts", func(ctx context.Context) {
 		// This functionality is only supported on containerd v1.7+
 		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
-		windowsNode, err := findWindowsNode(f)
+		windowsNode, err := findWindowsNode(ctx, f)
 		framework.ExpectNoError(err, "error finding Windows node")
 		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
 		framework.ExpectNoError(err, "error getting node container runtime and version")
@@ -830,10 +835,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		e2epod.NewPodClient(f).Create(pod)
+		e2epod.NewPodClient(f).Create(ctx, pod)
 
 		ginkgo.By("Waiting for pod to run")
-		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(ctx, podName, 3*time.Minute)
 
 		ginkgo.By("Then ensuring pod finished running successfully")
 		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
@@ -849,7 +854,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		// because all of the 'built-in' accounts that can be used with HostProcess
 		// are prefixed with this.
 		ginkgo.By("Then ensuring pod was not running as a system account")
-		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, "localgroup-container")
+		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, "localgroup-container")
 		framework.ExpectNoError(err, "error retrieving container logs")
 		framework.Logf("Pod logs: %s", logs)
 		framework.ExpectEqual(
@@ -1000,10 +1005,10 @@ type HostProcessContainersMetrics struct {
 
 // getCurrentHostProcessMetrics returns a HostPRocessContainersMetrics object. Any metrics that do not have any
 // values reported will be set to 0.
-func getCurrentHostProcessMetrics(f *framework.Framework, nodeName string) (HostProcessContainersMetrics, error) {
+func getCurrentHostProcessMetrics(ctx context.Context, f *framework.Framework, nodeName string) (HostProcessContainersMetrics, error) {
 	var result HostProcessContainersMetrics
 
-	metrics, err := e2emetrics.GetKubeletMetrics(f.ClientSet, nodeName)
+	metrics, err := e2emetrics.GetKubeletMetrics(ctx, f.ClientSet, nodeName)
 	if err != nil {
 		return result, err
 	}

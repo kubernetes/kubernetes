@@ -52,13 +52,13 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 
 	ginkgo.Context("Allocatable node memory", func() {
 		ginkgo.It("should be equal to a calculated allocatable memory value", func(ctx context.Context) {
-			checkNodeAllocatableTest(f)
+			checkNodeAllocatableTest(ctx, f)
 		})
 	})
 
 	ginkgo.Context("attempt to deploy past allocatable memory limits", func() {
 		ginkgo.It("should fail deployments of pods once there isn't enough memory", func(ctx context.Context) {
-			overrideAllocatableMemoryTest(f, framework.TestContext.CloudConfig.NumNodes)
+			overrideAllocatableMemoryTest(ctx, f, framework.TestContext.CloudConfig.NumNodes)
 		})
 	})
 
@@ -81,9 +81,9 @@ type nodeMemory struct {
 
 // runDensityBatchTest runs the density batch pod creation test
 // checks that a calculated value for NodeAllocatable is equal to the reported value
-func checkNodeAllocatableTest(f *framework.Framework) {
+func checkNodeAllocatableTest(ctx context.Context, f *framework.Framework) {
 
-	nodeMem := getNodeMemory(f)
+	nodeMem := getNodeMemory(ctx, f)
 	framework.Logf("nodeMem says: %+v", nodeMem)
 
 	// calculate the allocatable mem based on capacity - reserved amounts
@@ -101,9 +101,9 @@ func checkNodeAllocatableTest(f *framework.Framework) {
 
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable
 // memory, then confirms that the last pod failed because of failedScheduling
-func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) {
+func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, allocatablePods int) {
 	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	framework.ExpectNoError(err)
@@ -133,7 +133,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 				NodeName: node.Name,
 			},
 		}
-		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
 	podName := "mem-failure-pod"
@@ -158,10 +158,10 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 			},
 		},
 	}
-	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), failurePod, metav1.CreateOptions{})
+	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, failurePod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	gomega.Eventually(func() bool {
-		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
+	gomega.Eventually(ctx, func() bool {
+		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
@@ -176,9 +176,9 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 }
 
 // getNodeMemory populates a nodeMemory struct with information from the first
-func getNodeMemory(f *framework.Framework) nodeMemory {
+func getNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory {
 	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	framework.ExpectNoError(err)
@@ -193,7 +193,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	framework.Logf("Getting configuration details for node %s", nodeName)
 	request := f.ClientSet.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("configz")
-	rawbytes, err := request.DoRaw(context.Background())
+	rawbytes, err := request.DoRaw(ctx)
 	framework.ExpectNoError(err)
 	kubeletConfig, err := decodeConfigz(rawbytes)
 	framework.ExpectNoError(err)

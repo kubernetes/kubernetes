@@ -70,21 +70,21 @@ var _ = SIGDescribe("Events", func() {
 			ginkgo.By("deleting the pod")
 			return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 		})
-		if _, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+		if _, err := podClient.Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
 
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		pods, err := podClient.List(context.TODO(), options)
+		pods, err := podClient.List(ctx, options)
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("retrieving the pod")
-		podWithUID, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		podWithUID, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
@@ -100,7 +100,7 @@ var _ = SIGDescribe("Events", func() {
 				"source":                   v1.DefaultSchedulerName,
 			}.AsSelector().String()
 			options := metav1.ListOptions{FieldSelector: selector}
-			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), options)
+			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, options)
 			if err != nil {
 				return false, err
 			}
@@ -120,7 +120,7 @@ var _ = SIGDescribe("Events", func() {
 				"source":                   "kubelet",
 			}.AsSelector().String()
 			options := metav1.ListOptions{FieldSelector: selector}
-			events, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), options)
+			events, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, options)
 			if err != nil {
 				return false, err
 			}

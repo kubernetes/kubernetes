@@ -37,16 +37,16 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		var err error
 		var privilegedSecurityContext bool = false
 
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("Setting up data")
 			secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "my-secret"}, Data: map[string][]byte{"secret-key": []byte("secret-value")}}
-			_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
+			_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, secret, metav1.CreateOptions{})
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				framework.ExpectNoError(err, "while creating secret")
 			}
 
 			configmap := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-configmap"}, Data: map[string]string{"configmap-key": "configmap-value"}}
-			_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configmap, metav1.CreateOptions{})
+			_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configmap, metav1.CreateOptions{})
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				framework.ExpectNoError(err, "while creating configmap")
 			}
@@ -59,7 +59,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		*/
 		framework.ConformanceIt("should support subpaths with secret pod", func(ctx context.Context) {
 			pod := testsuites.SubpathTestPod(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, privilegedSecurityContext)
-			testsuites.TestBasicSubpath(f, "secret-value", pod)
+			testsuites.TestBasicSubpath(ctx, f, "secret-value", pod)
 		})
 
 		/*
@@ -69,7 +69,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		*/
 		framework.ConformanceIt("should support subpaths with configmap pod", func(ctx context.Context) {
 			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
-			testsuites.TestBasicSubpath(f, "configmap-value", pod)
+			testsuites.TestBasicSubpath(ctx, f, "configmap-value", pod)
 		})
 
 		/*
@@ -81,7 +81,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			file := "/etc/resolv.conf"
 			pod.Spec.Containers[0].VolumeMounts[0].MountPath = file
-			testsuites.TestBasicSubpathFile(f, "configmap-value", pod, file)
+			testsuites.TestBasicSubpathFile(ctx, f, "configmap-value", pod, file)
 		})
 
 		/*
@@ -95,7 +95,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 					Items: []v1.DownwardAPIVolumeFile{{Path: "downward/podname", FieldRef: &v1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
 				},
 			}, privilegedSecurityContext)
-			testsuites.TestBasicSubpath(f, pod.Name, pod)
+			testsuites.TestBasicSubpath(ctx, f, pod.Name, pod)
 		})
 
 		/*
@@ -114,7 +114,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 					},
 				},
 			}, privilegedSecurityContext)
-			testsuites.TestBasicSubpath(f, "configmap-value", pod)
+			testsuites.TestBasicSubpath(ctx, f, "configmap-value", pod)
 		})
 
 	})
@@ -123,7 +123,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		ginkgo.It("should verify that container can restart successfully after configmaps modified", func(ctx context.Context) {
 			configmapToModify := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-configmap-to-modify"}, Data: map[string]string{"configmap-key": "configmap-value"}}
 			configmapModified := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-configmap-to-modify"}, Data: map[string]string{"configmap-key": "configmap-modified-value"}}
-			testsuites.TestPodContainerRestartWithConfigmapModified(f, configmapToModify, configmapModified)
+			testsuites.TestPodContainerRestartWithConfigmapModified(ctx, f, configmapToModify, configmapModified)
 		})
 	})
 })

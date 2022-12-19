@@ -39,7 +39,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			ns = f.Namespace.Name
 			staticPodName = "graceful-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
@@ -51,14 +51,14 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running")
-			gomega.Eventually(func() error {
-				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 
 		ginkgo.It("mirror pod termination should satisfy grace period when static pod is deleted [NodeConformance]", func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
-			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			uid := pod.UID
 
@@ -69,14 +69,14 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running for grace period")
-			gomega.Consistently(func() error {
-				return checkMirrorPodRunningWithUID(f.ClientSet, mirrorPodName, ns, uid)
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRunningWithUID(ctx, f.ClientSet, mirrorPodName, ns, uid)
 			}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
 		})
 
 		ginkgo.It("mirror pod termination should satisfy grace period when static pod is updated [NodeConformance]", func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
-			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			uid := pod.UID
 
@@ -86,17 +86,17 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be running for grace period")
-			gomega.Consistently(func() error {
-				return checkMirrorPodRunningWithUID(f.ClientSet, mirrorPodName, ns, uid)
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRunningWithUID(ctx, f.ClientSet, mirrorPodName, ns, uid)
 			}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
 
 			ginkgo.By("wait for the mirror pod to be updated")
-			gomega.Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			ginkgo.By("check the mirror pod container image is updated")
-			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
+			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pod.Spec.Containers), 1)
 			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
@@ -104,7 +104,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 		ginkgo.It("should update a static pod when the static pod is updated multiple times during the graceful termination period [NodeConformance]", func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
-			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			uid := pod.UID
 
@@ -120,18 +120,18 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the mirror pod to be updated")
-			gomega.Eventually(func() error {
-				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRecreatedAndRunning(ctx, f.ClientSet, mirrorPodName, ns, uid)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			ginkgo.By("check the mirror pod container image is updated")
-			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), mirrorPodName, metav1.GetOptions{})
+			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pod.Spec.Containers), 1)
 			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
 		})
 
-		ginkgo.AfterEach(func() {
+		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
 			if !os.IsNotExist(err) {
@@ -139,8 +139,8 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			}
 
 			ginkgo.By("wait for the mirror pod to disappear")
-			gomega.Eventually(func() error {
-				return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 	})
@@ -184,8 +184,8 @@ spec:
 	return err
 }
 
-func checkMirrorPodRunningWithUID(cl clientset.Interface, name, namespace string, oUID types.UID) error {
-	pod, err := cl.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func checkMirrorPodRunningWithUID(ctx context.Context, cl clientset.Interface, name, namespace string, oUID types.UID) error {
+	pod, err := cl.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
 	}

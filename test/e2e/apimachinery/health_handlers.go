@@ -93,10 +93,10 @@ var (
 	)
 )
 
-func testPath(client clientset.Interface, path string, requiredChecks sets.String) error {
+func testPath(ctx context.Context, client clientset.Interface, path string, requiredChecks sets.String) error {
 	var result restclient.Result
 	err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		result = client.CoreV1().RESTClient().Get().RequestURI(path).Do(context.TODO())
+		result = client.CoreV1().RESTClient().Get().RequestURI(path).Do(ctx)
 		status := 0
 		result.StatusCode(&status)
 		return status == 200, nil
@@ -121,15 +121,15 @@ var _ = SIGDescribe("health handlers", func() {
 
 	ginkgo.It("should contain necessary checks", func(ctx context.Context) {
 		ginkgo.By("/health")
-		err := testPath(f.ClientSet, "/healthz?verbose=1", requiredHealthzChecks)
+		err := testPath(ctx, f.ClientSet, "/healthz?verbose=1", requiredHealthzChecks)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("/livez")
-		err = testPath(f.ClientSet, "/livez?verbose=1", requiredLivezChecks)
+		err = testPath(ctx, f.ClientSet, "/livez?verbose=1", requiredLivezChecks)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("/readyz")
-		err = testPath(f.ClientSet, "/readyz?verbose=1", requiredReadyzChecks)
+		err = testPath(ctx, f.ClientSet, "/readyz?verbose=1", requiredReadyzChecks)
 		framework.ExpectNoError(err)
 	})
 })

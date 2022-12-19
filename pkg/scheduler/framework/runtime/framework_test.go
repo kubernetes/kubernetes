@@ -1506,7 +1506,6 @@ func TestFilterPlugins(t *testing.T) {
 					name: "TestPlugin1",
 					inj:  injectedResult{FilterStatus: int(framework.Error)},
 				},
-
 				{
 					name: "TestPlugin2",
 					inj:  injectedResult{FilterStatus: int(framework.Error)},
@@ -1515,6 +1514,23 @@ func TestFilterPlugins(t *testing.T) {
 			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
 			wantStatusMap: framework.PluginToStatus{
 				"TestPlugin1": framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
+			},
+		},
+		{
+			name: "UnschedulableAndUnschedulableFilters",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(framework.Unschedulable)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(framework.Unschedulable)},
+				},
+			},
+			wantStatus: framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin1"),
+			wantStatusMap: framework.PluginToStatus{
+				"TestPlugin1": framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin1"),
 			},
 		},
 		{
@@ -2811,9 +2827,7 @@ func collectAndComparePluginMetrics(t *testing.T, wantExtensionPoint, wantPlugin
 	if err != nil {
 		t.Errorf("Failed to get %s value, err: %v", metrics.PluginExecutionDuration.Name, err)
 	}
-	if value <= 0 {
-		t.Errorf("Expect latency to be greater than 0, got: %v", value)
-	}
+	checkLatency(t, value)
 }
 
 func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, wantStatus framework.Code) {
@@ -2831,9 +2845,7 @@ func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, 
 	if err != nil {
 		t.Errorf("Failed to get %s value, err: %v", metrics.FrameworkExtensionPointDuration.Name, err)
 	}
-	if value <= 0 {
-		t.Errorf("Expect latency to be greater than 0, got: %v", value)
-	}
+	checkLatency(t, value)
 }
 
 func collectAndComparePermitWaitDuration(t *testing.T, wantRes string) {
@@ -2854,9 +2866,7 @@ func collectAndComparePermitWaitDuration(t *testing.T, wantRes string) {
 		if err != nil {
 			t.Errorf("Failed to get %s value, err: %v", metrics.PermitWaitDuration.Name, err)
 		}
-		if value <= 0 {
-			t.Errorf("Expect latency to be greater than 0, got: %v", value)
-		}
+		checkLatency(t, value)
 	}
 }
 

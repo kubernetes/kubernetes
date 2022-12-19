@@ -72,7 +72,7 @@ var NodePrePullImageList = sets.NewString(
 // 1. the hard coded lists
 // 2. the ones passed in from framework.TestContext.ExtraEnvs
 // So this function needs to be called after the extra envs are applied.
-func updateImageAllowList() {
+func updateImageAllowList(ctx context.Context) {
 	// Union NodePrePullImageList and PrePulledImages into the framework image pre-pull list.
 	e2epod.ImagePrePullList = NodePrePullImageList.Union(commontest.PrePulledImages)
 	// Images from extra envs
@@ -82,7 +82,7 @@ func updateImageAllowList() {
 	} else {
 		e2epod.ImagePrePullList.Insert(sriovDevicePluginImage)
 	}
-	if gpuDevicePluginImage, err := getGPUDevicePluginImage(); err != nil {
+	if gpuDevicePluginImage, err := getGPUDevicePluginImage(ctx); err != nil {
 		klog.Errorln(err)
 	} else {
 		e2epod.ImagePrePullList.Insert(gpuDevicePluginImage)
@@ -213,8 +213,8 @@ func PrePullAllImages() error {
 }
 
 // getGPUDevicePluginImage returns the image of GPU device plugin.
-func getGPUDevicePluginImage() (string, error) {
-	ds, err := e2emanifest.DaemonSetFromURL(e2egpu.GPUDevicePluginDSYAML)
+func getGPUDevicePluginImage(ctx context.Context) (string, error) {
+	ds, err := e2emanifest.DaemonSetFromURL(ctx, e2egpu.GPUDevicePluginDSYAML)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse the device plugin image: %w", err)
 	}

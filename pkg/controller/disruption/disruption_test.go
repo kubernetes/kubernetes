@@ -278,7 +278,6 @@ func updatePodOwnerToRs(t *testing.T, pod *v1.Pod, rs *apps.ReplicaSet) {
 	pod.OwnerReferences = append(pod.OwnerReferences, controllerReference)
 }
 
-// pod, podName := newPod(t, name)
 func updatePodOwnerToSs(t *testing.T, pod *v1.Pod, ss *apps.StatefulSet) {
 	var controllerReference metav1.OwnerReference
 	var trueVar = true

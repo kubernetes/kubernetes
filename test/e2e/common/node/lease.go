@@ -86,10 +86,10 @@ var _ = SIGDescribe("Lease", func() {
 			},
 		}
 
-		createdLease, err := leaseClient.Create(context.TODO(), lease, metav1.CreateOptions{})
+		createdLease, err := leaseClient.Create(ctx, lease, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating Lease failed")
 
-		readLease, err := leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
+		readLease, err := leaseClient.Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
 		if !apiequality.Semantic.DeepEqual(lease.Spec, readLease.Spec) {
 			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(lease.Spec, readLease.Spec))
@@ -103,10 +103,10 @@ var _ = SIGDescribe("Lease", func() {
 			LeaseTransitions:     pointer.Int32Ptr(1),
 		}
 
-		_, err = leaseClient.Update(context.TODO(), createdLease, metav1.UpdateOptions{})
+		_, err = leaseClient.Update(ctx, createdLease, metav1.UpdateOptions{})
 		framework.ExpectNoError(err, "updating Lease failed")
 
-		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
+		readLease, err = leaseClient.Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
 		if !apiequality.Semantic.DeepEqual(createdLease.Spec, readLease.Spec) {
 			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(createdLease.Spec, readLease.Spec))
@@ -123,10 +123,10 @@ var _ = SIGDescribe("Lease", func() {
 		patchBytes, err := getPatchBytes(readLease, patchedLease)
 		framework.ExpectNoError(err, "creating patch failed")
 
-		_, err = leaseClient.Patch(context.TODO(), name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+		_, err = leaseClient.Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "patching Lease failed")
 
-		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
+		readLease, err = leaseClient.Get(ctx, name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
 		if !apiequality.Semantic.DeepEqual(patchedLease.Spec, readLease.Spec) {
 			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(patchedLease.Spec, readLease.Spec))
@@ -146,25 +146,25 @@ var _ = SIGDescribe("Lease", func() {
 				LeaseTransitions:     pointer.Int32Ptr(0),
 			},
 		}
-		_, err = leaseClient.Create(context.TODO(), lease2, metav1.CreateOptions{})
+		_, err = leaseClient.Create(ctx, lease2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating Lease failed")
 
-		leases, err := leaseClient.List(context.TODO(), metav1.ListOptions{})
+		leases, err := leaseClient.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "couldn't list Leases")
 		framework.ExpectEqual(len(leases.Items), 2)
 
 		selector := labels.Set(map[string]string{"deletecollection": "true"}).AsSelector()
-		err = leaseClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector.String()})
+		err = leaseClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector.String()})
 		framework.ExpectNoError(err, "couldn't delete collection")
 
-		leases, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
+		leases, err = leaseClient.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "couldn't list Leases")
 		framework.ExpectEqual(len(leases.Items), 1)
 
-		err = leaseClient.Delete(context.TODO(), name, metav1.DeleteOptions{})
+		err = leaseClient.Delete(ctx, name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "deleting Lease failed")
 
-		_, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
+		_, err = leaseClient.Get(ctx, name, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("expected IsNotFound error, got %#v", err)
 		}
@@ -174,7 +174,7 @@ var _ = SIGDescribe("Lease", func() {
 		// created for every node by the corresponding Kubelet.
 		// That said, the objects themselves are small (~300B), so even with 5000
 		// of them, that gives ~1.5MB, which is acceptable.
-		_, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
+		_, err = leaseClient.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "couldn't list Leases from all namespace")
 	})
 })

@@ -96,7 +96,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		ginkgo.By("getting /apis/storage.k8s.io")
 		{
 			group := &metav1.APIGroup{}
-			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/storage.k8s.io").Do(context.TODO()).Into(group)
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/storage.k8s.io").Do(ctx).Into(group)
 			framework.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
@@ -129,50 +129,50 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		// Main resource create/read/update/watch operations
 
 		ginkgo.By("creating")
-		createdCSC, err := cscClient.Create(context.TODO(), csc, metav1.CreateOptions{})
+		createdCSC, err := cscClient.Create(ctx, csc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		_, err = cscClient.Create(context.TODO(), csc, metav1.CreateOptions{})
+		_, err = cscClient.Create(ctx, csc, metav1.CreateOptions{})
 		if !apierrors.IsAlreadyExists(err) {
 			framework.Failf("expected 409, got %#v", err)
 		}
-		_, err = cscClient.Create(context.TODO(), csc2, metav1.CreateOptions{})
+		_, err = cscClient.Create(ctx, csc2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
-		cscWatch, err := cscClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		cscWatch, err := cscClient.Watch(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		cscWatchNoNamespace, err := cscClientNoNamespace.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		cscWatchNoNamespace, err := cscClientNoNamespace.Watch(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 
 		// added for a watch
-		_, err = cscClient.Create(context.TODO(), csc3, metav1.CreateOptions{})
+		_, err = cscClient.Create(ctx, csc3, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("getting")
-		gottenCSC, err := cscClient.Get(context.TODO(), csc.Name, metav1.GetOptions{})
+		gottenCSC, err := cscClient.Get(ctx, csc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(gottenCSC.UID, createdCSC.UID)
 
 		ginkgo.By("listing in namespace")
-		cscs, err := cscClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		cscs, err := cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(cscs.Items), 3, "filtered list should have 3 items, got: %s", cscs)
 
 		ginkgo.By("listing across namespaces")
-		cscs, err = cscClientNoNamespace.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		cscs, err = cscClientNoNamespace.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(cscs.Items), 3, "filtered list should have 3 items, got: %s", cscs)
 
 		ginkgo.By("patching")
-		patchedCSC, err := cscClient.Patch(context.TODO(), createdCSC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
+		patchedCSC, err := cscClient.Patch(ctx, createdCSC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(patchedCSC.Annotations["patched"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		csrToUpdate := patchedCSC.DeepCopy()
 		csrToUpdate.Annotations["updated"] = "true"
-		updatedCSC, err := cscClient.Update(context.TODO(), csrToUpdate, metav1.UpdateOptions{})
+		updatedCSC, err := cscClient.Update(ctx, csrToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(updatedCSC.Annotations["updated"], "true", "updated object should have the applied annotation")
 
@@ -218,9 +218,9 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		// main resource delete operations
 
 		ginkgo.By("deleting")
-		err = cscClient.Delete(context.TODO(), createdCSC.Name, metav1.DeleteOptions{})
+		err = cscClient.Delete(ctx, createdCSC.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
-		csc, err = cscClient.Get(context.TODO(), createdCSC.Name, metav1.GetOptions{})
+		csc, err = cscClient.Get(ctx, createdCSC.Name, metav1.GetOptions{})
 		min := 2
 		max := min
 		switch {
@@ -236,7 +236,7 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		default:
 			framework.Failf("CSIStorageCapacitity should have been deleted or have DeletionTimestamp and Finalizers, but instead got: %s", csc)
 		}
-		cscs, err = cscClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		cscs, err = cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		actualLen := len(cscs.Items)
 		if actualLen < min || actualLen > max {
@@ -244,9 +244,9 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		}
 
 		ginkgo.By("deleting a collection")
-		err = cscClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		err = cscClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		cscs, err = cscClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
+		cscs, err = cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		for _, csc := range cscs.Items {
 			// Any remaining objects should be marked for deletion

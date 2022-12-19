@@ -77,7 +77,7 @@ var _ = SIGDescribe("Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	ginkgo.Describe("NFSv4", func() {
 		ginkgo.It("should be mountable for NFSv4", func(ctx context.Context) {
-			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
+			config, _, serverHost := e2evolume.NewNFSServer(ctx, c, namespace.Name, []string{})
 			ginkgo.DeferCleanup(e2evolume.TestServerCleanup, f, config)
 
 			tests := []e2evolume.Test{
@@ -95,13 +95,13 @@ var _ = SIGDescribe("Volumes", func() {
 			}
 
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(ctx, f, config, nil, "" /* fsType */, tests)
 		})
 	})
 
 	ginkgo.Describe("NFSv3", func() {
 		ginkgo.It("should be mountable for NFSv3", func(ctx context.Context) {
-			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
+			config, _, serverHost := e2evolume.NewNFSServer(ctx, c, namespace.Name, []string{})
 			ginkgo.DeferCleanup(e2evolume.TestServerCleanup, f, config)
 
 			tests := []e2evolume.Test{
@@ -118,7 +118,7 @@ var _ = SIGDescribe("Volumes", func() {
 				},
 			}
 			// Must match content of test/images/volume-tester/nfs/index.html
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(ctx, f, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

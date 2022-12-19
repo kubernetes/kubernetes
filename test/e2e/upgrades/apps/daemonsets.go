@@ -40,7 +40,7 @@ type DaemonSetUpgradeTest struct {
 func (DaemonSetUpgradeTest) Name() string { return "[sig-apps] daemonset-upgrade" }
 
 // Setup creates a DaemonSet and verifies that it's running
-func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
+func (t *DaemonSetUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	daemonSetName := "ds1"
 	labelSet := map[string]string{"ds-name": daemonSetName}
 	image := framework.ServeHostnameImage
@@ -54,38 +54,38 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating a DaemonSet")
 	var err error
-	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(context.TODO(), t.daemonSet, metav1.CreateOptions{}); err != nil {
+	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(ctx, t.daemonSet, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}
 
 	ginkgo.By("Waiting for DaemonSet pods to become ready")
-	err = wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
-		return e2edaemonset.CheckRunningOnAllNodes(f, t.daemonSet)
+	err = wait.PollWithContext(ctx, framework.Poll, framework.PodStartTimeout, func(ctx context.Context) (bool, error) {
+		return e2edaemonset.CheckRunningOnAllNodes(ctx, f, t.daemonSet)
 	})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Validating the DaemonSet after creation")
-	t.validateRunningDaemonSet(f)
+	t.validateRunningDaemonSet(ctx, f)
 }
 
 // Test waits until the upgrade has completed and then verifies that the DaemonSet
 // is still running
-func (t *DaemonSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
+func (t *DaemonSetUpgradeTest) Test(ctx context.Context, f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	ginkgo.By("Waiting for upgrade to complete before re-validating DaemonSet")
 	<-done
 
 	ginkgo.By("validating the DaemonSet is still running after upgrade")
-	t.validateRunningDaemonSet(f)
+	t.validateRunningDaemonSet(ctx, f)
 }
 
 // Teardown cleans up any remaining resources.
-func (t *DaemonSetUpgradeTest) Teardown(f *framework.Framework) {
+func (t *DaemonSetUpgradeTest) Teardown(ctx context.Context, f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 }
 
-func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) {
+func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("confirming the DaemonSet pods are running on all expected nodes")
-	res, err := e2edaemonset.CheckRunningOnAllNodes(f, t.daemonSet)
+	res, err := e2edaemonset.CheckRunningOnAllNodes(ctx, f, t.daemonSet)
 	framework.ExpectNoError(err)
 	if !res {
 		framework.Failf("expected DaemonSet pod to be running on all nodes, it was not")
@@ -93,6 +93,6 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 
 	// DaemonSet resource itself should be good
 	ginkgo.By("confirming the DaemonSet resource is in a good state")
-	err = e2edaemonset.CheckDaemonStatus(f, t.daemonSet.Name)
+	err = e2edaemonset.CheckDaemonStatus(ctx, f, t.daemonSet.Name)
 	framework.ExpectNoError(err)
 }

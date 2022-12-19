@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -49,54 +48,15 @@ var semanticIgnoreResourceVersion = conversion.EqualitiesOrDie(
 	},
 )
 
-// ServiceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls to AsSelectorPreValidated (see #73527)
-type ServiceSelectorCache struct {
-	lock  sync.RWMutex
-	cache map[string]labels.Selector
-}
-
-// NewServiceSelectorCache init ServiceSelectorCache for both endpoint controller and endpointSlice controller.
-func NewServiceSelectorCache() *ServiceSelectorCache {
-	return &ServiceSelectorCache{
-		cache: map[string]labels.Selector{},
-	}
-}
-
-// Get return selector and existence in ServiceSelectorCache by key.
-func (sc *ServiceSelectorCache) Get(key string) (labels.Selector, bool) {
-	sc.lock.RLock()
-	selector, ok := sc.cache[key]
-	// fine-grained lock improves GetPodServiceMemberships performance(16.5%) than defer measured by BenchmarkGetPodServiceMemberships
-	sc.lock.RUnlock()
-	return selector, ok
-}
-
-// Update can update or add a selector in ServiceSelectorCache while service's selector changed.
-func (sc *ServiceSelectorCache) Update(key string, rawSelector map[string]string) labels.Selector {
-	sc.lock.Lock()
-	defer sc.lock.Unlock()
-	selector := labels.Set(rawSelector).AsSelectorPreValidated()
-	sc.cache[key] = selector
-	return selector
-}
-
-// Delete can delete selector which exist in ServiceSelectorCache.
-func (sc *ServiceSelectorCache) Delete(key string) {
-	sc.lock.Lock()
-	defer sc.lock.Unlock()
-	delete(sc.cache, key)
-}
-
 // GetPodServiceMemberships returns a set of Service keys for Services that have
 // a selector matching the given pod.
-func (sc *ServiceSelectorCache) GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod) (sets.String, error) {
+func GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod) (sets.String, error) {
 	set := sets.String{}
 	services, err := serviceLister.Services(pod.Namespace).List(labels.Everything())
 	if err != nil {
 		return set, err
 	}
 
-	var selector labels.Selector
 	for _, service := range services {
 		if service.Spec.Selector == nil {
 			// if the service has a nil selector this means selectors match nothing, not everything.
@@ -106,13 +66,7 @@ func (sc *ServiceSelectorCache) GetPodServiceMemberships(serviceLister v1listers
 		if err != nil {
 			return nil, err
 		}
-		if v, ok := sc.Get(key); ok {
-			selector = v
-		} else {
-			selector = sc.Update(key, service.Spec.Selector)
-		}
-
-		if selector.Matches(labels.Set(pod.Labels)) {
+		if labels.ValidatedSetSelector(service.Spec.Selector).Matches(labels.Set(pod.Labels)) {
 			set.Insert(key)
 		}
 	}
@@ -206,7 +160,7 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 
 // GetServicesToUpdateOnPodChange returns a set of Service keys for Services
 // that have potentially been affected by a change to this pod.
-func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, selectorCache *ServiceSelectorCache, old, cur interface{}) sets.String {
+func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, old, cur interface{}) sets.String {
 	newPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if newPod.ResourceVersion == oldPod.ResourceVersion {
@@ -222,14 +176,14 @@ func GetServicesToUpdateOnPodChange(serviceLister v1listers.ServiceLister, selec
 		return sets.String{}
 	}
 
-	services, err := selectorCache.GetPodServiceMemberships(serviceLister, newPod)
+	services, err := GetPodServiceMemberships(serviceLister, newPod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
 		return sets.String{}
 	}
 
 	if labelsChanged {
-		oldServices, err := selectorCache.GetPodServiceMemberships(serviceLister, oldPod)
+		oldServices, err := GetPodServiceMemberships(serviceLister, oldPod)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("unable to get pod %s/%s's service memberships: %v", newPod.Namespace, newPod.Name, err))
 		}
