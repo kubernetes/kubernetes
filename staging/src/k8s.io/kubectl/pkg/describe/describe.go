@@ -295,7 +295,8 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings De
 		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
 		printLabelsMultiline(w, "Labels", obj.GetLabels())
 		printAnnotationsMultiline(w, "Annotations", obj.GetAnnotations())
-		printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".metadata.name", ".metadata.namespace", ".metadata.labels", ".metadata.annotations")
+		printUnstructuredContent(w, LEVEL_0, obj.UnstructuredContent(), "", ".metadata.managedFields", ".metadata.name",
+			".metadata.namespace", ".metadata.labels", ".metadata.annotations")
 		if events != nil {
 			DescribeEvents(events, w)
 		}
