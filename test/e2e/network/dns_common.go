@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -186,7 +187,10 @@ func (t *dnsTestCommon) restoreDNSConfigMap(ctx context.Context, configMapData m
 		t.setConfigMap(ctx, &v1.ConfigMap{Data: configMapData})
 		t.deleteCoreDNSPods(ctx)
 	} else {
-		framework.ExpectNoError(t.c.CoreV1().ConfigMaps(t.ns).Delete(ctx, t.name, metav1.DeleteOptions{}))
+		err := t.c.CoreV1().ConfigMaps(t.ns).Delete(ctx, t.name, metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			framework.Failf("Unexpected error deleting configmap %s/%s", t.ns, t.name)
+		}
 	}
 }
 
