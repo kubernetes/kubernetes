@@ -147,11 +147,15 @@ func (m *ManagerImpl) deviceHasTopologyAlignment(resource string) bool {
 }
 
 func (m *ManagerImpl) getAvailableDevices(resource string) sets.String {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	// Strip all devices in use from the list of healthy ones.
 	return m.healthyDevices[resource].Difference(m.allocatedDevices[resource])
 }
 
 func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available sets.String, reusable sets.String, request int) []topologymanager.TopologyHint {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	// Initialize minAffinitySize to include all NUMA Nodes
 	minAffinitySize := len(m.numaNodes)
 
