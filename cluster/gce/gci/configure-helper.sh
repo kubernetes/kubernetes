@@ -2246,7 +2246,6 @@ function start-kube-controller-manager {
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
-# (TODO/cloud-provider-gcp): Figure out how to inject
 # Starts cloud controller manager.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -2323,6 +2322,13 @@ function start-cloud-controller-manager {
 
   echo "Applying over-rides for manifest for cloud provider controller-manager"
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cloud-controller-manager.manifest"
+
+  if [ -n "${CUSTOM_CLOUD_CONTROLLER_MANAGER_YAML:-}" ]; then
+      # Replace with custom cloud controller manager.
+      cat > "$src_file" <<EOF
+$CUSTOM_CLOUD_CONTROLLER_MANAGER_YAML
+EOF
+  fi
   # Evaluate variables.
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{params}}@${paramstring}@g" "${src_file}"
@@ -2347,7 +2353,10 @@ function start-cloud-controller-manager {
     sed -i -e "s@{{runAsGroup}}@@g" "${src_file}"
     sed -i -e "s@{{supplementalGroups}}@@g" "${src_file}"
   fi
-
+  # Override the ccm image if GCE_CCM_IMAGE is specified.
+  if [[ -n "${GCE_CCM_IMAGE:-}" ]]; then
+    sed -i "s|image:.*|image: ${GCE_CCM_IMAGE}|" "${src_file}"
+  fi
   echo "Writing manifest for cloud provider controller-manager"
   cp "${src_file}" /etc/kubernetes/manifests
 }

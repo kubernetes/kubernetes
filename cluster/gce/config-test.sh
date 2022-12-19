@@ -408,6 +408,12 @@ if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
 fi
 CUSTOM_INGRESS_YAML=${CUSTOM_INGRESS_YAML:-}
 
+# Override default CCM image
+if [[ -n "${GCE_CCM_IMAGE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} GCE_CCM_IMAGE"
+fi
+CUSTOM_CLOUD_CONTROLLER_MANAGER_YAML="${CUSTOM_CLOUD_CONTROLLER_MANAGER_YAML:-}"
+
 if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
   ADMISSION_CONTROL='NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize,RuntimeClass'
   # ResourceQuota must come last, or a creation is recorded, but the pod may be forbidden.

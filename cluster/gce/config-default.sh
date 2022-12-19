@@ -362,6 +362,12 @@ if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
 fi
 CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
+# Override default CCM image
+if [[ -n "${GCE_CCM_IMAGE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} GCE_CCM_IMAGE"
+fi
+CUSTOM_CLOUD_CONTROLLER_MANAGER_YAML="${CUSTOM_CLOUD_CONTROLLER_MANAGER_YAML:-}"
+
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,RuntimeClass
 
