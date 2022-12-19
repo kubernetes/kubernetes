@@ -245,7 +245,7 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	}
 	// If no cpuset exists for cpusToReuse by this pod yet, create one.
 	if _, ok := p.cpusToReuse[string(pod.UID)]; !ok {
-		p.cpusToReuse[string(pod.UID)] = cpuset.NewCPUSet()
+		p.cpusToReuse[string(pod.UID)] = cpuset.New()
 	}
 	// Check if the container is an init container.
 	// If so, add its cpuset to the cpuset of reusable CPUs for any new allocations.
@@ -316,7 +316,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
 func getAssignedCPUsOfSiblings(s state.State, podUID string, containerName string) cpuset.CPUSet {
 	assignments := s.GetCPUAssignments()
-	cset := cpuset.NewCPUSet()
+	cset := cpuset.New()
 	for name, cpus := range assignments[podUID] {
 		if containerName == name {
 			continue
@@ -344,7 +344,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	allocatableCPUs := p.GetAvailableCPUs(s).Union(reusableCPUs)
 
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
-	result := cpuset.NewCPUSet()
+	result := cpuset.New()
 	if numaAffinity != nil {
 		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
 
@@ -355,7 +355,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 
 		alignedCPUs, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
 		if err != nil {
-			return cpuset.NewCPUSet(), err
+			return cpuset.New(), err
 		}
 
 		result = result.Union(alignedCPUs)
@@ -364,7 +364,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
 	remainingCPUs, err := p.takeByTopology(allocatableCPUs.Difference(result), numCPUs-result.Size())
 	if err != nil {
-		return cpuset.NewCPUSet(), err
+		return cpuset.New(), err
 	}
 	result = result.Union(remainingCPUs)
 
@@ -486,7 +486,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 		return nil
 	}
 
-	assignedCPUs := cpuset.NewCPUSet()
+	assignedCPUs := cpuset.New()
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		requestedByContainer := p.guaranteedCPUs(pod, &container)
 		// Short circuit to regenerate the same hints if there are already
@@ -616,7 +616,7 @@ func (p *staticPolicy) isHintSocketAligned(hint topologymanager.TopologyHint, mi
 
 // getAlignedCPUs return set of aligned CPUs based on numa affinity mask and configured policy options.
 func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableCPUs cpuset.CPUSet) cpuset.CPUSet {
-	alignedCPUs := cpuset.NewCPUSet()
+	alignedCPUs := cpuset.New()
 	numaBits := numaAffinity.GetBits()
 
 	// If align-by-socket policy option is enabled, NUMA based hint is expanded to

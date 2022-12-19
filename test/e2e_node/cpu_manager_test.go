@@ -334,7 +334,7 @@ func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap 
 	cpuListString = "0"
 	if cpuAlloc > 2 {
 		cset = mustParseCPUSet(fmt.Sprintf("0-%d", cpuCap-1))
-		cpuListString = fmt.Sprintf("%s", cset.Difference(cpuset.NewCPUSet(cpu1)))
+		cpuListString = fmt.Sprintf("%s", cset.Difference(cpuset.New(cpu1)))
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -633,7 +633,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:      cpuset.NewCPUSet(0),
+				reservedSystemCPUs:      cpuset.New(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
 			},

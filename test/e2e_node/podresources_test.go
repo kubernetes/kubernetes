@@ -561,7 +561,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 	f := framework.NewDefaultFramework("podresources-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	reservedSystemCPUs := cpuset.NewCPUSet(1)
+	reservedSystemCPUs := cpuset.New(1)
 
 	ginkgo.Context("with SRIOV devices in the system", func() {
 		ginkgo.BeforeEach(func() {

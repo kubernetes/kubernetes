@@ -64,8 +64,8 @@ type CPUSet struct {
 	elems map[int]struct{}
 }
 
-// NewCPUSet returns a new CPUSet containing the supplied elements.
-func NewCPUSet(cpus ...int) CPUSet {
+// New returns a new CPUSet containing the supplied elements.
+func New(cpus ...int) CPUSet {
 	b := NewBuilder()
 	for _, c := range cpus {
 		b.Add(c)
@@ -231,21 +231,21 @@ func Parse(s string) (CPUSet, error) {
 			// Handle ranges that consist of only one element like "34".
 			elem, err := strconv.Atoi(boundaries[0])
 			if err != nil {
-				return NewCPUSet(), err
+				return New(), err
 			}
 			b.Add(elem)
 		} else if len(boundaries) == 2 {
 			// Handle multi-element ranges like "0-5".
 			start, err := strconv.Atoi(boundaries[0])
 			if err != nil {
-				return NewCPUSet(), err
+				return New(), err
 			}
 			end, err := strconv.Atoi(boundaries[1])
 			if err != nil {
-				return NewCPUSet(), err
+				return New(), err
 			}
 			if start > end {
-				return NewCPUSet(), fmt.Errorf("invalid range %q (%d >= %d)", r, start, end)
+				return New(), fmt.Errorf("invalid range %q (%d >= %d)", r, start, end)
 			}
 			// start == end is acceptable (1-1 -> 1)
 

@@ -261,7 +261,7 @@ func getUniqueCoreID(threads []int) (coreID int, err error) {
 		return 0, fmt.Errorf("no cpus provided")
 	}
 
-	if len(threads) != cpuset.NewCPUSet(threads...).Size() {
+	if len(threads) != cpuset.New(threads...).Size() {
 		return 0, fmt.Errorf("cpus provided are not unique")
 	}
 

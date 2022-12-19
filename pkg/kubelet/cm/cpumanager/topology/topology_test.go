@@ -537,14 +537,14 @@ func TestCPUDetailsKeepOnly(t *testing.T) {
 		want CPUDetails
 	}{{
 		name: "cpus is in CPUDetails.",
-		cpus: cpuset.NewCPUSet(0, 1),
+		cpus: cpuset.New(0, 1),
 		want: map[int]CPUInfo{
 			0: {},
 			1: {},
 		},
 	}, {
 		name: "cpus is not in CPUDetails.",
-		cpus: cpuset.NewCPUSet(3),
+		cpus: cpuset.New(3),
 		want: CPUDetails{},
 	}}
 
@@ -572,7 +572,7 @@ func TestCPUDetailsNUMANodes(t *testing.T) {
 			2: {NUMANodeID: 1},
 			3: {NUMANodeID: 1},
 		},
-		want: cpuset.NewCPUSet(0, 1),
+		want: cpuset.New(0, 1),
 	}}
 
 	for _, tt := range tests {
@@ -613,22 +613,22 @@ func TestCPUDetailsNUMANodesInSockets(t *testing.T) {
 		name:    "Socket IDs is in CPUDetails.",
 		details: details1,
 		ids:     []int{0, 1, 2},
-		want:    cpuset.NewCPUSet(0, 1),
+		want:    cpuset.New(0, 1),
 	}, {
 		name:    "Socket IDs is not in CPUDetails.",
 		details: details1,
 		ids:     []int{4},
-		want:    cpuset.NewCPUSet(),
+		want:    cpuset.New(),
 	}, {
 		name:    "Socket IDs is in CPUDetails. (poorly designed mainboards)",
 		details: details2,
 		ids:     []int{0},
-		want:    cpuset.NewCPUSet(0, 1),
+		want:    cpuset.New(0, 1),
 	}, {
 		name:    "Socket IDs is not in CPUDetails. (poorly designed mainboards)",
 		details: details2,
 		ids:     []int{3},
-		want:    cpuset.NewCPUSet(),
+		want:    cpuset.New(),
 	}}
 
 	for _, tt := range tests {
@@ -655,7 +655,7 @@ func TestCPUDetailsSockets(t *testing.T) {
 			2: {SocketID: 1},
 			3: {SocketID: 1},
 		},
-		want: cpuset.NewCPUSet(0, 1),
+		want: cpuset.New(0, 1),
 	}}
 
 	for _, tt := range tests {
@@ -685,11 +685,11 @@ func TestCPUDetailsCPUsInSockets(t *testing.T) {
 	}{{
 		name: "Socket IDs is in CPUDetails.",
 		ids:  []int{0, 1},
-		want: cpuset.NewCPUSet(0, 1, 2),
+		want: cpuset.New(0, 1, 2),
 	}, {
 		name: "Socket IDs is not in CPUDetails.",
 		ids:  []int{3},
-		want: cpuset.NewCPUSet(),
+		want: cpuset.New(),
 	}}
 
 	for _, tt := range tests {
@@ -719,11 +719,11 @@ func TestCPUDetailsSocketsInNUMANodes(t *testing.T) {
 	}{{
 		name: "NUMANodes IDs is in CPUDetails.",
 		ids:  []int{0, 1},
-		want: cpuset.NewCPUSet(0, 1, 2),
+		want: cpuset.New(0, 1, 2),
 	}, {
 		name: "NUMANodes IDs is not in CPUDetails.",
 		ids:  []int{3},
-		want: cpuset.NewCPUSet(),
+		want: cpuset.New(),
 	}}
 
 	for _, tt := range tests {
@@ -750,7 +750,7 @@ func TestCPUDetailsCores(t *testing.T) {
 			2: {CoreID: 1},
 			3: {CoreID: 1},
 		},
-		want: cpuset.NewCPUSet(0, 1),
+		want: cpuset.New(0, 1),
 	}}
 
 	for _, tt := range tests {
@@ -780,11 +780,11 @@ func TestCPUDetailsCoresInNUMANodes(t *testing.T) {
 	}{{
 		name: "NUMANodes IDs is in CPUDetails.",
 		ids:  []int{0, 1},
-		want: cpuset.NewCPUSet(0, 1, 2),
+		want: cpuset.New(0, 1, 2),
 	}, {
 		name: "NUMANodes IDs is not in CPUDetails.",
 		ids:  []int{3},
-		want: cpuset.NewCPUSet(),
+		want: cpuset.New(),
 	}}
 
 	for _, tt := range tests {
@@ -814,11 +814,11 @@ func TestCPUDetailsCoresInSockets(t *testing.T) {
 	}{{
 		name: "Socket IDs is in CPUDetails.",
 		ids:  []int{0, 1},
-		want: cpuset.NewCPUSet(0, 1, 2),
+		want: cpuset.New(0, 1, 2),
 	}, {
 		name: "Socket IDs is not in CPUDetails.",
 		ids:  []int{3},
-		want: cpuset.NewCPUSet(),
+		want: cpuset.New(),
 	}}
 
 	for _, tt := range tests {
@@ -843,7 +843,7 @@ func TestCPUDetailsCPUs(t *testing.T) {
 			0: {},
 			1: {},
 		},
-		want: cpuset.NewCPUSet(0, 1),
+		want: cpuset.New(0, 1),
 	}}
 
 	for _, tt := range tests {
@@ -873,11 +873,11 @@ func TestCPUDetailsCPUsInNUMANodes(t *testing.T) {
 	}{{
 		name: "NUMANode IDs is in CPUDetails.",
 		ids:  []int{0, 1},
-		want: cpuset.NewCPUSet(0, 1, 2),
+		want: cpuset.New(0, 1, 2),
 	}, {
 		name: "NUMANode IDs is not in CPUDetails.",
 		ids:  []int{3},
-		want: cpuset.NewCPUSet(),
+		want: cpuset.New(),
 	}}
 
 	for _, tt := range tests {
@@ -907,11 +907,11 @@ func TestCPUDetailsCPUsInCores(t *testing.T) {
 	}{{
 		name: "Core IDs is in CPUDetails.",
 		ids:  []int{0, 1},
-		want: cpuset.NewCPUSet(0, 1, 2),
+		want: cpuset.New(0, 1, 2),
 	}, {
 		name: "Core IDs is not in CPUDetails.",
 		ids:  []int{3},
-		want: cpuset.NewCPUSet(),
+		want: cpuset.New(),
 	}}
 
 	for _, tt := range tests {
