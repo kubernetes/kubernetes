@@ -1179,8 +1179,8 @@ func TestFinalizersClearedWhenBackoffLimitExceeded(t *testing.T) {
 	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 		Spec: batchv1.JobSpec{
 			CompletionMode: &mode,
-			Completions:    pointer.Int32(500),
-			Parallelism:    pointer.Int32(500),
+			Completions:    pointer.Int32(100),
+			Parallelism:    pointer.Int32(100),
 			BackoffLimit:   pointer.Int32(0),
 		},
 	})
