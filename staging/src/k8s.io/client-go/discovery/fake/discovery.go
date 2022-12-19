@@ -141,7 +141,10 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action := testing.ActionImpl{}
 	action.Verb = "get"
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
-	c.Invokes(action, nil)
+	_, err := c.Invokes(action, nil)
+	if err != nil {
+		return nil, err
+	}
 
 	if c.FakedServerVersion != nil {
 		return c.FakedServerVersion, nil
