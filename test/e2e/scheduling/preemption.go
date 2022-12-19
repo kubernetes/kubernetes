@@ -623,7 +623,6 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		*/
 		framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func(ctx context.Context) {
 			podNamesSeen := []int32{0, 0, 0}
-			stopCh := make(chan struct{})
 
 			// create a pod controller to list/watch pod events from the test framework namespace
 			_, podController := cache.NewInformer(
@@ -652,8 +651,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 					},
 				},
 			)
-			go podController.Run(stopCh)
-			defer close(stopCh)
+			go podController.Run(ctx.Done())
 
 			// prepare three ReplicaSet
 			rsConfs := []pauseRSConfig{
