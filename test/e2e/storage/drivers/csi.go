@@ -139,15 +139,17 @@ var _ storageframework.EphemeralTestDriver = &hostpathCSIDriver{}
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver() storageframework.TestDriver {
 	capabilities := map[storageframework.Capability]bool{
-		storageframework.CapPersistence:                  true,
-		storageframework.CapSnapshotDataSource:           true,
-		storageframework.CapMultiPODs:                    true,
-		storageframework.CapBlock:                        true,
-		storageframework.CapPVCDataSource:                true,
-		storageframework.CapControllerExpansion:          true,
-		storageframework.CapOfflineExpansion:             true,
-		storageframework.CapOnlineExpansion:              true,
-		storageframework.CapSingleNodeVolume:             true,
+		storageframework.CapPersistence:         true,
+		storageframework.CapSnapshotDataSource:  true,
+		storageframework.CapMultiPODs:           true,
+		storageframework.CapBlock:               true,
+		storageframework.CapPVCDataSource:       true,
+		storageframework.CapControllerExpansion: true,
+		storageframework.CapOfflineExpansion:    true,
+		storageframework.CapOnlineExpansion:     true,
+		storageframework.CapSingleNodeVolume:    true,
+		storageframework.CapReadWriteOncePod:    true,
+		storageframework.CapMultiplePVsSameID:   true,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
@@ -811,7 +813,6 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapSnapshotDataSource:  true,
 				storageframework.CapReadWriteOncePod:    true,
 				storageframework.CapMultiplePVsSameID:   true,
-				storageframework.CapPVCDataSource:       true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
