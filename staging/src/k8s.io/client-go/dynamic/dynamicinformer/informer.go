@@ -18,6 +18,7 @@ package dynamicinformer
 
 import (
 	"context"
+	v1 "k8s.io/api/core/v1"
 	"sync"
 	"time"
 
@@ -34,20 +35,34 @@ import (
 
 // NewDynamicSharedInformerFactory constructs a new instance of dynamicSharedInformerFactory for all namespaces.
 func NewDynamicSharedInformerFactory(client dynamic.Interface, defaultResync time.Duration) DynamicSharedInformerFactory {
-	return NewFilteredDynamicSharedInformerFactory(client, defaultResync, metav1.NamespaceAll, nil)
+	return NewDynamicSharedInformerFactoryWithOptions(client, defaultResync)
 }
 
 // NewFilteredDynamicSharedInformerFactory constructs a new instance of dynamicSharedInformerFactory.
 // Listers obtained via this factory will be subject to the same filters as specified here.
 func NewFilteredDynamicSharedInformerFactory(client dynamic.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) DynamicSharedInformerFactory {
-	return &dynamicSharedInformerFactory{
+	return NewDynamicSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions))
+}
+
+type DynamicSharedInformerOption func(*dynamicSharedInformerFactory) *dynamicSharedInformerFactory
+
+func NewDynamicSharedInformerFactoryWithOptions(client dynamic.Interface, defaultResync time.Duration, options ...DynamicSharedInformerOption) DynamicSharedInformerFactory {
+	factory := &dynamicSharedInformerFactory{
 		client:           client,
+		namespace:        v1.NamespaceAll,
 		defaultResync:    defaultResync,
-		namespace:        namespace,
 		informers:        map[schema.GroupVersionResource]informers.GenericInformer{},
 		startedInformers: make(map[schema.GroupVersionResource]bool),
-		tweakListOptions: tweakListOptions,
+		customResync:     make(map[schema.GroupVersionResource]time.Duration),
+		indexers:         cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	}
+
+	// Apply all options
+	for _, opt := range options {
+		factory = opt(factory)
+	}
+
+	return factory
 }
 
 type dynamicSharedInformerFactory struct {
@@ -61,6 +76,22 @@ type dynamicSharedInformerFactory struct {
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[schema.GroupVersionResource]bool
 	tweakListOptions TweakListOptionsFunc
+	customResync     map[schema.GroupVersionResource]time.Duration
+	indexers         cache.Indexers
+}
+
+func WithTweakListOptions(tweakListOptions TweakListOptionsFunc) DynamicSharedInformerOption {
+	return func(factory *dynamicSharedInformerFactory) *dynamicSharedInformerFactory {
+		factory.tweakListOptions = tweakListOptions
+		return factory
+	}
+}
+
+func WithNamespace(namespace string) DynamicSharedInformerOption {
+	return func(factory *dynamicSharedInformerFactory) *dynamicSharedInformerFactory {
+		factory.namespace = namespace
+		return factory
+	}
 }
 
 var _ DynamicSharedInformerFactory = &dynamicSharedInformerFactory{}
@@ -75,7 +106,17 @@ func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResour
 		return informer
 	}
 
-	informer = NewFilteredDynamicInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	resyncPeriod, exists := f.customResync[key]
+	if !exists {
+		resyncPeriod = f.defaultResync
+	}
+
+	// cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
+
+	informer = NewFilteredDynamicInformer(f.client, gvr, f.namespace, f.tweakListOptions, cache.SharedIndexInformerOptions{
+		ResyncPeriod: resyncPeriod,
+		Indexers:     f.indexers,
+	})
 	f.informers[key] = informer
 
 	return informer
@@ -117,7 +158,7 @@ func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) 
 }
 
 // NewFilteredDynamicInformer constructs a new informer for a dynamic type.
-func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
+func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, tweakListOptions TweakListOptionsFunc, options cache.SharedIndexInformerOptions) informers.GenericInformer {
 	return &dynamicInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformerWithOptions(
@@ -137,8 +178,8 @@ func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersio
 			},
 			&unstructured.Unstructured{},
 			cache.SharedIndexInformerOptions{
-				ResyncPeriod:      resyncPeriod,
-				Indexers:          indexers,
+				ResyncPeriod:      options.ResyncPeriod,
+				Indexers:          options.Indexers,
 				ObjectDescription: gvr.String(),
 			},
 		),
