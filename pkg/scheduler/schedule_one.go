@@ -859,10 +859,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 
 	pod := podInfo.Pod
 	err := status.AsError()
-	var errMsg string
-	if err != nil {
-		errMsg = err.Error()
-	}
+	errMsg := status.Message()
 
 	if err == ErrNoNodesAvailable {
 		klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod), "err", err)

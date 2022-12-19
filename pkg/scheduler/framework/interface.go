@@ -177,7 +177,7 @@ func (s *Status) Message() string {
 	if s == nil {
 		return ""
 	}
-	return strings.Join(s.reasons, ", ")
+	return strings.Join(s.Reasons(), ", ")
 }
 
 // SetFailedPlugin sets the given plugin name to s.failedPlugin.
@@ -199,6 +199,9 @@ func (s *Status) FailedPlugin() string {
 
 // Reasons returns reasons of the Status.
 func (s *Status) Reasons() []string {
+	if s.err != nil {
+		return append([]string{s.err.Error()}, s.reasons...)
+	}
 	return s.reasons
 }
 
@@ -249,8 +252,8 @@ func (s *Status) Equal(x *Status) bool {
 	if s.code != x.code {
 		return false
 	}
-	if s.code == Error {
-		return cmp.Equal(s.err, x.err, cmpopts.EquateErrors())
+	if !cmp.Equal(s.err, x.err, cmpopts.EquateErrors()) {
+		return false
 	}
 	return cmp.Equal(s.reasons, x.reasons)
 }
@@ -261,9 +264,6 @@ func NewStatus(code Code, reasons ...string) *Status {
 		code:    code,
 		reasons: reasons,
 	}
-	if code == Error {
-		s.err = errors.New(s.Message())
-	}
 	return s
 }
 
@@ -273,9 +273,8 @@ func AsStatus(err error) *Status {
 		return nil
 	}
 	return &Status{
-		code:    Error,
-		reasons: []string{err.Error()},
-		err:     err,
+		code: Error,
+		err:  err,
 	}
 }
 
@@ -292,20 +291,21 @@ func (p PluginToStatus) Merge() *Status {
 
 	finalStatus := NewStatus(Success)
 	for _, s := range p {
-		if s.Code() == Error {
-			finalStatus.err = s.AsError()
-		}
 		if statusPrecedence[s.Code()] > statusPrecedence[finalStatus.code] {
 			finalStatus.code = s.Code()
 			// Same as code, we keep the most relevant failedPlugin in the returned Status.
 			finalStatus.failedPlugin = s.FailedPlugin()
 		}
 
-		for _, r := range s.reasons {
+		reasons := s.Reasons()
+		if finalStatus.err == nil {
+			finalStatus.err = s.err
+			reasons = s.reasons
+		}
+		for _, r := range reasons {
 			finalStatus.AppendReason(r)
 		}
 	}
-
 	return finalStatus
 }
 
