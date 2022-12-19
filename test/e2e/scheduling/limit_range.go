@@ -236,7 +236,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		the limitRange by collection with a labelSelector it MUST delete only one
 		limitRange.
 	*/
-	framework.ConformanceIt("should list, patch and delete a LimitRange by collection", func(ctx context.Context) {
+	framework.ConformanceIt("should list, patch and delete a LimitRange by collection", ginkgo.NodeTimeout(wait.ForeverTestTimeout), func(ctx context.Context) {
 
 		ns := f.Namespace.Name
 		lrClient := f.ClientSet.CoreV1().LimitRanges(ns)
@@ -274,9 +274,6 @@ var _ = SIGDescribe("LimitRange", func() {
 		// Create a copy to be used in a second namespace
 		limitRange2 := &v1.LimitRange{}
 		*limitRange2 = *limitRange
-
-		ctx, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
-		defer cancelCtx()
 
 		ginkgo.By(fmt.Sprintf("Creating LimitRange %q in namespace %q", lrName, f.Namespace.Name))
 		limitRange, err := lrClient.Create(ctx, limitRange, metav1.CreateOptions{})
