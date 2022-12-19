@@ -37,14 +37,12 @@ run_wait_tests() {
 
     # wait with jsonpath will timout for busybox deployment
     set +o errexit
-
     # Command: Wait with jsonpath support fields not exist in the first place
-    output_message=$(kubectl wait --for=jsonpath=.status.readyReplicas=1 deploy/test-1)
-    
+    output_message=$(kubectl wait --for=jsonpath=.status.readyReplicas=1 deploy/test-1 2>&1)
+    set -o errexit
+
     # Post-Condition: Wait failed
     kube::test::if_has_string "${output_message}" 'timed out'
-
-    set -o errexit
 
     # Delete all deployments async to kubectl wait
     ( sleep 2 && kubectl delete deployment --all ) &
@@ -55,6 +53,43 @@ run_wait_tests() {
     # Post-Condition: Wait was successful
     kube::test::if_has_string "${output_message}" 'test-1 condition met'
     kube::test::if_has_string "${output_message}" 'test-2 condition met'
+
+    # create test data to test timeout error is occurred in correct time
+    kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: dtest
+  name: dtest
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: dtest
+  template:
+    metadata:
+      labels:
+        app: dtest
+    spec:
+      containers:
+      - name: bb
+        image: busybox
+        command: ["/bin/sh", "-c", "sleep infinity"]
+EOF
+
+    set +o errexit
+    # wait timeout error because condition is invalid
+    start_sec=$(date +"%s")
+    output_message=$(time kubectl wait pod --selector=app=dtest --for=condition=InvalidCondition --timeout=1s 2>&1)
+    end_sec=$(date +"%s")
+    len_sec=$((end_sec-start_sec))
+    set -o errexit
+    kube::test::if_has_string "${output_message}" 'timed out waiting for the condition '
+    kube::test::if_has_string "${len_sec}" '1'
+
+    # Clean deployment
+    kubectl delete deployment dtest
 
     set +o nounset
     set +o errexit
