@@ -104,12 +104,6 @@ func (flags *CreateFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args 
 		return nil, err
 	}
 	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, dryRunStrategy)
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return nil, err
-	}
-	dryRunVerifier := resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
-	fieldValidationVerifier := resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
 
 	validationDirective, err := cmdutil.GetValidationDirective(cmd)
 	if err != nil {
@@ -152,10 +146,7 @@ func (flags *CreateFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args 
 		PrintFlags:  flags.PrintFlags,
 		RecordFlags: flags.RecordFlags,
 
-		DryRunStrategy:          dryRunStrategy,
-		DryRunVerifier:          dryRunVerifier,
-		FieldValidationVerifier: fieldValidationVerifier,
-
+		DryRunStrategy:      dryRunStrategy,
 		ValidationDirective: validationDirective,
 
 		fieldManager:     flags.fieldManager,
