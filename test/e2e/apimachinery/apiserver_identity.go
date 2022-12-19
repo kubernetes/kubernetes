@@ -115,7 +115,7 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 		}
 
 		leases, err := client.CoordinationV1().Leases(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "k8s.io/component=kube-apiserver",
+			LabelSelector: "apiserver.kubernetes.io/identity=kube-apiserver",
 		})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(leases.Items), len(controlPlaneNodes), "unexpected number of leases")
@@ -161,7 +161,7 @@ var _ = SIGDescribe("kube-apiserver identity [Feature:APIServerIdentity]", func(
 		// As long as the hostname of kube-apiserver is unchanged, a restart should not result in new Lease objects.
 		// Check that the number of lease objects remains the same after restarting kube-apiserver.
 		leases, err = client.CoordinationV1().Leases(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "k8s.io/component=kube-apiserver",
+			LabelSelector: "apiserver.kubernetes.io/identity=kube-apiserver",
 		})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(leases.Items), len(controlPlaneNodes), "unexpected number of leases")
