@@ -137,21 +137,21 @@ func (f *dynamicSharedInformerFactory) Start(stopCh <-chan struct{}) {
 
 // WaitForCacheSync waits for all started informers' cache were synced.
 func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool {
-	informers := func() map[schema.GroupVersionResource]cache.SharedIndexInformer {
+	indexInformers := func() map[schema.GroupVersionResource]cache.SharedIndexInformer {
 		f.lock.Lock()
 		defer f.lock.Unlock()
 
-		informers := map[schema.GroupVersionResource]cache.SharedIndexInformer{}
+		indexInformers := map[schema.GroupVersionResource]cache.SharedIndexInformer{}
 		for informerType, informer := range f.informers {
 			if f.startedInformers[informerType] {
-				informers[informerType] = informer.Informer()
+				indexInformers[informerType] = informer.Informer()
 			}
 		}
-		return informers
+		return indexInformers
 	}()
 
 	res := map[schema.GroupVersionResource]bool{}
-	for informType, informer := range informers {
+	for informType, informer := range indexInformers {
 		res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
 	}
 	return res
