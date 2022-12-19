@@ -113,7 +113,7 @@ func formatURL(scheme string, host string, port int, path string) *url.URL {
 func v1HeaderToHTTPHeader(headerList []v1.HTTPHeader) http.Header {
 	headers := make(http.Header)
 	for _, header := range headerList {
-		headers[header.Name] = append(headers[header.Name], header.Value)
+		headers.Add(header.Name, header.Value)
 	}
 	return headers
 }
