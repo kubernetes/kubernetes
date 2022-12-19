@@ -445,8 +445,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		var (
 			allLocalVolumes = make(map[string][]*localTestVolume)
 			volType         = TmpfsLocalVolumeType
-			stopCh          = make(chan struct{})
-			wg              sync.WaitGroup
 		)
 
 		const (
@@ -471,11 +469,18 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				}
 			}
 			ginkgo.By("Start a goroutine to recycle unbound PVs")
+			backgroundCtx, cancel := context.WithCancel(context.Background())
+			var wg sync.WaitGroup
 			wg.Add(1)
+			ginkgo.DeferCleanup(func() {
+				ginkgo.By("Stop and wait for recycle goroutine to finish")
+				cancel()
+				wg.Wait()
+			})
 			go func() {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
-				w, err := config.client.CoreV1().PersistentVolumes().Watch(ctx, metav1.ListOptions{})
+				w, err := config.client.CoreV1().PersistentVolumes().Watch(backgroundCtx, metav1.ListOptions{})
 				framework.ExpectNoError(err)
 				if w == nil {
 					return
@@ -494,7 +499,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 						if pv.Status.Phase == v1.VolumeBound || pv.Status.Phase == v1.VolumeAvailable {
 							continue
 						}
-						pv, err = config.client.CoreV1().PersistentVolumes().Get(ctx, pv.Name, metav1.GetOptions{})
+						pv, err = config.client.CoreV1().PersistentVolumes().Get(backgroundCtx, pv.Name, metav1.GetOptions{})
 						if apierrors.IsNotFound(err) {
 							continue
 						}
@@ -505,14 +510,14 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 								if localVolume.pv.Name != pv.Name {
 									continue
 								}
-								err = config.client.CoreV1().PersistentVolumes().Delete(ctx, pv.Name, metav1.DeleteOptions{})
+								err = config.client.CoreV1().PersistentVolumes().Delete(backgroundCtx, pv.Name, metav1.DeleteOptions{})
 								framework.ExpectNoError(err)
 								pvConfig := makeLocalPVConfig(config, localVolume)
-								localVolume.pv, err = e2epv.CreatePV(ctx, config.client, f.Timeouts, e2epv.MakePersistentVolume(pvConfig))
+								localVolume.pv, err = e2epv.CreatePV(backgroundCtx, config.client, f.Timeouts, e2epv.MakePersistentVolume(pvConfig))
 								framework.ExpectNoError(err)
 							}
 						}
-					case <-stopCh:
+					case <-backgroundCtx.Done():
 						return
 					}
 				}
@@ -520,9 +525,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
-			ginkgo.By("Stop and wait for recycle goroutine to finish")
-			close(stopCh)
-			wg.Wait()
 			ginkgo.By("Clean all PVs")
 			for nodeName, localVolumes := range allLocalVolumes {
 				ginkgo.By(fmt.Sprintf("Cleaning up %d local volumes on node %q", len(localVolumes), nodeName))
