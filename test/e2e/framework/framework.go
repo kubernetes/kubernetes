@@ -529,11 +529,6 @@ func (kc *KubeConfig) FindCluster(name string) *KubeCluster {
 	return nil
 }
 
-// ConformanceIt is wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
-func ConformanceIt(text string, body interface{}) bool {
-	return ginkgo.It(text+" [Conformance]", ginkgo.Offset(1), body)
-}
-
 // PodStateVerification represents a verification of pod state.
 // Any time you have a set of pods that you want to operate against or query,
 // this struct can be used to declaratively identify those pods.
