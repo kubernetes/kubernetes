@@ -93,9 +93,9 @@ var _ = SIGDescribe("LimitRange", func() {
 		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.LimitRange{})
 		defer w.Stop()
 
-		ctx, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)
-		defer cancelCtx()
-		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+		timeoutCtx, cancel := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+		defer cancel()
+		if !cache.WaitForCacheSync(timeoutCtx.Done(), informer.HasSynced) {
 			framework.Failf("Timeout while waiting for LimitRange informer to sync")
 		}
 
