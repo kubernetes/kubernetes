@@ -47,7 +47,7 @@ const (
 
 func expectedAPIServerIdentity(hostname string) string {
 	hash := sha256.Sum256([]byte(hostname))
-	return "kube-apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
+	return "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 }
 
 func TestCreateLeaseOnStart(t *testing.T) {
