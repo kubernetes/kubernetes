@@ -132,10 +132,10 @@ func (t *DynamicControllerClientBuilder) Config(saName string) (*restclient.Conf
 	return &configCopy, nil
 }
 
-func (t *DynamicControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
+func (t *DynamicControllerClientBuilder) ConfigOrDie(ctx context.Context, name string) *restclient.Config {
 	clientConfig, err := t.Config(name)
 	if err != nil {
-		klog.Fatal(err)
+		klog.FromContext(ctx).Error(err, "error in ConfigOrDie")
 	}
 	return clientConfig
 }
@@ -148,10 +148,10 @@ func (t *DynamicControllerClientBuilder) Client(name string) (clientset.Interfac
 	return clientset.NewForConfig(clientConfig)
 }
 
-func (t *DynamicControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
+func (t *DynamicControllerClientBuilder) ClientOrDie(ctx context.Context, name string) clientset.Interface {
 	client, err := t.Client(name)
 	if err != nil {
-		klog.Fatal(err)
+		klog.FromContext(ctx).Error(err, "error in ClientOrDie")
 	}
 	return client
 }
@@ -168,10 +168,10 @@ func (t *DynamicControllerClientBuilder) DiscoveryClient(name string) (discovery
 	return clientset.NewForConfig(clientConfig)
 }
 
-func (t *DynamicControllerClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
+func (t *DynamicControllerClientBuilder) DiscoveryClientOrDie(ctx context.Context, name string) discovery.DiscoveryInterface {
 	client, err := t.DiscoveryClient(name)
 	if err != nil {
-		klog.Fatal(err)
+		klog.FromContext(ctx).Error(err, "error in DiscoveryClientOrDie")
 	}
 	return client
 }
@@ -184,7 +184,7 @@ type tokenSourceImpl struct {
 	leewayPercent      int
 }
 
-func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
+func (ts *tokenSourceImpl) Token(ctx context.Context) (*oauth2.Token, error) {
 	var retTokenRequest *v1authenticationapi.TokenRequest
 
 	backoff := wait.Backoff{
@@ -194,7 +194,7 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 	}
 	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		if _, inErr := getOrCreateServiceAccount(ts.coreClient, ts.namespace, ts.serviceAccountName); inErr != nil {
-			klog.Warningf("get or create service account failed: %v", inErr)
+			klog.FromContext(ctx).Info("get or create service account failed", "error", inErr)
 			return false, nil
 		}
 
@@ -204,7 +204,7 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 			},
 		}, metav1.CreateOptions{})
 		if inErr != nil {
-			klog.Warningf("get token failed: %v", inErr)
+			klog.FromContext(ctx).Info("get token failed", "error", inErr)
 			return false, nil
 		}
 		retTokenRequest = tr

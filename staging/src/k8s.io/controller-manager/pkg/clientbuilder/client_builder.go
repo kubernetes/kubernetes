@@ -17,6 +17,8 @@ limitations under the License.
 package clientbuilder
 
 import (
+	"context"
+
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -28,11 +30,11 @@ import (
 // TODO: Extract this into a separate controller utilities repo (issues/68947)
 type ControllerClientBuilder interface {
 	Config(name string) (*restclient.Config, error)
-	ConfigOrDie(name string) *restclient.Config
+	ConfigOrDie(ctx context.Context, name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
-	ClientOrDie(name string) clientset.Interface
+	ClientOrDie(ctx context.Context, name string) clientset.Interface
 	DiscoveryClient(name string) (discovery.DiscoveryInterface, error)
-	DiscoveryClientOrDie(name string) discovery.DiscoveryInterface
+	DiscoveryClientOrDie(ctx context.Context, name string) discovery.DiscoveryInterface
 }
 
 // SimpleControllerClientBuilder returns a fixed client with different user agents

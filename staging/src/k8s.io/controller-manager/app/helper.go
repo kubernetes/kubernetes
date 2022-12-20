@@ -29,12 +29,12 @@ import (
 )
 
 // WaitForAPIServer waits for the API Server's /healthz endpoint to report "ok" with timeout.
-func WaitForAPIServer(client clientset.Interface, timeout time.Duration) error {
+func WaitForAPIServer(ctx context.Context, client clientset.Interface, timeout time.Duration) error {
 	var lastErr error
 
 	err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
 		healthStatus := 0
-		result := client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&healthStatus)
+		result := client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&healthStatus)
 		if result.Error() != nil {
 			lastErr = fmt.Errorf("failed to get apiserver /healthz status: %v", result.Error())
 			return false, nil
@@ -42,7 +42,7 @@ func WaitForAPIServer(client clientset.Interface, timeout time.Duration) error {
 		if healthStatus != http.StatusOK {
 			content, _ := result.Raw()
 			lastErr = fmt.Errorf("APIServer isn't healthy: %v", string(content))
-			klog.Warningf("APIServer isn't healthy yet: %v. Waiting a little while.", string(content))
+			klog.FromContext(ctx).Info("APIServer isn't healthy yet, waiting a little while.", "status", string(content))
 			return false, nil
 		}
 
