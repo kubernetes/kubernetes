@@ -494,7 +494,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		// Create claim w/ bigger size than original
 		biggerClaim := l.testCase.Claim.DeepCopy()
-		biggerClaim.Name = "biggerClaim"
+		biggerClaim.Name = "bigger-claim"
 		biggerClaim.Spec.Resources = v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				v1.ResourceStorage: biggerSize,
@@ -506,7 +506,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		// Create claim w/ same size as original
 		sameSizeClaim := l.testCase.Claim.DeepCopy()
-		sameSizeClaim.Name = "sameSizeclaim"
+		sameSizeClaim.Name = "same-size-claim"
 		sameSizeClaim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{
 			v1.PersistentVolumeAccessMode(v1.ReadOnlyMany),
 		}
@@ -587,7 +587,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		// Create readonlymany claim w/ same size as original, then test to make
 		// sure it has expected content when restored.
 		sameSizeROClaim := l.pvc.DeepCopy()
-		sameSizeROClaim.Name = "sameSizeclaim"
+		sameSizeROClaim.Name = "same-size-claim"
 		sameSizeROClaim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{
 			v1.PersistentVolumeAccessMode(v1.ReadOnlyMany),
 		}
@@ -641,6 +641,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		storageRequest.Add(resource.MustParse("1Gi"))
 
 		biggerClaim := l.pvc.DeepCopy()
+		biggerClaim.Name = "bigger-claim"
 	  biggerClaim.Spec.Resources.Requests = v1.ResourceList{
 			v1.ResourceStorage: *storageRequest,
 		}
