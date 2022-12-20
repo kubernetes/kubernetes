@@ -388,7 +388,6 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []v1.EndpointAddress{
 					{IP: "1.2.3.4"},
 					{IP: "1.2.3.4", TargetRef: podRef("uid-1")},
-					{IP: "5.6.7.8", TargetRef: podRef("uid-1")},
 				},
 				Ports: []v1.EndpointPort{{Port: 111}},
 			}},
