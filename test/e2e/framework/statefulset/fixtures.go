@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -30,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -152,8 +154,8 @@ func PauseNewPods(ss *appsv1.StatefulSet) {
 // It fails the test if it finds any pods that are not in phase Running,
 // or if it finds more than one paused Pod existing at the same time.
 // This is a no-op if there are no paused pods.
-func ResumeNextPod(c clientset.Interface, ss *appsv1.StatefulSet) {
-	podList := GetPodList(c, ss)
+func ResumeNextPod(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) {
+	podList := GetPodList(ctx, c, ss)
 	resumedPod := ""
 	for _, pod := range podList.Items {
 		if pod.Status.Phase != v1.PodRunning {
@@ -165,7 +167,7 @@ func ResumeNextPod(c clientset.Interface, ss *appsv1.StatefulSet) {
 		if resumedPod != "" {
 			framework.Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
 		}
-		_, err := framework.RunHostCmdWithRetries(pod.Namespace, pod.Name, "dd if=/dev/zero of=/data/statefulset-continue bs=1 count=1 conv=fsync", StatefulSetPoll, StatefulPodTimeout)
+		_, err := e2epodoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, "dd if=/dev/zero of=/data/statefulset-continue bs=1 count=1 conv=fsync", StatefulSetPoll, StatefulPodTimeout)
 		framework.ExpectNoError(err)
 		framework.Logf("Resumed pod %v", pod.Name)
 		resumedPod = pod.Name

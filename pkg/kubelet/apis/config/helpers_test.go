@@ -175,6 +175,7 @@ var (
 		"CPUManagerReconcilePeriod.Duration",
 		"TopologyManagerPolicy",
 		"TopologyManagerScope",
+		"TopologyManagerPolicyOptions[*]",
 		"QOSReserved[*]",
 		"CgroupDriver",
 		"CgroupRoot",

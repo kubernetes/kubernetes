@@ -33,37 +33,37 @@ type ProcStatus struct {
 	TGID int
 
 	// Peak virtual memory size.
-	VmPeak uint64 // nolint:golint
+	VmPeak uint64 // nolint:revive
 	// Virtual memory size.
-	VmSize uint64 // nolint:golint
+	VmSize uint64 // nolint:revive
 	// Locked memory size.
-	VmLck uint64 // nolint:golint
+	VmLck uint64 // nolint:revive
 	// Pinned memory size.
-	VmPin uint64 // nolint:golint
+	VmPin uint64 // nolint:revive
 	// Peak resident set size.
-	VmHWM uint64 // nolint:golint
+	VmHWM uint64 // nolint:revive
 	// Resident set size (sum of RssAnnon RssFile and RssShmem).
-	VmRSS uint64 // nolint:golint
+	VmRSS uint64 // nolint:revive
 	// Size of resident anonymous memory.
-	RssAnon uint64 // nolint:golint
+	RssAnon uint64 // nolint:revive
 	// Size of resident file mappings.
-	RssFile uint64 // nolint:golint
+	RssFile uint64 // nolint:revive
 	// Size of resident shared memory.
-	RssShmem uint64 // nolint:golint
+	RssShmem uint64 // nolint:revive
 	// Size of data segments.
-	VmData uint64 // nolint:golint
+	VmData uint64 // nolint:revive
 	// Size of stack segments.
-	VmStk uint64 // nolint:golint
+	VmStk uint64 // nolint:revive
 	// Size of text segments.
-	VmExe uint64 // nolint:golint
+	VmExe uint64 // nolint:revive
 	// Shared library code size.
-	VmLib uint64 // nolint:golint
+	VmLib uint64 // nolint:revive
 	// Page table entries size.
-	VmPTE uint64 // nolint:golint
+	VmPTE uint64 // nolint:revive
 	// Size of second-level page tables.
-	VmPMD uint64 // nolint:golint
+	VmPMD uint64 // nolint:revive
 	// Swapped-out virtual memory size by anonymous private.
-	VmSwap uint64 // nolint:golint
+	VmSwap uint64 // nolint:revive
 	// Size of hugetlb memory portions
 	HugetlbPages uint64
 

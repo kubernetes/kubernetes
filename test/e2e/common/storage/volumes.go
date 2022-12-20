@@ -31,8 +31,8 @@ limitations under the License.
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
  *
- * 2) With server outside of Kubernetes (Cinder, ...)
- * Appropriate server (e.g. OpenStack Cinder) must exist somewhere outside
+ * 2) With server outside of Kubernetes
+ * Appropriate server must exist somewhere outside
  * the tested Kubernetes cluster. The test itself creates a new volume,
  * and checks, that Kubernetes can use it as a volume.
  */
@@ -46,15 +46,13 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // TODO(#99468): Check if these tests are still needed.
@@ -78,9 +76,9 @@ var _ = SIGDescribe("Volumes", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 	ginkgo.Describe("NFSv4", func() {
-		ginkgo.It("should be mountable for NFSv4", func() {
-			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
-			defer e2evolume.TestServerCleanup(f, config)
+		ginkgo.It("should be mountable for NFSv4", func(ctx context.Context) {
+			config, _, serverHost := e2evolume.NewNFSServer(ctx, c, namespace.Name, []string{})
+			ginkgo.DeferCleanup(e2evolume.TestServerCleanup, f, config)
 
 			tests := []e2evolume.Test{
 				{
@@ -97,14 +95,14 @@ var _ = SIGDescribe("Volumes", func() {
 			}
 
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(ctx, f, config, nil, "" /* fsType */, tests)
 		})
 	})
 
 	ginkgo.Describe("NFSv3", func() {
-		ginkgo.It("should be mountable for NFSv3", func() {
-			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
-			defer e2evolume.TestServerCleanup(f, config)
+		ginkgo.It("should be mountable for NFSv3", func(ctx context.Context) {
+			config, _, serverHost := e2evolume.NewNFSServer(ctx, c, namespace.Name, []string{})
+			ginkgo.DeferCleanup(e2evolume.TestServerCleanup, f, config)
 
 			tests := []e2evolume.Test{
 				{
@@ -120,42 +118,7 @@ var _ = SIGDescribe("Volumes", func() {
 				},
 			}
 			// Must match content of test/images/volume-tester/nfs/index.html
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
-		})
-	})
-
-	////////////////////////////////////////////////////////////////////////
-	// Gluster
-	////////////////////////////////////////////////////////////////////////
-	ginkgo.Describe("GlusterFS", func() {
-		ginkgo.It("should be mountable", func() {
-			// create gluster server and endpoints
-			config, _, _ := e2evolume.NewGlusterfsServer(c, namespace.Name)
-			name := config.Prefix + "-server"
-			defer func() {
-				e2evolume.TestServerCleanup(f, config)
-				err := c.CoreV1().Endpoints(namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
-				if !apierrors.IsNotFound(err) {
-					framework.ExpectNoError(err, "defer: Gluster delete endpoints failed")
-				}
-			}()
-
-			tests := []e2evolume.Test{
-				{
-					Volume: v1.VolumeSource{
-						Glusterfs: &v1.GlusterfsVolumeSource{
-							EndpointsName: name,
-							// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
-							Path:     "test_vol",
-							ReadOnly: true,
-						},
-					},
-					File: "index.html",
-					// Must match content of test/images/volumes-tester/gluster/index.html
-					ExpectedContent: "Hello from GlusterFS!",
-				},
-			}
-			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
+			e2evolume.TestVolumeClient(ctx, f, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

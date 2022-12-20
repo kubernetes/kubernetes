@@ -39,12 +39,12 @@ const (
 	_Hani = 57
 	_Hans = 59
 	_Hant = 60
-	_Qaaa = 143
-	_Qaai = 151
-	_Qabx = 192
-	_Zinh = 245
-	_Zyyy = 250
-	_Zzzz = 251
+	_Qaaa = 147
+	_Qaai = 155
+	_Qabx = 196
+	_Zinh = 252
+	_Zyyy = 257
+	_Zzzz = 258
 )
 
 var regionToGroups = []uint8{ // 358 elements
@@ -265,9 +265,9 @@ var matchScript = []scriptIntelligibility{ // 26 elements
 	13: {wantLang: 0x39d, haveLang: 0x139, wantScript: 0x36, haveScript: 0x5a, distance: 0xa},
 	14: {wantLang: 0x3be, haveLang: 0x139, wantScript: 0x5, haveScript: 0x5a, distance: 0xa},
 	15: {wantLang: 0x3fa, haveLang: 0x139, wantScript: 0x5, haveScript: 0x5a, distance: 0xa},
-	16: {wantLang: 0x40c, haveLang: 0x139, wantScript: 0xcf, haveScript: 0x5a, distance: 0xa},
-	17: {wantLang: 0x450, haveLang: 0x139, wantScript: 0xde, haveScript: 0x5a, distance: 0xa},
-	18: {wantLang: 0x461, haveLang: 0x139, wantScript: 0xe1, haveScript: 0x5a, distance: 0xa},
+	16: {wantLang: 0x40c, haveLang: 0x139, wantScript: 0xd4, haveScript: 0x5a, distance: 0xa},
+	17: {wantLang: 0x450, haveLang: 0x139, wantScript: 0xe3, haveScript: 0x5a, distance: 0xa},
+	18: {wantLang: 0x461, haveLang: 0x139, wantScript: 0xe6, haveScript: 0x5a, distance: 0xa},
 	19: {wantLang: 0x46f, haveLang: 0x139, wantScript: 0x2c, haveScript: 0x5a, distance: 0xa},
 	20: {wantLang: 0x476, haveLang: 0x3e2, wantScript: 0x5a, haveScript: 0x20, distance: 0xa},
 	21: {wantLang: 0x4b4, haveLang: 0x139, wantScript: 0x5, haveScript: 0x5a, distance: 0xa},

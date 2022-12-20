@@ -18,7 +18,7 @@ package drain
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -182,7 +182,7 @@ func TestCordon(t *testing.T) {
 					case m.isFor("PATCH", "/nodes/node2"):
 						fallthrough
 					case m.isFor("PATCH", "/nodes/node"):
-						data, err := ioutil.ReadAll(req.Body)
+						data, err := io.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("%s: unexpected error: %v", test.description, err)
 						}
@@ -833,7 +833,7 @@ func TestDrain(t *testing.T) {
 						case m.isFor("GET", "/replicationcontrollers"):
 							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationControllerList{Items: test.rcs})}, nil
 						case m.isFor("PATCH", "/nodes/node"):
-							data, err := ioutil.ReadAll(req.Body)
+							data, err := io.ReadAll(req.Body)
 							if err != nil {
 								t.Fatalf("%s: unexpected error: %v", test.description, err)
 							}

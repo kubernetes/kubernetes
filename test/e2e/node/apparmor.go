@@ -17,8 +17,11 @@ limitations under the License.
 package node
 
 import (
+	"context"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -31,23 +34,23 @@ var _ = SIGDescribe("AppArmor", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("load AppArmor profiles", func() {
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			e2eskipper.SkipIfAppArmorNotSupported()
-			e2esecurity.LoadAppArmorProfiles(f.Namespace.Name, f.ClientSet)
+			e2esecurity.LoadAppArmorProfiles(ctx, f.Namespace.Name, f.ClientSet)
 		})
-		ginkgo.AfterEach(func() {
+		ginkgo.AfterEach(func(ctx context.Context) {
 			if !ginkgo.CurrentSpecReport().Failed() {
 				return
 			}
-			e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+			e2ekubectl.LogFailedContainers(ctx, f.ClientSet, f.Namespace.Name, framework.Logf)
 		})
 
-		ginkgo.It("should enforce an AppArmor profile", func() {
-			e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, true)
+		ginkgo.It("should enforce an AppArmor profile", func(ctx context.Context) {
+			e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, true)
 		})
 
-		ginkgo.It("can disable an AppArmor profile, using unconfined", func() {
-			e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), true, true)
+		ginkgo.It("can disable an AppArmor profile, using unconfined", func(ctx context.Context) {
+			e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), true, true)
 		})
 	})
 })

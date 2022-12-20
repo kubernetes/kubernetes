@@ -19,7 +19,7 @@ package metadata
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -245,7 +245,7 @@ func TestClient(t *testing.T) {
 					t.Fatal(req.URL.String())
 				}
 				defer req.Body.Close()
-				buf, err := ioutil.ReadAll(req.Body)
+				buf, err := io.ReadAll(req.Body)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -272,7 +272,7 @@ func TestClient(t *testing.T) {
 					t.Fatal(req.URL.String())
 				}
 				defer req.Body.Close()
-				buf, err := ioutil.ReadAll(req.Body)
+				buf, err := io.ReadAll(req.Body)
 				if err != nil {
 					t.Fatal(err)
 				}

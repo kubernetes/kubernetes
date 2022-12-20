@@ -183,7 +183,7 @@ func (pl *PodTopologySpread) PreScore(
 			atomic.AddInt64(tpCount, int64(count))
 		}
 	}
-	pl.parallelizer.Until(ctx, len(allNodes), processAllNode)
+	pl.parallelizer.Until(ctx, len(allNodes), processAllNode, pl.Name())
 
 	cycleState.Write(preScoreStateKey, state)
 	return nil

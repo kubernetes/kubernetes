@@ -21,7 +21,6 @@ package cm
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -128,16 +127,16 @@ func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 }
 
 func TestGetCpuWeight(t *testing.T) {
-	assert.Equal(t, uint64(0), getCpuWeight(nil))
+	assert.Equal(t, uint64(0), getCPUWeight(nil))
 
 	v := uint64(2)
-	assert.Equal(t, uint64(1), getCpuWeight(&v))
+	assert.Equal(t, uint64(1), getCPUWeight(&v))
 
 	v = uint64(262144)
-	assert.Equal(t, uint64(10000), getCpuWeight(&v))
+	assert.Equal(t, uint64(10000), getCPUWeight(&v))
 
 	v = uint64(1000000000)
-	assert.Equal(t, uint64(10000), getCpuWeight(&v))
+	assert.Equal(t, uint64(10000), getCPUWeight(&v))
 }
 
 func TestSoftRequirementsValidationSuccess(t *testing.T) {
@@ -145,11 +144,11 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 		t.Skip("skipping cgroup v1 test on a cgroup v2 system")
 	}
 	req := require.New(t)
-	tempDir, err := ioutil.TempDir("", "")
+	tempDir, err := os.MkdirTemp("", "")
 	req.NoError(err)
 	defer os.RemoveAll(tempDir)
-	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_period_us"), []byte("0"), os.ModePerm))
-	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_quota_us"), []byte("0"), os.ModePerm))
+	req.NoError(os.WriteFile(path.Join(tempDir, "cpu.cfs_period_us"), []byte("0"), os.ModePerm))
+	req.NoError(os.WriteFile(path.Join(tempDir, "cpu.cfs_quota_us"), []byte("0"), os.ModePerm))
 	mountInt := mount.NewFakeMounter(
 		[]mount.MountPoint{
 			{

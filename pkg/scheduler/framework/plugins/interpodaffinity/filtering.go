@@ -150,8 +150,8 @@ func podMatchesAllAffinityTerms(terms []framework.AffinityTerm, pod *v1.Pod) boo
 }
 
 // calculates the following for each existing pod on each node:
-// (1) Whether it has PodAntiAffinity
-// (2) Whether any AffinityTerm matches the incoming pod
+//  1. Whether it has PodAntiAffinity
+//  2. Whether any AffinityTerm matches the incoming pod
 func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, pod *v1.Pod, nsLabels labels.Set, nodes []*framework.NodeInfo) topologyToMatchedTermCount {
 	topoMaps := make([]topologyToMatchedTermCount, len(nodes))
 	index := int32(-1)
@@ -170,7 +170,7 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 			topoMaps[atomic.AddInt32(&index, 1)] = topoMap
 		}
 	}
-	pl.parallelizer.Until(ctx, len(nodes), processNode)
+	pl.parallelizer.Until(ctx, len(nodes), processNode, pl.Name())
 
 	result := make(topologyToMatchedTermCount)
 	for i := 0; i <= int(index); i++ {
@@ -216,7 +216,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 			antiAffinityCountsList[k] = antiAffinity
 		}
 	}
-	pl.parallelizer.Until(ctx, len(allNodes), processNode)
+	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 
 	for i := 0; i <= int(index); i++ {
 		affinityCounts.append(affinityCountsList[i])
@@ -240,9 +240,8 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 
 	s := &preFilterState{}
 
-	s.podInfo = framework.NewPodInfo(pod)
-	if s.podInfo.ParseError != nil {
-		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", s.podInfo.ParseError))
+	if s.podInfo, err = framework.NewPodInfo(pod); err != nil {
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", err))
 	}
 
 	for i := range s.podInfo.RequiredAffinityTerms {

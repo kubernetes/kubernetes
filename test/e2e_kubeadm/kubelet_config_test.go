@@ -17,6 +17,8 @@ limitations under the License.
 package kubeadm
 
 import (
+	"context"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -61,24 +63,24 @@ var _ = Describe("kubelet-config ConfigMap", func() {
 		kubeletConfigRoleBindingName = kubeletConfigRoleName
 	})
 
-	ginkgo.It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 		cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeletConfigConfigMapName)
 		gomega.Expect(cm.Data).To(gomega.HaveKey(kubeletConfigConfigMapKey))
 	})
 
-	ginkgo.It("should have related Role and RoleBinding", func() {
+	ginkgo.It("should have related Role and RoleBinding", func(ctx context.Context) {
 		ExpectRole(f.ClientSet, kubeSystemNamespace, kubeletConfigRoleName)
 		ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeletConfigRoleBindingName)
 	})
 
-	ginkgo.It("should be accessible for bootstrap tokens", func() {
+	ginkgo.It("should be accessible for bootstrap tokens", func(ctx context.Context) {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, bootstrapTokensGroup,
 			kubeadmConfigConfigMapResource,
 		)
 	})
 
-	ginkgo.It("should be accessible for nodes", func() {
+	ginkgo.It("should be accessible for nodes", func(ctx context.Context) {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, nodesGroup,
 			kubeadmConfigConfigMapResource,

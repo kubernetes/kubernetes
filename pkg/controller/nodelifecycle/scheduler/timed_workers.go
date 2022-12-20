@@ -52,11 +52,17 @@ type TimedWorker struct {
 // createWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
 func createWorker(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(ctx context.Context, args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
 	delay := fireAt.Sub(createdAt)
+	fWithErrorLogging := func() {
+		err := f(ctx, args)
+		if err != nil {
+			klog.Errorf("NodeLifecycle: timed worker failed with error: %q", err)
+		}
+	}
 	if delay <= 0 {
-		go f(ctx, args)
+		go fWithErrorLogging()
 		return nil
 	}
-	timer := clock.AfterFunc(delay, func() { f(ctx, args) })
+	timer := clock.AfterFunc(delay, fWithErrorLogging)
 	return &TimedWorker{
 		WorkItem:  args,
 		CreatedAt: createdAt,

@@ -300,26 +300,10 @@ func TestCachedAuditAnnotations(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				// exercise both ways of tracking audit annotations
-				r := mathrand.New(mathrand.NewSource(mathrand.Int63()))
-				randomChoice := r.Int()%2 == 0
-				ctx := context.Background()
-
-				if randomChoice {
-					ctx = audit.WithAuditAnnotations(ctx)
-				} else {
-					ctx = audit.WithAuditContext(ctx, &audit.AuditContext{
-						Event: &auditinternal.Event{Level: auditinternal.LevelMetadata},
-					})
-				}
-
+				ctx := withAudit(context.Background())
 				_, _, _ = a.AuthenticateToken(ctx, "token")
 
-				if randomChoice {
-					allAnnotations <- extractAnnotations(ctx)
-				} else {
-					allAnnotations <- audit.AuditEventFrom(ctx).Annotations
-				}
+				allAnnotations <- audit.AuditEventFrom(ctx).Annotations
 			}()
 		}
 
@@ -354,9 +338,9 @@ func TestCachedAuditAnnotations(t *testing.T) {
 		allAnnotations := make([]map[string]string, 0, 10)
 
 		for i := 0; i < cap(allAnnotations); i++ {
-			ctx := audit.WithAuditAnnotations(context.Background())
+			ctx := withAudit(context.Background())
 			_, _, _ = a.AuthenticateToken(ctx, "token")
-			allAnnotations = append(allAnnotations, extractAnnotations(ctx))
+			allAnnotations = append(allAnnotations, audit.AuditEventFrom(ctx).Annotations)
 		}
 
 		if len(allAnnotations) != cap(allAnnotations) {
@@ -381,16 +365,16 @@ func TestCachedAuditAnnotations(t *testing.T) {
 			return snorlax, true, nil
 		}), false, time.Minute, 0)
 
-		ctx1 := audit.WithAuditAnnotations(context.Background())
+		ctx1 := withAudit(context.Background())
 		_, _, _ = a.AuthenticateToken(ctx1, "token1")
-		annotations1 := extractAnnotations(ctx1)
+		annotations1 := audit.AuditEventFrom(ctx1).Annotations
 
 		// guarantee different now times
 		time.Sleep(time.Second)
 
-		ctx2 := audit.WithAuditAnnotations(context.Background())
+		ctx2 := withAudit(context.Background())
 		_, _, _ = a.AuthenticateToken(ctx2, "token2")
-		annotations2 := extractAnnotations(ctx2)
+		annotations2 := audit.AuditEventFrom(ctx2).Annotations
 
 		if ok := len(annotations1) == 1 && len(annotations1["timestamp"]) > 0; !ok {
 			t.Errorf("invalid annotations 1: %v", annotations1)
@@ -403,18 +387,6 @@ func TestCachedAuditAnnotations(t *testing.T) {
 			t.Errorf("annotations should have different timestamp value: %v", annotations1)
 		}
 	})
-}
-
-func extractAnnotations(ctx context.Context) map[string]string {
-	annotationsSlice := reflect.ValueOf(ctx).Elem().FieldByName("val").Elem().Elem()
-	annotations := map[string]string{}
-	for i := 0; i < annotationsSlice.Len(); i++ {
-		annotation := annotationsSlice.Index(i)
-		key := annotation.FieldByName("key").String()
-		val := annotation.FieldByName("value").String()
-		annotations[key] = val
-	}
-	return annotations
 }
 
 func BenchmarkCachedTokenAuthenticator(b *testing.B) {
@@ -565,4 +537,13 @@ func (s *singleBenchmark) bench(b *testing.B) {
 	b.StopTimer()
 
 	b.ReportMetric(float64(lookups)/float64(b.N), "lookups/op")
+}
+
+// Add a test version of the audit context with a pre-populated event for easy annotation
+// extraction.
+func withAudit(ctx context.Context) context.Context {
+	ctx = audit.WithAuditContext(ctx)
+	ac := audit.AuditContextFrom(ctx)
+	ac.Event = &auditinternal.Event{Level: auditinternal.LevelMetadata}
+	return ctx
 }

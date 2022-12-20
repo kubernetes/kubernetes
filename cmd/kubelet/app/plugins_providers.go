@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/azuredd"
-	"k8s.io/kubernetes/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/portworx"
@@ -72,7 +71,6 @@ func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate f
 	pluginMigrationStatus := make(map[string]pluginInfo)
 	pluginMigrationStatus[plugins.AWSEBSInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAWS, pluginUnregisterFeature: features.InTreePluginAWSUnregister, pluginProbeFunction: awsebs.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.GCEPDInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationGCE, pluginUnregisterFeature: features.InTreePluginGCEUnregister, pluginProbeFunction: gcepd.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.CinderInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationOpenStack, pluginUnregisterFeature: features.InTreePluginOpenStackUnregister, pluginProbeFunction: cinder.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.AzureDiskInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureDisk, pluginUnregisterFeature: features.InTreePluginAzureDiskUnregister, pluginProbeFunction: azuredd.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.AzureFileInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureFile, pluginUnregisterFeature: features.InTreePluginAzureFileUnregister, pluginProbeFunction: azure_file.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.VSphereInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationvSphere, pluginUnregisterFeature: features.InTreePluginvSphereUnregister, pluginProbeFunction: vsphere_volume.ProbeVolumePlugins}

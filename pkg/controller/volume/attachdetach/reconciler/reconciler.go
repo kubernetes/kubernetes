@@ -251,6 +251,9 @@ func (rc *reconciler) reconcile() {
 			if err != nil {
 				// Skip detaching this volume if unable to update node status
 				klog.ErrorS(err, "UpdateNodeStatusForNode failed while attempting to report volume as attached", "volume", attachedVolume)
+				// Add volume back to ReportAsAttached if UpdateNodeStatusForNode call failed so that node status updater will add it back to VolumeAttached list.
+				// It is needed here too because DetachVolume is not call actually and we keep the data consistency for every reconcile.
+				rc.actualStateOfWorld.AddVolumeToReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
 				continue
 			}
 
@@ -320,7 +323,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 		attachState := rc.actualStateOfWorld.GetAttachState(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		if attachState == cache.AttachStateAttached {
 			// Volume/Node exists, touch it to reset detachRequestedTime
-			klog.V(5).InfoS("Volume attached--touching", "volume", volumeToAttach)
+			klog.V(10).InfoS("Volume attached--touching", "volume", volumeToAttach)
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			continue
 		}
@@ -414,5 +417,5 @@ func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach
 	}
 
 	// Log all pods for system admin
-	klog.InfoS("Multi-Attach error: volume is already used by pods", "pods", klog.KObjs(pods), "attachedTo", otherNodesStr, "volume", volumeToAttach)
+	klog.InfoS("Multi-Attach error: volume is already used by pods", "pods", klog.KObjSlice(pods), "attachedTo", otherNodesStr, "volume", volumeToAttach)
 }

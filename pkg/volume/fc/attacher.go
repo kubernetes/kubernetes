@@ -94,7 +94,7 @@ func (attacher *fcAttacher) GetDeviceMountPath(
 	return attacher.manager.MakeGlobalPDName(*mounter.fcDisk), nil
 }
 
-func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
+func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
 	mounter := attacher.host.GetMounter(fcPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -116,6 +116,9 @@ func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 	options := []string{}
 	if readOnly {
 		options = append(options, "ro")
+	}
+	if mountArgs.SELinuxLabel != "" {
+		options = volumeutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
 	}
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(fcPluginName)}

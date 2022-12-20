@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -198,6 +197,10 @@ type FakeResources struct {
 
 func (f FakeResources) LookupResource(s schema.GroupVersionKind) proto.Schema {
 	return f.resources[s]
+}
+
+func (f FakeResources) GetConsumes(gvk schema.GroupVersionKind, operation string) []string {
+	return nil
 }
 
 var _ openapi.Resources = &FakeResources{}
@@ -742,7 +745,7 @@ func TestGetEmptyTable(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	emptyTable := ioutil.NopCloser(bytes.NewBufferString(`{
+	emptyTable := io.NopCloser(bytes.NewBufferString(`{
 "kind":"Table",
 "apiVersion":"meta.k8s.io/v1beta1",
 "metadata":{
@@ -955,7 +958,7 @@ func TestGetSortedObjectsUnstructuredTable(t *testing.T) {
 		t.Fatal(err)
 	}
 	// t.Log(string(unstructuredBytes))
-	body := ioutil.NopCloser(bytes.NewReader(unstructuredBytes))
+	body := io.NopCloser(bytes.NewReader(unstructuredBytes))
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
@@ -2840,7 +2843,7 @@ func watchBody(codec runtime.Codec, events []watch.Event) io.ReadCloser {
 			panic(err)
 		}
 	}
-	return ioutil.NopCloser(buf)
+	return io.NopCloser(buf)
 }
 
 var podColumns = []metav1.TableColumnDefinition{

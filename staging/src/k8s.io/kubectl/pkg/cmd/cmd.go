@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/diff"
 	"k8s.io/kubectl/pkg/cmd/drain"
 	"k8s.io/kubectl/pkg/cmd/edit"
+	"k8s.io/kubectl/pkg/cmd/events"
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
@@ -279,8 +280,15 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		Run: runHelp,
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
-		PersistentPreRunE: func(*cobra.Command, []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			rest.SetDefaultWarningHandler(warningHandler)
+
+			if cmd.Name() == cobra.ShellCompRequestCmd {
+				// This is the __complete or __completeNoDesc command which
+				// indicates shell completion has been requested.
+				plugin.SetupPluginCompletion(cmd, args)
+			}
+
 			return initProfiling()
 		},
 		PersistentPostRunE: func(*cobra.Command, []string) error {
@@ -322,13 +330,6 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	addCmdHeaderHooks(cmds, kubeConfigFlags)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
-
-	// Sending in 'nil' for the getLanguageFn() results in using
-	// the LANG environment variable.
-	//
-	// TODO: Consider adding a flag or file preference for setting
-	// the language, instead of just loading from the LANG env. variable.
-	i18n.LoadTranslations("kubectl", nil)
 
 	// Proxy command is incompatible with CommandHeaderRoundTripper, so
 	// clear the WrapConfigFn before running proxy command.
@@ -392,6 +393,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 				cp.NewCmdCp(f, o.IOStreams),
 				auth.NewCmdAuth(f, o.IOStreams),
 				debug.NewCmdDebug(f, o.IOStreams),
+				events.NewCmdEvents(f, o.IOStreams),
 			},
 		},
 		{

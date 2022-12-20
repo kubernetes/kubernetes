@@ -17,7 +17,6 @@ limitations under the License.
 package bootstrappolicy_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -225,7 +224,7 @@ func TestBootstrapControllerRoleBindings(t *testing.T) {
 
 func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 	filename := filepath.Join("testdata", fixtureFilename)
-	expectedYAML, err := ioutil.ReadFile(filename)
+	expectedYAML, err := os.ReadFile(filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +246,7 @@ func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 
 		const updateEnvVar = "UPDATE_BOOTSTRAP_POLICY_FIXTURE_DATA"
 		if os.Getenv(updateEnvVar) == "true" {
-			if err := ioutil.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
+			if err := os.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
 				t.Logf("Updated data in %s", filename)
 				t.Logf("Verify the diff, commit changes, and rerun the tests")
 			} else {

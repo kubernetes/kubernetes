@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"k8s.io/component-base/metrics/testutil"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -94,12 +94,12 @@ func (m *ComponentCollection) PrintHumanReadable() string {
 func PrettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
 	if err := json.NewEncoder(output).Encode(metrics); err != nil {
-		e2elog.Logf("Error building encoder: %v", err)
+		framework.Logf("Error building encoder: %v", err)
 		return ""
 	}
 	formatted := &bytes.Buffer{}
 	if err := json.Indent(formatted, output.Bytes(), "", "  "); err != nil {
-		e2elog.Logf("Error indenting: %v", err)
+		framework.Logf("Error indenting: %v", err)
 		return ""
 	}
 	return string(formatted.Bytes())

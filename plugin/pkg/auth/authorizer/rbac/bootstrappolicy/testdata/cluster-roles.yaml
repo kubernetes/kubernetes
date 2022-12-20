@@ -914,7 +914,6 @@ items:
     - nodes/log
     - nodes/metrics
     - nodes/proxy
-    - nodes/spec
     - nodes/stats
     verbs:
     - '*'
@@ -934,6 +933,7 @@ items:
     - /livez
     - /livez/*
     - /metrics
+    - /metrics/slis
     - /readyz
     - /readyz/*
     verbs:

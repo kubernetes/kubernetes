@@ -489,7 +489,7 @@ func TestAbsentOwnerCache(t *testing.T) {
 			Name:       "rc1",
 			UID:        "1",
 			APIVersion: "v1",
-			Controller: pointer.BoolPtr(true),
+			Controller: pointer.Bool(true),
 		},
 	})
 	rc1Pod2 := getPod("rc1Pod2", []metav1.OwnerReference{
@@ -498,7 +498,7 @@ func TestAbsentOwnerCache(t *testing.T) {
 			Name:       "rc1",
 			UID:        "1",
 			APIVersion: "v1",
-			Controller: pointer.BoolPtr(false),
+			Controller: pointer.Bool(false),
 		},
 	})
 	rc2Pod1 := getPod("rc2Pod1", []metav1.OwnerReference{

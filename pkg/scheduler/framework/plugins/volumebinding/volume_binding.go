@@ -38,9 +38,6 @@ import (
 )
 
 const (
-	// DefaultBindTimeoutSeconds defines the default bind timeout in seconds
-	DefaultBindTimeoutSeconds = 600
-
 	stateKey framework.StateKey = Name
 
 	maxUtilization = 100
@@ -185,8 +182,16 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 		status.AppendReason("pod has unbound immediate PersistentVolumeClaims")
 		return nil, status
 	}
+	// Attempt to reduce down the number of nodes to consider in subsequent scheduling stages if pod has bound claims.
+	var result *framework.PreFilterResult
+	if eligibleNodes := pl.Binder.GetEligibleNodes(boundClaims); eligibleNodes != nil {
+		result = &framework.PreFilterResult{
+			NodeNames: eligibleNodes,
+		}
+	}
+
 	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind, podVolumesByNode: make(map[string]*PodVolumes)})
-	return nil, nil
+	return result, nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.

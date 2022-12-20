@@ -38,7 +38,7 @@ type nodeTree struct {
 // newNodeTree creates a NodeTree from nodes.
 func newNodeTree(nodes []*v1.Node) *nodeTree {
 	nt := &nodeTree{
-		tree: make(map[string][]string),
+		tree: make(map[string][]string, len(nodes)),
 	}
 	for _, n := range nodes {
 		nt.addNode(n)

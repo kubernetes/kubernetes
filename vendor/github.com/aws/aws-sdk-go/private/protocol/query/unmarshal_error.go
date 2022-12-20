@@ -3,6 +3,7 @@ package query
 import (
 	"encoding/xml"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
@@ -62,7 +63,7 @@ func UnmarshalError(r *request.Request) {
 	}
 
 	r.Error = awserr.NewRequestFailure(
-		awserr.New(respErr.Code, respErr.Message, nil),
+		awserr.New(strings.TrimSpace(respErr.Code), strings.TrimSpace(respErr.Message), nil),
 		r.HTTPResponse.StatusCode,
 		reqID,
 	)

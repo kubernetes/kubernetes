@@ -19,11 +19,13 @@ package routes
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestPreCheckLogFileNameLength(t *testing.T) {
-	oversizeFileName := fmt.Sprintf("%0256s", "a")
+	// In windows, with long file name support enabled, file names can have up to 32,767 characters.
+	oversizeFileName := fmt.Sprintf("%032768s", "a")
 	normalFileName := fmt.Sprintf("%0255s", "a")
 
 	// check file with oversize name.
@@ -37,11 +39,19 @@ func TestPreCheckLogFileNameLength(t *testing.T) {
 	}
 
 	// check file with normal name which does exist.
-	_, err := os.Create(normalFileName)
+	dir, err := os.MkdirTemp("", "logs")
+	if err != nil {
+		t.Fatal("failed to create temp dir")
+	}
+	defer os.RemoveAll(dir)
+
+	normalFileName = filepath.Join(dir, normalFileName)
+	f, err := os.Create(normalFileName)
 	if err != nil {
 		t.Error("failed to create test file")
 	}
 	defer os.Remove(normalFileName)
+	defer f.Close()
 	if logFileNameIsTooLong(normalFileName) {
 		t.Error("failed to check normal filename")
 	}

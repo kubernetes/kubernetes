@@ -33,7 +33,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
@@ -1432,15 +1431,15 @@ func TestSetDefaultServiceExternalTraffic(t *testing.T) {
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeNodePort}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyCluster, out.Spec.ExternalTrafficPolicy)
 	}
 
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyCluster, out.Spec.ExternalTrafficPolicy)
 	}
 }
 
@@ -1860,15 +1859,13 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 	local := v1.ServiceInternalTrafficPolicyLocal
 	testCases := []struct {
 		name                          string
-		expectedInternalTrafficPolicy *v1.ServiceInternalTrafficPolicyType
+		expectedInternalTrafficPolicy *v1.ServiceInternalTrafficPolicy
 		svc                           v1.Service
-		featureGateOn                 bool
 	}{
 		{
 			name:                          "must set default internalTrafficPolicy",
 			expectedInternalTrafficPolicy: &cluster,
 			svc:                           v1.Service{},
-			featureGateOn:                 true,
 		},
 		{
 			name:                          "must not set default internalTrafficPolicy when it's cluster",
@@ -1878,7 +1875,6 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 					InternalTrafficPolicy: &cluster,
 				},
 			},
-			featureGateOn: true,
 		},
 		{
 			name:                          "must not set default internalTrafficPolicy when type is ExternalName",
@@ -1888,7 +1884,6 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 					Type: v1.ServiceTypeExternalName,
 				},
 			},
-			featureGateOn: true,
 		},
 		{
 			name:                          "must not set default internalTrafficPolicy when it's local",
@@ -1898,18 +1893,10 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 					InternalTrafficPolicy: &local,
 				},
 			},
-			featureGateOn: true,
-		},
-		{
-			name:                          "must not set default internalTrafficPolicy when gate is disabled",
-			expectedInternalTrafficPolicy: nil,
-			svc:                           v1.Service{},
-			featureGateOn:                 false,
 		},
 	}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, test.featureGateOn)()
 			obj := roundTrip(t, runtime.Object(&test.svc))
 			svc := obj.(*v1.Service)
 

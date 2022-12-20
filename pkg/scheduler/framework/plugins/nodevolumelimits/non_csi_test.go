@@ -18,6 +18,7 @@ package nodevolumelimits
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -31,7 +32,7 @@ import (
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -126,14 +127,14 @@ func TestEphemeralLimits(t *testing.T) {
 			newPod:           ephemeralVolumePod,
 			ephemeralEnabled: true,
 			test:             "volume missing",
-			wantStatus:       framework.NewStatus(framework.Error, `looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`),
+			wantStatus:       framework.AsStatus(errors.New(`looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`)),
 		},
 		{
 			newPod:           ephemeralVolumePod,
 			ephemeralEnabled: true,
 			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
 			test:             "volume not owned",
-			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
+			wantStatus:       framework.AsStatus(errors.New("PVC test/abc-xyz was not created for pod test/abc (pod is not owner)")),
 		},
 		{
 			newPod:           ephemeralVolumePod,
@@ -792,14 +793,14 @@ func getFakePVCLister(filterName string) fakeframework.PersistentVolumeClaimList
 			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithDefaultSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
-				StorageClassName: utilpointer.StringPtr("standard-sc"),
+				StorageClassName: pointer.String("standard-sc"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithInvalidSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
-				StorageClassName: utilpointer.StringPtr("invalid-sc"),
+				StorageClassName: pointer.String("invalid-sc"),
 			},
 		},
 	}

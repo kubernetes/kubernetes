@@ -68,6 +68,10 @@ func fillPresignedURL(r *request.Request) {
 		func(opt *endpoints.Options) {
 			opt.DisableSSL = aws.BoolValue(cfg.DisableSSL)
 			opt.UseDualStack = aws.BoolValue(cfg.UseDualStack)
+			opt.UseDualStackEndpoint = cfg.UseDualStackEndpoint
+			opt.UseFIPSEndpoint = cfg.UseFIPSEndpoint
+			opt.Logger = r.Config.Logger
+			opt.LogDeprecated = r.Config.LogLevel.Matches(aws.LogDebugWithDeprecated)
 		},
 	)
 	if err != nil {

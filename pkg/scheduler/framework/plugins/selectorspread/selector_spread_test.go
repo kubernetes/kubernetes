@@ -50,7 +50,7 @@ func controllerRef(name string, gvk schema.GroupVersionKind) []metav1.OwnerRefer
 			APIVersion: gvk.GroupVersion().String(),
 			Kind:       gvk.Kind,
 			Name:       name,
-			Controller: pointer.BoolPtr(true),
+			Controller: pointer.Bool(true),
 		},
 	}
 }

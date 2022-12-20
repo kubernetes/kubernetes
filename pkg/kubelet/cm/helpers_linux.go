@@ -44,12 +44,16 @@ const (
 	SharesPerCPU  = 1024
 	MilliCPUToCPU = 1000
 
-	// 100000 is equivalent to 100ms
-	QuotaPeriod    = 100000
+	// 100000 microseconds is equivalent to 100ms
+	QuotaPeriod = 100000
+	// 1000 microseconds is equivalent to 1ms
+	// defined here:
+	// https://github.com/torvalds/linux/blob/cac03ac368fabff0122853de2422d4e17a32de08/kernel/sched/core.c#L10546
 	MinQuotaPeriod = 1000
 )
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
+// Input parameters and resulting value is number of microseconds.
 func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	// CFS quota is measured in two values:
 	//  - cfs_period_us=100ms (the amount of time to measure usage across given by period)
@@ -182,22 +186,22 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	// build the result
 	result := &ResourceConfig{}
 	if qosClass == v1.PodQOSGuaranteed {
-		result.CpuShares = &cpuShares
-		result.CpuQuota = &cpuQuota
-		result.CpuPeriod = &cpuPeriod
+		result.CPUShares = &cpuShares
+		result.CPUQuota = &cpuQuota
+		result.CPUPeriod = &cpuPeriod
 		result.Memory = &memoryLimits
 	} else if qosClass == v1.PodQOSBurstable {
-		result.CpuShares = &cpuShares
+		result.CPUShares = &cpuShares
 		if cpuLimitsDeclared {
-			result.CpuQuota = &cpuQuota
-			result.CpuPeriod = &cpuPeriod
+			result.CPUQuota = &cpuQuota
+			result.CPUPeriod = &cpuPeriod
 		}
 		if memoryLimitsDeclared {
 			result.Memory = &memoryLimits
 		}
 	} else {
 		shares := uint64(MinShares)
-		result.CpuShares = &shares
+		result.CPUShares = &shares
 	}
 	result.HugePageLimit = hugePageLimits
 

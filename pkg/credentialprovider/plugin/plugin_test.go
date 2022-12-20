@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/cache"
 	credentialproviderapi "k8s.io/kubelet/pkg/apis/credentialprovider"
+	credentialproviderv1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1"
 	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
 	credentialproviderv1beta1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1beta1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -435,6 +436,16 @@ func Test_encodeRequest(t *testing.T) {
 `),
 			expectedErr: false,
 		},
+		{
+			name:       "successful with v1",
+			apiVersion: credentialproviderv1.SchemeGroupVersion,
+			request: &credentialproviderapi.CredentialProviderRequest{
+				Image: "test.registry.io/foobar",
+			},
+			expectedData: []byte(`{"kind":"CredentialProviderRequest","apiVersion":"credentialprovider.kubelet.k8s.io/v1","image":"test.registry.io/foobar"}
+`),
+			expectedErr: false,
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -474,6 +485,23 @@ func Test_decodeResponse(t *testing.T) {
 		expectedResponse *credentialproviderapi.CredentialProviderResponse
 		expectedErr      bool
 	}{
+		{
+			name: "success with v1",
+			data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
+			expectedResponse: &credentialproviderapi.CredentialProviderResponse{
+				CacheKeyType: credentialproviderapi.RegistryPluginCacheKeyType,
+				CacheDuration: &metav1.Duration{
+					Duration: time.Minute,
+				},
+				Auth: map[string]credentialproviderapi.AuthConfig{
+					"*.registry.io": {
+						Username: "user",
+						Password: "password",
+					},
+				},
+			},
+			expectedErr: false,
+		},
 		{
 			name: "success with v1beta1",
 			data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),

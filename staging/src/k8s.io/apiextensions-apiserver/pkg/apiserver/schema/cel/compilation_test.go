@@ -22,9 +22,11 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apiserver/pkg/cel"
+
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 )
 
 const (
@@ -79,12 +81,12 @@ func (m fnMatcher) String() string {
 }
 
 type errorMatcher struct {
-	errorType ErrorType
+	errorType cel.ErrorType
 	contains  string
 }
 
 func invalidError(contains string) validationMatcher {
-	return errorMatcher{errorType: ErrorTypeInvalid, contains: contains}
+	return errorMatcher{errorType: cel.ErrorTypeInvalid, contains: contains}
 }
 
 func (v errorMatcher) matches(cr CompilationResult) bool {
@@ -1592,6 +1594,27 @@ func TestCostEstimation(t *testing.T) {
 			expectedCalcCost: 314575,
 			setMaxElements:   10,
 			expectedSetCost:  6,
+		},
+		{
+			name:             "check cost of size call",
+			schemaGenerator:  genMapWithRule("integer", "oldSelf.size() == self.size()"),
+			expectedCalcCost: 5,
+			setMaxElements:   10,
+			expectedSetCost:  5,
+		},
+		{
+			name:             "check cost of timestamp comparison",
+			schemaGenerator:  genMapWithRule("date-time", `self["a"] == self["b"]`),
+			expectedCalcCost: 8,
+			setMaxElements:   7,
+			expectedSetCost:  8,
+		},
+		{
+			name:             "check cost of duration comparison",
+			schemaGenerator:  genMapWithRule("duration", `self["c"] == self["d"]`),
+			expectedCalcCost: 8,
+			setMaxElements:   42,
+			expectedSetCost:  8,
 		},
 	}
 	for _, testCase := range cases {

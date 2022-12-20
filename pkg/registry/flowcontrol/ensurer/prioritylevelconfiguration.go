@@ -21,15 +21,15 @@ import (
 	"errors"
 	"fmt"
 
-	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
-	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
-	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
+	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta3"
+	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 
 // PriorityLevelEnsurer ensures the specified bootstrap configuration objects
 type PriorityLevelEnsurer interface {
-	Ensure([]*flowcontrolv1beta2.PriorityLevelConfiguration) error
+	Ensure([]*flowcontrolv1beta3.PriorityLevelConfiguration) error
 }
 
 // PriorityLevelRemover is the interface that wraps the
@@ -93,7 +93,7 @@ func NewPriorityLevelRemover(client flowcontrolclient.PriorityLevelConfiguration
 // names that are candidates for removal from the cluster.
 // bootstrap: a set of hard coded PriorityLevelConfiguration configuration
 // objects kube-apiserver maintains in-memory.
-func GetPriorityLevelRemoveCandidates(lister flowcontrollisters.PriorityLevelConfigurationLister, bootstrap []*flowcontrolv1beta2.PriorityLevelConfiguration) ([]string, error) {
+func GetPriorityLevelRemoveCandidates(lister flowcontrollisters.PriorityLevelConfigurationLister, bootstrap []*flowcontrolv1beta3.PriorityLevelConfiguration) ([]string, error) {
 	plList, err := lister.List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list PriorityLevelConfiguration - %w", err)
@@ -117,7 +117,7 @@ type plEnsurer struct {
 	wrapper  configurationWrapper
 }
 
-func (e *plEnsurer) Ensure(priorityLevels []*flowcontrolv1beta2.PriorityLevelConfiguration) error {
+func (e *plEnsurer) Ensure(priorityLevels []*flowcontrolv1beta3.PriorityLevelConfiguration) error {
 	for _, priorityLevel := range priorityLevels {
 		if err := ensureConfiguration(e.wrapper, e.strategy, priorityLevel); err != nil {
 			return err
@@ -149,7 +149,7 @@ func (fs *priorityLevelConfigurationWrapper) TypeName() string {
 }
 
 func (fs *priorityLevelConfigurationWrapper) Create(object runtime.Object) (runtime.Object, error) {
-	plObject, ok := object.(*flowcontrolv1beta2.PriorityLevelConfiguration)
+	plObject, ok := object.(*flowcontrolv1beta3.PriorityLevelConfiguration)
 	if !ok {
 		return nil, errObjectNotPriorityLevel
 	}
@@ -158,7 +158,7 @@ func (fs *priorityLevelConfigurationWrapper) Create(object runtime.Object) (runt
 }
 
 func (fs *priorityLevelConfigurationWrapper) Update(object runtime.Object) (runtime.Object, error) {
-	fsObject, ok := object.(*flowcontrolv1beta2.PriorityLevelConfiguration)
+	fsObject, ok := object.(*flowcontrolv1beta3.PriorityLevelConfiguration)
 	if !ok {
 		return nil, errObjectNotPriorityLevel
 	}
@@ -175,11 +175,11 @@ func (fs *priorityLevelConfigurationWrapper) Delete(name string) error {
 }
 
 func (fs *priorityLevelConfigurationWrapper) CopySpec(bootstrap, current runtime.Object) error {
-	bootstrapFS, ok := bootstrap.(*flowcontrolv1beta2.PriorityLevelConfiguration)
+	bootstrapFS, ok := bootstrap.(*flowcontrolv1beta3.PriorityLevelConfiguration)
 	if !ok {
 		return errObjectNotPriorityLevel
 	}
-	currentFS, ok := current.(*flowcontrolv1beta2.PriorityLevelConfiguration)
+	currentFS, ok := current.(*flowcontrolv1beta3.PriorityLevelConfiguration)
 	if !ok {
 		return errObjectNotPriorityLevel
 	}
@@ -190,11 +190,11 @@ func (fs *priorityLevelConfigurationWrapper) CopySpec(bootstrap, current runtime
 }
 
 func (fs *priorityLevelConfigurationWrapper) HasSpecChanged(bootstrap, current runtime.Object) (bool, error) {
-	bootstrapFS, ok := bootstrap.(*flowcontrolv1beta2.PriorityLevelConfiguration)
+	bootstrapFS, ok := bootstrap.(*flowcontrolv1beta3.PriorityLevelConfiguration)
 	if !ok {
 		return false, errObjectNotPriorityLevel
 	}
-	currentFS, ok := current.(*flowcontrolv1beta2.PriorityLevelConfiguration)
+	currentFS, ok := current.(*flowcontrolv1beta3.PriorityLevelConfiguration)
 	if !ok {
 		return false, errObjectNotPriorityLevel
 	}
@@ -202,8 +202,8 @@ func (fs *priorityLevelConfigurationWrapper) HasSpecChanged(bootstrap, current r
 	return priorityLevelSpecChanged(bootstrapFS, currentFS), nil
 }
 
-func priorityLevelSpecChanged(expected, actual *flowcontrolv1beta2.PriorityLevelConfiguration) bool {
+func priorityLevelSpecChanged(expected, actual *flowcontrolv1beta3.PriorityLevelConfiguration) bool {
 	copiedExpectedPriorityLevel := expected.DeepCopy()
-	flowcontrolapisv1beta2.SetObjectDefaults_PriorityLevelConfiguration(copiedExpectedPriorityLevel)
+	flowcontrolapisv1beta3.SetObjectDefaults_PriorityLevelConfiguration(copiedExpectedPriorityLevel)
 	return !equality.Semantic.DeepEqual(copiedExpectedPriorityLevel.Spec, actual.Spec)
 }

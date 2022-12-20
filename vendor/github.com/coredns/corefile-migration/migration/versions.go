@@ -30,27 +30,22 @@ type release struct {
 
 // Versions holds a map of plugin/option migrations per CoreDNS release (since 1.1.4)
 var Versions = map[string]release{
+	"1.10.0": {
+		priorVersion:   "1.9.4",
+		dockerImageSHA: "017727efcfeb7d053af68e51436ce8e65edbc6ca573720afb4f79c8594036955",
+		plugins:        plugins_1_9_3,
+	},
+	"1.9.4": {
+		nextVersion:    "1.10.0",
+		priorVersion:   "1.9.3",
+		dockerImageSHA: "b82e294de6be763f73ae71266c8f5466e7e03c69f3a1de96efd570284d35bb18",
+		plugins:        plugins_1_9_3,
+	},
 	"1.9.3": {
+		nextVersion:    "1.9.4",
 		priorVersion:   "1.9.2",
 		dockerImageSHA: "8e352a029d304ca7431c6507b56800636c321cb52289686a581ab70aaa8a2e2a",
-		plugins: map[string]plugin{
-			"errors":       plugins["errors"]["v3"], // stacktrace option added
-			"log":          plugins["log"]["v1"],
-			"health":       plugins["health"]["v1"],
-			"ready":        {},
-			"autopath":     {},
-			"kubernetes":   plugins["kubernetes"]["v8"],
-			"k8s_external": plugins["k8s_external"]["v1"],
-			"prometheus":   {},
-			"forward":      plugins["forward"]["v3"],
-			"cache":        plugins["cache"]["v1"],
-			"loop":         {},
-			"reload":       {},
-			"loadbalance":  {},
-			"hosts":        plugins["hosts"]["v1"],
-			"rewrite":      plugins["rewrite"]["v2"],
-			"transfer":     plugins["transfer"]["v1"],
-		},
+		plugins:        plugins_1_9_3,
 	},
 	"1.9.2": {
 		nextVersion:    "1.9.3",
@@ -742,6 +737,25 @@ var Versions = map[string]release{
     cache 30
     reload
 }`},
+}
+
+var plugins_1_9_3 = map[string]plugin{
+	"errors":       plugins["errors"]["v3"], // stacktrace option added
+	"log":          plugins["log"]["v1"],
+	"health":       plugins["health"]["v1"],
+	"ready":        {},
+	"autopath":     {},
+	"kubernetes":   plugins["kubernetes"]["v8"],
+	"k8s_external": plugins["k8s_external"]["v1"],
+	"prometheus":   {},
+	"forward":      plugins["forward"]["v3"],
+	"cache":        plugins["cache"]["v1"],
+	"loop":         {},
+	"reload":       {},
+	"loadbalance":  {},
+	"hosts":        plugins["hosts"]["v1"],
+	"rewrite":      plugins["rewrite"]["v2"],
+	"transfer":     plugins["transfer"]["v1"],
 }
 
 var plugins_1_8_3 = map[string]plugin{

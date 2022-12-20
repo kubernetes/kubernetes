@@ -7,19 +7,20 @@ issues:
   max-same-issues: 0
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
-    # exclude ineffassing linter for generated files for conversion
+    # exclude ineffassign linter for generated files for conversion
     - path: conversion\.go
       linters:
         - ineffassign
+    # TODO(oscr) Remove these excluded directories and fix findings. Due to large amount of findings in different components
+    # with different owners it's hard to fix everything in a single pr. This will therefore be done in multiple prs.
+    - path: (pkg/volume/*|test/*|cmd/kubeadm/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
+      linters:
+        - gocritic
 
 linters:
   disable-all: true
   enable: # please keep this alphabetized
-  # Don't use soon to deprecated[1] linters that lead to false
-  # https://github.com/golangci/golangci-lint/issues/1841
-  # - deadcode
-  # - structcheck
-  # - varcheck
+    - gocritic
     - ineffassign
     - logcheck
     - staticcheck
@@ -33,8 +34,11 @@ linters-settings: # please keep this alphabetized
       path: _output/local/bin/logcheck.so
       description: structured logging checker
       original-url: k8s.io/klog/hack/tools
+  gocritic:
+    enabled-checks:
+      - equalFold
+      - boolExprSimplify
   staticcheck:
-    go: "1.18"
     checks: [
       "all",
       "-SA1019", # TODO(fix) Using a deprecated function, variable, constant or field
@@ -44,5 +48,3 @@ linters-settings: # please keep this alphabetized
     checks: [
       "ST1019",  # Importing the same package multiple times.
     ]
-  unused:
-    go: "1.18"

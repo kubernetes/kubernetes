@@ -110,6 +110,11 @@ type SubConn interface {
 	UpdateAddresses([]resolver.Address)
 	// Connect starts the connecting for this SubConn.
 	Connect()
+	// GetOrBuildProducer returns a reference to the existing Producer for this
+	// ProducerBuilder in this SubConn, or, if one does not currently exist,
+	// creates a new one and returns it.  Returns a close function which must
+	// be called when the Producer is no longer needed.
+	GetOrBuildProducer(ProducerBuilder) (p Producer, close func())
 }
 
 // NewSubConnOptions contains options to create new SubConn.
@@ -244,7 +249,7 @@ type DoneInfo struct {
 	// ServerLoad is the load received from server. It's usually sent as part of
 	// trailing metadata.
 	//
-	// The only supported type now is *orca_v1.LoadReport.
+	// The only supported type now is *orca_v3.LoadReport.
 	ServerLoad interface{}
 }
 
@@ -372,55 +377,20 @@ type ClientConnState struct {
 // problem with the provided name resolver data.
 var ErrBadResolverState = errors.New("bad resolver state")
 
-// ConnectivityStateEvaluator takes the connectivity states of multiple SubConns
-// and returns one aggregated connectivity state.
-//
-// It's not thread safe.
-type ConnectivityStateEvaluator struct {
-	numReady            uint64 // Number of addrConns in ready state.
-	numConnecting       uint64 // Number of addrConns in connecting state.
-	numTransientFailure uint64 // Number of addrConns in transient failure state.
-	numIdle             uint64 // Number of addrConns in idle state.
+// A ProducerBuilder is a simple constructor for a Producer.  It is used by the
+// SubConn to create producers when needed.
+type ProducerBuilder interface {
+	// Build creates a Producer.  The first parameter is always a
+	// grpc.ClientConnInterface (a type to allow creating RPCs/streams on the
+	// associated SubConn), but is declared as interface{} to avoid a
+	// dependency cycle.  Should also return a close function that will be
+	// called when all references to the Producer have been given up.
+	Build(grpcClientConnInterface interface{}) (p Producer, close func())
 }
 
-// RecordTransition records state change happening in subConn and based on that
-// it evaluates what aggregated state should be.
-//
-//  - If at least one SubConn in Ready, the aggregated state is Ready;
-//  - Else if at least one SubConn in Connecting, the aggregated state is Connecting;
-//  - Else if at least one SubConn is TransientFailure, the aggregated state is Transient Failure;
-//  - Else if at least one SubConn is Idle, the aggregated state is Idle;
-//  - Else there are no subconns and the aggregated state is Transient Failure
-//
-// Shutdown is not considered.
-func (cse *ConnectivityStateEvaluator) RecordTransition(oldState, newState connectivity.State) connectivity.State {
-	// Update counters.
-	for idx, state := range []connectivity.State{oldState, newState} {
-		updateVal := 2*uint64(idx) - 1 // -1 for oldState and +1 for new.
-		switch state {
-		case connectivity.Ready:
-			cse.numReady += updateVal
-		case connectivity.Connecting:
-			cse.numConnecting += updateVal
-		case connectivity.TransientFailure:
-			cse.numTransientFailure += updateVal
-		case connectivity.Idle:
-			cse.numIdle += updateVal
-		}
-	}
-
-	// Evaluate.
-	if cse.numReady > 0 {
-		return connectivity.Ready
-	}
-	if cse.numConnecting > 0 {
-		return connectivity.Connecting
-	}
-	if cse.numTransientFailure > 0 {
-		return connectivity.TransientFailure
-	}
-	if cse.numIdle > 0 {
-		return connectivity.Idle
-	}
-	return connectivity.TransientFailure
+// A Producer is a type shared among potentially many consumers.  It is
+// associated with a SubConn, and an implementation will typically contain
+// other methods to provide additional functionality, e.g. configuration or
+// subscription registration.
+type Producer interface {
 }

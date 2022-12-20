@@ -33,7 +33,6 @@ func main() {
 
 	// Override defaults.
 	// TODO: move this out of lister-gen
-	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/listers"
 
 	genericArgs.AddFlags(pflag.CommandLine)

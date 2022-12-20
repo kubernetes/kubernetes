@@ -159,6 +159,9 @@ type KubeSchedulerProfile struct {
 // Enabled plugins are called in the order specified here, after default plugins. If they need to
 // be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.
 type Plugins struct {
+	// PreEnqueue is a list of plugins that should be invoked before adding pods to the scheduling queue.
+	PreEnqueue PluginSet `json:"preEnqueue,omitempty"`
+
 	// QueueSort is a list of plugins that should be invoked when sorting pods in the scheduling queue.
 	QueueSort PluginSet `json:"queueSort,omitempty"`
 

@@ -48,11 +48,25 @@ type NodeScore struct {
 	Score int64
 }
 
-// PluginToNodeScores declares a map from plugin name to its NodeScoreList.
-type PluginToNodeScores map[string]NodeScoreList
-
 // NodeToStatusMap declares map from node name to its status.
 type NodeToStatusMap map[string]*Status
+
+// NodePluginScores is a struct with node name and scores for that node.
+type NodePluginScores struct {
+	// Name is node name.
+	Name string
+	// Scores is scores from plugins and extenders.
+	Scores []PluginScore
+	// TotalScore is the total score in Scores.
+	TotalScore int64
+}
+
+// PluginScore is a struct with plugin/extender name and score.
+type PluginScore struct {
+	// Name is the name of plugin or extender.
+	Name  string
+	Score int64
+}
 
 // Code is the Status code/type which is returned from plugins.
 type Code int
@@ -145,6 +159,11 @@ type Status struct {
 	failedPlugin string
 }
 
+func (s *Status) WithError(err error) *Status {
+	s.err = err
+	return s
+}
+
 // Code returns code of the Status.
 func (s *Status) Code() Code {
 	if s == nil {
@@ -158,7 +177,7 @@ func (s *Status) Message() string {
 	if s == nil {
 		return ""
 	}
-	return strings.Join(s.reasons, ", ")
+	return strings.Join(s.Reasons(), ", ")
 }
 
 // SetFailedPlugin sets the given plugin name to s.failedPlugin.
@@ -180,6 +199,9 @@ func (s *Status) FailedPlugin() string {
 
 // Reasons returns reasons of the Status.
 func (s *Status) Reasons() []string {
+	if s.err != nil {
+		return append([]string{s.err.Error()}, s.reasons...)
+	}
 	return s.reasons
 }
 
@@ -230,8 +252,8 @@ func (s *Status) Equal(x *Status) bool {
 	if s.code != x.code {
 		return false
 	}
-	if s.code == Error {
-		return cmp.Equal(s.err, x.err, cmpopts.EquateErrors())
+	if !cmp.Equal(s.err, x.err, cmpopts.EquateErrors()) {
+		return false
 	}
 	return cmp.Equal(s.reasons, x.reasons)
 }
@@ -242,18 +264,17 @@ func NewStatus(code Code, reasons ...string) *Status {
 		code:    code,
 		reasons: reasons,
 	}
-	if code == Error {
-		s.err = errors.New(s.Message())
-	}
 	return s
 }
 
 // AsStatus wraps an error in a Status.
 func AsStatus(err error) *Status {
+	if err == nil {
+		return nil
+	}
 	return &Status{
-		code:    Error,
-		reasons: []string{err.Error()},
-		err:     err,
+		code: Error,
+		err:  err,
 	}
 }
 
@@ -270,20 +291,21 @@ func (p PluginToStatus) Merge() *Status {
 
 	finalStatus := NewStatus(Success)
 	for _, s := range p {
-		if s.Code() == Error {
-			finalStatus.err = s.AsError()
-		}
 		if statusPrecedence[s.Code()] > statusPrecedence[finalStatus.code] {
 			finalStatus.code = s.Code()
 			// Same as code, we keep the most relevant failedPlugin in the returned Status.
 			finalStatus.failedPlugin = s.FailedPlugin()
 		}
 
-		for _, r := range s.reasons {
+		reasons := s.Reasons()
+		if finalStatus.err == nil {
+			finalStatus.err = s.err
+			reasons = s.reasons
+		}
+		for _, r := range reasons {
 			finalStatus.AppendReason(r)
 		}
 	}
-
 	return finalStatus
 }
 
@@ -304,6 +326,17 @@ type WaitingPod interface {
 // Plugin is the parent type for all the scheduling framework plugins.
 type Plugin interface {
 	Name() string
+}
+
+// PreEnqueuePlugin is an interface that must be implemented by "PreEnqueue" plugins.
+// These plugins are called prior to adding Pods to activeQ.
+// Note: an preEnqueue plugin is expected to be lightweight and efficient, so it's not expected to
+// involve expensive calls like accessing external endpoints; otherwise it'd block other
+// Pods' enqueuing in event handlers.
+type PreEnqueuePlugin interface {
+	Plugin
+	// PreEnqueue is called prior to adding Pods to activeQ.
+	PreEnqueue(ctx context.Context, p *v1.Pod) *Status
 }
 
 // LessFunc is the function to sort pod info
@@ -504,6 +537,10 @@ type BindPlugin interface {
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	Handle
+
+	// PreEnqueuePlugins returns the registered preEnqueue plugins.
+	PreEnqueuePlugins() []PreEnqueuePlugin
+
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
 
@@ -571,8 +608,11 @@ type Framework interface {
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() *config.Plugins
 
-	// ProfileName returns the profile name associated to this framework.
+	// ProfileName returns the profile name associated to a profile.
 	ProfileName() string
+
+	// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
+	PercentageOfNodesToScore() *int32
 }
 
 // Handle provides data and some tools that plugins can use. It is
@@ -706,11 +746,11 @@ type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
 	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) *Status
-	// RunScorePlugins runs the set of configured Score plugins. It returns a map that
-	// stores for each Score plugin name the corresponding NodeScoreList(s).
+	// RunScorePlugins runs the set of configured scoring plugins.
+	// It returns a list that stores scores from each plugin and total score for each Node.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) (PluginToNodeScores, *Status)
+	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) ([]NodePluginScores, *Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods

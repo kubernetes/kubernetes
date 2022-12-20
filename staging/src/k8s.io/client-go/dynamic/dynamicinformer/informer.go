@@ -120,7 +120,7 @@ func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) 
 func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
 	return &dynamicInformer{
 		gvr: gvr,
-		informer: cache.NewSharedIndexInformer(
+		informer: cache.NewSharedIndexInformerWithOptions(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					if tweakListOptions != nil {
@@ -136,8 +136,11 @@ func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersio
 				},
 			},
 			&unstructured.Unstructured{},
-			resyncPeriod,
-			indexers,
+			cache.SharedIndexInformerOptions{
+				ResyncPeriod:      resyncPeriod,
+				Indexers:          indexers,
+				ObjectDescription: gvr.String(),
+			},
 		),
 	}
 }

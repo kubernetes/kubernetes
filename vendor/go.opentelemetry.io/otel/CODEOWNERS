@@ -12,6 +12,6 @@
 #  https://help.github.com/en/articles/about-code-owners
 #
 
-* @jmacd @MrAlias @Aneurysm9 @evantorrie @XSAM @dashpole @paivagustavo
+* @jmacd @MrAlias @Aneurysm9 @evantorrie @XSAM @dashpole @MadVikingGod @pellared @hanyuancheung @dmathieu
 
-CODEOWNERS @MrAlias @Aneurysm9
+CODEOWNERS @MrAlias @Aneurysm9 @MadVikingGod

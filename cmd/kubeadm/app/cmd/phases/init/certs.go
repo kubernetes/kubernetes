@@ -123,6 +123,7 @@ func getCertPhaseFlags(name string) []string {
 		options.CertificatesDir,
 		options.CfgPath,
 		options.KubernetesVersion,
+		options.DryRun,
 	}
 	if name == "all" || name == "apiserver" {
 		flags = append(flags,

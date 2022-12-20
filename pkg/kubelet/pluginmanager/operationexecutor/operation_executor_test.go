@@ -18,7 +18,7 @@ package operationexecutor
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -35,7 +35,7 @@ var _ OperationGenerator = &fakeOperationGenerator{}
 var socketDir string
 
 func init() {
-	d, err := ioutil.TempDir("", "operation_executor_test")
+	d, err := os.MkdirTemp("", "operation_executor_test")
 	if err != nil {
 		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}

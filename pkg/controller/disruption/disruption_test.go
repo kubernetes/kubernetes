@@ -54,7 +54,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
 	clocktesting "k8s.io/utils/clock/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 type pdbStates map[string]policy.PodDisruptionBudget
@@ -278,7 +278,6 @@ func updatePodOwnerToRs(t *testing.T, pod *v1.Pod, rs *apps.ReplicaSet) {
 	pod.OwnerReferences = append(pod.OwnerReferences, controllerReference)
 }
 
-// pod, podName := newPod(t, name)
 func updatePodOwnerToSs(t *testing.T, pod *v1.Pod, ss *apps.StatefulSet) {
 	var controllerReference metav1.OwnerReference
 	var trueVar = true
@@ -507,7 +506,7 @@ func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 5, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = utilpointer.Int32Ptr(5)
+	rs.Spec.Replicas = pointer.Int32(5)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(ctx, pdbName)
@@ -533,7 +532,7 @@ func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 4, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = utilpointer.Int32Ptr(3)
+	rs.Spec.Replicas = pointer.Int32(3)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(ctx, pdbName)
@@ -1403,7 +1402,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: now},
 						},
@@ -1413,7 +1412,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute + time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionFalse,
 				},
 			},
@@ -1427,7 +1426,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: now},
 						},
@@ -1437,7 +1436,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute - time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 				},
 			},
@@ -1452,7 +1451,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: now},
 						},
@@ -1462,7 +1461,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute + time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 				},
 			},
@@ -1487,7 +1486,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionFalse,
 						},
 					},
@@ -1496,7 +1495,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute + time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionFalse,
 				},
 			},
@@ -1511,22 +1510,20 @@ func TestStalePodDisruption(t *testing.T) {
 			if _, err := dc.coreClient.CoreV1().Pods(tc.pod.Namespace).Create(ctx, tc.pod, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
+			dc.clock.Sleep(tc.timePassed)
 			if err := dc.informerFactory.Core().V1().Pods().Informer().GetIndexer().Add(tc.pod); err != nil {
 				t.Fatalf("Failed adding pod to indexer: %v", err)
 			}
-			dc.clock.Sleep(tc.timePassed)
+			diff := ""
 			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				return dc.stalePodDisruptionQueue.Len() == 0, nil
+				pod, err := dc.kubeClient.CoreV1().Pods(tc.pod.Namespace).Get(ctx, tc.pod.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed getting updated pod: %v", err)
+				}
+				diff = cmp.Diff(tc.wantConditions, pod.Status.Conditions, cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime"))
+				return diff == "", nil
 			}); err != nil {
-				t.Fatalf("Failed waiting for worker to sync: %v", err)
-			}
-			pod, err := dc.kubeClient.CoreV1().Pods(tc.pod.Namespace).Get(ctx, tc.pod.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("Failed getting updated pod: %v", err)
-			}
-			diff := cmp.Diff(tc.wantConditions, pod.Status.Conditions, cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime"))
-			if diff != "" {
-				t.Errorf("Obtained pod conditions (-want,+got):\n%s", diff)
+				t.Fatalf("Failed waiting for worker to sync: %v, (-want,+got):\n%s", err, diff)
 			}
 		})
 	}

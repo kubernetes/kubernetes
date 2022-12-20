@@ -4,7 +4,6 @@ package jsonutil
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
@@ -14,6 +13,12 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/private/protocol"
+)
+
+const (
+	floatNaN    = "NaN"
+	floatInf    = "Infinity"
+	floatNegInf = "-Infinity"
 )
 
 var timeType = reflect.ValueOf(time.Time{}).Type()
@@ -82,13 +87,17 @@ func buildStruct(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 		field, _ := value.Type().FieldByName(payload)
 		tag = field.Tag
 		value = elemOf(value.FieldByName(payload))
-
-		if !value.IsValid() {
+		if !value.IsValid() && tag.Get("type") != "structure" {
 			return nil
 		}
 	}
 
 	buf.WriteByte('{')
+	defer buf.WriteString("}")
+
+	if !value.IsValid() {
+		return nil
+	}
 
 	t := value.Type()
 	first := true
@@ -143,8 +152,6 @@ func buildStruct(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 		}
 
 	}
-
-	buf.WriteString("}")
 
 	return nil
 }
@@ -209,10 +216,16 @@ func buildScalar(v reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) erro
 		buf.Write(strconv.AppendInt(scratch[:0], value.Int(), 10))
 	case reflect.Float64:
 		f := value.Float()
-		if math.IsInf(f, 0) || math.IsNaN(f) {
-			return &json.UnsupportedValueError{Value: v, Str: strconv.FormatFloat(f, 'f', -1, 64)}
+		switch {
+		case math.IsNaN(f):
+			writeString(floatNaN, buf)
+		case math.IsInf(f, 1):
+			writeString(floatInf, buf)
+		case math.IsInf(f, -1):
+			writeString(floatNegInf, buf)
+		default:
+			buf.Write(strconv.AppendFloat(scratch[:0], f, 'f', -1, 64))
 		}
-		buf.Write(strconv.AppendFloat(scratch[:0], f, 'f', -1, 64))
 	default:
 		switch converted := value.Interface().(type) {
 		case time.Time:

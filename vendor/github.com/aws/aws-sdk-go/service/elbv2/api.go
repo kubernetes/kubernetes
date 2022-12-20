@@ -29,14 +29,13 @@ const opAddListenerCertificates = "AddListenerCertificates"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the AddListenerCertificatesRequest method.
+//	req, resp := client.AddListenerCertificatesRequest(params)
 //
-//    // Example sending a request using the AddListenerCertificatesRequest method.
-//    req, resp := client.AddListenerCertificatesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/AddListenerCertificates
 func (c *ELBV2) AddListenerCertificatesRequest(input *AddListenerCertificatesInput) (req *request.Request, output *AddListenerCertificatesOutput) {
@@ -75,14 +74,15 @@ func (c *ELBV2) AddListenerCertificatesRequest(input *AddListenerCertificatesInp
 // API operation AddListenerCertificates for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
 //
-//   * ErrCodeTooManyCertificatesException "TooManyCertificates"
-//   You've reached the limit on the number of certificates per load balancer.
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
 //
-//   * ErrCodeCertificateNotFoundException "CertificateNotFound"
-//   The specified certificate does not exist.
+//   - ErrCodeTooManyCertificatesException "TooManyCertificates"
+//     You've reached the limit on the number of certificates per load balancer.
+//
+//   - ErrCodeCertificateNotFoundException "CertificateNotFound"
+//     The specified certificate does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/AddListenerCertificates
 func (c *ELBV2) AddListenerCertificates(input *AddListenerCertificatesInput) (*AddListenerCertificatesOutput, error) {
@@ -122,14 +122,13 @@ const opAddTags = "AddTags"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the AddTagsRequest method.
+//	req, resp := client.AddTagsRequest(params)
 //
-//    // Example sending a request using the AddTagsRequest method.
-//    req, resp := client.AddTagsRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/AddTags
 func (c *ELBV2) AddTagsRequest(input *AddTagsInput) (req *request.Request, output *AddTagsOutput) {
@@ -166,17 +165,24 @@ func (c *ELBV2) AddTagsRequest(input *AddTagsInput) (req *request.Request, outpu
 // API operation AddTags for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeDuplicateTagKeysException "DuplicateTagKeys"
-//   A tag key was specified more than once.
 //
-//   * ErrCodeTooManyTagsException "TooManyTags"
-//   You've reached the limit on the number of tags per load balancer.
+//   - ErrCodeDuplicateTagKeysException "DuplicateTagKeys"
+//     A tag key was specified more than once.
 //
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
+//   - ErrCodeTooManyTagsException "TooManyTags"
+//     You've reached the limit on the number of tags per load balancer.
 //
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
+//
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
+//
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
+//
+//   - ErrCodeRuleNotFoundException "RuleNotFound"
+//     The specified rule does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/AddTags
 func (c *ELBV2) AddTags(input *AddTagsInput) (*AddTagsOutput, error) {
@@ -216,14 +222,13 @@ const opCreateListener = "CreateListener"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the CreateListenerRequest method.
+//	req, resp := client.CreateListenerRequest(params)
 //
-//    // Example sending a request using the CreateListenerRequest method.
-//    req, resp := client.CreateListenerRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/CreateListener
 func (c *ELBV2) CreateListenerRequest(input *CreateListenerInput) (req *request.Request, output *CreateListenerOutput) {
@@ -249,11 +254,11 @@ func (c *ELBV2) CreateListenerRequest(input *CreateListenerInput) (req *request.
 //
 // For more information, see the following:
 //
-//    * Listeners for your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html)
+//   - Listeners for your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html)
 //
-//    * Listeners for your Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html)
+//   - Listeners for your Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html)
 //
-//    * Listeners for your Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/gateway-listeners.html)
+//   - Listeners for your Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/gateway-listeners.html)
 //
 // This operation is idempotent, which means that it completes at most one time.
 // If you attempt to create multiple listeners with the same settings, each
@@ -267,62 +272,63 @@ func (c *ELBV2) CreateListenerRequest(input *CreateListenerInput) (req *request.
 // API operation CreateListener for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeDuplicateListenerException "DuplicateListener"
-//   A listener with the specified port already exists.
 //
-//   * ErrCodeTooManyListenersException "TooManyListeners"
-//   You've reached the limit on the number of listeners per load balancer.
+//   - ErrCodeDuplicateListenerException "DuplicateListener"
+//     A listener with the specified port already exists.
 //
-//   * ErrCodeTooManyCertificatesException "TooManyCertificates"
-//   You've reached the limit on the number of certificates per load balancer.
+//   - ErrCodeTooManyListenersException "TooManyListeners"
+//     You've reached the limit on the number of listeners per load balancer.
 //
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
+//   - ErrCodeTooManyCertificatesException "TooManyCertificates"
+//     You've reached the limit on the number of certificates per load balancer.
 //
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
 //
-//   * ErrCodeTargetGroupAssociationLimitException "TargetGroupAssociationLimit"
-//   You've reached the limit on the number of load balancers per target group.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeTargetGroupAssociationLimitException "TargetGroupAssociationLimit"
+//     You've reached the limit on the number of load balancers per target group.
 //
-//   * ErrCodeIncompatibleProtocolsException "IncompatibleProtocols"
-//   The specified configuration is not valid with this protocol.
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
 //
-//   * ErrCodeSSLPolicyNotFoundException "SSLPolicyNotFound"
-//   The specified SSL policy does not exist.
+//   - ErrCodeIncompatibleProtocolsException "IncompatibleProtocols"
+//     The specified configuration is not valid with this protocol.
 //
-//   * ErrCodeCertificateNotFoundException "CertificateNotFound"
-//   The specified certificate does not exist.
+//   - ErrCodeSSLPolicyNotFoundException "SSLPolicyNotFound"
+//     The specified SSL policy does not exist.
 //
-//   * ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
-//   The specified protocol is not supported.
+//   - ErrCodeCertificateNotFoundException "CertificateNotFound"
+//     The specified certificate does not exist.
 //
-//   * ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
-//   You've reached the limit on the number of times a target can be registered
-//   with a load balancer.
+//   - ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
+//     The specified protocol is not supported.
 //
-//   * ErrCodeTooManyTargetsException "TooManyTargets"
-//   You've reached the limit on the number of targets.
+//   - ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
+//     You've reached the limit on the number of times a target can be registered
+//     with a load balancer.
 //
-//   * ErrCodeTooManyActionsException "TooManyActions"
-//   You've reached the limit on the number of actions per rule.
+//   - ErrCodeTooManyTargetsException "TooManyTargets"
+//     You've reached the limit on the number of targets.
 //
-//   * ErrCodeInvalidLoadBalancerActionException "InvalidLoadBalancerAction"
-//   The requested action is not valid.
+//   - ErrCodeTooManyActionsException "TooManyActions"
+//     You've reached the limit on the number of actions per rule.
 //
-//   * ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException "TooManyUniqueTargetGroupsPerLoadBalancer"
-//   You've reached the limit on the number of unique target groups per load balancer
-//   across all listeners. If a target group is used by multiple actions for a
-//   load balancer, it is counted as only one use.
+//   - ErrCodeInvalidLoadBalancerActionException "InvalidLoadBalancerAction"
+//     The requested action is not valid.
 //
-//   * ErrCodeALPNPolicyNotSupportedException "ALPNPolicyNotFound"
-//   The specified ALPN policy is not supported.
+//   - ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException "TooManyUniqueTargetGroupsPerLoadBalancer"
+//     You've reached the limit on the number of unique target groups per load balancer
+//     across all listeners. If a target group is used by multiple actions for a
+//     load balancer, it is counted as only one use.
 //
-//   * ErrCodeTooManyTagsException "TooManyTags"
-//   You've reached the limit on the number of tags per load balancer.
+//   - ErrCodeALPNPolicyNotSupportedException "ALPNPolicyNotFound"
+//     The specified ALPN policy is not supported.
+//
+//   - ErrCodeTooManyTagsException "TooManyTags"
+//     You've reached the limit on the number of tags per load balancer.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/CreateListener
 func (c *ELBV2) CreateListener(input *CreateListenerInput) (*CreateListenerOutput, error) {
@@ -362,14 +368,13 @@ const opCreateLoadBalancer = "CreateLoadBalancer"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the CreateLoadBalancerRequest method.
+//	req, resp := client.CreateLoadBalancerRequest(params)
 //
-//    // Example sending a request using the CreateLoadBalancerRequest method.
-//    req, resp := client.CreateLoadBalancerRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/CreateLoadBalancer
 func (c *ELBV2) CreateLoadBalancerRequest(input *CreateLoadBalancerInput) (req *request.Request, output *CreateLoadBalancerOutput) {
@@ -395,11 +400,11 @@ func (c *ELBV2) CreateLoadBalancerRequest(input *CreateLoadBalancerInput) (req *
 //
 // For more information, see the following:
 //
-//    * Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html)
+//   - Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html)
 //
-//    * Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html)
+//   - Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html)
 //
-//    * Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/gateway-load-balancers.html)
+//   - Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/gateway-load-balancers.html)
 //
 // This operation is idempotent, which means that it completes at most one time.
 // If you attempt to create multiple load balancers with the same settings,
@@ -413,44 +418,46 @@ func (c *ELBV2) CreateLoadBalancerRequest(input *CreateLoadBalancerInput) (req *
 // API operation CreateLoadBalancer for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeDuplicateLoadBalancerNameException "DuplicateLoadBalancerName"
-//   A load balancer with the specified name already exists.
 //
-//   * ErrCodeTooManyLoadBalancersException "TooManyLoadBalancers"
-//   You've reached the limit on the number of load balancers for your AWS account.
+//   - ErrCodeDuplicateLoadBalancerNameException "DuplicateLoadBalancerName"
+//     A load balancer with the specified name already exists.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeTooManyLoadBalancersException "TooManyLoadBalancers"
+//     You've reached the limit on the number of load balancers for your Amazon
+//     Web Services account.
 //
-//   * ErrCodeSubnetNotFoundException "SubnetNotFound"
-//   The specified subnet does not exist.
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
 //
-//   * ErrCodeInvalidSubnetException "InvalidSubnet"
-//   The specified subnet is out of available addresses.
+//   - ErrCodeSubnetNotFoundException "SubnetNotFound"
+//     The specified subnet does not exist.
 //
-//   * ErrCodeInvalidSecurityGroupException "InvalidSecurityGroup"
-//   The specified security group does not exist.
+//   - ErrCodeInvalidSubnetException "InvalidSubnet"
+//     The specified subnet is out of available addresses.
 //
-//   * ErrCodeInvalidSchemeException "InvalidScheme"
-//   The requested scheme is not valid.
+//   - ErrCodeInvalidSecurityGroupException "InvalidSecurityGroup"
+//     The specified security group does not exist.
 //
-//   * ErrCodeTooManyTagsException "TooManyTags"
-//   You've reached the limit on the number of tags per load balancer.
+//   - ErrCodeInvalidSchemeException "InvalidScheme"
+//     The requested scheme is not valid.
 //
-//   * ErrCodeDuplicateTagKeysException "DuplicateTagKeys"
-//   A tag key was specified more than once.
+//   - ErrCodeTooManyTagsException "TooManyTags"
+//     You've reached the limit on the number of tags per load balancer.
 //
-//   * ErrCodeResourceInUseException "ResourceInUse"
-//   A specified resource is in use.
+//   - ErrCodeDuplicateTagKeysException "DuplicateTagKeys"
+//     A tag key was specified more than once.
 //
-//   * ErrCodeAllocationIdNotFoundException "AllocationIdNotFound"
-//   The specified allocation ID does not exist.
+//   - ErrCodeResourceInUseException "ResourceInUse"
+//     A specified resource is in use.
 //
-//   * ErrCodeAvailabilityZoneNotSupportedException "AvailabilityZoneNotSupported"
-//   The specified Availability Zone is not supported.
+//   - ErrCodeAllocationIdNotFoundException "AllocationIdNotFound"
+//     The specified allocation ID does not exist.
 //
-//   * ErrCodeOperationNotPermittedException "OperationNotPermitted"
-//   This operation is not allowed.
+//   - ErrCodeAvailabilityZoneNotSupportedException "AvailabilityZoneNotSupported"
+//     The specified Availability Zone is not supported.
+//
+//   - ErrCodeOperationNotPermittedException "OperationNotPermitted"
+//     This operation is not allowed.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/CreateLoadBalancer
 func (c *ELBV2) CreateLoadBalancer(input *CreateLoadBalancerInput) (*CreateLoadBalancerOutput, error) {
@@ -490,14 +497,13 @@ const opCreateRule = "CreateRule"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the CreateRuleRequest method.
+//	req, resp := client.CreateRuleRequest(params)
 //
-//    // Example sending a request using the CreateRuleRequest method.
-//    req, resp := client.CreateRuleRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/CreateRule
 func (c *ELBV2) CreateRuleRequest(input *CreateRuleInput) (req *request.Request, output *CreateRuleOutput) {
@@ -536,53 +542,55 @@ func (c *ELBV2) CreateRuleRequest(input *CreateRuleInput) (req *request.Request,
 // API operation CreateRule for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodePriorityInUseException "PriorityInUse"
-//   The specified priority is in use.
 //
-//   * ErrCodeTooManyTargetGroupsException "TooManyTargetGroups"
-//   You've reached the limit on the number of target groups for your AWS account.
+//   - ErrCodePriorityInUseException "PriorityInUse"
+//     The specified priority is in use.
 //
-//   * ErrCodeTooManyRulesException "TooManyRules"
-//   You've reached the limit on the number of rules per load balancer.
+//   - ErrCodeTooManyTargetGroupsException "TooManyTargetGroups"
+//     You've reached the limit on the number of target groups for your Amazon Web
+//     Services account.
 //
-//   * ErrCodeTargetGroupAssociationLimitException "TargetGroupAssociationLimit"
-//   You've reached the limit on the number of load balancers per target group.
+//   - ErrCodeTooManyRulesException "TooManyRules"
+//     You've reached the limit on the number of rules per load balancer.
 //
-//   * ErrCodeIncompatibleProtocolsException "IncompatibleProtocols"
-//   The specified configuration is not valid with this protocol.
+//   - ErrCodeTargetGroupAssociationLimitException "TargetGroupAssociationLimit"
+//     You've reached the limit on the number of load balancers per target group.
 //
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
+//   - ErrCodeIncompatibleProtocolsException "IncompatibleProtocols"
+//     The specified configuration is not valid with this protocol.
 //
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
 //
-//   * ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
-//   You've reached the limit on the number of times a target can be registered
-//   with a load balancer.
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
 //
-//   * ErrCodeTooManyTargetsException "TooManyTargets"
-//   You've reached the limit on the number of targets.
+//   - ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
+//     You've reached the limit on the number of times a target can be registered
+//     with a load balancer.
 //
-//   * ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
-//   The specified protocol is not supported.
+//   - ErrCodeTooManyTargetsException "TooManyTargets"
+//     You've reached the limit on the number of targets.
 //
-//   * ErrCodeTooManyActionsException "TooManyActions"
-//   You've reached the limit on the number of actions per rule.
+//   - ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
+//     The specified protocol is not supported.
 //
-//   * ErrCodeInvalidLoadBalancerActionException "InvalidLoadBalancerAction"
-//   The requested action is not valid.
+//   - ErrCodeTooManyActionsException "TooManyActions"
+//     You've reached the limit on the number of actions per rule.
 //
-//   * ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException "TooManyUniqueTargetGroupsPerLoadBalancer"
-//   You've reached the limit on the number of unique target groups per load balancer
-//   across all listeners. If a target group is used by multiple actions for a
-//   load balancer, it is counted as only one use.
+//   - ErrCodeInvalidLoadBalancerActionException "InvalidLoadBalancerAction"
+//     The requested action is not valid.
 //
-//   * ErrCodeTooManyTagsException "TooManyTags"
-//   You've reached the limit on the number of tags per load balancer.
+//   - ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException "TooManyUniqueTargetGroupsPerLoadBalancer"
+//     You've reached the limit on the number of unique target groups per load balancer
+//     across all listeners. If a target group is used by multiple actions for a
+//     load balancer, it is counted as only one use.
+//
+//   - ErrCodeTooManyTagsException "TooManyTags"
+//     You've reached the limit on the number of tags per load balancer.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/CreateRule
 func (c *ELBV2) CreateRule(input *CreateRuleInput) (*CreateRuleOutput, error) {
@@ -622,14 +630,13 @@ const opCreateTargetGroup = "CreateTargetGroup"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the CreateTargetGroupRequest method.
+//	req, resp := client.CreateTargetGroupRequest(params)
 //
-//    // Example sending a request using the CreateTargetGroupRequest method.
-//    req, resp := client.CreateTargetGroupRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/CreateTargetGroup
 func (c *ELBV2) CreateTargetGroupRequest(input *CreateTargetGroupInput) (req *request.Request, output *CreateTargetGroupOutput) {
@@ -654,11 +661,11 @@ func (c *ELBV2) CreateTargetGroupRequest(input *CreateTargetGroupInput) (req *re
 //
 // For more information, see the following:
 //
-//    * Target groups for your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html)
+//   - Target groups for your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html)
 //
-//    * Target groups for your Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html)
+//   - Target groups for your Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html)
 //
-//    * Target groups for your Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/target-groups.html)
+//   - Target groups for your Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/target-groups.html)
 //
 // This operation is idempotent, which means that it completes at most one time.
 // If you attempt to create multiple target groups with the same settings, each
@@ -672,17 +679,19 @@ func (c *ELBV2) CreateTargetGroupRequest(input *CreateTargetGroupInput) (req *re
 // API operation CreateTargetGroup for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeDuplicateTargetGroupNameException "DuplicateTargetGroupName"
-//   A target group with the specified name already exists.
 //
-//   * ErrCodeTooManyTargetGroupsException "TooManyTargetGroups"
-//   You've reached the limit on the number of target groups for your AWS account.
+//   - ErrCodeDuplicateTargetGroupNameException "DuplicateTargetGroupName"
+//     A target group with the specified name already exists.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeTooManyTargetGroupsException "TooManyTargetGroups"
+//     You've reached the limit on the number of target groups for your Amazon Web
+//     Services account.
 //
-//   * ErrCodeTooManyTagsException "TooManyTags"
-//   You've reached the limit on the number of tags per load balancer.
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
+//
+//   - ErrCodeTooManyTagsException "TooManyTags"
+//     You've reached the limit on the number of tags per load balancer.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/CreateTargetGroup
 func (c *ELBV2) CreateTargetGroup(input *CreateTargetGroupInput) (*CreateTargetGroupOutput, error) {
@@ -722,14 +731,13 @@ const opDeleteListener = "DeleteListener"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DeleteListenerRequest method.
+//	req, resp := client.DeleteListenerRequest(params)
 //
-//    // Example sending a request using the DeleteListenerRequest method.
-//    req, resp := client.DeleteListenerRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeleteListener
 func (c *ELBV2) DeleteListenerRequest(input *DeleteListenerInput) (req *request.Request, output *DeleteListenerOutput) {
@@ -764,8 +772,12 @@ func (c *ELBV2) DeleteListenerRequest(input *DeleteListenerInput) (req *request.
 // API operation DeleteListener for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
+//
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
+//
+//   - ErrCodeResourceInUseException "ResourceInUse"
+//     A specified resource is in use.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeleteListener
 func (c *ELBV2) DeleteListener(input *DeleteListenerInput) (*DeleteListenerOutput, error) {
@@ -805,14 +817,13 @@ const opDeleteLoadBalancer = "DeleteLoadBalancer"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DeleteLoadBalancerRequest method.
+//	req, resp := client.DeleteLoadBalancerRequest(params)
 //
-//    // Example sending a request using the DeleteLoadBalancerRequest method.
-//    req, resp := client.DeleteLoadBalancerRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeleteLoadBalancer
 func (c *ELBV2) DeleteLoadBalancerRequest(input *DeleteLoadBalancerInput) (req *request.Request, output *DeleteLoadBalancerOutput) {
@@ -853,14 +864,15 @@ func (c *ELBV2) DeleteLoadBalancerRequest(input *DeleteLoadBalancerInput) (req *
 // API operation DeleteLoadBalancer for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
 //
-//   * ErrCodeOperationNotPermittedException "OperationNotPermitted"
-//   This operation is not allowed.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
 //
-//   * ErrCodeResourceInUseException "ResourceInUse"
-//   A specified resource is in use.
+//   - ErrCodeOperationNotPermittedException "OperationNotPermitted"
+//     This operation is not allowed.
+//
+//   - ErrCodeResourceInUseException "ResourceInUse"
+//     A specified resource is in use.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeleteLoadBalancer
 func (c *ELBV2) DeleteLoadBalancer(input *DeleteLoadBalancerInput) (*DeleteLoadBalancerOutput, error) {
@@ -900,14 +912,13 @@ const opDeleteRule = "DeleteRule"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DeleteRuleRequest method.
+//	req, resp := client.DeleteRuleRequest(params)
 //
-//    // Example sending a request using the DeleteRuleRequest method.
-//    req, resp := client.DeleteRuleRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeleteRule
 func (c *ELBV2) DeleteRuleRequest(input *DeleteRuleInput) (req *request.Request, output *DeleteRuleOutput) {
@@ -941,11 +952,12 @@ func (c *ELBV2) DeleteRuleRequest(input *DeleteRuleInput) (req *request.Request,
 // API operation DeleteRule for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeRuleNotFoundException "RuleNotFound"
-//   The specified rule does not exist.
 //
-//   * ErrCodeOperationNotPermittedException "OperationNotPermitted"
-//   This operation is not allowed.
+//   - ErrCodeRuleNotFoundException "RuleNotFound"
+//     The specified rule does not exist.
+//
+//   - ErrCodeOperationNotPermittedException "OperationNotPermitted"
+//     This operation is not allowed.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeleteRule
 func (c *ELBV2) DeleteRule(input *DeleteRuleInput) (*DeleteRuleOutput, error) {
@@ -985,14 +997,13 @@ const opDeleteTargetGroup = "DeleteTargetGroup"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DeleteTargetGroupRequest method.
+//	req, resp := client.DeleteTargetGroupRequest(params)
 //
-//    // Example sending a request using the DeleteTargetGroupRequest method.
-//    req, resp := client.DeleteTargetGroupRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeleteTargetGroup
 func (c *ELBV2) DeleteTargetGroupRequest(input *DeleteTargetGroupInput) (req *request.Request, output *DeleteTargetGroupOutput) {
@@ -1029,8 +1040,8 @@ func (c *ELBV2) DeleteTargetGroupRequest(input *DeleteTargetGroupInput) (req *re
 // API operation DeleteTargetGroup for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeResourceInUseException "ResourceInUse"
-//   A specified resource is in use.
+//   - ErrCodeResourceInUseException "ResourceInUse"
+//     A specified resource is in use.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeleteTargetGroup
 func (c *ELBV2) DeleteTargetGroup(input *DeleteTargetGroupInput) (*DeleteTargetGroupOutput, error) {
@@ -1070,14 +1081,13 @@ const opDeregisterTargets = "DeregisterTargets"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DeregisterTargetsRequest method.
+//	req, resp := client.DeregisterTargetsRequest(params)
 //
-//    // Example sending a request using the DeregisterTargetsRequest method.
-//    req, resp := client.DeregisterTargetsRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeregisterTargets
 func (c *ELBV2) DeregisterTargetsRequest(input *DeregisterTargetsInput) (req *request.Request, output *DeregisterTargetsOutput) {
@@ -1111,12 +1121,13 @@ func (c *ELBV2) DeregisterTargetsRequest(input *DeregisterTargetsInput) (req *re
 // API operation DeregisterTargets for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
 //
-//   * ErrCodeInvalidTargetException "InvalidTarget"
-//   The specified target does not exist, is not in the same VPC as the target
-//   group, or has an unsupported instance type.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
+//
+//   - ErrCodeInvalidTargetException "InvalidTarget"
+//     The specified target does not exist, is not in the same VPC as the target
+//     group, or has an unsupported instance type.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DeregisterTargets
 func (c *ELBV2) DeregisterTargets(input *DeregisterTargetsInput) (*DeregisterTargetsOutput, error) {
@@ -1156,14 +1167,13 @@ const opDescribeAccountLimits = "DescribeAccountLimits"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeAccountLimitsRequest method.
+//	req, resp := client.DescribeAccountLimitsRequest(params)
 //
-//    // Example sending a request using the DescribeAccountLimitsRequest method.
-//    req, resp := client.DescribeAccountLimitsRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeAccountLimits
 func (c *ELBV2) DescribeAccountLimitsRequest(input *DescribeAccountLimitsInput) (req *request.Request, output *DescribeAccountLimitsOutput) {
@@ -1184,16 +1194,16 @@ func (c *ELBV2) DescribeAccountLimitsRequest(input *DescribeAccountLimitsInput) 
 
 // DescribeAccountLimits API operation for Elastic Load Balancing.
 //
-// Describes the current Elastic Load Balancing resource limits for your AWS
-// account.
+// Describes the current Elastic Load Balancing resource limits for your Amazon
+// Web Services account.
 //
 // For more information, see the following:
 //
-//    * Quotas for your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-limits.html)
+//   - Quotas for your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-limits.html)
 //
-//    * Quotas for your Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-limits.html)
+//   - Quotas for your Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-limits.html)
 //
-//    * Quotas for your Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/quotas-limits.html)
+//   - Quotas for your Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/quotas-limits.html)
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1239,14 +1249,13 @@ const opDescribeListenerCertificates = "DescribeListenerCertificates"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeListenerCertificatesRequest method.
+//	req, resp := client.DescribeListenerCertificatesRequest(params)
 //
-//    // Example sending a request using the DescribeListenerCertificatesRequest method.
-//    req, resp := client.DescribeListenerCertificatesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeListenerCertificates
 func (c *ELBV2) DescribeListenerCertificatesRequest(input *DescribeListenerCertificatesInput) (req *request.Request, output *DescribeListenerCertificatesOutput) {
@@ -1286,8 +1295,8 @@ func (c *ELBV2) DescribeListenerCertificatesRequest(input *DescribeListenerCerti
 // API operation DescribeListenerCertificates for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeListenerCertificates
 func (c *ELBV2) DescribeListenerCertificates(input *DescribeListenerCertificatesInput) (*DescribeListenerCertificatesOutput, error) {
@@ -1327,14 +1336,13 @@ const opDescribeListeners = "DescribeListeners"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeListenersRequest method.
+//	req, resp := client.DescribeListenersRequest(params)
 //
-//    // Example sending a request using the DescribeListenersRequest method.
-//    req, resp := client.DescribeListenersRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeListeners
 func (c *ELBV2) DescribeListenersRequest(input *DescribeListenersInput) (req *request.Request, output *DescribeListenersOutput) {
@@ -1373,14 +1381,15 @@ func (c *ELBV2) DescribeListenersRequest(input *DescribeListenersInput) (req *re
 // API operation DescribeListeners for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
 //
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
 //
-//   * ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
-//   The specified protocol is not supported.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
+//
+//   - ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
+//     The specified protocol is not supported.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeListeners
 func (c *ELBV2) DescribeListeners(input *DescribeListenersInput) (*DescribeListenersOutput, error) {
@@ -1412,15 +1421,14 @@ func (c *ELBV2) DescribeListenersWithContext(ctx aws.Context, input *DescribeLis
 //
 // Note: This operation can generate multiple requests to a service.
 //
-//    // Example iterating over at most 3 pages of a DescribeListeners operation.
-//    pageNum := 0
-//    err := client.DescribeListenersPages(params,
-//        func(page *elbv2.DescribeListenersOutput, lastPage bool) bool {
-//            pageNum++
-//            fmt.Println(page)
-//            return pageNum <= 3
-//        })
-//
+//	// Example iterating over at most 3 pages of a DescribeListeners operation.
+//	pageNum := 0
+//	err := client.DescribeListenersPages(params,
+//	    func(page *elbv2.DescribeListenersOutput, lastPage bool) bool {
+//	        pageNum++
+//	        fmt.Println(page)
+//	        return pageNum <= 3
+//	    })
 func (c *ELBV2) DescribeListenersPages(input *DescribeListenersInput, fn func(*DescribeListenersOutput, bool) bool) error {
 	return c.DescribeListenersPagesWithContext(aws.BackgroundContext(), input, fn)
 }
@@ -1472,14 +1480,13 @@ const opDescribeLoadBalancerAttributes = "DescribeLoadBalancerAttributes"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeLoadBalancerAttributesRequest method.
+//	req, resp := client.DescribeLoadBalancerAttributesRequest(params)
 //
-//    // Example sending a request using the DescribeLoadBalancerAttributesRequest method.
-//    req, resp := client.DescribeLoadBalancerAttributesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeLoadBalancerAttributes
 func (c *ELBV2) DescribeLoadBalancerAttributesRequest(input *DescribeLoadBalancerAttributesInput) (req *request.Request, output *DescribeLoadBalancerAttributesOutput) {
@@ -1505,14 +1512,14 @@ func (c *ELBV2) DescribeLoadBalancerAttributesRequest(input *DescribeLoadBalance
 //
 // For more information, see the following:
 //
-//    * Load balancer attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#load-balancer-attributes)
-//    in the Application Load Balancers Guide
+//   - Load balancer attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#load-balancer-attributes)
+//     in the Application Load Balancers Guide
 //
-//    * Load balancer attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html#load-balancer-attributes)
-//    in the Network Load Balancers Guide
+//   - Load balancer attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html#load-balancer-attributes)
+//     in the Network Load Balancers Guide
 //
-//    * Load balancer attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/gateway-load-balancers.html#load-balancer-attributes)
-//    in the Gateway Load Balancers Guide
+//   - Load balancer attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/gateway-load-balancers.html#load-balancer-attributes)
+//     in the Gateway Load Balancers Guide
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1522,8 +1529,8 @@ func (c *ELBV2) DescribeLoadBalancerAttributesRequest(input *DescribeLoadBalance
 // API operation DescribeLoadBalancerAttributes for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeLoadBalancerAttributes
 func (c *ELBV2) DescribeLoadBalancerAttributes(input *DescribeLoadBalancerAttributesInput) (*DescribeLoadBalancerAttributesOutput, error) {
@@ -1563,14 +1570,13 @@ const opDescribeLoadBalancers = "DescribeLoadBalancers"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeLoadBalancersRequest method.
+//	req, resp := client.DescribeLoadBalancersRequest(params)
 //
-//    // Example sending a request using the DescribeLoadBalancersRequest method.
-//    req, resp := client.DescribeLoadBalancersRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeLoadBalancers
 func (c *ELBV2) DescribeLoadBalancersRequest(input *DescribeLoadBalancersInput) (req *request.Request, output *DescribeLoadBalancersOutput) {
@@ -1607,8 +1613,8 @@ func (c *ELBV2) DescribeLoadBalancersRequest(input *DescribeLoadBalancersInput) 
 // API operation DescribeLoadBalancers for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeLoadBalancers
 func (c *ELBV2) DescribeLoadBalancers(input *DescribeLoadBalancersInput) (*DescribeLoadBalancersOutput, error) {
@@ -1640,15 +1646,14 @@ func (c *ELBV2) DescribeLoadBalancersWithContext(ctx aws.Context, input *Describ
 //
 // Note: This operation can generate multiple requests to a service.
 //
-//    // Example iterating over at most 3 pages of a DescribeLoadBalancers operation.
-//    pageNum := 0
-//    err := client.DescribeLoadBalancersPages(params,
-//        func(page *elbv2.DescribeLoadBalancersOutput, lastPage bool) bool {
-//            pageNum++
-//            fmt.Println(page)
-//            return pageNum <= 3
-//        })
-//
+//	// Example iterating over at most 3 pages of a DescribeLoadBalancers operation.
+//	pageNum := 0
+//	err := client.DescribeLoadBalancersPages(params,
+//	    func(page *elbv2.DescribeLoadBalancersOutput, lastPage bool) bool {
+//	        pageNum++
+//	        fmt.Println(page)
+//	        return pageNum <= 3
+//	    })
 func (c *ELBV2) DescribeLoadBalancersPages(input *DescribeLoadBalancersInput, fn func(*DescribeLoadBalancersOutput, bool) bool) error {
 	return c.DescribeLoadBalancersPagesWithContext(aws.BackgroundContext(), input, fn)
 }
@@ -1700,14 +1705,13 @@ const opDescribeRules = "DescribeRules"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeRulesRequest method.
+//	req, resp := client.DescribeRulesRequest(params)
 //
-//    // Example sending a request using the DescribeRulesRequest method.
-//    req, resp := client.DescribeRulesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeRules
 func (c *ELBV2) DescribeRulesRequest(input *DescribeRulesInput) (req *request.Request, output *DescribeRulesOutput) {
@@ -1739,14 +1743,15 @@ func (c *ELBV2) DescribeRulesRequest(input *DescribeRulesInput) (req *request.Re
 // API operation DescribeRules for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
 //
-//   * ErrCodeRuleNotFoundException "RuleNotFound"
-//   The specified rule does not exist.
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
 //
-//   * ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
-//   The specified protocol is not supported.
+//   - ErrCodeRuleNotFoundException "RuleNotFound"
+//     The specified rule does not exist.
+//
+//   - ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
+//     The specified protocol is not supported.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeRules
 func (c *ELBV2) DescribeRules(input *DescribeRulesInput) (*DescribeRulesOutput, error) {
@@ -1786,14 +1791,13 @@ const opDescribeSSLPolicies = "DescribeSSLPolicies"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeSSLPoliciesRequest method.
+//	req, resp := client.DescribeSSLPoliciesRequest(params)
 //
-//    // Example sending a request using the DescribeSSLPoliciesRequest method.
-//    req, resp := client.DescribeSSLPoliciesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeSSLPolicies
 func (c *ELBV2) DescribeSSLPoliciesRequest(input *DescribeSSLPoliciesInput) (req *request.Request, output *DescribeSSLPoliciesOutput) {
@@ -1828,8 +1832,8 @@ func (c *ELBV2) DescribeSSLPoliciesRequest(input *DescribeSSLPoliciesInput) (req
 // API operation DescribeSSLPolicies for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeSSLPolicyNotFoundException "SSLPolicyNotFound"
-//   The specified SSL policy does not exist.
+//   - ErrCodeSSLPolicyNotFoundException "SSLPolicyNotFound"
+//     The specified SSL policy does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeSSLPolicies
 func (c *ELBV2) DescribeSSLPolicies(input *DescribeSSLPoliciesInput) (*DescribeSSLPoliciesOutput, error) {
@@ -1869,14 +1873,13 @@ const opDescribeTags = "DescribeTags"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeTagsRequest method.
+//	req, resp := client.DescribeTagsRequest(params)
 //
-//    // Example sending a request using the DescribeTagsRequest method.
-//    req, resp := client.DescribeTagsRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeTags
 func (c *ELBV2) DescribeTagsRequest(input *DescribeTagsInput) (req *request.Request, output *DescribeTagsOutput) {
@@ -1909,17 +1912,18 @@ func (c *ELBV2) DescribeTagsRequest(input *DescribeTagsInput) (req *request.Requ
 // API operation DescribeTags for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
 //
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
 //
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
 //
-//   * ErrCodeRuleNotFoundException "RuleNotFound"
-//   The specified rule does not exist.
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
+//
+//   - ErrCodeRuleNotFoundException "RuleNotFound"
+//     The specified rule does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeTags
 func (c *ELBV2) DescribeTags(input *DescribeTagsInput) (*DescribeTagsOutput, error) {
@@ -1959,14 +1963,13 @@ const opDescribeTargetGroupAttributes = "DescribeTargetGroupAttributes"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeTargetGroupAttributesRequest method.
+//	req, resp := client.DescribeTargetGroupAttributesRequest(params)
 //
-//    // Example sending a request using the DescribeTargetGroupAttributesRequest method.
-//    req, resp := client.DescribeTargetGroupAttributesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeTargetGroupAttributes
 func (c *ELBV2) DescribeTargetGroupAttributesRequest(input *DescribeTargetGroupAttributesInput) (req *request.Request, output *DescribeTargetGroupAttributesOutput) {
@@ -1991,14 +1994,14 @@ func (c *ELBV2) DescribeTargetGroupAttributesRequest(input *DescribeTargetGroupA
 //
 // For more information, see the following:
 //
-//    * Target group attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html#target-group-attributes)
-//    in the Application Load Balancers Guide
+//   - Target group attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html#target-group-attributes)
+//     in the Application Load Balancers Guide
 //
-//    * Target group attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html#target-group-attributes)
-//    in the Network Load Balancers Guide
+//   - Target group attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html#target-group-attributes)
+//     in the Network Load Balancers Guide
 //
-//    * Target group attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/target-groups.html#target-group-attributes)
-//    in the Gateway Load Balancers Guide
+//   - Target group attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/target-groups.html#target-group-attributes)
+//     in the Gateway Load Balancers Guide
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2008,8 +2011,8 @@ func (c *ELBV2) DescribeTargetGroupAttributesRequest(input *DescribeTargetGroupA
 // API operation DescribeTargetGroupAttributes for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeTargetGroupAttributes
 func (c *ELBV2) DescribeTargetGroupAttributes(input *DescribeTargetGroupAttributesInput) (*DescribeTargetGroupAttributesOutput, error) {
@@ -2049,14 +2052,13 @@ const opDescribeTargetGroups = "DescribeTargetGroups"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeTargetGroupsRequest method.
+//	req, resp := client.DescribeTargetGroupsRequest(params)
 //
-//    // Example sending a request using the DescribeTargetGroupsRequest method.
-//    req, resp := client.DescribeTargetGroupsRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeTargetGroups
 func (c *ELBV2) DescribeTargetGroupsRequest(input *DescribeTargetGroupsInput) (req *request.Request, output *DescribeTargetGroupsOutput) {
@@ -2096,11 +2098,12 @@ func (c *ELBV2) DescribeTargetGroupsRequest(input *DescribeTargetGroupsInput) (r
 // API operation DescribeTargetGroups for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
 //
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
+//
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeTargetGroups
 func (c *ELBV2) DescribeTargetGroups(input *DescribeTargetGroupsInput) (*DescribeTargetGroupsOutput, error) {
@@ -2132,15 +2135,14 @@ func (c *ELBV2) DescribeTargetGroupsWithContext(ctx aws.Context, input *Describe
 //
 // Note: This operation can generate multiple requests to a service.
 //
-//    // Example iterating over at most 3 pages of a DescribeTargetGroups operation.
-//    pageNum := 0
-//    err := client.DescribeTargetGroupsPages(params,
-//        func(page *elbv2.DescribeTargetGroupsOutput, lastPage bool) bool {
-//            pageNum++
-//            fmt.Println(page)
-//            return pageNum <= 3
-//        })
-//
+//	// Example iterating over at most 3 pages of a DescribeTargetGroups operation.
+//	pageNum := 0
+//	err := client.DescribeTargetGroupsPages(params,
+//	    func(page *elbv2.DescribeTargetGroupsOutput, lastPage bool) bool {
+//	        pageNum++
+//	        fmt.Println(page)
+//	        return pageNum <= 3
+//	    })
 func (c *ELBV2) DescribeTargetGroupsPages(input *DescribeTargetGroupsInput, fn func(*DescribeTargetGroupsOutput, bool) bool) error {
 	return c.DescribeTargetGroupsPagesWithContext(aws.BackgroundContext(), input, fn)
 }
@@ -2192,14 +2194,13 @@ const opDescribeTargetHealth = "DescribeTargetHealth"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the DescribeTargetHealthRequest method.
+//	req, resp := client.DescribeTargetHealthRequest(params)
 //
-//    // Example sending a request using the DescribeTargetHealthRequest method.
-//    req, resp := client.DescribeTargetHealthRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeTargetHealth
 func (c *ELBV2) DescribeTargetHealthRequest(input *DescribeTargetHealthInput) (req *request.Request, output *DescribeTargetHealthOutput) {
@@ -2230,16 +2231,17 @@ func (c *ELBV2) DescribeTargetHealthRequest(input *DescribeTargetHealthInput) (r
 // API operation DescribeTargetHealth for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeInvalidTargetException "InvalidTarget"
-//   The specified target does not exist, is not in the same VPC as the target
-//   group, or has an unsupported instance type.
 //
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeInvalidTargetException "InvalidTarget"
+//     The specified target does not exist, is not in the same VPC as the target
+//     group, or has an unsupported instance type.
 //
-//   * ErrCodeHealthUnavailableException "HealthUnavailable"
-//   The health of the specified targets could not be retrieved due to an internal
-//   error.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
+//
+//   - ErrCodeHealthUnavailableException "HealthUnavailable"
+//     The health of the specified targets could not be retrieved due to an internal
+//     error.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/DescribeTargetHealth
 func (c *ELBV2) DescribeTargetHealth(input *DescribeTargetHealthInput) (*DescribeTargetHealthOutput, error) {
@@ -2279,14 +2281,13 @@ const opModifyListener = "ModifyListener"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the ModifyListenerRequest method.
+//	req, resp := client.ModifyListenerRequest(params)
 //
-//    // Example sending a request using the ModifyListenerRequest method.
-//    req, resp := client.ModifyListenerRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyListener
 func (c *ELBV2) ModifyListenerRequest(input *ModifyListenerInput) (req *request.Request, output *ModifyListenerOutput) {
@@ -2327,59 +2328,60 @@ func (c *ELBV2) ModifyListenerRequest(input *ModifyListenerInput) (req *request.
 // API operation ModifyListener for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeDuplicateListenerException "DuplicateListener"
-//   A listener with the specified port already exists.
 //
-//   * ErrCodeTooManyListenersException "TooManyListeners"
-//   You've reached the limit on the number of listeners per load balancer.
+//   - ErrCodeDuplicateListenerException "DuplicateListener"
+//     A listener with the specified port already exists.
 //
-//   * ErrCodeTooManyCertificatesException "TooManyCertificates"
-//   You've reached the limit on the number of certificates per load balancer.
+//   - ErrCodeTooManyListenersException "TooManyListeners"
+//     You've reached the limit on the number of listeners per load balancer.
 //
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
+//   - ErrCodeTooManyCertificatesException "TooManyCertificates"
+//     You've reached the limit on the number of certificates per load balancer.
 //
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
 //
-//   * ErrCodeTargetGroupAssociationLimitException "TargetGroupAssociationLimit"
-//   You've reached the limit on the number of load balancers per target group.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
 //
-//   * ErrCodeIncompatibleProtocolsException "IncompatibleProtocols"
-//   The specified configuration is not valid with this protocol.
+//   - ErrCodeTargetGroupAssociationLimitException "TargetGroupAssociationLimit"
+//     You've reached the limit on the number of load balancers per target group.
 //
-//   * ErrCodeSSLPolicyNotFoundException "SSLPolicyNotFound"
-//   The specified SSL policy does not exist.
+//   - ErrCodeIncompatibleProtocolsException "IncompatibleProtocols"
+//     The specified configuration is not valid with this protocol.
 //
-//   * ErrCodeCertificateNotFoundException "CertificateNotFound"
-//   The specified certificate does not exist.
+//   - ErrCodeSSLPolicyNotFoundException "SSLPolicyNotFound"
+//     The specified SSL policy does not exist.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeCertificateNotFoundException "CertificateNotFound"
+//     The specified certificate does not exist.
 //
-//   * ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
-//   The specified protocol is not supported.
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
 //
-//   * ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
-//   You've reached the limit on the number of times a target can be registered
-//   with a load balancer.
+//   - ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
+//     The specified protocol is not supported.
 //
-//   * ErrCodeTooManyTargetsException "TooManyTargets"
-//   You've reached the limit on the number of targets.
+//   - ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
+//     You've reached the limit on the number of times a target can be registered
+//     with a load balancer.
 //
-//   * ErrCodeTooManyActionsException "TooManyActions"
-//   You've reached the limit on the number of actions per rule.
+//   - ErrCodeTooManyTargetsException "TooManyTargets"
+//     You've reached the limit on the number of targets.
 //
-//   * ErrCodeInvalidLoadBalancerActionException "InvalidLoadBalancerAction"
-//   The requested action is not valid.
+//   - ErrCodeTooManyActionsException "TooManyActions"
+//     You've reached the limit on the number of actions per rule.
 //
-//   * ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException "TooManyUniqueTargetGroupsPerLoadBalancer"
-//   You've reached the limit on the number of unique target groups per load balancer
-//   across all listeners. If a target group is used by multiple actions for a
-//   load balancer, it is counted as only one use.
+//   - ErrCodeInvalidLoadBalancerActionException "InvalidLoadBalancerAction"
+//     The requested action is not valid.
 //
-//   * ErrCodeALPNPolicyNotSupportedException "ALPNPolicyNotFound"
-//   The specified ALPN policy is not supported.
+//   - ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException "TooManyUniqueTargetGroupsPerLoadBalancer"
+//     You've reached the limit on the number of unique target groups per load balancer
+//     across all listeners. If a target group is used by multiple actions for a
+//     load balancer, it is counted as only one use.
+//
+//   - ErrCodeALPNPolicyNotSupportedException "ALPNPolicyNotFound"
+//     The specified ALPN policy is not supported.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyListener
 func (c *ELBV2) ModifyListener(input *ModifyListenerInput) (*ModifyListenerOutput, error) {
@@ -2419,14 +2421,13 @@ const opModifyLoadBalancerAttributes = "ModifyLoadBalancerAttributes"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the ModifyLoadBalancerAttributesRequest method.
+//	req, resp := client.ModifyLoadBalancerAttributesRequest(params)
 //
-//    // Example sending a request using the ModifyLoadBalancerAttributesRequest method.
-//    req, resp := client.ModifyLoadBalancerAttributesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyLoadBalancerAttributes
 func (c *ELBV2) ModifyLoadBalancerAttributesRequest(input *ModifyLoadBalancerAttributesInput) (req *request.Request, output *ModifyLoadBalancerAttributesOutput) {
@@ -2462,11 +2463,12 @@ func (c *ELBV2) ModifyLoadBalancerAttributesRequest(input *ModifyLoadBalancerAtt
 // API operation ModifyLoadBalancerAttributes for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
+//
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyLoadBalancerAttributes
 func (c *ELBV2) ModifyLoadBalancerAttributes(input *ModifyLoadBalancerAttributesInput) (*ModifyLoadBalancerAttributesOutput, error) {
@@ -2506,14 +2508,13 @@ const opModifyRule = "ModifyRule"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the ModifyRuleRequest method.
+//	req, resp := client.ModifyRuleRequest(params)
 //
-//    // Example sending a request using the ModifyRuleRequest method.
-//    req, resp := client.ModifyRuleRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyRule
 func (c *ELBV2) ModifyRuleRequest(input *ModifyRuleInput) (req *request.Request, output *ModifyRuleOutput) {
@@ -2549,41 +2550,42 @@ func (c *ELBV2) ModifyRuleRequest(input *ModifyRuleInput) (req *request.Request,
 // API operation ModifyRule for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeTargetGroupAssociationLimitException "TargetGroupAssociationLimit"
-//   You've reached the limit on the number of load balancers per target group.
 //
-//   * ErrCodeIncompatibleProtocolsException "IncompatibleProtocols"
-//   The specified configuration is not valid with this protocol.
+//   - ErrCodeTargetGroupAssociationLimitException "TargetGroupAssociationLimit"
+//     You've reached the limit on the number of load balancers per target group.
 //
-//   * ErrCodeRuleNotFoundException "RuleNotFound"
-//   The specified rule does not exist.
+//   - ErrCodeIncompatibleProtocolsException "IncompatibleProtocols"
+//     The specified configuration is not valid with this protocol.
 //
-//   * ErrCodeOperationNotPermittedException "OperationNotPermitted"
-//   This operation is not allowed.
+//   - ErrCodeRuleNotFoundException "RuleNotFound"
+//     The specified rule does not exist.
 //
-//   * ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
-//   You've reached the limit on the number of times a target can be registered
-//   with a load balancer.
+//   - ErrCodeOperationNotPermittedException "OperationNotPermitted"
+//     This operation is not allowed.
 //
-//   * ErrCodeTooManyTargetsException "TooManyTargets"
-//   You've reached the limit on the number of targets.
+//   - ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
+//     You've reached the limit on the number of times a target can be registered
+//     with a load balancer.
 //
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeTooManyTargetsException "TooManyTargets"
+//     You've reached the limit on the number of targets.
 //
-//   * ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
-//   The specified protocol is not supported.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
 //
-//   * ErrCodeTooManyActionsException "TooManyActions"
-//   You've reached the limit on the number of actions per rule.
+//   - ErrCodeUnsupportedProtocolException "UnsupportedProtocol"
+//     The specified protocol is not supported.
 //
-//   * ErrCodeInvalidLoadBalancerActionException "InvalidLoadBalancerAction"
-//   The requested action is not valid.
+//   - ErrCodeTooManyActionsException "TooManyActions"
+//     You've reached the limit on the number of actions per rule.
 //
-//   * ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException "TooManyUniqueTargetGroupsPerLoadBalancer"
-//   You've reached the limit on the number of unique target groups per load balancer
-//   across all listeners. If a target group is used by multiple actions for a
-//   load balancer, it is counted as only one use.
+//   - ErrCodeInvalidLoadBalancerActionException "InvalidLoadBalancerAction"
+//     The requested action is not valid.
+//
+//   - ErrCodeTooManyUniqueTargetGroupsPerLoadBalancerException "TooManyUniqueTargetGroupsPerLoadBalancer"
+//     You've reached the limit on the number of unique target groups per load balancer
+//     across all listeners. If a target group is used by multiple actions for a
+//     load balancer, it is counted as only one use.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyRule
 func (c *ELBV2) ModifyRule(input *ModifyRuleInput) (*ModifyRuleOutput, error) {
@@ -2623,14 +2625,13 @@ const opModifyTargetGroup = "ModifyTargetGroup"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the ModifyTargetGroupRequest method.
+//	req, resp := client.ModifyTargetGroupRequest(params)
 //
-//    // Example sending a request using the ModifyTargetGroupRequest method.
-//    req, resp := client.ModifyTargetGroupRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyTargetGroup
 func (c *ELBV2) ModifyTargetGroupRequest(input *ModifyTargetGroupInput) (req *request.Request, output *ModifyTargetGroupOutput) {
@@ -2662,11 +2663,12 @@ func (c *ELBV2) ModifyTargetGroupRequest(input *ModifyTargetGroupInput) (req *re
 // API operation ModifyTargetGroup for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
+//
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyTargetGroup
 func (c *ELBV2) ModifyTargetGroup(input *ModifyTargetGroupInput) (*ModifyTargetGroupOutput, error) {
@@ -2706,14 +2708,13 @@ const opModifyTargetGroupAttributes = "ModifyTargetGroupAttributes"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the ModifyTargetGroupAttributesRequest method.
+//	req, resp := client.ModifyTargetGroupAttributesRequest(params)
 //
-//    // Example sending a request using the ModifyTargetGroupAttributesRequest method.
-//    req, resp := client.ModifyTargetGroupAttributesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyTargetGroupAttributes
 func (c *ELBV2) ModifyTargetGroupAttributesRequest(input *ModifyTargetGroupAttributesInput) (req *request.Request, output *ModifyTargetGroupAttributesOutput) {
@@ -2744,11 +2745,12 @@ func (c *ELBV2) ModifyTargetGroupAttributesRequest(input *ModifyTargetGroupAttri
 // API operation ModifyTargetGroupAttributes for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
+//
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/ModifyTargetGroupAttributes
 func (c *ELBV2) ModifyTargetGroupAttributes(input *ModifyTargetGroupAttributesInput) (*ModifyTargetGroupAttributesOutput, error) {
@@ -2788,14 +2790,13 @@ const opRegisterTargets = "RegisterTargets"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the RegisterTargetsRequest method.
+//	req, resp := client.RegisterTargetsRequest(params)
 //
-//    // Example sending a request using the RegisterTargetsRequest method.
-//    req, resp := client.RegisterTargetsRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/RegisterTargets
 func (c *ELBV2) RegisterTargetsRequest(input *RegisterTargetsInput) (req *request.Request, output *RegisterTargetsOutput) {
@@ -2840,19 +2841,20 @@ func (c *ELBV2) RegisterTargetsRequest(input *RegisterTargetsInput) (req *reques
 // API operation RegisterTargets for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
 //
-//   * ErrCodeTooManyTargetsException "TooManyTargets"
-//   You've reached the limit on the number of targets.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
 //
-//   * ErrCodeInvalidTargetException "InvalidTarget"
-//   The specified target does not exist, is not in the same VPC as the target
-//   group, or has an unsupported instance type.
+//   - ErrCodeTooManyTargetsException "TooManyTargets"
+//     You've reached the limit on the number of targets.
 //
-//   * ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
-//   You've reached the limit on the number of times a target can be registered
-//   with a load balancer.
+//   - ErrCodeInvalidTargetException "InvalidTarget"
+//     The specified target does not exist, is not in the same VPC as the target
+//     group, or has an unsupported instance type.
+//
+//   - ErrCodeTooManyRegistrationsForTargetIdException "TooManyRegistrationsForTargetId"
+//     You've reached the limit on the number of times a target can be registered
+//     with a load balancer.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/RegisterTargets
 func (c *ELBV2) RegisterTargets(input *RegisterTargetsInput) (*RegisterTargetsOutput, error) {
@@ -2892,14 +2894,13 @@ const opRemoveListenerCertificates = "RemoveListenerCertificates"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the RemoveListenerCertificatesRequest method.
+//	req, resp := client.RemoveListenerCertificatesRequest(params)
 //
-//    // Example sending a request using the RemoveListenerCertificatesRequest method.
-//    req, resp := client.RemoveListenerCertificatesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/RemoveListenerCertificates
 func (c *ELBV2) RemoveListenerCertificatesRequest(input *RemoveListenerCertificatesInput) (req *request.Request, output *RemoveListenerCertificatesOutput) {
@@ -2932,11 +2933,12 @@ func (c *ELBV2) RemoveListenerCertificatesRequest(input *RemoveListenerCertifica
 // API operation RemoveListenerCertificates for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
 //
-//   * ErrCodeOperationNotPermittedException "OperationNotPermitted"
-//   This operation is not allowed.
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
+//
+//   - ErrCodeOperationNotPermittedException "OperationNotPermitted"
+//     This operation is not allowed.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/RemoveListenerCertificates
 func (c *ELBV2) RemoveListenerCertificates(input *RemoveListenerCertificatesInput) (*RemoveListenerCertificatesOutput, error) {
@@ -2976,14 +2978,13 @@ const opRemoveTags = "RemoveTags"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the RemoveTagsRequest method.
+//	req, resp := client.RemoveTagsRequest(params)
 //
-//    // Example sending a request using the RemoveTagsRequest method.
-//    req, resp := client.RemoveTagsRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/RemoveTags
 func (c *ELBV2) RemoveTagsRequest(input *RemoveTagsInput) (req *request.Request, output *RemoveTagsOutput) {
@@ -3017,20 +3018,21 @@ func (c *ELBV2) RemoveTagsRequest(input *RemoveTagsInput) (req *request.Request,
 // API operation RemoveTags for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
 //
-//   * ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
-//   The specified target group does not exist.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
 //
-//   * ErrCodeListenerNotFoundException "ListenerNotFound"
-//   The specified listener does not exist.
+//   - ErrCodeTargetGroupNotFoundException "TargetGroupNotFound"
+//     The specified target group does not exist.
 //
-//   * ErrCodeRuleNotFoundException "RuleNotFound"
-//   The specified rule does not exist.
+//   - ErrCodeListenerNotFoundException "ListenerNotFound"
+//     The specified listener does not exist.
 //
-//   * ErrCodeTooManyTagsException "TooManyTags"
-//   You've reached the limit on the number of tags per load balancer.
+//   - ErrCodeRuleNotFoundException "RuleNotFound"
+//     The specified rule does not exist.
+//
+//   - ErrCodeTooManyTagsException "TooManyTags"
+//     You've reached the limit on the number of tags per load balancer.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/RemoveTags
 func (c *ELBV2) RemoveTags(input *RemoveTagsInput) (*RemoveTagsOutput, error) {
@@ -3070,14 +3072,13 @@ const opSetIpAddressType = "SetIpAddressType"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the SetIpAddressTypeRequest method.
+//	req, resp := client.SetIpAddressTypeRequest(params)
 //
-//    // Example sending a request using the SetIpAddressTypeRequest method.
-//    req, resp := client.SetIpAddressTypeRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/SetIpAddressType
 func (c *ELBV2) SetIpAddressTypeRequest(input *SetIpAddressTypeInput) (req *request.Request, output *SetIpAddressTypeOutput) {
@@ -3098,8 +3099,7 @@ func (c *ELBV2) SetIpAddressTypeRequest(input *SetIpAddressTypeInput) (req *requ
 
 // SetIpAddressType API operation for Elastic Load Balancing.
 //
-// Sets the type of IP addresses used by the subnets of the specified Application
-// Load Balancer or Network Load Balancer.
+// Sets the type of IP addresses used by the subnets of the specified load balancer.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -3109,14 +3109,15 @@ func (c *ELBV2) SetIpAddressTypeRequest(input *SetIpAddressTypeInput) (req *requ
 // API operation SetIpAddressType for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
 //
-//   * ErrCodeInvalidSubnetException "InvalidSubnet"
-//   The specified subnet is out of available addresses.
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
+//
+//   - ErrCodeInvalidSubnetException "InvalidSubnet"
+//     The specified subnet is out of available addresses.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/SetIpAddressType
 func (c *ELBV2) SetIpAddressType(input *SetIpAddressTypeInput) (*SetIpAddressTypeOutput, error) {
@@ -3156,14 +3157,13 @@ const opSetRulePriorities = "SetRulePriorities"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the SetRulePrioritiesRequest method.
+//	req, resp := client.SetRulePrioritiesRequest(params)
 //
-//    // Example sending a request using the SetRulePrioritiesRequest method.
-//    req, resp := client.SetRulePrioritiesRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/SetRulePriorities
 func (c *ELBV2) SetRulePrioritiesRequest(input *SetRulePrioritiesInput) (req *request.Request, output *SetRulePrioritiesOutput) {
@@ -3198,14 +3198,15 @@ func (c *ELBV2) SetRulePrioritiesRequest(input *SetRulePrioritiesInput) (req *re
 // API operation SetRulePriorities for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeRuleNotFoundException "RuleNotFound"
-//   The specified rule does not exist.
 //
-//   * ErrCodePriorityInUseException "PriorityInUse"
-//   The specified priority is in use.
+//   - ErrCodeRuleNotFoundException "RuleNotFound"
+//     The specified rule does not exist.
 //
-//   * ErrCodeOperationNotPermittedException "OperationNotPermitted"
-//   This operation is not allowed.
+//   - ErrCodePriorityInUseException "PriorityInUse"
+//     The specified priority is in use.
+//
+//   - ErrCodeOperationNotPermittedException "OperationNotPermitted"
+//     This operation is not allowed.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/SetRulePriorities
 func (c *ELBV2) SetRulePriorities(input *SetRulePrioritiesInput) (*SetRulePrioritiesOutput, error) {
@@ -3245,14 +3246,13 @@ const opSetSecurityGroups = "SetSecurityGroups"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the SetSecurityGroupsRequest method.
+//	req, resp := client.SetSecurityGroupsRequest(params)
 //
-//    // Example sending a request using the SetSecurityGroupsRequest method.
-//    req, resp := client.SetSecurityGroupsRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/SetSecurityGroups
 func (c *ELBV2) SetSecurityGroupsRequest(input *SetSecurityGroupsInput) (req *request.Request, output *SetSecurityGroupsOutput) {
@@ -3288,14 +3288,15 @@ func (c *ELBV2) SetSecurityGroupsRequest(input *SetSecurityGroupsInput) (req *re
 // API operation SetSecurityGroups for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
 //
-//   * ErrCodeInvalidSecurityGroupException "InvalidSecurityGroup"
-//   The specified security group does not exist.
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
+//
+//   - ErrCodeInvalidSecurityGroupException "InvalidSecurityGroup"
+//     The specified security group does not exist.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/SetSecurityGroups
 func (c *ELBV2) SetSecurityGroups(input *SetSecurityGroupsInput) (*SetSecurityGroupsOutput, error) {
@@ -3335,14 +3336,13 @@ const opSetSubnets = "SetSubnets"
 // This method is useful when you want to inject custom logic or configuration
 // into the SDK's request lifecycle. Such as custom headers, or retry logic.
 //
+//	// Example sending a request using the SetSubnetsRequest method.
+//	req, resp := client.SetSubnetsRequest(params)
 //
-//    // Example sending a request using the SetSubnetsRequest method.
-//    req, resp := client.SetSubnetsRequest(params)
-//
-//    err := req.Send()
-//    if err == nil { // resp is now filled
-//        fmt.Println(resp)
-//    }
+//	err := req.Send()
+//	if err == nil { // resp is now filled
+//	    fmt.Println(resp)
+//	}
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/SetSubnets
 func (c *ELBV2) SetSubnetsRequest(input *SetSubnetsInput) (req *request.Request, output *SetSubnetsOutput) {
@@ -3379,23 +3379,24 @@ func (c *ELBV2) SetSubnetsRequest(input *SetSubnetsInput) (req *request.Request,
 // API operation SetSubnets for usage and error information.
 //
 // Returned Error Codes:
-//   * ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
-//   The specified load balancer does not exist.
 //
-//   * ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
-//   The requested configuration is not valid.
+//   - ErrCodeLoadBalancerNotFoundException "LoadBalancerNotFound"
+//     The specified load balancer does not exist.
 //
-//   * ErrCodeSubnetNotFoundException "SubnetNotFound"
-//   The specified subnet does not exist.
+//   - ErrCodeInvalidConfigurationRequestException "InvalidConfigurationRequest"
+//     The requested configuration is not valid.
 //
-//   * ErrCodeInvalidSubnetException "InvalidSubnet"
-//   The specified subnet is out of available addresses.
+//   - ErrCodeSubnetNotFoundException "SubnetNotFound"
+//     The specified subnet does not exist.
 //
-//   * ErrCodeAllocationIdNotFoundException "AllocationIdNotFound"
-//   The specified allocation ID does not exist.
+//   - ErrCodeInvalidSubnetException "InvalidSubnet"
+//     The specified subnet is out of available addresses.
 //
-//   * ErrCodeAvailabilityZoneNotSupportedException "AvailabilityZoneNotSupported"
-//   The specified Availability Zone is not supported.
+//   - ErrCodeAllocationIdNotFoundException "AllocationIdNotFound"
+//     The specified allocation ID does not exist.
+//
+//   - ErrCodeAvailabilityZoneNotSupportedException "AvailabilityZoneNotSupported"
+//     The specified Availability Zone is not supported.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancingv2-2015-12-01/SetSubnets
 func (c *ELBV2) SetSubnets(input *SetSubnetsInput) (*SetSubnetsOutput, error) {
@@ -3464,12 +3465,20 @@ type Action struct {
 	Type *string `type:"string" required:"true" enum:"ActionTypeEnum"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Action) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Action) GoString() string {
 	return s.String()
 }
@@ -3573,12 +3582,20 @@ type AddListenerCertificatesInput struct {
 	ListenerArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddListenerCertificatesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddListenerCertificatesInput) GoString() string {
 	return s.String()
 }
@@ -3618,12 +3635,20 @@ type AddListenerCertificatesOutput struct {
 	Certificates []*Certificate `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddListenerCertificatesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddListenerCertificatesOutput) GoString() string {
 	return s.String()
 }
@@ -3648,12 +3673,20 @@ type AddTagsInput struct {
 	Tags []*Tag `min:"1" type:"list" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddTagsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddTagsInput) GoString() string {
 	return s.String()
 }
@@ -3703,12 +3736,20 @@ type AddTagsOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddTagsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AddTagsOutput) GoString() string {
 	return s.String()
 }
@@ -3764,12 +3805,20 @@ type AuthenticateCognitoActionConfig struct {
 	UserPoolDomain *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AuthenticateCognitoActionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AuthenticateCognitoActionConfig) GoString() string {
 	return s.String()
 }
@@ -3914,12 +3963,20 @@ type AuthenticateOidcActionConfig struct {
 	UserInfoEndpoint *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AuthenticateOidcActionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AuthenticateOidcActionConfig) GoString() string {
 	return s.String()
 }
@@ -4041,12 +4098,20 @@ type AvailabilityZone struct {
 	ZoneName *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AvailabilityZone) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s AvailabilityZone) GoString() string {
 	return s.String()
 }
@@ -4089,12 +4154,20 @@ type Certificate struct {
 	IsDefault *bool `type:"boolean"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Certificate) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Certificate) GoString() string {
 	return s.String()
 }
@@ -4122,12 +4195,20 @@ type Cipher struct {
 	Priority *int64 `type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Cipher) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Cipher) GoString() string {
 	return s.String()
 }
@@ -4202,12 +4283,20 @@ type CreateListenerInput struct {
 	Tags []*Tag `min:"1" type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateListenerInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateListenerInput) GoString() string {
 	return s.String()
 }
@@ -4309,12 +4398,20 @@ type CreateListenerOutput struct {
 	Listeners []*Listener `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateListenerOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateListenerOutput) GoString() string {
 	return s.String()
 }
@@ -4334,7 +4431,7 @@ type CreateLoadBalancerInput struct {
 
 	// The type of IP addresses used by the subnets for your load balancer. The
 	// possible values are ipv4 (for IPv4 addresses) and dualstack (for IPv4 and
-	// IPv6 addresses). Internal load balancers must use ipv4.
+	// IPv6 addresses).
 	IpAddressType *string `type:"string" enum:"IpAddressType"`
 
 	// The name of the load balancer.
@@ -4366,7 +4463,7 @@ type CreateLoadBalancerInput struct {
 	SecurityGroups []*string `type:"list"`
 
 	// The IDs of the public subnets. You can specify only one subnet per Availability
-	// Zone. You must specify either subnets or subnet mappings.
+	// Zone. You must specify either subnets or subnet mappings, but not both.
 	//
 	// [Application Load Balancers] You must specify subnets from at least two Availability
 	// Zones. You cannot specify Elastic IP addresses for your subnets.
@@ -4388,7 +4485,8 @@ type CreateLoadBalancerInput struct {
 	SubnetMappings []*SubnetMapping `type:"list"`
 
 	// The IDs of the public subnets. You can specify only one subnet per Availability
-	// Zone. You must specify either subnets or subnet mappings.
+	// Zone. You must specify either subnets or subnet mappings, but not both. To
+	// specify an Elastic IP address, specify subnet mappings instead of subnets.
 	//
 	// [Application Load Balancers] You must specify subnets from at least two Availability
 	// Zones.
@@ -4412,12 +4510,20 @@ type CreateLoadBalancerInput struct {
 	Type *string `type:"string" enum:"LoadBalancerTypeEnum"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateLoadBalancerInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateLoadBalancerInput) GoString() string {
 	return s.String()
 }
@@ -4509,12 +4615,20 @@ type CreateLoadBalancerOutput struct {
 	LoadBalancers []*LoadBalancer `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateLoadBalancerOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateLoadBalancerOutput) GoString() string {
 	return s.String()
 }
@@ -4552,12 +4666,20 @@ type CreateRuleInput struct {
 	Tags []*Tag `min:"1" type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateRuleInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateRuleInput) GoString() string {
 	return s.String()
 }
@@ -4647,12 +4769,20 @@ type CreateRuleOutput struct {
 	Rules []*Rule `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateRuleOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateRuleOutput) GoString() string {
 	return s.String()
 }
@@ -4668,14 +4798,14 @@ type CreateTargetGroupInput struct {
 
 	// Indicates whether health checks are enabled. If the target type is lambda,
 	// health checks are disabled by default but can be enabled. If the target type
-	// is instance or ip, health checks are always enabled and cannot be disabled.
+	// is instance, ip, or alb, health checks are always enabled and cannot be disabled.
 	HealthCheckEnabled *bool `type:"boolean"`
 
 	// The approximate amount of time, in seconds, between health checks of an individual
-	// target. If the target group protocol is TCP, TLS, UDP, or TCP_UDP, the supported
-	// values are 10 and 30 seconds. If the target group protocol is HTTP or HTTPS,
-	// the default is 30 seconds. If the target group protocol is GENEVE, the default
-	// is 10 seconds. If the target type is lambda, the default is 35 seconds.
+	// target. The range is 5-300. If the target group protocol is TCP, TLS, UDP,
+	// TCP_UDP, HTTP or HTTPS, the default is 30 seconds. If the target group protocol
+	// is GENEVE, the default is 10 seconds. If the target type is lambda, the default
+	// is 35 seconds.
 	HealthCheckIntervalSeconds *int64 `min:"5" type:"integer"`
 
 	// [HTTP/HTTPS health checks] The destination for health checks on the targets.
@@ -4683,7 +4813,7 @@ type CreateTargetGroupInput struct {
 	// [HTTP1 or HTTP2 protocol version] The ping path. The default is /.
 	//
 	// [GRPC protocol version] The path of a custom health check method with the
-	// format /package.service/method. The default is /AWS.ALB/healthcheck.
+	// format /package.service/method. The default is /Amazon Web Services.ALB/healthcheck.
 	HealthCheckPath *string `min:"1" type:"string"`
 
 	// The port the load balancer uses when performing health checks on targets.
@@ -4700,21 +4830,30 @@ type CreateTargetGroupInput struct {
 	HealthCheckProtocol *string `type:"string" enum:"ProtocolEnum"`
 
 	// The amount of time, in seconds, during which no response from a target means
-	// a failed health check. For target groups with a protocol of HTTP, HTTPS,
-	// or GENEVE, the default is 5 seconds. For target groups with a protocol of
-	// TCP or TLS, this value must be 6 seconds for HTTP health checks and 10 seconds
-	// for TCP and HTTPS health checks. If the target type is lambda, the default
-	// is 30 seconds.
+	// a failed health check. The range is 2–120 seconds. For target groups with
+	// a protocol of HTTP, the default is 6 seconds. For target groups with a protocol
+	// of TCP, TLS or HTTPS, the default is 10 seconds. For target groups with a
+	// protocol of GENEVE, the default is 5 seconds. If the target type is lambda,
+	// the default is 30 seconds.
 	HealthCheckTimeoutSeconds *int64 `min:"2" type:"integer"`
 
-	// The number of consecutive health checks successes required before considering
-	// an unhealthy target healthy. For target groups with a protocol of HTTP or
-	// HTTPS, the default is 5. For target groups with a protocol of TCP, TLS, or
-	// GENEVE, the default is 3. If the target type is lambda, the default is 5.
+	// The number of consecutive health check successes required before considering
+	// a target healthy. The range is 2-10. If the target group protocol is TCP,
+	// TCP_UDP, UDP, TLS, HTTP or HTTPS, the default is 5. For target groups with
+	// a protocol of GENEVE, the default is 3. If the target type is lambda, the
+	// default is 5.
 	HealthyThresholdCount *int64 `min:"2" type:"integer"`
 
+	// The type of IP address used for this target group. The possible values are
+	// ipv4 and ipv6. This is an optional parameter. If not specified, the IP address
+	// type defaults to ipv4.
+	IpAddressType *string `type:"string" enum:"TargetGroupIpAddressTypeEnum"`
+
 	// [HTTP/HTTPS health checks] The HTTP or gRPC codes to use when checking for
-	// a successful response from a target.
+	// a successful response from a target. For target groups with a protocol of
+	// TCP, TCP_UDP, UDP or TLS the range is 200-599. For target groups with a protocol
+	// of HTTP or HTTPS, the range is 200-499. For target groups with a protocol
+	// of GENEVE, the range is 200-399.
 	Matcher *Matcher `type:"structure"`
 
 	// The name of the target group.
@@ -4761,13 +4900,15 @@ type CreateTargetGroupInput struct {
 	//    addresses.
 	//
 	//    * lambda - Register a single Lambda function as a target.
+	//
+	//    * alb - Register a single Application Load Balancer as a target.
 	TargetType *string `type:"string" enum:"TargetTypeEnum"`
 
 	// The number of consecutive health check failures required before considering
-	// a target unhealthy. If the target group protocol is HTTP or HTTPS, the default
-	// is 2. If the target group protocol is TCP or TLS, this value must be the
-	// same as the healthy threshold count. If the target group protocol is GENEVE,
-	// the default is 3. If the target type is lambda, the default is 2.
+	// a target unhealthy. The range is 2-10. If the target group protocol is TCP,
+	// TCP_UDP, UDP, TLS, HTTP or HTTPS, the default is 2. For target groups with
+	// a protocol of GENEVE, the default is 3. If the target type is lambda, the
+	// default is 5.
 	UnhealthyThresholdCount *int64 `min:"2" type:"integer"`
 
 	// The identifier of the virtual private cloud (VPC). If the target is a Lambda
@@ -4775,12 +4916,20 @@ type CreateTargetGroupInput struct {
 	VpcId *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateTargetGroupInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateTargetGroupInput) GoString() string {
 	return s.String()
 }
@@ -4871,6 +5020,12 @@ func (s *CreateTargetGroupInput) SetHealthyThresholdCount(v int64) *CreateTarget
 	return s
 }
 
+// SetIpAddressType sets the IpAddressType field's value.
+func (s *CreateTargetGroupInput) SetIpAddressType(v string) *CreateTargetGroupInput {
+	s.IpAddressType = &v
+	return s
+}
+
 // SetMatcher sets the Matcher field's value.
 func (s *CreateTargetGroupInput) SetMatcher(v *Matcher) *CreateTargetGroupInput {
 	s.Matcher = v
@@ -4932,12 +5087,20 @@ type CreateTargetGroupOutput struct {
 	TargetGroups []*TargetGroup `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateTargetGroupOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s CreateTargetGroupOutput) GoString() string {
 	return s.String()
 }
@@ -4957,12 +5120,20 @@ type DeleteListenerInput struct {
 	ListenerArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteListenerInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteListenerInput) GoString() string {
 	return s.String()
 }
@@ -4990,12 +5161,20 @@ type DeleteListenerOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteListenerOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteListenerOutput) GoString() string {
 	return s.String()
 }
@@ -5009,12 +5188,20 @@ type DeleteLoadBalancerInput struct {
 	LoadBalancerArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteLoadBalancerInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteLoadBalancerInput) GoString() string {
 	return s.String()
 }
@@ -5042,12 +5229,20 @@ type DeleteLoadBalancerOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteLoadBalancerOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteLoadBalancerOutput) GoString() string {
 	return s.String()
 }
@@ -5061,12 +5256,20 @@ type DeleteRuleInput struct {
 	RuleArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteRuleInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteRuleInput) GoString() string {
 	return s.String()
 }
@@ -5094,12 +5297,20 @@ type DeleteRuleOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteRuleOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteRuleOutput) GoString() string {
 	return s.String()
 }
@@ -5113,12 +5324,20 @@ type DeleteTargetGroupInput struct {
 	TargetGroupArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteTargetGroupInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteTargetGroupInput) GoString() string {
 	return s.String()
 }
@@ -5146,12 +5365,20 @@ type DeleteTargetGroupOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteTargetGroupOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeleteTargetGroupOutput) GoString() string {
 	return s.String()
 }
@@ -5171,12 +5398,20 @@ type DeregisterTargetsInput struct {
 	Targets []*TargetDescription `type:"list" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeregisterTargetsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeregisterTargetsInput) GoString() string {
 	return s.String()
 }
@@ -5223,12 +5458,20 @@ type DeregisterTargetsOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeregisterTargetsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DeregisterTargetsOutput) GoString() string {
 	return s.String()
 }
@@ -5244,12 +5487,20 @@ type DescribeAccountLimitsInput struct {
 	PageSize *int64 `min:"1" type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeAccountLimitsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeAccountLimitsInput) GoString() string {
 	return s.String()
 }
@@ -5290,12 +5541,20 @@ type DescribeAccountLimitsOutput struct {
 	NextMarker *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeAccountLimitsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeAccountLimitsOutput) GoString() string {
 	return s.String()
 }
@@ -5328,12 +5587,20 @@ type DescribeListenerCertificatesInput struct {
 	PageSize *int64 `min:"1" type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeListenerCertificatesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeListenerCertificatesInput) GoString() string {
 	return s.String()
 }
@@ -5383,12 +5650,20 @@ type DescribeListenerCertificatesOutput struct {
 	NextMarker *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeListenerCertificatesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeListenerCertificatesOutput) GoString() string {
 	return s.String()
 }
@@ -5422,12 +5697,20 @@ type DescribeListenersInput struct {
 	PageSize *int64 `min:"1" type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeListenersInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeListenersInput) GoString() string {
 	return s.String()
 }
@@ -5480,12 +5763,20 @@ type DescribeListenersOutput struct {
 	NextMarker *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeListenersOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeListenersOutput) GoString() string {
 	return s.String()
 }
@@ -5511,12 +5802,20 @@ type DescribeLoadBalancerAttributesInput struct {
 	LoadBalancerArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeLoadBalancerAttributesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeLoadBalancerAttributesInput) GoString() string {
 	return s.String()
 }
@@ -5547,12 +5846,20 @@ type DescribeLoadBalancerAttributesOutput struct {
 	Attributes []*LoadBalancerAttribute `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeLoadBalancerAttributesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeLoadBalancerAttributesOutput) GoString() string {
 	return s.String()
 }
@@ -5581,12 +5888,20 @@ type DescribeLoadBalancersInput struct {
 	PageSize *int64 `min:"1" type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeLoadBalancersInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeLoadBalancersInput) GoString() string {
 	return s.String()
 }
@@ -5639,12 +5954,20 @@ type DescribeLoadBalancersOutput struct {
 	NextMarker *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeLoadBalancersOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeLoadBalancersOutput) GoString() string {
 	return s.String()
 }
@@ -5678,12 +6001,20 @@ type DescribeRulesInput struct {
 	RuleArns []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeRulesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeRulesInput) GoString() string {
 	return s.String()
 }
@@ -5736,12 +6067,20 @@ type DescribeRulesOutput struct {
 	Rules []*Rule `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeRulesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeRulesOutput) GoString() string {
 	return s.String()
 }
@@ -5761,6 +6100,10 @@ func (s *DescribeRulesOutput) SetRules(v []*Rule) *DescribeRulesOutput {
 type DescribeSSLPoliciesInput struct {
 	_ struct{} `type:"structure"`
 
+	// The type of load balancer. The default lists the SSL policies for all load
+	// balancers.
+	LoadBalancerType *string `type:"string" enum:"LoadBalancerTypeEnum"`
+
 	// The marker for the next set of results. (You received this marker from a
 	// previous call.)
 	Marker *string `type:"string"`
@@ -5772,12 +6115,20 @@ type DescribeSSLPoliciesInput struct {
 	PageSize *int64 `min:"1" type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeSSLPoliciesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeSSLPoliciesInput) GoString() string {
 	return s.String()
 }
@@ -5793,6 +6144,12 @@ func (s *DescribeSSLPoliciesInput) Validate() error {
 		return invalidParams
 	}
 	return nil
+}
+
+// SetLoadBalancerType sets the LoadBalancerType field's value.
+func (s *DescribeSSLPoliciesInput) SetLoadBalancerType(v string) *DescribeSSLPoliciesInput {
+	s.LoadBalancerType = &v
+	return s
 }
 
 // SetMarker sets the Marker field's value.
@@ -5824,12 +6181,20 @@ type DescribeSSLPoliciesOutput struct {
 	SslPolicies []*SslPolicy `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeSSLPoliciesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeSSLPoliciesOutput) GoString() string {
 	return s.String()
 }
@@ -5856,12 +6221,20 @@ type DescribeTagsInput struct {
 	ResourceArns []*string `type:"list" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTagsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTagsInput) GoString() string {
 	return s.String()
 }
@@ -5892,12 +6265,20 @@ type DescribeTagsOutput struct {
 	TagDescriptions []*TagDescription `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTagsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTagsOutput) GoString() string {
 	return s.String()
 }
@@ -5917,12 +6298,20 @@ type DescribeTargetGroupAttributesInput struct {
 	TargetGroupArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetGroupAttributesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetGroupAttributesInput) GoString() string {
 	return s.String()
 }
@@ -5953,12 +6342,20 @@ type DescribeTargetGroupAttributesOutput struct {
 	Attributes []*TargetGroupAttribute `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetGroupAttributesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetGroupAttributesOutput) GoString() string {
 	return s.String()
 }
@@ -5989,12 +6386,20 @@ type DescribeTargetGroupsInput struct {
 	TargetGroupArns []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetGroupsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetGroupsInput) GoString() string {
 	return s.String()
 }
@@ -6053,12 +6458,20 @@ type DescribeTargetGroupsOutput struct {
 	TargetGroups []*TargetGroup `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetGroupsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetGroupsOutput) GoString() string {
 	return s.String()
 }
@@ -6087,12 +6500,20 @@ type DescribeTargetHealthInput struct {
 	Targets []*TargetDescription `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetHealthInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetHealthInput) GoString() string {
 	return s.String()
 }
@@ -6139,12 +6560,20 @@ type DescribeTargetHealthOutput struct {
 	TargetHealthDescriptions []*TargetHealthDescription `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetHealthOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s DescribeTargetHealthOutput) GoString() string {
 	return s.String()
 }
@@ -6174,12 +6603,20 @@ type FixedResponseActionConfig struct {
 	StatusCode *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s FixedResponseActionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s FixedResponseActionConfig) GoString() string {
 	return s.String()
 }
@@ -6222,17 +6659,25 @@ type ForwardActionConfig struct {
 	// The target group stickiness for the rule.
 	TargetGroupStickinessConfig *TargetGroupStickinessConfig `type:"structure"`
 
-	// One or more target groups. For Network Load Balancers, you can specify a
-	// single target group.
+	// The target groups. For Network Load Balancers, you can specify a single target
+	// group.
 	TargetGroups []*TargetGroupTuple `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ForwardActionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ForwardActionConfig) GoString() string {
 	return s.String()
 }
@@ -6253,21 +6698,29 @@ func (s *ForwardActionConfig) SetTargetGroups(v []*TargetGroupTuple) *ForwardAct
 type HostHeaderConditionConfig struct {
 	_ struct{} `type:"structure"`
 
-	// One or more host names. The maximum size of each name is 128 characters.
-	// The comparison is case insensitive. The following wildcard characters are
-	// supported: * (matches 0 or more characters) and ? (matches exactly 1 character).
+	// The host names. The maximum size of each name is 128 characters. The comparison
+	// is case insensitive. The following wildcard characters are supported: * (matches
+	// 0 or more characters) and ? (matches exactly 1 character).
 	//
 	// If you specify multiple strings, the condition is satisfied if one of the
 	// strings matches the host name.
 	Values []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s HostHeaderConditionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s HostHeaderConditionConfig) GoString() string {
 	return s.String()
 }
@@ -6293,10 +6746,10 @@ type HttpHeaderConditionConfig struct {
 	// to specify a host header condition.
 	HttpHeaderName *string `type:"string"`
 
-	// One or more strings to compare against the value of the HTTP header. The
-	// maximum size of each string is 128 characters. The comparison strings are
-	// case insensitive. The following wildcard characters are supported: * (matches
-	// 0 or more characters) and ? (matches exactly 1 character).
+	// The strings to compare against the value of the HTTP header. The maximum
+	// size of each string is 128 characters. The comparison strings are case insensitive.
+	// The following wildcard characters are supported: * (matches 0 or more characters)
+	// and ? (matches exactly 1 character).
 	//
 	// If the same header appears multiple times in the request, we search them
 	// in order until a match is found.
@@ -6307,12 +6760,20 @@ type HttpHeaderConditionConfig struct {
 	Values []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s HttpHeaderConditionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s HttpHeaderConditionConfig) GoString() string {
 	return s.String()
 }
@@ -6349,12 +6810,20 @@ type HttpRequestMethodConditionConfig struct {
 	Values []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s HttpRequestMethodConditionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s HttpRequestMethodConditionConfig) GoString() string {
 	return s.String()
 }
@@ -6365,7 +6834,8 @@ func (s *HttpRequestMethodConditionConfig) SetValues(v []*string) *HttpRequestMe
 	return s
 }
 
-// Information about an Elastic Load Balancing resource limit for your AWS account.
+// Information about an Elastic Load Balancing resource limit for your Amazon
+// Web Services account.
 type Limit struct {
 	_ struct{} `type:"structure"`
 
@@ -6412,12 +6882,20 @@ type Limit struct {
 	Name *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Limit) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Limit) GoString() string {
 	return s.String()
 }
@@ -6465,12 +6943,20 @@ type Listener struct {
 	SslPolicy *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Listener) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Listener) GoString() string {
 	return s.String()
 }
@@ -6578,12 +7064,20 @@ type LoadBalancer struct {
 	VpcId *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LoadBalancer) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LoadBalancer) GoString() string {
 	return s.String()
 }
@@ -6684,12 +7178,20 @@ type LoadBalancerAddress struct {
 	PrivateIPv4Address *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LoadBalancerAddress) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LoadBalancerAddress) GoString() string {
 	return s.String()
 }
@@ -6724,10 +7226,15 @@ type LoadBalancerAttribute struct {
 
 	// The name of the attribute.
 	//
-	// The following attribute is supported by all load balancers:
+	// The following attributes are supported by all load balancers:
 	//
 	//    * deletion_protection.enabled - Indicates whether deletion protection
 	//    is enabled. The value is true or false. The default is false.
+	//
+	//    * load_balancing.cross_zone.enabled - Indicates whether cross-zone load
+	//    balancing is enabled. The possible values are true and false. The default
+	//    for Network Load Balancers and Gateway Load Balancers is false. The default
+	//    for Application Load Balancers is true, and cannot be changed.
 	//
 	// The following attributes are supported by both Application Load Balancers
 	// and Network Load Balancers:
@@ -6743,6 +7250,11 @@ type LoadBalancerAttribute struct {
 	//    * access_logs.s3.prefix - The prefix for the location in the S3 bucket
 	//    for the access logs.
 	//
+	//    * ipv6.deny_all_igw_traffic - Blocks internet gateway (IGW) access to
+	//    the load balancer. It is set to false for internet-facing load balancers
+	//    and true for internal load balancers, preventing unintended access to
+	//    your internal load balancer through an internet gateway.
+	//
 	// The following attributes are supported by only Application Load Balancers:
 	//
 	//    * idle_timeout.timeout_seconds - The idle timeout value, in seconds. The
@@ -6757,31 +7269,67 @@ type LoadBalancerAttribute struct {
 	//    HTTP headers with invalid header fields are removed by the load balancer
 	//    (true) or routed to targets (false). The default is false.
 	//
-	//    * routing.http2.enabled - Indicates whether HTTP/2 is enabled. The value
-	//    is true or false. The default is true. Elastic Load Balancing requires
-	//    that message header names contain only alphanumeric characters and hyphens.
+	//    * routing.http.preserve_host_header.enabled - Indicates whether the Application
+	//    Load Balancer should preserve the Host header in the HTTP request and
+	//    send it to the target without any change. The possible values are true
+	//    and false. The default is false.
+	//
+	//    * routing.http.x_amzn_tls_version_and_cipher_suite.enabled - Indicates
+	//    whether the two headers (x-amzn-tls-version and x-amzn-tls-cipher-suite),
+	//    which contain information about the negotiated TLS version and cipher
+	//    suite, are added to the client request before sending it to the target.
+	//    The x-amzn-tls-version header has information about the TLS protocol version
+	//    negotiated with the client, and the x-amzn-tls-cipher-suite header has
+	//    information about the cipher suite negotiated with the client. Both headers
+	//    are in OpenSSL format. The possible values for the attribute are true
+	//    and false. The default is false.
+	//
+	//    * routing.http.xff_client_port.enabled - Indicates whether the X-Forwarded-For
+	//    header should preserve the source port that the client used to connect
+	//    to the load balancer. The possible values are true and false. The default
+	//    is false.
+	//
+	//    * routing.http.xff_header_processing.mode - Enables you to modify, preserve,
+	//    or remove the X-Forwarded-For header in the HTTP request before the Application
+	//    Load Balancer sends the request to the target. The possible values are
+	//    append, preserve, and remove. The default is append. If the value is append,
+	//    the Application Load Balancer adds the client IP address (of the last
+	//    hop) to the X-Forwarded-For header in the HTTP request before it sends
+	//    it to targets. If the value is preserve the Application Load Balancer
+	//    preserves the X-Forwarded-For header in the HTTP request, and sends it
+	//    to targets without any change. If the value is remove, the Application
+	//    Load Balancer removes the X-Forwarded-For header in the HTTP request before
+	//    it sends it to targets.
+	//
+	//    * routing.http2.enabled - Indicates whether HTTP/2 is enabled. The possible
+	//    values are true and false. The default is true. Elastic Load Balancing
+	//    requires that message header names contain only alphanumeric characters
+	//    and hyphens.
 	//
 	//    * waf.fail_open.enabled - Indicates whether to allow a WAF-enabled load
 	//    balancer to route requests to targets if it is unable to forward the request
-	//    to AWS WAF. The value is true or false. The default is false.
-	//
-	// The following attribute is supported by Network Load Balancers and Gateway
-	// Load Balancers:
-	//
-	//    * load_balancing.cross_zone.enabled - Indicates whether cross-zone load
-	//    balancing is enabled. The value is true or false. The default is false.
+	//    to Amazon Web Services WAF. The possible values are true and false. The
+	//    default is false.
 	Key *string `type:"string"`
 
 	// The value of the attribute.
 	Value *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LoadBalancerAttribute) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LoadBalancerAttribute) GoString() string {
 	return s.String()
 }
@@ -6813,12 +7361,20 @@ type LoadBalancerState struct {
 	Reason *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LoadBalancerState) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s LoadBalancerState) GoString() string {
 	return s.String()
 }
@@ -6847,19 +7403,34 @@ type Matcher struct {
 	GrpcCode *string `type:"string"`
 
 	// For Application Load Balancers, you can specify values between 200 and 499,
-	// and the default value is 200. You can specify multiple values (for example,
+	// with the default value being 200. You can specify multiple values (for example,
 	// "200,202") or a range of values (for example, "200-299").
 	//
-	// For Network Load Balancers and Gateway Load Balancers, this must be "200–399".
+	// For Network Load Balancers, you can specify values between 200 and 599, with
+	// the default value being 200-399. You can specify multiple values (for example,
+	// "200,202") or a range of values (for example, "200-299").
+	//
+	// For Gateway Load Balancers, this must be "200–399".
+	//
+	// Note that when using shorthand syntax, some values such as commas need to
+	// be escaped.
 	HttpCode *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Matcher) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Matcher) GoString() string {
 	return s.String()
 }
@@ -6929,12 +7500,20 @@ type ModifyListenerInput struct {
 	SslPolicy *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyListenerInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyListenerInput) GoString() string {
 	return s.String()
 }
@@ -7014,12 +7593,20 @@ type ModifyListenerOutput struct {
 	Listeners []*Listener `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyListenerOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyListenerOutput) GoString() string {
 	return s.String()
 }
@@ -7044,12 +7631,20 @@ type ModifyLoadBalancerAttributesInput struct {
 	LoadBalancerArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyLoadBalancerAttributesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyLoadBalancerAttributesInput) GoString() string {
 	return s.String()
 }
@@ -7089,12 +7684,20 @@ type ModifyLoadBalancerAttributesOutput struct {
 	Attributes []*LoadBalancerAttribute `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyLoadBalancerAttributesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyLoadBalancerAttributesOutput) GoString() string {
 	return s.String()
 }
@@ -7120,12 +7723,20 @@ type ModifyRuleInput struct {
 	RuleArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyRuleInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyRuleInput) GoString() string {
 	return s.String()
 }
@@ -7178,12 +7789,20 @@ type ModifyRuleOutput struct {
 	Rules []*Rule `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyRuleOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyRuleOutput) GoString() string {
 	return s.String()
 }
@@ -7208,12 +7827,20 @@ type ModifyTargetGroupAttributesInput struct {
 	TargetGroupArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyTargetGroupAttributesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyTargetGroupAttributesInput) GoString() string {
 	return s.String()
 }
@@ -7253,12 +7880,20 @@ type ModifyTargetGroupAttributesOutput struct {
 	Attributes []*TargetGroupAttribute `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyTargetGroupAttributesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyTargetGroupAttributesOutput) GoString() string {
 	return s.String()
 }
@@ -7276,9 +7911,7 @@ type ModifyTargetGroupInput struct {
 	HealthCheckEnabled *bool `type:"boolean"`
 
 	// The approximate amount of time, in seconds, between health checks of an individual
-	// target. For TCP health checks, the supported values are 10 or 30 seconds.
-	//
-	// With Network Load Balancers, you can't modify this setting.
+	// target.
 	HealthCheckIntervalSeconds *int64 `min:"5" type:"integer"`
 
 	// [HTTP/HTTPS health checks] The destination for health checks on the targets.
@@ -7286,24 +7919,23 @@ type ModifyTargetGroupInput struct {
 	// [HTTP1 or HTTP2 protocol version] The ping path. The default is /.
 	//
 	// [GRPC protocol version] The path of a custom health check method with the
-	// format /package.service/method. The default is /AWS.ALB/healthcheck.
+	// format /package.service/method. The default is /Amazon Web Services.ALB/healthcheck.
 	HealthCheckPath *string `min:"1" type:"string"`
 
 	// The port the load balancer uses when performing health checks on targets.
 	HealthCheckPort *string `type:"string"`
 
 	// The protocol the load balancer uses when performing health checks on targets.
-	// The TCP protocol is supported for health checks only if the protocol of the
-	// target group is TCP, TLS, UDP, or TCP_UDP. The GENEVE, TLS, UDP, and TCP_UDP
-	// protocols are not supported for health checks.
-	//
-	// With Network Load Balancers, you can't modify this setting.
+	// For Application Load Balancers, the default is HTTP. For Network Load Balancers
+	// and Gateway Load Balancers, the default is TCP. The TCP protocol is not supported
+	// for health checks if the protocol of the target group is HTTP or HTTPS. It
+	// is supported for health checks only if the protocol of the target group is
+	// TCP, TLS, UDP, or TCP_UDP. The GENEVE, TLS, UDP, and TCP_UDP protocols are
+	// not supported for health checks.
 	HealthCheckProtocol *string `type:"string" enum:"ProtocolEnum"`
 
 	// [HTTP/HTTPS health checks] The amount of time, in seconds, during which no
 	// response means a failed health check.
-	//
-	// With Network Load Balancers, you can't modify this setting.
 	HealthCheckTimeoutSeconds *int64 `min:"2" type:"integer"`
 
 	// The number of consecutive health checks successes required before considering
@@ -7311,9 +7943,10 @@ type ModifyTargetGroupInput struct {
 	HealthyThresholdCount *int64 `min:"2" type:"integer"`
 
 	// [HTTP/HTTPS health checks] The HTTP or gRPC codes to use when checking for
-	// a successful response from a target.
-	//
-	// With Network Load Balancers, you can't modify this setting.
+	// a successful response from a target. For target groups with a protocol of
+	// TCP, TCP_UDP, UDP or TLS the range is 200-599. For target groups with a protocol
+	// of HTTP or HTTPS, the range is 200-499. For target groups with a protocol
+	// of GENEVE, the range is 200-399.
 	Matcher *Matcher `type:"structure"`
 
 	// The Amazon Resource Name (ARN) of the target group.
@@ -7322,17 +7955,24 @@ type ModifyTargetGroupInput struct {
 	TargetGroupArn *string `type:"string" required:"true"`
 
 	// The number of consecutive health check failures required before considering
-	// the target unhealthy. For target groups with a protocol of TCP or TLS, this
-	// value must be the same as the healthy threshold count.
+	// the target unhealthy.
 	UnhealthyThresholdCount *int64 `min:"2" type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyTargetGroupInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyTargetGroupInput) GoString() string {
 	return s.String()
 }
@@ -7432,12 +8072,20 @@ type ModifyTargetGroupOutput struct {
 	TargetGroups []*TargetGroup `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyTargetGroupOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s ModifyTargetGroupOutput) GoString() string {
 	return s.String()
 }
@@ -7452,10 +8100,10 @@ func (s *ModifyTargetGroupOutput) SetTargetGroups(v []*TargetGroup) *ModifyTarge
 type PathPatternConditionConfig struct {
 	_ struct{} `type:"structure"`
 
-	// One or more path patterns to compare against the request URL. The maximum
-	// size of each string is 128 characters. The comparison is case sensitive.
-	// The following wildcard characters are supported: * (matches 0 or more characters)
-	// and ? (matches exactly 1 character).
+	// The path patterns to compare against the request URL. The maximum size of
+	// each string is 128 characters. The comparison is case sensitive. The following
+	// wildcard characters are supported: * (matches 0 or more characters) and ?
+	// (matches exactly 1 character).
 	//
 	// If you specify multiple strings, the condition is satisfied if one of them
 	// matches the request URL. The path pattern is compared only to the path of
@@ -7464,12 +8112,20 @@ type PathPatternConditionConfig struct {
 	Values []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s PathPatternConditionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s PathPatternConditionConfig) GoString() string {
 	return s.String()
 }
@@ -7489,9 +8145,9 @@ func (s *PathPatternConditionConfig) SetValues(v []*string) *PathPatternConditio
 type QueryStringConditionConfig struct {
 	_ struct{} `type:"structure"`
 
-	// One or more key/value pairs or values to find in the query string. The maximum
-	// size of each string is 128 characters. The comparison is case insensitive.
-	// The following wildcard characters are supported: * (matches 0 or more characters)
+	// The key/value pairs or values to find in the query string. The maximum size
+	// of each string is 128 characters. The comparison is case insensitive. The
+	// following wildcard characters are supported: * (matches 0 or more characters)
 	// and ? (matches exactly 1 character). To search for a literal '*' or '?' character
 	// in a query string, you must escape these characters in Values using a '\'
 	// character.
@@ -7501,12 +8157,20 @@ type QueryStringConditionConfig struct {
 	Values []*QueryStringKeyValuePair `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s QueryStringConditionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s QueryStringConditionConfig) GoString() string {
 	return s.String()
 }
@@ -7528,12 +8192,20 @@ type QueryStringKeyValuePair struct {
 	Value *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s QueryStringKeyValuePair) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s QueryStringKeyValuePair) GoString() string {
 	return s.String()
 }
@@ -7559,15 +8231,15 @@ func (s *QueryStringKeyValuePair) SetValue(v string) *QueryStringKeyValuePair {
 //
 // You can reuse URI components using the following reserved keywords:
 //
-//    * #{protocol}
+//   - #{protocol}
 //
-//    * #{host}
+//   - #{host}
 //
-//    * #{port}
+//   - #{port}
 //
-//    * #{path} (the leading "/" is removed)
+//   - #{path} (the leading "/" is removed)
 //
-//    * #{query}
+//   - #{query}
 //
 // For example, you can change the path to "/new/#{path}", the hostname to "example.#{host}",
 // or the query to "#{query}&value=xyz".
@@ -7602,12 +8274,20 @@ type RedirectActionConfig struct {
 	StatusCode *string `type:"string" required:"true" enum:"RedirectActionStatusCodeEnum"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RedirectActionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RedirectActionConfig) GoString() string {
 	return s.String()
 }
@@ -7681,12 +8361,20 @@ type RegisterTargetsInput struct {
 	Targets []*TargetDescription `type:"list" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RegisterTargetsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RegisterTargetsInput) GoString() string {
 	return s.String()
 }
@@ -7733,12 +8421,20 @@ type RegisterTargetsOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RegisterTargetsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RegisterTargetsOutput) GoString() string {
 	return s.String()
 }
@@ -7758,12 +8454,20 @@ type RemoveListenerCertificatesInput struct {
 	ListenerArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveListenerCertificatesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveListenerCertificatesInput) GoString() string {
 	return s.String()
 }
@@ -7800,12 +8504,20 @@ type RemoveListenerCertificatesOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveListenerCertificatesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveListenerCertificatesOutput) GoString() string {
 	return s.String()
 }
@@ -7824,12 +8536,20 @@ type RemoveTagsInput struct {
 	TagKeys []*string `type:"list" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveTagsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveTagsInput) GoString() string {
 	return s.String()
 }
@@ -7866,12 +8586,20 @@ type RemoveTagsOutput struct {
 	_ struct{} `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveTagsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RemoveTagsOutput) GoString() string {
 	return s.String()
 }
@@ -7900,12 +8628,20 @@ type Rule struct {
 	RuleArn *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Rule) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Rule) GoString() string {
 	return s.String()
 }
@@ -7945,7 +8681,8 @@ func (s *Rule) SetRuleArn(v string) *Rule {
 // Each rule can optionally include up to one of each of the following conditions:
 // http-request-method, host-header, path-pattern, and source-ip. Each rule
 // can also optionally include one or more of each of the following conditions:
-// http-header and query-string.
+// http-header and query-string. Note that the value for a condition cannot
+// be empty.
 type RuleCondition struct {
 	_ struct{} `type:"structure"`
 
@@ -8016,12 +8753,20 @@ type RuleCondition struct {
 	Values []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RuleCondition) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RuleCondition) GoString() string {
 	return s.String()
 }
@@ -8085,12 +8830,20 @@ type RulePriorityPair struct {
 	RuleArn *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RulePriorityPair) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s RulePriorityPair) GoString() string {
 	return s.String()
 }
@@ -8124,9 +8877,8 @@ type SetIpAddressTypeInput struct {
 	_ struct{} `type:"structure"`
 
 	// The IP address type. The possible values are ipv4 (for IPv4 addresses) and
-	// dualstack (for IPv4 and IPv6 addresses). Internal load balancers must use
-	// ipv4. You can’t specify dualstack for a load balancer with a UDP or TCP_UDP
-	// listener.
+	// dualstack (for IPv4 and IPv6 addresses). You can’t specify dualstack for
+	// a load balancer with a UDP or TCP_UDP listener.
 	//
 	// IpAddressType is a required field
 	IpAddressType *string `type:"string" required:"true" enum:"IpAddressType"`
@@ -8137,12 +8889,20 @@ type SetIpAddressTypeInput struct {
 	LoadBalancerArn *string `type:"string" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetIpAddressTypeInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetIpAddressTypeInput) GoString() string {
 	return s.String()
 }
@@ -8182,12 +8942,20 @@ type SetIpAddressTypeOutput struct {
 	IpAddressType *string `type:"string" enum:"IpAddressType"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetIpAddressTypeOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetIpAddressTypeOutput) GoString() string {
 	return s.String()
 }
@@ -8207,12 +8975,20 @@ type SetRulePrioritiesInput struct {
 	RulePriorities []*RulePriorityPair `type:"list" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetRulePrioritiesInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetRulePrioritiesInput) GoString() string {
 	return s.String()
 }
@@ -8253,12 +9029,20 @@ type SetRulePrioritiesOutput struct {
 	Rules []*Rule `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetRulePrioritiesOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetRulePrioritiesOutput) GoString() string {
 	return s.String()
 }
@@ -8283,12 +9067,20 @@ type SetSecurityGroupsInput struct {
 	SecurityGroups []*string `type:"list" required:"true"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetSecurityGroupsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetSecurityGroupsInput) GoString() string {
 	return s.String()
 }
@@ -8328,12 +9120,20 @@ type SetSecurityGroupsOutput struct {
 	SecurityGroupIds []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetSecurityGroupsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetSecurityGroupsOutput) GoString() string {
 	return s.String()
 }
@@ -8350,8 +9150,7 @@ type SetSubnetsInput struct {
 	// [Network Load Balancers] The type of IP addresses used by the subnets for
 	// your load balancer. The possible values are ipv4 (for IPv4 addresses) and
 	// dualstack (for IPv4 and IPv6 addresses). You can’t specify dualstack for
-	// a load balancer with a UDP or TCP_UDP listener. Internal load balancers must
-	// use ipv4.
+	// a load balancer with a UDP or TCP_UDP listener. .
 	IpAddressType *string `type:"string" enum:"IpAddressType"`
 
 	// The Amazon Resource Name (ARN) of the load balancer.
@@ -8394,12 +9193,20 @@ type SetSubnetsInput struct {
 	Subnets []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetSubnetsInput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetSubnetsInput) GoString() string {
 	return s.String()
 }
@@ -8451,12 +9258,20 @@ type SetSubnetsOutput struct {
 	IpAddressType *string `type:"string" enum:"IpAddressType"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetSubnetsOutput) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SetSubnetsOutput) GoString() string {
 	return s.String()
 }
@@ -8481,8 +9296,8 @@ func (s *SetSubnetsOutput) SetIpAddressType(v string) *SetSubnetsOutput {
 type SourceIpConditionConfig struct {
 	_ struct{} `type:"structure"`
 
-	// One or more source IP addresses, in CIDR format. You can use both IPv4 and
-	// IPv6 addresses. Wildcards are not supported.
+	// The source IP addresses, in CIDR format. You can use both IPv4 and IPv6 addresses.
+	// Wildcards are not supported.
 	//
 	// If you specify multiple addresses, the condition is satisfied if the source
 	// IP address of the request matches one of the CIDR blocks. This condition
@@ -8491,12 +9306,20 @@ type SourceIpConditionConfig struct {
 	Values []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SourceIpConditionConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SourceIpConditionConfig) GoString() string {
 	return s.String()
 }
@@ -8519,14 +9342,25 @@ type SslPolicy struct {
 
 	// The protocols.
 	SslProtocols []*string `type:"list"`
+
+	// The supported load balancers.
+	SupportedLoadBalancerTypes []*string `type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SslPolicy) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SslPolicy) GoString() string {
 	return s.String()
 }
@@ -8549,6 +9383,12 @@ func (s *SslPolicy) SetSslProtocols(v []*string) *SslPolicy {
 	return s
 }
 
+// SetSupportedLoadBalancerTypes sets the SupportedLoadBalancerTypes field's value.
+func (s *SslPolicy) SetSupportedLoadBalancerTypes(v []*string) *SslPolicy {
+	s.SupportedLoadBalancerTypes = v
+	return s
+}
+
 // Information about a subnet mapping.
 type SubnetMapping struct {
 	_ struct{} `type:"structure"`
@@ -8567,12 +9407,20 @@ type SubnetMapping struct {
 	SubnetId *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SubnetMapping) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s SubnetMapping) GoString() string {
 	return s.String()
 }
@@ -8614,12 +9462,20 @@ type Tag struct {
 	Value *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Tag) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s Tag) GoString() string {
 	return s.String()
 }
@@ -8663,12 +9519,20 @@ type TagDescription struct {
 	Tags []*Tag `min:"1" type:"list"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TagDescription) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TagDescription) GoString() string {
 	return s.String()
 }
@@ -8693,16 +9557,22 @@ type TargetDescription struct {
 	// traffic from the load balancer nodes in the specified Availability Zone or
 	// from all enabled Availability Zones for the load balancer.
 	//
+	// For Application Load Balancer target groups, the specified Availability Zone
+	// value is only applicable when cross-zone load balancing is off. Otherwise
+	// the parameter is ignored and treated as all.
+	//
 	// This parameter is not supported if the target type of the target group is
-	// instance.
+	// instance or alb.
 	//
 	// If the target type is ip and the IP address is in a subnet of the VPC for
 	// the target group, the Availability Zone is automatically detected and this
 	// parameter is optional. If the IP address is outside the VPC, this parameter
 	// is required.
 	//
-	// With an Application Load Balancer, if the target type is ip and the IP address
-	// is outside the VPC for the target group, the only supported value is all.
+	// For Application Load Balancer target groups with cross-zone load balancing
+	// off, if the target type is ip and the IP address is outside of the VPC for
+	// the target group, this should be an Availability Zone inside the VPC for
+	// the target group.
 	//
 	// If the target type is lambda, this parameter is optional and the only supported
 	// value is all.
@@ -8710,22 +9580,34 @@ type TargetDescription struct {
 
 	// The ID of the target. If the target type of the target group is instance,
 	// specify an instance ID. If the target type is ip, specify an IP address.
-	// If the target type is lambda, specify the ARN of the Lambda function.
+	// If the target type is lambda, specify the ARN of the Lambda function. If
+	// the target type is alb, specify the ARN of the Application Load Balancer
+	// target.
 	//
 	// Id is a required field
 	Id *string `type:"string" required:"true"`
 
 	// The port on which the target is listening. If the target group protocol is
-	// GENEVE, the supported port is 6081. Not used if the target is a Lambda function.
+	// GENEVE, the supported port is 6081. If the target type is alb, the targeted
+	// Application Load Balancer must have at least one listener whose port matches
+	// the target group port. Not used if the target is a Lambda function.
 	Port *int64 `min:"1" type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetDescription) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetDescription) GoString() string {
 	return s.String()
 }
@@ -8793,6 +9675,11 @@ type TargetGroup struct {
 	// an unhealthy target healthy.
 	HealthyThresholdCount *int64 `min:"2" type:"integer"`
 
+	// The type of IP address used for this target group. The possible values are
+	// ipv4 and ipv6. This is an optional parameter. If not specified, the IP address
+	// type defaults to ipv4.
+	IpAddressType *string `type:"string" enum:"TargetGroupIpAddressTypeEnum"`
+
 	// The Amazon Resource Names (ARN) of the load balancers that route traffic
 	// to this target group.
 	LoadBalancerArns []*string `type:"list"`
@@ -8820,8 +9707,9 @@ type TargetGroup struct {
 
 	// The type of target that you must specify when registering targets with this
 	// target group. The possible values are instance (register targets by instance
-	// ID), ip (register targets by IP address), or lambda (register a single Lambda
-	// function as a target).
+	// ID), ip (register targets by IP address), lambda (register a single Lambda
+	// function as a target), or alb (register a single Application Load Balancer
+	// as a target).
 	TargetType *string `type:"string" enum:"TargetTypeEnum"`
 
 	// The number of consecutive health check failures required before considering
@@ -8832,12 +9720,20 @@ type TargetGroup struct {
 	VpcId *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetGroup) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetGroup) GoString() string {
 	return s.String()
 }
@@ -8881,6 +9777,12 @@ func (s *TargetGroup) SetHealthCheckTimeoutSeconds(v int64) *TargetGroup {
 // SetHealthyThresholdCount sets the HealthyThresholdCount field's value.
 func (s *TargetGroup) SetHealthyThresholdCount(v int64) *TargetGroup {
 	s.HealthyThresholdCount = &v
+	return s
+}
+
+// SetIpAddressType sets the IpAddressType field's value.
+func (s *TargetGroup) SetIpAddressType(v string) *TargetGroup {
+	s.IpAddressType = &v
 	return s
 }
 
@@ -8950,7 +9852,7 @@ type TargetGroupAttribute struct {
 
 	// The name of the attribute.
 	//
-	// The following attribute is supported by all load balancers:
+	// The following attributes are supported by all load balancers:
 	//
 	//    * deregistration_delay.timeout_seconds - The amount of time, in seconds,
 	//    for Elastic Load Balancing to wait before changing the state of a deregistering
@@ -8958,15 +9860,44 @@ type TargetGroupAttribute struct {
 	//    value is 300 seconds. If the target is a Lambda function, this attribute
 	//    is not supported.
 	//
-	// The following attributes are supported by both Application Load Balancers
-	// and Network Load Balancers:
-	//
-	//    * stickiness.enabled - Indicates whether sticky sessions are enabled.
+	//    * stickiness.enabled - Indicates whether target stickiness is enabled.
 	//    The value is true or false. The default is false.
 	//
-	//    * stickiness.type - The type of sticky sessions. The possible values are
-	//    lb_cookie and app_cookie for Application Load Balancers or source_ip for
-	//    Network Load Balancers.
+	//    * stickiness.type - Indicates the type of stickiness. The possible values
+	//    are: lb_cookie and app_cookie for Application Load Balancers. source_ip
+	//    for Network Load Balancers. source_ip_dest_ip and source_ip_dest_ip_proto
+	//    for Gateway Load Balancers.
+	//
+	// The following attributes are supported by Application Load Balancers and
+	// Network Load Balancers:
+	//
+	//    * load_balancing.cross_zone.enabled - Indicates whether cross zone load
+	//    balancing is enabled. The value is true, false or use_load_balancer_configuration.
+	//    The default is use_load_balancer_configuration.
+	//
+	//    * target_group_health.dns_failover.minimum_healthy_targets.count - The
+	//    minimum number of targets that must be healthy. If the number of healthy
+	//    targets is below this value, mark the zone as unhealthy in DNS, so that
+	//    traffic is routed only to healthy zones. The possible values are off or
+	//    an integer from 1 to the maximum number of targets. The default is off.
+	//
+	//    * target_group_health.dns_failover.minimum_healthy_targets.percentage
+	//    - The minimum percentage of targets that must be healthy. If the percentage
+	//    of healthy targets is below this value, mark the zone as unhealthy in
+	//    DNS, so that traffic is routed only to healthy zones. The possible values
+	//    are off or an integer from 1 to 100. The default is off.
+	//
+	//    * target_group_health.unhealthy_state_routing.minimum_healthy_targets.count
+	//    - The minimum number of targets that must be healthy. If the number of
+	//    healthy targets is below this value, send traffic to all targets, including
+	//    unhealthy targets. The possible values are 1 to the maximum number of
+	//    targets. The default is 1.
+	//
+	//    * target_group_health.unhealthy_state_routing.minimum_healthy_targets.percentage
+	//    - The minimum percentage of targets that must be healthy. If the percentage
+	//    of healthy targets is below this value, send traffic to all targets, including
+	//    unhealthy targets. The possible values are off or an integer from 1 to
+	//    100. The default is off.
 	//
 	// The following attributes are supported only if the load balancer is an Application
 	// Load Balancer and the target is an instance or an IP address:
@@ -8982,8 +9913,9 @@ type TargetGroupAttribute struct {
 	//    default is 0 seconds (disabled).
 	//
 	//    * stickiness.app_cookie.cookie_name - Indicates the name of the application-based
-	//    cookie. Names that start with the following names are not allowed: AWSALB,
-	//    AWSALBAPP, and AWSALBTG. They're reserved for use by the load balancer.
+	//    cookie. Names that start with the following prefixes are not allowed:
+	//    AWSALB, AWSALBAPP, and AWSALBTG; they're reserved for use by the load
+	//    balancer.
 	//
 	//    * stickiness.app_cookie.duration_seconds - The time period, in seconds,
 	//    during which requests from a client should be routed to the same target.
@@ -9021,18 +9953,42 @@ type TargetGroupAttribute struct {
 	//
 	//    * proxy_protocol_v2.enabled - Indicates whether Proxy Protocol version
 	//    2 is enabled. The value is true or false. The default is false.
+	//
+	// The following attributes are supported only by Gateway Load Balancers:
+	//
+	//    * target_failover.on_deregistration - Indicates how the Gateway Load Balancer
+	//    handles existing flows when a target is deregistered. The possible values
+	//    are rebalance and no_rebalance. The default is no_rebalance. The two attributes
+	//    (target_failover.on_deregistration and target_failover.on_unhealthy) can't
+	//    be set independently. The value you set for both attributes must be the
+	//    same.
+	//
+	//    * target_failover.on_unhealthy - Indicates how the Gateway Load Balancer
+	//    handles existing flows when a target is unhealthy. The possible values
+	//    are rebalance and no_rebalance. The default is no_rebalance. The two attributes
+	//    (target_failover.on_deregistration and target_failover.on_unhealthy) cannot
+	//    be set independently. The value you set for both attributes must be the
+	//    same.
 	Key *string `type:"string"`
 
 	// The value of the attribute.
 	Value *string `type:"string"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetGroupAttribute) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetGroupAttribute) GoString() string {
 	return s.String()
 }
@@ -9061,12 +10017,20 @@ type TargetGroupStickinessConfig struct {
 	Enabled *bool `type:"boolean"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetGroupStickinessConfig) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetGroupStickinessConfig) GoString() string {
 	return s.String()
 }
@@ -9095,12 +10059,20 @@ type TargetGroupTuple struct {
 	Weight *int64 `type:"integer"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetGroupTuple) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetGroupTuple) GoString() string {
 	return s.String()
 }
@@ -9188,12 +10160,20 @@ type TargetHealth struct {
 	State *string `type:"string" enum:"TargetHealthStateEnum"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetHealth) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetHealth) GoString() string {
 	return s.String()
 }
@@ -9230,12 +10210,20 @@ type TargetHealthDescription struct {
 	TargetHealth *TargetHealth `type:"structure"`
 }
 
-// String returns the string representation
+// String returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetHealthDescription) String() string {
 	return awsutil.Prettify(s)
 }
 
-// GoString returns the string representation
+// GoString returns the string representation.
+//
+// API parameter values that are decorated as "sensitive" in the API will not
+// be included in the string output. The member name will be present, but the
+// value will be replaced with "sensitive".
 func (s TargetHealthDescription) GoString() string {
 	return s.String()
 }
@@ -9455,6 +10443,22 @@ func RedirectActionStatusCodeEnum_Values() []string {
 }
 
 const (
+	// TargetGroupIpAddressTypeEnumIpv4 is a TargetGroupIpAddressTypeEnum enum value
+	TargetGroupIpAddressTypeEnumIpv4 = "ipv4"
+
+	// TargetGroupIpAddressTypeEnumIpv6 is a TargetGroupIpAddressTypeEnum enum value
+	TargetGroupIpAddressTypeEnumIpv6 = "ipv6"
+)
+
+// TargetGroupIpAddressTypeEnum_Values returns all elements of the TargetGroupIpAddressTypeEnum enum
+func TargetGroupIpAddressTypeEnum_Values() []string {
+	return []string{
+		TargetGroupIpAddressTypeEnumIpv4,
+		TargetGroupIpAddressTypeEnumIpv6,
+	}
+}
+
+const (
 	// TargetHealthReasonEnumElbRegistrationInProgress is a TargetHealthReasonEnum enum value
 	TargetHealthReasonEnumElbRegistrationInProgress = "Elb.RegistrationInProgress"
 
@@ -9551,6 +10555,9 @@ const (
 
 	// TargetTypeEnumLambda is a TargetTypeEnum enum value
 	TargetTypeEnumLambda = "lambda"
+
+	// TargetTypeEnumAlb is a TargetTypeEnum enum value
+	TargetTypeEnumAlb = "alb"
 )
 
 // TargetTypeEnum_Values returns all elements of the TargetTypeEnum enum
@@ -9559,5 +10566,6 @@ func TargetTypeEnum_Values() []string {
 		TargetTypeEnumInstance,
 		TargetTypeEnumIp,
 		TargetTypeEnumLambda,
+		TargetTypeEnumAlb,
 	}
 }

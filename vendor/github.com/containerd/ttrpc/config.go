@@ -16,7 +16,7 @@
 
 package ttrpc
 
-import "github.com/pkg/errors"
+import "errors"
 
 type serverConfig struct {
 	handshaker  Handshaker

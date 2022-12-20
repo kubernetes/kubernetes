@@ -50,6 +50,7 @@ func TestValidVersion(t *testing.T) {
 		"v1.5.0-alpha.0.1078+1044b6822497da-pull",
 		"v1.5.0-alpha.1.822+49b9e32fad9f32-pull-gke-gci",
 		"v1.6.1+coreos.0",
+		"1.7.1",
 	}
 	for _, s := range validVersions {
 		t.Run(s, func(t *testing.T) {
@@ -58,7 +59,7 @@ func TestValidVersion(t *testing.T) {
 			if err != nil {
 				t.Errorf("KubernetesReleaseVersion unexpected error for version %q: %v", s, err)
 			}
-			if ver != s {
+			if ver != s && ver != "v"+s {
 				t.Errorf("KubernetesReleaseVersion should return same valid version string. %q != %q", s, ver)
 			}
 		})
@@ -203,6 +204,9 @@ func TestSplitVersion(t *testing.T) {
 		{"unknown-1", "https://dl.k8s.io/release", "unknown-1", true},
 		// unknown area, not valid input.
 		{"unknown/latest-1", "", "", false},
+		// invalid input
+		{"", "", "", false},
+		{"ci/", "", "", false},
 	}
 
 	for _, tc := range cases {
@@ -235,6 +239,7 @@ func TestKubernetesIsCIVersion(t *testing.T) {
 		// CI builds
 		{"ci/latest-1", true},
 		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci/", false},
 	}
 
 	for _, tc := range cases {
@@ -265,6 +270,7 @@ func TestCIBuildVersion(t *testing.T) {
 		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
 		{"ci/1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
 		{"ci/0invalid", "", false},
+		{"0invalid", "", false},
 	}
 
 	for _, tc := range cases {

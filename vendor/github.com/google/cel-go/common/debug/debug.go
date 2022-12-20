@@ -102,9 +102,9 @@ func (w *debugWriter) Buffer(e *exprpb.Expr) {
 }
 
 func (w *debugWriter) appendSelect(sel *exprpb.Expr_Select) {
-	w.Buffer(sel.Operand)
+	w.Buffer(sel.GetOperand())
 	w.append(".")
-	w.append(sel.Field)
+	w.append(sel.GetField())
 	if sel.TestOnly {
 		w.append("~test-only~")
 	}
@@ -112,15 +112,15 @@ func (w *debugWriter) appendSelect(sel *exprpb.Expr_Select) {
 
 func (w *debugWriter) appendCall(call *exprpb.Expr_Call) {
 	if call.Target != nil {
-		w.Buffer(call.Target)
+		w.Buffer(call.GetTarget())
 		w.append(".")
 	}
-	w.append(call.Function)
+	w.append(call.GetFunction())
 	w.append("(")
 	if len(call.GetArgs()) > 0 {
 		w.addIndent()
 		w.appendLine()
-		for i, arg := range call.Args {
+		for i, arg := range call.GetArgs() {
 			if i > 0 {
 				w.append(",")
 				w.appendLine()
@@ -138,7 +138,7 @@ func (w *debugWriter) appendList(list *exprpb.Expr_CreateList) {
 	if len(list.GetElements()) > 0 {
 		w.appendLine()
 		w.addIndent()
-		for i, elem := range list.Elements {
+		for i, elem := range list.GetElements() {
 			if i > 0 {
 				w.append(",")
 				w.appendLine()
@@ -160,19 +160,19 @@ func (w *debugWriter) appendStruct(obj *exprpb.Expr_CreateStruct) {
 }
 
 func (w *debugWriter) appendObject(obj *exprpb.Expr_CreateStruct) {
-	w.append(obj.MessageName)
+	w.append(obj.GetMessageName())
 	w.append("{")
-	if len(obj.Entries) > 0 {
+	if len(obj.GetEntries()) > 0 {
 		w.appendLine()
 		w.addIndent()
-		for i, entry := range obj.Entries {
+		for i, entry := range obj.GetEntries() {
 			if i > 0 {
 				w.append(",")
 				w.appendLine()
 			}
 			w.append(entry.GetFieldKey())
 			w.append(":")
-			w.Buffer(entry.Value)
+			w.Buffer(entry.GetValue())
 			w.adorn(entry)
 		}
 		w.removeIndent()
@@ -183,17 +183,17 @@ func (w *debugWriter) appendObject(obj *exprpb.Expr_CreateStruct) {
 
 func (w *debugWriter) appendMap(obj *exprpb.Expr_CreateStruct) {
 	w.append("{")
-	if len(obj.Entries) > 0 {
+	if len(obj.GetEntries()) > 0 {
 		w.appendLine()
 		w.addIndent()
-		for i, entry := range obj.Entries {
+		for i, entry := range obj.GetEntries() {
 			if i > 0 {
 				w.append(",")
 				w.appendLine()
 			}
 			w.Buffer(entry.GetMapKey())
 			w.append(":")
-			w.Buffer(entry.Value)
+			w.Buffer(entry.GetValue())
 			w.adorn(entry)
 		}
 		w.removeIndent()
@@ -208,43 +208,43 @@ func (w *debugWriter) appendComprehension(comprehension *exprpb.Expr_Comprehensi
 	w.appendLine()
 	w.append("// Variable")
 	w.appendLine()
-	w.append(comprehension.IterVar)
+	w.append(comprehension.GetIterVar())
 	w.append(",")
 	w.appendLine()
 	w.append("// Target")
 	w.appendLine()
-	w.Buffer(comprehension.IterRange)
+	w.Buffer(comprehension.GetIterRange())
 	w.append(",")
 	w.appendLine()
 	w.append("// Accumulator")
 	w.appendLine()
-	w.append(comprehension.AccuVar)
+	w.append(comprehension.GetAccuVar())
 	w.append(",")
 	w.appendLine()
 	w.append("// Init")
 	w.appendLine()
-	w.Buffer(comprehension.AccuInit)
+	w.Buffer(comprehension.GetAccuInit())
 	w.append(",")
 	w.appendLine()
 	w.append("// LoopCondition")
 	w.appendLine()
-	w.Buffer(comprehension.LoopCondition)
+	w.Buffer(comprehension.GetLoopCondition())
 	w.append(",")
 	w.appendLine()
 	w.append("// LoopStep")
 	w.appendLine()
-	w.Buffer(comprehension.LoopStep)
+	w.Buffer(comprehension.GetLoopStep())
 	w.append(",")
 	w.appendLine()
 	w.append("// Result")
 	w.appendLine()
-	w.Buffer(comprehension.Result)
+	w.Buffer(comprehension.GetResult())
 	w.append(")")
 	w.removeIndent()
 }
 
 func formatLiteral(c *exprpb.Constant) string {
-	switch c.ConstantKind.(type) {
+	switch c.GetConstantKind().(type) {
 	case *exprpb.Constant_BoolValue:
 		return fmt.Sprintf("%t", c.GetBoolValue())
 	case *exprpb.Constant_BytesValue:

@@ -771,6 +771,18 @@ test1   20h   This is first line which is long and goes for on and on and on an 
 test1   20h   This is first...
 `,
 		},
+		// terminal special character, should be escaped
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1\x1b"}},
+			},
+			expected: `NAME
+test1^[
+`,
+		},
 	}
 
 	for _, test := range tests {

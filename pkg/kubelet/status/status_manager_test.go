@@ -34,18 +34,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeconfigmap "k8s.io/kubernetes/pkg/kubelet/configmap"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
-	kubesecret "k8s.io/kubernetes/pkg/kubelet/secret"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 // Generate new instance of test pod with the same initial value.
@@ -82,9 +84,10 @@ func (m *manager) testSyncBatch() {
 }
 
 func newTestManager(kubeClient clientset.Interface) *manager {
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), kubesecret.NewFakeManager(), kubeconfigmap.NewFakeManager())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
 	podManager.AddPod(getTestPod())
-	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}).(*manager)
+	podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
+	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 }
 
 func generateRandomMessage() string {
@@ -957,8 +960,9 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), kubesecret.NewFakeManager(), kubeconfigmap.NewFakeManager())
-			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}).(*manager)
+			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
+			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 
 			original := tc.pod.DeepCopy()
 			syncer.SetPodStatus(original, original.Status)
@@ -1319,7 +1323,11 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 }
 
 func TestUpdateLastTransitionTime(t *testing.T) {
-	old := metav1.Now()
+	// On Windows, time.Now() is not as precise, which means that 2 consecutive calls may
+	// return the same timestamp. This test expects the old timestamp to be updated with a
+	// newer one, so we set the old timestamp to one second in the past.
+	// See: https://github.com/golang/go/issues/8687
+	old := metav1.NewTime(time.Now().Add(-time.Second))
 	for desc, test := range map[string]struct {
 		condition    *v1.PodCondition
 		oldCondition *v1.PodCondition
@@ -1393,21 +1401,291 @@ func deleteAction() core.DeleteAction {
 
 func TestMergePodStatus(t *testing.T) {
 	useCases := []struct {
-		desc                 string
-		hasRunningContainers bool
-		oldPodStatus         func(input v1.PodStatus) v1.PodStatus
-		newPodStatus         func(input v1.PodStatus) v1.PodStatus
-		expectPodStatus      v1.PodStatus
+		desc                          string
+		enablePodDisruptionConditions bool
+		hasRunningContainers          bool
+		oldPodStatus                  func(input v1.PodStatus) v1.PodStatus
+		newPodStatus                  func(input v1.PodStatus) v1.PodStatus
+		expectPodStatus               v1.PodStatus
 	}{
 		{
 			"no change",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus { return input },
 			func(input v1.PodStatus) v1.PodStatus { return input },
 			getPodStatus(),
 		},
 		{
+			"add DisruptionTarget condition when transitioning into failed phase; PodDisruptionConditions enabled",
+			true,
+			false,
+			func(input v1.PodStatus) v1.PodStatus { return input },
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Phase = v1.PodFailed
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationByKubelet",
+				})
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodFailed,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.DisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "TerminationByKubelet",
+					},
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionFalse,
+						Reason: "PodFailed",
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.ContainersReady,
+						Status: v1.ConditionFalse,
+						Reason: "PodFailed",
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"don't add DisruptionTarget condition when transitioning into failed phase, but there are might still be running containers; PodDisruptionConditions enabled",
+			true,
+			true,
+			func(input v1.PodStatus) v1.PodStatus { return input },
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Phase = v1.PodFailed
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationByKubelet",
+				})
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"preserve DisruptionTarget condition; PodDisruptionConditions enabled",
+			true,
+			false,
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationByKubelet",
+				})
+				return input
+			},
+			func(input v1.PodStatus) v1.PodStatus {
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.DisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "TerminationByKubelet",
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"preserve DisruptionTarget condition; PodDisruptionConditions disabled",
+			false,
+			false,
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationByKubelet",
+				})
+				return input
+			},
+			func(input v1.PodStatus) v1.PodStatus {
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.DisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "TerminationByKubelet",
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"override DisruptionTarget condition; PodDisruptionConditions enabled",
+			true,
+			false,
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "EvictedByEvictionAPI",
+				})
+				return input
+			},
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Phase = v1.PodFailed
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationByKubelet",
+				})
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodFailed,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionFalse,
+						Reason: "PodFailed",
+					},
+					{
+						Type:   v1.ContainersReady,
+						Status: v1.ConditionFalse,
+						Reason: "PodFailed",
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.DisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "TerminationByKubelet",
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"don't override DisruptionTarget condition when remaining in running phase; PodDisruptionConditions enabled",
+			true,
+			false,
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "EvictedByEvictionAPI",
+				})
+				return input
+			},
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationByKubelet",
+				})
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.DisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "EvictedByEvictionAPI",
+					},
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"don't override DisruptionTarget condition when transitioning to failed phase but there might still be running containers; PodDisruptionConditions enabled",
+			true,
+			true,
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "EvictedByEvictionAPI",
+				})
+				return input
+			},
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Phase = v1.PodFailed
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationByKubelet",
+				})
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.DisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "EvictedByEvictionAPI",
+					},
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
 			"readiness changes",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus { return input },
 			func(input v1.PodStatus) v1.PodStatus {
@@ -1431,6 +1709,7 @@ func TestMergePodStatus(t *testing.T) {
 		},
 		{
 			"additional pod condition",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
@@ -1461,6 +1740,7 @@ func TestMergePodStatus(t *testing.T) {
 		},
 		{
 			"additional pod condition and readiness changes",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
@@ -1494,6 +1774,7 @@ func TestMergePodStatus(t *testing.T) {
 		},
 		{
 			"additional pod condition changes",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
@@ -1531,6 +1812,7 @@ func TestMergePodStatus(t *testing.T) {
 		{
 			"phase is transitioning to failed and no containers running",
 			false,
+			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Phase = v1.PodRunning
 				input.Reason = "Unknown"
@@ -1549,10 +1831,12 @@ func TestMergePodStatus(t *testing.T) {
 					{
 						Type:   v1.PodReady,
 						Status: v1.ConditionFalse,
+						Reason: "PodFailed",
 					},
 					{
 						Type:   v1.ContainersReady,
 						Status: v1.ConditionFalse,
+						Reason: "PodFailed",
 					},
 					{
 						Type:   v1.PodScheduled,
@@ -1565,6 +1849,7 @@ func TestMergePodStatus(t *testing.T) {
 		},
 		{
 			"phase is transitioning to failed and containers running",
+			false,
 			true,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Phase = v1.PodRunning
@@ -1598,6 +1883,7 @@ func TestMergePodStatus(t *testing.T) {
 
 	for _, tc := range useCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
 			output := mergePodStatus(tc.oldPodStatus(getPodStatus()), tc.newPodStatus(getPodStatus()), tc.hasRunningContainers)
 			if !conditionsEqual(output.Conditions, tc.expectPodStatus.Conditions) || !statusEqual(output, tc.expectPodStatus) {
 				t.Fatalf("unexpected output: %s", cmp.Diff(tc.expectPodStatus, output))
@@ -1623,7 +1909,7 @@ func conditionsEqual(left, right []v1.PodCondition) bool {
 		for _, r := range right {
 			if l.Type == r.Type {
 				found = true
-				if l.Status != r.Status {
+				if l.Status != r.Status || l.Reason != r.Reason {
 					return false
 				}
 			}

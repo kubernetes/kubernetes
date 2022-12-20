@@ -57,7 +57,7 @@ func getBoolValue(b []rune) (int, error) {
 			continue
 		}
 
-		if isLitValue(lv, b) {
+		if isCaselessLitValue(lv, b) {
 			n = len(lv)
 		}
 	}

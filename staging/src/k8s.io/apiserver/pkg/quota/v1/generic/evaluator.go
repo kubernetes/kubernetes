@@ -52,10 +52,10 @@ func ListerFuncForResourceFunc(f InformerForResourceFunc) quota.ListerForResourc
 
 // cachedHasSynced returns a function that calls hasSynced() until it returns true once, then returns true
 func cachedHasSynced(hasSynced func() bool) func() bool {
-	cache := &atomic.Value{}
+	cache := &atomic.Bool{}
 	cache.Store(false)
 	return func() bool {
-		if cache.Load().(bool) {
+		if cache.Load() {
 			// short-circuit if already synced
 			return true
 		}

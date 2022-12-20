@@ -34,7 +34,7 @@ var (
 // GetReference returns an ObjectReference which refers to the given
 // object, or an error if the object doesn't follow the conventions
 // that would allow this.
-// TODO: should take a meta.Interface see http://issue.k8s.io/7127
+// TODO: should take a meta.Interface see https://issue.k8s.io/7127
 func GetReference(scheme *runtime.Scheme, obj runtime.Object) (*v1.ObjectReference, error) {
 	if obj == nil {
 		return nil, ErrNilObject

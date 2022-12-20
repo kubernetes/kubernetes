@@ -72,6 +72,7 @@ type lazyMetric struct {
 	markDeprecationOnce sync.Once
 	createOnce          sync.Once
 	self                kubeCollector
+	stabilityLevel      StabilityLevel
 }
 
 func (r *lazyMetric) IsCreated() bool {
@@ -96,9 +97,8 @@ func (r *lazyMetric) lazyInit(self kubeCollector, fqName string) {
 //  2. if the metric is manually disabled via a CLI flag.
 //
 // Disclaimer:  disabling a metric via a CLI flag has higher precedence than
-//
-//	  	deprecation and will override show-hidden-metrics for the explicitly
-//		disabled metric.
+// deprecation and will override show-hidden-metrics for the explicitly
+// disabled metric.
 func (r *lazyMetric) preprocessMetric(version semver.Version) {
 	disabledMetricsLock.RLock()
 	defer disabledMetricsLock.RUnlock()
@@ -149,6 +149,7 @@ func (r *lazyMetric) Create(version *semver.Version) bool {
 	if r.IsHidden() {
 		return false
 	}
+
 	r.createOnce.Do(func() {
 		r.createLock.Lock()
 		defer r.createLock.Unlock()
@@ -159,6 +160,13 @@ func (r *lazyMetric) Create(version *semver.Version) bool {
 			r.self.initializeMetric()
 		}
 	})
+	sl := r.stabilityLevel
+	deprecatedV := r.self.DeprecatedVersion()
+	dv := ""
+	if deprecatedV != nil {
+		dv = deprecatedV.String()
+	}
+	registeredMetrics.WithLabelValues(string(sl), dv).Inc()
 	return r.IsCreated()
 }
 

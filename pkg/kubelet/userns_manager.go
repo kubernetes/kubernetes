@@ -33,65 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
-
-// bitsDataElement is the number of bits in a bitArray.data element.
-const bitsDataElement = 32
-
-type bitArray struct {
-	data       []uint32
-	firstIndex int
-}
-
-func makeBitArray(size uint32) *bitArray {
-	m := bitArray{
-		data:       make([]uint32, (size+bitsDataElement-1)/bitsDataElement),
-		firstIndex: 0,
-	}
-	return &m
-}
-
-func (b *bitArray) set(index uint32) {
-	b.data[index/bitsDataElement] |= (uint32(1) << (index % bitsDataElement))
-}
-
-func (b *bitArray) isSet(index uint32) bool {
-	return (b.data[index/bitsDataElement]>>(index%bitsDataElement))&0x1 == 1
-}
-
-func (b *bitArray) findAvailable() (uint32, bool) {
-	for i := b.firstIndex; i < len(b.data); i++ {
-		// Check if all bits are used (all 1s).
-		if b.data[i] == math.MaxUint32 {
-			continue
-		}
-		for j := uint32(0); j < bitsDataElement; j++ {
-			if (b.data[i]>>j)&0x1 == 0 {
-				v := uint32(i)*bitsDataElement + j
-				b.set(v)
-				// Update firstIndex to the current
-				// data element since there are no other
-				// unset bits before the current index.
-				b.firstIndex = int(i)
-				return v, true
-			}
-		}
-	}
-	return 0, false
-}
-
-func (b *bitArray) clear(index uint32) {
-	i := index / bitsDataElement
-	// update firstIndex if the index found is less than
-	// the current one.
-	if i < uint32(b.firstIndex) {
-		b.firstIndex = int(i)
-	}
-	// clear the bit by ANDing the data element with the
-	// complement of the bitmask to be cleared.
-	b.data[i] &= ^(1 << (index % bitsDataElement))
-}
 
 // length for the user namespace to create (65536).
 const userNsLength = (1 << 16)
@@ -110,7 +54,7 @@ type userNsPodsManager interface {
 }
 
 type usernsManager struct {
-	used         *bitArray
+	used         *allocator.AllocationBitmap
 	usedBy       map[types.UID]uint32 // Map pod.UID to range used
 	removed      int
 	numAllocated int
@@ -188,15 +132,19 @@ func MakeUserNsManager(kl userNsPodsManager) (*usernsManager, error) {
 	m := usernsManager{
 		// Create a bitArray for all the UID space (2^32).
 		// As a by product of that, no index param to bitArray can be out of bounds (index is uint32).
-		used:   makeBitArray((math.MaxUint32 + 1) / userNsLength),
+		used:   allocator.NewAllocationMap((math.MaxUint32+1)/userNsLength, "user namespaces"),
 		usedBy: make(map[types.UID]uint32),
 		kl:     kl,
 	}
 	// First block is reserved for the host.
-	m.used.set(0)
+	if _, err := m.used.Allocate(0); err != nil {
+		return nil, err
+	}
 
 	// Second block will be used for phase II. Don't assign that range for now.
-	m.used.set(1)
+	if _, err := m.used.Allocate(1); err != nil {
+		return nil, err
+	}
 
 	// do not bother reading the list of pods if user namespaces are not enabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
@@ -240,8 +188,8 @@ func (m *usernsManager) recordPodMappings(pod types.UID) error {
 
 // isSet checks if the specified index is already set.
 func (m *usernsManager) isSet(v uint32) bool {
-	index := v / userNsLength
-	return m.used.isSet(index)
+	index := int(v / userNsLength)
+	return m.used.Has(index)
 }
 
 // allocateOne finds a free user namespace and allocate it to the specified pod.
@@ -258,14 +206,17 @@ func (m *usernsManager) allocateOne(pod types.UID) (firstID uint32, length uint3
 		}
 	}()
 
-	firstZero, found := m.used.findAvailable()
+	firstZero, found, err := m.used.AllocateNext()
+	if err != nil {
+		return 0, 0, err
+	}
 	if !found {
 		return 0, 0, fmt.Errorf("could not find an empty slot to allocate a user namespace")
 	}
 
 	klog.V(5).InfoS("new pod user namespace allocation", "podUID", pod)
 
-	firstID = firstZero * userNsLength
+	firstID = uint32(firstZero * userNsLength)
 	m.usedBy[pod] = firstID
 	return firstID, userNsLength, nil
 }
@@ -282,9 +233,9 @@ func (m *usernsManager) record(pod types.UID, from, length uint32) (err error) {
 	if found && prevFrom != from {
 		return fmt.Errorf("different user namespace range already used by pod %q", pod)
 	}
-	index := from / userNsLength
+	index := int(from / userNsLength)
 	// if the pod wasn't found then verify the range is free.
-	if !found && m.used.isSet(index) {
+	if !found && m.used.Has(index) {
 		return fmt.Errorf("range picked for pod %q already taken", pod)
 	}
 	// The pod is already registered, nothing to do.
@@ -305,7 +256,7 @@ func (m *usernsManager) record(pod types.UID, from, length uint32) (err error) {
 
 	// "from" is a ID (UID/GID), set the corresponding userns of size
 	// userNsLength in the bit-array.
-	m.used.set(index)
+	m.used.Allocate(index)
 	m.usedBy[pod] = from
 	return nil
 }
@@ -344,7 +295,7 @@ func (m *usernsManager) releaseWithLock(pod types.UID) {
 		m.usedBy = n
 		m.removed = 0
 	}
-	m.used.clear(v / userNsLength)
+	m.used.Release(int(v / userNsLength))
 }
 
 func (m *usernsManager) parseUserNsFileAndRecord(pod types.UID, content []byte) (userNs userNamespace, err error) {

@@ -14,10 +14,6 @@
 
 // Package resource provides detecting and representing resources.
 //
-// This package is currently in a pre-GA phase. Backwards incompatible changes
-// may be introduced in subsequent minor version releases as we work to track
-// the evolving OpenTelemetry specification and user feedback.
-//
 // The fundamental struct is a Resource which holds identifying information
 // about the entities for which telemetry is exported.
 //

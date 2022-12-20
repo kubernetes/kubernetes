@@ -34,16 +34,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -87,6 +90,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	podutil.DropDisabledPodFields(pod, nil)
 
 	applySeccompVersionSkew(pod)
+	applyWaitingForSchedulingGatesCondition(pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -102,12 +106,18 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, nil, &pod.ObjectMeta, nil)
-	return validation.ValidatePodCreate(pod, opts)
+	return corevalidation.ValidatePodCreate(pod, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (podStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return podutil.GetWarningsForPod(ctx, obj.(*api.Pod), nil)
+	newPod := obj.(*api.Pod)
+	var warnings []string
+	if msgs := utilvalidation.IsDNS1123Label(newPod.Name); len(msgs) != 0 {
+		warnings = append(warnings, fmt.Sprintf("metadata.name: this is used in Pod names and hostnames, which can result in surprising behavior; a DNS label is recommended: %v", msgs))
+	}
+	warnings = append(warnings, podutil.GetWarningsForPod(ctx, newPod, nil)...)
+	return warnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -125,7 +135,7 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	pod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
-	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	return corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -210,7 +220,7 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
 
-	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
+	return corevalidation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -248,7 +258,7 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
-	return validation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
+	return corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -640,6 +650,29 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 	}
 
 	return container, nil
+}
+
+// applyWaitingForSchedulingGatesCondition adds a {type:PodScheduled, reason:WaitingForGates} condition
+// to a new-created Pod if necessary.
+func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) ||
+		len(pod.Spec.SchedulingGates) == 0 {
+		return
+	}
+
+	// If found a condition with type PodScheduled, return.
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == api.PodScheduled {
+			return
+		}
+	}
+
+	pod.Status.Conditions = append(pod.Status.Conditions, api.PodCondition{
+		Type:    api.PodScheduled,
+		Status:  api.ConditionFalse,
+		Reason:  api.PodReasonSchedulingGated,
+		Message: "Scheduling is blocked due to non-empty scheduling gates",
+	})
 }
 
 // applySeccompVersionSkew implements the version skew behavior described in:

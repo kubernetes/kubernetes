@@ -12,6 +12,7 @@ import (
 	"io"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/onsi/ginkgo/v2/formatter"
 	"github.com/onsi/ginkgo/v2/types"
@@ -134,9 +135,11 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 		denoter = fmt.Sprintf("[%s]", report.LeafNodeType)
 	}
 
+	highlightColor = r.highlightColorForState(report.State)
+
 	switch report.State {
 	case types.SpecStatePassed:
-		highlightColor, succinctLocationBlock = "{{green}}", v.LT(types.VerbosityLevelVerbose)
+		succinctLocationBlock = v.LT(types.VerbosityLevelVerbose)
 		emitGinkgoWriterOutput = (r.conf.AlwaysEmitGinkgoWriter || v.GTE(types.VerbosityLevelVerbose)) && hasGW
 		if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
 			if v.GTE(types.VerbosityLevelVerbose) || hasStd || hasEmittableReports {
@@ -146,7 +149,7 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 			}
 		} else {
 			header, stream = denoter, true
-			if report.NumAttempts > 1 {
+			if report.NumAttempts > 1 && report.MaxFlakeAttempts > 1 {
 				header, stream = fmt.Sprintf("%s [FLAKEY TEST - TOOK %d ATTEMPTS TO PASS]", r.retryDenoter, report.NumAttempts), false
 			}
 			if report.RunTime > r.conf.SlowSpecThreshold {
@@ -157,7 +160,6 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 			stream = false
 		}
 	case types.SpecStatePending:
-		highlightColor = "{{yellow}}"
 		includeRuntime, emitGinkgoWriterOutput = false, false
 		if v.Is(types.VerbosityLevelSuccinct) {
 			header, stream = "P", true
@@ -165,22 +167,26 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 			header, succinctLocationBlock = "P [PENDING]", v.LT(types.VerbosityLevelVeryVerbose)
 		}
 	case types.SpecStateSkipped:
-		highlightColor = "{{cyan}}"
 		if report.Failure.Message != "" || v.Is(types.VerbosityLevelVeryVerbose) {
 			header = "S [SKIPPED]"
 		} else {
 			header, stream = "S", true
 		}
 	case types.SpecStateFailed:
-		highlightColor, header = "{{red}}", fmt.Sprintf("%s [FAILED]", denoter)
+		header = fmt.Sprintf("%s [FAILED]", denoter)
+	case types.SpecStateTimedout:
+		header = fmt.Sprintf("%s [TIMEDOUT]", denoter)
 	case types.SpecStatePanicked:
-		highlightColor, header = "{{magenta}}", fmt.Sprintf("%s! [PANICKED]", denoter)
+		header = fmt.Sprintf("%s! [PANICKED]", denoter)
 	case types.SpecStateInterrupted:
-		highlightColor, header = "{{orange}}", fmt.Sprintf("%s! [INTERRUPTED]", denoter)
+		header = fmt.Sprintf("%s! [INTERRUPTED]", denoter)
 	case types.SpecStateAborted:
-		highlightColor, header = "{{coral}}", fmt.Sprintf("%s! [ABORTED]", denoter)
+		header = fmt.Sprintf("%s! [ABORTED]", denoter)
 	}
 
+	if report.State.Is(types.SpecStateFailureStates) && report.MaxMustPassRepeatedly > 1 {
+		header, stream = fmt.Sprintf("%s DURING REPETITION #%d", header, report.NumAttempts), false
+	}
 	// Emit stream and return
 	if stream {
 		r.emit(r.f(highlightColor + header + "{{/}}"))
@@ -208,9 +214,7 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 	//Emit Captured GinkgoWriter Output
 	if emitGinkgoWriterOutput && hasGW {
 		r.emitBlock("\n")
-		r.emitBlock(r.fi(1, "{{gray}}Begin Captured GinkgoWriter Output >>{{/}}"))
-		r.emitBlock(r.fi(2, "%s", report.CapturedGinkgoWriterOutput))
-		r.emitBlock(r.fi(1, "{{gray}}<< End Captured GinkgoWriter Output{{/}}"))
+		r.emitGinkgoWriterOutput(1, report.CapturedGinkgoWriterOutput, 0)
 	}
 
 	if hasEmittableReports {
@@ -232,28 +236,96 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 	// Emit Failure Message
 	if !report.Failure.IsZero() {
 		r.emitBlock("\n")
-		r.emitBlock(r.fi(1, highlightColor+"%s{{/}}", report.Failure.Message))
-		r.emitBlock(r.fi(1, highlightColor+"In {{bold}}[%s]{{/}}"+highlightColor+" at: {{bold}}%s{{/}}\n", report.Failure.FailureNodeType, report.Failure.Location))
-		if report.Failure.ForwardedPanic != "" {
-			r.emitBlock("\n")
-			r.emitBlock(r.fi(1, highlightColor+"%s{{/}}", report.Failure.ForwardedPanic))
-		}
+		r.EmitFailure(1, report.State, report.Failure, false)
+	}
 
-		if r.conf.FullTrace || report.Failure.ForwardedPanic != "" {
+	if len(report.AdditionalFailures) > 0 {
+		if v.GTE(types.VerbosityLevelVerbose) {
 			r.emitBlock("\n")
-			r.emitBlock(r.fi(1, highlightColor+"Full Stack Trace{{/}}"))
-			r.emitBlock(r.fi(2, "%s", report.Failure.Location.FullStackTrace))
+			r.emitBlock(r.fi(1, "{{bold}}There were additional failures detected after the initial failure:{{/}}"))
+			for i, additionalFailure := range report.AdditionalFailures {
+				r.EmitFailure(2, additionalFailure.State, additionalFailure.Failure, true)
+				if i < len(report.AdditionalFailures)-1 {
+					r.emitBlock(r.fi(2, "{{gray}}%s{{/}}", strings.Repeat("-", 10)))
+				}
+			}
+		} else {
+			r.emitBlock("\n")
+			r.emitBlock(r.fi(1, "{{bold}}There were additional failures detected after the initial failure.  Here's a summary - for full details run Ginkgo in verbose mode:{{/}}"))
+			for _, additionalFailure := range report.AdditionalFailures {
+				r.emitBlock(r.fi(2, r.highlightColorForState(additionalFailure.State)+"[%s]{{/}} in [%s] at %s",
+					r.humanReadableState(additionalFailure.State),
+					additionalFailure.Failure.FailureNodeType,
+					additionalFailure.Failure.Location,
+				))
+			}
+
 		}
 	}
 
 	r.emitDelimiter()
 }
 
+func (r *DefaultReporter) highlightColorForState(state types.SpecState) string {
+	switch state {
+	case types.SpecStatePassed:
+		return "{{green}}"
+	case types.SpecStatePending:
+		return "{{yellow}}"
+	case types.SpecStateSkipped:
+		return "{{cyan}}"
+	case types.SpecStateFailed:
+		return "{{red}}"
+	case types.SpecStateTimedout:
+		return "{{orange}}"
+	case types.SpecStatePanicked:
+		return "{{magenta}}"
+	case types.SpecStateInterrupted:
+		return "{{orange}}"
+	case types.SpecStateAborted:
+		return "{{coral}}"
+	default:
+		return "{{gray}}"
+	}
+}
+
+func (r *DefaultReporter) humanReadableState(state types.SpecState) string {
+	return strings.ToUpper(state.String())
+}
+
+func (r *DefaultReporter) EmitFailure(indent uint, state types.SpecState, failure types.Failure, includeState bool) {
+	highlightColor := r.highlightColorForState(state)
+	if includeState {
+		r.emitBlock(r.fi(indent, highlightColor+"[%s]{{/}}", r.humanReadableState(state)))
+	}
+	r.emitBlock(r.fi(indent, highlightColor+"%s{{/}}", failure.Message))
+	r.emitBlock(r.fi(indent, highlightColor+"In {{bold}}[%s]{{/}}"+highlightColor+" at: {{bold}}%s{{/}}\n", failure.FailureNodeType, failure.Location))
+	if failure.ForwardedPanic != "" {
+		r.emitBlock("\n")
+		r.emitBlock(r.fi(indent, highlightColor+"%s{{/}}", failure.ForwardedPanic))
+	}
+
+	if r.conf.FullTrace || failure.ForwardedPanic != "" {
+		r.emitBlock("\n")
+		r.emitBlock(r.fi(indent, highlightColor+"Full Stack Trace{{/}}"))
+		r.emitBlock(r.fi(indent+1, "%s", failure.Location.FullStackTrace))
+	}
+
+	if !failure.ProgressReport.IsZero() {
+		r.emitBlock("\n")
+		r.emitProgressReport(indent, false, failure.ProgressReport)
+	}
+}
+
 func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 	failures := report.SpecReports.WithState(types.SpecStateFailureStates)
-	if len(failures) > 1 {
+	if len(failures) > 0 {
 		r.emitBlock("\n\n")
-		r.emitBlock(r.f("{{red}}{{bold}}Summarizing %d Failures:{{/}}", len(failures)))
+		if len(failures) > 1 {
+			r.emitBlock(r.f("{{red}}{{bold}}Summarizing %d Failures:{{/}}", len(failures)))
+		} else {
+			r.emitBlock(r.f("{{red}}{{bold}}Summarizing 1 Failure:{{/}}"))
+		}
 		for _, specReport := range failures {
 			highlightColor, heading := "{{red}}", "[FAIL]"
 			switch specReport.State {
@@ -261,6 +333,8 @@ func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 				highlightColor, heading = "{{magenta}}", "[PANICKED!]"
 			case types.SpecStateAborted:
 				highlightColor, heading = "{{coral}}", "[ABORTED]"
+			case types.SpecStateTimedout:
+				highlightColor, heading = "{{orange}}", "[TIMEDOUT]"
 			case types.SpecStateInterrupted:
 				highlightColor, heading = "{{orange}}", "[INTERRUPTED]"
 			}
@@ -305,8 +379,166 @@ func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 		if specs.CountOfFlakedSpecs() > 0 {
 			r.emit(r.f("{{light-yellow}}{{bold}}%d Flaked{{/}} | ", specs.CountOfFlakedSpecs()))
 		}
+		if specs.CountOfRepeatedSpecs() > 0 {
+			r.emit(r.f("{{light-yellow}}{{bold}}%d Repeated{{/}} | ", specs.CountOfRepeatedSpecs()))
+		}
 		r.emit(r.f("{{yellow}}{{bold}}%d Pending{{/}} | ", specs.CountWithState(types.SpecStatePending)))
 		r.emit(r.f("{{cyan}}{{bold}}%d Skipped{{/}}\n", specs.CountWithState(types.SpecStateSkipped)))
+	}
+}
+
+func (r *DefaultReporter) EmitProgressReport(report types.ProgressReport) {
+	r.emitDelimiter()
+
+	if report.RunningInParallel {
+		r.emit(r.f("{{coral}}Progress Report for Ginkgo Process #{{bold}}%d{{/}}\n", report.ParallelProcess))
+	}
+	r.emitProgressReport(0, true, report)
+	r.emitDelimiter()
+}
+
+func (r *DefaultReporter) emitProgressReport(indent uint, emitGinkgoWriterOutput bool, report types.ProgressReport) {
+	if report.Message != "" {
+		r.emitBlock(r.fi(indent, report.Message+"\n"))
+		indent += 1
+	}
+	if report.LeafNodeText != "" {
+		subjectIndent := indent
+		if len(report.ContainerHierarchyTexts) > 0 {
+			r.emit(r.fi(indent, r.cycleJoin(report.ContainerHierarchyTexts, " ")))
+			r.emit(" ")
+			subjectIndent = 0
+		}
+		r.emit(r.fi(subjectIndent, "{{bold}}{{orange}}%s{{/}} (Spec Runtime: %s)\n", report.LeafNodeText, report.Time.Sub(report.SpecStartTime).Round(time.Millisecond)))
+		r.emit(r.fi(indent+1, "{{gray}}%s{{/}}\n", report.LeafNodeLocation))
+		indent += 1
+	}
+	if report.CurrentNodeType != types.NodeTypeInvalid {
+		r.emit(r.fi(indent, "In {{bold}}{{orange}}[%s]{{/}}", report.CurrentNodeType))
+		if report.CurrentNodeText != "" && !report.CurrentNodeType.Is(types.NodeTypeIt) {
+			r.emit(r.f(" {{bold}}{{orange}}%s{{/}}", report.CurrentNodeText))
+		}
+
+		r.emit(r.f(" (Node Runtime: %s)\n", report.Time.Sub(report.CurrentNodeStartTime).Round(time.Millisecond)))
+		r.emit(r.fi(indent+1, "{{gray}}%s{{/}}\n", report.CurrentNodeLocation))
+		indent += 1
+	}
+	if report.CurrentStepText != "" {
+		r.emit(r.fi(indent, "At {{bold}}{{orange}}[By Step] %s{{/}} (Step Runtime: %s)\n", report.CurrentStepText, report.Time.Sub(report.CurrentStepStartTime).Round(time.Millisecond)))
+		r.emit(r.fi(indent+1, "{{gray}}%s{{/}}\n", report.CurrentStepLocation))
+		indent += 1
+	}
+
+	if indent > 0 {
+		indent -= 1
+	}
+
+	if emitGinkgoWriterOutput && report.CapturedGinkgoWriterOutput != "" && (report.RunningInParallel || r.conf.Verbosity().LT(types.VerbosityLevelVerbose)) {
+		r.emit("\n")
+		r.emitGinkgoWriterOutput(indent, report.CapturedGinkgoWriterOutput, 10)
+	}
+
+	if !report.SpecGoroutine().IsZero() {
+		r.emit("\n")
+		r.emit(r.fi(indent, "{{bold}}{{underline}}Spec Goroutine{{/}}\n"))
+		r.emitGoroutines(indent, report.SpecGoroutine())
+	}
+
+	if len(report.AdditionalReports) > 0 {
+		r.emit("\n")
+		r.emitBlock(r.fi(indent, "{{gray}}Begin Additional Progress Reports >>{{/}}"))
+		for i, additionalReport := range report.AdditionalReports {
+			r.emit(r.fi(indent+1, additionalReport))
+			if i < len(report.AdditionalReports)-1 {
+				r.emitBlock(r.fi(indent+1, "{{gray}}%s{{/}}", strings.Repeat("-", 10)))
+			}
+		}
+		r.emitBlock(r.fi(indent, "{{gray}}<< End Additional Progress Reports{{/}}"))
+	}
+
+	highlightedGoroutines := report.HighlightedGoroutines()
+	if len(highlightedGoroutines) > 0 {
+		r.emit("\n")
+		r.emit(r.fi(indent, "{{bold}}{{underline}}Goroutines of Interest{{/}}\n"))
+		r.emitGoroutines(indent, highlightedGoroutines...)
+	}
+
+	otherGoroutines := report.OtherGoroutines()
+	if len(otherGoroutines) > 0 {
+		r.emit("\n")
+		r.emit(r.fi(indent, "{{gray}}{{bold}}{{underline}}Other Goroutines{{/}}\n"))
+		r.emitGoroutines(indent, otherGoroutines...)
+	}
+}
+
+func (r *DefaultReporter) emitGinkgoWriterOutput(indent uint, output string, limit int) {
+	r.emitBlock(r.fi(indent, "{{gray}}Begin Captured GinkgoWriter Output >>{{/}}"))
+	if limit == 0 {
+		r.emitBlock(r.fi(indent+1, "%s", output))
+	} else {
+		lines := strings.Split(output, "\n")
+		if len(lines) <= limit {
+			r.emitBlock(r.fi(indent+1, "%s", output))
+		} else {
+			r.emitBlock(r.fi(indent+1, "{{gray}}...{{/}}"))
+			for _, line := range lines[len(lines)-limit-1:] {
+				r.emitBlock(r.fi(indent+1, "%s", line))
+			}
+		}
+	}
+	r.emitBlock(r.fi(indent, "{{gray}}<< End Captured GinkgoWriter Output{{/}}"))
+}
+
+func (r *DefaultReporter) emitGoroutines(indent uint, goroutines ...types.Goroutine) {
+	for idx, g := range goroutines {
+		color := "{{gray}}"
+		if g.HasHighlights() {
+			color = "{{orange}}"
+		}
+		r.emit(r.fi(indent, color+"goroutine %d [%s]{{/}}\n", g.ID, g.State))
+		for _, fc := range g.Stack {
+			if fc.Highlight {
+				r.emit(r.fi(indent, color+"{{bold}}> %s{{/}}\n", fc.Function))
+				r.emit(r.fi(indent+2, color+"{{bold}}%s:%d{{/}}\n", fc.Filename, fc.Line))
+				r.emitSource(indent+3, fc)
+			} else {
+				r.emit(r.fi(indent+1, "{{gray}}%s{{/}}\n", fc.Function))
+				r.emit(r.fi(indent+2, "{{gray}}%s:%d{{/}}\n", fc.Filename, fc.Line))
+			}
+		}
+
+		if idx+1 < len(goroutines) {
+			r.emit("\n")
+		}
+	}
+}
+
+func (r *DefaultReporter) emitSource(indent uint, fc types.FunctionCall) {
+	lines := fc.Source
+	if len(lines) == 0 {
+		return
+	}
+
+	lTrim := 100000
+	for _, line := range lines {
+		lTrimLine := len(line) - len(strings.TrimLeft(line, " \t"))
+		if lTrimLine < lTrim && len(line) > 0 {
+			lTrim = lTrimLine
+		}
+	}
+	if lTrim == 100000 {
+		lTrim = 0
+	}
+
+	for idx, line := range lines {
+		if len(line) > lTrim {
+			line = line[lTrim:]
+		}
+		if idx == fc.SourceHighlight {
+			r.emit(r.fi(indent, "{{bold}}{{orange}}> %s{{/}}\n", line))
+		} else {
+			r.emit(r.fi(indent, "| %s\n", line))
+		}
 	}
 }
 

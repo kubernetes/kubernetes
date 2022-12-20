@@ -24,12 +24,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/controlplane"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -67,9 +65,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 			}
 			opts.Authentication.ServiceAccounts.Issuers = []string{iss}
 			opts.Authentication.ServiceAccounts.KeyFiles = []string{tmpfile.Name()}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+			opts.Authorization.Modes = []string{"AlwaysAllow"}
 		},
 	})
 	defer tearDownFn()

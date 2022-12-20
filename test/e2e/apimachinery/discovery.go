@@ -49,7 +49,7 @@ var _ = SIGDescribe("Discovery", func() {
 		setupServerCert(namespaceName, serviceName)
 	})
 
-	ginkgo.It("should accurately determine present and missing resources", func() {
+	ginkgo.It("should accurately determine present and missing resources", func(ctx context.Context) {
 		// checks that legacy api group resources function
 		ok, err := clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"})
 		framework.ExpectNoError(err)
@@ -76,12 +76,12 @@ var _ = SIGDescribe("Discovery", func() {
 		}
 	})
 
-	ginkgo.It("Custom resource should have storage version hash", func() {
+	ginkgo.It("Custom resource should have storage version hash", func(ctx context.Context) {
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
 		}
-		defer testcrd.CleanUp()
+		ginkgo.DeferCleanup(testcrd.CleanUp)
 		spec := testcrd.Crd.Spec
 		resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
 		if err != nil {
@@ -119,11 +119,11 @@ var _ = SIGDescribe("Discovery", func() {
 	   Description: Ensure that a list of apis is retrieved.
 	   Each api group found MUST return a valid PreferredVersion unless the group suffix is example.com.
 	*/
-	framework.ConformanceIt("should validate PreferredVersion for each APIGroup", func() {
+	framework.ConformanceIt("should validate PreferredVersion for each APIGroup", func(ctx context.Context) {
 
 		// get list of APIGroup endpoints
 		list := &metav1.APIGroupList{}
-		err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(context.TODO()).Into(list)
+		err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(ctx).Into(list)
 		framework.ExpectNoError(err, "Failed to find /apis/")
 		framework.ExpectNotEqual(len(list.Groups), 0, "Missing APIGroups")
 
@@ -137,7 +137,7 @@ var _ = SIGDescribe("Discovery", func() {
 			// locate APIGroup endpoint
 			checkGroup := &metav1.APIGroup{}
 			apiPath := "/apis/" + group.Name + "/"
-			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(context.TODO()).Into(checkGroup)
+			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(ctx).Into(checkGroup)
 			framework.ExpectNoError(err, "Fail to access: %s", apiPath)
 			framework.ExpectNotEqual(len(checkGroup.Versions), 0, "No version found for %v", group.Name)
 			framework.Logf("PreferredVersion.GroupVersion: %s", checkGroup.PreferredVersion.GroupVersion)

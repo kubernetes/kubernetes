@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/pointer"
 )
 
 func TestSchedulerCreation(t *testing.T) {
@@ -237,25 +238,21 @@ func TestFailureHandler(t *testing.T) {
 
 	tests := []struct {
 		name                       string
-		injectErr                  error
 		podUpdatedDuringScheduling bool // pod is updated during a scheduling cycle
 		podDeletedDuringScheduling bool // pod is deleted during a scheduling cycle
 		expect                     *v1.Pod
 	}{
 		{
 			name:                       "pod is updated during a scheduling cycle",
-			injectErr:                  nil,
 			podUpdatedDuringScheduling: true,
 			expect:                     testPodUpdated,
 		},
 		{
-			name:      "pod is not updated during a scheduling cycle",
-			injectErr: nil,
-			expect:    testPod,
+			name:   "pod is not updated during a scheduling cycle",
+			expect: testPod,
 		},
 		{
 			name:                       "pod is deleted during a scheduling cycle",
-			injectErr:                  nil,
 			podDeletedDuringScheduling: true,
 			expect:                     nil,
 		},
@@ -292,8 +289,8 @@ func TestFailureHandler(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
-			s.FailureHandler(ctx, fwk, testPodInfo, tt.injectErr, v1.PodReasonUnschedulable, nil)
+			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable), nil, time.Now())
 
 			var got *v1.Pod
 			if tt.podUpdatedDuringScheduling {
@@ -367,8 +364,8 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
-			s.FailureHandler(ctx, fwk, testPodInfo, tt.injectErr, v1.PodReasonUnschedulable, nil)
+			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(tt.injectErr), nil, time.Now())
 
 			gotNodes := schedulerCache.Dump().Nodes
 			gotNodeNames := sets.NewString()
@@ -406,8 +403,8 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
-	s.FailureHandler(ctx, fwk, testPodInfo, fmt.Errorf("binding rejected: timeout"), v1.PodReasonUnschedulable, nil)
+	testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+	s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
 
 	pod := getPodFromPriorityQueue(queue, testPod)
 	if pod != nil {
@@ -415,10 +412,54 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 	}
 }
 
+// TestWithPercentageOfNodesToScore tests scheduler's PercentageOfNodesToScore is set correctly.
+func TestWithPercentageOfNodesToScore(t *testing.T) {
+	tests := []struct {
+		name                           string
+		percentageOfNodesToScoreConfig *int32
+		wantedPercentageOfNodesToScore int32
+	}{
+		{
+			name:                           "percentageOfNodesScore is nil",
+			percentageOfNodesToScoreConfig: nil,
+			wantedPercentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+		},
+		{
+			name:                           "percentageOfNodesScore is not nil",
+			percentageOfNodesToScoreConfig: pointer.Int32(10),
+			wantedPercentageOfNodesToScore: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			sched, err := New(
+				client,
+				informerFactory,
+				nil,
+				profile.NewRecorderFactory(eventBroadcaster),
+				stopCh,
+				WithPercentageOfNodesToScore(tt.percentageOfNodesToScoreConfig),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create scheduler: %v", err)
+			}
+			if sched.percentageOfNodesToScore != tt.wantedPercentageOfNodesToScore {
+				t.Errorf("scheduler.percercentageOfNodesToScore = %v, want %v", sched.percentageOfNodesToScore, tt.wantedPercentageOfNodesToScore)
+			}
+		})
+	}
+}
+
 // getPodFromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
 // the specific pod from the given priority queue. It returns the found pod in the priority queue.
 func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
-	podList := queue.PendingPods()
+	podList, _ := queue.PendingPods()
 	if len(podList) == 0 {
 		return nil
 	}
@@ -460,17 +501,14 @@ func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue intern
 		return nil, nil, err
 	}
 
-	s := newScheduler(
-		cache,
-		nil,
-		nil,
-		stop,
-		queue,
-		profile.Map{testSchedulerName: fwk},
-		client,
-		nil,
-		0,
-	)
+	s := &Scheduler{
+		Cache:           cache,
+		client:          client,
+		StopEverything:  stop,
+		SchedulingQueue: queue,
+		Profiles:        profile.Map{testSchedulerName: fwk},
+	}
+	s.applyDefaultHandlers()
 
 	return s, fwk, nil
 }

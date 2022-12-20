@@ -34,9 +34,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -840,8 +840,12 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(lbName string, instances map[
 		for sgID, sg := range clusterSGs {
 			sgPerms := NewIPPermissionSet(sg.IpPermissions...).Ungroup()
 			if desiredSGIDs.Has(sgID) {
-				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, healthRuleAnnotation, "tcp", healthCheckPorts, subnetCIDRs); err != nil {
-					return err
+				// If the client rule is 1) all addresses 2) tcp and 3) has same ports as the healthcheck,
+				// then the health rules are a subset of the client rule and are not needed.
+				if len(clientCIDRs) != 1 || clientCIDRs[0] != "0.0.0.0/0" || clientProtocol != "tcp" || !healthCheckPorts.Equal(clientPorts) {
+					if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, healthRuleAnnotation, "tcp", healthCheckPorts, subnetCIDRs); err != nil {
+						return err
+					}
 				}
 				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, clientRuleAnnotation, clientProtocol, clientPorts, clientCIDRs); err != nil {
 					return err
@@ -1240,8 +1244,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 // syncElbListeners computes a plan to reconcile the desired vs actual state of the listeners on an ELB
 // NOTE: there exists an O(nlgn) implementation for this function. However, as the default limit of
-//
-//	listeners per elb is 100, this implementation is reduced from O(m*n) => O(n).
+// listeners per elb is 100, this implementation is reduced from O(m*n) => O(n).
 func syncElbListeners(loadBalancerName string, listeners []*elb.Listener, listenerDescriptions []*elb.ListenerDescription) ([]*elb.Listener, []*int64) {
 	foundSet := make(map[int]bool)
 	removals := []*int64{}

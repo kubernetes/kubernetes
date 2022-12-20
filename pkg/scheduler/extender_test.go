@@ -295,18 +295,16 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := newScheduler(
-				cache,
-				extenders,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				emptySnapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore)
+			sched := &Scheduler{
+				Cache:                    cache,
+				nodeInfoSnapshot:         emptySnapshot,
+				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+				Extenders:                extenders,
+			}
+			sched.applyDefaultHandlers()
+
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
+			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)
@@ -356,9 +354,17 @@ func TestIsInterested(t *testing.T) {
 			want:     false,
 		},
 		{
-			label:    "Managed memory, container memory",
+			label:    "Managed memory, container memory with Requests",
 			extender: mem,
 			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				"memory": "0",
+			}).Obj(),
+			want: true,
+		},
+		{
+			label:    "Managed memory, container memory with Limits",
+			extender: mem,
+			pod: st.MakePod().Lim(map[v1.ResourceName]string{
 				"memory": "0",
 			}).Obj(),
 			want: true,

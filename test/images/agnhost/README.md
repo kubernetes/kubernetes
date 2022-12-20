@@ -668,5 +668,5 @@ The Windows `agnhost` image includes a `nc` binary that is 100% compliant with i
 ## Image
 
 The image can be found at `registry.k8s.io/e2e-test-images/agnhost:2.40` for both Linux and
-Windows containers (based on `mcr.microsoft.com/windows/nanoserver:1809`, `mcr.microsoft.com/windows/nanoserver:20H2`, and
+Windows containers (based on `mcr.microsoft.com/windows/nanoserver:1809` and
 `mcr.microsoft.com/windows/nanoserver:ltsc2022`).

@@ -64,16 +64,6 @@ const (
 	ProbeRemove
 )
 
-var (
-	deprecatedVolumeProviders = map[string]string{
-		"kubernetes.io/cinder":    "The Cinder volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/storageos": "The StorageOS volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/quobyte":   "The Quobyte volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/flocker":   "The Flocker volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/glusterfs": "The GlusterFS volume provider is deprecated and will be removed soon after in a subsequent release",
-	}
-)
-
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {
 	// The attributes below are required by volume.Provisioner
@@ -176,7 +166,7 @@ type VolumePlugin interface {
 	// and volumePath. The spec may have incomplete information due to limited
 	// information from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk
-	ConstructVolumeSpec(volumeName, volumePath string) (*Spec, error)
+	ConstructVolumeSpec(volumeName, volumePath string) (ReconstructedVolume, error)
 
 	// SupportsMountOption returns true if volume plugins supports Mount options
 	// Specifying mount options in a volume plugin that doesn't support
@@ -580,6 +570,16 @@ type VolumeConfig struct {
 	ProvisioningEnabled bool
 }
 
+// ReconstructedVolume contains information about a volume reconstructed by
+// ConstructVolumeSpec().
+type ReconstructedVolume struct {
+	// Spec is the volume spec of a mounted volume
+	Spec *Spec
+	// SELinuxMountContext is value of -o context=XYZ mount option.
+	// If empty, no such mount option is used.
+	SELinuxMountContext string
+}
+
 // NewSpecFromVolume creates an Spec from an v1.Volume
 func NewSpecFromVolume(vs *v1.Volume) *Spec {
 	return &Spec{
@@ -698,8 +698,6 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 
-	// Issue warning if the matched provider is deprecated
-	pm.logDeprecation(match.GetPluginName())
 	return match, nil
 }
 
@@ -726,20 +724,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	if match == nil {
 		return nil, fmt.Errorf("no volume plugin matched name: %s", name)
 	}
-
-	// Issue warning if the matched provider is deprecated
-	pm.logDeprecation(match.GetPluginName())
 	return match, nil
-}
-
-// logDeprecation logs warning when a deprecated plugin is used.
-func (pm *VolumePluginMgr) logDeprecation(plugin string) {
-	if detail, ok := deprecatedVolumeProviders[plugin]; ok && !pm.loggedDeprecationWarnings.Has(plugin) {
-		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", plugin, detail)
-		// Make sure the message is logged only once. It has Warning severity
-		// and we don't want to spam the log too much.
-		pm.loggedDeprecationWarnings.Insert(plugin)
-	}
 }
 
 // Check if probedPlugin cache update is required.

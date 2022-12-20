@@ -39,11 +39,11 @@ type LeaseLock struct {
 
 // Get returns the election record from a Lease spec
 func (ll *LeaseLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
-	var err error
-	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Get(ctx, ll.LeaseMeta.Name, metav1.GetOptions{})
+	lease, err := ll.Client.Leases(ll.LeaseMeta.Namespace).Get(ctx, ll.LeaseMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
+	ll.lease = lease
 	record := LeaseSpecToLeaderElectionRecord(&ll.lease.Spec)
 	recordByte, err := json.Marshal(*record)
 	if err != nil {

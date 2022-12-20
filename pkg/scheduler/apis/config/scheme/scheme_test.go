@@ -48,6 +48,7 @@ func TestCodecsDecodePluginConfig(t *testing.T) {
 			data: []byte(`
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
+percentageOfNodesToScore: 0
 profiles:
 - pluginConfig:
   - name: DefaultPreemption
@@ -94,8 +95,9 @@ profiles:
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
-					SchedulerName: "default-scheduler",
-					Plugins:       defaults.PluginsV1beta2,
+					SchedulerName:            "default-scheduler",
+					PercentageOfNodesToScore: nil,
+					Plugins:                  defaults.PluginsV1beta2,
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
@@ -166,6 +168,22 @@ profiles:
 							},
 						},
 					},
+				},
+			},
+		},
+		{
+			name: "v1beta2 with non-default global percentageOfNodesToScore",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1beta2
+kind: KubeSchedulerConfiguration
+percentageOfNodesToScore: 10
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName:            "default-scheduler",
+					PercentageOfNodesToScore: nil,
+					Plugins:                  defaults.PluginsV1beta2,
+					PluginConfig:             defaults.PluginConfigsV1beta2,
 				},
 			},
 		},
@@ -511,6 +529,22 @@ profiles:
 			},
 		},
 		{
+			name: "v1beta3 with non-default global percentageOfNodesToScore",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1beta3
+kind: KubeSchedulerConfiguration
+percentageOfNodesToScore: 10
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName:            "default-scheduler",
+					PercentageOfNodesToScore: nil,
+					Plugins:                  defaults.PluginsV1beta3,
+					PluginConfig:             defaults.PluginConfigsV1beta3,
+				},
+			},
+		},
+		{
 			name: "v1beta3 plugins can include version and kind",
 			data: []byte(`
 apiVersion: kubescheduler.config.k8s.io/v1beta3
@@ -776,8 +810,9 @@ profiles:
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
-					SchedulerName: "default-scheduler",
-					Plugins:       defaults.PluginsV1,
+					SchedulerName:            "default-scheduler",
+					PercentageOfNodesToScore: nil,
+					Plugins:                  defaults.PluginsV1,
 					PluginConfig: []config.PluginConfig{
 						{
 							Name: "DefaultPreemption",
@@ -848,6 +883,40 @@ profiles:
 							},
 						},
 					},
+				},
+			},
+		},
+		{
+			name: "v1 with non-default global percentageOfNodesToScore",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+percentageOfNodesToScore: 10
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName:            "default-scheduler",
+					PercentageOfNodesToScore: nil,
+					Plugins:                  defaults.PluginsV1,
+					PluginConfig:             defaults.PluginConfigsV1,
+				},
+			},
+		},
+		{
+			name: "v1 with non-default global and profile percentageOfNodesToScore",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+percentageOfNodesToScore: 10
+profiles:
+- percentageOfNodesToScore: 20
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName:            "default-scheduler",
+					PercentageOfNodesToScore: pointer.Int32(20),
+					Plugins:                  defaults.PluginsV1,
+					PluginConfig:             defaults.PluginConfigsV1,
 				},
 			},
 		},
@@ -1109,7 +1178,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
 									Object: &v1beta2.InterPodAffinityArgs{
-										HardPodAffinityWeight: pointer.Int32Ptr(5),
+										HardPodAffinityWeight: pointer.Int32(5),
 									},
 								},
 							},
@@ -1117,7 +1186,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								Name: "VolumeBinding",
 								Args: runtime.RawExtension{
 									Object: &v1beta2.VolumeBindingArgs{
-										BindTimeoutSeconds: pointer.Int64Ptr(300),
+										BindTimeoutSeconds: pointer.Int64(300),
 										Shape: []v1beta2.UtilizationShapePoint{
 											{
 												Utilization: 0,
@@ -1284,7 +1353,6 @@ leaderElection:
   retryPeriod: 0s
 metricsBindAddress: ""
 parallelism: 8
-percentageOfNodesToScore: 0
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
 profiles:
@@ -1330,7 +1398,7 @@ profiles:
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
 									Object: &v1beta3.InterPodAffinityArgs{
-										HardPodAffinityWeight: pointer.Int32Ptr(5),
+										HardPodAffinityWeight: pointer.Int32(5),
 									},
 								},
 							},
@@ -1338,7 +1406,7 @@ profiles:
 								Name: "VolumeBinding",
 								Args: runtime.RawExtension{
 									Object: &v1beta2.VolumeBindingArgs{
-										BindTimeoutSeconds: pointer.Int64Ptr(300),
+										BindTimeoutSeconds: pointer.Int64(300),
 										Shape: []v1beta2.UtilizationShapePoint{
 											{
 												Utilization: 0,
@@ -1503,7 +1571,6 @@ leaderElection:
   resourceNamespace: ""
   retryPeriod: 0s
 parallelism: 8
-percentageOfNodesToScore: 0
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
 profiles:
@@ -1549,7 +1616,7 @@ profiles:
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
 									Object: &v1.InterPodAffinityArgs{
-										HardPodAffinityWeight: pointer.Int32Ptr(5),
+										HardPodAffinityWeight: pointer.Int32(5),
 									},
 								},
 							},
@@ -1557,7 +1624,7 @@ profiles:
 								Name: "VolumeBinding",
 								Args: runtime.RawExtension{
 									Object: &v1.VolumeBindingArgs{
-										BindTimeoutSeconds: pointer.Int64Ptr(300),
+										BindTimeoutSeconds: pointer.Int64(300),
 										Shape: []v1.UtilizationShapePoint{
 											{
 												Utilization: 0,
@@ -1722,7 +1789,6 @@ leaderElection:
   resourceNamespace: ""
   retryPeriod: 0s
 parallelism: 8
-percentageOfNodesToScore: 0
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
 profiles:

@@ -17,13 +17,15 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -40,10 +42,10 @@ var _ = utils.SIGDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
 		e2eskipper.SkipUnlessProviderIs("gke")
 	})
 
-	ginkgo.It("should write and read from node local SSD [Feature:GKELocalSSD]", func() {
+	ginkgo.It("should write and read from node local SSD [Feature:GKELocalSSD]", func(ctx context.Context) {
 		framework.Logf("Start local SSD test")
 		createNodePoolWithLocalSsds("np-ssd")
-		doTestWriteAndReadToLocalSsd(f)
+		doTestWriteAndReadToLocalSsd(ctx, f)
 	})
 })
 
@@ -60,12 +62,12 @@ func createNodePoolWithLocalSsds(nodePoolName string) {
 	framework.Logf("Successfully created node pool %s:\n%v", nodePoolName, string(out))
 }
 
-func doTestWriteAndReadToLocalSsd(f *framework.Framework) {
+func doTestWriteAndReadToLocalSsd(ctx context.Context, f *framework.Framework) {
 	var pod = testPodWithSsd("echo 'hello world' > /mnt/disks/ssd0/data  && sleep 1 && cat /mnt/disks/ssd0/data")
 	var msg string
 	var out = []string{"hello world"}
 
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2eoutput.TestContainerOutput(ctx, f, msg, pod, 0, out)
 }
 
 func testPodWithSsd(command string) *v1.Pod {

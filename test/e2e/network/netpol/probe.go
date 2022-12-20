@@ -32,8 +32,9 @@ type Prober interface {
 
 // ProbeJob packages the data for the input of a pod->pod connectivity probe
 type ProbeJob struct {
-	PodFrom        *Pod
-	PodTo          *Pod
+	PodFrom        TestPod
+	PodTo          TestPod
+	PodToServiceIP string
 	ToPort         int
 	ToPodDNSDomain string
 	Protocol       v1.Protocol
@@ -48,13 +49,12 @@ type ProbeJobResults struct {
 }
 
 // ProbePodToPodConnectivity runs a series of probes in kube, and records the results in `testCase.Reachability`
-func ProbePodToPodConnectivity(prober Prober, model *Model, testCase *TestCase) {
-	allPods := model.AllPods()
+func ProbePodToPodConnectivity(prober Prober, allPods []TestPod, dnsDomain string, testCase *TestCase) {
 	size := len(allPods) * len(allPods)
 	jobs := make(chan *ProbeJob, size)
 	results := make(chan *ProbeJobResults, size)
-	for i := 0; i < model.GetWorkers(); i++ {
-		go probeWorker(prober, jobs, results, model.GetProbeTimeoutSeconds())
+	for i := 0; i < getWorkers(); i++ {
+		go probeWorker(prober, jobs, results, getProbeTimeoutSeconds())
 	}
 	for _, podFrom := range allPods {
 		for _, podTo := range allPods {
@@ -62,7 +62,7 @@ func ProbePodToPodConnectivity(prober Prober, model *Model, testCase *TestCase) 
 				PodFrom:        podFrom,
 				PodTo:          podTo,
 				ToPort:         testCase.ToPort,
-				ToPodDNSDomain: model.DNSDomain,
+				ToPodDNSDomain: dnsDomain,
 				Protocol:       testCase.Protocol,
 			}
 		}
@@ -95,6 +95,7 @@ func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobR
 	defer ginkgo.GinkgoRecover()
 	for job := range jobs {
 		podFrom := job.PodFrom
+		// defensive programming: this should not be possible as we already check in initializeClusterFromModel
 		if netutils.ParseIPSloppy(job.PodTo.ServiceIP) == nil {
 			results <- &ProbeJobResults{
 				Job:         job,
@@ -111,7 +112,7 @@ func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobR
 		connected, command, err := prober.probeConnectivity(&probeConnectivityArgs{
 			nsFrom:         podFrom.Namespace,
 			podFrom:        podFrom.Name,
-			containerFrom:  podFrom.Containers[0].Name(),
+			containerFrom:  podFrom.ContainerName,
 			addrTo:         job.PodTo.ServiceIP,
 			protocol:       job.Protocol,
 			toPort:         job.ToPort,

@@ -17,7 +17,6 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +24,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
@@ -40,14 +38,14 @@ func TestMoveFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create cert file %s: %v", certPath, err)
 	}
-	defer certFile.Close()
+	certFile.Close()
 
 	keyPath := filepath.Join(tmpdir, constants.APIServerKeyName)
 	keyFile, err := os.OpenFile(keyPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 	if err != nil {
 		t.Fatalf("Failed to create key file %s: %v", keyPath, err)
 	}
-	defer keyFile.Close()
+	keyFile.Close()
 
 	subDir := filepath.Join(tmpdir, "expired")
 	if err := os.Mkdir(subDir, 0766); err != nil {
@@ -101,47 +99,5 @@ func TestRollbackFiles(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), errString) {
 		t.Fatalf("Expected error contains %q, got %v", errString, err)
-	}
-}
-
-func TestUpdateKubeletDynamicEnvFileWithURLScheme(t *testing.T) {
-	tcases := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "missing flag of interest",
-			input:    fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "add missing URL scheme",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint=/some/endpoint --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint=%s:///some/endpoint --bar=def\"", constants.KubeletEnvFileVariableName, kubeadmapiv1.DefaultContainerRuntimeURLScheme),
-		},
-		{
-			name:     "add missing URL scheme if there is no '=' after the flag name",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint /some/endpoint --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint %s:///some/endpoint --bar=def\"", constants.KubeletEnvFileVariableName, kubeadmapiv1.DefaultContainerRuntimeURLScheme),
-		},
-		{
-			name:     "empty flag of interest value following '='",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint= --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint= --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-		{
-			name:     "empty flag of interest value without '='",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint --bar=def\"", constants.KubeletEnvFileVariableName),
-		},
-	}
-	for _, tt := range tcases {
-		t.Run(tt.name, func(t *testing.T) {
-			output := updateKubeletDynamicEnvFileWithURLScheme(tt.input)
-			if output != tt.expected {
-				t.Errorf("expected output: %q, got: %q", tt.expected, output)
-			}
-		})
 	}
 }

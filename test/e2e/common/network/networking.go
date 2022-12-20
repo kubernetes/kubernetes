@@ -17,6 +17,8 @@ limitations under the License.
 package network
 
 import (
+	"context"
+
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,13 +33,13 @@ var _ = SIGDescribe("Networking", func() {
 
 	ginkgo.Describe("Granular Checks: Pods", func() {
 
-		checkPodToPodConnectivity := func(config *e2enetwork.NetworkingTestConfig, protocol string, port int) {
+		checkPodToPodConnectivity := func(ctx context.Context, config *e2enetwork.NetworkingTestConfig, protocol string, port int) {
 			// breadth first poll to quickly estimate failure.
 			failedPodsByHost := map[string][]*v1.Pod{}
 			// First time, we'll quickly try all pods, breadth first.
 			for _, endpointPod := range config.EndpointPods {
 				framework.Logf("Breadth first check of %v on host %v...", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
-				if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, 1, 0, sets.NewString(endpointPod.Name)); err != nil {
+				if err := config.DialFromTestContainer(ctx, protocol, endpointPod.Status.PodIP, port, 1, 0, sets.NewString(endpointPod.Name)); err != nil {
 					if _, ok := failedPodsByHost[endpointPod.Status.HostIP]; !ok {
 						failedPodsByHost[endpointPod.Status.HostIP] = []*v1.Pod{}
 					}
@@ -52,7 +54,7 @@ var _ = SIGDescribe("Networking", func() {
 				framework.Logf("Doublechecking %v pods in host %v which weren't seen the first time.", len(failedPods), host)
 				for _, endpointPod := range failedPods {
 					framework.Logf("Now attempting to probe pod [[[ %v ]]]", endpointPod.Status.PodIP)
-					if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {
+					if err := config.DialFromTestContainer(ctx, protocol, endpointPod.Status.PodIP, port, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {
 						errors = append(errors, err)
 					} else {
 						framework.Logf("Was able to reach %v on %v ", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
@@ -79,9 +81,9 @@ var _ = SIGDescribe("Networking", func() {
 			Description: Create a hostexec pod that is capable of curl to netcat commands. Create a test Pod that will act as a webserver front end exposing ports 8080 for tcp and 8081 for udp. The netserver service proxies are created on specified number of nodes.
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 		*/
-		framework.ConformanceIt("should function for intra-pod communication: http [NodeConformance]", func() {
-			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
-			checkPodToPodConnectivity(config, "http", e2enetwork.EndpointHTTPPort)
+		framework.ConformanceIt("should function for intra-pod communication: http [NodeConformance]", func(ctx context.Context) {
+			config := e2enetwork.NewCoreNetworkingTestConfig(ctx, f, false)
+			checkPodToPodConnectivity(ctx, config, "http", e2enetwork.EndpointHTTPPort)
 		})
 
 		/*
@@ -90,9 +92,9 @@ var _ = SIGDescribe("Networking", func() {
 			Description: Create a hostexec pod that is capable of curl to netcat commands. Create a test Pod that will act as a webserver front end exposing ports 8080 for tcp and 8081 for udp. The netserver service proxies are created on specified number of nodes.
 			The kubectl exec on the webserver container MUST reach a udp port on the each of service proxy endpoints in the cluster and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 		*/
-		framework.ConformanceIt("should function for intra-pod communication: udp [NodeConformance]", func() {
-			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
-			checkPodToPodConnectivity(config, "udp", e2enetwork.EndpointUDPPort)
+		framework.ConformanceIt("should function for intra-pod communication: udp [NodeConformance]", func(ctx context.Context) {
+			config := e2enetwork.NewCoreNetworkingTestConfig(ctx, f, false)
+			checkPodToPodConnectivity(ctx, config, "udp", e2enetwork.EndpointUDPPort)
 		})
 
 		/*
@@ -102,10 +104,10 @@ var _ = SIGDescribe("Networking", func() {
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster using a http post(protocol=tcp)  and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 			This test is marked LinuxOnly it breaks when using Overlay networking with Windows.
 		*/
-		framework.ConformanceIt("should function for node-pod communication: http [LinuxOnly] [NodeConformance]", func() {
-			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
+		framework.ConformanceIt("should function for node-pod communication: http [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+			config := e2enetwork.NewCoreNetworkingTestConfig(ctx, f, true)
 			for _, endpointPod := range config.EndpointPods {
-				err := config.DialFromNode("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				err := config.DialFromNode(ctx, "http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 				if err != nil {
 					framework.Failf("Error dialing HTTP node to pod %v", err)
 				}
@@ -119,28 +121,26 @@ var _ = SIGDescribe("Networking", func() {
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster using a http post(protocol=udp)  and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 			This test is marked LinuxOnly it breaks when using Overlay networking with Windows.
 		*/
-		framework.ConformanceIt("should function for node-pod communication: udp [LinuxOnly] [NodeConformance]", func() {
-			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
+		framework.ConformanceIt("should function for node-pod communication: udp [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+			config := e2enetwork.NewCoreNetworkingTestConfig(ctx, f, true)
 			for _, endpointPod := range config.EndpointPods {
-				err := config.DialFromNode("udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				err := config.DialFromNode(ctx, "udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 				if err != nil {
 					framework.Failf("Error dialing UDP from node to pod: %v", err)
 				}
 			}
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
-			checkPodToPodConnectivity(config, "sctp", e2enetwork.EndpointSCTPPort)
+		ginkgo.It("should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity]", func(ctx context.Context) {
+			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableSCTP)
+			checkPodToPodConnectivity(ctx, config, "sctp", e2enetwork.EndpointSCTPPort)
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]", func() {
+		ginkgo.It("should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity]", func(ctx context.Context) {
 			ginkgo.Skip("Skipping SCTP node to pod test until DialFromNode supports SCTP #96482")
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
+			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableSCTP)
 			for _, endpointPod := range config.EndpointPods {
-				err := config.DialFromNode("sctp", endpointPod.Status.PodIP, e2enetwork.EndpointSCTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				err := config.DialFromNode(ctx, "sctp", endpointPod.Status.PodIP, e2enetwork.EndpointSCTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 				if err != nil {
 					framework.Failf("Error dialing SCTP from node to pod: %v", err)
 				}

@@ -25,12 +25,14 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
@@ -376,6 +378,18 @@ func addAllEventHandlers(
 			informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
 				buildEvtResHandler(at, framework.PersistentVolumeClaim, "Pvc"),
 			)
+		case framework.PodScheduling:
+			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+				_, _ = informerFactory.Resource().V1alpha1().PodSchedulings().Informer().AddEventHandler(
+					buildEvtResHandler(at, framework.PodScheduling, "PodScheduling"),
+				)
+			}
+		case framework.ResourceClaim:
+			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+				_, _ = informerFactory.Resource().V1alpha1().ResourceClaims().Informer().AddEventHandler(
+					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"),
+				)
+			}
 		case framework.StorageClass:
 			if at&framework.Add != 0 {
 				informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(

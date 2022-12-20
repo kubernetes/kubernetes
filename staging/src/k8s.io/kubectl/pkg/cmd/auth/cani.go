@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -154,7 +153,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		}
 	} else {
 		if o.Quiet {
-			o.Out = ioutil.Discard
+			o.Out = io.Discard
 		}
 
 		switch len(args) {
@@ -174,7 +173,9 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 				o.ResourceName = resourceTokens[1]
 			}
 		default:
-			return errors.New("you must specify two or three arguments: verb, resource, and optional resourceName")
+			errString := "you must specify two arguments: verb resource or verb resource/resourceName."
+			usageString := "See 'kubectl auth can-i -h' for help and examples."
+			return errors.New(fmt.Sprintf("%s\n%s", errString, usageString))
 		}
 	}
 

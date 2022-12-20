@@ -1,0 +1,5 @@
+{
+  "kind": "NodeProxyOptions",
+  "apiVersion": "v1",
+  "path": "pathValue"
+}

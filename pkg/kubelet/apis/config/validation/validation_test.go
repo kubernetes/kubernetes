@@ -34,8 +34,8 @@ import (
 
 var (
 	successConfig = kubeletconfig.KubeletConfiguration{
-		CgroupsPerQOS:                   true,
-		EnforceNodeAllocatable:          []string{"pods", "system-reserved", "kube-reserved"},
+		CgroupsPerQOS:                   cgroupsPerQOS,
+		EnforceNodeAllocatable:          enforceNodeAllocatable,
 		SystemReservedCgroup:            "/system.slice",
 		KubeReservedCgroup:              "/kubelet.service",
 		SystemCgroups:                   "",
@@ -157,7 +157,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.CPUCFSQuotaPeriod = metav1.Duration{Duration: 2 * time.Second}
 				return conf
 			},
-			errMsg: "invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) {2s} must be between 1usec and 1sec, inclusive",
+			errMsg: "invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) {2s} must be between 1ms and 1sec, inclusive",
 		},
 		{
 			name: "invalid ImageGCHighThresholdPercent",
@@ -527,6 +527,32 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "tracing.endpoint: Invalid value: \"dn%2s://localhost:4317\": parse \"dn%2s://localhost:4317\": first path segment in URL cannot contain colon",
+		},
+		{
+			name: "invalid GracefulNodeShutdownBasedOnPodPriority",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"GracefulNodeShutdownBasedOnPodPriority": true}
+				conf.ShutdownGracePeriodByPodPriority = []kubeletconfig.ShutdownGracePeriodByPodPriority{
+					{
+						Priority:                   0,
+						ShutdownGracePeriodSeconds: 0,
+					}}
+				return conf
+			},
+			errMsg: "invalid configuration: Cannot specify both shutdownGracePeriodByPodPriority and shutdownGracePeriod at the same time",
+		},
+		{
+			name: "Specifying shutdownGracePeriodByPodPriority without enable GracefulNodeShutdownBasedOnPodPriority",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"GracefulNodeShutdownBasedOnPodPriority": false}
+				conf.ShutdownGracePeriodByPodPriority = []kubeletconfig.ShutdownGracePeriodByPodPriority{
+					{
+						Priority:                   0,
+						ShutdownGracePeriodSeconds: 0,
+					}}
+				return conf
+			},
+			errMsg: "invalid configuration: Specifying shutdownGracePeriodByPodPriority requires feature gate GracefulNodeShutdownBasedOnPodPriority",
 		},
 	}
 

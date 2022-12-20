@@ -22,12 +22,16 @@ package kuberuntime
 const (
 	milliCPUToCPU = 1000
 
-	// 100000 is equivalent to 100ms
-	quotaPeriod    = 100000
+	// 100000 microseconds is equivalent to 100ms
+	quotaPeriod = 100000
+	// 1000 microseconds is equivalent to 1ms
+	// defined here:
+	// https://github.com/torvalds/linux/blob/cac03ac368fabff0122853de2422d4e17a32de08/kernel/sched/core.c#L10546
 	minQuotaPeriod = 1000
 )
 
 // milliCPUToQuota converts milliCPU to CFS quota and period values
+// Input parameters and resulting value is number of microseconds.
 func milliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	// CFS quota is measured in two values:
 	//  - cfs_period_us=100ms (the amount of time to measure usage across)

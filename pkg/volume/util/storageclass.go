@@ -17,9 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
+	"sort"
+
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	storagev1listers "k8s.io/client-go/listers/storage/v1"
@@ -54,10 +54,19 @@ func GetDefaultClass(lister storagev1listers.StorageClassLister) (*storagev1.Sto
 	if len(defaultClasses) == 0 {
 		return nil, nil
 	}
+
+	// Primary sort by creation timestamp, newest first
+	// Secondary sort by class name, ascending order
+	sort.Slice(defaultClasses, func(i, j int) bool {
+		if defaultClasses[i].CreationTimestamp.UnixNano() == defaultClasses[j].CreationTimestamp.UnixNano() {
+			return defaultClasses[i].Name < defaultClasses[j].Name
+		}
+		return defaultClasses[i].CreationTimestamp.UnixNano() > defaultClasses[j].CreationTimestamp.UnixNano()
+	})
 	if len(defaultClasses) > 1 {
-		klog.V(4).Infof("GetDefaultClass %d defaults found", len(defaultClasses))
-		return nil, errors.NewInternalError(fmt.Errorf("%d default StorageClasses were found", len(defaultClasses)))
+		klog.V(4).Infof("%d default StorageClasses were found, choosing the newest: %s", len(defaultClasses), defaultClasses[0].Name)
 	}
+
 	return defaultClasses[0], nil
 }
 

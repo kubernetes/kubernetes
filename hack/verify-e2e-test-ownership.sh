@@ -41,7 +41,8 @@ fi
 pushd "${KUBE_ROOT}" > /dev/null
 
 # Setup a tmpdir to hold generated scripts and results
-readonly tmpdir=$(mktemp -d -t verify-e2e-test-ownership.XXXX)
+tmpdir=$(mktemp -d -t verify-e2e-test-ownership.XXXX)
+readonly tmpdir
 trap 'rm -rf ${tmpdir}' EXIT
 
 # input

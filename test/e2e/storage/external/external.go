@@ -34,7 +34,6 @@ import (
 	klog "k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -162,7 +161,7 @@ func (t testDriverParameter) Set(filename string) error {
 // to define the tests.
 func AddDriverDefinition(filename string) error {
 	driver, err := loadDriverDefinition(filename)
-	e2elog.Logf("Driver loaded from path [%s]: %+v", filename, driver)
+	framework.Logf("Driver loaded from path [%s]: %+v", filename, driver)
 	if err != nil {
 		return err
 	}
@@ -271,7 +270,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern storageframework.TestPatt
 
 }
 
-func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (d *driverDefinition) GetDynamicProvisionStorageClass(ctx context.Context, e2econfig *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	var (
 		sc  *storagev1.StorageClass
 		err error
@@ -282,7 +281,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storagefra
 	case d.StorageClass.FromName:
 		sc = &storagev1.StorageClass{Provisioner: d.DriverInfo.Name}
 	case d.StorageClass.FromExistingClassName != "":
-		sc, err = f.ClientSet.StorageV1().StorageClasses().Get(context.TODO(), d.StorageClass.FromExistingClassName, metav1.GetOptions{})
+		sc, err = f.ClientSet.StorageV1().StorageClasses().Get(ctx, d.StorageClass.FromExistingClassName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "getting storage class %s", d.StorageClass.FromExistingClassName)
 	case d.StorageClass.FromFile != "":
 		var ok bool
@@ -293,7 +292,9 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storagefra
 		framework.ExpectNoError(err, "patch items")
 
 		sc, ok = items[0].(*storagev1.StorageClass)
-		framework.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
+		if !ok {
+			framework.Failf("storage class from %s", d.StorageClass.FromFile)
+		}
 	}
 
 	framework.ExpectNotEqual(sc, nil, "storage class is unexpectantly nil")
@@ -359,7 +360,7 @@ func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
 	return snapshotClass, nil
 }
 
-func (d *driverDefinition) GetSnapshotClass(e2econfig *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
+func (d *driverDefinition) GetSnapshotClass(ctx context.Context, e2econfig *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
 	if !d.SnapshotClass.FromName && d.SnapshotClass.FromFile == "" && d.SnapshotClass.FromExistingClassName == "" {
 		e2eskipper.Skipf("Driver %q does not support snapshotting - skipping", d.DriverInfo.Name)
 	}
@@ -372,7 +373,7 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *storageframework.PerTestC
 	case d.SnapshotClass.FromName:
 		// Do nothing (just use empty parameters)
 	case d.SnapshotClass.FromExistingClassName != "":
-		snapshotClass, err := f.DynamicClient.Resource(utils.SnapshotClassGVR).Get(context.TODO(), d.SnapshotClass.FromExistingClassName, metav1.GetOptions{})
+		snapshotClass, err := f.DynamicClient.Resource(utils.SnapshotClassGVR).Get(ctx, d.SnapshotClass.FromExistingClassName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "getting snapshot class %s", d.SnapshotClass.FromExistingClassName)
 
 		if params, ok := snapshotClass.Object["parameters"].(map[string]interface{}); ok {
@@ -414,12 +415,12 @@ func (d *driverDefinition) GetCSIDriverName(e2econfig *storageframework.PerTestC
 	return d.DriverInfo.Name
 }
 
-func (d *driverDefinition) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (d *driverDefinition) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {
 	e2econfig := &storageframework.PerTestConfig{
 		Driver:              d,
 		Prefix:              "external",
 		Framework:           f,
 		ClientNodeSelection: e2epod.NodeSelection{Name: d.ClientNodeName},
 	}
-	return e2econfig, func() {}
+	return e2econfig
 }

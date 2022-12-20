@@ -1,9 +1,11 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
 	"sync"
 
@@ -27,26 +29,38 @@ type Node struct {
 	NodeType types.NodeType
 
 	Text         string
-	Body         func()
+	Body         func(SpecContext)
 	CodeLocation types.CodeLocation
 	NestingLevel int
+	HasContext   bool
 
-	SynchronizedBeforeSuiteProc1Body    func() []byte
-	SynchronizedBeforeSuiteAllProcsBody func([]byte)
+	SynchronizedBeforeSuiteProc1Body              func(SpecContext) []byte
+	SynchronizedBeforeSuiteProc1BodyHasContext    bool
+	SynchronizedBeforeSuiteAllProcsBody           func(SpecContext, []byte)
+	SynchronizedBeforeSuiteAllProcsBodyHasContext bool
 
-	SynchronizedAfterSuiteAllProcsBody func()
-	SynchronizedAfterSuiteProc1Body    func()
+	SynchronizedAfterSuiteAllProcsBody           func(SpecContext)
+	SynchronizedAfterSuiteAllProcsBodyHasContext bool
+	SynchronizedAfterSuiteProc1Body              func(SpecContext)
+	SynchronizedAfterSuiteProc1BodyHasContext    bool
 
 	ReportEachBody       func(types.SpecReport)
 	ReportAfterSuiteBody func(types.Report)
 
-	MarkedFocus          bool
-	MarkedPending        bool
-	MarkedSerial         bool
-	MarkedOrdered        bool
-	MarkedOncePerOrdered bool
-	FlakeAttempts        int
-	Labels               Labels
+	MarkedFocus                     bool
+	MarkedPending                   bool
+	MarkedSerial                    bool
+	MarkedOrdered                   bool
+	MarkedOncePerOrdered            bool
+	MarkedSuppressProgressReporting bool
+	FlakeAttempts                   int
+	MustPassRepeatedly              int
+	Labels                          Labels
+	PollProgressAfter               time.Duration
+	PollProgressInterval            time.Duration
+	NodeTimeout                     time.Duration
+	SpecTimeout                     time.Duration
+	GracePeriod                     time.Duration
 
 	NodeIDWhereCleanupWasGenerated uint
 }
@@ -57,17 +71,25 @@ type pendingType bool
 type serialType bool
 type orderedType bool
 type honorsOrderedType bool
+type suppressProgressReporting bool
 
 const Focus = focusType(true)
 const Pending = pendingType(true)
 const Serial = serialType(true)
 const Ordered = orderedType(true)
 const OncePerOrdered = honorsOrderedType(true)
+const SuppressProgressReporting = suppressProgressReporting(true)
 
 type FlakeAttempts uint
+type MustPassRepeatedly uint
 type Offset uint
 type Done chan<- interface{} // Deprecated Done Channel for asynchronous testing
 type Labels []string
+type PollProgressInterval time.Duration
+type PollProgressAfter time.Duration
+type NodeTimeout time.Duration
+type SpecTimeout time.Duration
+type GracePeriod time.Duration
 
 func UnionOfLabels(labels ...Labels) Labels {
 	out := Labels{}
@@ -114,9 +136,23 @@ func isDecoration(arg interface{}) bool {
 		return true
 	case t == reflect.TypeOf(OncePerOrdered):
 		return true
+	case t == reflect.TypeOf(SuppressProgressReporting):
+		return true
 	case t == reflect.TypeOf(FlakeAttempts(0)):
 		return true
+	case t == reflect.TypeOf(MustPassRepeatedly(0)):
+		return true
 	case t == reflect.TypeOf(Labels{}):
+		return true
+	case t == reflect.TypeOf(PollProgressInterval(0)):
+		return true
+	case t == reflect.TypeOf(PollProgressAfter(0)):
+		return true
+	case t == reflect.TypeOf(NodeTimeout(0)):
+		return true
+	case t == reflect.TypeOf(SpecTimeout(0)):
+		return true
+	case t == reflect.TypeOf(GracePeriod(0)):
 		return true
 	case t.Kind() == reflect.Slice && isSliceOfDecorations(arg):
 		return true
@@ -138,16 +174,23 @@ func isSliceOfDecorations(slice interface{}) bool {
 	return true
 }
 
+var contextType = reflect.TypeOf(new(context.Context)).Elem()
+var specContextType = reflect.TypeOf(new(SpecContext)).Elem()
+
 func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeType, text string, args ...interface{}) (Node, []error) {
 	baseOffset := 2
 	node := Node{
-		ID:           UniqueNodeID(),
-		NodeType:     nodeType,
-		Text:         text,
-		Labels:       Labels{},
-		CodeLocation: types.NewCodeLocation(baseOffset),
-		NestingLevel: -1,
+		ID:                   UniqueNodeID(),
+		NodeType:             nodeType,
+		Text:                 text,
+		Labels:               Labels{},
+		CodeLocation:         types.NewCodeLocation(baseOffset),
+		NestingLevel:         -1,
+		PollProgressAfter:    -1,
+		PollProgressInterval: -1,
+		GracePeriod:          -1,
 	}
+
 	errors := []error{}
 	appendError := func(err error) {
 		if err != nil {
@@ -176,7 +219,6 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 	remainingArgs = []interface{}{}
 	//now process the rest of the args
 	for _, arg := range args {
-
 		switch t := reflect.TypeOf(arg); {
 		case t == reflect.TypeOf(float64(0)):
 			break //ignore deprecated timeouts
@@ -205,10 +247,45 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 			if !nodeType.Is(types.NodeTypeBeforeEach | types.NodeTypeJustBeforeEach | types.NodeTypeAfterEach | types.NodeTypeJustAfterEach) {
 				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "OncePerOrdered"))
 			}
+		case t == reflect.TypeOf(SuppressProgressReporting):
+			node.MarkedSuppressProgressReporting = bool(arg.(suppressProgressReporting))
+			if nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "SuppressProgressReporting"))
+			}
 		case t == reflect.TypeOf(FlakeAttempts(0)):
 			node.FlakeAttempts = int(arg.(FlakeAttempts))
 			if !nodeType.Is(types.NodeTypesForContainerAndIt) {
 				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "FlakeAttempts"))
+			}
+		case t == reflect.TypeOf(MustPassRepeatedly(0)):
+			node.MustPassRepeatedly = int(arg.(MustPassRepeatedly))
+			if !nodeType.Is(types.NodeTypesForContainerAndIt) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "MustPassRepeatedly"))
+			}
+		case t == reflect.TypeOf(PollProgressAfter(0)):
+			node.PollProgressAfter = time.Duration(arg.(PollProgressAfter))
+			if nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "PollProgressAfter"))
+			}
+		case t == reflect.TypeOf(PollProgressInterval(0)):
+			node.PollProgressInterval = time.Duration(arg.(PollProgressInterval))
+			if nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "PollProgressInterval"))
+			}
+		case t == reflect.TypeOf(NodeTimeout(0)):
+			node.NodeTimeout = time.Duration(arg.(NodeTimeout))
+			if nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "NodeTimeout"))
+			}
+		case t == reflect.TypeOf(SpecTimeout(0)):
+			node.SpecTimeout = time.Duration(arg.(SpecTimeout))
+			if !nodeType.Is(types.NodeTypeIt) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "SpecTimeout"))
+			}
+		case t == reflect.TypeOf(GracePeriod(0)):
+			node.GracePeriod = time.Duration(arg.(GracePeriod))
+			if nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "GracePeriod"))
 			}
 		case t == reflect.TypeOf(Labels{}):
 			if !nodeType.Is(types.NodeTypesForContainerAndIt) {
@@ -223,23 +300,85 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 				}
 			}
 		case t.Kind() == reflect.Func:
-			if node.Body != nil {
-				appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
-				trackedFunctionError = true
-				break
-			}
-			isValid := (t.NumOut() == 0) && (t.NumIn() <= 1) && (t.NumIn() == 0 || t.In(0) == reflect.TypeOf(make(Done)))
-			if !isValid {
-				appendError(types.GinkgoErrors.InvalidBodyType(t, node.CodeLocation, nodeType))
-				trackedFunctionError = true
-				break
-			}
-			if t.NumIn() == 0 {
-				node.Body = arg.(func())
+			if nodeType.Is(types.NodeTypeContainer) {
+				if node.Body != nil {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+				if t.NumOut() > 0 || t.NumIn() > 0 {
+					appendError(types.GinkgoErrors.InvalidBodyTypeForContainer(t, node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+				body := arg.(func())
+				node.Body = func(SpecContext) { body() }
+			} else if nodeType.Is(types.NodeTypeReportBeforeEach | types.NodeTypeReportAfterEach) {
+				if node.ReportEachBody == nil {
+					node.ReportEachBody = arg.(func(types.SpecReport))
+				} else {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+			} else if nodeType.Is(types.NodeTypeReportAfterSuite) {
+				if node.ReportAfterSuiteBody == nil {
+					node.ReportAfterSuiteBody = arg.(func(types.Report))
+				} else {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+			} else if nodeType.Is(types.NodeTypeSynchronizedBeforeSuite) {
+				if node.SynchronizedBeforeSuiteProc1Body != nil && node.SynchronizedBeforeSuiteAllProcsBody != nil {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+				if node.SynchronizedBeforeSuiteProc1Body == nil {
+					body, hasContext := extractSynchronizedBeforeSuiteProc1Body(arg)
+					if body == nil {
+						appendError(types.GinkgoErrors.InvalidBodyTypeForSynchronizedBeforeSuiteProc1(t, node.CodeLocation))
+						trackedFunctionError = true
+					}
+					node.SynchronizedBeforeSuiteProc1Body, node.SynchronizedBeforeSuiteProc1BodyHasContext = body, hasContext
+				} else if node.SynchronizedBeforeSuiteAllProcsBody == nil {
+					body, hasContext := extractSynchronizedBeforeSuiteAllProcsBody(arg)
+					if body == nil {
+						appendError(types.GinkgoErrors.InvalidBodyTypeForSynchronizedBeforeSuiteAllProcs(t, node.CodeLocation))
+						trackedFunctionError = true
+					}
+					node.SynchronizedBeforeSuiteAllProcsBody, node.SynchronizedBeforeSuiteAllProcsBodyHasContext = body, hasContext
+				}
+			} else if nodeType.Is(types.NodeTypeSynchronizedAfterSuite) {
+				if node.SynchronizedAfterSuiteAllProcsBody != nil && node.SynchronizedAfterSuiteProc1Body != nil {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+				body, hasContext := extractBodyFunction(deprecationTracker, node.CodeLocation, arg)
+				if body == nil {
+					appendError(types.GinkgoErrors.InvalidBodyType(t, node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+				if node.SynchronizedAfterSuiteAllProcsBody == nil {
+					node.SynchronizedAfterSuiteAllProcsBody, node.SynchronizedAfterSuiteAllProcsBodyHasContext = body, hasContext
+				} else if node.SynchronizedAfterSuiteProc1Body == nil {
+					node.SynchronizedAfterSuiteProc1Body, node.SynchronizedAfterSuiteProc1BodyHasContext = body, hasContext
+				}
 			} else {
-				deprecationTracker.TrackDeprecation(types.Deprecations.Async(), node.CodeLocation)
-				deprecatedAsyncBody := arg.(func(Done))
-				node.Body = func() { deprecatedAsyncBody(make(Done)) }
+				if node.Body != nil {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+				node.Body, node.HasContext = extractBodyFunction(deprecationTracker, node.CodeLocation, arg)
+				if node.Body == nil {
+					appendError(types.GinkgoErrors.InvalidBodyType(t, node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
 			}
 		default:
 			remainingArgs = append(remainingArgs, arg)
@@ -251,11 +390,30 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 		appendError(types.GinkgoErrors.InvalidDeclarationOfFocusedAndPending(node.CodeLocation, nodeType))
 	}
 
-	if node.Body == nil && !node.MarkedPending && !trackedFunctionError {
+	hasContext := node.HasContext || node.SynchronizedAfterSuiteProc1BodyHasContext || node.SynchronizedAfterSuiteAllProcsBodyHasContext || node.SynchronizedBeforeSuiteProc1BodyHasContext || node.SynchronizedBeforeSuiteAllProcsBodyHasContext
+
+	if !hasContext && (node.NodeTimeout > 0 || node.SpecTimeout > 0 || node.GracePeriod > 0) && len(errors) == 0 {
+		appendError(types.GinkgoErrors.InvalidTimeoutOrGracePeriodForNonContextNode(node.CodeLocation, nodeType))
+	}
+
+	if !node.NodeType.Is(types.NodeTypeReportBeforeEach|types.NodeTypeReportAfterEach|types.NodeTypeSynchronizedBeforeSuite|types.NodeTypeSynchronizedAfterSuite|types.NodeTypeReportAfterSuite) && node.Body == nil && !node.MarkedPending && !trackedFunctionError {
 		appendError(types.GinkgoErrors.MissingBodyFunction(node.CodeLocation, nodeType))
 	}
+
+	if node.NodeType.Is(types.NodeTypeSynchronizedBeforeSuite) && !trackedFunctionError && (node.SynchronizedBeforeSuiteProc1Body == nil || node.SynchronizedBeforeSuiteAllProcsBody == nil) {
+		appendError(types.GinkgoErrors.MissingBodyFunction(node.CodeLocation, nodeType))
+	}
+
+	if node.NodeType.Is(types.NodeTypeSynchronizedAfterSuite) && !trackedFunctionError && (node.SynchronizedAfterSuiteProc1Body == nil || node.SynchronizedAfterSuiteAllProcsBody == nil) {
+		appendError(types.GinkgoErrors.MissingBodyFunction(node.CodeLocation, nodeType))
+	}
+
 	for _, arg := range remainingArgs {
 		appendError(types.GinkgoErrors.UnknownDecorator(node.CodeLocation, nodeType, arg))
+	}
+
+	if node.FlakeAttempts > 0 && node.MustPassRepeatedly > 0 {
+		appendError(types.GinkgoErrors.InvalidDeclarationOfFlakeAttemptsAndMustPassRepeatedly(node.CodeLocation, nodeType))
 	}
 
 	if len(errors) > 0 {
@@ -265,96 +423,157 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 	return node, errors
 }
 
-func NewSynchronizedBeforeSuiteNode(proc1Body func() []byte, allProcsBody func([]byte), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:                                  UniqueNodeID(),
-		NodeType:                            types.NodeTypeSynchronizedBeforeSuite,
-		SynchronizedBeforeSuiteProc1Body:    proc1Body,
-		SynchronizedBeforeSuiteAllProcsBody: allProcsBody,
-		CodeLocation:                        codeLocation,
-	}, nil
-}
+var doneType = reflect.TypeOf(make(Done))
 
-func NewSynchronizedAfterSuiteNode(allProcsBody func(), proc1Body func(), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:                                 UniqueNodeID(),
-		NodeType:                           types.NodeTypeSynchronizedAfterSuite,
-		SynchronizedAfterSuiteAllProcsBody: allProcsBody,
-		SynchronizedAfterSuiteProc1Body:    proc1Body,
-		CodeLocation:                       codeLocation,
-	}, nil
-}
-
-func NewReportBeforeEachNode(body func(types.SpecReport), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:             UniqueNodeID(),
-		NodeType:       types.NodeTypeReportBeforeEach,
-		ReportEachBody: body,
-		CodeLocation:   codeLocation,
-		NestingLevel:   -1,
-	}, nil
-}
-
-func NewReportAfterEachNode(body func(types.SpecReport), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:             UniqueNodeID(),
-		NodeType:       types.NodeTypeReportAfterEach,
-		ReportEachBody: body,
-		CodeLocation:   codeLocation,
-		NestingLevel:   -1,
-	}, nil
-}
-
-func NewReportAfterSuiteNode(text string, body func(types.Report), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:                   UniqueNodeID(),
-		Text:                 text,
-		NodeType:             types.NodeTypeReportAfterSuite,
-		ReportAfterSuiteBody: body,
-		CodeLocation:         codeLocation,
-	}, nil
-}
-
-func NewCleanupNode(fail func(string, types.CodeLocation), args ...interface{}) (Node, []error) {
-	baseOffset := 2
-	node := Node{
-		ID:           UniqueNodeID(),
-		NodeType:     types.NodeTypeCleanupInvalid,
-		CodeLocation: types.NewCodeLocation(baseOffset),
-		NestingLevel: -1,
+func extractBodyFunction(deprecationTracker *types.DeprecationTracker, cl types.CodeLocation, arg interface{}) (func(SpecContext), bool) {
+	t := reflect.TypeOf(arg)
+	if t.NumOut() > 0 || t.NumIn() > 1 {
+		return nil, false
 	}
-	remainingArgs := []interface{}{}
-	for _, arg := range args {
+	if t.NumIn() == 1 {
+		if t.In(0) == doneType {
+			deprecationTracker.TrackDeprecation(types.Deprecations.Async(), cl)
+			deprecatedAsyncBody := arg.(func(Done))
+			return func(SpecContext) { deprecatedAsyncBody(make(Done)) }, false
+		} else if t.In(0).Implements(specContextType) {
+			return arg.(func(SpecContext)), true
+		} else if t.In(0).Implements(contextType) {
+			body := arg.(func(context.Context))
+			return func(c SpecContext) { body(c) }, true
+		}
+
+		return nil, false
+	}
+
+	body := arg.(func())
+	return func(SpecContext) { body() }, false
+}
+
+var byteType = reflect.TypeOf([]byte{})
+
+func extractSynchronizedBeforeSuiteProc1Body(arg interface{}) (func(SpecContext) []byte, bool) {
+	t := reflect.TypeOf(arg)
+	v := reflect.ValueOf(arg)
+
+	if t.NumOut() > 1 || t.NumIn() > 1 {
+		return nil, false
+	} else if t.NumOut() == 1 && t.Out(0) != byteType {
+		return nil, false
+	} else if t.NumIn() == 1 && !t.In(0).Implements(contextType) {
+		return nil, false
+	}
+	hasContext := t.NumIn() == 1
+
+	return func(c SpecContext) []byte {
+		var out []reflect.Value
+		if hasContext {
+			out = v.Call([]reflect.Value{reflect.ValueOf(c)})
+		} else {
+			out = v.Call([]reflect.Value{})
+		}
+		if len(out) == 1 {
+			return (out[0].Interface()).([]byte)
+		} else {
+			return []byte{}
+		}
+	}, hasContext
+}
+
+func extractSynchronizedBeforeSuiteAllProcsBody(arg interface{}) (func(SpecContext, []byte), bool) {
+	t := reflect.TypeOf(arg)
+	v := reflect.ValueOf(arg)
+	hasContext, hasByte := false, false
+
+	if t.NumOut() > 0 || t.NumIn() > 2 {
+		return nil, false
+	} else if t.NumIn() == 2 && t.In(0).Implements(contextType) && t.In(1) == byteType {
+		hasContext, hasByte = true, true
+	} else if t.NumIn() == 1 && t.In(0).Implements(contextType) {
+		hasContext = true
+	} else if t.NumIn() == 1 && t.In(0) == byteType {
+		hasByte = true
+	} else if t.NumIn() != 0 {
+		return nil, false
+	}
+
+	return func(c SpecContext, b []byte) {
+		in := []reflect.Value{}
+		if hasContext {
+			in = append(in, reflect.ValueOf(c))
+		}
+		if hasByte {
+			in = append(in, reflect.ValueOf(b))
+		}
+		v.Call(in)
+	}, hasContext
+}
+
+var errInterface = reflect.TypeOf((*error)(nil)).Elem()
+
+func NewCleanupNode(deprecationTracker *types.DeprecationTracker, fail func(string, types.CodeLocation), args ...interface{}) (Node, []error) {
+	decorations, remainingArgs := PartitionDecorations(args...)
+	baseOffset := 2
+	cl := types.NewCodeLocation(baseOffset)
+	finalArgs := []interface{}{}
+	for _, arg := range decorations {
 		switch t := reflect.TypeOf(arg); {
 		case t == reflect.TypeOf(Offset(0)):
-			node.CodeLocation = types.NewCodeLocation(baseOffset + int(arg.(Offset)))
+			cl = types.NewCodeLocation(baseOffset + int(arg.(Offset)))
 		case t == reflect.TypeOf(types.CodeLocation{}):
-			node.CodeLocation = arg.(types.CodeLocation)
+			cl = arg.(types.CodeLocation)
 		default:
-			remainingArgs = append(remainingArgs, arg)
+			finalArgs = append(finalArgs, arg)
 		}
 	}
+	finalArgs = append(finalArgs, cl)
 
 	if len(remainingArgs) == 0 {
-		return Node{}, []error{types.GinkgoErrors.DeferCleanupInvalidFunction(node.CodeLocation)}
+		return Node{}, []error{types.GinkgoErrors.DeferCleanupInvalidFunction(cl)}
 	}
+
 	callback := reflect.ValueOf(remainingArgs[0])
-	if !(callback.Kind() == reflect.Func && callback.Type().NumOut() <= 1) {
-		return Node{}, []error{types.GinkgoErrors.DeferCleanupInvalidFunction(node.CodeLocation)}
+	if !(callback.Kind() == reflect.Func) {
+		return Node{}, []error{types.GinkgoErrors.DeferCleanupInvalidFunction(cl)}
 	}
+
 	callArgs := []reflect.Value{}
 	for _, arg := range remainingArgs[1:] {
 		callArgs = append(callArgs, reflect.ValueOf(arg))
 	}
-	cl := node.CodeLocation
-	node.Body = func() {
-		out := callback.Call(callArgs)
-		if len(out) == 1 && !out[0].IsNil() {
-			fail(fmt.Sprintf("DeferCleanup callback returned error: %v", out[0]), cl)
+
+	hasContext := false
+	t := callback.Type()
+	if t.NumIn() > 0 {
+		if t.In(0).Implements(specContextType) {
+			hasContext = true
+		} else if t.In(0).Implements(contextType) && (len(callArgs) == 0 || !callArgs[0].Type().Implements(contextType)) {
+			hasContext = true
 		}
 	}
 
-	return node, nil
+	handleFailure := func(out []reflect.Value) {
+		if len(out) == 0 {
+			return
+		}
+		last := out[len(out)-1]
+		if last.Type().Implements(errInterface) && !last.IsNil() {
+			fail(fmt.Sprintf("DeferCleanup callback returned error: %v", last), cl)
+		}
+	}
+
+	if hasContext {
+		finalArgs = append(finalArgs, func(c SpecContext) {
+			out := callback.Call(append([]reflect.Value{reflect.ValueOf(c)}, callArgs...))
+			handleFailure(out)
+		})
+	} else {
+		finalArgs = append(finalArgs, func() {
+			out := callback.Call(callArgs)
+			handleFailure(out)
+		})
+	}
+
+	return NewNode(deprecationTracker, types.NodeTypeCleanupInvalid, "", finalArgs...)
 }
 
 func (n Node) IsZero() bool {
@@ -640,6 +859,26 @@ func (n Nodes) FirstNodeMarkedOrdered() Node {
 		}
 	}
 	return Node{}
+}
+
+func (n Nodes) GetMaxFlakeAttempts() int {
+	maxFlakeAttempts := 0
+	for i := range n {
+		if n[i].FlakeAttempts > 0 {
+			maxFlakeAttempts = n[i].FlakeAttempts
+		}
+	}
+	return maxFlakeAttempts
+}
+
+func (n Nodes) GetMaxMustPassRepeatedly() int {
+	maxMustPassRepeatedly := 0
+	for i := range n {
+		if n[i].MustPassRepeatedly > 0 {
+			maxMustPassRepeatedly = n[i].MustPassRepeatedly
+		}
+	}
+	return maxMustPassRepeatedly
 }
 
 func unrollInterfaceSlice(args interface{}) []interface{} {

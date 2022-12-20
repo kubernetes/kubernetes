@@ -17,6 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -96,10 +97,9 @@ func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver storageframew
 
 func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
-		driver        storageframework.TestDriver
-		resource      *storageframework.VolumeResource
+		config   *storageframework.PerTestConfig
+		driver   storageframework.TestDriver
+		resource *storageframework.VolumeResource
 	}
 	var l local
 
@@ -108,27 +108,22 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 	f := framework.NewFrameworkWithCustomTimeouts("fsgroupchangepolicy", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	init := func() {
+	init := func(ctx context.Context) {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		l = local{}
 		l.driver = driver
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(ctx, f)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = storageframework.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageframework.CreateVolumeResource(ctx, l.driver, l.config, pattern, testVolumeSizeRange)
 	}
 
-	cleanup := func() {
+	cleanup := func(ctx context.Context) {
 		var errs []error
 		if l.resource != nil {
-			if err := l.resource.CleanupResource(); err != nil {
+			if err := l.resource.CleanupResource(ctx); err != nil {
 				errs = append(errs, err)
 			}
 			l.resource = nil
-		}
-
-		if l.driverCleanup != nil {
-			errs = append(errs, storageutils.TryFunc(l.driverCleanup))
-			l.driverCleanup = nil
 		}
 
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
@@ -141,8 +136,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		changedRootDirFileOwnership       int    // Change the ownership of the file in the root directory (/mnt/volume1/file1), as part of the initial pod
 		changedSubDirFileOwnership        int    // Change the ownership of the file in the sub directory (/mnt/volume1/subdir/file2), as part of the initial pod
 		secondPodFsGroup                  int    // FsGroup of the second pod
-		finalExpectedRootDirFileOwnership int    // Final expcted ownership of the file in the root directory (/mnt/volume1/file1), as part of the second pod
-		finalExpectedSubDirFileOwnership  int    // Final expcted ownership of the file in the sub directory (/mnt/volume1/subdir/file2), as part of the second pod
+		finalExpectedRootDirFileOwnership int    // Final expected ownership of the file in the root directory (/mnt/volume1/file1), as part of the second pod
+		finalExpectedSubDirFileOwnership  int    // Final expected ownership of the file in the sub directory (/mnt/volume1/subdir/file2), as part of the second pod
 		// Whether the test can run for drivers that support volumeMountGroup capability.
 		// For CSI drivers that support volumeMountGroup:
 		// * OnRootMismatch policy is not supported.
@@ -213,7 +208,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 	for _, t := range tests {
 		test := t
 		testCaseName := fmt.Sprintf("(%s)[LinuxOnly], %s", test.podfsGroupChangePolicy, test.name)
-		ginkgo.It(testCaseName, func() {
+		ginkgo.It(testCaseName, func(ctx context.Context) {
 			dInfo := driver.GetDriverInfo()
 			policy := v1.PodFSGroupChangePolicy(test.podfsGroupChangePolicy)
 
@@ -222,8 +217,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 				e2eskipper.Skipf("Driver %q supports VolumeMountGroup, which is incompatible with this test - skipping", dInfo.Name)
 			}
 
-			init()
-			defer cleanup()
+			init(ctx)
+			ginkgo.DeferCleanup(cleanup)
 			podConfig := e2epod.Config{
 				NS:                     f.Namespace.Name,
 				NodeSelection:          l.config.ClientNodeSelection,
@@ -232,7 +227,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 				PodFSGroupChangePolicy: &policy,
 			}
 			// Create initial pod and create files in root and sub-directory and verify ownership.
-			pod := createPodAndVerifyContentGid(l.config.Framework, &podConfig, true /* createInitialFiles */, "" /* expectedRootDirFileOwnership */, "" /* expectedSubDirFileOwnership */)
+			pod := createPodAndVerifyContentGid(ctx, l.config.Framework, &podConfig, true /* createInitialFiles */, "" /* expectedRootDirFileOwnership */, "" /* expectedSubDirFileOwnership */)
 
 			// Change the ownership of files in the initial pod.
 			if test.changedRootDirFileOwnership != 0 {
@@ -246,21 +241,21 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			}
 
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
-			framework.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, pod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
 
 			// Create a second pod with existing volume and verify the contents ownership.
 			podConfig.FsGroup = utilpointer.Int64Ptr(int64(test.secondPodFsGroup))
-			pod = createPodAndVerifyContentGid(l.config.Framework, &podConfig, false /* createInitialFiles */, strconv.Itoa(test.finalExpectedRootDirFileOwnership), strconv.Itoa(test.finalExpectedSubDirFileOwnership))
+			pod = createPodAndVerifyContentGid(ctx, l.config.Framework, &podConfig, false /* createInitialFiles */, strconv.Itoa(test.finalExpectedRootDirFileOwnership), strconv.Itoa(test.finalExpectedSubDirFileOwnership))
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
-			framework.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, pod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
 		})
 	}
 }
 
-func createPodAndVerifyContentGid(f *framework.Framework, podConfig *e2epod.Config, createInitialFiles bool, expectedRootDirFileOwnership, expectedSubDirFileOwnership string) *v1.Pod {
+func createPodAndVerifyContentGid(ctx context.Context, f *framework.Framework, podConfig *e2epod.Config, createInitialFiles bool, expectedRootDirFileOwnership, expectedSubDirFileOwnership string) *v1.Pod {
 	podFsGroup := strconv.FormatInt(*podConfig.FsGroup, 10)
 	ginkgo.By(fmt.Sprintf("Creating Pod in namespace %s with fsgroup %s", podConfig.NS, podFsGroup))
-	pod, err := e2epod.CreateSecPodWithNodeSelection(f.ClientSet, podConfig, f.Timeouts.PodStart)
+	pod, err := e2epod.CreateSecPodWithNodeSelection(ctx, f.ClientSet, podConfig, f.Timeouts.PodStart)
 	framework.ExpectNoError(err)
 	framework.Logf("Pod %s/%s started successfully", pod.Namespace, pod.Name)
 

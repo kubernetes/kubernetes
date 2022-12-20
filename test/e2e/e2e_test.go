@@ -52,6 +52,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/autoscaling"
 	_ "k8s.io/kubernetes/test/e2e/cloud"
 	_ "k8s.io/kubernetes/test/e2e/common"
+	_ "k8s.io/kubernetes/test/e2e/dra"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation"
 	_ "k8s.io/kubernetes/test/e2e/kubectl"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle"
@@ -60,8 +61,15 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/node"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
 	_ "k8s.io/kubernetes/test/e2e/storage"
+	_ "k8s.io/kubernetes/test/e2e/storage/csi_mock"
 	_ "k8s.io/kubernetes/test/e2e/storage/external"
 	_ "k8s.io/kubernetes/test/e2e/windows"
+
+	// reconfigure framework
+	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
+	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
+	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
+	_ "k8s.io/kubernetes/test/utils/format"
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -141,7 +149,7 @@ func TestE2E(t *testing.T) {
 
 var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
 	progressReporter.ProcessSpecReport(report)
-})
+}, ginkgo.SuppressProgressReporting)
 
 var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
 	var err error

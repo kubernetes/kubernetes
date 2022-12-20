@@ -23,9 +23,9 @@ import (
 	"net"
 
 	"github.com/spf13/pflag"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/semconv"
+	"go.opentelemetry.io/otel/semconv/v1.12.0"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -93,7 +93,7 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 		return fmt.Errorf("failed to validate tracing configuration: %v", errs.ToAggregate())
 	}
 
-	opts := []otlpgrpc.Option{}
+	opts := []otlptracegrpc.Option{}
 	if es != nil {
 		// Only use the egressselector dialer if egressselector is enabled.
 		// Endpoint is on the "ControlPlane" network
@@ -101,11 +101,12 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 		if err != nil {
 			return err
 		}
-
-		otelDialer := func(ctx context.Context, addr string) (net.Conn, error) {
-			return egressDialer(ctx, "tcp", addr)
+		if egressDialer != nil {
+			otelDialer := func(ctx context.Context, addr string) (net.Conn, error) {
+				return egressDialer(ctx, "tcp", addr)
+			}
+			opts = append(opts, otlptracegrpc.WithDialOption(grpc.WithContextDialer(otelDialer)))
 		}
-		opts = append(opts, otlpgrpc.WithDialOption(grpc.WithContextDialer(otelDialer)))
 	}
 
 	resourceOpts := []resource.Option{

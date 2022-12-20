@@ -17,13 +17,14 @@ limitations under the License.
 package manifest
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -94,14 +95,19 @@ func StatefulSetFromManifest(fileName, ns string) (*appsv1.StatefulSet, error) {
 }
 
 // DaemonSetFromURL reads from a url and returns the daemonset in it.
-func DaemonSetFromURL(url string) (*appsv1.DaemonSet, error) {
+func DaemonSetFromURL(ctx context.Context, url string) (*appsv1.DaemonSet, error) {
 	framework.Logf("Parsing ds from %v", url)
 
 	var response *http.Response
 	var err error
 
 	for i := 1; i <= 5; i++ {
-		response, err = http.Get(url)
+		request, reqErr := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if reqErr != nil {
+			err = reqErr
+			continue
+		}
+		response, err = http.DefaultClient.Do(request)
 		if err == nil && response.StatusCode == 200 {
 			break
 		}

@@ -15,6 +15,7 @@
 package promlint
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -83,7 +84,7 @@ func (l *Linter) Lint() ([]Problem, error) {
 		mf := &dto.MetricFamily{}
 		for {
 			if err := d.Decode(mf); err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 
@@ -283,7 +284,7 @@ func lintUnitAbbreviations(mf *dto.MetricFamily) []Problem {
 
 // metricUnits attempts to detect known unit types used as part of a metric name,
 // e.g. "foo_bytes_total" or "bar_baz_milligrams".
-func metricUnits(m string) (unit string, base string, ok bool) {
+func metricUnits(m string) (unit, base string, ok bool) {
 	ss := strings.Split(m, "_")
 
 	for unit, base := range units {

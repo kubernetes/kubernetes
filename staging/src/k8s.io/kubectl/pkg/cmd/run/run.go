@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -93,8 +94,6 @@ const (
 
 var metadataAccessor = meta.NewAccessor()
 
-var attachFunc = attach.DefaultAttachFunc
-
 type RunObject struct {
 	Object  runtime.Object
 	Mapping *meta.RESTMapping
@@ -106,10 +105,10 @@ type RunOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
+	DeleteFlags   *cmddelete.DeleteFlags
 	DeleteOptions *cmddelete.DeleteOptions
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.QueryParamVerifier
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
@@ -135,6 +134,7 @@ type RunOptions struct {
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		DeleteFlags: cmddelete.NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -158,12 +158,30 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 		},
 	}
 
+	o.DeleteFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
 	addRunFlags(cmd, o)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
+
+	// Deprecate the cascade flag. If set, it has no practical effect since the created pod has no dependents.
+	// TODO: Remove the cascade flag from the run command in kubectl 1.29
+	cmd.Flags().MarkDeprecated("cascade", "because it is not relevant for this command. It will be removed in version 1.29.")
+
+	// Deprecate and hide unused flags.
+	// These flags are being added to the run command by DeleteFlags to support pod deletion after attach,
+	// but they are not used if set, so they effectively do nothing.
+	// TODO: Remove these flags from the run command in kubectl 1.29
+	cmd.Flags().MarkDeprecated("filename", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("force", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("grace-period", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("kustomize", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("recursive", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("timeout", "because it is not used by this command. It will be removed in version 1.29.")
+	cmd.Flags().MarkDeprecated("wait", "because it is not used by this command. It will be removed in version 1.29.")
+
 	return cmd
 }
 
@@ -208,7 +226,6 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
@@ -224,16 +241,17 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	o.DeleteOptions = &cmddelete.DeleteOptions{
-		CascadingStrategy: metav1.DeletePropagationBackground,
-		DynamicClient:     dynamicClient,
-		GracePeriod:       -1,
-		IgnoreNotFound:    true,
-		IOStreams:         o.IOStreams,
-		Quiet:             o.Quiet,
-		Timeout:           time.Duration(0),
-		WaitForDeletion:   false,
+	deleteOpts, err := o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	if err != nil {
+		return err
 	}
+
+	deleteOpts.IgnoreNotFound = true
+	deleteOpts.WaitForDeletion = false
+	deleteOpts.GracePeriod = -1
+	deleteOpts.Quiet = o.Quiet
+
+	o.DeleteOptions = deleteOpts
 
 	return nil
 }
@@ -322,11 +340,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	if o.Attach {
 		if remove {
-			defer func() {
-				if err := o.removeCreatedObjects(f, createdObjects); err != nil {
-					fmt.Fprintf(o.ErrOut, "Delete failed: %v\n", err)
-				}
-			}()
+			defer o.removeCreatedObjects(f, createdObjects)
 		}
 
 		opts := &attach.AttachOptions{
@@ -346,9 +360,9 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			return err
 		}
 		opts.Config = config
-		opts.AttachFunc = attachFunc
+		opts.AttachFunc = attach.DefaultAttachFunc
 
-		clientset, err := f.KubernetesClientSet()
+		clientset, err := kubernetes.NewForConfig(config)
 		if err != nil {
 			return err
 		}
@@ -634,11 +648,6 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		client, err := f.ClientForMapping(mapping)
 		if err != nil {
 			return nil, err
-		}
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-				return nil, err
-			}
 		}
 		actualObj, err = resource.
 			NewHelper(client, mapping).

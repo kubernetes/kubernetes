@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
@@ -100,7 +100,7 @@ func TestStructuralRoundtripOrError(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(origSchema, internalSchema) {
-			t.Fatalf("original and result differ: %v", diff.ObjectDiff(origSchema, internalSchema))
+			t.Fatalf("original and result differ: %v", cmp.Diff(origSchema, internalSchema))
 		}
 	}
 }

@@ -50,7 +50,6 @@ func (rev ReportEntryValue) MarshalJSON() ([]byte, error) {
 	}{
 		Representation: rev.String(),
 	}
-
 	asJSON, err := json.Marshal(rev.raw)
 	if err != nil {
 		return nil, err
@@ -98,7 +97,7 @@ type ReportEntry struct {
 	Value ReportEntryValue
 }
 
-// ColorableStringer is an interface that ReportEntry values can satisfy.  If they do then ColorableStirng() is used to generate their representation.
+// ColorableStringer is an interface that ReportEntry values can satisfy.  If they do then ColorableString() is used to generate their representation.
 type ColorableStringer interface {
 	ColorableString() string
 }
@@ -120,6 +119,8 @@ func (entry ReportEntry) StringRepresentation() string {
 func (entry ReportEntry) GetRawValue() interface{} {
 	return entry.Value.GetRawValue()
 }
+
+
 
 type ReportEntries []ReportEntry
 

@@ -50,8 +50,9 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	customArgs := &CustomArgs{
 		ExternalApplyConfigurations: map[types.Name]string{
 			// Always include TypeMeta and ObjectMeta. They are sufficient for the vast majority of use cases.
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:   "k8s.io/client-go/applyconfigurations/meta/v1",
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}: "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:       "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}:     "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "OwnerReference"}: "k8s.io/client-go/applyconfigurations/meta/v1",
 		},
 	}
 	genericArgs.CustomArgs = customArgs

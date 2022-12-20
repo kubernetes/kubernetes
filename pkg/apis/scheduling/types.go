@@ -51,7 +51,7 @@ type PriorityClass struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// The value of this priority class. This is the actual priority that pods
+	// value represents the integer value of this priority class. This is the actual priority that pods
 	// receive when they have the name of this class in their pod spec.
 	Value int32
 
@@ -63,12 +63,12 @@ type PriorityClass struct {
 	// +optional
 	GlobalDefault bool
 
-	// Description is an arbitrary string that usually provides guidelines on
+	// description is an arbitrary string that usually provides guidelines on
 	// when this priority class should be used.
 	// +optional
 	Description string
 
-	// PreemptionPolicy it the Policy for preempting pods with lower priority.
+	// preemptionPolicy it the Policy for preempting pods with lower priority.
 	// This field is beta-level.
 	// +optional
 	PreemptionPolicy *core.PreemptionPolicy
@@ -84,6 +84,6 @@ type PriorityClassList struct {
 	// +optional
 	metav1.ListMeta
 
-	// Items is the list of PriorityClasses.
+	// items is the list of PriorityClasses.
 	Items []PriorityClass
 }

@@ -80,7 +80,7 @@ func (opts formatOptions) CanFormatDiffSlice(v *valueNode) bool {
 	}
 
 	// Use specialized string diffing for longer slices or strings.
-	const minLength = 64
+	const minLength = 32
 	return vx.Len() >= minLength && vy.Len() >= minLength
 }
 
@@ -104,7 +104,7 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 	case t.Kind() == reflect.String:
 		sx, sy = vx.String(), vy.String()
 		isString = true
-	case t.Kind() == reflect.Slice && t.Elem() == reflect.TypeOf(byte(0)):
+	case t.Kind() == reflect.Slice && t.Elem() == byteType:
 		sx, sy = string(vx.Bytes()), string(vy.Bytes())
 		isString = true
 	case t.Kind() == reflect.Array:
@@ -147,7 +147,10 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 			})
 			efficiencyLines := float64(esLines.Dist()) / float64(len(esLines))
 			efficiencyBytes := float64(esBytes.Dist()) / float64(len(esBytes))
-			isPureLinedText = efficiencyLines < 4*efficiencyBytes
+			quotedLength := len(strconv.Quote(sx + sy))
+			unquotedLength := len(sx) + len(sy)
+			escapeExpansionRatio := float64(quotedLength) / float64(unquotedLength)
+			isPureLinedText = efficiencyLines < 4*efficiencyBytes || escapeExpansionRatio > 1.1
 		}
 	}
 
@@ -171,12 +174,13 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 		// differences in a string literal. This format is more readable,
 		// but has edge-cases where differences are visually indistinguishable.
 		// This format is avoided under the following conditions:
-		//	• A line starts with `"""`
-		//	• A line starts with "..."
-		//	• A line contains non-printable characters
-		//	• Adjacent different lines differ only by whitespace
+		//   - A line starts with `"""`
+		//   - A line starts with "..."
+		//   - A line contains non-printable characters
+		//   - Adjacent different lines differ only by whitespace
 		//
 		// For example:
+		//
 		//		"""
 		//		... // 3 identical lines
 		//		foo
@@ -231,7 +235,7 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 			var out textNode = &textWrap{Prefix: "(", Value: list2, Suffix: ")"}
 			switch t.Kind() {
 			case reflect.String:
-				if t != reflect.TypeOf(string("")) {
+				if t != stringType {
 					out = opts.FormatType(t, out)
 				}
 			case reflect.Slice:
@@ -326,12 +330,12 @@ func (opts formatOptions) FormatDiffSlice(v *valueNode) textNode {
 	switch t.Kind() {
 	case reflect.String:
 		out = &textWrap{Prefix: "strings.Join(", Value: out, Suffix: fmt.Sprintf(", %q)", delim)}
-		if t != reflect.TypeOf(string("")) {
+		if t != stringType {
 			out = opts.FormatType(t, out)
 		}
 	case reflect.Slice:
 		out = &textWrap{Prefix: "bytes.Join(", Value: out, Suffix: fmt.Sprintf(", %q)", delim)}
-		if t != reflect.TypeOf([]byte(nil)) {
+		if t != bytesType {
 			out = opts.FormatType(t, out)
 		}
 	}
@@ -446,7 +450,6 @@ func (opts formatOptions) formatDiffSlice(
 //		{NumIdentical: 3},
 //		{NumInserted: 1},
 //	]
-//
 func coalesceAdjacentEdits(name string, es diff.EditScript) (groups []diffStats) {
 	var prevMode byte
 	lastStats := func(mode byte) *diffStats {
@@ -503,7 +506,6 @@ func coalesceAdjacentEdits(name string, es diff.EditScript) (groups []diffStats)
 //		{NumIdentical: 8, NumRemoved: 12, NumInserted: 3},
 //		{NumIdentical: 63},
 //	]
-//
 func coalesceInterveningIdentical(groups []diffStats, windowSize int) []diffStats {
 	groups, groupsOrig := groups[:0], groups
 	for i, ds := range groupsOrig {
@@ -548,7 +550,6 @@ func coalesceInterveningIdentical(groups []diffStats, windowSize int) []diffStat
 //		{NumRemoved: 9},
 //		{NumIdentical: 64}, // incremented by 10
 //	]
-//
 func cleanupSurroundingIdentical(groups []diffStats, eq func(i, j int) bool) []diffStats {
 	var ix, iy int // indexes into sequence x and y
 	for i, ds := range groups {
@@ -563,10 +564,10 @@ func cleanupSurroundingIdentical(groups []diffStats, eq func(i, j int) bool) []d
 		nx := ds.NumIdentical + ds.NumRemoved + ds.NumModified
 		ny := ds.NumIdentical + ds.NumInserted + ds.NumModified
 		var numLeadingIdentical, numTrailingIdentical int
-		for i := 0; i < nx && i < ny && eq(ix+i, iy+i); i++ {
+		for j := 0; j < nx && j < ny && eq(ix+j, iy+j); j++ {
 			numLeadingIdentical++
 		}
-		for i := 0; i < nx && i < ny && eq(ix+nx-1-i, iy+ny-1-i); i++ {
+		for j := 0; j < nx && j < ny && eq(ix+nx-1-j, iy+ny-1-j); j++ {
 			numTrailingIdentical++
 		}
 		if numIdentical := numLeadingIdentical + numTrailingIdentical; numIdentical > 0 {

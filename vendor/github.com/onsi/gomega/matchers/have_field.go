@@ -8,7 +8,16 @@ import (
 	"github.com/onsi/gomega/format"
 )
 
-func extractField(actual interface{}, field string) (interface{}, error) {
+// missingFieldError represents a missing field extraction error that
+// HaveExistingFieldMatcher can ignore, as opposed to other, sever field
+// extraction errors, such as nil pointers, et cetera.
+type missingFieldError string
+
+func (e missingFieldError) Error() string {
+	return string(e)
+}
+
+func extractField(actual interface{}, field string, matchername string) (interface{}, error) {
 	fields := strings.SplitN(field, ".", 2)
 	actualValue := reflect.ValueOf(actual)
 
@@ -16,36 +25,39 @@ func extractField(actual interface{}, field string) (interface{}, error) {
 		actualValue = actualValue.Elem()
 	}
 	if actualValue == (reflect.Value{}) {
-		return nil, fmt.Errorf("HaveField encountered nil while dereferencing a pointer of type %T.", actual)
+		return nil, fmt.Errorf("%s encountered nil while dereferencing a pointer of type %T.", matchername, actual)
 	}
 
 	if actualValue.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("HaveField encountered:\n%s\nWhich is not a struct.", format.Object(actual, 1))
+		return nil, fmt.Errorf("%s encountered:\n%s\nWhich is not a struct.", matchername, format.Object(actual, 1))
 	}
 
 	var extractedValue reflect.Value
 
 	if strings.HasSuffix(fields[0], "()") {
 		extractedValue = actualValue.MethodByName(strings.TrimSuffix(fields[0], "()"))
+		if extractedValue == (reflect.Value{}) && actualValue.CanAddr() {
+			extractedValue = actualValue.Addr().MethodByName(strings.TrimSuffix(fields[0], "()"))
+		}
 		if extractedValue == (reflect.Value{}) {
-			return nil, fmt.Errorf("HaveField could not find method named '%s' in struct of type %T.", fields[0], actual)
+			return nil, missingFieldError(fmt.Sprintf("%s could not find method named '%s' in struct of type %T.", matchername, fields[0], actual))
 		}
 		t := extractedValue.Type()
 		if t.NumIn() != 0 || t.NumOut() != 1 {
-			return nil, fmt.Errorf("HaveField found an invalid method named '%s' in struct of type %T.\nMethods must take no arguments and return exactly one value.", fields[0], actual)
+			return nil, fmt.Errorf("%s found an invalid method named '%s' in struct of type %T.\nMethods must take no arguments and return exactly one value.", matchername, fields[0], actual)
 		}
 		extractedValue = extractedValue.Call([]reflect.Value{})[0]
 	} else {
 		extractedValue = actualValue.FieldByName(fields[0])
 		if extractedValue == (reflect.Value{}) {
-			return nil, fmt.Errorf("HaveField could not find field named '%s' in struct:\n%s", fields[0], format.Object(actual, 1))
+			return nil, missingFieldError(fmt.Sprintf("%s could not find field named '%s' in struct:\n%s", matchername, fields[0], format.Object(actual, 1)))
 		}
 	}
 
 	if len(fields) == 1 {
 		return extractedValue.Interface(), nil
 	} else {
-		return extractField(extractedValue.Interface(), fields[1])
+		return extractField(extractedValue.Interface(), fields[1], matchername)
 	}
 }
 
@@ -58,7 +70,7 @@ type HaveFieldMatcher struct {
 }
 
 func (matcher *HaveFieldMatcher) Match(actual interface{}) (success bool, err error) {
-	matcher.extractedField, err = extractField(actual, matcher.Field)
+	matcher.extractedField, err = extractField(actual, matcher.Field, "HaveField")
 	if err != nil {
 		return false, err
 	}

@@ -63,6 +63,70 @@ var (
 	// xDS-enabled server invokes this method on a grpc.Server when a particular
 	// listener moves to "not-serving" mode.
 	DrainServerTransports interface{} // func(*grpc.Server, string)
+	// AddGlobalServerOptions adds an array of ServerOption that will be
+	// effective globally for newly created servers. The priority will be: 1.
+	// user-provided; 2. this method; 3. default values.
+	AddGlobalServerOptions interface{} // func(opt ...ServerOption)
+	// ClearGlobalServerOptions clears the array of extra ServerOption. This
+	// method is useful in testing and benchmarking.
+	ClearGlobalServerOptions func()
+	// AddGlobalDialOptions adds an array of DialOption that will be effective
+	// globally for newly created client channels. The priority will be: 1.
+	// user-provided; 2. this method; 3. default values.
+	AddGlobalDialOptions interface{} // func(opt ...DialOption)
+	// ClearGlobalDialOptions clears the array of extra DialOption. This
+	// method is useful in testing and benchmarking.
+	ClearGlobalDialOptions func()
+	// JoinServerOptions combines the server options passed as arguments into a
+	// single server option.
+	JoinServerOptions interface{} // func(...grpc.ServerOption) grpc.ServerOption
+
+	// WithBinaryLogger returns a DialOption that specifies the binary logger
+	// for a ClientConn.
+	WithBinaryLogger interface{} // func(binarylog.Logger) grpc.DialOption
+	// BinaryLogger returns a ServerOption that can set the binary logger for a
+	// server.
+	BinaryLogger interface{} // func(binarylog.Logger) grpc.ServerOption
+
+	// NewXDSResolverWithConfigForTesting creates a new xds resolver builder using
+	// the provided xds bootstrap config instead of the global configuration from
+	// the supported environment variables.  The resolver.Builder is meant to be
+	// used in conjunction with the grpc.WithResolvers DialOption.
+	//
+	// Testing Only
+	//
+	// This function should ONLY be used for testing and may not work with some
+	// other features, including the CSDS service.
+	NewXDSResolverWithConfigForTesting interface{} // func([]byte) (resolver.Builder, error)
+
+	// RegisterRLSClusterSpecifierPluginForTesting registers the RLS Cluster
+	// Specifier Plugin for testing purposes, regardless of the XDSRLS environment
+	// variable.
+	//
+	// TODO: Remove this function once the RLS env var is removed.
+	RegisterRLSClusterSpecifierPluginForTesting func()
+
+	// UnregisterRLSClusterSpecifierPluginForTesting unregisters the RLS Cluster
+	// Specifier Plugin for testing purposes. This is needed because there is no way
+	// to unregister the RLS Cluster Specifier Plugin after registering it solely
+	// for testing purposes using RegisterRLSClusterSpecifierPluginForTesting().
+	//
+	// TODO: Remove this function once the RLS env var is removed.
+	UnregisterRLSClusterSpecifierPluginForTesting func()
+
+	// RegisterRBACHTTPFilterForTesting registers the RBAC HTTP Filter for testing
+	// purposes, regardless of the RBAC environment variable.
+	//
+	// TODO: Remove this function once the RBAC env var is removed.
+	RegisterRBACHTTPFilterForTesting func()
+
+	// UnregisterRBACHTTPFilterForTesting unregisters the RBAC HTTP Filter for
+	// testing purposes. This is needed because there is no way to unregister the
+	// HTTP Filter after registering it solely for testing purposes using
+	// RegisterRBACHTTPFilterForTesting().
+	//
+	// TODO: Remove this function once the RBAC env var is removed.
+	UnregisterRBACHTTPFilterForTesting func()
 )
 
 // HealthChecker defines the signature of the client-side LB channel health checking function.

@@ -561,72 +561,6 @@ func Test_PVLAdmission(t *testing.T) {
 			err: nil,
 		},
 		{
-			name:    "Cinder Disk PV labeled correctly",
-			handler: newPersistentVolumeLabel(),
-			pvlabeler: mockVolumeLabels(map[string]string{
-				"a":                           "1",
-				"b":                           "2",
-				v1.LabelFailureDomainBetaZone: "1__2__3",
-			}),
-			preAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "azurepd",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						Cinder: &api.CinderPersistentVolumeSource{
-							VolumeID: "123",
-						},
-					},
-				},
-			},
-			postAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "azurepd",
-					Namespace: "myns",
-					Labels: map[string]string{
-						"a":                           "1",
-						"b":                           "2",
-						v1.LabelFailureDomainBetaZone: "1__2__3",
-					},
-				},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						Cinder: &api.CinderPersistentVolumeSource{
-							VolumeID: "123",
-						},
-					},
-					NodeAffinity: &api.VolumeNodeAffinity{
-						Required: &api.NodeSelector{
-							NodeSelectorTerms: []api.NodeSelectorTerm{
-								{
-									MatchExpressions: []api.NodeSelectorRequirement{
-										{
-											Key:      "a",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1"},
-										},
-										{
-											Key:      "b",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"2"},
-										},
-										{
-											Key:      v1.LabelFailureDomainBetaZone,
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1", "2", "3"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			err: nil,
-		},
-		{
 			name:    "AWS EBS PV overrides user applied labels",
 			handler: newPersistentVolumeLabel(),
 			pvlabeler: mockVolumeLabels(map[string]string{
@@ -978,12 +912,11 @@ func Test_PVLAdmission(t *testing.T) {
 // setPVLabler applies the given mock pvlabeler to implement PV labeling for all cloud providers.
 // Given we mock out the values of the labels anyways, assigning the same mock labeler for every
 // provider does not reduce test coverage but it does simplify/clean up the tests here because
-// the provider is then decided based on the type of PV (EBS, Cinder, GCEPD, Azure Disk, etc)
+// the provider is then decided based on the type of PV (EBS, GCEPD, Azure Disk, etc)
 func setPVLabeler(handler *persistentVolumeLabel, pvlabeler cloudprovider.PVLabeler) {
 	handler.awsPVLabeler = pvlabeler
 	handler.gcePVLabeler = pvlabeler
 	handler.azurePVLabeler = pvlabeler
-	handler.openStackPVLabeler = pvlabeler
 	handler.vspherePVLabeler = pvlabeler
 }
 

@@ -32,7 +32,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -106,7 +105,7 @@ func runApply(flags *applyFlags, args []string) error {
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, flags.dryRun, true, &output.TextPrinter{})
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, flags.dryRun, true, &output.TextPrinter{}, loadConfig)
 	if err != nil {
 		return err
 	}
@@ -144,7 +143,7 @@ func runApply(flags *applyFlags, args []string) error {
 		fmt.Println("[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster")
 		fmt.Println("[upgrade/prepull] This might take a minute or two, depending on the speed of your internet connection")
 		fmt.Println("[upgrade/prepull] You can also perform this action in beforehand using 'kubeadm config images pull'")
-		if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, sets.NewString(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
+		if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, sets.New(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
 			return err
 		}
 	} else {
@@ -158,16 +157,6 @@ func runApply(flags *applyFlags, args []string) error {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
-	// Clean this up in 1.26
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Removing the old taint %s from all control plane Nodes. "+
-		"After this step only the %s taint will be present on control plane Nodes.\n",
-		kubeadmconstants.OldControlPlaneTaint.String(),
-		kubeadmconstants.ControlPlaneTaint.String())
-	if err := upgrade.RemoveOldControlPlaneTaint(client); err != nil {
-		return err
-	}
-
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
 	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.patchesDir, flags.dryRun, flags.applyPlanFlags.out); err != nil {
@@ -175,7 +164,7 @@ func runApply(flags *applyFlags, args []string) error {
 	}
 
 	if flags.dryRun {
-		fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
+		fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 		return nil
 	}
 

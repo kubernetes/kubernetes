@@ -19,7 +19,7 @@
 // Package gzip implements and registers the gzip compressor
 // during the initialization.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This package is EXPERIMENTAL and may be changed or removed in a
 // later release.

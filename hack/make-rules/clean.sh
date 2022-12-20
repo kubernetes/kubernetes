@@ -30,8 +30,8 @@ CLEAN_PATTERNS=(
 
 for pattern in "${CLEAN_PATTERNS[@]}"; do
   while IFS=$'\n' read -r match; do
-    echo "Removing ${match#${KUBE_ROOT}\/} .."
-    rm -rf "${match#${KUBE_ROOT}\/}"
+    echo "Removing ${match#"${KUBE_ROOT}"\/} .."
+    rm -rf "${match#"${KUBE_ROOT}"\/}"
   done <   <(find "${KUBE_ROOT}" -iregex "^${KUBE_ROOT}/${pattern}$")
 done
 

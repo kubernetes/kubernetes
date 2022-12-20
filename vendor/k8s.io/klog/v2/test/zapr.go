@@ -19,7 +19,7 @@ package test
 // ZaprOutputMappingDirect provides a mapping from klog output to the
 // corresponding zapr output when zapr is called directly.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This package is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -241,18 +241,18 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 // klog.
 //
 // This is different from ZaprOutputMappingDirect because:
-// - WithName gets added to the message by Output.
-// - zap uses . as separator instead of / between WithName values,
-//   here we get slashes because Output concatenates these values.
-// - WithValues are added to the normal key/value parameters by
-//   Output, which puts them after "v".
-// - Output does that without emitting the warning that we get
-//   from zapr.
-// - zap drops keys with missing values, here we get "(MISSING)".
-// - zap does not de-duplicate key/value pairs, here klog does that
-//   for it.
+//   - WithName gets added to the message by Output.
+//   - zap uses . as separator instead of / between WithName values,
+//     here we get slashes because Output concatenates these values.
+//   - WithValues are added to the normal key/value parameters by
+//     Output, which puts them after "v".
+//   - Output does that without emitting the warning that we get
+//     from zapr.
+//   - zap drops keys with missing values, here we get "(MISSING)".
+//   - zap does not de-duplicate key/value pairs, here klog does that
+//     for it.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This package is EXPERIMENTAL and may be changed or removed in a
 // later release.

@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -402,6 +403,17 @@ func haveSameExpandedDNSConfig(podSpec, oldPodSpec *api.PodSpec) bool {
 	return true
 }
 
+// hasInvalidTopologySpreadConstraintLabelSelector return true if spec.TopologySpreadConstraints have any entry with invalid labelSelector
+func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
+	for _, constraint := range spec.TopologySpreadConstraints {
+		errs := metavalidation.ValidateLabelSelector(constraint.LabelSelector, metavalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, nil)
+		if len(errs) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // GetValidationOptionsFromPodSpecAndMeta returns validation options based on pod specs and metadata
 func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) apivalidation.PodValidationOptions {
 	// default pod validation options based on feature gate
@@ -411,9 +423,10 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
 		AllowIndivisibleHugePagesValues: false,
-		AllowWindowsHostProcessField:    utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers),
 		// Allow pod spec with expanded DNS configuration
-		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
+		AllowExpandedDNSConfig:                            utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
+		AllowInvalidLabelValueInSelector:                  false,
+		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 	}
 
 	if oldPodSpec != nil {
@@ -426,12 +439,13 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 				return !opts.AllowDownwardAPIHugePages
 			})
 		}
-		// if old spec has Windows Host Process fields set, we must allow it
-		opts.AllowWindowsHostProcessField = opts.AllowWindowsHostProcessField || setsWindowsHostProcess(oldPodSpec)
 
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
 
+		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
+		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
+		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -540,11 +554,52 @@ func dropDisabledFields(
 		}
 	}
 
+	// If the feature is disabled and not in use, drop the schedulingGates field.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) && !schedulingGatesInUse(oldPodSpec) {
+		podSpec.SchedulingGates = nil
+	}
+
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysField(podSpec, oldPodSpec)
+	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
+}
+
+// dropDisabledDynamicResourceAllocationFields removes pod claim references from
+// container specs and pod-level resource claims unless they are already used
+// by the old pod spec.
+func dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
+		dropResourceClaimRequests(podSpec.Containers)
+		dropResourceClaimRequests(podSpec.InitContainers)
+		dropEphemeralResourceClaimRequests(podSpec.EphemeralContainers)
+		podSpec.ResourceClaims = nil
+	}
+}
+
+func dynamicResourceAllocationInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	// We only need to check this field because the containers cannot have
+	// resource requirements entries for claims without a corresponding
+	// entry at the pod spec level.
+	return len(podSpec.ResourceClaims) > 0
+}
+
+func dropResourceClaimRequests(containers []api.Container) {
+	for i := range containers {
+		containers[i].Resources.Claims = nil
+	}
+}
+
+func dropEphemeralResourceClaimRequests(containers []api.EphemeralContainer) {
+	for i := range containers {
+		containers[i].Resources.Claims = nil
+	}
 }
 
 // dropDisabledTopologySpreadConstraintsFields removes disabled fields from PodSpec related
@@ -722,6 +777,14 @@ func probeGracePeriodInUse(podSpec *api.PodSpec) bool {
 	return inUse
 }
 
+// schedulingGatesInUse returns true if the pod spec is non-nil and it has SchedulingGates field set.
+func schedulingGatesInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	return len(podSpec.SchedulingGates) != 0
+}
+
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the
 // converted annotation value
 func SeccompAnnotationForField(field *api.SeccompProfile) string {
@@ -747,27 +810,36 @@ func SeccompAnnotationForField(field *api.SeccompProfile) string {
 	return ""
 }
 
-// setsWindowsHostProcess returns true if WindowsOptions.HostProcess is set (true or false)
-// anywhere in the pod spec.
-func setsWindowsHostProcess(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	// Check Pod's WindowsOptions.HostProcess
-	if podSpec.SecurityContext != nil && podSpec.SecurityContext.WindowsOptions != nil && podSpec.SecurityContext.WindowsOptions.HostProcess != nil {
-		return true
-	}
-
-	// Check WindowsOptions.HostProcess for each container
-	inUse := false
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.SecurityContext != nil && c.SecurityContext.WindowsOptions != nil && c.SecurityContext.WindowsOptions.HostProcess != nil {
-			inUse = true
-			return false
+func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
+	if spec.Affinity != nil {
+		if spec.Affinity.PodAffinity != nil {
+			for _, term := range spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+				allErrs := apivalidation.ValidatePodAffinityTermSelector(term, false, nil)
+				if len(allErrs) != 0 {
+					return true
+				}
+			}
+			for _, term := range spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				allErrs := apivalidation.ValidatePodAffinityTermSelector(term.PodAffinityTerm, false, nil)
+				if len(allErrs) != 0 {
+					return true
+				}
+			}
 		}
-		return true
-	})
-
-	return inUse
+		if spec.Affinity.PodAntiAffinity != nil {
+			for _, term := range spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+				allErrs := apivalidation.ValidatePodAffinityTermSelector(term, false, nil)
+				if len(allErrs) != 0 {
+					return true
+				}
+			}
+			for _, term := range spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				allErrs := apivalidation.ValidatePodAffinityTermSelector(term.PodAffinityTerm, false, nil)
+				if len(allErrs) != 0 {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

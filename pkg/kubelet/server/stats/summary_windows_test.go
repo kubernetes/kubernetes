@@ -67,12 +67,14 @@ func TestSummaryProvider(t *testing.T) {
 	mockStatsProvider.EXPECT().RlimitStats().Return(nil, nil).AnyTimes()
 	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).AnyTimes()
 
-	provider := NewSummaryProvider(mockStatsProvider)
+	kubeletCreationTime := metav1.Now()
+	systemBootTime := metav1.Now()
+	provider := summaryProviderImpl{kubeletCreationTime: kubeletCreationTime, systemBootTime: systemBootTime, provider: mockStatsProvider}
 	summary, err := provider.Get(true)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")
-	assert.Equal(summary.Node.StartTime, cgroupStatsMap["/"].cs.StartTime)
+	assert.Equal(summary.Node.StartTime, systemBootTime)
 	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
 	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
 	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)

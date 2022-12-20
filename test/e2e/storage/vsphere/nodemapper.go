@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
@@ -148,7 +149,7 @@ func withTagsClient(ctx context.Context, connection *VSphere, f func(c *rest.Cli
 	if err := c.Login(ctx, user); err != nil {
 		return err
 	}
-	defer c.Logout(ctx)
+	ginkgo.DeferCleanup(c.Logout)
 	return f(c)
 }
 

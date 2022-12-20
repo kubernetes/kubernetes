@@ -21,6 +21,8 @@ import (
 	"strings"
 
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // BooleanProperty creates a boolean property
@@ -465,6 +467,10 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON marshal this from JSON
 func (s *Schema) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshaling {
+		return jsonv2.Unmarshal(data, s)
+	}
+
 	props := struct {
 		SchemaProps
 		SwaggerSchemaProps
@@ -509,5 +515,40 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 
 	*s = sch
 
+	return nil
+}
+
+func (s *Schema) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	var x struct {
+		Extensions
+		SchemaProps
+		SwaggerSchemaProps
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+
+	if err := x.Ref.fromMap(x.Extensions); err != nil {
+		return err
+	}
+
+	if err := x.Schema.fromMap(x.Extensions); err != nil {
+		return err
+	}
+
+	delete(x.Extensions, "$ref")
+	delete(x.Extensions, "$schema")
+
+	for _, pn := range swag.DefaultJSONNameProvider.GetJSONNames(s) {
+		delete(x.Extensions, pn)
+	}
+	if len(x.Extensions) == 0 {
+		x.Extensions = nil
+	}
+
+	s.ExtraProps = x.Extensions.sanitizeWithExtra()
+	s.VendorExtensible.Extensions = x.Extensions
+	s.SchemaProps = x.SchemaProps
+	s.SwaggerSchemaProps = x.SwaggerSchemaProps
 	return nil
 }

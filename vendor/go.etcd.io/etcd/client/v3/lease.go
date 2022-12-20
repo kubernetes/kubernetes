@@ -397,7 +397,7 @@ func (l *lessor) closeRequireLeader() {
 	}
 }
 
-func (l *lessor) keepAliveOnce(ctx context.Context, id LeaseID) (*LeaseKeepAliveResponse, error) {
+func (l *lessor) keepAliveOnce(ctx context.Context, id LeaseID) (karesp *LeaseKeepAliveResponse, ferr error) {
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -405,6 +405,15 @@ func (l *lessor) keepAliveOnce(ctx context.Context, id LeaseID) (*LeaseKeepAlive
 	if err != nil {
 		return nil, toErr(ctx, err)
 	}
+
+	defer func() {
+		if err := stream.CloseSend(); err != nil {
+			if ferr == nil {
+				ferr = toErr(ctx, err)
+			}
+			return
+		}
+	}()
 
 	err = stream.Send(&pb.LeaseKeepAliveRequest{ID: int64(id)})
 	if err != nil {
@@ -416,7 +425,7 @@ func (l *lessor) keepAliveOnce(ctx context.Context, id LeaseID) (*LeaseKeepAlive
 		return nil, toErr(ctx, rerr)
 	}
 
-	karesp := &LeaseKeepAliveResponse{
+	karesp = &LeaseKeepAliveResponse{
 		ResponseHeader: resp.GetHeader(),
 		ID:             LeaseID(resp.ID),
 		TTL:            resp.TTL,

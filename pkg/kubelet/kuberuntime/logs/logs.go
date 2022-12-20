@@ -237,13 +237,13 @@ func newLogWriter(stdout io.Writer, stderr io.Writer, opts *LogOptions) *logWrit
 }
 
 // writeLogs writes logs into stdout, stderr.
-func (w *logWriter) write(msg *logMessage) error {
+func (w *logWriter) write(msg *logMessage, addPrefix bool) error {
 	if msg.timestamp.Before(w.opts.since) {
 		// Skip the line because it's older than since
 		return nil
 	}
 	line := msg.log
-	if w.opts.timestamp {
+	if w.opts.timestamp && addPrefix {
 		prefix := append([]byte(msg.timestamp.Format(timeFormatOut)), delimiter[0])
 		line = append(prefix, line...)
 	}
@@ -314,6 +314,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	var watcher *fsnotify.Watcher
 	var parse parseFunc
 	var stop bool
+	isNewLine := true
 	found := true
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
@@ -399,7 +400,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 			continue
 		}
 		// Write the log line into the stream.
-		if err := writer.write(msg); err != nil {
+		if err := writer.write(msg, isNewLine); err != nil {
 			if err == errMaximumWrite {
 				klog.V(2).InfoS("Finished parsing log file, hit bytes limit", "path", path, "limit", opts.bytes)
 				return nil
@@ -410,12 +411,16 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 		if limitedMode {
 			limitedNum--
 		}
-
+		if len(msg.log) > 0 {
+			isNewLine = msg.log[len(msg.log)-1] == eol[0]
+		} else {
+			isNewLine = true
+		}
 	}
 }
 
-func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
-	resp, err := r.ContainerStatus(id, false)
+func isContainerRunning(ctx context.Context, id string, r internalapi.RuntimeService) (bool, error) {
+	resp, err := r.ContainerStatus(ctx, id, false)
 	if err != nil {
 		return false, err
 	}
@@ -438,7 +443,7 @@ func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
 // the error is error happens during waiting new logs.
 func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
 	// no need to wait if the pod is not running
-	if running, err := isContainerRunning(id, runtimeService); !running {
+	if running, err := isContainerRunning(ctx, id, runtimeService); !running {
 		return false, false, err
 	}
 	errRetry := 5

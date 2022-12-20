@@ -37,30 +37,30 @@ type Logger interface {
 // binLogger is the global binary logger for the binary. One of this should be
 // built at init time from the configuration (environment variable or flags).
 //
-// It is used to get a methodLogger for each individual method.
+// It is used to get a MethodLogger for each individual method.
 var binLogger Logger
 
 var grpclogLogger = grpclog.Component("binarylog")
 
-// SetLogger sets the binarg logger.
+// SetLogger sets the binary logger.
 //
 // Only call this at init time.
 func SetLogger(l Logger) {
 	binLogger = l
 }
 
-// GetLogger gets the binarg logger.
+// GetLogger gets the binary logger.
 //
 // Only call this at init time.
 func GetLogger() Logger {
 	return binLogger
 }
 
-// GetMethodLogger returns the methodLogger for the given methodName.
+// GetMethodLogger returns the MethodLogger for the given methodName.
 //
 // methodName should be in the format of "/service/method".
 //
-// Each methodLogger returned by this method is a new instance. This is to
+// Each MethodLogger returned by this method is a new instance. This is to
 // generate sequence id within the call.
 func GetMethodLogger(methodName string) MethodLogger {
 	if binLogger == nil {
@@ -117,7 +117,7 @@ func (l *logger) setDefaultMethodLogger(ml *MethodLoggerConfig) error {
 
 // Set method logger for "service/*".
 //
-// New methodLogger with same service overrides the old one.
+// New MethodLogger with same service overrides the old one.
 func (l *logger) setServiceMethodLogger(service string, ml *MethodLoggerConfig) error {
 	if _, ok := l.config.Services[service]; ok {
 		return fmt.Errorf("conflicting service rules for service %v found", service)
@@ -131,7 +131,7 @@ func (l *logger) setServiceMethodLogger(service string, ml *MethodLoggerConfig) 
 
 // Set method logger for "service/method".
 //
-// New methodLogger with same method overrides the old one.
+// New MethodLogger with same method overrides the old one.
 func (l *logger) setMethodMethodLogger(method string, ml *MethodLoggerConfig) error {
 	if _, ok := l.config.Blacklist[method]; ok {
 		return fmt.Errorf("conflicting blacklist rules for method %v found", method)
@@ -161,11 +161,11 @@ func (l *logger) setBlacklist(method string) error {
 	return nil
 }
 
-// getMethodLogger returns the methodLogger for the given methodName.
+// getMethodLogger returns the MethodLogger for the given methodName.
 //
 // methodName should be in the format of "/service/method".
 //
-// Each methodLogger returned by this method is a new instance. This is to
+// Each MethodLogger returned by this method is a new instance. This is to
 // generate sequence id within the call.
 func (l *logger) GetMethodLogger(methodName string) MethodLogger {
 	s, m, err := grpcutil.ParseMethod(methodName)
@@ -174,16 +174,16 @@ func (l *logger) GetMethodLogger(methodName string) MethodLogger {
 		return nil
 	}
 	if ml, ok := l.config.Methods[s+"/"+m]; ok {
-		return newMethodLogger(ml.Header, ml.Message)
+		return NewTruncatingMethodLogger(ml.Header, ml.Message)
 	}
 	if _, ok := l.config.Blacklist[s+"/"+m]; ok {
 		return nil
 	}
 	if ml, ok := l.config.Services[s]; ok {
-		return newMethodLogger(ml.Header, ml.Message)
+		return NewTruncatingMethodLogger(ml.Header, ml.Message)
 	}
 	if l.config.All == nil {
 		return nil
 	}
-	return newMethodLogger(l.config.All.Header, l.config.All.Message)
+	return NewTruncatingMethodLogger(l.config.All.Header, l.config.All.Message)
 }

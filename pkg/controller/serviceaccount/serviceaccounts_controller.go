@@ -32,7 +32,6 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 )
 
@@ -68,24 +67,19 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		serviceAccountsToEnsure: options.ServiceAccounts,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount"),
 	}
-	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, err
-		}
-	}
 
-	saInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	saHandler, _ := saInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.serviceAccountDeleted,
 	}, options.ServiceAccountResync)
 	e.saLister = saInformer.Lister()
-	e.saListerSynced = saInformer.Informer().HasSynced
+	e.saListerSynced = saHandler.HasSynced
 
-	nsInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	nsHandler, _ := nsInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
 	}, options.NamespaceResync)
 	e.nsLister = nsInformer.Lister()
-	e.nsListerSynced = nsInformer.Informer().HasSynced
+	e.nsListerSynced = nsHandler.HasSynced
 
 	e.syncHandler = e.syncNamespace
 

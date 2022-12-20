@@ -210,7 +210,7 @@ func (plugin *portworxVolumePlugin) ExpandVolumeDevice(
 	return newSize, nil
 }
 
-func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	portworxVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -219,7 +219,9 @@ func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath st
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(portworxVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(portworxVolume),
+	}, nil
 }
 
 func (plugin *portworxVolumePlugin) SupportsMountOption() bool {

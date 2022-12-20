@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -55,16 +56,15 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func() {
-		testStackdriverAcceleratorMonitoring(f)
+	ginkgo.It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func(ctx context.Context) {
+		testStackdriverAcceleratorMonitoring(ctx, f)
 	})
 
 })
 
-func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
+func testStackdriverAcceleratorMonitoring(ctx context.Context, f *framework.Framework) {
 	projectID := framework.TestContext.CloudConfig.ProjectID
 
-	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
 	framework.ExpectNoError(err)
 
@@ -79,9 +79,9 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 		gcmService.BasePath = basePathOverride
 	}
 
-	scheduling.SetupNVIDIAGPUNode(f, false)
+	scheduling.SetupNVIDIAGPUNode(ctx, f, false)
 
-	f.PodClient().Create(&v1.Pod{
+	e2epod.NewPodClient(f).Create(ctx, &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rcName,
 		},

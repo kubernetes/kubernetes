@@ -20,7 +20,7 @@ import (
 	"context"
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -205,7 +205,7 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 	client := pluginapi.NewRegistrationClient(conn)
 	reqt := &pluginapi.RegisterRequest{
 		Version:      pluginapi.Version,
-		Endpoint:     path.Base(m.socket),
+		Endpoint:     filepath.Base(m.socket),
 		ResourceName: resourceName,
 		Options: &pluginapi.DevicePluginOptions{
 			PreStartRequired:                m.preStartContainerFlag,
@@ -214,10 +214,7 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 	}
 
 	_, err = client.Register(context.Background(), reqt)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // GetDevicePluginOptions returns DevicePluginOptions settings for the device plugin.

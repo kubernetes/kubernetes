@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
+	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/pods"
 )
@@ -150,6 +151,9 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 		if v.Glusterfs != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.25, this feature will be removed soon after in a subsequent release", fieldPath.Child("spec", "volumes").Index(i).Child("glusterfs")))
+		}
+		if v.Ephemeral != nil && v.Ephemeral.VolumeClaimTemplate != nil {
+			warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(fieldPath.Child("spec", "volumes").Index(i).Child("ephemeral").Child("volumeClaimTemplate").Child("spec"), v.Ephemeral.VolumeClaimTemplate.Spec)...)
 		}
 	}
 

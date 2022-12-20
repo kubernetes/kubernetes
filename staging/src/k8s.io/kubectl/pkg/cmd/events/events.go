@@ -48,7 +48,7 @@ import (
 
 var (
 	eventsLong = templates.LongDesc(i18n.T(`
-		Experimental: Display events
+		Display events
 
 		Prints a table of the most important information about events.
 		You can request events for a namespace, for all namespace, or
@@ -56,19 +56,19 @@ var (
 
 	eventsExample = templates.Examples(i18n.T(`
 	# List recent events in the default namespace.
-	kubectl alpha events
+	kubectl events
 
 	# List recent events in all namespaces.
-	kubectl alpha events --all-namespaces
+	kubectl events --all-namespaces
 
 	# List recent events for the specified pod, then wait for more events and list them as they arrive.
-	kubectl alpha events --for pod/web-pod-13je7 --watch
+	kubectl events --for pod/web-pod-13je7 --watch
 
 	# List recent events in given format. Supported ones, apart from default, are json and yaml.
-	kubectl alpha events -oyaml
+	kubectl events -oyaml
 
 	# List recent only events in given event types
-	kubectl alpha events --types=Warning,Normal`))
+	kubectl events --types=Warning,Normal`))
 )
 
 // EventsFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
@@ -122,7 +122,7 @@ func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams g
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--event=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Experimental: List events"),
+		Short:                 i18n.T("List events"),
 		Long:                  eventsLong,
 		Example:               eventsExample,
 		Run: func(cmd *cobra.Command, args []string) {

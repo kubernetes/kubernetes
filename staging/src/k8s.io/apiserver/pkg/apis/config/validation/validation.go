@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/apis/config"
 )
@@ -40,18 +41,21 @@ const (
 	nonZeroErrFmt                  = "%s should be a positive value, or negative to disable"
 	encryptionConfigNilErr         = "EncryptionConfiguration can't be nil"
 	invalidKMSConfigNameErrFmt     = "invalid KMS provider name %s, must not contain ':'"
+	duplicateKMSConfigNameErrFmt   = "duplicate KMS provider name %s, names must be unique"
 )
 
 var (
-	aesKeySizes = []int{16, 24, 32}
 	// See https://golang.org/pkg/crypto/aes/#NewCipher for details on supported key sizes for AES.
-	secretBoxKeySizes = []int{32}
+	aesKeySizes = []int{16, 24, 32}
+
 	// See https://godoc.org/golang.org/x/crypto/nacl/secretbox#Open for details on the supported key sizes for Secretbox.
+	secretBoxKeySizes = []int{32}
+
 	root = field.NewPath("resources")
 )
 
 // ValidateEncryptionConfiguration validates a v1.EncryptionConfiguration.
-func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration) field.ErrorList {
+func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration, reload bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if c == nil {
@@ -64,6 +68,8 @@ func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration) field.Er
 		return allErrs
 	}
 
+	// kmsProviderNames is used to track config names to ensure they are unique.
+	kmsProviderNames := sets.NewString()
 	for i, conf := range c.Resources {
 		r := root.Index(i).Child("resources")
 		p := root.Index(i).Child("providers")
@@ -82,7 +88,8 @@ func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration) field.Er
 
 			switch {
 			case provider.KMS != nil:
-				allErrs = append(allErrs, validateKMSConfiguration(provider.KMS, path.Child("kms"))...)
+				allErrs = append(allErrs, validateKMSConfiguration(provider.KMS, path.Child("kms"), kmsProviderNames, reload)...)
+				kmsProviderNames.Insert(provider.KMS.Name)
 			case provider.AESGCM != nil:
 				allErrs = append(allErrs, validateKeys(provider.AESGCM.Keys, path.Child("aesgcm").Child("keys"), aesKeySizes)...)
 			case provider.AESCBC != nil:
@@ -96,7 +103,7 @@ func ValidateEncryptionConfiguration(c *config.EncryptionConfiguration) field.Er
 	return allErrs
 }
 
-func validateSingleProvider(provider config.ProviderConfiguration, filedPath *field.Path) field.ErrorList {
+func validateSingleProvider(provider config.ProviderConfiguration, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	found := 0
 
@@ -117,11 +124,11 @@ func validateSingleProvider(provider config.ProviderConfiguration, filedPath *fi
 	}
 
 	if found == 0 {
-		return append(allErrs, field.Invalid(filedPath, provider, "provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity"))
+		return append(allErrs, field.Invalid(fieldPath, provider, "provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity"))
 	}
 
 	if found > 1 {
-		return append(allErrs, field.Invalid(filedPath, provider, moreThanOneElementErr))
+		return append(allErrs, field.Invalid(fieldPath, provider, moreThanOneElementErr))
 	}
 
 	return allErrs
@@ -175,10 +182,10 @@ func validateKey(key config.Key, fieldPath *field.Path, expectedLen []int) field
 	return allErrs
 }
 
-func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.String, reload bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, validateKMSConfigName(c, fieldPath.Child("name"))...)
+	allErrs = append(allErrs, validateKMSConfigName(c, fieldPath.Child("name"), kmsProviderNames, reload)...)
 	allErrs = append(allErrs, validateKMSTimeout(c, fieldPath.Child("timeout"))...)
 	allErrs = append(allErrs, validateKMSEndpoint(c, fieldPath.Child("endpoint"))...)
 	allErrs = append(allErrs, validateKMSCacheSize(c, fieldPath.Child("cachesize"))...)
@@ -231,14 +238,23 @@ func validateKMSAPIVersion(c *config.KMSConfiguration, fieldPath *field.Path) fi
 	return allErrs
 }
 
-func validateKMSConfigName(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+func validateKMSConfigName(c *config.KMSConfiguration, fieldPath *field.Path, kmsProviderNames sets.String, reload bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if c.Name == "" {
 		allErrs = append(allErrs, field.Required(fieldPath, fmt.Sprintf(mandatoryFieldErrFmt, "name", "provider")))
 	}
 
+	// kms v2 providers are not allowed to have a ":" in their name
 	if c.APIVersion != "v1" && strings.Contains(c.Name, ":") {
 		allErrs = append(allErrs, field.Invalid(fieldPath, c.Name, fmt.Sprintf(invalidKMSConfigNameErrFmt, c.Name)))
+	}
+
+	// kms v2 providers name must always be unique across all kms providers (v1 and v2)
+	// kms v1 provider names must be unique across all kms providers (v1 and v2) when hot reloading of encryption configuration is enabled (reload=true)
+	if reload || c.APIVersion != "v1" {
+		if kmsProviderNames.Has(c.Name) {
+			allErrs = append(allErrs, field.Invalid(fieldPath, c.Name, fmt.Sprintf(duplicateKMSConfigNameErrFmt, c.Name)))
+		}
 	}
 
 	return allErrs

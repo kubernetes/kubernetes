@@ -35,8 +35,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 	"k8s.io/klog/v2"
+	kmsapi "k8s.io/kms/apis/v1beta1"
 )
 
 const (

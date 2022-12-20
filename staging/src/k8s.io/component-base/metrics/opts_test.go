@@ -38,9 +38,9 @@ func TestDefaultStabilityLevel(t *testing.T) {
 			expectPanic: false,
 		},
 		{
-			name:        "ALPHA remain unchanged",
-			inputValue:  ALPHA,
-			expectValue: ALPHA,
+			name:        "INTERNAL remain unchanged",
+			inputValue:  INTERNAL,
+			expectValue: INTERNAL,
 			expectPanic: false,
 		},
 		{

@@ -137,12 +137,12 @@ func seLinuxOptions_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec)
 				pluralize("type", "types", len(badTypes)),
 				joinQuote(badTypes.List()),
 			))
-			if setUser {
-				badData = append(badData, "user may not be set")
-			}
-			if setRole {
-				badData = append(badData, "role may not be set")
-			}
+		}
+		if setUser {
+			badData = append(badData, "user may not be set")
+		}
+		if setRole {
+			badData = append(badData, "role may not be set")
 		}
 
 		return CheckResult{

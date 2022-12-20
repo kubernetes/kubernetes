@@ -537,10 +537,15 @@ func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *
 // CSIStorageCapacity object.
 var ValidateStorageCapacityName = apimachineryvalidation.NameIsDNSSubdomain
 
+type CSIStorageCapacityValidateOptions struct {
+	AllowInvalidLabelValueInSelector bool
+}
+
 // ValidateCSIStorageCapacity validates a CSIStorageCapacity.
-func ValidateCSIStorageCapacity(capacity *storage.CSIStorageCapacity) field.ErrorList {
+func ValidateCSIStorageCapacity(capacity *storage.CSIStorageCapacity, opts CSIStorageCapacityValidateOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&capacity.ObjectMeta, true, ValidateStorageCapacityName, field.NewPath("metadata"))
-	allErrs = append(allErrs, metav1validation.ValidateLabelSelector(capacity.NodeTopology, field.NewPath("nodeTopology"))...)
+	labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector}
+	allErrs = append(allErrs, metav1validation.ValidateLabelSelector(capacity.NodeTopology, labelSelectorValidationOptions, field.NewPath("nodeTopology"))...)
 	for _, msg := range apivalidation.ValidateClassName(capacity.StorageClassName, false) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, msg))
 	}

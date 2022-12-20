@@ -25,12 +25,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -58,6 +60,9 @@ var (
 	boundPVCNode1a      = makeTestPVC("unbound-pvc", "1G", "", pvcBound, "pv-node1a", "1", &waitClass)
 	immediateUnboundPVC = makeTestPVC("immediate-unbound-pvc", "1G", "", pvcUnbound, "", "1", &immediateClass)
 	immediateBoundPVC   = makeTestPVC("immediate-bound-pvc", "1G", "", pvcBound, "pv-bound-immediate", "1", &immediateClass)
+	localPreboundPVC1a  = makeTestPVC("local-prebound-pvc-1a", "1G", "", pvcPrebound, "local-pv-node1a", "1", &waitClass)
+	localPreboundPVC1b  = makeTestPVC("local-prebound-pvc-1b", "1G", "", pvcPrebound, "local-pv-node1b", "1", &waitClass)
+	localPreboundPVC2a  = makeTestPVC("local-prebound-pvc-2a", "1G", "", pvcPrebound, "local-pv-node2a", "1", &waitClass)
 
 	// PVCs for dynamic provisioning
 	provisionedPVC              = makeTestPVC("provisioned-pvc", "1Gi", "", pvcUnbound, "", "1", &waitClassWithProvisioner)
@@ -89,6 +94,9 @@ var (
 	pvNode1bBoundHigherVersion = makeTestPV("pv-node1b", "node1", "10G", "2", unboundPVC2, waitClass)
 	pvBoundImmediate           = makeTestPV("pv-bound-immediate", "node1", "1G", "1", immediateBoundPVC, immediateClass)
 	pvBoundImmediateNode2      = makeTestPV("pv-bound-immediate", "node2", "1G", "1", immediateBoundPVC, immediateClass)
+	localPVNode1a              = makeLocalPV("local-pv-node1a", "node1", "5G", "1", nil, waitClass)
+	localPVNode1b              = makeLocalPV("local-pv-node1b", "node1", "10G", "1", nil, waitClass)
+	localPVNode2a              = makeLocalPV("local-pv-node2a", "node2", "5G", "1", nil, waitClass)
 
 	// PVs for CSI migration
 	migrationPVBound             = makeTestPVForCSIMigration(zone1Labels, boundMigrationPVC, true)
@@ -431,13 +439,13 @@ func (env *testEnv) validatePodCache(t *testing.T, node string, pod *v1.Pod, pod
 	} else {
 		for i := 0; i < aLen; i++ {
 			// Validate PV
-			if !reflect.DeepEqual(expectedBindings[i].pv, bindings[i].pv) {
-				t.Errorf("binding.pv doesn't match [A-expected, B-got]: %s", diff.ObjectDiff(expectedBindings[i].pv, bindings[i].pv))
+			if diff := cmp.Diff(expectedBindings[i].pv, bindings[i].pv); diff != "" {
+				t.Errorf("binding.pv doesn't match (-want, +got):\n%s", diff)
 			}
 
 			// Validate PVC
-			if !reflect.DeepEqual(expectedBindings[i].pvc, bindings[i].pvc) {
-				t.Errorf("binding.pvc doesn't match [A-expected, B-got]: %s", diff.ObjectDiff(expectedBindings[i].pvc, bindings[i].pvc))
+			if diff := cmp.Diff(expectedBindings[i].pvc, bindings[i].pvc); diff != "" {
+				t.Errorf("binding.pvc doesn't match (-want, +got):\n%s", diff)
 			}
 		}
 	}
@@ -452,8 +460,8 @@ func (env *testEnv) validatePodCache(t *testing.T, node string, pod *v1.Pod, pod
 		t.Error("expected empty provisionings, got nil")
 	} else {
 		for i := 0; i < aLen; i++ {
-			if !reflect.DeepEqual(expectedProvisionings[i], provisionedClaims[i]) {
-				t.Errorf("provisioned claims doesn't match [A-expected, B-got]: %s", diff.ObjectDiff(expectedProvisionings[i], provisionedClaims[i]))
+			if diff := cmp.Diff(expectedProvisionings[i], provisionedClaims[i]); diff != "" {
+				t.Errorf("provisioned claims doesn't match (-want, +got):\n%s", diff)
 			}
 		}
 	}
@@ -538,8 +546,8 @@ func (env *testEnv) validateBind(
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
 		newCachedPV := cachedPV.DeepCopy()
 		newCachedPV.ResourceVersion = pv.ResourceVersion
-		if !reflect.DeepEqual(newCachedPV, pv) {
-			t.Errorf("cached PV check failed [A-expected, B-got]:\n%s", diff.ObjectDiff(pv, cachedPV))
+		if diff := cmp.Diff(pv, newCachedPV); diff != "" {
+			t.Errorf("cached PV check failed (-want, +got):\n%s", diff)
 		}
 	}
 
@@ -565,8 +573,8 @@ func (env *testEnv) validateProvision(
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
 		newCachedPVC := cachedPVC.DeepCopy()
 		newCachedPVC.ResourceVersion = pvc.ResourceVersion
-		if !reflect.DeepEqual(newCachedPVC, pvc) {
-			t.Errorf("cached PVC check failed [A-expected, B-got]:\n%s", diff.ObjectDiff(pvc, cachedPVC))
+		if diff := cmp.Diff(pvc, newCachedPVC); diff != "" {
+			t.Errorf("cached PVC check failed (-want, +got):\n%s", diff)
 		}
 	}
 
@@ -715,6 +723,12 @@ func makeTestPVForCSIMigration(labels map[string]string, pvc *v1.PersistentVolum
 			},
 		}
 	}
+	return pv
+}
+
+func makeLocalPV(name, node, capacity, version string, boundToPVC *v1.PersistentVolumeClaim, className string) *v1.PersistentVolume {
+	pv := makeTestPV(name, node, capacity, version, boundToPVC, className)
+	pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0].Key = v1.LabelHostname
 	return pv
 }
 
@@ -2316,5 +2330,131 @@ func TestCapacity(t *testing.T) {
 				t.Run(name, func(t *testing.T) { run(t, scenario, optIn) })
 			}
 		})
+	}
+}
+
+func TestGetEligibleNodes(t *testing.T) {
+	type scenarioType struct {
+		// Inputs
+		pvcs  []*v1.PersistentVolumeClaim
+		pvs   []*v1.PersistentVolume
+		nodes []*v1.Node
+
+		// Expected return values
+		eligibleNodes sets.String
+	}
+
+	scenarios := map[string]scenarioType{
+		"no-bound-claims": {},
+		"no-nodes-found": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				preboundPVC,
+				preboundPVCNode1a,
+			},
+		},
+		"pv-not-found": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				preboundPVC,
+				preboundPVCNode1a,
+			},
+			nodes: []*v1.Node{
+				node1,
+			},
+		},
+		"node-affinity-mismatch": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				preboundPVC,
+				preboundPVCNode1a,
+			},
+			pvs: []*v1.PersistentVolume{
+				pvNode1a,
+			},
+			nodes: []*v1.Node{
+				node1,
+				node2,
+			},
+		},
+		"local-pv-with-node-affinity": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				localPreboundPVC1a,
+				localPreboundPVC1b,
+			},
+			pvs: []*v1.PersistentVolume{
+				localPVNode1a,
+				localPVNode1b,
+			},
+			nodes: []*v1.Node{
+				node1,
+				node2,
+			},
+			eligibleNodes: sets.NewString("node1"),
+		},
+		"multi-local-pv-with-different-nodes": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				localPreboundPVC1a,
+				localPreboundPVC1b,
+				localPreboundPVC2a,
+			},
+			pvs: []*v1.PersistentVolume{
+				localPVNode1a,
+				localPVNode1b,
+				localPVNode2a,
+			},
+			nodes: []*v1.Node{
+				node1,
+				node2,
+			},
+			eligibleNodes: sets.NewString(),
+		},
+		"local-and-non-local-pv": {
+			pvcs: []*v1.PersistentVolumeClaim{
+				localPreboundPVC1a,
+				localPreboundPVC1b,
+				preboundPVC,
+				immediateBoundPVC,
+			},
+			pvs: []*v1.PersistentVolume{
+				localPVNode1a,
+				localPVNode1b,
+				pvNode1a,
+				pvBoundImmediate,
+				pvBoundImmediateNode2,
+			},
+			nodes: []*v1.Node{
+				node1,
+				node2,
+			},
+			eligibleNodes: sets.NewString("node1"),
+		},
+	}
+
+	run := func(t *testing.T, scenario scenarioType) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Setup
+		testEnv := newTestBinder(t, ctx.Done())
+		testEnv.initVolumes(scenario.pvs, scenario.pvs)
+
+		testEnv.initNodes(scenario.nodes)
+		testEnv.initClaims(scenario.pvcs, scenario.pvcs)
+
+		// Execute
+		eligibleNodes := testEnv.binder.GetEligibleNodes(scenario.pvcs)
+
+		// Validate
+		if reflect.DeepEqual(scenario.eligibleNodes, eligibleNodes) {
+			fmt.Println("foo")
+		}
+
+		if compDiff := cmp.Diff(scenario.eligibleNodes, eligibleNodes, cmp.Comparer(func(a, b sets.String) bool {
+			return reflect.DeepEqual(a, b)
+		})); compDiff != "" {
+			t.Errorf("Unexpected eligible nodes (-want +got):\n%s", compDiff)
+		}
+	}
+
+	for name, scenario := range scenarios {
+		t.Run(name, func(t *testing.T) { run(t, scenario) })
 	}
 }

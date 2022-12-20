@@ -8,6 +8,7 @@ rules:
       - k8s.io/kubernetes/pkg/api/v1/service
       - k8s.io/kubernetes/pkg/api/pod
       - k8s.io/kubernetes/pkg/api/node
+      - k8s.io/kubernetes/pkg/api/persistentvolumeclaim
       - k8s.io/kubernetes/pkg/apis/apps
       - k8s.io/kubernetes/pkg/apis/apps/validation
       - k8s.io/kubernetes/pkg/apis/autoscaling
@@ -168,7 +169,6 @@ rules:
       - k8s.io/kubernetes/pkg/proxy/ipvs
       - k8s.io/kubernetes/pkg/proxy/metaproxier
       - k8s.io/kubernetes/pkg/proxy/metrics
-      - k8s.io/kubernetes/pkg/proxy/userspace
       - k8s.io/kubernetes/pkg/proxy/util
       - k8s.io/kubernetes/pkg/registry/core/service/allocator
       - k8s.io/kubernetes/pkg/registry/core/service/portallocator

@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -110,8 +111,9 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 		{"valid-nodename", false},   // supported
 		// test cases for criSocket are covered in TestValidateSocketPath
 	}
+	criPath := fmt.Sprintf("%s:///some/path", kubeadmapiv1.DefaultContainerRuntimeURLScheme)
 	for _, rt := range tests {
-		nro := kubeadmapi.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: "unix:///some/path"}
+		nro := kubeadmapi.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: criPath}
 		actual := ValidateNodeRegistrationOptions(&nro, field.NewPath("nodeRegistration"))
 		actualErrors := len(actual) > 0
 		if actualErrors != rt.expectedErrors {
@@ -456,6 +458,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 // TODO: Create a separated test for ValidateClusterConfiguration
 func TestValidateInitConfiguration(t *testing.T) {
 	nodename := "valid-nodename"
+	criPath := fmt.Sprintf("%s:///some/path", kubeadmapiv1.DefaultContainerRuntimeURLScheme)
 	var tests = []struct {
 		name     string
 		s        *kubeadmapi.InitConfiguration
@@ -476,7 +479,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadmapi.InitConfiguration{
@@ -491,7 +494,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, false},
 		{"invalid missing node name",
 			&kubeadmapi.InitConfiguration{
@@ -521,7 +524,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, false},
 		{"valid InitConfiguration with IPv4 service subnet",
 			&kubeadmapi.InitConfiguration{
@@ -530,6 +533,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					BindPort:         6443,
 				},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ImageRepository: "registry.k8s.io",
 					Etcd: kubeadmapi.Etcd{
 						Local: &kubeadmapi.LocalEtcd{
 							DataDir: "/some/path",
@@ -542,7 +546,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, true},
 		{"valid InitConfiguration using IPv6 service subnet",
 			&kubeadmapi.InitConfiguration{
@@ -551,6 +555,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					BindPort:         3446,
 				},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ImageRepository: "registry.k8s.io",
 					Etcd: kubeadmapi.Etcd{
 						Local: &kubeadmapi.LocalEtcd{
 							DataDir: "/some/path",
@@ -562,7 +567,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, true},
 	}
 	for _, rt := range tests {
@@ -579,6 +584,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 }
 
 func TestValidateJoinConfiguration(t *testing.T) {
+	criPath := fmt.Sprintf("%s:///var/run/containerd/containerd.sock", kubeadmapiv1.DefaultContainerRuntimeURLScheme)
 	var tests = []struct {
 		s        *kubeadmapi.JoinConfiguration
 		expected bool
@@ -607,7 +613,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/containerd/containerd.sock",
+				CRISocket: criPath,
 			},
 		}, true},
 		{&kubeadmapi.JoinConfiguration{ // Pass with JoinControlPlane
@@ -622,7 +628,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/containerd/containerd.sock",
+				CRISocket: criPath,
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -643,7 +649,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/containerd/containerd.sock",
+				CRISocket: criPath,
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -664,7 +670,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/containerd/containerd.sock",
+				CRISocket: criPath,
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -755,67 +761,67 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 	var tests = []struct {
 		ignorePreflightErrorsFromCLI        []string
 		ignorePreflightErrorsFromConfigFile []string
-		expectedSet                         sets.String
+		expectedSet                         sets.Set[string]
 		expectedError                       bool
 	}{
 		{ // empty lists in CLI and config file
 			[]string{},
 			[]string{},
-			sets.NewString(),
+			sets.New[string](),
 			false,
 		},
 		{ // empty list in CLI only
 			[]string{},
 			[]string{"a"},
-			sets.NewString("a"),
+			sets.New("a"),
 			false,
 		},
 		{ // empty list in config file only
 			[]string{"a"},
 			[]string{},
-			sets.NewString("a"),
+			sets.New("a"),
 			false,
 		},
 		{ // no duplicates, no overlap
 			[]string{"a", "b"},
 			[]string{"c", "d"},
-			sets.NewString("a", "b", "c", "d"),
+			sets.New("a", "b", "c", "d"),
 			false,
 		},
 		{ // some duplicates, with some overlapping duplicates
 			[]string{"a", "b", "a"},
 			[]string{"c", "b"},
-			sets.NewString("a", "b", "c"),
+			sets.New("a", "b", "c"),
 			false,
 		},
 		{ // non-duplicate, but 'all' present together with individual checks in CLI
 			[]string{"a", "b", "all"},
 			[]string{},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // empty list in CLI, but 'all' present in config file, which is forbidden
 			[]string{},
 			[]string{"all"},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // non-duplicate, but 'all' present in config file, which is forbidden
 			[]string{"a", "b"},
 			[]string{"all"},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // non-duplicate, but 'all' present in CLI, while values are in config file, which is forbidden
 			[]string{"all"},
 			[]string{"a", "b"},
-			sets.NewString(),
+			sets.New[string](),
 			true,
 		},
 		{ // skip all checks
 			[]string{"all"},
 			[]string{},
-			sets.NewString("all"),
+			sets.New("all"),
 			false,
 		},
 	}
@@ -1124,9 +1130,10 @@ func TestValidateEtcd(t *testing.T) {
 		actual := ValidateEtcd(tc.etcd, field.NewPath("etcd"))
 		actualErrors := len(actual) > 0
 		if actualErrors != tc.expectedErrors {
-			t.Errorf("Error: \n\texpected: %t\n\t  actual: %t",
+			t.Errorf("Error: \n\texpected: %t\n\t  actual: %t\n\t  encountered errors: %v",
 				tc.expectedErrors,
 				actualErrors,
+				actual,
 			)
 		}
 	}
@@ -1233,5 +1240,86 @@ func TestGetClusterNodeMask(t *testing.T) {
 				t.Errorf("expected mask: %d, got %d", test.expectedMask, mask)
 			}
 		})
+	}
+}
+
+func TestValidateImageRepository(t *testing.T) {
+	var tests = []struct {
+		imageRepository string
+		expectedErrors  bool
+	}{
+		{
+			imageRepository: "a",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a.b.c",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a.b.c/repo",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a:5000",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a.b.c:5000",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a.b.c:5000/repo",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "a/b/c",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "127.0.0.1:5000/repo",
+			expectedErrors:  false,
+		},
+		{
+			imageRepository: "",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: `a.b/c
+			s`,
+			expectedErrors: true,
+		},
+		{
+			imageRepository: " a.b.c",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "a.b c",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "a.b.c:5000/",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "https://a.b.c:5000",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "a//b/c",
+			expectedErrors:  true,
+		},
+		{
+			imageRepository: "a.b.c:5000/test:1.0",
+			expectedErrors:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		actual := ValidateImageRepository(tc.imageRepository, nil)
+		actualErrors := len(actual) > 0
+		if actualErrors != tc.expectedErrors {
+			t.Errorf("case %q error:\n\t expected: %t\n\t actual: %t", tc.imageRepository, tc.expectedErrors, actualErrors)
+		}
 	}
 }

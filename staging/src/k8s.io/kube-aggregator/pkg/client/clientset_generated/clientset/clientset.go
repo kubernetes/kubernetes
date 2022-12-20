@@ -35,8 +35,7 @@ type Interface interface {
 	ApiregistrationV1() apiregistrationv1.ApiregistrationV1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	apiregistrationV1beta1 *apiregistrationv1beta1.ApiregistrationV1beta1Client

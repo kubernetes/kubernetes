@@ -185,14 +185,14 @@ func (p *Provider) GroupSize(group string) (int, error) {
 }
 
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
-func (p *Provider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
+func (p *Provider) EnsureLoadBalancerResourcesDeleted(ctx context.Context, ip, portRange string) error {
 	project := framework.TestContext.CloudConfig.ProjectID
 	region, err := gcecloud.GetGCERegion(framework.TestContext.CloudConfig.Zone)
 	if err != nil {
 		return fmt.Errorf("could not get region for zone %q: %v", framework.TestContext.CloudConfig.Zone, err)
 	}
 
-	return wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
+	return wait.PollWithContext(ctx, 10*time.Second, 5*time.Minute, func(ctx context.Context) (bool, error) {
 		computeservice := p.gceCloud.ComputeServices().GA
 		list, err := computeservice.ForwardingRules.List(project, region).Do()
 		if err != nil {
@@ -268,7 +268,7 @@ func (p *Provider) DeletePD(pdName string) error {
 }
 
 // CreatePVSource creates a persistent volume source
-func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error) {
+func (p *Provider) CreatePVSource(ctx context.Context, zone, diskName string) (*v1.PersistentVolumeSource, error) {
 	return &v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   diskName,
@@ -279,16 +279,16 @@ func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSo
 }
 
 // DeletePVSource deletes a persistent volume source
-func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return e2epv.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
+func (p *Provider) DeletePVSource(ctx context.Context, pvSource *v1.PersistentVolumeSource) error {
+	return e2epv.DeletePDWithRetry(ctx, pvSource.GCEPersistentDisk.PDName)
 }
 
 // CleanupServiceResources cleans up GCE Service Type=LoadBalancer resources with
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
-func (p *Provider) CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
-	if pollErr := wait.Poll(5*time.Second, e2eservice.LoadBalancerCleanupTimeout, func() (bool, error) {
-		if err := p.cleanupGCEResources(c, loadBalancerName, region, zone); err != nil {
+func (p *Provider) CleanupServiceResources(ctx context.Context, c clientset.Interface, loadBalancerName, region, zone string) {
+	if pollErr := wait.PollWithContext(ctx, 5*time.Second, e2eservice.LoadBalancerCleanupTimeout, func(ctx context.Context) (bool, error) {
+		if err := p.cleanupGCEResources(ctx, c, loadBalancerName, region, zone); err != nil {
 			framework.Logf("Still waiting for glbc to cleanup: %v", err)
 			return false, nil
 		}
@@ -298,7 +298,7 @@ func (p *Provider) CleanupServiceResources(c clientset.Interface, loadBalancerNa
 	}
 }
 
-func (p *Provider) cleanupGCEResources(c clientset.Interface, loadBalancerName, region, zone string) (retErr error) {
+func (p *Provider) cleanupGCEResources(ctx context.Context, c clientset.Interface, loadBalancerName, region, zone string) (retErr error) {
 	if region == "" {
 		// Attempt to parse region from zone if no region is given.
 		var err error
@@ -320,7 +320,7 @@ func (p *Provider) cleanupGCEResources(c clientset.Interface, loadBalancerName, 
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}
-	clusterID, err := GetClusterID(c)
+	clusterID, err := GetClusterID(ctx, c)
 	if err != nil {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 		return
@@ -401,8 +401,8 @@ func GetGCECloud() (*gcecloud.Cloud, error) {
 }
 
 // GetClusterID returns cluster ID
-func GetClusterID(c clientset.Interface) (string, error) {
-	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), gcecloud.UIDConfigMapName, metav1.GetOptions{})
+func GetClusterID(ctx context.Context, c clientset.Interface) (string, error) {
+	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, gcecloud.UIDConfigMapName, metav1.GetOptions{})
 	if err != nil || cm == nil {
 		return "", fmt.Errorf("error getting cluster ID: %v", err)
 	}

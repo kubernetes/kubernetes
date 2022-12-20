@@ -19,8 +19,8 @@ func getPackageAndFormattedName() (string, string, string) {
 	path, err := os.Getwd()
 	command.AbortIfError("Could not get current working directory:", err)
 
-	dirName := strings.Replace(filepath.Base(path), "-", "_", -1)
-	dirName = strings.Replace(dirName, " ", "_", -1)
+	dirName := strings.ReplaceAll(filepath.Base(path), "-", "_")
+	dirName = strings.ReplaceAll(dirName, " ", "_")
 
 	pkg, err := build.ImportDir(path, 0)
 	packageName := pkg.Name
@@ -47,10 +47,10 @@ func ensureLegalPackageName(name string) string {
 }
 
 func prettifyName(name string) string {
-	name = strings.Replace(name, "-", " ", -1)
-	name = strings.Replace(name, "_", " ", -1)
+	name = strings.ReplaceAll(name, "-", " ")
+	name = strings.ReplaceAll(name, "_", " ")
 	name = strings.Title(name)
-	name = strings.Replace(name, " ", "", -1)
+	name = strings.ReplaceAll(name, " ", "")
 	return name
 }
 

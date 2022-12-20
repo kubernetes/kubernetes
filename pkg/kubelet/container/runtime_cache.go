@@ -18,6 +18,7 @@ limitations under the License.
 package container
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -29,12 +30,12 @@ var (
 
 // RuntimeCache is in interface for obtaining cached Pods.
 type RuntimeCache interface {
-	GetPods() ([]*Pod, error)
-	ForceUpdateIfOlder(time.Time) error
+	GetPods(context.Context) ([]*Pod, error)
+	ForceUpdateIfOlder(context.Context, time.Time) error
 }
 
 type podsGetter interface {
-	GetPods(bool) ([]*Pod, error)
+	GetPods(context.Context, bool) ([]*Pod, error)
 }
 
 // NewRuntimeCache creates a container runtime cache.
@@ -60,28 +61,28 @@ type runtimeCache struct {
 
 // GetPods returns the cached pods if they are not outdated; otherwise, it
 // retrieves the latest pods and return them.
-func (r *runtimeCache) GetPods() ([]*Pod, error) {
+func (r *runtimeCache) GetPods(ctx context.Context) ([]*Pod, error) {
 	r.Lock()
 	defer r.Unlock()
 	if time.Since(r.cacheTime) > defaultCachePeriod {
-		if err := r.updateCache(); err != nil {
+		if err := r.updateCache(ctx); err != nil {
 			return nil, err
 		}
 	}
 	return r.pods, nil
 }
 
-func (r *runtimeCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error {
+func (r *runtimeCache) ForceUpdateIfOlder(ctx context.Context, minExpectedCacheTime time.Time) error {
 	r.Lock()
 	defer r.Unlock()
 	if r.cacheTime.Before(minExpectedCacheTime) {
-		return r.updateCache()
+		return r.updateCache(ctx)
 	}
 	return nil
 }
 
-func (r *runtimeCache) updateCache() error {
-	pods, timestamp, err := r.getPodsWithTimestamp()
+func (r *runtimeCache) updateCache(ctx context.Context) error {
+	pods, timestamp, err := r.getPodsWithTimestamp(ctx)
 	if err != nil {
 		return err
 	}
@@ -90,9 +91,9 @@ func (r *runtimeCache) updateCache() error {
 }
 
 // getPodsWithTimestamp records a timestamp and retrieves pods from the getter.
-func (r *runtimeCache) getPodsWithTimestamp() ([]*Pod, time.Time, error) {
+func (r *runtimeCache) getPodsWithTimestamp(ctx context.Context) ([]*Pod, time.Time, error) {
 	// Always record the timestamp before getting the pods to avoid stale pods.
 	timestamp := time.Now()
-	pods, err := r.getter.GetPods(false)
+	pods, err := r.getter.GetPods(ctx, false)
 	return pods, timestamp, err
 }

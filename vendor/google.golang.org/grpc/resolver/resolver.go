@@ -96,7 +96,7 @@ const (
 
 // Address represents a server the client connects to.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -236,12 +236,12 @@ type ClientConn interface {
 //
 // Examples:
 //
-// - "dns://some_authority/foo.bar"
-//   Target{Scheme: "dns", Authority: "some_authority", Endpoint: "foo.bar"}
-// - "foo.bar"
-//   Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "foo.bar"}
-// - "unknown_scheme://authority/endpoint"
-//   Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "unknown_scheme://authority/endpoint"}
+//   - "dns://some_authority/foo.bar"
+//     Target{Scheme: "dns", Authority: "some_authority", Endpoint: "foo.bar"}
+//   - "foo.bar"
+//     Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "foo.bar"}
+//   - "unknown_scheme://authority/endpoint"
+//     Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "unknown_scheme://authority/endpoint"}
 type Target struct {
 	// Deprecated: use URL.Scheme instead.
 	Scheme string

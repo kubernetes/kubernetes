@@ -131,8 +131,8 @@ func (c *hollowNodeConfig) bootstrapClientConfig() error {
 	return nil
 }
 
-func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubletOptions {
-	return &kubemark.HollowKubletOptions{
+func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubeletOptions {
+	return &kubemark.HollowKubeletOptions{
 		NodeName:            c.NodeName,
 		KubeletPort:         c.KubeletPort,
 		KubeletReadOnlyPort: c.KubeletReadOnlyPort,
@@ -254,7 +254,7 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) error {
 
 		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
 		if config.UseHostImageService {
-			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second)
+			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
 			if err != nil {
 				return fmt.Errorf("Failed to init image service, error: %w", err)
 			}

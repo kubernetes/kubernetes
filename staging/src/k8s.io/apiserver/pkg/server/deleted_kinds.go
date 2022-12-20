@@ -55,8 +55,7 @@ type ResourceExpirationEvaluator interface {
 
 func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (ResourceExpirationEvaluator, error) {
 	ret := &resourceExpirationEvaluator{
-		// TODO https://github.com/kubernetes/kubernetes/issues/109799 set this back to false after beta is tagged.
-		strictRemovedHandlingInAlpha: true,
+		strictRemovedHandlingInAlpha: false,
 	}
 	if len(currentVersion.Major) > 0 {
 		currentMajor64, err := strconv.ParseInt(currentVersion.Major, 10, 32)

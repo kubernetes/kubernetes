@@ -21,26 +21,29 @@ import (
 	"time"
 )
 
-type keepAliveConn interface {
-	SetKeepAlive(bool) error
-	SetKeepAlivePeriod(d time.Duration) error
-}
-
 // NewKeepAliveListener returns a listener that listens on the given address.
 // Be careful when wrap around KeepAliveListener with another Listener if TLSInfo is not nil.
 // Some pkgs (like go/http) might expect Listener to return TLSConn type to start TLS handshake.
 // http://tldp.org/HOWTO/TCP-Keepalive-HOWTO/overview.html
+//
+// Note(ahrtr):
+// only `net.TCPConn` supports `SetKeepAlive` and `SetKeepAlivePeriod`
+// by default, so if you want to wrap multiple layers of net.Listener,
+// the `keepaliveListener` should be the one which is closest to the
+// original `net.Listener` implementation, namely `TCPListener`.
 func NewKeepAliveListener(l net.Listener, scheme string, tlscfg *tls.Config) (net.Listener, error) {
+	kal := &keepaliveListener{
+		Listener: l,
+	}
+
 	if scheme == "https" {
 		if tlscfg == nil {
 			return nil, fmt.Errorf("cannot listen on TLS for given listener: KeyFile and CertFile are not presented")
 		}
-		return newTLSKeepaliveListener(l, tlscfg), nil
+		return newTLSKeepaliveListener(kal, tlscfg), nil
 	}
 
-	return &keepaliveListener{
-		Listener: l,
-	}, nil
+	return kal, nil
 }
 
 type keepaliveListener struct{ net.Listener }
@@ -50,13 +53,43 @@ func (kln *keepaliveListener) Accept() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	kac := c.(keepAliveConn)
+
+	kac, err := createKeepaliveConn(c)
+	if err != nil {
+		return nil, fmt.Errorf("create keepalive connection failed, %w", err)
+	}
 	// detection time: tcp_keepalive_time + tcp_keepalive_probes + tcp_keepalive_intvl
 	// default on linux:  30 + 8 * 30
 	// default on osx:    30 + 8 * 75
-	kac.SetKeepAlive(true)
-	kac.SetKeepAlivePeriod(30 * time.Second)
-	return c, nil
+	if err := kac.SetKeepAlive(true); err != nil {
+		return nil, fmt.Errorf("SetKeepAlive failed, %w", err)
+	}
+	if err := kac.SetKeepAlivePeriod(30 * time.Second); err != nil {
+		return nil, fmt.Errorf("SetKeepAlivePeriod failed, %w", err)
+	}
+	return kac, nil
+}
+
+func createKeepaliveConn(c net.Conn) (*keepAliveConn, error) {
+	tcpc, ok := c.(*net.TCPConn)
+	if !ok {
+		return nil, ErrNotTCP
+	}
+	return &keepAliveConn{tcpc}, nil
+}
+
+type keepAliveConn struct {
+	*net.TCPConn
+}
+
+// SetKeepAlive sets keepalive
+func (l *keepAliveConn) SetKeepAlive(doKeepAlive bool) error {
+	return l.TCPConn.SetKeepAlive(doKeepAlive)
+}
+
+// SetKeepAlivePeriod sets keepalive period
+func (l *keepAliveConn) SetKeepAlivePeriod(d time.Duration) error {
+	return l.TCPConn.SetKeepAlivePeriod(d)
 }
 
 // A tlsKeepaliveListener implements a network listener (net.Listener) for TLS connections.
@@ -72,12 +105,6 @@ func (l *tlsKeepaliveListener) Accept() (c net.Conn, err error) {
 	if err != nil {
 		return
 	}
-	kac := c.(keepAliveConn)
-	// detection time: tcp_keepalive_time + tcp_keepalive_probes + tcp_keepalive_intvl
-	// default on linux:  30 + 8 * 30
-	// default on osx:    30 + 8 * 75
-	kac.SetKeepAlive(true)
-	kac.SetKeepAlivePeriod(30 * time.Second)
 	c = tls.Server(c, l.config)
 	return c, nil
 }

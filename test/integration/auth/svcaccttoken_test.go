@@ -19,12 +19,10 @@ package auth
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -42,18 +40,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
-	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/apis/core"
-	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -71,15 +63,6 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 )
 
 func TestServiceAccountTokenCreate(t *testing.T) {
-
-	// Build client config, clientset, and informers
-	sk, err := keyutil.ParsePrivateKeyPEM([]byte(ecdsaPrivateKey))
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-
-	pk := sk.(*ecdsa.PrivateKey).PublicKey
-
 	const iss = "https://foo.bar.example.com"
 	aud := authenticator.Audiences{"api"}
 
@@ -89,12 +72,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		t.Fatalf("err: %v", err)
 	}
 
-	gcs := &clientset.Clientset{}
-
-	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
+	var tokenGenerator serviceaccount.TokenGenerator
 
 	// Start the server
 	var serverAddress string
@@ -102,45 +80,21 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.Authorization.Modes = []string{"AlwaysAllow"}
+			// Disable token cache so we can check reaction to service account deletion quickly
+			opts.Authentication.TokenSuccessCacheTTL = 0
+			opts.Authentication.TokenFailureCacheTTL = 0
+			// Pin to fixed URLs for easier testing
+			opts.Authentication.ServiceAccounts.JWKSURI = "https:///openid/v1/jwks"
+			opts.Authentication.ServiceAccounts.Issuers = []string{iss}
+			opts.Authentication.APIAudiences = aud
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-			config.GenericConfig.Authentication.APIAudiences = aud
-			config.GenericConfig.Authentication.Authenticator = bearertoken.New(
-				serviceaccount.JWTTokenAuthenticator(
-					[]string{iss},
-					[]interface{}{&pk},
-					aud,
-					serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(
-						gcs,
-						v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
-							return gcs.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-						})),
-						v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
-							return gcs.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-						})),
-						v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
-							return gcs.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-						})),
-					)),
-				),
-			)
+			// extract token generator
+			tokenGenerator = config.ExtraConfig.ServiceAccountIssuer
 
-			config.ExtraConfig.ServiceAccountIssuer = tokenGenerator
 			config.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
 			config.ExtraConfig.ExtendExpiration = true
-
-			config.ExtraConfig.ServiceAccountIssuerURL = iss
-			config.ExtraConfig.ServiceAccountJWKSURI = ""
-			config.ExtraConfig.ServiceAccountPublicKeys = []interface{}{&pk}
-
-			// Compute the serverAddress.
-			serverAddress = config.GenericConfig.ExternalAddress
-			_, port, err := config.GenericConfig.SecureServing.HostPort()
-			if err != nil {
-				t.Fatalf("Couldn't get server port: %v", err)
-			}
-			serverAddress = net.JoinHostPort(serverAddress, strconv.Itoa(port))
 		},
 	})
 	defer tearDownFn()
@@ -156,7 +110,6 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	*gcs = *cs
 
 	kubeConfig.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	rc, err := rest.UnversionedRESTClientFor(kubeConfig)
@@ -917,25 +870,36 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) authenticationv1.UserInfo {
 	t.Helper()
-	trev, err := cs.AuthenticationV1().TokenReviews().Create(context.TODO(), &authenticationv1.TokenReview{
-		Spec: authenticationv1.TokenReviewSpec{
-			Token: treq.Status.Token,
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("err: %v", err)
+	tries := 0
+	for {
+		trev, err := cs.AuthenticationV1().TokenReviews().Create(context.TODO(), &authenticationv1.TokenReview{
+			Spec: authenticationv1.TokenReviewSpec{
+				Token: treq.Status.Token,
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		t.Logf("status: %+v", trev.Status)
+		if (trev.Status.Error != "") && !expectErr {
+			t.Fatalf("expected no error but got: %v", trev.Status.Error)
+		}
+		if (trev.Status.Error == "") && expectErr {
+			// if we expected an error and didn't get one, retry
+			// to let changes that invalidate the token percolate through informers
+			if tries < 10 {
+				tries++
+				time.Sleep(100 * time.Millisecond)
+				t.Logf("expected error but got: %+v, retrying", trev.Status)
+				continue
+			}
+			t.Fatalf("expected error but got: %+v", trev.Status)
+		}
+		if !trev.Status.Authenticated && !expectErr {
+			t.Fatal("expected token to be authenticated but it wasn't")
+		}
+		return trev.Status.User
 	}
-	t.Logf("status: %+v", trev.Status)
-	if (trev.Status.Error != "") && !expectErr {
-		t.Fatalf("expected no error but got: %v", trev.Status.Error)
-	}
-	if (trev.Status.Error == "") && expectErr {
-		t.Fatalf("expected error but got: %+v", trev.Status)
-	}
-	if !trev.Status.Authenticated && !expectErr {
-		t.Fatal("expected token to be authenticated but it wasn't")
-	}
-	return trev.Status.User
 }
 
 func checkPayload(t *testing.T, tok string, want string, parts ...string) {
@@ -1041,26 +1005,6 @@ func createDeleteSecret(t *testing.T, cs clientset.Interface, sec *v1.Secret) (*
 			t.Fatalf("err: %v", err)
 		}
 	}
-}
-
-func newIndexer(get func(namespace, name string) (interface{}, error)) cache.Indexer {
-	return &fakeIndexer{get: get}
-}
-
-type fakeIndexer struct {
-	cache.Indexer
-	get func(namespace, name string) (interface{}, error)
-}
-
-func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
-	parts := strings.SplitN(key, "/", 2)
-	namespace := parts[0]
-	name := ""
-	if len(parts) == 2 {
-		name = parts[1]
-	}
-	obj, err := f.get(namespace, name)
-	return obj, err == nil, err
 }
 
 type recordingWarningHandler struct {

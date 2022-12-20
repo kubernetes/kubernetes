@@ -68,7 +68,7 @@ func newCmdConfig(out io.Writer) *cobra.Command {
 		// cobra will print usage information, but still exit cleanly.
 		// We want to return an error code in these cases so that the
 		// user knows that their command was invalid.
-		RunE: cmdutil.SubCmdRunE("config"),
+		Run: cmdutil.SubCmdRun(),
 	}
 
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
@@ -88,7 +88,7 @@ func newCmdConfigPrint(out io.Writer) *cobra.Command {
 		Long: dedent.Dedent(`
 			This command prints configurations for subcommands provided.
 			For details, see: https://pkg.go.dev/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm#section-directories`),
-		RunE: cmdutil.SubCmdRunE("print"),
+		Run: cmdutil.SubCmdRun(),
 	}
 	cmd.AddCommand(newCmdConfigPrintInitDefaults(out))
 	cmd.AddCommand(newCmdConfigPrintJoinDefaults(out))
@@ -277,7 +277,7 @@ func newCmdConfigImages(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "images",
 		Short: "Interact with container images used by kubeadm",
-		RunE:  cmdutil.SubCmdRunE("images"),
+		Run:   cmdutil.SubCmdRun(),
 	}
 	cmd.AddCommand(newCmdConfigImagesList(out, nil))
 	cmd.AddCommand(newCmdConfigImagesPull())

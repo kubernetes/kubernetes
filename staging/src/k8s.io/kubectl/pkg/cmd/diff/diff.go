@@ -19,7 +19,6 @@ package diff
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -111,7 +110,6 @@ type DiffOptions struct {
 	Selector         string
 	OpenAPISchema    openapi.Resources
 	DynamicClient    dynamic.Interface
-	DryRunVerifier   *resource.QueryParamVerifier
 	CmdNamespace     string
 	EnforceNamespace bool
 	Builder          *resource.Builder
@@ -147,7 +145,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			// return 1 if there was a problem.
 			if err := options.Run(); err != nil {
 				if exitErr := diffError(err); exitErr != nil {
-					os.Exit(exitErr.ExitStatus())
+					cmdutil.CheckErr(cmdutil.ErrExit)
 				}
 				cmdutil.CheckDiffErr(err)
 			}
@@ -286,7 +284,7 @@ type Directory struct {
 // CreateDirectory does create the actual disk directory, and return a
 // new representation of it.
 func CreateDirectory(prefix string) (*Directory, error) {
-	name, err := ioutil.TempDir("", prefix+"-")
+	name, err := os.MkdirTemp("", prefix+"-")
 	if err != nil {
 		return nil, err
 	}
@@ -646,8 +644,6 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
-	o.DryRunVerifier = resource.NewQueryParamVerifier(o.DynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
-
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -698,10 +694,6 @@ func (o *DiffOptions) Run() error {
 			return err
 		}
 
-		if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-			return err
-		}
-
 		local := info.Object.DeepCopyObject()
 		for i := 1; i <= maxRetries; i++ {
 			if err = info.Get(); err != nil {
@@ -747,7 +739,7 @@ func (o *DiffOptions) Run() error {
 	})
 
 	if o.pruner != nil {
-		prunedObjs, err := o.pruner.pruneAll()
+		prunedObjs, err := o.pruner.pruneAll(o.CmdNamespace != "")
 		if err != nil {
 			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
 		}

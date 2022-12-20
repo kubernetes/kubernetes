@@ -215,9 +215,6 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 		}
 		createOptions.FieldValidation = c.ValidationDirective
 		if c.DryRunStrategy == cmdutil.DryRunServer {
-			if err := c.DryRunVerifier.HasSupport(clusterRole.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		clusterRole, err = c.Client.ClusterRoles().Create(context.TODO(), clusterRole, createOptions)

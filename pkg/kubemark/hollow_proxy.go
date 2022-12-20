@@ -82,7 +82,7 @@ func NewHollowProxyOrDie(
 	if useRealProxier {
 		nodeIP := utilnode.GetNodeIP(client, nodeName)
 		if nodeIP == nil {
-			klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1")
+			klog.InfoS("can't determine this node's IP, assuming 127.0.0.1")
 			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
@@ -93,6 +93,7 @@ func NewHollowProxyOrDie(
 			execer,
 			proxierSyncPeriod,
 			proxierMinSyncPeriod,
+			false,
 			false,
 			0,
 			proxyutiliptables.NewNoOpLocalDetector(),
@@ -118,17 +119,16 @@ func NewHollowProxyOrDie(
 	}
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
-			Client:            client,
-			EventClient:       eventClient,
-			IptInterface:      iptInterface,
-			Proxier:           proxier,
-			Broadcaster:       broadcaster,
-			Recorder:          recorder,
-			ProxyMode:         "fake",
-			NodeRef:           nodeRef,
-			UseEndpointSlices: true,
-			OOMScoreAdj:       utilpointer.Int32Ptr(0),
-			ConfigSyncPeriod:  30 * time.Second,
+			Client:           client,
+			EventClient:      eventClient,
+			IptInterface:     iptInterface,
+			Proxier:          proxier,
+			Broadcaster:      broadcaster,
+			Recorder:         recorder,
+			ProxyMode:        "fake",
+			NodeRef:          nodeRef,
+			OOMScoreAdj:      utilpointer.Int32Ptr(0),
+			ConfigSyncPeriod: 30 * time.Second,
 		},
 	}, nil
 }

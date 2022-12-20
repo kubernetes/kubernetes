@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		datastore = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 	})
 
-	ginkgo.It("verify dynamically provisioned pv has size rounded up correctly", func() {
+	ginkgo.It("verify dynamically provisioned pv has size rounded up correctly", func(ctx context.Context) {
 		ginkgo.By("Invoking Test disk size")
 		scParameters[Datastore] = datastore
 		scParameters[DiskFormat] = ThinDisk
@@ -71,25 +71,25 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 		expectedDiskSize := "1Mi"
 
 		ginkgo.By("Creating Storage Class")
-		storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""), metav1.CreateOptions{})
+		storageclass, err := client.StorageV1().StorageClasses().Create(ctx, getVSphereStorageClassSpec(diskSizeSCName, scParameters, nil, ""), metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
+		ginkgo.DeferCleanup(framework.IgnoreNotFound(client.StorageV1().StorageClasses().Delete), storageclass.Name, metav1.DeleteOptions{})
 
 		ginkgo.By("Creating PVC using the Storage Class")
-		pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, diskSize, storageclass))
+		pvclaim, err := e2epv.CreatePVC(ctx, client, namespace, getVSphereClaimSpecWithStorageClass(namespace, diskSize, storageclass))
 		framework.ExpectNoError(err)
-		defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+		ginkgo.DeferCleanup(e2epv.DeletePersistentVolumeClaim, client, pvclaim.Name, namespace)
 
 		ginkgo.By("Waiting for claim to be in bound phase")
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Getting new copy of PVC")
-		pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(context.TODO(), pvclaim.Name, metav1.GetOptions{})
+		pvclaim, err = client.CoreV1().PersistentVolumeClaims(pvclaim.Namespace).Get(ctx, pvclaim.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Getting PV created")
-		pv, err := client.CoreV1().PersistentVolumes().Get(context.TODO(), pvclaim.Spec.VolumeName, metav1.GetOptions{})
+		pv, err := client.CoreV1().PersistentVolumes().Get(ctx, pvclaim.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying if provisioned PV has the correct size")

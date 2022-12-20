@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/metrics/testutil"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -43,6 +43,8 @@ const (
 	podWorkerDurationKey = "pod_worker_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	podStartDurationKey = "pod_start_duration_seconds"
+	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
+	PodStartSLIDurationKey = "pod_start_sli_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
 	cgroupManagerOperationsKey = "cgroup_manager_duration_seconds"
 	// Taken from k8s.io/kubernetes/pkg/kubelet/metrics
@@ -66,9 +68,12 @@ func NewKubeletMetrics() KubeletMetrics {
 }
 
 // GrabKubeletMetricsWithoutProxy retrieve metrics from the kubelet on the given node using a simple GET over http.
-// Currently only used in integration tests.
-func GrabKubeletMetricsWithoutProxy(nodeName, path string) (KubeletMetrics, error) {
-	resp, err := http.Get(fmt.Sprintf("http://%s%s", nodeName, path))
+func GrabKubeletMetricsWithoutProxy(ctx context.Context, nodeName, path string) (KubeletMetrics, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://%s%s", nodeName, path), nil)
+	if err != nil {
+		return KubeletMetrics{}, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -88,7 +93,7 @@ func parseKubeletMetrics(data string) (KubeletMetrics, error) {
 	return result, nil
 }
 
-func (g *Grabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, error) {
+func (g *Grabber) getMetricsFromNode(ctx context.Context, nodeName string, kubeletPort int) (string, error) {
 	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
 	finished := make(chan struct{}, 1)
 	var err error
@@ -99,7 +104,7 @@ func (g *Grabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, 
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", nodeName, kubeletPort)).
 			Suffix("metrics").
-			Do(context.TODO()).Raw()
+			Do(ctx).Raw()
 		finished <- struct{}{}
 	}()
 	select {
@@ -135,21 +140,21 @@ func (a KubeletLatencyMetrics) Less(i, j int) bool { return a[i].Latency > a[j].
 
 // If a apiserver client is passed in, the function will try to get kubelet metrics from metrics grabber;
 // or else, the function will try to get kubelet metrics directly from the node.
-func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (KubeletMetrics, error) {
+func getKubeletMetricsFromNode(ctx context.Context, c clientset.Interface, nodeName string) (KubeletMetrics, error) {
 	if c == nil {
-		return GrabKubeletMetricsWithoutProxy(nodeName, "/metrics")
+		return GrabKubeletMetricsWithoutProxy(ctx, nodeName, "/metrics")
 	}
-	grabber, err := NewMetricsGrabber(c, nil, nil, true, false, false, false, false, false)
+	grabber, err := NewMetricsGrabber(ctx, c, nil, nil, true, false, false, false, false, false)
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
-	return grabber.GrabFromKubelet(nodeName)
+	return grabber.GrabFromKubelet(ctx, nodeName)
 }
 
 // GetKubeletMetrics gets all metrics in kubelet subsystem from specified node and trims
 // the subsystem prefix.
-func GetKubeletMetrics(c clientset.Interface, nodeName string) (KubeletMetrics, error) {
-	ms, err := getKubeletMetricsFromNode(c, nodeName)
+func GetKubeletMetrics(ctx context.Context, c clientset.Interface, nodeName string) (KubeletMetrics, error) {
+	ms, err := getKubeletMetricsFromNode(ctx, c, nodeName)
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -175,6 +180,7 @@ func GetDefaultKubeletLatencyMetrics(ms KubeletMetrics) KubeletLatencyMetrics {
 		podWorkerDurationKey,
 		podWorkerStartDurationKey,
 		podStartDurationKey,
+		PodStartSLIDurationKey,
 		cgroupManagerOperationsKey,
 		dockerOperationsLatencyKey,
 		podWorkerStartDurationKey,
@@ -214,8 +220,8 @@ func GetKubeletLatencyMetrics(ms KubeletMetrics, filterMetricNames sets.String) 
 }
 
 // HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
-func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
-	ms, err := GetKubeletMetrics(c, nodeName)
+func HighLatencyKubeletOperations(ctx context.Context, c clientset.Interface, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
+	ms, err := GetKubeletMetrics(ctx, c, nodeName)
 	if err != nil {
 		return KubeletLatencyMetrics{}, err
 	}
@@ -226,7 +232,7 @@ func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration
 	for _, m := range latencyMetrics {
 		if m.Latency > threshold {
 			badMetrics = append(badMetrics, m)
-			e2elog.Logf("%+v", m)
+			framework.Logf("%+v", m)
 		}
 	}
 	return badMetrics, nil

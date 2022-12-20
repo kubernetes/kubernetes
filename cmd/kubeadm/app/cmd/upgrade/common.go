@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,15 +33,12 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -74,15 +70,6 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	// This is probably 90% of the time. So we handle it first.
 	if cfgPath == "" {
 		cfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, false, skipComponentConfigs)
-		// In case we fetch a configuration from the cluster, mutate the ImageRepository field
-		// to be 'registry.k8s.io', if it was 'k8s.gcr.io'.
-		// TODO: Remove this in 1.26
-		// https://github.com/kubernetes/kubeadm/issues/2671
-		if err == nil {
-			if err := uploadconfig.MutateImageRepository(cfg, client); err != nil {
-				return nil, false, err
-			}
-		}
 		return cfg, false, err
 	}
 
@@ -132,8 +119,10 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	return initCfg, false, nil
 }
 
+type LoadConfigFunc func(cfgPath string, client clientset.Interface, skipComponentConfigs bool, printer output.Printer) (*kubeadmapi.InitConfiguration, bool, error)
+
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
+func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer, loadConfig LoadConfigFunc) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
@@ -190,7 +179,7 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		return nil, nil, nil, err
 	}
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
@@ -224,29 +213,6 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		printConfiguration(&cfg.ClusterConfiguration, os.Stdout, printer)
 	}
 
-	// Handle a dupliate prefix URL scheme in the Node CRI socket.
-	// Older versions of kubeadm(v1.24.0~2) upgrade may add one or two extra prefix `unix://`
-	// TODO: this fix can be removed in 1.26 once all user node sockets have a correct URL scheme:
-	// https://github.com/kubernetes/kubeadm/issues/2426
-	dupURLScheme := strings.HasPrefix(cfg.NodeRegistration.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://"+kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://")
-	if dupURLScheme {
-		socket := strings.ReplaceAll(cfg.NodeRegistration.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://", "")
-		cfg.NodeRegistration.CRISocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + socket
-		var hostname string
-		if len(cfg.NodeRegistration.Name) > 0 {
-			hostname = cfg.NodeRegistration.Name
-		} else {
-			hostname, err = os.Hostname()
-			if err != nil {
-				return nil, nil, nil, errors.Wrapf(err, "failed to get hostname")
-			}
-		}
-		klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", hostname, cfg.NodeRegistration.CRISocket)
-		if err := patchnodephase.AnnotateCRISocket(client, hostname, cfg.NodeRegistration.CRISocket); err != nil {
-			return nil, nil, nil, errors.Wrapf(err, "error updating the CRI socket for Node %q", cfg.NodeRegistration.CRISocket)
-		}
-	}
-
 	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
 	return client, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client), newK8sVersion), cfg, nil
 }
@@ -270,17 +236,13 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration, printer output.Printer) error {
+func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], cfg *kubeadmapi.ClusterConfiguration, printer output.Printer) error {
 	printer.Printf("[preflight] Running pre-flight checks.\n")
 	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
 	if err != nil {
 		return err
 	}
-	err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
-	if err != nil {
-		return err
-	}
-	return nil
+	return upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not

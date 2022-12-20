@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package fieldmanager_test
 
 import (
 	"fmt"
@@ -26,14 +26,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
 	"sigs.k8s.io/yaml"
 )
 
 func TestLastAppliedUpdater(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
+	f := fieldmanagertest.NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
 		"",
-		func(m Manager) Manager {
-			return NewLastAppliedUpdater(m)
+		func(m fieldmanager.Manager) fieldmanager.Manager {
+			return fieldmanager.NewLastAppliedUpdater(m)
 		})
 
 	originalLastApplied := `nonempty`
@@ -69,7 +71,7 @@ spec:
 		t.Errorf("error applying object: %v", err)
 	}
 
-	lastApplied, err := getLastApplied(f.liveObj)
+	lastApplied, err := getLastApplied(f.Live())
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}
@@ -82,7 +84,7 @@ spec:
 		t.Errorf("error applying object: %v", err)
 	}
 
-	lastApplied, err = getLastApplied(f.liveObj)
+	lastApplied, err = getLastApplied(f.Live())
 	if err != nil {
 		t.Errorf("failed to get last applied: %v", err)
 	}
@@ -187,17 +189,17 @@ func TestLargeLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"),
+			f := fieldmanagertest.NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "ConfigMap"),
 				"",
-				func(m Manager) Manager {
-					return NewLastAppliedUpdater(m)
+				func(m fieldmanager.Manager) fieldmanager.Manager {
+					return fieldmanager.NewLastAppliedUpdater(m)
 				})
 
 			if err := f.Apply(test.oldObject, "kubectl", false); err != nil {
 				t.Errorf("Error applying object: %v", err)
 			}
 
-			lastApplied, err := getLastApplied(f.liveObj)
+			lastApplied, err := getLastApplied(f.Live())
 			if err != nil {
 				t.Errorf("Failed to access last applied annotation: %v", err)
 			}
@@ -210,12 +212,12 @@ func TestLargeLastApplied(t *testing.T) {
 			}
 
 			accessor := meta.NewAccessor()
-			annotations, err := accessor.Annotations(f.liveObj)
+			annotations, err := accessor.Annotations(f.Live())
 			if err != nil {
 				t.Errorf("Failed to access annotations: %v", err)
 			}
 			if annotations == nil {
-				t.Errorf("No annotations on obj: %v", f.liveObj)
+				t.Errorf("No annotations on obj: %v", f.Live())
 			}
 			lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
 			if ok || len(lastApplied) > 0 {

@@ -49,7 +49,7 @@ func shredFile(filePath string) {
 		framework.Logf("File %v successfully shredded", filePath)
 		return
 	}
-	// Shred failed Try to remove the file for good meausure
+	// Shred failed Try to remove the file for good measure
 	err = os.Remove(filePath)
 	framework.ExpectNoError(err, "Failed to remove service account file %s", filePath)
 

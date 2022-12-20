@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -76,7 +77,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 			ResourceVersion: "18",
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -138,7 +139,7 @@ func newReplicaSet(name string, replicas int) *apps.ReplicaSet {
 			ResourceVersion: "18",
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -987,6 +988,43 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 				{Key: "key2", Value: "value2", Effect: "NoExecute"},
 			},
 			requestCount: 1,
+		},
+		{
+			name: "add taint to changed node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "node1",
+							ResourceVersion: "1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+				AsyncCalls: []func(*testutil.FakeNodeHandler){func(m *testutil.FakeNodeHandler) {
+					if len(m.UpdatedNodes) == 0 {
+						m.UpdatedNodes = append(m.UpdatedNodes, &v1.Node{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:            "node1",
+								ResourceVersion: "2",
+							},
+							Spec: v1.NodeSpec{
+								Taints: []v1.Taint{},
+							}})
+					}
+				}},
+			},
+			nodeName:    "node1",
+			taintsToAdd: []*v1.Taint{{Key: "key2", Value: "value2", Effect: "NoExecute"}},
+			expectedTaints: []v1.Taint{
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			requestCount: 5,
 		},
 	}
 	for _, test := range tests {

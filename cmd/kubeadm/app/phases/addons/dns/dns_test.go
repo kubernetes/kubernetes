@@ -43,14 +43,13 @@ func TestCompileManifests(t *testing.T) {
 			name:     "CoreDNSDeployment manifest",
 			manifest: CoreDNSDeployment,
 			data: struct {
-				DeploymentName, Image, OldControlPlaneTaintKey, ControlPlaneTaintKey string
-				Replicas                                                             *int32
+				DeploymentName, Image, ControlPlaneTaintKey string
+				Replicas                                    *int32
 			}{
-				DeploymentName:          "foo",
-				Image:                   "foo",
-				OldControlPlaneTaintKey: "foo",
-				ControlPlaneTaintKey:    "foo",
-				Replicas:                &replicas,
+				DeploymentName:       "foo",
+				Image:                "foo",
+				ControlPlaneTaintKey: "foo",
+				Replicas:             &replicas,
 			},
 		},
 		{
@@ -127,15 +126,14 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 			name:     "CoreDNSDeployment",
 			manifest: CoreDNSDeployment,
 			data: struct {
-				DeploymentName, Image, OldControlPlaneTaintKey, ControlPlaneTaintKey, CoreDNSConfigMapName string
-				Replicas                                                                                   *int32
+				DeploymentName, Image, ControlPlaneTaintKey, CoreDNSConfigMapName string
+				Replicas                                                          *int32
 			}{
-				DeploymentName:          "foo",
-				Image:                   "foo",
-				OldControlPlaneTaintKey: "foo",
-				ControlPlaneTaintKey:    "foo",
-				CoreDNSConfigMapName:    "foo",
-				Replicas:                &replicas,
+				DeploymentName:       "foo",
+				Image:                "foo",
+				ControlPlaneTaintKey: "foo",
+				CoreDNSConfigMapName: "foo",
+				Replicas:             &replicas,
 			},
 		},
 	}

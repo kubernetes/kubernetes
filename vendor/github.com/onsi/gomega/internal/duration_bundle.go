@@ -44,28 +44,28 @@ func durationFromEnv(key string, defaultDuration time.Duration) time.Duration {
 	return duration
 }
 
-func toDuration(input interface{}) time.Duration {
+func toDuration(input interface{}) (time.Duration, error) {
 	duration, ok := input.(time.Duration)
 	if ok {
-		return duration
+		return duration, nil
 	}
 
 	value := reflect.ValueOf(input)
 	kind := reflect.TypeOf(input).Kind()
 
 	if reflect.Int <= kind && kind <= reflect.Int64 {
-		return time.Duration(value.Int()) * time.Second
+		return time.Duration(value.Int()) * time.Second, nil
 	} else if reflect.Uint <= kind && kind <= reflect.Uint64 {
-		return time.Duration(value.Uint()) * time.Second
+		return time.Duration(value.Uint()) * time.Second, nil
 	} else if reflect.Float32 <= kind && kind <= reflect.Float64 {
-		return time.Duration(value.Float() * float64(time.Second))
+		return time.Duration(value.Float() * float64(time.Second)), nil
 	} else if reflect.String == kind {
 		duration, err := time.ParseDuration(value.String())
 		if err != nil {
-			panic(fmt.Sprintf("%#v is not a valid parsable duration string.", input))
+			return 0, fmt.Errorf("%#v is not a valid parsable duration string: %w", input, err)
 		}
-		return duration
+		return duration, nil
 	}
 
-	panic(fmt.Sprintf("%v is not a valid interval.  Must be time.Duration, parsable duration string or a number.", input))
+	return 0, fmt.Errorf("%#v is not a valid interval. Must be a time.Duration, a parsable duration string, or a number.", input)
 }

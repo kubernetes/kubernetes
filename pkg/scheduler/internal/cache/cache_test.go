@@ -212,6 +212,10 @@ func TestAssumePodScheduled(t *testing.T) {
 				if err := cache.AssumePod(pod); err != nil {
 					t.Fatalf("AssumePod failed: %v", err)
 				}
+				// pod already in cache so can't be assumed
+				if err := cache.AssumePod(pod); err == nil {
+					t.Error("expected error, no error found")
+				}
 			}
 			n := cache.nodes[nodeName]
 			if err := deepEqualWithoutGeneration(n, tt.wNodeInfo); err != nil {
@@ -389,6 +393,10 @@ func TestAddPodWillConfirm(t *testing.T) {
 				if err := cache.AddPod(podToAdd); err != nil {
 					t.Fatalf("AddPod failed: %v", err)
 				}
+				// pod already in added state
+				if err := cache.AddPod(podToAdd); err == nil {
+					t.Error("expected error, no error found")
+				}
 			}
 			cache.cleanupAssumedPods(now.Add(2 * ttl))
 			// check after expiration. confirmed pods shouldn't be expired.
@@ -443,6 +451,68 @@ func TestDump(t *testing.T) {
 			}
 			if !reflect.DeepEqual(snapshot.AssumedPods, cache.assumedPods) {
 				t.Errorf("expect \n%+v; got \n%+v", cache.assumedPods, snapshot.AssumedPods)
+			}
+		})
+	}
+}
+
+// TestAddPodAlwaysUpdatePodInfoInNodeInfo tests that AddPod method always updates PodInfo in NodeInfo,
+// even when the Pod is assumed one.
+func TestAddPodAlwaysUpdatesPodInfoInNodeInfo(t *testing.T) {
+	ttl := 10 * time.Second
+	now := time.Now()
+	p1 := makeBasePod(t, "node1", "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
+
+	p2 := p1.DeepCopy()
+	p2.Status.Conditions = append(p1.Status.Conditions, v1.PodCondition{
+		Type:   v1.PodScheduled,
+		Status: v1.ConditionTrue,
+	})
+
+	tests := []struct {
+		podsToAssume         []*v1.Pod
+		podsToAddAfterAssume []*v1.Pod
+		nodeInfo             map[string]*framework.NodeInfo
+	}{
+		{
+			podsToAssume:         []*v1.Pod{p1},
+			podsToAddAfterAssume: []*v1.Pod{p2},
+			nodeInfo: map[string]*framework.NodeInfo{
+				"node1": newNodeInfo(
+					&framework.Resource{
+						MilliCPU: 100,
+						Memory:   500,
+					},
+					&framework.Resource{
+						MilliCPU: 100,
+						Memory:   500,
+					},
+					[]*v1.Pod{p2},
+					newHostPortInfoBuilder().add("TCP", "0.0.0.0", 80).build(),
+					make(map[string]*framework.ImageStateSummary),
+				),
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			cache := newCache(ttl, time.Second, nil)
+			for _, podToAssume := range tt.podsToAssume {
+				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
+					t.Fatalf("assumePod failed: %v", err)
+				}
+			}
+			for _, podToAdd := range tt.podsToAddAfterAssume {
+				if err := cache.AddPod(podToAdd); err != nil {
+					t.Fatalf("AddPod failed: %v", err)
+				}
+			}
+			for nodeName, expected := range tt.nodeInfo {
+				n := cache.nodes[nodeName]
+				if err := deepEqualWithoutGeneration(n, expected); err != nil {
+					t.Errorf("node %q: %v", nodeName, err)
+				}
 			}
 		})
 	}
@@ -671,6 +741,17 @@ func TestUpdatePodAndGet(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			cache := newCache(ttl, time.Second, nil)
+			// trying to get an unknown pod should return an error
+			// podToUpdate has not been added yet
+			if _, err := cache.GetPod(tt.podToUpdate); err == nil {
+				t.Error("expected error, no error found")
+			}
+
+			// trying to update an unknown pod should return an error
+			// pod has not been added yet
+			if err := cache.UpdatePod(tt.pod, tt.podToUpdate); err == nil {
+				t.Error("expected error, no error found")
+			}
 
 			if err := tt.handler(cache, tt.pod); err != nil {
 				t.Fatalf("unexpected err: %v", err)
@@ -885,6 +966,11 @@ func TestRemovePod(t *testing.T) {
 				t.Errorf("pod was not deleted")
 			}
 
+			// trying to remove a pod already removed should return an error
+			if err := cache.RemovePod(pod); err == nil {
+				t.Error("expected error, no error found")
+			}
+
 			// Node that owned the Pod should be at the head of the list.
 			if cache.headNode.info.Node().Name != nodeName {
 				t.Errorf("node %q is not at the head of the list", nodeName)
@@ -929,6 +1015,10 @@ func TestForgetPod(t *testing.T) {
 		}
 		if err := isForgottenFromCache(pod, cache); err != nil {
 			t.Errorf("pod %q: %v", pod.Name, err)
+		}
+		// trying to forget a pod already forgotten should return an error
+		if err := cache.ForgetPod(pod); err == nil {
+			t.Error("expected error, no error found")
 		}
 	}
 }
@@ -1158,6 +1248,12 @@ func TestNodeOperators(t *testing.T) {
 			} else if n != nil {
 				t.Errorf("The node object for %v should be nil", node.Name)
 			}
+
+			// trying to remove a node already removed should return an error
+			if err := cache.RemoveNode(node); err == nil {
+				t.Error("expected error, no error found")
+			}
+
 			// Check node is removed from nodeTree as well.
 			nodesList, err = cache.nodeTree.list()
 			if err != nil {

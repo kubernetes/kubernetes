@@ -163,18 +163,22 @@ func TestRESTClientLimiter(t *testing.T) {
 		Limiter flowcontrol.RateLimiter
 	}{
 		{
+			Name:    "with no QPS",
 			Config:  Config{},
 			Limiter: flowcontrol.NewTokenBucketRateLimiter(5, 10),
 		},
 		{
+			Name:    "with QPS:10",
 			Config:  Config{QPS: 10},
 			Limiter: flowcontrol.NewTokenBucketRateLimiter(10, 10),
 		},
 		{
+			Name:    "with QPS:-1",
 			Config:  Config{QPS: -1},
 			Limiter: nil,
 		},
 		{
+			Name: "with RateLimiter",
 			Config: Config{
 				RateLimiter: flowcontrol.NewTokenBucketRateLimiter(11, 12),
 			},
@@ -191,7 +195,7 @@ func TestRESTClientLimiter(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if !reflect.DeepEqual(testCase.Limiter, client.rateLimiter) {
-				t.Fatalf("unexpected rate limiter: %#v", client.rateLimiter)
+				t.Fatalf("unexpected rate limiter: %#v, expected %#v at %s", client.rateLimiter, testCase.Limiter, testCase.Name)
 			}
 		})
 		t.Run("Unversioned_"+testCase.Name, func(t *testing.T) {
@@ -203,7 +207,7 @@ func TestRESTClientLimiter(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if !reflect.DeepEqual(testCase.Limiter, client.rateLimiter) {
-				t.Fatalf("unexpected rate limiter: %#v", client.rateLimiter)
+				t.Fatalf("unexpected rate limiter: %#v, expected %#v at %s", client.rateLimiter, testCase.Limiter, testCase.Name)
 			}
 		})
 	}

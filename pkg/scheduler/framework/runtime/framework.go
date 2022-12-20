@@ -75,6 +75,7 @@ type frameworkImpl struct {
 	snapshotSharedLister framework.SharedLister
 	waitingPods          *waitingPodsMap
 	scorePluginWeight    map[string]int
+	preEnqueuePlugins    []framework.PreEnqueuePlugin
 	queueSortPlugins     []framework.QueueSortPlugin
 	preFilterPlugins     []framework.PreFilterPlugin
 	filterPlugins        []framework.FilterPlugin
@@ -92,8 +93,9 @@ type frameworkImpl struct {
 	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
 
-	metricsRecorder *metricsRecorder
-	profileName     string
+	metricsRecorder          *metricsRecorder
+	profileName              string
+	percentageOfNodesToScore *int32
 
 	extenders []framework.Extender
 	framework.PodNominator
@@ -124,6 +126,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Bind, &f.bindPlugins},
 		{&plugins.PostBind, &f.postBindPlugins},
 		{&plugins.Permit, &f.permitPlugins},
+		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
 	}
 }
@@ -271,6 +274,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 	}
 
 	f.profileName = profile.SchedulerName
+	f.percentageOfNodesToScore = profile.PercentageOfNodesToScore
 	if profile.Plugins == nil {
 		return f, nil
 	}
@@ -287,9 +291,10 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 		pluginConfig[name] = profile.PluginConfig[i].Args
 	}
 	outputProfile := config.KubeSchedulerProfile{
-		SchedulerName: f.profileName,
-		Plugins:       profile.Plugins,
-		PluginConfig:  make([]config.PluginConfig, 0, len(pg)),
+		SchedulerName:            f.profileName,
+		PercentageOfNodesToScore: f.percentageOfNodesToScore,
+		Plugins:                  profile.Plugins,
+		PluginConfig:             make([]config.PluginConfig, 0, len(pg)),
 	}
 
 	pluginsMap := make(map[string]framework.Plugin)
@@ -571,6 +576,11 @@ func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, plugin
 	return nil
 }
 
+// EnqueuePlugins returns the registered enqueue plugins.
+func (f *frameworkImpl) PreEnqueuePlugins() []framework.PreEnqueuePlugin {
+	return f.preEnqueuePlugins
+}
+
 // QueueSortFunc returns the function to sort pods in scheduling queue
 func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 	if f == nil {
@@ -605,7 +615,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			if s.IsUnschedulable() {
 				return nil, s
 			}
-			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), status.AsError())).WithFailedPlugin(pl.Name())
+			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithFailedPlugin(pl.Name())
 		}
 		if !r.AllNodes() {
 			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
@@ -720,11 +730,10 @@ func (f *frameworkImpl) RunFilterPlugins(
 			if !pluginStatus.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
 				// Success or Unschedulable.
-				errStatus := framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), pluginStatus.AsError())).WithFailedPlugin(pl.Name())
-				return map[string]*framework.Status{pl.Name(): errStatus}
+				pluginStatus = framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), pluginStatus.AsError()))
 			}
 			pluginStatus.SetFailedPlugin(pl.Name())
-			statuses[pl.Name()] = pluginStatus
+			return map[string]*framework.Status{pl.Name(): pluginStatus}
 		}
 	}
 
@@ -893,20 +902,22 @@ func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreS
 	return status
 }
 
-// RunScorePlugins runs the set of configured scoring plugins. It returns a list that
-// stores for each scoring plugin name the corresponding NodeScoreList(s).
+// RunScorePlugins runs the set of configured scoring plugins.
+// It returns a list that stores scores from each plugin and total score for each Node.
 // It also returns *Status, which is set to non-success if any of the plugins returns
 // a non-success status.
-func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) (ps framework.PluginToNodeScores, status *framework.Status) {
+func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) (ns []framework.NodePluginScores, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	pluginToNodeScores := make(framework.PluginToNodeScores, len(f.scorePlugins))
+	allNodePluginScores := make([]framework.NodePluginScores, len(nodes))
+	pluginToNodeScores := make(map[string]framework.NodeScoreList, len(f.scorePlugins))
 	for _, pl := range f.scorePlugins {
 		pluginToNodeScores[pl.Name()] = make(framework.NodeScoreList, len(nodes))
 	}
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	errCh := parallelize.NewErrorChannel()
 
 	// Run Score method for each node in parallel.
@@ -924,7 +935,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 				Score: s,
 			}
 		}
-	})
+	}, score)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 	}
@@ -932,43 +943,53 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	// Run NormalizeScore method for each ScorePlugin in parallel.
 	f.Parallelizer().Until(ctx, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
-		nodeScoreList := pluginToNodeScores[pl.Name()]
 		if pl.ScoreExtensions() == nil {
 			return
 		}
+		nodeScoreList := pluginToNodeScores[pl.Name()]
 		status := f.runScoreExtension(ctx, pl, state, pod, nodeScoreList)
 		if !status.IsSuccess() {
 			err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
 			errCh.SendErrorWithCancel(err, cancel)
 			return
 		}
-	})
+	}, score)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("running Normalize on Score plugins: %w", err))
 	}
 
-	// Apply score defaultWeights for each ScorePlugin in parallel.
-	f.Parallelizer().Until(ctx, len(f.scorePlugins), func(index int) {
-		pl := f.scorePlugins[index]
-		// Score plugins' weight has been checked when they are initialized.
-		weight := f.scorePluginWeight[pl.Name()]
-		nodeScoreList := pluginToNodeScores[pl.Name()]
+	// Apply score weight for each ScorePlugin in parallel,
+	// and then, build allNodePluginScores.
+	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
+		nodePluginScores := framework.NodePluginScores{
+			Name:   nodes[index].Name,
+			Scores: make([]framework.PluginScore, len(f.scorePlugins)),
+		}
 
-		for i, nodeScore := range nodeScoreList {
-			// return error if score plugin returns invalid score.
-			if nodeScore.Score > framework.MaxNodeScore || nodeScore.Score < framework.MinNodeScore {
-				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), nodeScore.Score, framework.MinNodeScore, framework.MaxNodeScore)
+		for i, pl := range f.scorePlugins {
+			weight := f.scorePluginWeight[pl.Name()]
+			nodeScoreList := pluginToNodeScores[pl.Name()]
+			score := nodeScoreList[index].Score
+
+			if score > framework.MaxNodeScore || score < framework.MinNodeScore {
+				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), score, framework.MinNodeScore, framework.MaxNodeScore)
 				errCh.SendErrorWithCancel(err, cancel)
 				return
 			}
-			nodeScoreList[i].Score = nodeScore.Score * int64(weight)
+			weightedScore := score * int64(weight)
+			nodePluginScores.Scores[i] = framework.PluginScore{
+				Name:  pl.Name(),
+				Score: weightedScore,
+			}
+			nodePluginScores.TotalScore += weightedScore
 		}
-	})
+		allNodePluginScores[index] = nodePluginScores
+	}, score)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("applying score defaultWeights on Score plugins: %w", err))
 	}
 
-	return pluginToNodeScores, nil
+	return allNodePluginScores, nil
 }
 
 func (f *frameworkImpl) runScorePlugin(ctx context.Context, pl framework.ScorePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
@@ -1002,8 +1023,13 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state *framework.
 	for _, pl := range f.preBindPlugins {
 		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
+			if status.IsUnschedulable() {
+				klog.V(4).InfoS("Pod rejected by PreBind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
+				status.SetFailedPlugin(pl.Name())
+				return status
+			}
 			err := status.AsError()
-			klog.ErrorS(err, "Failed running PreBind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod))
+			klog.ErrorS(err, "Failed running PreBind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
 			return framework.AsStatus(fmt.Errorf("running PreBind plugin %q: %w", pl.Name(), err))
 		}
 	}
@@ -1029,15 +1055,20 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state *framework.Cyc
 	if len(f.bindPlugins) == 0 {
 		return framework.NewStatus(framework.Skip, "")
 	}
-	for _, bp := range f.bindPlugins {
-		status = f.runBindPlugin(ctx, bp, state, pod, nodeName)
+	for _, pl := range f.bindPlugins {
+		status = f.runBindPlugin(ctx, pl, state, pod, nodeName)
 		if status.IsSkip() {
 			continue
 		}
 		if !status.IsSuccess() {
+			if status.IsUnschedulable() {
+				klog.V(4).InfoS("Pod rejected by Bind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
+				status.SetFailedPlugin(pl.Name())
+				return status
+			}
 			err := status.AsError()
-			klog.ErrorS(err, "Failed running Bind plugin", "plugin", bp.Name(), "pod", klog.KObj(pod))
-			return framework.AsStatus(fmt.Errorf("running Bind plugin %q: %w", bp.Name(), err))
+			klog.ErrorS(err, "Failed running Bind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
+			return framework.AsStatus(fmt.Errorf("running Bind plugin %q: %w", pl.Name(), err))
 		}
 		return status
 	}
@@ -1201,7 +1232,6 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framewor
 	if !s.IsSuccess() {
 		if s.IsUnschedulable() {
 			klog.V(4).InfoS("Pod rejected while waiting on permit", "pod", klog.KObj(pod), "status", s.Message())
-			s.SetFailedPlugin(s.FailedPlugin())
 			return s
 		}
 		err := s.AsError()
@@ -1327,6 +1357,11 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.String {
 // ProfileName returns the profile name associated to this framework.
 func (f *frameworkImpl) ProfileName() string {
 	return f.profileName
+}
+
+// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
+func (f *frameworkImpl) PercentageOfNodesToScore() *int32 {
+	return f.percentageOfNodesToScore
 }
 
 // Parallelizer returns a parallelizer holding parallelism for scheduler.

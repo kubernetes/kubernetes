@@ -217,7 +217,7 @@ func (p *parserHelper) buildMacroCallArg(expr *exprpb.Expr) *exprpb.Expr {
 		return &exprpb.Expr{Id: expr.GetId()}
 	}
 
-	switch expr.ExprKind.(type) {
+	switch expr.GetExprKind().(type) {
 	case *exprpb.Expr_CallExpr:
 		// Iterate the AST from `expr` recursively looking for macros. Because we are at most
 		// starting from the top level macro, this recursion is bounded by the size of the AST. This

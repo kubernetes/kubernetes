@@ -48,9 +48,9 @@ func (HTTPIngressRuleValue) SwaggerDoc() map[string]string {
 }
 
 var map_IPBlock = map[string]string{
-	"":       "IPBlock describes a particular CIDR (Ex. \"192.168.1.1/24\",\"2001:db9::/64\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
-	"cidr":   "CIDR is a string representing the IP Block Valid examples are \"192.168.1.1/24\" or \"2001:db9::/64\"",
-	"except": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.1/24\" or \"2001:db9::/64\" Except values will be rejected if they are outside the CIDR range",
+	"":       "IPBlock describes a particular CIDR (Ex. \"192.168.1.0/24\",\"2001:db8::/64\") that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should not be included within this rule.",
+	"cidr":   "CIDR is a string representing the IP Block Valid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"",
+	"except": "Except is a slice of CIDRs that should not be included within an IP Block Valid examples are \"192.168.1.0/24\" or \"2001:db8::/64\" Except values will be rejected if they are outside the CIDR range",
 }
 
 func (IPBlock) SwaggerDoc() map[string]string {
@@ -129,6 +129,37 @@ var map_IngressList = map[string]string{
 
 func (IngressList) SwaggerDoc() map[string]string {
 	return map_IngressList
+}
+
+var map_IngressLoadBalancerIngress = map[string]string{
+	"":         "IngressLoadBalancerIngress represents the status of a load-balancer ingress point.",
+	"ip":       "IP is set for load-balancer ingress points that are IP based.",
+	"hostname": "Hostname is set for load-balancer ingress points that are DNS based.",
+	"ports":    "Ports provides information about the ports exposed by this LoadBalancer.",
+}
+
+func (IngressLoadBalancerIngress) SwaggerDoc() map[string]string {
+	return map_IngressLoadBalancerIngress
+}
+
+var map_IngressLoadBalancerStatus = map[string]string{
+	"":        "IngressLoadBalancerStatus represents the status of a load-balancer.",
+	"ingress": "Ingress is a list containing ingress points for the load-balancer.",
+}
+
+func (IngressLoadBalancerStatus) SwaggerDoc() map[string]string {
+	return map_IngressLoadBalancerStatus
+}
+
+var map_IngressPortStatus = map[string]string{
+	"":         "IngressPortStatus represents the error condition of a service port",
+	"port":     "Port is the port number of the ingress port.",
+	"protocol": "Protocol is the protocol of the ingress port. The supported values are: \"TCP\", \"UDP\", \"SCTP\"",
+	"error":    "Error is to record the problem with the service port The format of the error shall comply with the following rules: - built-in error values shall be specified in this file and those shall use\n  CamelCase names\n- cloud provider specific error values must have names that comply with the\n  format foo.example.com/CamelCase.",
+}
+
+func (IngressPortStatus) SwaggerDoc() map[string]string {
+	return map_IngressPortStatus
 }
 
 var map_IngressRule = map[string]string{

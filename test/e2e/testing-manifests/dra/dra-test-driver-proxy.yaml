@@ -1,0 +1,85 @@
+# This YAML file deploys the csi-driver-host-path on a number of nodes such
+# that it proxies all connections from kubelet (plugin registration and dynamic
+# resource allocation). The actual handling of those connections then happens
+# inside the e2e.test binary via test/e2e/storage/drivers/proxy. This approach
+# has the advantage that no separate container image with the test driver is
+# needed and that tests have full control over the driver, for example for
+# error injection.
+#
+# The csi-driver-host-path image is used because:
+# - it has the necessary proxy mode (https://github.com/kubernetes-csi/csi-driver-host-path/commit/65480fc74d550a9a5aa81e850955cc20403857b1)
+# - its base image contains a shell (useful for creating files)
+# - the image is already a dependency of e2e.test
+
+kind: ReplicaSet
+apiVersion: apps/v1
+metadata:
+  name: dra-test-driver
+  labels:
+    app.kubernetes.io/instance: test-driver.dra.k8s.io
+    app.kubernetes.io/part-of: dra-test-driver
+    app.kubernetes.io/name: dra-test-driver-kubelet-plugin
+    app.kubernetes.io/component: kubelet-plugin
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: test-driver.dra.k8s.io
+      app.kubernetes.io/part-of: dra-test-driver
+      app.kubernetes.io/name: dra-test-driver-kubelet-plugin
+      app.kubernetes.io/component: kubelet-plugin
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: test-driver.dra.k8s.io
+        app.kubernetes.io/part-of: dra-test-driver
+        app.kubernetes.io/name: dra-test-driver-kubelet-plugin
+        app.kubernetes.io/component: kubelet-plugin
+    spec:
+      # Ensure that all pods run on distinct nodes.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: test-driver.dra.k8s.io
+            topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: registrar
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.7.3
+          args:
+            - "--v=5"
+            - "--endpoint=/plugins_registry/dra-test-driver-reg.sock"
+            - "--proxy-endpoint=tcp://:9000"
+          volumeMounts:
+            - mountPath: /plugins_registry
+              name: registration-dir
+
+        - name: plugin
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.7.3
+          args:
+            - "--v=5"
+            - "--endpoint=/dra/dra-test-driver.sock"
+            - "--proxy-endpoint=tcp://:9001"
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /dra
+              name: socket-dir
+            - mountPath: /cdi
+              name: cdi-dir
+
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins
+            type: DirectoryOrCreate
+          name: socket-dir
+        - hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate
+          name: cdi-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: DirectoryOrCreate
+          name: registration-dir

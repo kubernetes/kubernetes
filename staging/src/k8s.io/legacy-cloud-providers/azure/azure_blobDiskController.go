@@ -33,12 +33,12 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	azstorage "github.com/Azure/azure-sdk-for-go/storage"
-	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/rubiojr/go-vhd/vhd"
 
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 // Attention: blob disk feature is deprecated
@@ -504,14 +504,14 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 			Sku: &storage.Sku{Name: storageAccountType},
 			// switch to use StorageV2 as it's recommended according to https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
 			Kind:     defaultStorageAccountKind,
-			Tags:     map[string]*string{"created-by": to.StringPtr("azure-dd")},
+			Tags:     map[string]*string{"created-by": pointer.String("azure-dd")},
 			Location: &location}
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
 		err := c.common.cloud.StorageAccountClient.Create(ctx, c.common.resourceGroup, storageAccountName, cp)
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("Create Storage Account: %s, error: %v", storageAccountName, err))
+			return fmt.Errorf("Create Storage Account: %s, error: %v", storageAccountName, err)
 		}
 
 		newAccountState := &storageAccountState{

@@ -204,7 +204,7 @@ func (c *DynamicFileCAContent) watchCAFile(stopCh <-chan struct{}) error {
 func (c *DynamicFileCAContent) handleWatchEvent(e fsnotify.Event, w *fsnotify.Watcher) error {
 	// This should be executed after restarting the watch (if applicable) to ensure no file event will be missing.
 	defer c.queue.Add(workItemKey)
-	if e.Op&(fsnotify.Remove|fsnotify.Rename) == 0 {
+	if !e.Has(fsnotify.Remove) && !e.Has(fsnotify.Rename) {
 		return nil
 	}
 	if err := w.Remove(c.filename); err != nil {

@@ -65,6 +65,8 @@ func Register(pvLister PVLister, pvcLister PVCLister, pluginMgr *volume.VolumePl
 	registerMetrics.Do(func() {
 		legacyregistry.CustomMustRegister(newPVAndPVCCountCollector(pvLister, pvcLister, pluginMgr))
 		legacyregistry.MustRegister(volumeOperationErrorsMetric)
+		legacyregistry.MustRegister(retroactiveStorageClassMetric)
+		legacyregistry.MustRegister(retroactiveStorageClassErrorMetric)
 	})
 }
 
@@ -122,6 +124,20 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin_name", "operation_name"})
+
+	retroactiveStorageClassMetric = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "retroactive_storageclass_total",
+			Help:           "Total number of retroactive StorageClass assignments to persistent volume claim",
+			StabilityLevel: metrics.ALPHA,
+		})
+
+	retroactiveStorageClassErrorMetric = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "retroactive_storageclass_errors_total",
+			Help:           "Total number of failed retroactive StorageClass assignments to persistent volume claim",
+			StabilityLevel: metrics.ALPHA,
+		})
 )
 
 // volumeCount counts by PluginName and VolumeMode.
@@ -228,6 +244,18 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- metrics.Metric) {
 			metrics.GaugeValue,
 			float64(number),
 			namespace)
+	}
+}
+
+// RecordRetroactiveStorageClassMetric increments only retroactive_storageclass_total
+// metric or both retroactive_storageclass_total and retroactive_storageclass_errors_total
+// if success is false.
+func RecordRetroactiveStorageClassMetric(success bool) {
+	if !success {
+		retroactiveStorageClassMetric.Inc()
+		retroactiveStorageClassErrorMetric.Inc()
+	} else {
+		retroactiveStorageClassMetric.Inc()
 	}
 }
 

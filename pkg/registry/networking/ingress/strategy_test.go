@@ -21,7 +21,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
 )
 
@@ -62,8 +61,8 @@ func newIngress() networking.Ingress {
 			},
 		},
 		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			LoadBalancer: networking.IngressLoadBalancerStatus{
+				Ingress: []networking.IngressLoadBalancerIngress{
 					{IP: "127.0.0.1"},
 				},
 			},
@@ -121,8 +120,8 @@ func TestIngressStatusStrategy(t *testing.T) {
 	newIngress.ResourceVersion = "4"
 	newIngress.Spec.DefaultBackend.Service.Name = "ignore"
 	newIngress.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.IngressLoadBalancerStatus{
+			Ingress: []networking.IngressLoadBalancerIngress{
 				{IP: "127.0.0.2"},
 			},
 		},

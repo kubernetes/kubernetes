@@ -21,9 +21,11 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -152,6 +154,18 @@ func (cm *containerManagerStub) GetAllocatableMemory() []*podresourcesapi.Contai
 
 func (cm *containerManagerStub) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
+}
+
+func (cm *containerManagerStub) PrepareResources(pod *v1.Pod, container *v1.Container) (*dra.ContainerInfo, error) {
+	return nil, nil
+}
+
+func (cm *containerManagerStub) UnprepareResources(*v1.Pod) error {
+	return nil
+}
+
+func (cm *containerManagerStub) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return false
 }
 
 func NewStubContainerManager() ContainerManager {

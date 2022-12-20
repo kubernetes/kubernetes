@@ -32,10 +32,35 @@ import (
 var (
 	showHiddenOnce      sync.Once
 	disabledMetricsLock sync.RWMutex
-	showHidden          atomic.Value
+	showHidden          atomic.Bool
 	registries          []*kubeRegistry // stores all registries created by NewKubeRegistry()
 	registriesLock      sync.RWMutex
 	disabledMetrics     = map[string]struct{}{}
+
+	registeredMetrics = NewCounterVec(
+		&CounterOpts{
+			Name:           "registered_metric_total",
+			Help:           "The count of registered metrics broken by stability level and deprecation version.",
+			StabilityLevel: ALPHA,
+		},
+		[]string{"stability_level", "deprecated_version"},
+	)
+
+	disabledMetricsTotal = NewCounter(
+		&CounterOpts{
+			Name:           "disabled_metric_total",
+			Help:           "The count of disabled metrics.",
+			StabilityLevel: ALPHA,
+		},
+	)
+
+	hiddenMetricsTotal = NewCounter(
+		&CounterOpts{
+			Name:           "hidden_metric_total",
+			Help:           "The count of hidden metrics.",
+			StabilityLevel: ALPHA,
+		},
+	)
 )
 
 // shouldHide be used to check if a specific metric with deprecated version should be hidden
@@ -67,6 +92,7 @@ func SetDisabledMetric(name string) {
 	disabledMetricsLock.Lock()
 	defer disabledMetricsLock.Unlock()
 	disabledMetrics[name] = struct{}{}
+	disabledMetricsTotal.Inc()
 }
 
 // SetShowHidden will enable showing hidden metrics. This will no-opt
@@ -87,7 +113,7 @@ func SetShowHidden() {
 // is enabled. While the primary usecase for this is internal (to determine
 // registration behavior) this can also be used to introspect
 func ShouldShowHidden() bool {
-	return showHidden.Load() != nil && showHidden.Load().(bool)
+	return showHidden.Load()
 }
 
 // Registerable is an interface for a collector metric which we
@@ -129,6 +155,8 @@ type KubeRegistry interface {
 	// Reset invokes the Reset() function on all items in the registry
 	// which are added as resettables.
 	Reset()
+	// RegisterMetaMetrics registers metrics about the number of registered metrics.
+	RegisterMetaMetrics()
 }
 
 // kubeRegistry is a wrapper around a prometheus registry-type object. Upon initialization
@@ -250,6 +278,7 @@ func (kr *kubeRegistry) trackHiddenCollector(c Registerable) {
 	defer kr.hiddenCollectorsLock.Unlock()
 
 	kr.hiddenCollectors[c.FQName()] = c
+	hiddenMetricsTotal.Inc()
 }
 
 // trackStableCollectors stores all custom collectors.
@@ -329,9 +358,14 @@ func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 	return r
 }
 
-// NewKubeRegistry creates a new vanilla Registry without any Collectors
-// pre-registered.
+// NewKubeRegistry creates a new vanilla Registry
 func NewKubeRegistry() KubeRegistry {
 	r := newKubeRegistry(BuildVersion())
 	return r
+}
+
+func (r *kubeRegistry) RegisterMetaMetrics() {
+	r.MustRegister(registeredMetrics)
+	r.MustRegister(disabledMetricsTotal)
+	r.MustRegister(hiddenMetricsTotal)
 }

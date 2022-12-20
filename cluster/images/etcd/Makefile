@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.4] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.6] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,10 +26,10 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.4
+BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.6
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.5.4
+LATEST_ETCD_VERSION?=3.5.6
 
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
@@ -43,7 +43,7 @@ ARCH?=amd64
 
 # Operating systems supported: linux, windows
 OS ?= linux
-# OS Version for the Windows images: 1809, 20H2, ltsc2022
+# OS Version for the Windows images: 1809, ltsc2022
 OSVERSION ?= 1809
 
 # The output type could either be docker (local), or registry.
@@ -54,7 +54,7 @@ ALL_OS = linux windows
 ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 ALL_ARCH.windows = amd64
-ALL_OSVERSIONS.windows := 1809 20H2 ltsc2022
+ALL_OSVERSIONS.windows := 1809 ltsc2022
 ALL_OS_ARCH.windows = $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, ${ALL_OSVERSIONS.windows}, windows-$(arch)-${osversion}))
 ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
 
@@ -83,7 +83,7 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION?=1.16.15
+GOLANG_VERSION := 1.17.13
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 

@@ -261,6 +261,7 @@ type GrpcLogEntry struct {
 	// according to the type of the log entry.
 	//
 	// Types that are assignable to Payload:
+	//
 	//	*GrpcLogEntry_ClientHeader
 	//	*GrpcLogEntry_ServerHeader
 	//	*GrpcLogEntry_Message
@@ -694,12 +695,12 @@ func (x *Message) GetData() []byte {
 // Header keys added by gRPC are omitted. To be more specific,
 // implementations will not log the following entries, and this is
 // not to be treated as a truncation:
-// - entries handled by grpc that are not user visible, such as those
-//   that begin with 'grpc-' (with exception of grpc-trace-bin)
-//   or keys like 'lb-token'
-// - transport specific entries, including but not limited to:
-//   ':path', ':authority', 'content-encoding', 'user-agent', 'te', etc
-// - entries added for call credentials
+//   - entries handled by grpc that are not user visible, such as those
+//     that begin with 'grpc-' (with exception of grpc-trace-bin)
+//     or keys like 'lb-token'
+//   - transport specific entries, including but not limited to:
+//     ':path', ':authority', 'content-encoding', 'user-agent', 'te', etc
+//   - entries added for call credentials
 //
 // Implementations must always log grpc-trace-bin if it is present.
 // Practically speaking it will only be visible on server side because

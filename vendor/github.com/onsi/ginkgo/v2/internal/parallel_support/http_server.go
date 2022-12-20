@@ -49,6 +49,7 @@ func (server *httpServer) Start() {
 	mux.HandleFunc("/did-run", server.didRun)
 	mux.HandleFunc("/suite-did-end", server.specSuiteDidEnd)
 	mux.HandleFunc("/emit-output", server.emitOutput)
+	mux.HandleFunc("/progress-report", server.emitProgressReport)
 
 	//synchronization endpoints
 	mux.HandleFunc("/before-suite-completed", server.handleBeforeSuiteCompleted)
@@ -153,6 +154,14 @@ func (server *httpServer) emitOutput(writer http.ResponseWriter, request *http.R
 	}
 	var n int
 	server.handleError(server.handler.EmitOutput(output, &n), writer)
+}
+
+func (server *httpServer) emitProgressReport(writer http.ResponseWriter, request *http.Request) {
+	var report types.ProgressReport
+	if !server.decode(writer, request, &report) {
+		return
+	}
+	server.handleError(server.handler.EmitProgressReport(report, voidReceiver), writer)
 }
 
 func (server *httpServer) handleBeforeSuiteCompleted(writer http.ResponseWriter, request *http.Request) {

@@ -20,21 +20,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog/v2"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
@@ -77,8 +71,21 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 			return err
 		}
 
-		// TODO: Checkpoint the current configuration first so that if something goes wrong it can be recovered
-
+		// Create a copy of the kubelet config file in the /etc/kubernetes/tmp/ folder.
+		backupDir, err := constants.CreateTempDirForKubeadm(constants.KubernetesDir, "kubeadm-kubelet-config")
+		if err != nil {
+			return err
+		}
+		src := filepath.Join(kubeletDir, constants.KubeletConfigurationFileName)
+		dest := filepath.Join(backupDir, constants.KubeletConfigurationFileName)
+		if !dryRun {
+			fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
+			if err := os.Rename(src, dest); err != nil {
+				return errors.Wrap(err, "error backing up the kubelet config file")
+			}
+		} else {
+			fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
+		}
 		// Store the kubelet component configuration.
 		if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, data.PatchesDir(), data.OutputWriter()); err != nil {
 			return err
@@ -90,31 +97,6 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 				return errors.Wrap(err, "error printing files on dryrun")
 			}
 			return nil
-		}
-
-		// Handle a dupliate prefix URL scheme in the Node CRI socket.
-		// Older versions of kubeadm(v1.24.0~2) upgrade may add one or two extra prefix `unix://`
-		// TODO: this fix can be removed in 1.26 once all user node sockets have a correct URL scheme:
-		// https://github.com/kubernetes/kubeadm/issues/2426
-		var dupURLScheme bool
-		nro := &kubeadmapi.NodeRegistrationOptions{}
-		if !dryRun {
-			if err := configutil.GetNodeRegistration(data.KubeConfigPath(), data.Client(), nro); err != nil {
-				return errors.Wrap(err, "could not retrieve the node registration options for this node")
-			}
-			dupURLScheme = strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://"+kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://")
-		}
-		if dupURLScheme {
-			if !dryRun {
-				newSocket := strings.ReplaceAll(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://", "")
-				newSocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + newSocket
-				klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", nro.Name, newSocket)
-				if err := patchnodephase.AnnotateCRISocket(data.Client(), nro.Name, newSocket); err != nil {
-					return errors.Wrapf(err, "error updating the CRI socket for Node %q", nro.Name)
-				}
-			} else {
-				fmt.Println("[upgrade] Would update the node CRI socket path to remove dup URL scheme prefix")
-			}
 		}
 
 		fmt.Println("[upgrade] The configuration for this node was successfully updated!")

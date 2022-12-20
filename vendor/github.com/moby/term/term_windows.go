@@ -66,10 +66,6 @@ func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
 		}
 	}
 
-	// Temporarily use STD_INPUT_HANDLE, STD_OUTPUT_HANDLE and
-	// STD_ERROR_HANDLE from syscall rather than x/sys/windows as long as
-	// go-ansiterm hasn't switch to x/sys/windows.
-	// TODO: switch back to x/sys/windows once go-ansiterm has switched
 	if emulateStdin {
 		h := uint32(windows.STD_INPUT_HANDLE)
 		stdIn = windowsconsole.NewAnsiReader(int(h))

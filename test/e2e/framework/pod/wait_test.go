@@ -17,6 +17,7 @@ limitations under the License.
 package pod_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -48,16 +49,15 @@ import (
 //
 //
 //
-//
 // This must be line #52.
 
 var _ = ginkgo.Describe("pod", func() {
-	ginkgo.It("not found", func() {
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, "no-such-pod", "default", timeout /* no explanation here to cover that code path */))
+	ginkgo.It("not found", func(ctx context.Context) {
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, "no-such-pod", "default", timeout /* no explanation here to cover that code path */))
 	})
 
-	ginkgo.It("not running", func() {
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(clientSet, podName, podNamespace, timeout), "wait for pod %s running", podName /* tests printf formatting */)
+	ginkgo.It("not running", func(ctx context.Context) {
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, podName, podNamespace, timeout), "wait for pod %s running", podName /* tests printf formatting */)
 	})
 })
 
@@ -184,6 +184,8 @@ INFO: Unexpected error: wait for pod pending-pod running:
                     SetHostnameAsFQDN: nil,
                     OS: nil,
                     HostUsers: nil,
+                    SchedulingGates: nil,
+                    ResourceClaims: nil,
                 },
                 Status: {
                     Phase: "",

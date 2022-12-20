@@ -22,9 +22,11 @@ import (
 	"strings"
 	"testing"
 
-	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/util/json"
+
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 func TestCoerce(t *testing.T) {
@@ -523,7 +525,7 @@ func TestCoerce(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected result mashalling error: %v", err)
 				}
-				t.Errorf("expected: %s\ngot: %s\ndiff: %s", tt.expected, buf.String(), diff.ObjectDiff(expected, in))
+				t.Errorf("expected: %s\ngot: %s\ndiff: %s", tt.expected, buf.String(), cmp.Diff(expected, in))
 			}
 			if !reflect.DeepEqual(unknownFields, tt.expectedUnknownFields) {
 				t.Errorf("expected unknown fields:\n\t%v\ngot:\n\t%v\n", strings.Join(tt.expectedUnknownFields, "\n\t"), strings.Join(unknownFields, "\n\t"))

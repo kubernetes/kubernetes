@@ -96,6 +96,7 @@ func newCmdCertsUtility(out io.Writer) *cobra.Command {
 		Use:     "certs",
 		Aliases: []string{"certificates"},
 		Short:   "Commands related to handling kubernetes certificates",
+		Run:     cmdutil.SubCmdRun(),
 	}
 
 	cmd.AddCommand(newCmdCertsRenewal(out))
@@ -203,7 +204,7 @@ func newCmdCertsRenewal(out io.Writer) *cobra.Command {
 		Use:   "renew",
 		Short: "Renew certificates for a Kubernetes cluster",
 		Long:  cmdutil.MacroCommandLongDescription,
-		RunE:  cmdutil.SubCmdRunE("renew"),
+		Run:   cmdutil.SubCmdRun(),
 	}
 
 	cmd.AddCommand(getRenewSubCommands(out, kubeadmconstants.KubernetesDir)...)

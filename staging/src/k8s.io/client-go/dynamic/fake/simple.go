@@ -387,7 +387,9 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 	}
 
 	list := &unstructured.UnstructuredList{}
+	list.SetRemainingItemCount(entireList.GetRemainingItemCount())
 	list.SetResourceVersion(entireList.GetResourceVersion())
+	list.SetContinue(entireList.GetContinue())
 	list.GetObjectKind().SetGroupVersionKind(listGVK)
 	for i := range entireList.Items {
 		item := &entireList.Items[i]

@@ -68,6 +68,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 		fstype                string
 		mountOptions          []string
 		sensitiveMountOptions []string
+		formatOptions         []string
 		execScripts           []ExecArgs
 		mountErrs             []error
 		expErrorType          MountErrorType
@@ -213,6 +214,15 @@ func TestSafeFormatAndMount(t *testing.T) {
 			},
 			expErrorType: FormatFailed,
 		},
+		{
+			description:   "Test that 'blkid' is called and confirms unformatted disk, format passes, mount passes (with format options)",
+			fstype:        "ext4",
+			formatOptions: []string{"-b", "1024"},
+			execScripts: []ExecArgs{
+				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
+				{"mkfs.ext4", []string{"-b", "1024", "-F", "-m0", "/dev/foo"}, "", nil},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -233,7 +243,9 @@ func TestSafeFormatAndMount(t *testing.T) {
 		device := "/dev/foo"
 		dest := mntDir
 		var err error
-		if len(test.sensitiveMountOptions) == 0 {
+		if len(test.formatOptions) > 0 {
+			err = mounter.FormatAndMountSensitiveWithFormatOptions(device, dest, test.fstype, test.mountOptions, test.sensitiveMountOptions, test.formatOptions)
+		} else if len(test.sensitiveMountOptions) == 0 {
 			err = mounter.FormatAndMount(device, dest, test.fstype, test.mountOptions)
 		} else {
 			err = mounter.FormatAndMountSensitive(device, dest, test.fstype, test.mountOptions, test.sensitiveMountOptions)

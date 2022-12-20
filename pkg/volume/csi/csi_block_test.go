@@ -219,7 +219,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
-	t.Log("created attachement ", attachID)
+	t.Log("created attachment ", attachID)
 
 	stagingPath, err := csiMapper.SetUpDevice()
 	if err != nil {
@@ -260,7 +260,7 @@ func TestBlockMapperSetupDeviceError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
-	t.Log("created attachement ", attachID)
+	t.Log("created attachment ", attachID)
 
 	stagingPath, err := csiMapper.SetUpDevice()
 	if err == nil {
@@ -304,7 +304,7 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
-	t.Log("created attachement ", attachID)
+	t.Log("created attachment ", attachID)
 
 	// Map device to global and pod device map path
 	path, err := csiMapper.MapPodDevice()
@@ -495,7 +495,7 @@ func TestVolumeSetupTeardown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
-	t.Log("created attachement ", attachID)
+	t.Log("created attachment ", attachID)
 
 	stagingPath, err := csiMapper.SetUpDevice()
 	if err != nil {

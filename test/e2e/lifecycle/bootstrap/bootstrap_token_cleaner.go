@@ -42,15 +42,15 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		c = f.ClientSet
 	})
 
-	ginkgo.AfterEach(func() {
+	ginkgo.AfterEach(func(ctx context.Context) {
 		if len(secretNeedClean) > 0 {
 			ginkgo.By("delete the bootstrap token secret")
-			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), secretNeedClean, metav1.DeleteOptions{})
+			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(ctx, secretNeedClean, metav1.DeleteOptions{})
 			secretNeedClean = ""
 			framework.ExpectNoError(err)
 		}
 	})
-	ginkgo.It("should delete the token secret when the secret expired", func() {
+	ginkgo.It("should delete the token secret when the secret expired", func(ctx context.Context) {
 		ginkgo.By("create a new expired bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)
@@ -59,7 +59,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 
 		secret := newTokenSecret(tokenID, tokenSecret)
 		addSecretExpiration(secret, TimeStringFromNow(-time.Hour))
-		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret, metav1.CreateOptions{})
+		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(ctx, secret, metav1.CreateOptions{})
 
 		framework.ExpectNoError(err)
 
@@ -68,7 +68,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should not delete the token secret when the secret is not expired", func() {
+	ginkgo.It("should not delete the token secret when the secret is not expired", func(ctx context.Context) {
 		ginkgo.By("create a new expired bootstrap token secret")
 		tokenID, err := GenerateTokenID()
 		framework.ExpectNoError(err)
@@ -76,7 +76,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		framework.ExpectNoError(err)
 		secret := newTokenSecret(tokenID, tokenSecret)
 		addSecretExpiration(secret, TimeStringFromNow(time.Hour))
-		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), secret, metav1.CreateOptions{})
+		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(ctx, secret, metav1.CreateOptions{})
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenID
 		framework.ExpectNoError(err)
 

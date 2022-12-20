@@ -109,9 +109,6 @@ kubernetes.tar.gz
 # Phony test files used as part of coverage generation
 zz_generated_*_test.go
 
-# make-related metadata
-/.make/
-
 # Just in time generated data in the source, should never be committed
 /test/e2e/generated/bindata.go
 

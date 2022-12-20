@@ -149,7 +149,7 @@ type directionAlgorithms struct {
 
 // rekeyBytes returns a rekeying intervals in bytes.
 func (a *directionAlgorithms) rekeyBytes() int64 {
-	// According to RFC4344 block ciphers should rekey after
+	// According to RFC 4344 block ciphers should rekey after
 	// 2^(BLOCKSIZE/4) blocks. For all AES flavors BLOCKSIZE is
 	// 128.
 	switch a.Cipher {
@@ -158,7 +158,7 @@ func (a *directionAlgorithms) rekeyBytes() int64 {
 
 	}
 
-	// For others, stick with RFC4253 recommendation to rekey after 1 Gb of data.
+	// For others, stick with RFC 4253 recommendation to rekey after 1 Gb of data.
 	return 1 << 30
 }
 

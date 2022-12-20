@@ -348,7 +348,7 @@ func TryLoadCSRAndKeyFromDisk(pkiPath, name string) (*x509.CertificateRequest, c
 }
 
 // TryLoadPrivatePublicKeyFromDisk tries to load the key from the disk and validates that it is valid
-func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, crypto.PublicKey, error) {
 	privateKeyPath := pathForKey(pkiPath, name)
 
 	// Parse the private key from a file
@@ -365,15 +365,15 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 		return nil, nil, errors.Wrapf(err, "couldn't load the public key file %s", publicKeyPath)
 	}
 
-	// Allow RSA format only
-	k, ok := privKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, nil, errors.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
+	// Allow RSA and ECDSA formats only
+	switch k := privKey.(type) {
+	case *rsa.PrivateKey:
+		return k, pubKeys[0].(*rsa.PublicKey), nil
+	case *ecdsa.PrivateKey:
+		return k, pubKeys[0].(*ecdsa.PublicKey), nil
+	default:
+		return nil, nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
 	}
-
-	p := pubKeys[0].(*rsa.PublicKey)
-
-	return k, p, nil
 }
 
 // TryLoadCSRFromDisk tries to load the CSR from the disk
@@ -500,7 +500,7 @@ func getAltNames(cfg *kubeadmapi.InitConfiguration, certName string) (*certutil.
 // valid IP address strings are parsed and added to altNames.IPs as net.IP's
 // RFC-1123 compliant DNS strings are added to altNames.DNSNames as strings
 // RFC-1123 compliant wildcard DNS strings are added to altNames.DNSNames as strings
-// certNames is used to print user facing warnings and should be the name of the cert the altNames will be used for
+// certNames is used to print user facing warnings and should be the name of the cert the altNames will be used for
 func appendSANsToAltNames(altNames *certutil.AltNames, SANs []string, certName string) {
 	for _, altname := range SANs {
 		if ip := netutils.ParseIPSloppy(altname); ip != nil {
@@ -680,7 +680,7 @@ func RemoveDuplicateAltNames(altNames *certutil.AltNames) {
 	}
 
 	if altNames.DNSNames != nil {
-		altNames.DNSNames = sets.NewString(altNames.DNSNames...).List()
+		altNames.DNSNames = sets.List(sets.New(altNames.DNSNames...))
 	}
 
 	ipsKeys := make(map[string]struct{})

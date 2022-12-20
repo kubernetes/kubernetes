@@ -1,3 +1,126 @@
+## 2.4.0
+
+### Features
+
+- DeferCleanup supports functions with multiple-return values [5e33c75]
+- Add GinkgoLogr (#1067) [bf78c28]
+- Introduction of 'MustPassRepeatedly' decorator (#1051) [047c02f]
+
+### Fixes
+- correcting some typos (#1064) [1403d3c]
+- fix flaky internal_integration interupt specs [2105ba3]
+- Correct busted link in README [be6b5b9]
+
+### Maintenance
+- Bump actions/checkout from 2 to 3 (#1062) [8a2f483]
+- Bump golang.org/x/tools from 0.1.12 to 0.2.0 (#1065) [529c4e8]
+- Bump github/codeql-action from 1 to 2 (#1061) [da09146]
+- Bump actions/setup-go from 2 to 3 (#1060) [918040d]
+- Bump github.com/onsi/gomega from 1.22.0 to 1.22.1 (#1053) [2098e4d]
+- Bump nokogiri from 1.13.8 to 1.13.9 in /docs (#1066) [1d74122]
+- Add GHA to dependabot config [4442772]
+
+## 2.3.1
+
+## Fixes
+Several users were invoking `ginkgo` by installing the latest version of the cli via `go install github.com/onsi/ginkgo/v2/ginkgo@latest`.  When 2.3.0 was released this resulted in an influx of issues as CI systems failed due to a change in the internal contract between the Ginkgo CLI and the Ginkgo library.  Ginkgo only supports running the same version of the library as the cli (which is why both are packaged in the same repository).
+
+With this patch release, the ginkgo CLI can now identify a version mismatch and emit a helpful error message.
+
+- Ginkgo cli can identify version mismatches and emit a helpful error message [bc4ae2f]
+- further emphasize that a version match is required when running Ginkgo on CI and/or locally [2691dd8]
+
+### Maintenance
+- bump gomega to v1.22.0 [822a937]
+
+## 2.3.0
+
+### Interruptible Nodes and Timeouts
+
+Ginkgo now supports per-node and per-spec timeouts on interruptible nodes.  Check out the [documentation for all the details](https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes) but the gist is you can now write specs like this:
+
+```go
+It("is interruptible", func(ctx SpecContext) { // or context.Context instead of SpecContext, both are valid.
+    // do things until `ctx.Done()` is closed, for example:
+    req, err := http.NewRequestWithContext(ctx, "POST", "/build-widgets", nil)
+    Expect(err).NotTo(HaveOccured())
+    _, err := http.DefaultClient.Do(req)
+    Expect(err).NotTo(HaveOccured())
+
+    Eventually(client.WidgetCount).WithContext(ctx).Should(Equal(17))
+}, NodeTimeout(time.Second*20), GracePeriod(5*time.Second))
+```
+
+and have Ginkgo ensure that the node completes before the timeout elapses.  If it does elapse, or if an external interrupt is received (e.g. `^C`) then Ginkgo will cancel the context and wait for the Grace Period for the node to exit before proceeding with any cleanup nodes associated with the spec.  The `ctx` provided by Ginkgo can also be passed down to Gomega's `Eventually` to have all assertions within the node governed by a single deadline.
+
+### Features
+
+- Ginkgo now records any additional failures that occur during the cleanup of a failed spec.  In prior versions this information was quietly discarded, but the introduction of a more rigorous approach to timeouts and interruptions allows Ginkgo to better track subsequent failures.
+- `SpecContext` also provides a mechanism for third-party libraries to provide additional information when a Progress Report is generated.  Gomega uses this to provide the current state of an `Eventually().WithContext()` assertion when a Progress Report is requested.
+- DescribeTable now exits with an error if it is not passed any Entries [a4c9865]
+
+## Fixes
+- fixes crashes on newer Ruby 3 installations by upgrading github-pages gem dependency [92c88d5]
+- Make the outline command able to use the DSL import [1be2427]
+
+## Maintenance
+- chore(docs): delete no meaning d [57c373c]
+- chore(docs): Fix hyperlinks [30526d5]
+- chore(docs): fix code blocks without language settings [cf611c4]
+- fix intra-doc link [b541bcb]
+
+## 2.2.0
+
+### Generate real-time Progress Reports [f91377c]
+
+Ginkgo can now generate Progress Reports to point users at the current running line of code (including a preview of the actual source code) and a best guess at the most relevant subroutines.
+
+These Progress Reports allow users to debug stuck or slow tests without exiting the Ginkgo process.  A Progress Report can be generated at any time by sending Ginkgo a `SIGINFO` (`^T` on MacOS/BSD) or `SIGUSR1`.
+
+In addition, the user can specify `--poll-progress-after` and `--poll-progress-interval` to have Ginkgo start periodically emitting progress reports if a given node takes too long.  These can be overriden/set on a per-node basis with the `PollProgressAfter` and `PollProgressInterval` decorators.
+
+Progress Reports are emitted to stdout, and also stored in the machine-redable report formats that Ginkgo supports.
+
+Ginkgo also uses this progress reporting infrastructure under the hood when handling timeouts and interrupts.  This yields much more focused, useful, and informative stack traces than previously.
+
+### Features
+- `BeforeSuite`, `AfterSuite`, `SynchronizedBeforeSuite`, `SynchronizedAfterSuite`, and `ReportAfterSuite` now support (the relevant subset of) decorators.  These can be passed in _after_ the callback functions that are usually passed into these nodes.
+
+  As a result the **signature of these methods has changed** and now includes a trailing `args ...interface{}`.  For most users simply using the DSL, this change is transparent.  However if you were assigning one of these functions to a custom variable (or passing it around) then your code may need to change to reflect the new signature.
+
+### Maintenance
+- Modernize the invocation of Ginkgo in github actions [0ffde58]
+- Update reocmmended CI settings in docs [896bbb9]
+- Speed up unnecessarily slow integration test [6d3a90e]
+
+## 2.1.6
+
+### Fixes
+- Add `SuppressProgressReporting` decorator to turn off --progress announcements for a given node [dfef62a]
+- chore: remove duplicate word in comments [7373214]
+
+## 2.1.5
+
+### Fixes
+- drop -mod=mod instructions; fixes #1026 [6ad7138]
+- Ensure `CurrentSpecReport` and `AddReportEntry` are thread-safe [817c09b]
+- remove stale importmap gcflags flag test [3cd8b93]
+- Always emit spec summary [5cf23e2] - even when only one spec has failed
+- Fix ReportAfterSuite usage in docs [b1864ad]
+- fixed typo (#997) [219cc00]
+- TrimRight is not designed to trim Suffix [71ebb74]
+- refactor: replace strings.Replace with strings.ReplaceAll (#978) [143d208]
+- fix syntax in examples (#975) [b69554f]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.20.0 to 1.20.1 (#1027) [e5dfce4]
+- Bump tzinfo from 1.2.9 to 1.2.10 in /docs (#1006) [7ae91c4]
+- Bump github.com/onsi/gomega from 1.19.0 to 1.20.0 (#1005) [e87a85a]
+- test: add new Go 1.19 to test matrix (#1014) [bbefe12]
+- Bump golang.org/x/tools from 0.1.11 to 0.1.12 (#1012) [9327906]
+- Bump golang.org/x/tools from 0.1.10 to 0.1.11 (#993) [f44af96]
+- Bump nokogiri from 1.13.3 to 1.13.6 in /docs (#981) [ef336aa]
+
 ## 2.1.4
 
 ### Fixes
@@ -49,7 +172,7 @@ See [https://onsi.github.io/ginkgo/MIGRATING_TO_V2](https://onsi.github.io/ginkg
 Ginkgo 2.0 now has a Release Candidate.  1.16.5 advertises the existence of the RC.
 1.16.5 deprecates GinkgoParallelNode in favor of GinkgoParallelProcess
 
-You can silence the RC advertisement by setting an `ACK_GINKG_RC=true` environment variable or creating a file in your home directory called `.ack-ginkgo-rc`
+You can silence the RC advertisement by setting an `ACK_GINKGO_RC=true` environment variable or creating a file in your home directory called `.ack-ginkgo-rc`
 
 ## 1.16.4
 
@@ -156,7 +279,7 @@ You can silence the RC advertisement by setting an `ACK_GINKG_RC=true` environme
 - replace tail package with maintained one. this fixes go get errors (#667) [4ba33d4]
 - improve ginkgo performance - makes progress on #644 [a14f98e]
 - fix convert integration tests [1f8ba69]
-- fix typo succesful -> successful (#663) [1ea49cf]
+- fix typo successful -> successful (#663) [1ea49cf]
 - Fix invalid link (#658) [b886136]
 - convert utility : Include comments from source (#657) [1077c6d]
 - Explain what BDD means [d79e7fb]
@@ -250,7 +373,7 @@ You can silence the RC advertisement by setting an `ACK_GINKG_RC=true` environme
 - Make generated Junit file compatible with "Maven Surefire" (#488) [e51bee6]
 - all: gofmt [000d317]
 - Increase eventually timeout to 30s [c73579c]
-- Clarify asynchronous test behaviour [294d8f4]
+- Clarify asynchronous test behavior [294d8f4]
 - Travis badge should only show master [26d2143]
 
 ## 1.5.0 5/10/2018
@@ -268,13 +391,13 @@ You can silence the RC advertisement by setting an `ACK_GINKG_RC=true` environme
 - When running a test and calculating the coverage using the `-coverprofile` and `-outputdir` flags, Ginkgo fails with an error if the directory does not exist. This is due to an [issue in go 1.10](https://github.com/golang/go/issues/24588) (#446) [b36a6e0]
 - `unfocus` command ignores vendor folder (#459) [e5e551c, c556e43, a3b6351, 9a820dd]
 - Ignore packages whose tests are all ignored by go (#456) [7430ca7, 6d8be98]
-- Increase the threshold when checking time measuments (#455) [2f714bf, 68f622c]
+- Increase the threshold when checking time measurements (#455) [2f714bf, 68f622c]
 - Fix race condition in coverage tests (#423) [a5a8ff7, ab9c08b]
 - Add an extra new line after reporting spec run completion for test2json [874520d]
 - added name name field to junit reported testsuite [ae61c63]
 - Do not set the run time of a spec when the dryRun flag is used (#438) [457e2d9, ba8e856]
 - Process FWhen and FSpecify when unfocusing (#434) [9008c7b, ee65bd, df87dfe]
-- Synchronise the access to the state of specs to avoid race conditions (#430) [7d481bc, ae6829d]
+- Synchronies the access to the state of specs to avoid race conditions (#430) [7d481bc, ae6829d]
 - Added Duration on GinkgoTestDescription (#383) [5f49dad, 528417e, 0747408, 329d7ed]
 - Fix Ginkgo stack trace on failure for Specify (#415) [b977ede, 65ca40e, 6c46eb8]
 - Update README with Go 1.6+, Golang -> Go (#409) [17f6b97, bc14b66, 20d1598]

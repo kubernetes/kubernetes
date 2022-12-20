@@ -108,6 +108,13 @@ func (handler *ServerHandler) EmitOutput(output []byte, n *int) error {
 	return err
 }
 
+func (handler *ServerHandler) EmitProgressReport(report types.ProgressReport, _ *Void) error {
+	handler.lock.Lock()
+	defer handler.lock.Unlock()
+	handler.reporter.EmitProgressReport(report)
+	return nil
+}
+
 func (handler *ServerHandler) registerAlive(proc int, alive func() bool) {
 	handler.lock.Lock()
 	defer handler.lock.Unlock()

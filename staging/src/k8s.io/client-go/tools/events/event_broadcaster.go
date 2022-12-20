@@ -292,8 +292,9 @@ func getKey(event *eventsv1.Event) eventKey {
 
 // StartStructuredLogging starts sending events received from this EventBroadcaster to the structured logging function.
 // The return value can be ignored or used to stop recording, if desired.
+// TODO: this function should also return an error.
 func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) func() {
-	return e.StartEventWatcher(
+	stopWatcher, err := e.StartEventWatcher(
 		func(obj runtime.Object) {
 			event, ok := obj.(*eventsv1.Event)
 			if !ok {
@@ -302,19 +303,20 @@ func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) func
 			}
 			klog.V(verbosity).InfoS("Event occurred", "object", klog.KRef(event.Regarding.Namespace, event.Regarding.Name), "kind", event.Regarding.Kind, "apiVersion", event.Regarding.APIVersion, "type", event.Type, "reason", event.Reason, "action", event.Action, "note", event.Note)
 		})
+	if err != nil {
+		klog.Errorf("failed to start event watcher: '%v'", err)
+		return func() {}
+	}
+	return stopWatcher
 }
 
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value is used to stop recording
-func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime.Object)) func() {
+func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime.Object)) (func(), error) {
 	watcher, err := e.Watch()
 	if err != nil {
 		klog.Errorf("Unable start event watcher: '%v' (will not retry!)", err)
-		// TODO: Rewrite the function signature to return an error, for
-		// now just return a no-op function
-		return func() {
-			klog.Error("The event watcher failed to start")
-		}
+		return nil, err
 	}
 	go func() {
 		defer utilruntime.HandleCrash()
@@ -326,10 +328,10 @@ func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime
 			eventHandler(watchEvent.Object)
 		}
 	}()
-	return watcher.Stop
+	return watcher.Stop, nil
 }
 
-func (e *eventBroadcasterImpl) startRecordingEvents(stopCh <-chan struct{}) {
+func (e *eventBroadcasterImpl) startRecordingEvents(stopCh <-chan struct{}) error {
 	eventHandler := func(obj runtime.Object) {
 		event, ok := obj.(*eventsv1.Event)
 		if !ok {
@@ -338,18 +340,26 @@ func (e *eventBroadcasterImpl) startRecordingEvents(stopCh <-chan struct{}) {
 		}
 		e.recordToSink(event, clock.RealClock{})
 	}
-	stopWatcher := e.StartEventWatcher(eventHandler)
+	stopWatcher, err := e.StartEventWatcher(eventHandler)
+	if err != nil {
+		return err
+	}
 	go func() {
 		<-stopCh
 		stopWatcher()
 	}()
+	return nil
 }
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
 func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
 	go wait.Until(e.refreshExistingEventSeries, refreshTime, stopCh)
 	go wait.Until(e.finishSeries, finishTime, stopCh)
-	e.startRecordingEvents(stopCh)
+	err := e.startRecordingEvents(stopCh)
+	if err != nil {
+		klog.Errorf("unexpected type, expected eventsv1.Event")
+		return
+	}
 }
 
 type eventBroadcasterAdapterImpl struct {
