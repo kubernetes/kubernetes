@@ -147,5 +147,6 @@ func (t *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string
 			Name:   bootstrapapi.BootstrapUserPrefix + string(id),
 			Groups: groups,
 		},
+		Type: authenticator.Bootstrap,
 	}, true, nil
 }

@@ -254,5 +254,6 @@ var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate
 			Name:   chain[0].Subject.CommonName,
 			Groups: chain[0].Subject.Organization,
 		},
+		Type: authenticator.X509,
 	}, true, nil
 })

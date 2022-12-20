@@ -48,15 +48,16 @@ func TestMetrics(t *testing.T) {
 			desc: "auth ok",
 			response: &authenticator.Response{
 				User: &user.DefaultInfo{Name: "admin"},
+				Type: authenticator.Proxy,
 			},
 			status: true,
 			want: `
 				# HELP authenticated_user_requests [ALPHA] Counter of authenticated requests broken out by username.
 				# TYPE authenticated_user_requests counter
-				authenticated_user_requests{username="admin"} 1
+				authenticated_user_requests{authenticator="proxy",username="admin"} 1
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="success"} 1
+        authentication_attempts{authenticator="proxy",result="success"} 1
 				`,
 		},
 		{
@@ -65,7 +66,7 @@ func TestMetrics(t *testing.T) {
 			want: `
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="error"} 1
+        authentication_attempts{authenticator="",result="error"} 1
 				`,
 		},
 		{
@@ -73,7 +74,7 @@ func TestMetrics(t *testing.T) {
 			want: `
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="failure"} 1
+        authentication_attempts{authenticator="",result="failure"} 1
 				`,
 		},
 		{
@@ -81,29 +82,31 @@ func TestMetrics(t *testing.T) {
 			response: &authenticator.Response{
 				User:      &user.DefaultInfo{Name: "admin"},
 				Audiences: authenticator.Audiences{"audience-x"},
+				Type:      authenticator.Proxy,
 			},
 			status:      true,
 			apiAudience: authenticator.Audiences{"audience-y"},
 			want: `
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="error"} 1
+        authentication_attempts{authenticator="proxy",result="error"} 1
 				`,
 		},
 		{
 			desc: "audiences not supplied in the response",
 			response: &authenticator.Response{
 				User: &user.DefaultInfo{Name: "admin"},
+				Type: authenticator.Proxy,
 			},
 			status:      true,
 			apiAudience: authenticator.Audiences{"audience-y"},
 			want: `
         # HELP authenticated_user_requests [ALPHA] Counter of authenticated requests broken out by username.
 				# TYPE authenticated_user_requests counter
-				authenticated_user_requests{username="admin"} 1
+				authenticated_user_requests{authenticator="proxy",username="admin"} 1
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="success"} 1
+        authentication_attempts{authenticator="proxy",result="success"} 1
 				`,
 		},
 		{
@@ -111,15 +114,16 @@ func TestMetrics(t *testing.T) {
 			response: &authenticator.Response{
 				User:      &user.DefaultInfo{Name: "admin"},
 				Audiences: authenticator.Audiences{"audience-x"},
+				Type:      authenticator.Proxy,
 			},
 			status: true,
 			want: `
         # HELP authenticated_user_requests [ALPHA] Counter of authenticated requests broken out by username.
 				# TYPE authenticated_user_requests counter
-				authenticated_user_requests{username="admin"} 1
+				authenticated_user_requests{authenticator="proxy",username="admin"} 1
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="success"} 1
+        authentication_attempts{authenticator="proxy",result="success"} 1
 				`,
 		},
 	}

@@ -47,7 +47,7 @@ var (
 			Help:           "Counter of authenticated requests broken out by username.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"username"},
+		[]string{"username", "authenticator"},
 	)
 
 	authenticatedAttemptsCounter = metrics.NewCounterVec(
@@ -56,7 +56,7 @@ var (
 			Help:           "Counter of authenticated attempts.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"},
+		[]string{"result", "authenticator"},
 	)
 
 	authenticationLatency = metrics.NewHistogramVec(
@@ -66,7 +66,7 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"},
+		[]string{"result", "authenticator"},
 	)
 )
 
@@ -78,6 +78,10 @@ func init() {
 
 func recordAuthMetrics(ctx context.Context, resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time, authFinish time.Time) {
 	var resultLabel string
+	var authenticatorType string
+	if resp != nil {
+		authenticatorType = string(resp.Type)
+	}
 
 	switch {
 	case err != nil || (resp != nil && !audiencesAreAcceptable(apiAudiences, resp.Audiences)):
@@ -86,11 +90,11 @@ func recordAuthMetrics(ctx context.Context, resp *authenticator.Response, ok boo
 		resultLabel = failureLabel
 	default:
 		resultLabel = successLabel
-		authenticatedUserCounter.WithContext(ctx).WithLabelValues(compressUsername(resp.User.GetName())).Inc()
+		authenticatedUserCounter.WithContext(ctx).WithLabelValues(compressUsername(resp.User.GetName()), authenticatorType).Inc()
 	}
 
-	authenticatedAttemptsCounter.WithContext(ctx).WithLabelValues(resultLabel).Inc()
-	authenticationLatency.WithContext(ctx).WithLabelValues(resultLabel).Observe(authFinish.Sub(authStart).Seconds())
+	authenticatedAttemptsCounter.WithContext(ctx).WithLabelValues(resultLabel, authenticatorType).Inc()
+	authenticationLatency.WithContext(ctx).WithLabelValues(resultLabel, authenticatorType).Observe(authFinish.Sub(authStart).Seconds())
 }
 
 // compressUsername maps all possible usernames onto a small set of categories

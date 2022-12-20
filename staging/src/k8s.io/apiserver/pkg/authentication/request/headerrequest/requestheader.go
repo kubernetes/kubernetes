@@ -181,6 +181,7 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 			Groups: groups,
 			Extra:  extra,
 		},
+		Type: authenticator.Proxy,
 	}, true, nil
 }
 

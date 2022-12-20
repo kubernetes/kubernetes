@@ -62,4 +62,19 @@ type Response struct {
 	Audiences Audiences
 	// User is the UserInfo associated with the authentication context.
 	User user.Info
+	// Type is the type of the authenticator that produced the response.
+	Type Type
 }
+
+type Type string
+
+const (
+	Anonymous      = Type("anonymous")
+	Bootstrap      = Type("bootstrap")
+	Proxy          = Type("proxy")
+	ServiceAccount = Type("service-account")
+	TokenFile      = Type("token-file")
+	X509           = Type("x509")
+	Webhook        = Type("webhook")
+	Oidc           = Type("oidc")
+)
