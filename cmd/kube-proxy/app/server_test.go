@@ -422,7 +422,14 @@ kind: KubeProxyConfiguration
 		},
 		Options: logsapi.FormatOptions{
 			JSON: logsapi.JSONOptions{
-				InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				OutputRoutingOptions: logsapi.OutputRoutingOptions{
+					InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				},
+			},
+			Text: logsapi.TextOptions{
+				OutputRoutingOptions: logsapi.OutputRoutingOptions{
+					InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				},
 			},
 		},
 	}

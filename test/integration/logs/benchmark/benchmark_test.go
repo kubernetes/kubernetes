@@ -215,6 +215,10 @@ func benchmarkOutputFormatStream(b *testing.B, config loadGeneratorConfig, disca
 		if err := c.Options.JSON.InfoBufferSize.Set("64Ki"); err != nil {
 			b.Fatalf("Error setting buffer size: %v", err)
 		}
+		c.Options.Text.SplitStream = true
+		if err := c.Options.Text.InfoBufferSize.Set("64Ki"); err != nil {
+			b.Fatalf("Error setting buffer size: %v", err)
+		}
 	}
 	var files []*os.File
 	if discard {
