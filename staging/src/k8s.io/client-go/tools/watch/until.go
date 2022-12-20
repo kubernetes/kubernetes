@@ -136,7 +136,7 @@ func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.
 
 	if precondition != nil {
 		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
-			return nil, fmt.Errorf("UntilWithSync: unable to sync caches: %v", ctx.Err())
+			return nil, fmt.Errorf("UntilWithSync: unable to sync caches: %w", ctx.Err())
 		}
 
 		done, err := precondition(indexer)
