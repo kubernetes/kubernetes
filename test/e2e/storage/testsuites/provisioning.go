@@ -577,7 +577,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		init(ctx)
 
-		pvc2 := l.pvc.DeepCopy()
 	  l.pvc.Name = "pvc-origin"
 		dc := l.config.Framework.DynamicClient
 		testConfig := storageframework.ConvertTestConfig(l.config)
@@ -585,7 +584,21 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
 		l.pvc.Spec.DataSourceRef = dataSourceRef
 
-		// test expected content exists in restored volume
+		// Create readonlymany claim w/ same size as original, then test to make
+		// sure it has expected content when restored.
+		sameSizeROClaim := l.pvc.DeepCopy()
+		sameSizeROClaim.Name = "sameSizeclaim"
+		sameSizeROClaim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{
+			v1.PersistentVolumeAccessMode(v1.ReadOnlyMany),
+		}
+
+		c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(sameSizeROClaim.Namespace).Create(ctx, sameSizeROClaim, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
+		createdClaims2 := []*v1.PersistentVolumeClaim{c2}
+		pod2, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
+		framework.ExpectNoError(err, "Failed to create pod: %v", err)
+
+		// Test expected content exists in restored volume
 		l.testCase.PvCheck = func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 			ginkgo.By("checking whether the created volume has the pre-populated data")
 			tests := []e2evolume.Test{
@@ -598,13 +611,15 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}
 			e2evolume.TestVolumeClientSlow(ctx, f, testConfig, nil, "", tests)
 		}
+		l.testCase.Claim = sameSizeROClaim
 		l.testCase.TestDynamicProvisioning(ctx)
 
+		// Do not check fs size for block volumes
 		if pattern.VolMode == "Block" {
 			return
 		}
 
-		// Get the created PVC and record the actual size of the pv (from pvc status).
+		// Create + record the actual size of the original pv (from pvc status).
 		c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get pvc: %v", err)
 		actualPVSize := c.Status.Capacity.Storage().Value()
@@ -624,17 +639,18 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		// For the new PVC, request a size that is larger than the origin PVC actually provisioned.
 		storageRequest := resource.NewQuantity(actualPVSize, resource.BinarySI)
 		storageRequest.Add(resource.MustParse("1Gi"))
-	  pvc2.Spec.Resources.Requests = v1.ResourceList{
+
+		biggerClaim := l.pvc.DeepCopy()
+	  biggerClaim.Spec.Resources.Requests = v1.ResourceList{
 			v1.ResourceStorage: *storageRequest,
 		}
-
-		pvc2.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
+		biggerClaim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
 
 		// Create a new claim and a pod that will use the new PVC.
-		c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(ctx, pvc2, metav1.CreateOptions{})
+		c2, err = l.testCase.Client.CoreV1().PersistentVolumeClaims(biggerClaim.Namespace).Create(ctx, biggerClaim, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
-		createdClaims2 := []*v1.PersistentVolumeClaim{c2}
-		pod2, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
+		createdClaims2 = []*v1.PersistentVolumeClaim{c2}
+		pod2, err = e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
 		framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
 		// Mount path should not be empty.
