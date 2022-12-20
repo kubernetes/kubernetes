@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"container/heap"
+	"math"
 	"sync"
 	"time"
 
@@ -290,6 +291,8 @@ func (q *RateLimitedTimedQueue) SwapLimiter(newQPS float32) {
 	var newLimiter flowcontrol.RateLimiter
 	if newQPS <= 0 {
 		newLimiter = flowcontrol.NewFakeNeverRateLimiter()
+	} else if newQPS == math.MaxFloat32 {
+		newLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 	} else {
 		newLimiter = flowcontrol.NewTokenBucketRateLimiter(newQPS, EvictionRateLimiterBurst)
 
