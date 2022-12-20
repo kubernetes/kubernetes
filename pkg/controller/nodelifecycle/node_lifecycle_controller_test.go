@@ -19,6 +19,7 @@ package nodelifecycle
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -2747,6 +2748,12 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 	if err := nodeController.monitorNodeHealth(context.TODO()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+
+	// Remove the NoExecute taint rate limiter. If we don't do this, not all the
+	// nodes will be processed and tainted appropriately when doing the NoExecute taint pass.
+	for k := range nodeController.zoneNoExecuteTainter {
+		nodeController.zoneNoExecuteTainter[k].SwapLimiter(math.MaxFloat32)
+	}
 	nodeController.doNoExecuteTaintingPass(context.TODO())
 	node0, err := fakeNodeHandler.Get(context.TODO(), "node0", metav1.GetOptions{})
 	if err != nil {
@@ -3001,12 +3008,18 @@ func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	// 4. do NoExecute taint pass
+	// 4. Remove the NoExecute taint rate limiter. If we don't do this, not all the
+	// nodes will be processed and tainted appropriately when doing the NoExecute taint pass.
+	for k := range nodeController.zoneNoExecuteTainter {
+		nodeController.zoneNoExecuteTainter[k].SwapLimiter(math.MaxFloat32)
+	}
+
+	// 5. do NoExecute taint pass
 	// when processing with node0, condition.Status is NodeReady, and return true with default case
 	// then remove the set value and queue value both, the taint job never stuck
 	nodeController.doNoExecuteTaintingPass(context.TODO())
 
-	// 5. get node3 and node5, see if it has ready got NoExecute taint
+	// 6. get node3 and node5, see if it has ready got NoExecute taint
 	node3, err := fakeNodeHandler.Get(context.TODO(), "node3", metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Can't get current node3...")
@@ -3126,6 +3139,12 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	}
 	if err := nodeController.monitorNodeHealth(context.TODO()); err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Remove the NoExecute taint rate limiter. If we don't do this, not all the
+	// nodes will be processed and tainted appropriately when doing the NoExecute taint pass.
+	for k := range nodeController.zoneNoExecuteTainter {
+		nodeController.zoneNoExecuteTainter[k].SwapLimiter(math.MaxFloat32)
 	}
 	nodeController.doNoExecuteTaintingPass(context.TODO())
 
