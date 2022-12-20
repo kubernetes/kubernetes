@@ -72,7 +72,7 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	podContainerName, _ := m.GetPodContainerName(pod)
 	// check if container already exist
-	alreadyExists := m.Exists(pod)
+	alreadyExists := m.cgroupManager.Exists(podContainerName)
 	if !alreadyExists {
 		enforceMemoryQoS := false
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
