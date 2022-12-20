@@ -106,9 +106,8 @@ dependencies:
     version: 1.19
     refPaths:
     - path: build/build-image/cross/VERSION
-    # TODO(liggitt): Uncomment once images are updated to go1.19
-    #- path: hack/lib/golang.sh
-    #  match: minimum_go_version=go([0-9]+\.[0-9]+)
+    - path: hack/lib/golang.sh
+      match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "golang: etcd release version"
     version: 1.16.12
