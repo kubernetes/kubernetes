@@ -91,9 +91,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		ns1 := f.Namespace.Name // LB1 in ns1 on TCP
 		framework.Logf("namespace for TCP test: %s", ns1)
 
-		nodeIP, err := getRandomNodeIP(cs)
-		framework.ExpectNoError(err, "Could not obtain a valid Node IP")
-
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
 		tcpJig := e2eservice.NewTestJig(cs, ns1, serviceName)
 		tcpService, err := tcpJig.CreateTCPService(nil)
@@ -122,9 +119,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		err = tcpJig.CheckServiceReachability(tcpService, execPod)
 		framework.ExpectNoError(err)
-
-		ginkgo.By("hitting the TCP service's NodePort")
-		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
 
 		// Change the services to LoadBalancer.
 
@@ -196,9 +190,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		err = tcpJig.CheckServiceReachability(tcpService, execPod)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("hitting the TCP service's NodePort")
-		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
@@ -216,12 +207,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 			framework.Failf("TCP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", tcpIngressIP, e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
 		}
 		framework.Logf("TCP node port: %d", tcpNodePort)
-
-		ginkgo.By("hitting the TCP service's new NodePort")
-		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
-
-		ginkgo.By("checking the old TCP NodePort is closed")
-		testNotReachableHTTP(nodeIP, tcpNodePortOld, e2eservice.KubeProxyLagTimeout)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
@@ -247,9 +232,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		framework.Logf("service port TCP: %d", svcPort)
 
-		ginkgo.By("hitting the TCP service's NodePort")
-		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 
@@ -257,18 +239,12 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		err = tcpJig.Scale(0)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("looking for ICMP REJECT on the TCP service's NodePort")
-		testRejectedHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("looking for ICMP REJECT on the TCP service's LoadBalancer")
 		testRejectedHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
 		err = tcpJig.Scale(1)
 		framework.ExpectNoError(err)
-
-		ginkgo.By("hitting the TCP service's NodePort")
-		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
@@ -287,9 +263,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		_, err = tcpJig.WaitForLoadBalancerDestroy(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("checking the TCP NodePort is closed")
-		testNotReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("checking the TCP LoadBalancer is closed")
 		testNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
@@ -307,9 +280,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		serviceName := "mutability-test"
 		ns2 := f.Namespace.Name // LB1 in ns2 on TCP
 		framework.Logf("namespace for TCP test: %s", ns2)
-
-		nodeIP, err := getRandomNodeIP(cs)
-		framework.ExpectNoError(err, "Could not obtain a valid Node IP")
 
 		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in namespace " + ns2)
 		udpJig := e2eservice.NewTestJig(cs, ns2, serviceName)
@@ -339,9 +309,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		err = udpJig.CheckServiceReachability(udpService, execPod)
 		framework.ExpectNoError(err)
-
-		ginkgo.By("hitting the UDP service's NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
 
 		// Change the services to LoadBalancer.
 
@@ -406,9 +373,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		err = udpJig.CheckServiceReachability(udpService, execPod)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("hitting the UDP service's NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
-
 		ginkgo.By("hitting the UDP service's LoadBalancer")
 		testReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
 
@@ -427,11 +391,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		}
 		framework.Logf("UDP node port: %d", udpNodePort)
 
-		ginkgo.By("hitting the UDP service's new NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
-
-		ginkgo.By("checking the old UDP NodePort is closed")
-		testNotReachableUDP(nodeIP, udpNodePortOld, e2eservice.KubeProxyLagTimeout)
+		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's LoadBalancer")
 		testReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
@@ -458,7 +419,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.Logf("service port UDP: %d", svcPort)
 
 		ginkgo.By("hitting the UDP service's NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
+		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's LoadBalancer")
 		testReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
@@ -466,9 +428,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		ginkgo.By("Scaling the pods to 0")
 		err = udpJig.Scale(0)
 		framework.ExpectNoError(err)
-
-		ginkgo.By("looking for ICMP REJECT on the UDP service's NodePort")
-		testRejectedUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
 
 		ginkgo.By("looking for ICMP REJECT on the UDP service's LoadBalancer")
 		testRejectedUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
@@ -478,7 +437,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's NodePort")
-		testReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
+		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's LoadBalancer")
 		testReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
@@ -496,9 +456,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// Wait for the load balancer to be destroyed asynchronously
 		_, err = udpJig.WaitForLoadBalancerDestroy(udpIngressIP, svcPort, loadBalancerCreateTimeout)
 		framework.ExpectNoError(err)
-
-		ginkgo.By("checking the UDP NodePort is closed")
-		testNotReachableUDP(nodeIP, udpNodePort, e2eservice.KubeProxyLagTimeout)
 
 		ginkgo.By("checking the UDP LoadBalancer is closed")
 		testNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
@@ -884,9 +841,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		ns1 := f.Namespace.Name // LB1 in ns1 on TCP
 		framework.Logf("namespace for TCP test: %s", ns1)
 
-		nodeIP, err := e2enode.PickIP(cs) // for later
-		framework.ExpectNoError(err)
-
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
 		tcpJig := e2eservice.NewTestJig(cs, ns1, serviceName)
 		tcpService, err := tcpJig.CreateTCPService(nil)
@@ -985,9 +939,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 			framework.Failf("TCP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", tcpIngressIP, e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
 		}
 		framework.Logf("TCP node port: %d", tcpNodePort)
-
-		ginkgo.By("hitting the TCP service's new NodePort")
-		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
@@ -1644,28 +1595,3 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		}
 	})
 })
-
-// getRandomNodeIP gets an IP address from a random worker node.
-// These tests exercise traffic coming from outside the traffic,
-// so it prefers ExternalIPs over InternalIPs.
-func getRandomNodeIP(cs clientset.Interface) (string, error) {
-	family := v1.IPv4Protocol
-	if framework.TestContext.ClusterIsIPv6() {
-		family = v1.IPv6Protocol
-	}
-
-	node, err := e2enode.GetRandomReadySchedulableNode(cs)
-	if err != nil {
-		return "", err
-	}
-	ips := e2enode.GetAddressesByTypeAndFamily(node, v1.NodeExternalIP, family)
-	if len(ips) > 0 {
-		return ips[0], nil
-	}
-
-	ips = e2enode.GetAddressesByTypeAndFamily(node, v1.NodeInternalIP, family)
-	if len(ips) > 0 {
-		return ips[0], nil
-	}
-	return "", fmt.Errorf("node %v does not contain any valid IP", node)
-}
