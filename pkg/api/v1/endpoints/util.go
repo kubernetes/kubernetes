@@ -77,7 +77,11 @@ func RepackSubsets(subsets []v1.EndpointSubset) []v1.EndpointSubset {
 		for addr, ready := range keyToAddrReadyMap[key] {
 			if ready {
 				readyAddrs = append(readyAddrs, *addr)
-				validIP[fmt.Sprintf("%s-%s", addr.IP, addr.TargetRef.Namespace)] = struct{}{}
+				namespace := ""
+				if nil != addr.TargetRef {
+					namespace = addr.TargetRef.Namespace
+				}
+				validIP[fmt.Sprintf("%s-%s", addr.IP, namespace)] = struct{}{}
 			} else {
 				notReadyAddrs = append(notReadyAddrs, *addr)
 			}
@@ -89,7 +93,11 @@ func RepackSubsets(subsets []v1.EndpointSubset) []v1.EndpointSubset {
 		for _, addr := range notReadyAddrs {
 			// some cni plugin will allocated same addrs between two namespace, ensure the notReadAddr which we remove
 			// is in the same namespace.
-			_, ok := validIP[fmt.Sprintf("%s-%s", addr.IP, addr.TargetRef.Namespace)]
+			namespace := ""
+			if nil != addr.TargetRef {
+				namespace = addr.TargetRef.Namespace
+			}
+			_, ok := validIP[fmt.Sprintf("%s-%s", addr.IP, namespace)]
 			if ok {
 				continue
 			}
