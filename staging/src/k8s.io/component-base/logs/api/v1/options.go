@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/logs/internal/setverbositylevel"
 	"k8s.io/component-base/logs/klogflags"
 )
 
@@ -167,8 +168,13 @@ func apply(c *LoggingConfiguration, featureGate featuregate.FeatureGate) error {
 	if format.factory == nil {
 		klog.ClearLogger()
 	} else {
-		log, flush := format.factory.Create(*c)
-		klog.SetLoggerWithOptions(log, klog.ContextualLogger(contextualLoggingEnabled), klog.FlushLogger(flush))
+		log, control := format.factory.Create(*c)
+		if control.SetVerbosityLevel != nil {
+			setverbositylevel.Mutex.Lock()
+			defer setverbositylevel.Mutex.Unlock()
+			setverbositylevel.Callbacks = append(setverbositylevel.Callbacks, control.SetVerbosityLevel)
+		}
+		klog.SetLoggerWithOptions(log, klog.ContextualLogger(contextualLoggingEnabled), klog.FlushLogger(control.Flush))
 	}
 	if err := loggingFlags.Lookup("v").Value.Set(VerbosityLevelPflag(&c.Verbosity).String()); err != nil {
 		return fmt.Errorf("internal error while setting klog verbosity: %v", err)

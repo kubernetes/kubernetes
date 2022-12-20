@@ -23,10 +23,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/spf13/pflag"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/logs/internal/setverbositylevel"
 	"k8s.io/component-base/logs/klogflags"
 	"k8s.io/klog/v2"
 )
@@ -182,11 +184,26 @@ func NewLogger(prefix string) *log.Logger {
 	return log.New(KlogWriter{}, prefix, 0)
 }
 
-// GlogSetter is a setter to set glog level.
+// GlogSetter modifies the verbosity threshold for the entire program.
+// Some components have HTTP-based APIs for invoking this at runtime.
 func GlogSetter(val string) (string, error) {
+	v, err := strconv.ParseUint(val, 10, 32)
+	if err != nil {
+		return "", err
+	}
+
 	var level klog.Level
 	if err := level.Set(val); err != nil {
 		return "", fmt.Errorf("failed set klog.logging.verbosity %s: %v", val, err)
 	}
+
+	setverbositylevel.Mutex.Lock()
+	defer setverbositylevel.Mutex.Unlock()
+	for _, cb := range setverbositylevel.Callbacks {
+		if err := cb(uint32(v)); err != nil {
+			return "", err
+		}
+	}
+
 	return fmt.Sprintf("successfully set klog.logging.verbosity to %s", val), nil
 }
