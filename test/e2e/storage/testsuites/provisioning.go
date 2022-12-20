@@ -462,20 +462,14 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
 
 		l.sourcePVC.Name = "source-pvc"
-		dataSource := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
-		localDataSource := &v1.TypedLocalObjectReference{
-			APIGroup: dataSource.APIGroup,
-			Kind:     dataSource.Kind,
-			Name:     dataSource.Name,
-		}
-		l.pvc.Spec.DataSource = localDataSource
+		dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
+		l.pvc.Spec.DataSourceRef = dataSourceRef
 		l.testCase.NodeSelection = testConfig.ClientNodeSelection
 
 		// Cloning fails if the source disk is still in the process of detaching, so we wait for the VolumeAttachment to be removed before cloning.
-		volumeAttachment := e2evolume.GetVolumeAttachmentName(ctx, f.ClientSet, testConfig, l.testCase.Provisioner, localDataSource.Name, l.sourcePVC.Namespace)
+		volumeAttachment := e2evolume.GetVolumeAttachmentName(ctx, f.ClientSet, testConfig, l.testCase.Provisioner, dataSourceRef.Name, l.sourcePVC.Namespace)
 		e2evolume.WaitForVolumeAttachmentTerminated(ctx, volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision)
 
-		klog.Errorf("HEREHERE %v", l.sourcePVC.Name)
 		claim, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.sourcePVC.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get pvc: %v", err)
 
@@ -498,9 +492,9 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		biggerSize := originalSize.DeepCopy()
 		biggerSize.Add(*resource.NewQuantity(1, resource.BinarySI))
 
-		// Create bigger claim
+		// Create claim w/ bigger size than original
 		biggerClaim := l.testCase.Claim.DeepCopy()
-		biggerClaim.Name = "claim1"
+		biggerClaim.Name = "biggerClaim"
 		biggerClaim.Spec.Resources = v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				v1.ResourceStorage: biggerSize,
@@ -510,8 +504,9 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			v1.PersistentVolumeAccessMode(v1.ReadOnlyMany),
 		}
 
+		// Create claim w/ same size as original
 		sameSizeClaim := l.testCase.Claim.DeepCopy()
-		sameSizeClaim.Name = "claim2"
+		sameSizeClaim.Name = "sameSizeclaim"
 		sameSizeClaim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{
 			v1.PersistentVolumeAccessMode(v1.ReadOnlyMany),
 		}
@@ -524,6 +519,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			if pattern.VolMode == "Block" {
 				continue
 			}
+
 			ginkgo.By(fmt.Sprintf("creating claim=%+v", claim))
 			claim, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
@@ -535,10 +531,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 					framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 				}
 			}()
-
-			// Get the created PVC and record the actual size of the pv (from pvc status).
-			//claim, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
-			//framework.ExpectNoError(err, "Failed to get pvc: %v", err)
 
 			createdClaims := []*v1.PersistentVolumeClaim{claim}
 			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
@@ -570,7 +562,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			e2eskipper.Skipf("Test is not valid for Block volume mode - skipping")
 		}
 
-
 		if !dInfo.Capabilities[storageframework.CapSnapshotDataSource] {
 			e2eskipper.Skipf("Driver %q does not support populating data from snapshot - skipping", dInfo.Name)
 		}
@@ -590,13 +581,28 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 	  l.pvc.Name = "pvc-origin"
 		dc := l.config.Framework.DynamicClient
 		testConfig := storageframework.ConvertTestConfig(l.config)
-		dataSource := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
-		localDataSource := &v1.TypedLocalObjectReference{
-			APIGroup: dataSource.APIGroup,
-			Kind:     dataSource.Kind,
-			Name:     dataSource.Name,
+		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
+		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
+		l.pvc.Spec.DataSourceRef = dataSourceRef
+
+		// test expected content exists in restored volume
+		l.testCase.PvCheck = func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
+			ginkgo.By("checking whether the created volume has the pre-populated data")
+			tests := []e2evolume.Test{
+				{
+					Volume:          *storageutils.CreateVolumeSource(claim.Name, false /* readOnly */),
+					Mode:            pattern.VolMode,
+					File:            "index.html",
+					ExpectedContent: expectedContent,
+				},
+			}
+			e2evolume.TestVolumeClientSlow(ctx, f, testConfig, nil, "", tests)
 		}
-		pvc2.Spec.DataSource = localDataSource
+		l.testCase.TestDynamicProvisioning(ctx)
+
+		if pattern.VolMode == "Block" {
+			return
+		}
 
 		// Get the created PVC and record the actual size of the pv (from pvc status).
 		c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
