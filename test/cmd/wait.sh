@@ -86,7 +86,7 @@ EOF
     len_sec=$((end_sec-start_sec))
     set -o errexit
     kube::test::if_has_string "${output_message}" 'timed out waiting for the condition '
-    kube::test::if_has_string "${len_sec}" '1'
+    test $len_sec -ge 1 && test $len_sec -le 2
 
     # Clean deployment
     kubectl delete deployment dtest
