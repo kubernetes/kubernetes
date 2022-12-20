@@ -38,19 +38,21 @@ const (
 
 var errMetricNotFound = errors.New("not found")
 
-/* TestSampler does a rough behavioral test of the sampling in a
-   SampleAndWatermarkHistograms.  The test creates one and exercises
-   it, checking that the count in the sampling histogram is correct at
-   each step.  The sampling histogram is expected to get one
-   observation at the end of each sampling period.  A fake clock is
-   used, and the exercise consists of repeatedly changing that fake
-   clock by an amount of time chosen uniformly at random from a range
-   that goes from a little negative to somewhat more than two sampling
-   periods.  The negative changes are included because small negative
-   changes have been observed in real monotonic clock readings (see
-   issue #96459) and we want to test that they are properly tolerated.
-   The designed toleration is to pretend that the clock did not
-   change, until it resumes net forward progress.
+/*
+TestSampler does a rough behavioral test of the sampling in a
+
+	SampleAndWatermarkHistograms.  The test creates one and exercises
+	it, checking that the count in the sampling histogram is correct at
+	each step.  The sampling histogram is expected to get one
+	observation at the end of each sampling period.  A fake clock is
+	used, and the exercise consists of repeatedly changing that fake
+	clock by an amount of time chosen uniformly at random from a range
+	that goes from a little negative to somewhat more than two sampling
+	periods.  The negative changes are included because small negative
+	changes have been observed in real monotonic clock readings (see
+	issue #96459) and we want to test that they are properly tolerated.
+	The designed toleration is to pretend that the clock did not
+	change, until it resumes net forward progress.
 */
 func TestSampler(t *testing.T) {
 	t0 := time.Now()

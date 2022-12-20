@@ -3088,18 +3088,23 @@ func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizatio
 }
 
 // generateEventsUniformDistribution generates events that uniformly spread in the time window
-//    time.Now()-periodSeconds  ; time.Now()
+//
+//	time.Now()-periodSeconds  ; time.Now()
+//
 // It split the time window into several segments (by the number of events) and put the event in the center of the segment
 // it is needed if you want to create events for several policies (to check how "outdated" flag is set).
 // E.g. generateEventsUniformDistribution([]int{1,2,3,4}, 120) will spread events uniformly for the last 120 seconds:
 //
-//       1          2          3          4
+//	1          2          3          4
+//
 // -----------------------------------------------
-//  ^          ^          ^          ^          ^
+//
+//	^          ^          ^          ^          ^
+//
 // -120s      -90s       -60s       -30s       now()
 // And we can safely have two different stabilizationWindows:
-//  - 60s (guaranteed to have last half of events)
-//  - 120s (guaranteed to have all events)
+//   - 60s (guaranteed to have last half of events)
+//   - 120s (guaranteed to have all events)
 func generateEventsUniformDistribution(rawEvents []int, periodSeconds int) []timestampedScaleEvent {
 	events := make([]timestampedScaleEvent, len(rawEvents))
 	segmentDuration := float64(periodSeconds) / float64(len(rawEvents))

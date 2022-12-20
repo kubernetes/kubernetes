@@ -304,11 +304,10 @@ type realIPGetter struct {
 // NodeIPs returns all LOCAL type IP addresses from host which are
 // taken as the Node IPs of NodePort service. Filtered addresses:
 //
-//  * Loopback addresses
-//  * Addresses of the "other" family (not handled by this proxier instance)
-//  * Link-local IPv6 addresses
-//  * Addresses on the created dummy device `kube-ipvs0`
-//
+//   - Loopback addresses
+//   - Addresses of the "other" family (not handled by this proxier instance)
+//   - Link-local IPv6 addresses
+//   - Addresses on the created dummy device `kube-ipvs0`
 func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 
 	nodeAddress, err := r.nl.GetAllLocalAddresses()

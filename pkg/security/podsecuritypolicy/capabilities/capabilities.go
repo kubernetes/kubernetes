@@ -58,9 +58,9 @@ func NewDefaultCapabilities(defaultAddCapabilities, requiredDropCapabilities, al
 }
 
 // Generate creates the capabilities based on policy rules.  Generate will produce the following:
-// 1.  a capabilities.Add set containing all the required adds (unless the
-// 		container specifically is dropping the cap) and container requested adds
-// 2.  a capabilities.Drop set containing all the required drops and container requested drops
+//  1. a capabilities.Add set containing all the required adds (unless the
+//     container specifically is dropping the cap) and container requested adds
+//  2. a capabilities.Drop set containing all the required drops and container requested drops
 //
 // Returns the original container capabilities if no changes are required.
 func (s *defaultCapabilities) Generate(pod *api.Pod, container *api.Container) (*api.Capabilities, error) {

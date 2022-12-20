@@ -77,9 +77,9 @@ func (e *errObjectName) Error() string {
 }
 
 // assumeCache stores two pointers to represent a single object:
-// * The pointer to the informer object.
-// * The pointer to the latest object, which could be the same as
-//   the informer object, or an in-memory object.
+//   - The pointer to the informer object.
+//   - The pointer to the latest object, which could be the same as
+//     the informer object, or an in-memory object.
 //
 // An informer update always overrides the latest object pointer.
 //

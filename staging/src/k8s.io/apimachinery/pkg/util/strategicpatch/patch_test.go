@@ -755,7 +755,6 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 // yields the correct outcome. They are also test cases for CreateTwoWayMergePatch
 // and CreateThreeWayMergePatch, to assert that they both generate the correct patch
 // for the given set of input documents.
-//
 var createStrategicMergePatchTestCaseData = []byte(`
 testCases:
   - description: nil original

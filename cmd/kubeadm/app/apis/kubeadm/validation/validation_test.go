@@ -424,7 +424,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 	}
 }
 
-//TODO: Create a separated test for ValidateClusterConfiguration
+// TODO: Create a separated test for ValidateClusterConfiguration
 func TestValidateInitConfiguration(t *testing.T) {
 	nodename := "valid-nodename"
 	var tests = []struct {

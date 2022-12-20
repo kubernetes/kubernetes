@@ -501,35 +501,35 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 // At a high-level this algorithm can be summarized as:
 //
 // For each NUMA single node:
-//      * If all requested CPUs can be allocated from this NUMA node;
-//    --> Do the allocation by running takeByTopologyNUMAPacked() over the
-//        available CPUs in that NUMA node and return
+//   - If all requested CPUs can be allocated from this NUMA node;
+//     --> Do the allocation by running takeByTopologyNUMAPacked() over the
+//     available CPUs in that NUMA node and return
 //
 // Otherwise, for each pair of NUMA nodes:
-//      * If the set of requested CPUs (modulo 2) can be evenly split across
-//        the 2 NUMA nodes; AND
-//      * Any remaining CPUs (after the modulo operation) can be striped across
-//        some subset of the NUMA nodes;
-//    --> Do the allocation by running takeByTopologyNUMAPacked() over the
-//        available CPUs in both NUMA nodes and return
+//   - If the set of requested CPUs (modulo 2) can be evenly split across
+//     the 2 NUMA nodes; AND
+//   - Any remaining CPUs (after the modulo operation) can be striped across
+//     some subset of the NUMA nodes;
+//     --> Do the allocation by running takeByTopologyNUMAPacked() over the
+//     available CPUs in both NUMA nodes and return
 //
 // Otherwise, for each 3-tuple of NUMA nodes:
-//      * If the set of requested CPUs (modulo 3) can be evenly distributed
-//        across the 3 NUMA nodes; AND
-//      * Any remaining CPUs (after the modulo operation) can be striped across
-//        some subset of the NUMA nodes;
-//    --> Do the allocation by running takeByTopologyNUMAPacked() over the
-//        available CPUs in all three NUMA nodes and return
+//   - If the set of requested CPUs (modulo 3) can be evenly distributed
+//     across the 3 NUMA nodes; AND
+//   - Any remaining CPUs (after the modulo operation) can be striped across
+//     some subset of the NUMA nodes;
+//     --> Do the allocation by running takeByTopologyNUMAPacked() over the
+//     available CPUs in all three NUMA nodes and return
 //
 // ...
 //
 // Otherwise, for the set of all NUMA nodes:
-//      * If the set of requested CPUs (modulo NUM_NUMA_NODES) can be evenly
-//        distributed across all NUMA nodes; AND
-//      * Any remaining CPUs (after the modulo operation) can be striped across
-//        some subset of the NUMA nodes;
-//    --> Do the allocation by running takeByTopologyNUMAPacked() over the
-//        available CPUs in all NUMA nodes and return
+//   - If the set of requested CPUs (modulo NUM_NUMA_NODES) can be evenly
+//     distributed across all NUMA nodes; AND
+//   - Any remaining CPUs (after the modulo operation) can be striped across
+//     some subset of the NUMA nodes;
+//     --> Do the allocation by running takeByTopologyNUMAPacked() over the
+//     available CPUs in all NUMA nodes and return
 //
 // If none of the above conditions can be met, then resort back to a
 // best-effort fit of packing CPUs into NUMA nodes by calling

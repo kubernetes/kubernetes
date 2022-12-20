@@ -35,18 +35,17 @@ import (
 // Returns substrings that match the provided regular expression. find returns the first match. findAll may optionally
 // be provided a limit. If the limit is set and >= 0, no more than the limit number of matches are returned.
 //
-//     <string>.find(<string>) <string>
-//     <string>.findAll(<string>) <list <string>>
-//     <string>.findAll(<string>, <int>) <list <string>>
+//	<string>.find(<string>) <string>
+//	<string>.findAll(<string>) <list <string>>
+//	<string>.findAll(<string>, <int>) <list <string>>
 //
 // Examples:
 //
-//     "abc 123".find('[0-9]*') // returns '123'
-//     "abc 123".find('xyz') // returns ''
-//     "123 abc 456".findAll('[0-9]*') // returns ['123', '456']
-//     "123 abc 456".findAll('[0-9]*', 1) // returns ['123']
-//     "123 abc 456".findAll('xyz') // returns []
-//
+//	"abc 123".find('[0-9]*') // returns '123'
+//	"abc 123".find('xyz') // returns ''
+//	"123 abc 456".findAll('[0-9]*') // returns ['123', '456']
+//	"123 abc 456".findAll('[0-9]*', 1) // returns ['123']
+//	"123 abc 456".findAll('xyz') // returns []
 func Regex() cel.EnvOption {
 	return cel.Lib(regexLib)
 }

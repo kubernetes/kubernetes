@@ -320,7 +320,8 @@ func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, version
 
 // RegisterPlugin starts the endpoint and registers it
 // TODO: Start the endpoint and wait for the First ListAndWatch call
-//       before registering the plugin
+//
+//	before registering the plugin
 func (m *ManagerImpl) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
 	klog.V(2).InfoS("Registering plugin at endpoint", "plugin", pluginName, "endpoint", endpoint)
 

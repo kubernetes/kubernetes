@@ -412,11 +412,11 @@ func podsDifferSemantically(existing, ref *v1.Pod) bool {
 }
 
 // checkAndUpdatePod updates existing, and:
-//   * if ref makes a meaningful change, returns needUpdate=true
-//   * if ref makes a meaningful change, and this change is graceful deletion, returns needGracefulDelete=true
-//   * if ref makes no meaningful change, but changes the pod status, returns needReconcile=true
-//   * else return all false
-//   Now, needUpdate, needGracefulDelete and needReconcile should never be both true
+//   - if ref makes a meaningful change, returns needUpdate=true
+//   - if ref makes a meaningful change, and this change is graceful deletion, returns needGracefulDelete=true
+//   - if ref makes no meaningful change, but changes the pod status, returns needReconcile=true
+//   - else return all false
+//     Now, needUpdate, needGracefulDelete and needReconcile should never be both true
 func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGracefulDelete bool) {
 
 	// 1. this is a reconcile

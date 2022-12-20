@@ -127,23 +127,23 @@ func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *v1.Per
 // A request for RWO could be satisfied by both sets of indexed volumes, so
 // allPossibleMatchingAccessModes returns:
 //
-// [][]v1.PersistentVolumeAccessMode {
-//      []v1.PersistentVolumeAccessMode {
-//			v1.ReadWriteOnce, v1.ReadOnlyMany,
-//		},
-//      []v1.PersistentVolumeAccessMode {
-//			v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
-//		},
-// }
+//	[][]v1.PersistentVolumeAccessMode {
+//	     []v1.PersistentVolumeAccessMode {
+//				v1.ReadWriteOnce, v1.ReadOnlyMany,
+//			},
+//	     []v1.PersistentVolumeAccessMode {
+//				v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
+//			},
+//	}
 //
 // A request for RWX can be satisfied by only one set of indexed volumes, so
 // the return is:
 //
-// [][]v1.PersistentVolumeAccessMode {
-//      []v1.PersistentVolumeAccessMode {
-//			v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
-//		},
-// }
+//	[][]v1.PersistentVolumeAccessMode {
+//	     []v1.PersistentVolumeAccessMode {
+//				v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany,
+//			},
+//	}
 //
 // This func returns modes with ascending levels of modes to give the user
 // what is closest to what they actually asked for.

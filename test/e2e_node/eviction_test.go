@@ -511,10 +511,12 @@ type podEvictSpec struct {
 }
 
 // runEvictionTest sets up a testing environment given the provided pods, and checks a few things:
-//		It ensures that the desired expectedNodeCondition is actually triggered.
-//		It ensures that evictionPriority 0 pods are not evicted
-//		It ensures that lower evictionPriority pods are always evicted before higher evictionPriority pods (2 evicted before 1, etc.)
-//		It ensures that all pods with non-zero evictionPriority are eventually evicted.
+//
+//	It ensures that the desired expectedNodeCondition is actually triggered.
+//	It ensures that evictionPriority 0 pods are not evicted
+//	It ensures that lower evictionPriority pods are always evicted before higher evictionPriority pods (2 evicted before 1, etc.)
+//	It ensures that all pods with non-zero evictionPriority are eventually evicted.
+//
 // runEvictionTest then cleans up the testing environment by deleting provided pods, and ensures that expectedNodeCondition no longer exists
 func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expectedNodeCondition v1.NodeConditionType, expectedStarvedResource v1.ResourceName, logFunc func(), testSpecs []podEvictSpec) {
 	// Place the remainder of the test within a context so that the kubelet config is set before and after the test.

@@ -693,8 +693,9 @@ func (adc *attachDetachController) processVolumesInUse(
 // For each VA object, this function checks if its present in the ASW.
 // If not, adds the volume to ASW as an "uncertain" attachment.
 // In the reconciler, the logic checks if the volume is present in the DSW;
-//   if yes, the reconciler will attempt attach on the volume;
-//   if not (could be a dangling attachment), the reconciler will detach this volume.
+//
+//	if yes, the reconciler will attempt attach on the volume;
+//	if not (could be a dangling attachment), the reconciler will detach this volume.
 func (adc *attachDetachController) processVolumeAttachments() error {
 	vas, err := adc.volumeAttachmentLister.List(labels.Everything())
 	if err != nil {

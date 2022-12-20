@@ -367,7 +367,7 @@ type execPlugin struct {
 
 // ExecPlugin executes the plugin binary with arguments and environment variables specified in CredentialProviderConfig:
 //
-//  $ ENV_NAME=ENV_VALUE <plugin-name> args[0] args[1] <<<request
+//	$ ENV_NAME=ENV_VALUE <plugin-name> args[0] args[1] <<<request
 //
 // The plugin is expected to receive the CredentialProviderRequest API via stdin from the kubelet and
 // return CredentialProviderResponse via stdout.

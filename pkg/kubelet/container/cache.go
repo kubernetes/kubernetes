@@ -108,8 +108,8 @@ func (c *cache) Delete(id types.UID) {
 	delete(c.pods, id)
 }
 
-//  UpdateTime modifies the global timestamp of the cache and notify
-//  subscribers if needed.
+// UpdateTime modifies the global timestamp of the cache and notify
+// subscribers if needed.
 func (c *cache) UpdateTime(timestamp time.Time) {
 	c.lock.Lock()
 	defer c.lock.Unlock()

@@ -111,7 +111,7 @@ func (LimitResponse) SwaggerDoc() map[string]string {
 }
 
 var map_LimitedPriorityLevelConfiguration = map[string]string{
-	"":                         "LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits. It addresses two issues:\n * How are requests for this priority level limited?\n * What should be done with requests that exceed the limit?",
+	"":                         "LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits. It addresses two issues:\n  - How are requests for this priority level limited?\n  - What should be done with requests that exceed the limit?",
 	"assuredConcurrencyShares": "`assuredConcurrencyShares` (ACS) configures the execution limit, which is a limit on the number of requests of this priority level that may be exeucting at a given time.  ACS must be a positive number. The server's concurrency limit (SCL) is divided among the concurrency-controlled priority levels in proportion to their assured concurrency shares. This produces the assured concurrency value (ACV) ",
 	"limitResponse":            "`limitResponse` indicates what to do with requests that can not be executed right now",
 }

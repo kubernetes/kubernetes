@@ -166,7 +166,8 @@ func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 // FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
 // plugin, but all it does is make empty directories.
 // Use as:
-//   volume.RegisterPlugin(&FakePlugin{"fake-name"})
+//
+//	volume.RegisterPlugin(&FakePlugin{"fake-name"})
 type FakeVolumePlugin struct {
 	sync.RWMutex
 	PluginName             string
@@ -1178,7 +1179,7 @@ func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []
 
 var _ volumepathhandler.BlockVolumePathHandler = &FakeVolumePathHandler{}
 
-//NewDeviceHandler Create a new IoHandler implementation
+// NewDeviceHandler Create a new IoHandler implementation
 func NewBlockVolumePathHandler() volumepathhandler.BlockVolumePathHandler {
 	return &FakeVolumePathHandler{}
 }

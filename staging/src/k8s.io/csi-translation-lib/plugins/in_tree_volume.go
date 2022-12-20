@@ -215,12 +215,12 @@ func translateTopologyFromInTreeToCSI(pv *v1.PersistentVolume, csiTopologyKey st
 // getTopologyLabel checks if the kubernetes topology label used in this
 // PV is GA and return the zone/region label used.
 // The version checking follows the following orders
-// 1. Check NodeAffinity
-//   1.1 Check if zoneGA exists, if yes return GA labels
-//   1.2 Check if zoneBeta exists, if yes return Beta labels
-// 2. Check PV labels
-//   2.1 Check if zoneGA exists, if yes return GA labels
-//   2.2 Check if zoneBeta exists, if yes return Beta labels
+//  1. Check NodeAffinity
+//     1.1 Check if zoneGA exists, if yes return GA labels
+//     1.2 Check if zoneBeta exists, if yes return Beta labels
+//  2. Check PV labels
+//     2.1 Check if zoneGA exists, if yes return GA labels
+//     2.2 Check if zoneBeta exists, if yes return Beta labels
 func getTopologyLabel(pv *v1.PersistentVolume) (zoneLabel string, regionLabel string) {
 
 	if zoneGA := TopologyKeyExist(v1.LabelTopologyZone, pv.Spec.NodeAffinity); zoneGA {
