@@ -211,6 +211,10 @@ func TestControllerSyncJob(t *testing.T) {
 		initialStatus  *jobInitialStatus
 
 		// pod setup
+
+		// If a podControllerError is set, finalizers are not able to be removed.
+		// This means that there is no status update so the counters for
+		// failedPods and succeededPods cannot be incremented.
 		podControllerError        error
 		jobKeyForget              bool
 		pendingPods               int
@@ -318,12 +322,13 @@ func TestControllerSyncJob(t *testing.T) {
 			completions:        5,
 			backoffLimit:       6,
 			podControllerError: fmt.Errorf("fake error"),
-			jobKeyForget:       true,
+			jobKeyForget:       false,
 			activePods:         1,
 			succeededPods:      1,
 			expectedCreations:  1,
 			expectedActive:     1,
-			expectedSucceeded:  1,
+			expectedSucceeded:  0,
+			expectedPodPatches: 1,
 		},
 		"too many active pods": {
 			parallelism:        2,
@@ -342,7 +347,8 @@ func TestControllerSyncJob(t *testing.T) {
 			podControllerError: fmt.Errorf("fake error"),
 			jobKeyForget:       false,
 			activePods:         3,
-			expectedDeletions:  1,
+			expectedDeletions:  0,
+			expectedPodPatches: 1,
 			expectedActive:     3,
 		},
 		"failed + succeed pods: reset backoff delay": {
@@ -391,7 +397,8 @@ func TestControllerSyncJob(t *testing.T) {
 			failedPods:         1,
 			expectedCreations:  1,
 			expectedActive:     1,
-			expectedFailed:     1,
+			expectedFailed:     0,
+			expectedPodPatches: 1,
 		},
 		"job finish": {
 			parallelism:             2,
@@ -737,9 +744,6 @@ func TestControllerSyncJob(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if tc.podControllerError != nil {
-				t.Skip("Can't track status if finalizers can't be removed")
-			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 
 			// job manager setup
