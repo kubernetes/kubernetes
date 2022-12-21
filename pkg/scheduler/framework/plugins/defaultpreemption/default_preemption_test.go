@@ -1401,6 +1401,7 @@ func TestSelectBestCandidate(t *testing.T) {
 func TestPodEligibleToPreemptOthers(t *testing.T) {
 	tests := []struct {
 		name                string
+		fts                 feature.Features
 		pod                 *v1.Pod
 		pods                []*v1.Pod
 		nodes               []string
@@ -1439,6 +1440,40 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			nominatedNodeStatus: nil,
 			expected:            false,
 		},
+		{
+			name: "victim Pods terminating, feature PodDisruptionConditions is enabled",
+			fts:  feature.Features{EnablePodDisruptionConditions: true},
+			pod:  st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().
+				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByKubeScheduler).Obj()},
+			nodes:    []string{"node1"},
+			expected: false,
+		},
+		{
+			name:     "non-victim Pods terminating, feature PodDisruptionConditions is enabled",
+			fts:      feature.Features{EnablePodDisruptionConditions: true},
+			pod:      st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			pods:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
+			nodes:    []string{"node1"},
+			expected: true,
+		},
+		{
+			name: "victim Pods terminating, feature PodDisruptionConditions is disabled",
+			fts:  feature.Features{EnablePodDisruptionConditions: false},
+			pod:  st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().
+				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByKubeScheduler).Obj()},
+			nodes:    []string{"node1"},
+			expected: false,
+		},
+		{
+			name:     "non-victim Pods terminating, feature PodDisruptionConditions is disabled",
+			fts:      feature.Features{EnablePodDisruptionConditions: false},
+			pod:      st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			pods:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
+			nodes:    []string{"node1"},
+			expected: false,
+		},
 	}
 
 	for _, test := range tests {
@@ -1459,7 +1494,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			pl := DefaultPreemption{fh: f}
+			pl := DefaultPreemption{fh: f, fts: test.fts}
 			if got, _ := pl.PodEligibleToPreemptOthers(test.pod, test.nominatedNodeStatus); got != test.expected {
 				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
 			}
