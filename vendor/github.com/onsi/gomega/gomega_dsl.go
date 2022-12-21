@@ -22,7 +22,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const GOMEGA_VERSION = "1.23.0"
+const GOMEGA_VERSION = "1.24.2"
 
 const nilGomegaPanic = `You are trying to make an assertion, but haven't registered Gomega's fail handler.
 If you're using Ginkgo then you probably forgot to put your assertion in an It().
@@ -368,9 +368,9 @@ is equivalent to
 
 	Eventually(...).WithTimeout(time.Second).WithPolling(2*time.Second).WithContext(ctx).Should(...)
 */
-func Eventually(args ...interface{}) AsyncAssertion {
+func Eventually(actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
-	return Default.Eventually(args...)
+	return Default.Eventually(actualOrCtx, args...)
 }
 
 // EventuallyWithOffset operates like Eventually but takes an additional
@@ -382,9 +382,9 @@ func Eventually(args ...interface{}) AsyncAssertion {
 // `EventuallyWithOffset` specifying a timeout interval (and an optional polling interval) are
 // the same as `Eventually(...).WithOffset(...).WithTimeout` or
 // `Eventually(...).WithOffset(...).WithTimeout(...).WithPolling`.
-func EventuallyWithOffset(offset int, args ...interface{}) AsyncAssertion {
+func EventuallyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
-	return Default.EventuallyWithOffset(offset, args...)
+	return Default.EventuallyWithOffset(offset, actualOrCtx, args...)
 }
 
 /*
@@ -402,9 +402,9 @@ Consistently is useful in cases where you want to assert that something *does no
 
 This will block for 200 milliseconds and repeatedly check the channel and ensure nothing has been received.
 */
-func Consistently(args ...interface{}) AsyncAssertion {
+func Consistently(actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
-	return Default.Consistently(args...)
+	return Default.Consistently(actualOrCtx, args...)
 }
 
 // ConsistentlyWithOffset operates like Consistently but takes an additional
@@ -413,9 +413,9 @@ func Consistently(args ...interface{}) AsyncAssertion {
 //
 // `ConsistentlyWithOffset` is the same as `Consistently(...).WithOffset` and
 // optional `WithTimeout` and `WithPolling`.
-func ConsistentlyWithOffset(offset int, args ...interface{}) AsyncAssertion {
+func ConsistentlyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
-	return Default.ConsistentlyWithOffset(offset, args...)
+	return Default.ConsistentlyWithOffset(offset, actualOrCtx, args...)
 }
 
 /*

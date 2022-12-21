@@ -1,3 +1,39 @@
+## 1.24.2
+
+### Fixes
+- Correctly handle assertion failure panics for eventually/consistnetly "g Gomega"s in a goroutine [78f1660]
+- docs:Fix typo "you an" -> "you can" (#607) [3187c1f]
+- fixes issue #600 (#606) [808d192]
+
+### Maintenance
+- Bump golang.org/x/net from 0.2.0 to 0.4.0 (#611) [6ebc0bf]
+- Bump nokogiri from 1.13.9 to 1.13.10 in /docs (#612) [258cfc8]
+- Bump github.com/onsi/ginkgo/v2 from 2.5.0 to 2.5.1 (#609) [e6c3eb9]
+
+## 1.24.1
+
+### Fixes
+- maintain backward compatibility for Eventually and Consisntetly's signatures [4c7df5e]
+- fix small typo (#601) [ea0ebe6]
+
+### Maintenance
+- Bump golang.org/x/net from 0.1.0 to 0.2.0 (#603) [1ba8372]
+- Bump github.com/onsi/ginkgo/v2 from 2.4.0 to 2.5.0 (#602) [f9426cb]
+- fix label-filter in test.yml [d795db6]
+- stop running flakey tests and rely on external network dependencies in CI [7133290]
+
+## 1.24.0
+
+### Features
+
+Introducting [gcustom](https://onsi.github.io/gomega/#gcustom-a-convenient-mechanism-for-buildling-custom-matchers) - a convenient mechanism for building custom matchers.
+
+This is an RC release for `gcustom`.  The external API may be tweaked in response to feedback however it is expected to remain mostly stable.
+
+### Maintenance
+
+- Update BeComparableTo documentation [756eaa0]
+
 ## 1.23.0
 
 ### Features
