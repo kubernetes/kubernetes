@@ -95,30 +95,11 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	job.Generation = 1
 
-	// While legacy tracking is supported, we use an annotation to mark whether
-	// jobs are tracked with finalizers.
-	addJobTrackingAnnotation(job)
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
 		job.Spec.PodFailurePolicy = nil
 	}
 
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
-}
-
-func addJobTrackingAnnotation(job *batch.Job) {
-	if job.Annotations == nil {
-		job.Annotations = map[string]string{}
-	}
-	job.Annotations[batchv1.JobTrackingFinalizer] = ""
-}
-
-func hasJobTrackingAnnotation(job *batch.Job) bool {
-	if job.Annotations == nil {
-		return false
-	}
-	_, ok := job.Annotations[batchv1.JobTrackingFinalizer]
-	return ok
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -139,12 +120,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 		newJob.Generation = oldJob.Generation + 1
 	}
 
-	// While legacy tracking is supported, we use an annotation to mark whether
-	// jobs are tracked with finalizers. This annotation cannot be removed by
-	// users.
-	if hasJobTrackingAnnotation(oldJob) {
-		addJobTrackingAnnotation(newJob)
-	}
 }
 
 // Validate validates a new job.
@@ -168,17 +143,11 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 	}
 	opts := batchvalidation.JobValidationOptions{
 		PodValidationOptions:    pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
-		AllowTrackingAnnotation: true,
 		AllowElasticIndexedJobs: utilfeature.DefaultFeatureGate.Enabled(features.ElasticIndexedJob),
 		RequirePrefixedLabels:   true,
 	}
 	if oldJob != nil {
 		opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldJob.Spec.Selector)
-
-		// Because we don't support the tracking with finalizers for already
-		// existing jobs, we allow the annotation only if the Job already had it,
-		// regardless of the feature gate.
-		opts.AllowTrackingAnnotation = hasJobTrackingAnnotation(oldJob)
 
 		// Updating node affinity, node selector and tolerations is allowed
 		// only for suspended jobs that never started before.

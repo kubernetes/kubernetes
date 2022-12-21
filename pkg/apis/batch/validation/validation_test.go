@@ -223,17 +223,13 @@ func TestValidateJob(t *testing.T) {
 		},
 		"valid job tracking annotation": {
 			opts: JobValidationOptions{
-				AllowTrackingAnnotation: true,
-				RequirePrefixedLabels:   true,
+				RequirePrefixedLabels: true,
 			},
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myjob",
 					Namespace: metav1.NamespaceDefault,
 					UID:       types.UID("1a2b3c"),
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-					},
 				},
 				Spec: batch.JobSpec{
 					Selector: validGeneratedSelector,
@@ -243,17 +239,13 @@ func TestValidateJob(t *testing.T) {
 		},
 		"valid batch labels": {
 			opts: JobValidationOptions{
-				AllowTrackingAnnotation: true,
-				RequirePrefixedLabels:   true,
+				RequirePrefixedLabels: true,
 			},
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myjob",
 					Namespace: metav1.NamespaceDefault,
 					UID:       types.UID("1a2b3c"),
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-					},
 				},
 				Spec: batch.JobSpec{
 					Selector: validGeneratedSelector,
@@ -263,17 +255,13 @@ func TestValidateJob(t *testing.T) {
 		},
 		"do not allow new batch labels": {
 			opts: JobValidationOptions{
-				AllowTrackingAnnotation: true,
-				RequirePrefixedLabels:   false,
+				RequirePrefixedLabels: false,
 			},
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myjob",
 					Namespace: metav1.NamespaceDefault,
 					UID:       types.UID("1a2b3c"),
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-					},
 				},
 				Spec: batch.JobSpec{
 					Selector: &metav1.LabelSelector{
@@ -975,23 +963,6 @@ func TestValidateJob(t *testing.T) {
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
 					Completions:    pointer.Int32Ptr(2),
 					Parallelism:    pointer.Int32Ptr(100001),
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-		},
-		"metadata.annotations[batch.kubernetes.io/job-tracking]: cannot add this annotation": {
-			job: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "myjob",
-					Namespace: metav1.NamespaceDefault,
-					UID:       types.UID("1a2b3c"),
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-					},
-				},
-				Spec: batch.JobSpec{
-					Selector: validGeneratedSelector,
-					Template: validPodTemplateSpecForGenerated,
 				},
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
