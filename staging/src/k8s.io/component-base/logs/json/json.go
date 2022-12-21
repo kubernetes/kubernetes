@@ -18,7 +18,6 @@ package json
 
 import (
 	"io"
-	"os"
 	"sync/atomic"
 	"time"
 
@@ -116,7 +115,7 @@ func (f Factory) Feature() featuregate.Feature {
 	return logsapi.LoggingBetaOptions
 }
 
-func (f Factory) Create(c logsapi.LoggingConfiguration) (logr.Logger, logsapi.RuntimeControl) {
+func (f Factory) Create(c logsapi.LoggingConfiguration, o logsapi.LoggingOptions) (logr.Logger, logsapi.RuntimeControl) {
 	// We intentionally avoid all os.File.Sync calls. Output is unbuffered,
 	// therefore we don't need to flush, and calling the underlying fsync
 	// would just slow down writing.
@@ -125,9 +124,9 @@ func (f Factory) Create(c logsapi.LoggingConfiguration) (logr.Logger, logsapi.Ru
 	// written to the output stream before the process terminates, but
 	// doesn't need to worry about data not being written because of a
 	// system crash or powerloss.
-	stderr := zapcore.Lock(AddNopSync(os.Stderr))
+	stderr := zapcore.Lock(AddNopSync(o.ErrorStream))
 	if c.Options.JSON.SplitStream {
-		stdout := zapcore.Lock(AddNopSync(os.Stdout))
+		stdout := zapcore.Lock(AddNopSync(o.InfoStream))
 		size := c.Options.JSON.InfoBufferSize.Value()
 		if size > 0 {
 			// Prevent integer overflow.

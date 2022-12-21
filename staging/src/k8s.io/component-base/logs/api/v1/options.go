@@ -19,7 +19,9 @@ package v1
 import (
 	"flag"
 	"fmt"
+	"io"
 	"math"
+	"os"
 	"strings"
 	"time"
 
@@ -63,18 +65,41 @@ func NewLoggingConfiguration() *LoggingConfiguration {
 // The optional FeatureGate controls logging features. If nil, the default for
 // these features is used.
 func ValidateAndApply(c *LoggingConfiguration, featureGate featuregate.FeatureGate) error {
-	return ValidateAndApplyAsField(c, featureGate, nil)
+	return validateAndApply(c, nil, featureGate, nil)
+}
+
+// ValidateAndApplyWithOptions is a variant of ValidateAndApply which accepts
+// additional options beyond those that can be configured through the API. This
+// is meant for testing.
+func ValidateAndApplyWithOptions(c *LoggingConfiguration, options *LoggingOptions, featureGate featuregate.FeatureGate) error {
+	return validateAndApply(c, options, featureGate, nil)
+}
+
+// +k8s:deepcopy-gen=false
+
+// LoggingOptions can be used with ValidateAndApplyWithOptions to override
+// certain global defaults.
+type LoggingOptions struct {
+	// ErrorStream can be used to override the os.Stderr default.
+	ErrorStream io.Writer
+
+	// InfoStream can be used to override the os.Stdout default.
+	InfoStream io.Writer
 }
 
 // ValidateAndApplyAsField is a variant of ValidateAndApply that should be used
 // when the LoggingConfiguration is embedded in some larger configuration
 // structure.
 func ValidateAndApplyAsField(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) error {
+	return validateAndApply(c, nil, featureGate, fldPath)
+}
+
+func validateAndApply(c *LoggingConfiguration, options *LoggingOptions, featureGate featuregate.FeatureGate, fldPath *field.Path) error {
 	errs := Validate(c, featureGate, fldPath)
 	if len(errs) > 0 {
 		return errs.ToAggregate()
 	}
-	return apply(c, featureGate)
+	return apply(c, options, featureGate)
 }
 
 // Validate can be used to check for invalid settings without applying them.
@@ -157,7 +182,7 @@ func featureEnabled(featureGate featuregate.FeatureGate, feature featuregate.Fea
 	return enabled
 }
 
-func apply(c *LoggingConfiguration, featureGate featuregate.FeatureGate) error {
+func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate featuregate.FeatureGate) error {
 	contextualLoggingEnabled := contextualLoggingDefault
 	if featureGate != nil {
 		contextualLoggingEnabled = featureGate.Enabled(ContextualLogging)
@@ -168,7 +193,13 @@ func apply(c *LoggingConfiguration, featureGate featuregate.FeatureGate) error {
 	if format.factory == nil {
 		klog.ClearLogger()
 	} else {
-		log, control := format.factory.Create(*c)
+		if options == nil {
+			options = &LoggingOptions{
+				ErrorStream: os.Stderr,
+				InfoStream:  os.Stdout,
+			}
+		}
+		log, control := format.factory.Create(*c, *options)
 		if control.SetVerbosityLevel != nil {
 			setverbositylevel.Mutex.Lock()
 			defer setverbositylevel.Mutex.Unlock()

@@ -61,7 +61,7 @@ type RuntimeControl struct {
 // non-default log format.
 type LogFormatFactory interface {
 	// Create returns a logger with the requested configuration.
-	Create(c LoggingConfiguration) (logr.Logger, RuntimeControl)
+	Create(c LoggingConfiguration, o LoggingOptions) (logr.Logger, RuntimeControl)
 }
 
 // RegisterLogFormat registers support for a new logging format. This must be called

@@ -32,7 +32,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	logsjson "k8s.io/component-base/logs/json"
 	"k8s.io/klog/v2"
@@ -175,9 +174,6 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 		generateOutput(b, config, nil, out)
 	})
 	b.Run("JSON", func(b *testing.B) {
-		c := logsapi.NewLoggingConfiguration()
-		var logger logr.Logger
-		var flush func()
 		var out1, out2 *os.File
 		if !discard {
 			var err error
@@ -192,46 +188,30 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 			}
 			defer out2.Close()
 		}
+		o := logsapi.LoggingOptions{}
+		if discard {
+			o.ErrorStream = io.Discard
+			o.InfoStream = io.Discard
+		} else {
+			o.ErrorStream = out1
+			o.InfoStream = out1
+		}
+
 		b.Run("single-stream", func(b *testing.B) {
-			if discard {
-				l, control := logsjson.NewJSONLogger(c.Verbosity, logsjson.AddNopSync(&output), nil, nil)
-				logger = l
-				flush = control.Flush
-			} else {
-				stderr := os.Stderr
-				os.Stderr = out1
-				defer func() {
-					os.Stderr = stderr
-				}()
-				l, control := logsjson.Factory{}.Create(*c)
-				logger = l
-				flush = control.Flush
-			}
+			c := logsapi.NewLoggingConfiguration()
+			logger, control := logsjson.Factory{}.Create(*c, o)
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
-			generateOutput(b, config, flush, out1)
+			generateOutput(b, config, control.Flush, out1)
 		})
 
 		b.Run("split-stream", func(b *testing.B) {
-			if discard {
-				l, control := logsjson.NewJSONLogger(c.Verbosity, logsjson.AddNopSync(&output), logsjson.AddNopSync(&output), nil)
-				logger = l
-				flush = control.Flush
-			} else {
-				stdout, stderr := os.Stdout, os.Stderr
-				os.Stdout, os.Stderr = out1, out2
-				defer func() {
-					os.Stdout, os.Stderr = stdout, stderr
-				}()
-				c := logsapi.NewLoggingConfiguration()
-				c.Options.JSON.SplitStream = true
-				l, control := logsjson.Factory{}.Create(*c)
-				logger = l
-				flush = control.Flush
-			}
+			c := logsapi.NewLoggingConfiguration()
+			c.Options.JSON.SplitStream = true
+			logger, control := logsjson.Factory{}.Create(*c, o)
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
-			generateOutput(b, config, flush, out1, out2)
+			generateOutput(b, config, control.Flush, out1, out2)
 		})
 	})
 }
