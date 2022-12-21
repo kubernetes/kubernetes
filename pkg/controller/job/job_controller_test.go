@@ -54,9 +54,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
+	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 )
 
+var realClock = &clock.RealClock{}
 var alwaysReady = func() bool { return true }
 
 func newJobWithName(name string, parallelism, completions, backoffLimit int32, completionMode batch.CompletionMode) *batch.Job {
@@ -110,10 +113,13 @@ func newJob(parallelism, completions, backoffLimit int32, completionMode batch.C
 }
 
 func newControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*Controller, informers.SharedInformerFactory) {
-	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
-	jm := NewController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient)
-	jm.podControl = &controller.FakePodControl{}
+	return newControllerFromClientWithClock(kubeClient, resyncPeriod, realClock)
+}
 
+func newControllerFromClientWithClock(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, clock clock.WithTicker) (*Controller, informers.SharedInformerFactory) {
+	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
+	jm := newControllerWithClock(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient, clock)
+	jm.podControl = &controller.FakePodControl{}
 	return jm, sharedInformers
 }
 
@@ -750,7 +756,7 @@ func TestControllerSyncJob(t *testing.T) {
 					manager.expectations.ExpectCreations(key, int(tc.fakeExpectationAtCreation))
 				}
 				if tc.wasSuspended {
-					job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended"))
+					job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended", realClock.Now()))
 				}
 				if wFinalizers {
 					job.Annotations = map[string]string{
@@ -1144,8 +1150,8 @@ func TestGetStatus(t *testing.T) {
 }
 
 func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
-	succeededCond := newCondition(batch.JobComplete, v1.ConditionTrue, "", "")
-	failedCond := newCondition(batch.JobFailed, v1.ConditionTrue, "", "")
+	succeededCond := newCondition(batch.JobComplete, v1.ConditionTrue, "", "", realClock.Now())
+	failedCond := newCondition(batch.JobFailed, v1.ConditionTrue, "", "", realClock.Now())
 	indexedCompletion := batch.IndexedCompletion
 	mockErr := errors.New("mock error")
 	cases := map[string]struct {
@@ -1825,10 +1831,10 @@ func hasTrueCondition(job *batch.Job) *batch.JobConditionType {
 
 func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
-	manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	fakeClock := clocktesting.NewFakeClock(time.Now().Truncate(time.Second))
+	manager, sharedInformerFactory := newControllerFromClientWithClock(clientset, controller.NoResyncPeriodFunc, fakeClock)
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	sharedInformerFactory.Start(ctx.Done())
@@ -1855,10 +1861,9 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			job := newJobWithName(tc.jobName, 1, 1, 6, batch.NonIndexedCompletion)
-			activeDeadlineSeconds := int64(1)
-			job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+			job.Spec.ActiveDeadlineSeconds = pointer.Int64(1)
 			if tc.setStartTime {
-				start := metav1.Unix(metav1.Now().Time.Unix()-1, 0)
+				start := metav1.NewTime(fakeClock.Now().Add(-time.Second))
 				job.Status.StartTime = &start
 			}
 
@@ -1870,7 +1875,25 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 			if err := sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job); err != nil {
 				t.Fatalf("Failed to insert job in index: %v", err)
 			}
+
 			var j *batch.Job
+			err = wait.PollImmediate(200*time.Microsecond, 3*time.Second, func() (done bool, err error) {
+				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return j.Status.StartTime != nil, nil
+			})
+			if err != nil {
+				t.Errorf("Job failed to ensure that start time was set: %v", err)
+			}
+			for _, c := range j.Status.Conditions {
+				if c.Reason == "DeadlineExceeded" {
+					t.Errorf("Job contains DeadlineExceeded condition earlier than expected")
+					break
+				}
+			}
+			manager.clock.Sleep(time.Second)
 			err = wait.Poll(200*time.Millisecond, 3*time.Second, func() (done bool, err error) {
 				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
 				if err != nil {
@@ -1902,11 +1925,10 @@ func TestSingleJobFailedCondition(t *testing.T) {
 	}
 
 	job := newJob(1, 1, 6, batch.NonIndexedCompletion)
-	activeDeadlineSeconds := int64(10)
-	job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+	job.Spec.ActiveDeadlineSeconds = pointer.Int64(10)
 	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
 	job.Status.StartTime = &start
-	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobFailed, v1.ConditionFalse, "DeadlineExceeded", "Job was active longer than specified deadline"))
+	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobFailed, v1.ConditionFalse, "DeadlineExceeded", "Job was active longer than specified deadline", realClock.Now()))
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 	if err != nil {
@@ -1940,7 +1962,7 @@ func TestSyncJobComplete(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	job := newJob(1, 1, 6, batch.NonIndexedCompletion)
-	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobComplete, v1.ConditionTrue, "", ""))
+	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobComplete, v1.ConditionTrue, "", "", realClock.Now()))
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 	if err != nil {
@@ -4224,7 +4246,7 @@ func TestEnsureJobConditions(t *testing.T) {
 			wantType:     batch.JobSuspended,
 			wantStatus:   v1.ConditionTrue,
 			wantReason:   "foo",
-			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "", realClock.Now())},
 			expectUpdate: true,
 		},
 		{
@@ -4238,44 +4260,44 @@ func TestEnsureJobConditions(t *testing.T) {
 		},
 		{
 			name:         "update true condition reason",
-			haveList:     []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			haveList:     []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "", realClock.Now())},
 			wantType:     batch.JobSuspended,
 			wantStatus:   v1.ConditionTrue,
 			wantReason:   "bar",
-			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "bar", "")},
+			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "bar", "", realClock.Now())},
 			expectUpdate: true,
 		},
 		{
 			name:         "update true condition status",
-			haveList:     []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			haveList:     []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "", realClock.Now())},
 			wantType:     batch.JobSuspended,
 			wantStatus:   v1.ConditionFalse,
 			wantReason:   "foo",
-			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionFalse, "foo", "")},
+			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionFalse, "foo", "", realClock.Now())},
 			expectUpdate: true,
 		},
 		{
 			name:         "update false condition status",
-			haveList:     []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionFalse, "foo", "")},
+			haveList:     []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionFalse, "foo", "", realClock.Now())},
 			wantType:     batch.JobSuspended,
 			wantStatus:   v1.ConditionTrue,
 			wantReason:   "foo",
-			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "", realClock.Now())},
 			expectUpdate: true,
 		},
 		{
 			name:         "condition already exists",
-			haveList:     []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			haveList:     []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "", realClock.Now())},
 			wantType:     batch.JobSuspended,
 			wantStatus:   v1.ConditionTrue,
 			wantReason:   "foo",
-			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "")},
+			expectList:   []batch.JobCondition{*newCondition(batch.JobSuspended, v1.ConditionTrue, "foo", "", realClock.Now())},
 			expectUpdate: false,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotList, isUpdated := ensureJobConditionStatus(tc.haveList, tc.wantType, tc.wantStatus, tc.wantReason, "")
+			gotList, isUpdated := ensureJobConditionStatus(tc.haveList, tc.wantType, tc.wantStatus, tc.wantReason, "", realClock.Now())
 			if isUpdated != tc.expectUpdate {
 				t.Errorf("Got isUpdated=%v, want %v", isUpdated, tc.expectUpdate)
 			}

@@ -131,11 +131,12 @@ func main() {
 		}
 	}()
 
+	// This program is meant for local testing. It creates a Namespace
+	// directly instead of using the e2e test framework.
 	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testNamespace,
 			Labels: map[string]string{
-				// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace in 1.24
 				admissionapi.EnforceLevelLabel: string(admissionapi.LevelPrivileged),
 			},
 		},
