@@ -487,8 +487,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			originFSSize, err = getFilesystemSizeBytes(pod, mountpath)
 			framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
 		}
-
-		originalSize := l.sourcePVC.Spec.Resources.Requests.Storage()
+		originalSize := claim.Status.Capacity.Storage()
 		biggerSize := originalSize.DeepCopy()
 		biggerSize.Add(*resource.NewQuantity(1, resource.BinarySI))
 
@@ -511,6 +510,20 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			v1.PersistentVolumeAccessMode(v1.ReadOnlyMany),
 		}
 
+		// Test expected content exists in restored volume
+		l.testCase.PvCheck = func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
+			ginkgo.By("checking whether the created volume has the pre-populated data")
+			tests := []e2evolume.Test{
+				{
+					Volume:          *storageutils.CreateVolumeSource(claim.Name, false /* readOnly */),
+					Mode:            pattern.VolMode,
+					File:            "index.html",
+					ExpectedContent: expectedContent,
+				},
+			}
+			e2evolume.TestVolumeClientSlow(ctx, f, testConfig, nil, "", tests)
+		}
+
 		for _, claim := range []*v1.PersistentVolumeClaim{sameSizeClaim, biggerClaim} {
 			l.testCase.Claim = claim
 			l.testCase.TestDynamicProvisioning(ctx)
@@ -520,18 +533,8 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 				continue
 			}
 
-			ginkgo.By(fmt.Sprintf("creating claim=%+v", claim))
 			claim, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			defer func() {
-				framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
-				// typically this claim has already been deleted
-				err = l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
-				if err != nil && !apierrors.IsNotFound(err) {
-					framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
-				}
-			}()
-
 			createdClaims := []*v1.PersistentVolumeClaim{claim}
 			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
 			framework.ExpectNoError(err, "Failed to create pod: %v", err)
@@ -584,6 +587,26 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
 		l.pvc.Spec.DataSourceRef = dataSourceRef
 
+		// Create + record the actual size of the original pv (from pvc status).
+		c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get pvc: %v", err)
+
+		var originFSSize int
+		// Do not check fs size for block volumes
+		if pattern.VolMode != "Block" {
+			createdClaims := []*v1.PersistentVolumeClaim{c}
+			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
+			framework.ExpectNoError(err, "Failed to create pod: %v", err)
+
+			// Mount path should not be empty.
+			mountpath := findVolumeMountPath(pod, c)
+			gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
+
+			// Save filesystem size of the origin volume.
+			originFSSize, err = getFilesystemSizeBytes(pod, mountpath)
+			framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
+		}
+
 		// Create readonlymany claim w/ same size as original, then test to make
 		// sure it has expected content when restored.
 		sameSizeROClaim := l.pvc.DeepCopy()
@@ -592,11 +615,17 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			v1.PersistentVolumeAccessMode(v1.ReadOnlyMany),
 		}
 
-		c2, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(sameSizeROClaim.Namespace).Create(ctx, sameSizeROClaim, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
-		createdClaims2 := []*v1.PersistentVolumeClaim{c2}
-		pod2, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
-		framework.ExpectNoError(err, "Failed to create pod: %v", err)
+		// Create claim w/ bigger size than original
+		originalSize := c.Status.Capacity.Storage()
+		biggerSize := originalSize.DeepCopy()
+		biggerSize.Add(resource.MustParse("1Gi"))
+
+		biggerROClaim := l.pvc.DeepCopy()
+		biggerROClaim.Name = "bigger-claim"
+	  biggerROClaim.Spec.Resources.Requests = v1.ResourceList{
+			v1.ResourceStorage: biggerSize,
+		}
+		biggerROClaim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
 
 		// Test expected content exists in restored volume
 		l.testCase.PvCheck = func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
@@ -611,63 +640,38 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}
 			e2evolume.TestVolumeClientSlow(ctx, f, testConfig, nil, "", tests)
 		}
-		l.testCase.Claim = sameSizeROClaim
-		l.testCase.TestDynamicProvisioning(ctx)
 
-		// Do not check fs size for block volumes
-		if pattern.VolMode == "Block" {
-			return
-		}
+		for _, claim := range []*v1.PersistentVolumeClaim{sameSizeROClaim, biggerROClaim} {
+			l.testCase.Claim = claim
+			l.testCase.TestDynamicProvisioning(ctx)
 
-		// Create + record the actual size of the original pv (from pvc status).
-		c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Failed to get pvc: %v", err)
-		actualPVSize := c.Status.Capacity.Storage().Value()
+			// Do not check fs size for block volumes
+			if pattern.VolMode == "Block" {
+				continue
+			}
 
-		createdClaims := []*v1.PersistentVolumeClaim{c}
-		pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
-		framework.ExpectNoError(err, "Failed to create pod: %v", err)
+			// Create pod to get mount path of fs
+			c, err = l.testCase.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "Failed to create pvc: %v", err)
+			createdClaims := []*v1.PersistentVolumeClaim{c}
+			pod, err := e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims, true, "")
+			framework.ExpectNoError(err, "Failed to create pod: %v", err)
 
-		// Mount path should not be empty.
-		mountpath := findVolumeMountPath(pod, c)
-		gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
+			// Mount path should not be empty.
+			mountpath := findVolumeMountPath(pod, c)
+			gomega.Expect(mountpath).ShouldNot(gomega.BeEmpty())
 
-		// Save filesystem size of the origin volume.
-		originFSSize, err := getFilesystemSizeBytes(pod, mountpath)
-		framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
+			// Get actual size of the restored filesystem.
+			restoredFSSize, err := getFilesystemSizeBytes(pod, mountpath)
+			framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
 
-		// For the new PVC, request a size that is larger than the origin PVC actually provisioned.
-		storageRequest := resource.NewQuantity(actualPVSize, resource.BinarySI)
-		storageRequest.Add(resource.MustParse("1Gi"))
-
-		biggerClaim := l.pvc.DeepCopy()
-		biggerClaim.Name = "bigger-claim"
-	  biggerClaim.Spec.Resources.Requests = v1.ResourceList{
-			v1.ResourceStorage: *storageRequest,
-		}
-		biggerClaim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.PersistentVolumeAccessMode(v1.ReadOnlyMany)}
-
-		// Create a new claim and a pod that will use the new PVC.
-		c2, err = l.testCase.Client.CoreV1().PersistentVolumeClaims(biggerClaim.Namespace).Create(ctx, biggerClaim, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create pvc: %v", err)
-		createdClaims2 = []*v1.PersistentVolumeClaim{c2}
-		pod2, err = e2epod.CreatePod(ctx, l.testCase.Client, f.Namespace.Name, nil, createdClaims2, true, "")
-		framework.ExpectNoError(err, "Failed to create pod: %v", err)
-
-		// Mount path should not be empty.
-		mountpath2 := findVolumeMountPath(pod2, c2)
-		gomega.Expect(mountpath2).ShouldNot(gomega.BeEmpty())
-
-		// Get actual size of the restored filesystem.
-		restoredFSSize, err := getFilesystemSizeBytes(pod2, mountpath2)
-		framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
-
-		// Filesystem of a restored volume should be larger than the origin.
-		msg := fmt.Sprintf("Filesystem resize occurred even though it is readonly. "+
+			// Filesystem of a restored volume should be larger than the origin.
+			msg := fmt.Sprintf("Filesystem resize occurred even though it is readonly. "+
 			"Restored fs size: %v bytes is not the same as origin fs size: %v bytes.\n"+
 			"HINT: Your driver needs to check the volume and skip resize if it's readonly.",
 			restoredFSSize, originFSSize)
-		gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
+			gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
+		}
 	})
 
 
