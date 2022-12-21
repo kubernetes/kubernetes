@@ -41,6 +41,11 @@ func TestCPUSetBuilder(t *testing.T) {
 
 	b.Add(6)
 	require.False(t, result.Contains(6), "expected calls to Add after calling Result() to have no effect")
+
+	clone := result.Clone()
+	if len(elems) != clone.Size() {
+		t.Fatalf("expected clone cpuset %s to have the same size as %v", clone, elems)
+	}
 }
 
 func TestCPUSetSize(t *testing.T) {
@@ -161,7 +166,9 @@ func TestCPUSetIsSubsetOf(t *testing.T) {
 	shouldNotBeSubset := []struct {
 		s1 CPUSet
 		s2 CPUSet
-	}{}
+	}{
+		{NewCPUSet(5), NewCPUSet(6, 7, 8)},
+	}
 
 	for _, c := range shouldBeSubset {
 		if !c.s1.IsSubsetOf(c.s2) {
@@ -292,18 +299,23 @@ func TestCPUSetDifference(t *testing.T) {
 
 func TestCPUSetToSlice(t *testing.T) {
 	testCases := []struct {
-		set      CPUSet
-		expected []int
+		set           CPUSet
+		expected      []int
+		expectedInt64 []int64
 	}{
-		{NewCPUSet(), []int{}},
-		{NewCPUSet(5), []int{5}},
-		{NewCPUSet(1, 2, 3, 4, 5), []int{1, 2, 3, 4, 5}},
+		{NewCPUSet(), []int{}, []int64{}},
+		{NewCPUSet(5), []int{5}, []int64{5}},
+		{NewCPUSet(2, 3, 5, 1, 4), []int{1, 2, 3, 4, 5}, []int64{1, 2, 3, 4, 5}},
 	}
 
 	for _, c := range testCases {
 		result := c.set.ToSlice()
 		if !reflect.DeepEqual(result, c.expected) {
 			t.Fatalf("expected set as slice to be [%v] (got [%v]), s: [%v]", c.expected, result, c.set)
+		}
+		resultInt64 := c.set.ToSliceInt64()
+		if !reflect.DeepEqual(resultInt64, c.expectedInt64) {
+			t.Fatalf("expected set as slice to be [%v] (got [%v]), s: [%v]", c.expectedInt64, resultInt64, c.set)
 		}
 	}
 }
@@ -365,6 +377,23 @@ func TestParse(t *testing.T) {
 		result, err := Parse(c)
 		if err == nil {
 			t.Fatalf("expected parse failure of \"%s\", but it succeeded as \"%s\"", c, result.String())
+		}
+	}
+}
+
+func TestNewCPUSetInt64(t *testing.T) {
+	for _, test := range []struct {
+		set      CPUSet
+		expected string
+	}{
+		{NewCPUSetInt64(), ""},
+		{NewCPUSetInt64(5), "5"},
+		{NewCPUSetInt64(4, 3, 2, 1), "1-4"},
+		{NewCPUSetInt64(1, 2, 3, 5, 6, 7, 8, 10), "1-3,5-8,10"},
+	} {
+		result := test.set.String()
+		if result != test.expected {
+			t.Fatalf("expected set as string to be %s (got \"%s\"), s: [%v]", test.expected, result, test.set)
 		}
 	}
 }
