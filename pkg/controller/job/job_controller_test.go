@@ -141,9 +141,7 @@ func newPodList(count int, status v1.PodPhase, job *batch.Job) []*v1.Pod {
 	for i := 0; i < count; i++ {
 		newPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
 		newPod.Status = v1.PodStatus{Phase: status}
-		if hasJobTrackingAnnotation(job) {
-			newPod.Finalizers = append(newPod.Finalizers, batch.JobTrackingFinalizer)
-		}
+		newPod.Finalizers = append(newPod.Finalizers, batch.JobTrackingFinalizer)
 		pods = append(pods, newPod)
 	}
 	return pods
@@ -184,9 +182,7 @@ func setPodsStatusesWithIndexes(podIndexer cache.Indexer, job *batch.Job, status
 			}
 			p.Spec.Hostname = fmt.Sprintf("%s-%s", job.Name, s.Index)
 		}
-		if hasJobTrackingAnnotation(job) {
-			p.Finalizers = append(p.Finalizers, batch.JobTrackingFinalizer)
-		}
+		p.Finalizers = append(p.Finalizers, batch.JobTrackingFinalizer)
 		podIndexer.Add(p)
 	}
 }
@@ -206,9 +202,6 @@ func TestControllerSyncJob(t *testing.T) {
 		completionMode batch.CompletionMode
 		wasSuspended   bool
 		suspend        bool
-
-		// If set, it means that the case is exclusive to tracking with/without finalizers.
-		wFinalizersExclusive *bool
 
 		// pod setup
 		podControllerError        error
@@ -495,7 +488,6 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedPodPatches:      1,
 		},
 		"job failures, unsatisfied expectations": {
-			wFinalizersExclusive:      pointer.Bool(true),
 			parallelism:               2,
 			completions:               5,
 			deleting:                  true,
@@ -725,175 +717,161 @@ func TestControllerSyncJob(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		for _, wFinalizers := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s, finalizers=%t", name, wFinalizers), func(t *testing.T) {
-				if wFinalizers && tc.podControllerError != nil {
-					t.Skip("Can't track status if finalizers can't be removed")
-				}
-				if tc.wFinalizersExclusive != nil && *tc.wFinalizersExclusive != wFinalizers {
-					t.Skipf("Test is exclusive for wFinalizers=%t", *tc.wFinalizersExclusive)
-				}
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
+		t.Run(name, func(t *testing.T) {
+			if tc.podControllerError != nil {
+				t.Skip("Can't track status if finalizers can't be removed")
+			}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 
-				// job manager setup
-				clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-				manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
-				fakePodControl := controller.FakePodControl{Err: tc.podControllerError, CreateLimit: tc.podLimit}
-				manager.podControl = &fakePodControl
-				manager.podStoreSynced = alwaysReady
-				manager.jobStoreSynced = alwaysReady
+			// job manager setup
+			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{Err: tc.podControllerError, CreateLimit: tc.podLimit}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
 
-				// job & pods setup
-				job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, tc.completionMode)
-				job.Spec.Suspend = pointer.Bool(tc.suspend)
-				key, err := controller.KeyFunc(job)
-				if err != nil {
-					t.Errorf("Unexpected error getting job key: %v", err)
-				}
-				if tc.fakeExpectationAtCreation < 0 {
-					manager.expectations.ExpectDeletions(key, int(-tc.fakeExpectationAtCreation))
-				} else if tc.fakeExpectationAtCreation > 0 {
-					manager.expectations.ExpectCreations(key, int(tc.fakeExpectationAtCreation))
-				}
-				if tc.wasSuspended {
-					job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended", realClock.Now()))
-				}
-				if wFinalizers {
-					job.Annotations = map[string]string{
-						batch.JobTrackingFinalizer: "",
-					}
-				}
-				if tc.deleting {
-					now := metav1.Now()
-					job.DeletionTimestamp = &now
-				}
-				sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-				podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-				setPodsStatuses(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods, tc.readyPods)
-				setPodsStatusesWithIndexes(podIndexer, job, tc.podsWithIndexes)
+			// job & pods setup
+			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, tc.completionMode)
+			job.Spec.Suspend = pointer.Bool(tc.suspend)
+			key, err := controller.KeyFunc(job)
+			if err != nil {
+				t.Errorf("Unexpected error getting job key: %v", err)
+			}
+			if tc.fakeExpectationAtCreation < 0 {
+				manager.expectations.ExpectDeletions(key, int(-tc.fakeExpectationAtCreation))
+			} else if tc.fakeExpectationAtCreation > 0 {
+				manager.expectations.ExpectCreations(key, int(tc.fakeExpectationAtCreation))
+			}
+			if tc.wasSuspended {
+				job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended", realClock.Now()))
+			}
+			if tc.deleting {
+				now := metav1.Now()
+				job.DeletionTimestamp = &now
+			}
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+			setPodsStatuses(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods, tc.readyPods)
+			setPodsStatusesWithIndexes(podIndexer, job, tc.podsWithIndexes)
 
-				actual := job
-				manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
-					actual = job
-					return job, nil
-				}
+			actual := job
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+				actual = job
+				return job, nil
+			}
 
-				// run
-				forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
+			// run
+			forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 
-				// We need requeue syncJob task if podController error
-				if tc.podControllerError != nil {
-					if err == nil {
-						t.Error("Syncing jobs expected to return error on podControl exception")
-					}
-				} else if tc.expectedCondition == nil && (hasValidFailingPods(tc.podsWithIndexes, int(tc.completions)) || (tc.completionMode != batch.IndexedCompletion && tc.failedPods > 0)) {
-					if err == nil {
-						t.Error("Syncing jobs expected to return error when there are new failed pods and Job didn't finish")
-					}
-				} else if tc.podLimit != 0 && fakePodControl.CreateCallCount > tc.podLimit {
-					if err == nil {
-						t.Error("Syncing jobs expected to return error when reached the podControl limit")
-					}
-				} else if err != nil {
-					t.Errorf("Unexpected error when syncing jobs: %v", err)
+			// We need requeue syncJob task if podController error
+			if tc.podControllerError != nil {
+				if err == nil {
+					t.Error("Syncing jobs expected to return error on podControl exception")
 				}
-				if forget != tc.jobKeyForget {
-					t.Errorf("Unexpected forget value. Expected %v, saw %v\n", tc.jobKeyForget, forget)
+			} else if tc.expectedCondition == nil && (hasValidFailingPods(tc.podsWithIndexes, int(tc.completions)) || (tc.completionMode != batch.IndexedCompletion && tc.failedPods > 0)) {
+				if err == nil {
+					t.Error("Syncing jobs expected to return error when there are new failed pods and Job didn't finish")
 				}
-				// validate created/deleted pods
-				if int32(len(fakePodControl.Templates)) != tc.expectedCreations {
-					t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.Templates))
+			} else if tc.podLimit != 0 && fakePodControl.CreateCallCount > tc.podLimit {
+				if err == nil {
+					t.Error("Syncing jobs expected to return error when reached the podControl limit")
 				}
-				if tc.completionMode == batch.IndexedCompletion {
-					checkIndexedJobPods(t, &fakePodControl, tc.expectedCreatedIndexes, job.Name)
-				} else {
-					for _, p := range fakePodControl.Templates {
-						// Fake pod control doesn't add generate name from the owner reference.
-						if p.GenerateName != "" {
-							t.Errorf("Got pod generate name %s, want %s", p.GenerateName, "")
-						}
-						if p.Spec.Hostname != "" {
-							t.Errorf("Got pod hostname %q, want none", p.Spec.Hostname)
-						}
+			} else if err != nil {
+				t.Errorf("Unexpected error when syncing jobs: %v", err)
+			}
+			if forget != tc.jobKeyForget {
+				t.Errorf("Unexpected forget value. Expected %v, saw %v\n", tc.jobKeyForget, forget)
+			}
+			// validate created/deleted pods
+			if int32(len(fakePodControl.Templates)) != tc.expectedCreations {
+				t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.Templates))
+			}
+			if tc.completionMode == batch.IndexedCompletion {
+				checkIndexedJobPods(t, &fakePodControl, tc.expectedCreatedIndexes, job.Name)
+			} else {
+				for _, p := range fakePodControl.Templates {
+					// Fake pod control doesn't add generate name from the owner reference.
+					if p.GenerateName != "" {
+						t.Errorf("Got pod generate name %s, want %s", p.GenerateName, "")
 					}
-				}
-				if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
-					t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", tc.expectedDeletions, len(fakePodControl.DeletePodName))
-				}
-				// Each create should have an accompanying ControllerRef.
-				if len(fakePodControl.ControllerRefs) != int(tc.expectedCreations) {
-					t.Errorf("Unexpected number of ControllerRefs.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.ControllerRefs))
-				}
-				// Make sure the ControllerRefs are correct.
-				for _, controllerRef := range fakePodControl.ControllerRefs {
-					if got, want := controllerRef.APIVersion, "batch/v1"; got != want {
-						t.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
-					}
-					if got, want := controllerRef.Kind, "Job"; got != want {
-						t.Errorf("controllerRef.Kind = %q, want %q", got, want)
-					}
-					if got, want := controllerRef.Name, job.Name; got != want {
-						t.Errorf("controllerRef.Name = %q, want %q", got, want)
-					}
-					if got, want := controllerRef.UID, job.UID; got != want {
-						t.Errorf("controllerRef.UID = %q, want %q", got, want)
-					}
-					if controllerRef.Controller == nil || *controllerRef.Controller != true {
-						t.Errorf("controllerRef.Controller is not set to true")
+					if p.Spec.Hostname != "" {
+						t.Errorf("Got pod hostname %q, want none", p.Spec.Hostname)
 					}
 				}
-				// validate status
-				if actual.Status.Active != tc.expectedActive {
-					t.Errorf("Unexpected number of active pods.  Expected %d, saw %d\n", tc.expectedActive, actual.Status.Active)
+			}
+			if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
+				t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", tc.expectedDeletions, len(fakePodControl.DeletePodName))
+			}
+			// Each create should have an accompanying ControllerRef.
+			if len(fakePodControl.ControllerRefs) != int(tc.expectedCreations) {
+				t.Errorf("Unexpected number of ControllerRefs.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.ControllerRefs))
+			}
+			// Make sure the ControllerRefs are correct.
+			for _, controllerRef := range fakePodControl.ControllerRefs {
+				if got, want := controllerRef.APIVersion, "batch/v1"; got != want {
+					t.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
 				}
-				if diff := cmp.Diff(tc.expectedReady, actual.Status.Ready); diff != "" {
-					t.Errorf("Unexpected number of ready pods (-want,+got): %s", diff)
+				if got, want := controllerRef.Kind, "Job"; got != want {
+					t.Errorf("controllerRef.Kind = %q, want %q", got, want)
 				}
-				if actual.Status.Succeeded != tc.expectedSucceeded {
-					t.Errorf("Unexpected number of succeeded pods.  Expected %d, saw %d\n", tc.expectedSucceeded, actual.Status.Succeeded)
+				if got, want := controllerRef.Name, job.Name; got != want {
+					t.Errorf("controllerRef.Name = %q, want %q", got, want)
 				}
-				if diff := cmp.Diff(tc.expectedCompletedIdxs, actual.Status.CompletedIndexes); diff != "" {
-					t.Errorf("Unexpected completed indexes (-want,+got):\n%s", diff)
+				if got, want := controllerRef.UID, job.UID; got != want {
+					t.Errorf("controllerRef.UID = %q, want %q", got, want)
 				}
-				if actual.Status.Failed != tc.expectedFailed {
-					t.Errorf("Unexpected number of failed pods.  Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
+				if controllerRef.Controller == nil || *controllerRef.Controller != true {
+					t.Errorf("controllerRef.Controller is not set to true")
 				}
-				if actual.Status.StartTime != nil && tc.suspend {
-					t.Error("Unexpected .status.startTime not nil when suspend is true")
+			}
+			// validate status
+			if actual.Status.Active != tc.expectedActive {
+				t.Errorf("Unexpected number of active pods.  Expected %d, saw %d\n", tc.expectedActive, actual.Status.Active)
+			}
+			if diff := cmp.Diff(tc.expectedReady, actual.Status.Ready); diff != "" {
+				t.Errorf("Unexpected number of ready pods (-want,+got): %s", diff)
+			}
+			if actual.Status.Succeeded != tc.expectedSucceeded {
+				t.Errorf("Unexpected number of succeeded pods.  Expected %d, saw %d\n", tc.expectedSucceeded, actual.Status.Succeeded)
+			}
+			if diff := cmp.Diff(tc.expectedCompletedIdxs, actual.Status.CompletedIndexes); diff != "" {
+				t.Errorf("Unexpected completed indexes (-want,+got):\n%s", diff)
+			}
+			if actual.Status.Failed != tc.expectedFailed {
+				t.Errorf("Unexpected number of failed pods.  Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
+			}
+			if actual.Status.StartTime != nil && tc.suspend {
+				t.Error("Unexpected .status.startTime not nil when suspend is true")
+			}
+			if actual.Status.StartTime == nil && !tc.suspend {
+				t.Error("Missing .status.startTime")
+			}
+			// validate conditions
+			if tc.expectedCondition != nil {
+				if !getCondition(actual, *tc.expectedCondition, tc.expectedConditionStatus, tc.expectedConditionReason) {
+					t.Errorf("Expected completion condition.  Got %#v", actual.Status.Conditions)
 				}
-				if actual.Status.StartTime == nil && !tc.suspend {
-					t.Error("Missing .status.startTime")
+			} else {
+				if cond := hasTrueCondition(actual); cond != nil {
+					t.Errorf("Got condition %s, want none", *cond)
 				}
-				// validate conditions
-				if tc.expectedCondition != nil {
-					if !getCondition(actual, *tc.expectedCondition, tc.expectedConditionStatus, tc.expectedConditionReason) {
-						t.Errorf("Expected completion condition.  Got %#v", actual.Status.Conditions)
-					}
-				} else {
-					if cond := hasTrueCondition(actual); cond != nil {
-						t.Errorf("Got condition %s, want none", *cond)
-					}
-				}
-				if tc.expectedCondition == nil && tc.suspend && len(actual.Status.Conditions) != 0 {
-					t.Errorf("Unexpected conditions %v", actual.Status.Conditions)
-				}
-				// validate slow start
-				expectedLimit := 0
-				for pass := uint8(0); expectedLimit <= tc.podLimit; pass++ {
-					expectedLimit += controller.SlowStartInitialBatchSize << pass
-				}
-				if tc.podLimit > 0 && fakePodControl.CreateCallCount > expectedLimit {
-					t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", fakePodControl.CreateLimit*2, fakePodControl.CreateCallCount)
-				}
-				wantPodPatches := 0
-				if wFinalizers {
-					wantPodPatches = tc.expectedPodPatches
-				}
-				if p := len(fakePodControl.Patches); p != wantPodPatches {
-					t.Errorf("Got %d pod patches, want %d", p, wantPodPatches)
-				}
-			})
-		}
+			}
+			if tc.expectedCondition == nil && tc.suspend && len(actual.Status.Conditions) != 0 {
+				t.Errorf("Unexpected conditions %v", actual.Status.Conditions)
+			}
+			// validate slow start
+			expectedLimit := 0
+			for pass := uint8(0); expectedLimit <= tc.podLimit; pass++ {
+				expectedLimit += controller.SlowStartInitialBatchSize << pass
+			}
+			if tc.podLimit > 0 && fakePodControl.CreateCallCount > expectedLimit {
+				t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", fakePodControl.CreateLimit*2, fakePodControl.CreateCallCount)
+			}
+			if p := len(fakePodControl.Patches); p != tc.expectedPodPatches {
+				t.Errorf("Got %d pod patches, want %d", p, tc.expectedPodPatches)
+			}
+		})
 	}
 }
 
@@ -922,94 +900,6 @@ func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantI
 	}
 }
 
-// TestSyncJobLegacyTracking makes sure that a Job is only tracked with
-// finalizers when the job has the annotation.
-func TestSyncJobLegacyTracking(t *testing.T) {
-	cases := map[string]struct {
-		job           batch.Job
-		wantUncounted bool
-		wantPatches   int
-	}{
-		"no annotation": {
-			job: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "ns",
-				},
-				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32(1),
-				},
-			},
-		},
-		"tracking annotation": {
-			job: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-					},
-				},
-				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32(1),
-				},
-			},
-			wantUncounted: true,
-		},
-		"different annotation": {
-			job: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						"foo": "bar",
-					},
-				},
-				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32(1),
-				},
-			},
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			// Job manager setup.
-			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-			manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
-			fakePodControl := controller.FakePodControl{}
-			manager.podControl = &fakePodControl
-			manager.podStoreSynced = alwaysReady
-			manager.jobStoreSynced = alwaysReady
-			jobPatches := 0
-			manager.patchJobHandler = func(context.Context, *batch.Job, []byte) error {
-				jobPatches++
-				return nil
-			}
-			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(&tc.job)
-
-			var actual *batch.Job
-			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
-				actual = job
-				return job, nil
-			}
-
-			// Run.
-			_, err := manager.syncJob(context.TODO(), testutil.GetKey(&tc.job, t))
-			if err != nil {
-				t.Fatalf("Syncing job: %v", err)
-			}
-
-			// Checks.
-			if got := actual.Status.UncountedTerminatedPods != nil; got != tc.wantUncounted {
-				t.Errorf("Job got uncounted pods %t, want %t", got, tc.wantUncounted)
-			}
-			if jobPatches != tc.wantPatches {
-				t.Errorf("Sync did %d patches, want %d", jobPatches, tc.wantPatches)
-			}
-		})
-	}
-}
-
 func TestGetStatus(t *testing.T) {
 	cases := map[string]struct {
 		job                  batch.Job
@@ -1018,24 +908,6 @@ func TestGetStatus(t *testing.T) {
 		wantSucceeded        int32
 		wantFailed           int32
 	}{
-		"without finalizers": {
-			job: batch.Job{
-				Status: batch.JobStatus{
-					Succeeded: 1,
-					Failed:    2,
-				},
-			},
-			pods: []*v1.Pod{
-				buildPod().uid("a").phase(v1.PodSucceeded).Pod,
-				buildPod().uid("b").phase(v1.PodSucceeded).Pod,
-				buildPod().uid("c").phase(v1.PodFailed).Pod,
-				buildPod().uid("d").phase(v1.PodFailed).Pod,
-				buildPod().uid("e").phase(v1.PodFailed).Pod,
-				buildPod().uid("f").phase(v1.PodRunning).Pod,
-			},
-			wantSucceeded: 2,
-			wantFailed:    3,
-		},
 		"some counted": {
 			job: batch.Job{
 				Status: batch.JobStatus{
@@ -1103,16 +975,6 @@ func TestGetStatus(t *testing.T) {
 			wantFailed:    5,
 		},
 		"deleted pods": {
-			pods: []*v1.Pod{
-				buildPod().uid("a").phase(v1.PodSucceeded).deletionTimestamp().Pod,
-				buildPod().uid("b").phase(v1.PodFailed).deletionTimestamp().Pod,
-				buildPod().uid("c").phase(v1.PodRunning).deletionTimestamp().Pod,
-				buildPod().uid("d").phase(v1.PodPending).deletionTimestamp().Pod,
-			},
-			wantSucceeded: 1,
-			wantFailed:    1,
-		},
-		"deleted pods, tracking with finalizers": {
 			job: batch.Job{
 				Status: batch.JobStatus{
 					Succeeded:               1,
@@ -1134,10 +996,7 @@ func TestGetStatus(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			var uncounted *uncountedTerminatedPods
-			if tc.job.Status.UncountedTerminatedPods != nil {
-				uncounted = newUncountedTerminatedPods(*tc.job.Status.UncountedTerminatedPods)
-			}
+			uncounted := newUncountedTerminatedPods(*tc.job.Status.UncountedTerminatedPods)
 			succeeded, failed := getStatus(&tc.job, tc.pods, uncounted, tc.expectedRmFinalizers)
 			if succeeded != tc.wantSucceeded {
 				t.Errorf("getStatus reports %d succeeded pods, want %d", succeeded, tc.wantSucceeded)
@@ -1869,9 +1728,6 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 				start := metav1.NewTime(fakeClock.Now())
 				job.Status.StartTime = &start
 			}
-			job.Annotations = map[string]string{
-				batch.JobTrackingFinalizer: "",
-			}
 
 			_, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
 			if err != nil {
@@ -2063,7 +1919,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		wFinalizersExclusive          *bool
 		enableJobPodFailurePolicy     bool
 		enablePodDisruptionConditions bool
 		job                           batch.Job
@@ -2949,7 +2804,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"terminating Pod considered failed when PodDisruptionConditions is disabled": {
-			wFinalizersExclusive:      pointer.Bool(true),
 			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
@@ -3030,76 +2884,63 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusActive: 1, // This is a replacement Pod: the terminating Pod is neither active nor failed.
 		},
 	}
-	for _, wFinalizers := range []bool{false, true} {
-		for name, tc := range testCases {
-			t.Run(fmt.Sprintf("%s; finalizers=%t", name, wFinalizers), func(t *testing.T) {
-				if tc.wFinalizersExclusive != nil && *tc.wFinalizersExclusive != wFinalizers {
-					t.Skipf("Test is exclusive for wFinalizers=%t", *tc.wFinalizersExclusive)
-				}
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
-				clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-				manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
-				fakePodControl := controller.FakePodControl{}
-				manager.podControl = &fakePodControl
-				manager.podStoreSynced = alwaysReady
-				manager.jobStoreSynced = alwaysReady
-				job := &tc.job
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
+			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			job := &tc.job
 
-				if wFinalizers {
-					job.Annotations = map[string]string{
-						batch.JobTrackingFinalizer: "",
-					}
+			actual := job
+			manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+				actual = job
+				return job, nil
+			}
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			for i, pod := range tc.pods {
+				pod := pod
+				pb := podBuilder{Pod: &pod}.name(fmt.Sprintf("mypod-%d", i)).job(job)
+				if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion {
+					pb.index(fmt.Sprintf("%v", i))
 				}
+				pb = pb.trackingFinalizer()
+				sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer().Add(pb.Pod)
+			}
 
-				actual := job
-				manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
-					actual = job
-					return job, nil
-				}
-				sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-				for i, pod := range tc.pods {
-					pod := pod
-					pb := podBuilder{Pod: &pod}.name(fmt.Sprintf("mypod-%d", i)).job(job)
-					if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion {
-						pb.index(fmt.Sprintf("%v", i))
-					}
-					if wFinalizers {
-						pb.trackingFinalizer()
-					}
-					sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer().Add(pb.Pod)
-				}
+			manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 
-				manager.syncJob(context.TODO(), testutil.GetKey(job, t))
-
-				if tc.wantConditions != nil {
-					for _, wantCondition := range *tc.wantConditions {
-						conditions := getConditionsByType(actual.Status.Conditions, wantCondition.Type)
-						if len(conditions) != 1 {
-							t.Fatalf("Expected a single completion condition. Got %#v for type: %q", conditions, wantCondition.Type)
-						}
-						condition := *conditions[0]
-						if diff := cmp.Diff(wantCondition, condition, cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
-							t.Errorf("Unexpected job condition (-want,+got):\n%s", diff)
-						}
+			if tc.wantConditions != nil {
+				for _, wantCondition := range *tc.wantConditions {
+					conditions := getConditionsByType(actual.Status.Conditions, wantCondition.Type)
+					if len(conditions) != 1 {
+						t.Fatalf("Expected a single completion condition. Got %#v for type: %q", conditions, wantCondition.Type)
 					}
-				} else {
-					if cond := hasTrueCondition(actual); cond != nil {
-						t.Errorf("Got condition %s, want none", *cond)
+					condition := *conditions[0]
+					if diff := cmp.Diff(wantCondition, condition, cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+						t.Errorf("Unexpected job condition (-want,+got):\n%s", diff)
 					}
 				}
-				// validate status
-				if actual.Status.Active != tc.wantStatusActive {
-					t.Errorf("unexpected number of active pods. Expected %d, saw %d\n", tc.wantStatusActive, actual.Status.Active)
+			} else {
+				if cond := hasTrueCondition(actual); cond != nil {
+					t.Errorf("Got condition %s, want none", *cond)
 				}
-				if actual.Status.Succeeded != tc.wantStatusSucceeded {
-					t.Errorf("unexpected number of succeeded pods. Expected %d, saw %d\n", tc.wantStatusSucceeded, actual.Status.Succeeded)
-				}
-				if actual.Status.Failed != tc.wantStatusFailed {
-					t.Errorf("unexpected number of failed pods. Expected %d, saw %d\n", tc.wantStatusFailed, actual.Status.Failed)
-				}
-			})
-		}
+			}
+			// validate status
+			if actual.Status.Active != tc.wantStatusActive {
+				t.Errorf("unexpected number of active pods. Expected %d, saw %d\n", tc.wantStatusActive, actual.Status.Active)
+			}
+			if actual.Status.Succeeded != tc.wantStatusSucceeded {
+				t.Errorf("unexpected number of succeeded pods. Expected %d, saw %d\n", tc.wantStatusSucceeded, actual.Status.Succeeded)
+			}
+			if actual.Status.Failed != tc.wantStatusFailed {
+				t.Errorf("unexpected number of failed pods. Expected %d, saw %d\n", tc.wantStatusFailed, actual.Status.Failed)
+			}
+		})
 	}
 }
 
@@ -3291,50 +3132,46 @@ func TestGetPodsForJob(t *testing.T) {
 		},
 	}
 	for name, tc := range cases {
-		for _, wFinalizers := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s, finalizers=%t", name, wFinalizers), func(t *testing.T) {
-				job := job.DeepCopy()
-				if tc.jobDeleted {
-					job.DeletionTimestamp = &metav1.Time{}
-				}
-				clientSet := fake.NewSimpleClientset(job, otherJob)
-				jm, informer := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
-				jm.podStoreSynced = alwaysReady
-				jm.jobStoreSynced = alwaysReady
-				cachedJob := job.DeepCopy()
-				if tc.jobDeletedInCache {
-					cachedJob.DeletionTimestamp = &metav1.Time{}
-				}
-				informer.Batch().V1().Jobs().Informer().GetIndexer().Add(cachedJob)
-				informer.Batch().V1().Jobs().Informer().GetIndexer().Add(otherJob)
-				for _, p := range tc.pods {
-					informer.Core().V1().Pods().Informer().GetIndexer().Add(p)
-				}
+		t.Run(name, func(t *testing.T) {
+			job := job.DeepCopy()
+			if tc.jobDeleted {
+				job.DeletionTimestamp = &metav1.Time{}
+			}
+			clientSet := fake.NewSimpleClientset(job, otherJob)
+			jm, informer := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
+			jm.podStoreSynced = alwaysReady
+			jm.jobStoreSynced = alwaysReady
+			cachedJob := job.DeepCopy()
+			if tc.jobDeletedInCache {
+				cachedJob.DeletionTimestamp = &metav1.Time{}
+			}
+			informer.Batch().V1().Jobs().Informer().GetIndexer().Add(cachedJob)
+			informer.Batch().V1().Jobs().Informer().GetIndexer().Add(otherJob)
+			for _, p := range tc.pods {
+				informer.Core().V1().Pods().Informer().GetIndexer().Add(p)
+			}
 
-				pods, err := jm.getPodsForJob(context.TODO(), job, wFinalizers)
-				if err != nil {
-					t.Fatalf("getPodsForJob() error: %v", err)
+			pods, err := jm.getPodsForJob(context.TODO(), job)
+			if err != nil {
+				t.Fatalf("getPodsForJob() error: %v", err)
+			}
+			got := make([]string, len(pods))
+			var gotFinalizer []string
+			for i, p := range pods {
+				got[i] = p.Name
+				if hasJobTrackingFinalizer(p) {
+					gotFinalizer = append(gotFinalizer, p.Name)
 				}
-				got := make([]string, len(pods))
-				var gotFinalizer []string
-				for i, p := range pods {
-					got[i] = p.Name
-					if hasJobTrackingFinalizer(p) {
-						gotFinalizer = append(gotFinalizer, p.Name)
-					}
-				}
-				sort.Strings(got)
-				if diff := cmp.Diff(tc.wantPods, got); diff != "" {
-					t.Errorf("getPodsForJob() returned (-want,+got):\n%s", diff)
-				}
-				if wFinalizers {
-					sort.Strings(gotFinalizer)
-					if diff := cmp.Diff(tc.wantPodsFinalizer, gotFinalizer); diff != "" {
-						t.Errorf("Pods with finalizers (-want,+got):\n%s", diff)
-					}
-				}
-			})
-		}
+			}
+			sort.Strings(got)
+			if diff := cmp.Diff(tc.wantPods, got); diff != "" {
+				t.Errorf("getPodsForJob() returned (-want,+got):\n%s", diff)
+			}
+			sort.Strings(gotFinalizer)
+			if diff := cmp.Diff(tc.wantPodsFinalizer, gotFinalizer); diff != "" {
+				t.Errorf("Pods with finalizers (-want,+got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -4337,9 +4174,6 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	}
 
 	job := newJob(2, 2, 6, batch.NonIndexedCompletion)
-	job.Annotations = map[string]string{
-		batch.JobTrackingFinalizer: "",
-	}
 	sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	pods := append(newPodList(2, v1.PodSucceeded, job), newPodList(2, v1.PodFailed, job)...)
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
