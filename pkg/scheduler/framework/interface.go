@@ -278,8 +278,7 @@ func AsStatus(err error) *Status {
 	}
 }
 
-// PluginToStatus maps plugin name to status. Currently used to identify which Filter plugin
-// returned which status.
+// PluginToStatus maps plugin name to status it returned.
 type PluginToStatus map[string]*Status
 
 // Merge merges the statuses in the map into one. The resulting status code have the following
