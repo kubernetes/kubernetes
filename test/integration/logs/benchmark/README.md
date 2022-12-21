@@ -6,7 +6,7 @@ must be benchmarked before and after the change.
 ## Running the benchmark
 
 ```
-$ go test -bench=. -test.benchmem -benchmem .
+go test -v -bench=. -benchmem -benchtime=10s .
 ```
 
 ## Real log data
@@ -59,5 +59,5 @@ While loading a file, some statistics about it are collected. Those are shown
 when running with:
 
 ```
-$ go test -v -bench=. -test.benchmem -benchmem .
+go test -v -bench=BenchmarkEncoding/none -run=none  .
 ```

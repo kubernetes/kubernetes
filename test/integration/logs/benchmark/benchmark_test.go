@@ -70,11 +70,6 @@ func BenchmarkEncoding(b *testing.B) {
 				v, _ = strconv.Atoi(vMatch[1])
 			}
 			fileSizes := map[string]int{}
-			b.Run("stats", func(b *testing.B) {
-				// Nothing to do. Use this for "go test -v
-				// -bench=BenchmarkLogging/.*/stats" to print
-				// just the statistics.
-			})
 			b.Run("printf", func(b *testing.B) {
 				b.ResetTimer()
 				output = 0
