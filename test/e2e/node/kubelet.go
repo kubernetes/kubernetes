@@ -19,7 +19,6 @@ package node
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -451,82 +450,4 @@ var _ = SIGDescribe("kubelet", func() {
 			}
 		})
 	})
-
-	//Test kubectl alpha node-logs <node-name> commands
-	ginkgo.Describe("kubectl node-logs <node-name> [Feature:add node log viewer]", func() {
-		var (
-			numNodes  int
-			nodeNames sets.String
-		)
-
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, c, maxNodesToCheck)
-			numNodes = len(nodes.Items)
-			framework.ExpectNoError(err)
-			nodeNames = sets.NewString()
-			for i := 0; i < numNodes; i++ {
-				nodeNames.Insert(nodes.Items[i].Name)
-			}
-		})
-
-		/*
-			Test if kubectl node-logs <node-name>
-			returns something or not!
-		*/
-
-		ginkgo.It("should return the logs ", func(ctx context.Context) {
-			ginkgo.By("Starting the command")
-			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
-
-			for nodeName := range nodeNames {
-				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName)
-				runKubectlCommand(cmd, "")
-			}
-		})
-
-		/*
-			Test if kubectl node-logs <node-name> --service kubelet
-			returns something or not!
-		*/
-
-		ginkgo.It("should return the logs for the requested service", func(ctx context.Context) {
-			ginkgo.By("Starting the command")
-			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
-
-			for nodeName := range nodeNames {
-				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName, "--service", "kubelet")
-				runKubectlCommand(cmd, "--service")
-			}
-		})
-
-		/*
-			Test if kubectl node-logs <node-name> --path pods
-			returns something or not!
-		*/
-
-		ginkgo.It("should return the logs for the provided path", func(ctx context.Context) {
-			ginkgo.By("Starting the command")
-			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
-
-			for nodeName := range nodeNames {
-				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName, "--path", "pods")
-				runKubectlCommand(cmd, "--path")
-			}
-		})
-	})
 })
-
-func runKubectlCommand(cmd *exec.Cmd, arg string) {
-	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
-	if err != nil {
-		framework.Failf("Failed to start kubectl command: %v", err)
-	}
-	defer stdout.Close()
-	defer stderr.Close()
-	defer framework.TryKill(cmd)
-	buf := make([]byte, 128)
-	if _, err = stdout.Read(buf); err != nil {
-		framework.Failf("Expected output from kubectl alpha node-logs %s: %v", arg, err)
-	}
-	framework.Logf("output: %s", buf)
-}
