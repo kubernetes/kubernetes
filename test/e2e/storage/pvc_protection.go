@@ -95,7 +95,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 
 		ginkgo.By("Creating a Pod that becomes Running and therefore is actively using the PVC")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-		pod, err = e2epod.CreatePod(ctx, client, nameSpace, nil, pvcClaims, false, "")
+		pod, err = e2epod.CreatePod(ctx, client, nameSpace, nil, pvcClaims, false, "", false)
 		framework.ExpectNoError(err, "While creating pod that uses the PVC or waiting for the Pod to become Running")
 
 		ginkgo.By("Waiting for PVC to become Bound")

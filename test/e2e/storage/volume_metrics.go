@@ -892,7 +892,7 @@ func waitForADControllerStatesMetrics(ctx context.Context, metricsGrabber *e2eme
 // generic ephemeral volume claim template.
 func makePod(ns string, pvc *v1.PersistentVolumeClaim, isEphemeral bool) *v1.Pod {
 	claims := []*v1.PersistentVolumeClaim{pvc}
-	pod := e2epod.MakePod(ns, nil, claims, false, "")
+	pod := e2epod.MakePod(ns, nil, claims, false, "", false)
 	if isEphemeral {
 		volSrc := pod.Spec.Volumes[0]
 		volSrc.PersistentVolumeClaim = nil

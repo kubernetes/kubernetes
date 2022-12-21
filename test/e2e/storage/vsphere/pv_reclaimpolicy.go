@@ -113,7 +113,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			framework.ExpectNoError(e2epv.WaitOnPVandPVC(ctx, c, f.Timeouts, ns, pv, pvc))
 
 			ginkgo.By("Creating the Pod")
-			pod, err := e2epod.CreateClientPod(ctx, c, ns, pvc)
+			pod, err := e2epod.CreateClientPod(ctx, c, ns, pvc, false)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Deleting the Claim")

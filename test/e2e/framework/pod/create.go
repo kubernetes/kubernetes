@@ -53,7 +53,7 @@ type Config struct {
 
 // CreateUnschedulablePod with given claims based on node selector
 func CreateUnschedulablePod(ctx context.Context, client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
-	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
+	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command, false)
 	pod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
@@ -72,13 +72,13 @@ func CreateUnschedulablePod(ctx context.Context, client clientset.Interface, nam
 }
 
 // CreateClientPod defines and creates a pod with a mounted PV. Pod runs infinite loop until killed.
-func CreateClientPod(ctx context.Context, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
-	return CreatePod(ctx, c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
+func CreateClientPod(ctx context.Context, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, readonlyPVCs bool) (*v1.Pod, error) {
+	return CreatePod(ctx, c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "", readonlyPVCs)
 }
 
 // CreatePod with given claims based on node selector
-func CreatePod(ctx context.Context, client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
-	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
+func CreatePod(ctx context.Context, client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, readonlyPVCs bool) (*v1.Pod, error) {
+	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command, readonlyPVCs)
 	pod, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
@@ -128,7 +128,7 @@ func CreateSecPodWithNodeSelection(ctx context.Context, client clientset.Interfa
 
 // MakePod returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
-func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
+func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, readonlyPVCs bool) *v1.Pod {
 	if len(command) == 0 {
 		command = "trap exit TERM; while true; do sleep 1; done"
 	}
@@ -153,7 +153,7 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
 	}
-	setVolumes(&podSpec.Spec, pvclaims, nil /*inline volume sources*/, false /*PVCs readonly*/)
+	setVolumes(&podSpec.Spec, pvclaims, nil /*inline volume sources*/, readonlyPVCs)
 	if nodeSelector != nil {
 		podSpec.Spec.NodeSelector = nodeSelector
 	}
@@ -231,7 +231,7 @@ func setVolumes(podSpec *v1.PodSpec, pvcs []*v1.PersistentVolumeClaim, inlineVol
 		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == v1.PersistentVolumeBlock {
 			volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: volumename, DevicePath: volumeMountPath})
 		} else {
-			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: volumeMountPath})
+			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: volumeMountPath, ReadOnly: pvcsReadOnly})
 		}
 		volumes[volumeIndex] = v1.Volume{
 			Name: volumename,
@@ -248,7 +248,7 @@ func setVolumes(podSpec *v1.PodSpec, pvcs []*v1.PersistentVolumeClaim, inlineVol
 		volumename := fmt.Sprintf("volume%v", volumeIndex+1)
 		volumeMountPath := fmt.Sprintf(VolumeMountPathTemplate, volumeIndex+1)
 		// In-line volumes can be only filesystem, not block.
-		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: volumeMountPath})
+		volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: volumeMountPath, ReadOnly: pvcsReadOnly})
 		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: *src}
 		volumeIndex++
 	}

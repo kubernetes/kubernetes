@@ -398,7 +398,7 @@ func verifyPVCAndPodCreationSucceeds(ctx context.Context, client clientset.Inter
 	}
 
 	ginkgo.By("Creating pod to attach PV to the node")
-	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, "")
+	pod, err := e2epod.CreatePod(ctx, client, namespace, nil, pvclaims, false, "", false)
 	framework.ExpectNoError(err)
 
 	if volumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
@@ -434,7 +434,7 @@ func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(ctx context.Contex
 	pvclaims = append(pvclaims, pvclaim)
 
 	ginkgo.By("Creating a pod")
-	pod := e2epod.MakePod(namespace, nil, pvclaims, false, "")
+	pod := e2epod.MakePod(namespace, nil, pvclaims, false, "", false)
 	pod, err = client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, client, pod)
