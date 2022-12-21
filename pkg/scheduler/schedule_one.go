@@ -126,46 +126,45 @@ func (sched *Scheduler) schedulingCycle(
 	start time.Time,
 	podsToActivate *framework.PodsToActivate,
 ) (ScheduleResult, *framework.QueuedPodInfo, *framework.Status) {
-
 	pod := podInfo.Pod
 	scheduleResult, err := sched.SchedulePod(ctx, fwk, state, pod)
 	if err != nil {
+		if err == ErrNoNodesAvailable {
+			status := framework.NewStatus(framework.UnschedulableAndUnresolvable).WithError(err)
+			return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, status
+		}
+
+		fitError, ok := err.(*framework.FitError)
+		if !ok {
+			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
+			return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, framework.AsStatus(err)
+		}
+
 		// SchedulePod() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
 		// will fit due to the preemption. It is also possible that a different pod will schedule
 		// into the resources that were preempted, but this is harmless.
-		var (
-			nominatingInfo *framework.NominatingInfo
-			status         *framework.Status
-		)
-		if fitError, ok := err.(*framework.FitError); ok {
-			if !fwk.HasPostFilterPlugins() {
-				klog.V(3).InfoS("No PostFilter plugins are registered, so no preemption will be performed")
-			} else {
-				// Run PostFilter plugins to try to make the pod schedulable in a future scheduling cycle.
-				result, status := fwk.RunPostFilterPlugins(ctx, state, pod, fitError.Diagnosis.NodeToStatusMap)
-				if status.Code() == framework.Error {
-					klog.ErrorS(nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
-				} else {
-					msg := status.Message()
-					fitError.Diagnosis.PostFilterMsg = msg
-					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
-				}
-				if result != nil {
-					nominatingInfo = result.NominatingInfo
-				}
-			}
-			status = framework.NewStatus(framework.Unschedulable).WithError(err)
-		} else if err == ErrNoNodesAvailable {
-			nominatingInfo = clearNominatedNode
-			status = framework.NewStatus(framework.UnschedulableAndUnresolvable).WithError(err)
-		} else {
-			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
-			nominatingInfo = clearNominatedNode
-			status = framework.AsStatus(err)
+
+		if !fwk.HasPostFilterPlugins() {
+			klog.V(3).InfoS("No PostFilter plugins are registered, so no preemption will be performed")
+			return ScheduleResult{}, podInfo, framework.NewStatus(framework.Unschedulable).WithError(err)
 		}
 
-		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, status
+		// Run PostFilter plugins to attempt to make the pod schedulable in a future scheduling cycle.
+		result, status := fwk.RunPostFilterPlugins(ctx, state, pod, fitError.Diagnosis.NodeToStatusMap)
+		msg := status.Message()
+		fitError.Diagnosis.PostFilterMsg = msg
+		if status.Code() == framework.Error {
+			klog.ErrorS(nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
+		} else {
+			klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
+		}
+
+		var nominatingInfo *framework.NominatingInfo
+		if result != nil {
+			nominatingInfo = result.NominatingInfo
+		}
+		return ScheduleResult{nominatingInfo: nominatingInfo}, podInfo, framework.NewStatus(framework.Unschedulable).WithError(err)
 	}
 
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
