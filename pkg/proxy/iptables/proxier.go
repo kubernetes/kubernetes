@@ -948,21 +948,6 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	proxier.largeClusterMode = (totalEndpoints > largeClusterEndpointsThreshold)
 
-	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
-	if err != nil {
-		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
-	}
-	// nodeAddresses may contain dual-stack zero-CIDRs if proxier.nodePortAddresses is empty.
-	// Ensure nodeAddresses only contains the addresses for this proxier's IP family.
-	isIPv6 := proxier.iptables.IsIPv6()
-	for addr := range nodeAddresses {
-		if utilproxy.IsZeroCIDR(addr) && isIPv6 == netutils.IsIPv6CIDRString(addr) {
-			// if any of the addresses is zero cidr of this IP family, non-zero IPs can be excluded.
-			nodeAddresses = sets.NewString(addr)
-			break
-		}
-	}
-
 	// These two variables are used to publish the sync_proxy_rules_no_endpoints_total
 	// metric.
 	serviceNoLocalEndpointsTotalInternal := 0
@@ -1179,7 +1164,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture nodeports.
-		if svcInfo.NodePort() != 0 && len(nodeAddresses) != 0 {
+		if svcInfo.NodePort() != 0 {
 			if hasEndpoints {
 				// Jump to the external destination chain.  For better or for
 				// worse, nodeports are not subect to loadBalancerSourceRanges,
@@ -1371,7 +1356,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, ep := range allLocallyReachableEndpoints {
 			epInfo, ok := ep.(*endpointsInfo)
 			if !ok {
-				klog.ErrorS(err, "Failed to cast endpointsInfo", "endpointsInfo", ep)
+				klog.ErrorS(nil, "Failed to cast endpointsInfo", "endpointsInfo", ep)
 				continue
 			}
 
@@ -1431,6 +1416,21 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finally, tail-call to the nodePorts chain.  This needs to be after all
 	// other service portal rules.
+	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
+	}
+	// nodeAddresses may contain dual-stack zero-CIDRs if proxier.nodePortAddresses is empty.
+	// Ensure nodeAddresses only contains the addresses for this proxier's IP family.
+	isIPv6 := proxier.iptables.IsIPv6()
+	for addr := range nodeAddresses {
+		if utilproxy.IsZeroCIDR(addr) && isIPv6 == netutils.IsIPv6CIDRString(addr) {
+			// if any of the addresses is zero cidr of this IP family, non-zero IPs can be excluded.
+			nodeAddresses = sets.NewString(addr)
+			break
+		}
+	}
+
 	for address := range nodeAddresses {
 		if utilproxy.IsZeroCIDR(address) {
 			destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
