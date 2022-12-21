@@ -31,8 +31,9 @@ type LeaderMigrator struct {
 }
 
 // NewLeaderMigrator creates a LeaderMigrator with given config for the given component. component
-//  indicates which controller manager is requesting this leader migration, and it should be consistent
-//  with the component field of ControllerLeaderConfiguration.
+//
+//	indicates which controller manager is requesting this leader migration, and it should be consistent
+//	with the component field of ControllerLeaderConfiguration.
 func NewLeaderMigrator(config *internal.LeaderMigrationConfiguration, component string) *LeaderMigrator {
 	migratedControllers := make(map[string]bool)
 	for _, leader := range config.ControllerLeaders {

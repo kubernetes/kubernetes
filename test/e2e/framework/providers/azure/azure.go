@@ -50,7 +50,7 @@ func newProvider() (framework.ProviderInterface, error) {
 	}, err
 }
 
-//Provider is a structure to handle Azure clouds for e2e testing
+// Provider is a structure to handle Azure clouds for e2e testing
 type Provider struct {
 	framework.NullProvider
 

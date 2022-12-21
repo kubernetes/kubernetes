@@ -48,14 +48,14 @@ const (
 // * RawExtension: for every schema with `x-kubernetes-embedded-resource: true`, `x-kubernetes-preserve-unknown-fields: true` and `type: object` are set
 // * IntOrString: for `x-kubernetes-int-or-string: true` either `type` is empty under `anyOf` and `allOf` or the schema structure is one of these:
 //
-// 	 1) anyOf:
-//      - type: integer
-//	    - type: string
-//	 2) allOf:
-//	    - anyOf:
-//	      - type: integer
-//	      - type: string
-//	    - ... zero or more
+//  1. anyOf:
+//     - type: integer
+//     - type: string
+//  2. allOf:
+//     - anyOf:
+//     - type: integer
+//     - type: string
+//     - ... zero or more
 //
 // * every specified field or array in s is also specified outside of value validation.
 // * metadata at the root can only restrict the name and generateName, and not be specified at all in nested contexts.

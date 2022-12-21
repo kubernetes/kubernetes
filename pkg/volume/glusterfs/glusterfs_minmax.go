@@ -44,7 +44,7 @@ var (
 	ErrInternal = errors.New("internal error")
 )
 
-//MinMaxAllocator defines allocator struct.
+// MinMaxAllocator defines allocator struct.
 type MinMaxAllocator struct {
 	lock sync.Mutex
 	min  int
@@ -79,7 +79,7 @@ func NewMinMaxAllocator(min, max int) (*MinMaxAllocator, error) {
 	}, nil
 }
 
-//SetRange defines the range/pool with provided min and max values.
+// SetRange defines the range/pool with provided min and max values.
 func (a *MinMaxAllocator) SetRange(min, max int) error {
 	if min > max {
 		return ErrInvalidRange
@@ -108,7 +108,7 @@ func (a *MinMaxAllocator) SetRange(min, max int) error {
 	return nil
 }
 
-//Allocate allocates provided value in the allocator and mark it as used.
+// Allocate allocates provided value in the allocator and mark it as used.
 func (a *MinMaxAllocator) Allocate(i int) (bool, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -127,7 +127,7 @@ func (a *MinMaxAllocator) Allocate(i int) (bool, error) {
 	return true, nil
 }
 
-//AllocateNext allocates next value from the allocator.
+// AllocateNext allocates next value from the allocator.
 func (a *MinMaxAllocator) AllocateNext() (int, bool, error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -150,7 +150,7 @@ func (a *MinMaxAllocator) AllocateNext() (int, bool, error) {
 	return 0, false, ErrInternal
 }
 
-//Release free/delete provided value from the allocator.
+// Release free/delete provided value from the allocator.
 func (a *MinMaxAllocator) Release(i int) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -173,7 +173,7 @@ func (a *MinMaxAllocator) has(i int) bool {
 	return ok
 }
 
-//Has check whether the provided value is used in the allocator
+// Has check whether the provided value is used in the allocator
 func (a *MinMaxAllocator) Has(i int) bool {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -181,7 +181,7 @@ func (a *MinMaxAllocator) Has(i int) bool {
 	return a.has(i)
 }
 
-//Free returns the number of free values in the allocator.
+// Free returns the number of free values in the allocator.
 func (a *MinMaxAllocator) Free() int {
 	a.lock.Lock()
 	defer a.lock.Unlock()

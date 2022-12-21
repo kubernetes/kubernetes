@@ -32,7 +32,6 @@ type FilterFunc func(in Event) (out Event, keep bool)
 // WARNING: filter has a fatal flaw, in that it can't properly update the
 // Type field (Add/Modified/Deleted) to reflect items beginning to pass the
 // filter when they previously didn't.
-//
 func Filter(w Interface, f FilterFunc) Interface {
 	fw := &filteredWatch{
 		incoming: w,

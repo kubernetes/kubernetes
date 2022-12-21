@@ -56,10 +56,11 @@ func NewProvider(ctx context.Context, baseSampler sdktrace.Sampler, resourceOpts
 }
 
 // WrapperFor can be used to add tracing to a *rest.Config. Example usage:
-//     tp := traces.NewProvider(...)
-//     config, _ := rest.InClusterConfig()
-//     config.Wrap(traces.WrapperFor(&tp))
-//     kubeclient, _ := clientset.NewForConfig(config)
+//
+//	tp := traces.NewProvider(...)
+//	config, _ := rest.InClusterConfig()
+//	config.Wrap(traces.WrapperFor(&tp))
+//	kubeclient, _ := clientset.NewForConfig(config)
 func WrapperFor(tp *trace.TracerProvider) transport.WrapperFunc {
 	return func(rt http.RoundTripper) http.RoundTripper {
 		opts := []otelhttp.Option{

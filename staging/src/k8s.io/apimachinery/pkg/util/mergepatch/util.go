@@ -88,7 +88,8 @@ func toYAML(v interface{}) (string, error) {
 // supports JSON merge patch semantics.
 //
 // NOTE: Numbers with different types (e.g. int(0) vs int64(0)) will be detected as conflicts.
-//       Make sure the unmarshaling of left and right are consistent (e.g. use the same library).
+//
+//	Make sure the unmarshaling of left and right are consistent (e.g. use the same library).
 func HasConflicts(left, right interface{}) (bool, error) {
 	switch typedLeft := left.(type) {
 	case map[string]interface{}:

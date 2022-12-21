@@ -744,7 +744,7 @@ func (plugin *kubenetNetworkPlugin) shaper() bandwidth.Shaper {
 	return plugin.bandwidthShaper
 }
 
-//TODO: make this into a goroutine and rectify the dedup rules periodically
+// TODO: make this into a goroutine and rectify the dedup rules periodically
 func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareAddr, podCIDRs []net.IPNet, podGateways []net.IP) {
 	if plugin.ebtables == nil {
 		plugin.ebtables = utilebtables.New(plugin.execer)

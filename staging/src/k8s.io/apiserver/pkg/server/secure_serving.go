@@ -207,7 +207,8 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 // It returns a stoppedCh that is closed when all non-hijacked active requests have been processed.
 // It returns a listenerStoppedCh that is closed when the underlying http Server has stopped listening.
 // TODO: do a follow up PR to remove this function, change 'Serve' to return listenerStoppedCh
-//  and update all components that call 'Serve'
+//
+//	and update all components that call 'Serve'
 func (s *SecureServingInfo) ServeWithListenerStopped(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {
 	if s.Listener == nil {
 		return nil, nil, fmt.Errorf("listener must not be nil")

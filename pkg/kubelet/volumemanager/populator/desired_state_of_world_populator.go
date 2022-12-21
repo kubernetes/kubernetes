@@ -81,9 +81,13 @@ type podStateProvider interface {
 //
 // kubeClient - used to fetch PV and PVC objects from the API server
 // loopSleepDuration - the amount of time the populator loop sleeps between
-//     successive executions
+//
+//	successive executions
+//
 // podManager - the kubelet podManager that is the source of truth for the pods
-//     that exist on this host
+//
+//	that exist on this host
+//
 // desiredStateOfWorld - the cache to populate
 func NewDesiredStateOfWorldPopulator(
 	kubeClient clientset.Interface,
@@ -344,11 +348,11 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 
 // checkVolumeFSResize checks whether a PVC mounted by the pod requires file
 // system resize or not. If so, marks this volume as fsResizeRequired in ASW.
-// - mountedVolumesForPod stores all mounted volumes in ASW, because online
-//   volume resize only considers mounted volumes.
-// - processedVolumesForFSResize stores all volumes we have checked in current loop,
-//   because file system resize operation is a global operation for volume, so
-//   we only need to check it once if more than one pod use it.
+//   - mountedVolumesForPod stores all mounted volumes in ASW, because online
+//     volume resize only considers mounted volumes.
+//   - processedVolumesForFSResize stores all volumes we have checked in current loop,
+//     because file system resize operation is a global operation for volume, so
+//     we only need to check it once if more than one pod use it.
 func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 	pod *v1.Pod,
 	podVolume v1.Volume,

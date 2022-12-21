@@ -26,11 +26,7 @@ stability_check_setup() {
   kube::golang::verify_go_version
   kube::util::ensure-temp-dir
   cd "${KUBE_ROOT}"
-  export KUBE_EXTRA_GOPATH=$KUBE_TEMP
   kube::golang::setup_env
-  pushd "${KUBE_EXTRA_GOPATH}" >/dev/null
-    GO111MODULE=on go get "gopkg.in/yaml.v2"
-  popd >/dev/null
 }
 
 find_files_to_check() {
@@ -58,7 +54,7 @@ reset=$(tput sgr0)
 kube::validate::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
-  doValidate=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | KUBE_ROOT=${KUBE_ROOT} xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
+  doValidate=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | grep -v ".git" | sort | KUBE_ROOT=${KUBE_ROOT} xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" -- 1>"${temp_file}")
 
   if $doValidate; then
     echo -e "${green}Diffing test/instrumentation/testdata/stable-metrics-list.yaml\n${reset}"

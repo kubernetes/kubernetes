@@ -247,12 +247,13 @@ type builder struct {
 }
 
 // subresource is a handy method to get subresource name. Valid inputs are:
-//     input                     output
-//     ""                        ""
-//     "/"                       ""
-//     "/{name}"                 ""
-//     "/{name}/scale"           "scale"
-//     "/{name}/scale/foo"       invalid input
+//
+//	input                     output
+//	""                        ""
+//	"/"                       ""
+//	"/{name}"                 ""
+//	"/{name}/scale"           "scale"
+//	"/{name}/scale/foo"       invalid input
 func subresource(path string) string {
 	parts := strings.Split(path, "/")
 	if len(parts) <= 2 {
@@ -302,9 +303,10 @@ func (b *builder) descriptionFor(path, operationVerb string) string {
 }
 
 // buildRoute returns a RouteBuilder for WebService to consume and builds path in swagger
-//     action can be one of: GET, PUT, PATCH, POST, DELETE;
-//     verb can be one of: list, read, replace, patch, create, delete, deletecollection;
-//     sample is the sample Go type for response type.
+//
+//	action can be one of: GET, PUT, PATCH, POST, DELETE;
+//	verb can be one of: list, read, replace, patch, create, delete, deletecollection;
+//	sample is the sample Go type for response type.
 func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb string, sample interface{}) *restful.RouteBuilder {
 	var namespaced string
 	if b.namespaced {
@@ -483,7 +485,8 @@ func generateBuildDefinitionsFunc(v2 bool) func() {
 }
 
 // addTypeMetaProperties adds Kubernetes-specific type meta properties to input schema:
-//     apiVersion and kind
+//
+//	apiVersion and kind
 func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 	s.SetProperty("apiVersion", getDefinition(typeMetaType, v2).SchemaProps.Properties["apiVersion"])
 	s.SetProperty("kind", getDefinition(typeMetaType, v2).SchemaProps.Properties["kind"])

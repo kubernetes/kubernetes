@@ -56,8 +56,7 @@ type TokenAuthenticator struct {
 // tokenErrorf prints a error message for a secret that has matched a bearer
 // token but fails to meet some other criteria.
 //
-//    tokenErrorf(secret, "has invalid value for key %s", key)
-//
+//	tokenErrorf(secret, "has invalid value for key %s", key)
 func tokenErrorf(s *corev1.Secret, format string, i ...interface{}) {
 	format = fmt.Sprintf("Bootstrap secret %s/%s matching bearer token ", s.Namespace, s.Name) + format
 	klog.V(3).Infof(format, i...)
@@ -69,26 +68,25 @@ func tokenErrorf(s *corev1.Secret, format string, i ...interface{}) {
 //
 // All secrets must be of type "bootstrap.kubernetes.io/token". An example secret:
 //
-//     apiVersion: v1
-//     kind: Secret
-//     metadata:
-//       # Name MUST be of form "bootstrap-token-( token id )".
-//       name: bootstrap-token-( token id )
-//       namespace: kube-system
-//     # Only secrets of this type will be evaluated.
-//     type: bootstrap.kubernetes.io/token
-//     data:
-//       token-secret: ( private part of token )
-//       token-id: ( token id )
-//       # Required key usage.
-//       usage-bootstrap-authentication: true
-//       auth-extra-groups: "system:bootstrappers:custom-group1,system:bootstrappers:custom-group2"
-//       # May also contain an expiry.
+//	apiVersion: v1
+//	kind: Secret
+//	metadata:
+//	  # Name MUST be of form "bootstrap-token-( token id )".
+//	  name: bootstrap-token-( token id )
+//	  namespace: kube-system
+//	# Only secrets of this type will be evaluated.
+//	type: bootstrap.kubernetes.io/token
+//	data:
+//	  token-secret: ( private part of token )
+//	  token-id: ( token id )
+//	  # Required key usage.
+//	  usage-bootstrap-authentication: true
+//	  auth-extra-groups: "system:bootstrappers:custom-group1,system:bootstrappers:custom-group2"
+//	  # May also contain an expiry.
 //
 // Tokens are expected to be of the form:
 //
-//     ( token-id ).( token-secret )
-//
+//	( token-id ).( token-secret )
 func (t *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	tokenID, tokenSecret, err := bootstraptokenutil.ParseToken(token)
 	if err != nil {

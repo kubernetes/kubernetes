@@ -905,6 +905,14 @@ const (
 	// https://www.unicode.org/notes/tn6/
 	BOCU1 MIB = 1020
 
+	// UTF7IMAP is the MIB identifier with IANA name UTF-7-IMAP.
+	//
+	// Note: This charset is used to encode Unicode in IMAP mailbox names;
+	// see section 5.1.3 of rfc3501 . It should never be used
+	// outside this context. A name has been assigned so that charset processing
+	// implementations can refer to it in a consistent way.
+	UTF7IMAP MIB = 1021
+
 	// Windows30Latin1 is the MIB identifier with IANA name ISO-8859-1-Windows-3.0-Latin-1.
 	//
 	// Extended ISO 8859-1 Latin-1 for Windows 3.0.

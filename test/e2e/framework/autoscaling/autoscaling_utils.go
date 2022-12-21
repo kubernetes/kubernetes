@@ -667,7 +667,7 @@ func DeleteContainerResourceHPA(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
 }
 
-//SidecarStatusType type for sidecar status
+// SidecarStatusType type for sidecar status
 type SidecarStatusType bool
 
 const (
@@ -675,7 +675,7 @@ const (
 	Disable SidecarStatusType = false
 )
 
-//SidecarWorkloadType type of the sidecar
+// SidecarWorkloadType type of the sidecar
 type SidecarWorkloadType string
 
 const (

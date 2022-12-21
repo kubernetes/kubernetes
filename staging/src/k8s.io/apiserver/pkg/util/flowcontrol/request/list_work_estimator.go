@@ -141,7 +141,8 @@ func key(requestInfo *apirequest.RequestInfo) string {
 }
 
 // NOTICE: Keep in sync with shouldDelegateList function in
-//  staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+//
+//	staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
 func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
