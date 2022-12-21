@@ -842,6 +842,9 @@ func TestValidateIPVSSchedulerMethod(t *testing.T) {
 		kubeproxyconfig.DestinationHashing,
 		kubeproxyconfig.ShortestExpectedDelay,
 		kubeproxyconfig.NeverQueue,
+		kubeproxyconfig.WeightedFailover,
+		kubeproxyconfig.WeightedOverflow,
+		kubeproxyconfig.MaglevHashing,
 		"",
 	}
 
@@ -857,7 +860,7 @@ func TestValidateIPVSSchedulerMethod(t *testing.T) {
 	}{
 		"non-existent scheduler method": {
 			mode:         kubeproxyconfig.IPVSSchedulerMethod("non-existing"),
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode.Scheduler"), "non-existing", "must be in [rr wrr lc wlc lblc lblcr sh dh sed nq ], blank means the default algorithm method (currently rr)")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ProxyMode.Scheduler"), "non-existing", "must be in [rr wrr lc wlc lblc lblcr sh dh sed nq fo ovf mh ], blank means the default algorithm method (currently rr)")},
 		},
 	}
 

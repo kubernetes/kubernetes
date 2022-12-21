@@ -258,6 +258,16 @@ const (
 	// NeverQueue assigns an incoming job to an idle server if there is, instead of waiting for a fast one;
 	// if all the servers are busy, it adopts the ShortestExpectedDelay policy to assign the job.
 	NeverQueue IPVSSchedulerMethod = "nq"
+	// WeightedFailover assigns an incoming job to the server with the highest weight that is currently available.
+	WeightedFailover IPVSSchedulerMethod = "fo"
+	// WeightedOverflow: assigns an incoming job to the server with the highest weight that is currently available
+	// and overflows to the next when active connections exceed the node's weight.
+	// Note that this scheduler might not be suitable for UDP because it only uses active connections.
+	WeightedOverflow IPVSSchedulerMethod = "ovf"
+	// MaglevHashing: assigns incoming jobs based on Google's Maglev hashing algorithm, providing an almost equal
+	// share of jobs to each real server and provides minimal disruption. When the set of real servers changes,
+	// a connection will likely be sent to the same real server as it was before.
+	MaglevHashing IPVSSchedulerMethod = "mh"
 )
 
 func (m *ProxyMode) Set(s string) error {
