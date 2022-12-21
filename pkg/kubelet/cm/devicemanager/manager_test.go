@@ -993,6 +993,102 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 
 }
 
+func TestPodContainerDeviceToAllocate(t *testing.T) {
+	resourceName1 := "domain1.com/resource1"
+	resourceName2 := "domain2.com/resource2"
+	resourceName3 := "domain2.com/resource3"
+	as := require.New(t)
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
+
+	testManager := &ManagerImpl{
+		endpoints:        make(map[string]endpointInfo),
+		healthyDevices:   make(map[string]sets.String),
+		unhealthyDevices: make(map[string]sets.String),
+		allocatedDevices: make(map[string]sets.String),
+		podDevices:       newPodDevices(),
+	}
+
+	testManager.podDevices.insert("pod1", "con1", resourceName1,
+		constructDevices([]string{"dev1", "dev2"}),
+		constructAllocResp(map[string]string{"/dev/r2dev1": "/dev/r2dev1", "/dev/r2dev2": "/dev/r2dev2"},
+			map[string]string{"/home/r2lib1": "/usr/r2lib1"},
+			map[string]string{"r2devices": "dev1 dev2"}))
+	testManager.podDevices.insert("pod2", "con2", resourceName2,
+		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
+		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
+			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+	testManager.podDevices.insert("pod3", "con3", resourceName3,
+		checkpoint.DevicesPerNUMA{nodeWithoutTopology: []string{"dev5"}},
+		constructAllocResp(map[string]string{"/dev/r1dev5": "/dev/r1dev5"},
+			map[string]string{"/home/r1lib1": "/usr/r1lib1"}, map[string]string{}))
+
+	// no healthy devices for resourceName1 and devices corresponding to
+	// resource2 are intentionally omitted to simulate that the resource
+	// hasn't been registered.
+	testManager.healthyDevices[resourceName1] = sets.NewString()
+	testManager.healthyDevices[resourceName3] = sets.NewString()
+	// dev5 is no longer in the list of healthy devices
+	testManager.healthyDevices[resourceName3].Insert("dev7")
+	testManager.healthyDevices[resourceName3].Insert("dev8")
+
+	testCases := []struct {
+		description              string
+		podUID                   string
+		contName                 string
+		resource                 string
+		required                 int
+		reusableDevices          sets.String
+		expectedAllocatedDevices sets.String
+		expErr                   error
+	}{
+		{
+			description:              "Admission error in case no healthy devices to allocate present",
+			podUID:                   "pod1",
+			contName:                 "con1",
+			resource:                 resourceName1,
+			required:                 2,
+			reusableDevices:          sets.NewString(),
+			expectedAllocatedDevices: nil,
+			expErr:                   fmt.Errorf("no healthy devices present; cannot allocate unhealthy devices %s", resourceName1),
+		},
+		{
+			description:              "Admission error in case resource is not registered",
+			podUID:                   "pod2",
+			contName:                 "con2",
+			resource:                 resourceName2,
+			required:                 1,
+			reusableDevices:          sets.NewString(),
+			expectedAllocatedDevices: nil,
+			expErr:                   fmt.Errorf("cannot allocate unregistered device %s", resourceName2),
+		},
+		{
+			description:              "Admission error in case resource not devices previously allocated no longer healthy",
+			podUID:                   "pod3",
+			contName:                 "con3",
+			resource:                 resourceName3,
+			required:                 1,
+			reusableDevices:          sets.NewString(),
+			expectedAllocatedDevices: nil,
+			expErr:                   fmt.Errorf("previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s", resourceName3),
+		},
+	}
+
+	for _, testCase := range testCases {
+		allocDevices, err := testManager.devicesToAllocate(testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices)
+		if !reflect.DeepEqual(err, testCase.expErr) {
+			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expErr, err)
+		}
+		if !reflect.DeepEqual(allocDevices, testCase.expectedAllocatedDevices) {
+			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expectedAllocatedDevices, allocDevices)
+		}
+	}
+
+}
+
 func TestGetDeviceRunContainerOptions(t *testing.T) {
 	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",

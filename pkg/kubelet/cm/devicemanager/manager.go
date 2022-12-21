@@ -544,14 +544,28 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 			return nil, fmt.Errorf("pod %q container %q changed request for resource %q from %d to %d", string(podUID), contName, resource, devices.Len(), required)
 		}
 	}
+
+	klog.V(3).InfoS("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
+	healthyDevices, hasRegistered := m.healthyDevices[resource]
+
+	// Check if resource registered with devicemanager
+	if !hasRegistered {
+		return nil, fmt.Errorf("cannot allocate unregistered device %s", resource)
+	}
+
+	// Check if registered resource has healthy devices
+	if healthyDevices.Len() == 0 {
+		return nil, fmt.Errorf("no healthy devices present; cannot allocate unhealthy devices %s", resource)
+	}
+
+	// Check if all the previously allocated devices are healthy
+	if !healthyDevices.IsSuperset(devices) {
+		return nil, fmt.Errorf("previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s", resource)
+	}
+
 	if needed == 0 {
 		// No change, no work.
 		return nil, nil
-	}
-	klog.V(3).InfoS("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
-	// Check if resource registered with devicemanager
-	if _, ok := m.healthyDevices[resource]; !ok {
-		return nil, fmt.Errorf("can't allocate unregistered device %s", resource)
 	}
 
 	// Declare the list of allocated devices.
