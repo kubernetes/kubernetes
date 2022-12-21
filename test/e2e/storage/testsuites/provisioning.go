@@ -547,9 +547,9 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
 
 			msg := fmt.Sprintf("Filesystem resize occurred even though it is readonly. "+
-			"Restored fs size: %v bytes is not the same as origin fs size: %v bytes.\n"+
-			"HINT: Your driver needs to check the volume and skip resize if it's readonly.",
-			restoredFSSize, originFSSize)
+				"Restored fs size: %v bytes is not the same as origin fs size: %v bytes.\n"+
+				"HINT: Your driver needs to check the volume and skip resize if it's readonly.",
+				restoredFSSize, originFSSize)
 			gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
 		}
 	})
@@ -578,7 +578,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		init(ctx)
 
-	  l.pvc.Name = "pvc-origin"
+		l.pvc.Name = "pvc-origin"
 		dc := l.config.Framework.DynamicClient
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
@@ -662,9 +662,9 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "Failed to obtain filesystem size of a volume mount: %v", err)
 
 			msg := fmt.Sprintf("Filesystem resize occurred even though it is readonly. "+
-			"Restored fs size: %v bytes is not the same as origin fs size: %v bytes.\n"+
-			"HINT: Your driver needs to check the volume and skip resize if it's readonly.",
-			restoredFSSize, originFSSize)
+				"Restored fs size: %v bytes is not the same as origin fs size: %v bytes.\n"+
+				"HINT: Your driver needs to check the volume and skip resize if it's readonly.",
+				restoredFSSize, originFSSize)
 			gomega.Expect(restoredFSSize).Should(gomega.BeEquivalentTo(originFSSize), msg)
 		}
 	})
@@ -868,7 +868,7 @@ func (t StorageClassTest) TestDynamicProvisioning(ctx context.Context) *v1.Persi
 // getBoundPV returns a PV details.
 func getBoundPV(ctx context.Context, client clientset.Interface, pvc *v1.PersistentVolumeClaim, claimProvisionTimeout time.Duration) (*v1.PersistentVolume, error) {
 	// Get new copy of the claim
-	klog.Errorf("pvc = %v+",pvc)
+	klog.Errorf("pvc = %v+", pvc)
 	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -878,7 +878,7 @@ func getBoundPV(ctx context.Context, client clientset.Interface, pvc *v1.Persist
 	err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, claimProvisionTimeout)
 	framework.ExpectNoError(err)
 
-	klog.Errorf("claim = %v+",claim)
+	klog.Errorf("claim = %v+", claim)
 	// Get the bound PV
 	pv, err := client.CoreV1().PersistentVolumes().Get(ctx, claim.Spec.VolumeName, metav1.GetOptions{})
 	return pv, err
