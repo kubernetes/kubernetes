@@ -474,18 +474,12 @@ func TestAnnotateObject(t *testing.T) {
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
-			case "GET":
+			case "GET", "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			case "PATCH":
-				switch req.URL.Path {
-				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+				case "/namespaces/test/pods/bar":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[1])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -502,15 +496,34 @@ func TestAnnotateObject(t *testing.T) {
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
-	flags := NewAnnotateFlags(iostreams)
-	args := []string{"pods/foo", "a=b", "c-"}
 
-	options, err := flags.ToOptions(tf, cmd, args)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	testCases := map[string]struct {
+		args       []string
+		flags_list bool
+	}{
+		"test annotate object": {
+			args:       []string{"pods/foo", "a=b", "c-"},
+			flags_list: false,
+		},
+		"test annotate object multiple resources": {
+			args:       []string{"pods/foo", "pods/bar", "a=b", "c-"},
+			flags_list: true,
+		},
 	}
-	if err := options.RunAnnotate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+
+	for _, testCase := range testCases {
+
+		flags := NewAnnotateFlags(iostreams)
+		flags.List = testCase.flags_list
+		args := testCase.args
+
+		options, err := flags.ToOptions(tf, cmd, args)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if err := options.RunAnnotate(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 	}
 }
 
