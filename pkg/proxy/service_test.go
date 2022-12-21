@@ -536,16 +536,16 @@ func makeServiceMap(fake *FakeProxier, allServices ...*v1.Service) {
 	}
 }
 
-func (fake *FakeProxier) addService(service *v1.Service) {
-	fake.serviceChanges.Update(nil, service)
+func (proxier *FakeProxier) addService(service *v1.Service) {
+	proxier.serviceChanges.Update(nil, service)
 }
 
-func (fake *FakeProxier) updateService(oldService *v1.Service, service *v1.Service) {
-	fake.serviceChanges.Update(oldService, service)
+func (proxier *FakeProxier) updateService(oldService *v1.Service, service *v1.Service) {
+	proxier.serviceChanges.Update(oldService, service)
 }
 
-func (fake *FakeProxier) deleteService(service *v1.Service) {
-	fake.serviceChanges.Update(service, nil)
+func (proxier *FakeProxier) deleteService(service *v1.Service) {
+	proxier.serviceChanges.Update(service, nil)
 }
 
 func TestServiceMapUpdateHeadless(t *testing.T) {
