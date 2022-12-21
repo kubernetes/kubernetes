@@ -17,8 +17,6 @@ limitations under the License.
 package clientbuilder
 
 import (
-	"context"
-
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -30,11 +28,11 @@ import (
 // TODO: Extract this into a separate controller utilities repo (issues/68947)
 type ControllerClientBuilder interface {
 	Config(name string) (*restclient.Config, error)
-	ConfigOrDie(ctx context.Context, name string) *restclient.Config
+	ConfigOrDie(logger klog.Logger, name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
-	ClientOrDie(ctx context.Context, name string) clientset.Interface
+	ClientOrDie(logger klog.Logger, name string) clientset.Interface
 	DiscoveryClient(name string) (discovery.DiscoveryInterface, error)
-	DiscoveryClientOrDie(ctx context.Context, name string) discovery.DiscoveryInterface
+	DiscoveryClientOrDie(logger klog.Logger, name string) discovery.DiscoveryInterface
 }
 
 // SimpleControllerClientBuilder returns a fixed client with different user agents
@@ -51,7 +49,7 @@ func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, 
 
 // ConfigOrDie returns a client config if no error from previous config func.
 // If it gets an error getting the client, it will log the error and kill the process it's running in.
-func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
+func (b SimpleControllerClientBuilder) ConfigOrDie(logger klog.Logger, name string) *restclient.Config {
 	clientConfig, err := b.Config(name)
 	if err != nil {
 		klog.Fatal(err)
@@ -70,7 +68,7 @@ func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface,
 
 // ClientOrDie returns a clientset.interface built from the ClientBuilder with no error.
 // If it gets an error getting the client, it will log the error and kill the process it's running in.
-func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
+func (b SimpleControllerClientBuilder) ClientOrDie(logger klog.Logger, name string) clientset.Interface {
 	client, err := b.Client(name)
 	if err != nil {
 		klog.Fatal(err)
@@ -95,7 +93,7 @@ func (b SimpleControllerClientBuilder) DiscoveryClient(name string) (discovery.D
 // DiscoveryClientOrDie returns a discovery.DiscoveryInterface built from the ClientBuilder with no error.
 // Discovery is special because it will artificially pump the burst quite high to handle the many discovery requests.
 // If it gets an error getting the client, it will log the error and kill the process it's running in.
-func (b SimpleControllerClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
+func (b SimpleControllerClientBuilder) DiscoveryClientOrDie(logger klog.Logger, name string) discovery.DiscoveryInterface {
 	client, err := b.DiscoveryClient(name)
 	if err != nil {
 		klog.Fatal(err)

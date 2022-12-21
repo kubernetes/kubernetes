@@ -32,7 +32,7 @@ import (
 func WaitForAPIServer(ctx context.Context, client clientset.Interface, timeout time.Duration) error {
 	var lastErr error
 
-	err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+	err := wait.PollImmediateWithContext(ctx, time.Second, timeout, func(ctx context.Context) (bool, error) {
 		healthStatus := 0
 		result := client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&healthStatus)
 		if result.Error() != nil {

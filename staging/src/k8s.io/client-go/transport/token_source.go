@@ -17,6 +17,7 @@ limitations under the License.
 package transport
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -131,7 +132,7 @@ type fileTokenSource struct {
 
 var _ = oauth2.TokenSource(&fileTokenSource{})
 
-func (ts *fileTokenSource) Token() (*oauth2.Token, error) {
+func (ts *fileTokenSource) Token(ctx context.Context) (*oauth2.Token, error) {
 	tokb, err := os.ReadFile(ts.path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read token file %q: %v", ts.path, err)
@@ -159,7 +160,7 @@ type cachingTokenSource struct {
 	now func() time.Time
 }
 
-func (ts *cachingTokenSource) Token() (*oauth2.Token, error) {
+func (ts *cachingTokenSource) Token(ctx context.Context) (*oauth2.Token, error) {
 	now := ts.now()
 	// fast path
 	ts.RLock()
@@ -177,7 +178,7 @@ func (ts *cachingTokenSource) Token() (*oauth2.Token, error) {
 		return tok, nil
 	}
 
-	tok, err := ts.base.Token()
+	tok, err := ts.base.Token(ctx)
 	if err != nil {
 		if ts.tok == nil {
 			return nil, err

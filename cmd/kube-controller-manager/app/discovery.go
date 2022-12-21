@@ -23,6 +23,7 @@ import (
 	"context"
 
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
 	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
 )
@@ -34,7 +35,7 @@ func startEndpointSliceController(ctx context.Context, controllerContext Control
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.InformerFactory.Discovery().V1().EndpointSlices(),
 		controllerContext.ComponentConfig.EndpointSliceController.MaxEndpointsPerSlice,
-		controllerContext.ClientBuilder.ClientOrDie("endpointslice-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(klog.FromContext(ctx), "endpointslice-controller"),
 		controllerContext.ComponentConfig.EndpointSliceController.EndpointUpdatesBatchPeriod.Duration,
 	).Run(int(controllerContext.ComponentConfig.EndpointSliceController.ConcurrentServiceEndpointSyncs), ctx.Done())
 	return nil, true, nil
@@ -46,7 +47,7 @@ func startEndpointSliceMirroringController(ctx context.Context, controllerContex
 		controllerContext.InformerFactory.Discovery().V1().EndpointSlices(),
 		controllerContext.InformerFactory.Core().V1().Services(),
 		controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringMaxEndpointsPerSubset,
-		controllerContext.ClientBuilder.ClientOrDie("endpointslicemirroring-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(klog.FromContext(ctx), "endpointslicemirroring-controller"),
 		controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringEndpointUpdatesBatchPeriod.Duration,
 	).Run(int(controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringConcurrentServiceEndpointSyncs), ctx.Done())
 	return nil, true, nil

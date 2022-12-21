@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
 )
@@ -32,7 +33,7 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 	go job.NewController(
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
-		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(klog.FromContext(ctx), "job-controller"),
 	).Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
 	return nil, true, nil
 }
@@ -41,7 +42,7 @@ func startCronJobController(ctx context.Context, controllerContext ControllerCon
 
 	cj2c, err := cronjob.NewControllerV2(controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.InformerFactory.Batch().V1().CronJobs(),
-		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(klog.FromContext(ctx), "cronjob-controller"),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating CronJob controller V2: %v", err)

@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 
@@ -43,8 +44,8 @@ func startHPAController(ctx context.Context, controllerContext ControllerContext
 }
 
 func startHPAControllerWithRESTClient(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	clientConfig := controllerContext.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
-	hpaClient := controllerContext.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
+	clientConfig := controllerContext.ClientBuilder.ConfigOrDie(klog.FromContext(ctx), "horizontal-pod-autoscaler")
+	hpaClient := controllerContext.ClientBuilder.ClientOrDie(klog.FromContext(ctx), "horizontal-pod-autoscaler")
 
 	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(hpaClient.Discovery())
 	// invalidate the discovery information roughly once per resync interval our API
@@ -63,8 +64,8 @@ func startHPAControllerWithRESTClient(ctx context.Context, controllerContext Con
 }
 
 func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext ControllerContext, metricsClient metrics.MetricsClient) (controller.Interface, bool, error) {
-	hpaClient := controllerContext.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
-	hpaClientConfig := controllerContext.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
+	hpaClient := controllerContext.ClientBuilder.ClientOrDie(klog.FromContext(ctx), "horizontal-pod-autoscaler")
+	hpaClientConfig := controllerContext.ClientBuilder.ConfigOrDie(klog.FromContext(ctx), "horizontal-pod-autoscaler")
 
 	// we don't use cached discovery because DiscoveryScaleKindResolver does its own caching,
 	// so we want to re-fetch every time when we actually ask for it

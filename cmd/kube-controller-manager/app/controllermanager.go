@@ -224,7 +224,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
 	run := func(ctx context.Context, startSATokenController InitFunc, initializersFunc ControllerInitializersFunc) {
-		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
+		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx)
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
 		}
@@ -514,8 +514,8 @@ func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) 
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
-func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
-	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
+func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder, ctx context.Context) (ControllerContext, error) {
+	versionedClient := rootClientBuilder.ClientOrDie(klog.FromContext(ctx), "shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
 	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))
@@ -523,17 +523,17 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
-	if err := genericcontrollermanager.WaitForAPIServer(versionedClient, 10*time.Second); err != nil {
+	if err := genericcontrollermanager.WaitForAPIServer(ctx, versionedClient, 10*time.Second); err != nil {
 		return ControllerContext{}, fmt.Errorf("failed to wait for apiserver being healthy: %v", err)
 	}
 
 	// Use a discovery client capable of being refreshed.
-	discoveryClient := rootClientBuilder.DiscoveryClientOrDie("controller-discovery")
+	discoveryClient := rootClientBuilder.DiscoveryClientOrDie(klog.FromContext(ctx), "controller-discovery")
 	cachedClient := cacheddiscovery.NewMemCacheClient(discoveryClient)
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedClient)
 	go wait.Until(func() {
 		restMapper.Reset()
-	}, 30*time.Second, stop)
+	}, 30*time.Second, ctx.Done())
 
 	availableResources, err := GetAvailableResources(rootClientBuilder)
 	if err != nil {
@@ -546,7 +546,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		return ControllerContext{}, err
 	}
 
-	ctx := ControllerContext{
+	contCtx := ControllerContext{
 		ClientBuilder:                   clientBuilder,
 		InformerFactory:                 sharedInformers,
 		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
@@ -560,7 +560,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("kube-controller-manager"),
 	}
 	controllersmetrics.Register()
-	return ctx, nil
+	return contCtx, nil
 }
 
 // StartControllers starts a set of controllers with a specified ControllerContext
@@ -655,7 +655,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", controllerContext.ComponentConfig.SAController.RootCAFile, err)
 		}
 	} else {
-		rootCA = c.rootClientBuilder.ConfigOrDie("tokens-controller").CAData
+		rootCA = c.rootClientBuilder.ConfigOrDie(klog.FromContext(ctx), "tokens-controller").CAData
 	}
 
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, privateKey)
@@ -665,7 +665,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	controller, err := serviceaccountcontroller.NewTokensController(
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
-		c.rootClientBuilder.ClientOrDie("tokens-controller"),
+		c.rootClientBuilder.ClientOrDie(klog.FromContext(ctx), "tokens-controller"),
 		serviceaccountcontroller.TokensControllerOptions{
 			TokenGenerator: tokenGenerator,
 			RootCA:         rootCA,

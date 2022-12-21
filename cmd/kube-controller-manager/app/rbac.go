@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
 
@@ -30,7 +31,7 @@ func startClusterRoleAggregrationController(ctx context.Context, controllerConte
 	}
 	go clusterroleaggregation.NewClusterRoleAggregation(
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
-		controllerContext.ClientBuilder.ClientOrDie("clusterrole-aggregation-controller").RbacV1(),
+		controllerContext.ClientBuilder.ClientOrDie(klog.FromContext(ctx), "clusterrole-aggregation-controller").RbacV1(),
 	).Run(ctx, 5)
 	return nil, true, nil
 }
