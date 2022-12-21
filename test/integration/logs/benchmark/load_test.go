@@ -58,6 +58,31 @@ func TestData(t *testing.T) {
 				ArgCounts:  map[string]int{},
 			},
 		},
+		"data/split.log": {
+			messages: []logMessage{
+				{
+					msg: "Pod status updated",
+				},
+				{
+					msg: "Pod status updated again",
+				},
+			},
+			printf: `Pod status updated: []
+Pod status updated again: []
+`,
+			structured: `"Pod status updated"
+"Pod status updated again"
+`,
+			json: `{"msg":"Pod status updated","v":0}
+{"msg":"Pod status updated again","v":0}
+`,
+			stats: logStats{
+				TotalLines: 3,
+				SplitLines: 1,
+				JsonLines:  2,
+				ArgCounts:  map[string]int{},
+			},
+		},
 		"data/error.log": {
 			messages: []logMessage{
 				{

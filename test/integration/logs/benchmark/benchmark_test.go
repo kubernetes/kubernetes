@@ -23,7 +23,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -38,10 +37,11 @@ import (
 )
 
 func BenchmarkEncoding(b *testing.B) {
+	seen := map[string]bool{}
+
 	// Each "data/(v[0-9]/)?*.log" file is expected to contain JSON log
 	// messages. We generate one sub-benchmark for each file where logging
-	// is tested with the log level from the directory.  Symlinks can be
-	// used to test the same file with different levels.
+	// is tested with the log level from the directory.
 	if err := filepath.Walk("data", func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -53,8 +53,14 @@ func BenchmarkEncoding(b *testing.B) {
 		if err != nil {
 			return err
 		}
-		if info.Mode()&fs.ModeSymlink == 0 {
-			b.Log(path + "\n" + stats.String())
+		// Only print unique file statistics. They get shown for the
+		// first file where new statistics are encountered. The
+		// assumption here is that the there are no files with
+		// different content and exactly the same statistics.
+		statsStr := stats.String()
+		if !seen[statsStr] {
+			b.Log(path + "\n" + statsStr)
+			seen[statsStr] = true
 		}
 		b.Run(strings.TrimSuffix(strings.TrimPrefix(path, "data/"), ".log"), func(b *testing.B) {
 			// Take verbosity threshold from directory, if present.
@@ -108,7 +114,7 @@ func BenchmarkEncoding(b *testing.B) {
 				fileSizes["JSON"] = int(output) / b.N
 			})
 
-			b.Log(fmt.Sprintf("file sizes: %v\n", fileSizes))
+			b.Log(fmt.Sprintf("%s: file sizes: %v\n", path, fileSizes))
 		})
 		return nil
 	}); err != nil {
@@ -164,7 +170,7 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 		var out *os.File
 		if !discard {
 			var err error
-			out, err = os.Create(path.Join(tmpDir, "all.log"))
+			out, err = os.Create(filepath.Join(tmpDir, "all.log"))
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -177,12 +183,12 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 		var out1, out2 *os.File
 		if !discard {
 			var err error
-			out1, err = os.Create(path.Join(tmpDir, "stream-1.log"))
+			out1, err = os.Create(filepath.Join(tmpDir, "stream-1.log"))
 			if err != nil {
 				b.Fatal(err)
 			}
 			defer out1.Close()
-			out2, err = os.Create(path.Join(tmpDir, "stream-2.log"))
+			out2, err = os.Create(filepath.Join(tmpDir, "stream-2.log"))
 			if err != nil {
 				b.Fatal(err)
 			}
