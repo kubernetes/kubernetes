@@ -16,7 +16,7 @@ ignore_klog_header
 ```
 
 Expected output:
-```
+```console
 I0605 22:03:07.224293 3228948 logger.go:58] Log using Infof, key: value
 I0605 22:03:07.224378 3228948 logger.go:59] "Log using InfoS" key="value"
 E0605 22:03:07.224393 3228948 logger.go:61] Log using Errorf, err: fail

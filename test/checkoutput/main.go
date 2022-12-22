@@ -37,6 +37,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -67,7 +68,17 @@ const (
 	verifyCmd
 )
 
+const (
+	RunTrigger    = "Run:"
+	MetaTrigger   = "Metadata:"
+	OutputTrigger = "Expected output:"
+	StartConsole  = "```console"
+	EndConsole    = "```"
+)
+
 const newline = "\n"
+
+var failFast = flag.Bool("failfast", false, "specify failfast to fail immediately")
 
 // state-command combination
 type commandState struct {
@@ -92,8 +103,8 @@ type runVerify struct {
 // Sample: I0412 01:55:01.765514  728443 logger.go:76] Log using Infof, key: value
 // We name the first named group as klog_header. The second unnamed group (.*) is used as-is
 // [2] json header
-//{"ts":1648546681782.9392,"caller":"cmd/logger.go:77","msg"... => {"msg"...
-var regex_header = map[string]string{
+// {"ts":1648546681782.9392,"caller":"cmd/logger.go:77","msg"... => {"msg"...
+var Regex_header = map[string]string{
 	"ignore_klog_header": "(?m)(?P<klog_header>^[IWEF][0-9]{4}\\s[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}\\s*[0-9]*\\s.*\\.go:[0-9]{2}])(.*)",
 	"ignore_json_header": "(?m)(?P<json_header>\"ts\":\\d*.\\d*\\,\"caller\":\"[0-9A-Za-z/.]*:\\d*\",?)(.*)"}
 
@@ -142,7 +153,7 @@ func (rv *runVerify) compare(output string) error {
 	// User-specified regexes
 	for _, s := range rv.meta.headerRegex {
 		// Map keywords to supported regexes
-		if r, ok := regex_header[s]; ok {
+		if r, ok := Regex_header[s]; ok {
 			s = r
 		}
 		ignoreHeader = append(ignoreHeader, s)
@@ -158,7 +169,11 @@ func (rv *runVerify) compare(output string) error {
 		if status2 {
 			if processedOutput != processedExpected {
 				// Mismatch after processing headers
-				return fmt.Errorf("Mismatch in Run command : %v\n diff : %v\n", rv.run, cmp.Diff(processedExpected, processedOutput))
+				err := fmt.Errorf("Mismatch in Run command : %v\n", rv.run)
+				// Print the diff to stdout
+				fmt.Printf("Compare Failure! Error : %v Diff : %v\n", err,
+					cmp.Diff(processedExpected, processedOutput))
+				return err
 			}
 		}
 	}
@@ -168,7 +183,11 @@ func (rv *runVerify) compare(output string) error {
 
 		// Fallback to comparing non-processed output
 		if output != rv.verify {
-			return fmt.Errorf("Mismatch in text output. diff : %v ", cmp.Diff(rv.verify, output))
+			err := fmt.Errorf("Mismatch in Run command : %v\n", rv.run)
+			// Print the diff to stdout
+			fmt.Printf("Compare Failure! Error : %v Diff : %v\n", err,
+				cmp.Diff(rv.verify, output))
+			return err
 		}
 	}
 	return nil
@@ -183,7 +202,8 @@ func (rv *runVerify) validate(mdfile string) error {
 	cmd.Dir = rv.dir
 	ex, _ := os.Executable()
 	klog.V(2).InfoS("==================New Run====================", "markdown-file", mdfile)
-	klog.V(2).InfoS("Binary related information", "binary", binary, "arguments", args, "directory", cmd.Dir, "run-verify directory", rv.dir, "exec-name", filepath.Base(ex))
+	klog.V(2).InfoS("Binary related information", "binary", binary, "arguments",
+		args, "directory", cmd.Dir, "run-verify directory", rv.dir, "exec-name", filepath.Base(ex))
 	// Running go run . in the checkoutput directory causes a hang.
 	if filepath.Base(ex) == "checkoutput" {
 		klog.V(2).InfoS("Skip as we will recursively loop in checkoutput tool in validate")
@@ -202,10 +222,8 @@ func (rv *runVerify) validate(mdfile string) error {
 		return nil
 	}
 
-	klog.InfoS("Failure", "markdown-file", mdfile)
-	// This implies a validation failure
-	fmt.Println(err)
-	return nil
+	klog.V(2).InfoS("Failure", "markdown-file", mdfile)
+	return err
 }
 
 type transitionFunc func(state *state, rv *runVerify, scanner *bufio.Scanner, mdfile string) error
@@ -256,7 +274,7 @@ func parseVerifyCmd(state *state, rv *runVerify, scanner *bufio.Scanner, mdfile 
 	}
 	var sb strings.Builder
 	scanner.Scan()
-	if scanner.Text() == "```" {
+	if scanner.Text() == "```console" {
 		for scanner.Scan() {
 			if scanner.Text() == "```" {
 				rv.verify = sb.String()
@@ -268,7 +286,7 @@ func parseVerifyCmd(state *state, rv *runVerify, scanner *bufio.Scanner, mdfile 
 			sb.WriteString(newline)
 		}
 	} else {
-		return fmt.Errorf("verify: Expected ``` but got %v", scanner.Text())
+		return fmt.Errorf("verify: Expected ```console but got %v", scanner.Text())
 	}
 	return fmt.Errorf("failed to parse Expected output")
 }
@@ -280,7 +298,8 @@ var stateTransitionTable = map[commandState]transitionFunc{
 	{parsing, verifyCmd}: parseVerifyCmd,
 }
 
-func parseMD(mdfile string, dir string) error {
+func parseMD(ctx context.Context, mdfile string, dir string) error {
+	logger := klog.FromContext(ctx)
 
 	f, err := os.Open(mdfile)
 	if err != nil {
@@ -296,7 +315,7 @@ func parseMD(mdfile string, dir string) error {
 	var rv runVerify
 	rv.dir = dir
 
-	klog.V(2).InfoS("Parsing Markdown File", "markdown file", mdfile, "dir", dir)
+	logger.V(2).Info("Parsing Markdown File", "markdown file", mdfile, "dir", dir)
 
 	scanner := bufio.NewScanner(f)
 	var cmd uint32
@@ -319,7 +338,11 @@ func parseMD(mdfile string, dir string) error {
 			if f := stateTransitionTable[tupple]; f != nil {
 				err := f(&state, &rv, scanner, mdfile)
 				if err != nil {
-					klog.ErrorS(err, "State transition")
+					if *failFast {
+						return err
+					} else {
+						logger.Error(err, "State transition Failure", "mdfile", mdfile, "dir", dir)
+					}
 				}
 			}
 		}
@@ -394,7 +417,10 @@ func processDir(roots []string) error {
 
 			md := strings.HasSuffix(path, ".md")
 			if md {
-				parseMD(path, dir)
+				err := parseMD(context.Background(), path, dir)
+				if *failFast {
+					return err
+				}
 			}
 			return nil
 		})
@@ -417,6 +443,6 @@ func main() {
 	klog.V(2).InfoS("verbosity level", "v", flag.CommandLine.Lookup("v").Value)
 	err := processDir(args)
 	if err != nil {
-		klog.Errorln(err)
+		fmt.Println(err)
 	}
 }

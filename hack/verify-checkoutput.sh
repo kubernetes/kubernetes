@@ -28,8 +28,6 @@ kube::golang::verify_go_version
 
 cd "${KUBE_ROOT}"
 
-make --no-print-directory -C "${KUBE_ROOT}" generated_files
-
 ret=0
 hack/run-in-gopath.sh \
     go run test/checkoutput/main.go "$@" || ret=$?

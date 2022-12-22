@@ -16,7 +16,7 @@ Metadata:
 ignore_klog_header
 ```
 Expected output:
-```
+```console
 I0707 07:40:46.557923  524273 logger.go:45] "Oops, I shouldn't be logging yet!"
 This is normal output via stdout.
 This is other output via stderr.
@@ -37,9 +37,14 @@ Run:
 ```console
 go run . --logging-format json
 ```
+Metadata:
+```console
+ignore_klog_header
+ignore_json_header
+```
 
 Expected output:
-```
+```console
 I0329 11:38:01.782592   99945 logger.go:44] "Oops, I shouldn't be logging yet!"
 This is normal output via stdout.
 This is other output via stderr.
@@ -69,7 +74,7 @@ ignore_json_header
 ```
 
 Expected output:
-```
+```console
 I0329 11:38:01.782592   99945 logger.go:44] "Oops, I shouldn't be logging yet!"
 This is normal output via stdout.
 This is other output via stderr.
@@ -89,9 +94,13 @@ This is other output via stderr.
 ```console
 go run . --experimental-logging-sanitization
 ```
+Metadata:
+```console
+ignore_klog_header
+```
 
 Expected output:
-```
+```console
 I0605 22:04:02.019609 3229645 logger.go:58] Log using Infof, key: value
 I0605 22:04:02.019677 3229645 logger.go:59] "Log using InfoS" key="value"
 E0605 22:04:02.019698 3229645 logger.go:61] Log using Errorf, err: fail
@@ -105,6 +114,10 @@ I0605 22:04:02.019714 3229645 logger.go:64] Log message has been redacted. Log a
 go run . -v1
 ```
 
+Metadata:
+```console
+ignore_klog_header
+```
 The expected output now includes `Log less important message`:
 ```
 I0329 11:38:23.145695  100190 logger.go:44] "Oops, I shouldn't be logging yet!"
