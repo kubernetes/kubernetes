@@ -228,15 +228,16 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 // PodEligibleToPreemptOthers returns one bool and one string. The bool
 // indicates whether this pod should be considered for preempting other pods or
 // not. The string includes the reason if this pod isn't eligible.
-// If this pod has a preemptionPolicy of Never or has already preempted other
-// pods and those are in their graceful termination period, it shouldn't be
-// considered for preemption.
-// We look at the node that is nominated for this pod and as long as there are
-// terminating pods on the node, we don't consider this for preempting more pods.
+// There're several reasons:
+//  1. The pod has a preemptionPolicy of Never.
+//  2. The pod has already preempted other pods and the victims are in their graceful termination period.
+//     Currently we check the node that is nominated for this pod, and as long as there are
+//     terminating pods on this node, we don't attempt to preempt more pods.
 func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string) {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
-		return false, fmt.Sprint("not eligible due to preemptionPolicy=Never.")
+		return false, "not eligible due to preemptionPolicy=Never."
 	}
+
 	nodeInfos := pl.fh.SnapshotSharedLister().NodeInfos()
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
@@ -251,7 +252,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNo
 			for _, p := range nodeInfo.Pods {
 				if p.Pod.DeletionTimestamp != nil && corev1helpers.PodPriority(p.Pod) < podPriority {
 					// There is a terminating pod on the nominated node.
-					return false, fmt.Sprint("not eligible due to a terminating pod on the nominated node.")
+					return false, "not eligible due to a terminating pod on the nominated node."
 				}
 			}
 		}

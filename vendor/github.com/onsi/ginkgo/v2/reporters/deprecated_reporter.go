@@ -35,7 +35,7 @@ func ReportViaDeprecatedReporter(reporter DeprecatedReporter, report types.Repor
 		FailOnPending:     report.SuiteConfig.FailOnPending,
 		FailFast:          report.SuiteConfig.FailFast,
 		FlakeAttempts:     report.SuiteConfig.FlakeAttempts,
-		EmitSpecProgress:  report.SuiteConfig.EmitSpecProgress,
+		EmitSpecProgress:  false,
 		DryRun:            report.SuiteConfig.DryRun,
 		ParallelNode:      report.SuiteConfig.ParallelProcess,
 		ParallelTotal:     report.SuiteConfig.ParallelTotal,

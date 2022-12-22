@@ -71,21 +71,6 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 			return err
 		}
 
-		// Create a copy of the kubelet config file in the /etc/kubernetes/tmp/ folder.
-		backupDir, err := constants.CreateTempDirForKubeadm(constants.KubernetesDir, "kubeadm-kubelet-config")
-		if err != nil {
-			return err
-		}
-		src := filepath.Join(kubeletDir, constants.KubeletConfigurationFileName)
-		dest := filepath.Join(backupDir, constants.KubeletConfigurationFileName)
-		if !dryRun {
-			fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
-			if err := os.Rename(src, dest); err != nil {
-				return errors.Wrap(err, "error backing up the kubelet config file")
-			}
-		} else {
-			fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
-		}
 		// Store the kubelet component configuration.
 		if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, data.PatchesDir(), data.OutputWriter()); err != nil {
 			return err

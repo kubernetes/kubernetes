@@ -327,8 +327,7 @@ func (g *Graph) recomputeDestinationIndex_locked(n graph.Node) {
 // AddPod should only be called once spec.NodeName is populated.
 // It sets up edges for the following relationships (which are immutable for a pod once bound to a node):
 //
-//	pod -> node
-//
+//	pod       -> node
 //	secret    -> pod
 //	configmap -> pod
 //	pvc       -> pod

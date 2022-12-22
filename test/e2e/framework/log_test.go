@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -76,122 +77,212 @@ var _ = ginkgo.Describe("log", func() {
 })
 
 func TestFailureOutput(t *testing.T) {
-	// output from AfterEach
-	commonOutput := `
+	expected := output.TestResult{
+		Suite: reporters.JUnitTestSuite{
+			Tests:    6,
+			Failures: 6,
+			Errors:   0,
+			Disabled: 0,
+			Skipped:  0,
+
+			TestCases: []reporters.JUnitTestCase{
+				{
+					Name:   "[It] log fails",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] I'm failing.
+In [It] at: log_test.go:57 <time>
+
+There were additional failures detected after the initial failure. These are visible in the timeline
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] fails - log_test.go:55 <time>
+[FAILED] I'm failing.
+In [It] at: log_test.go:57 <time>
+< Exit [It] fails - log_test.go:55 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
 INFO: after
-FAIL: true is never false either
+[FAILED] true is never false either
 Expected
     <bool>: true
 to equal
     <bool>: false
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
-	log_test.go:52
-`
-
-	// Sorted by name!
-	expected := output.SuiteResults{
-		output.TestResult{
-			Name: "log asserts",
-			Output: `INFO: before
-FAIL: false is never true
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+				{
+					Name:   "[It] log asserts",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] false is never true
 Expected
     <bool>: false
 to equal
     <bool>: true
+In [It] at: log_test.go:61 <time>
 
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
-	log_test.go:60` + commonOutput,
-			Failure: `false is never true
+There were additional failures detected after the initial failure. These are visible in the timeline
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] asserts - log_test.go:60 <time>
+[FAILED] false is never true
 Expected
     <bool>: false
 to equal
-    <bool>: true`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
-	log_test.go:60`,
-		},
-		output.TestResult{
-			Name: "log equal",
-			Output: `INFO: before
-FAIL: of course it's not equal...
+    <bool>: true
+In [It] at: log_test.go:61 <time>
+< Exit [It] asserts - log_test.go:60 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
 Expected
-    <int>: 0
+    <bool>: true
 to equal
-    <int>: 1
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+				{
+					Name:   "[It] log error",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] hard-coded error: an error with a long, useless description
+In [It] at: log_test.go:65 <time>
 
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
-	log_test.go:67` + commonOutput,
-			Failure: `of course it's not equal...
-Expected
-    <int>: 0
-to equal
-    <int>: 1`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
-	log_test.go:67`,
-		},
-		output.TestResult{
-			Name: "log error",
-			Output: `INFO: before
+There were additional failures detected after the initial failure. These are visible in the timeline
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] error - log_test.go:63 <time>
 INFO: Unexpected error: hard-coded error: 
     <*errors.errorString>: {
         s: "an error with a long, useless description",
     }
-FAIL: hard-coded error: an error with a long, useless description
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
-	log_test.go:64` + commonOutput,
-			Failure: `hard-coded error: an error with a long, useless description`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
-	log_test.go:64`,
-		},
-		output.TestResult{
-			Name: "log fails",
-			Output: `INFO: before
-FAIL: I'm failing.
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3.1()
-	log_test.go:56
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
-	log_test.go:57` + commonOutput,
-			Failure: "I'm failing.",
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3.1()
-	log_test.go:56
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
-	log_test.go:57`,
-		},
-		output.TestResult{
-			Name: "log fails with helper",
-			Output: `INFO: before
-FAIL: I'm failing with helper.
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.failHelper()
-	log_test.go:43
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.7()
-	log_test.go:70` + commonOutput,
-			Failure: "I'm failing with helper.",
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.failHelper()
-	log_test.go:43
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.7()
-	log_test.go:70`,
-		},
-		output.TestResult{
-			Name: "log redirects klog",
-			Output: `INFO: before
-<klog> log_test.go:73] hello world
-<klog> log_test.go:74] <nil>not really an error` + commonOutput,
-			Failure: `true is never false either
+[FAILED] hard-coded error: an error with a long, useless description
+In [It] at: log_test.go:65 <time>
+< Exit [It] error - log_test.go:63 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
 Expected
     <bool>: true
 to equal
-    <bool>: false`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
-	log_test.go:52`,
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+				{
+					Name:   "[It] log equal",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] of course it's not equal...
+Expected
+    <int>: 0
+to equal
+    <int>: 1
+In [It] at: log_test.go:68 <time>
+
+There were additional failures detected after the initial failure. These are visible in the timeline
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] equal - log_test.go:67 <time>
+[FAILED] of course it's not equal...
+Expected
+    <int>: 0
+to equal
+    <int>: 1
+In [It] at: log_test.go:68 <time>
+< Exit [It] equal - log_test.go:67 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+				{
+					Name:   "[It] log fails with helper",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] I'm failing with helper.
+In [It] at: log_test.go:44 <time>
+
+There were additional failures detected after the initial failure. These are visible in the timeline
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] fails with helper - log_test.go:70 <time>
+[FAILED] I'm failing with helper.
+In [It] at: log_test.go:44 <time>
+< Exit [It] fails with helper - log_test.go:70 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+				{
+					Name:   "[It] log redirects klog",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+`,
+					},
+					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
+INFO: before
+< Exit [BeforeEach] log - log_test.go:48 <time>
+> Enter [It] redirects klog - log_test.go:73 <time>
+<klog> log_test.go:74] hello world
+<klog> log_test.go:75] <nil>not really an error
+< Exit [It] redirects klog - log_test.go:73 <time>
+> Enter [AfterEach] log - log_test.go:51 <time>
+INFO: after
+[FAILED] true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false
+In [AfterEach] at: log_test.go:53 <time>
+< Exit [AfterEach] log - log_test.go:51 <time>
+`,
+				},
+			},
 		},
 	}
 

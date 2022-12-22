@@ -621,9 +621,11 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 func shouldDelegateList(opts storage.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
+	match := opts.ResourceVersionMatch
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(pred.Continue) > 0
 	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
 
 	// If resourceVersion is not specified, serve it from underlying
 	// storage (for backward compatibility). If a continuation is
@@ -631,7 +633,7 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	// Limits are only sent to storage when resourceVersion is non-zero
 	// since the watch cache isn't able to perform continuations, and
 	// limits are ignored when resource version is zero
-	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	return resourceVersion == "" || hasContinuation || hasLimit || unsupportedMatch
 }
 
 func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) ([]interface{}, uint64, string, error) {
@@ -655,6 +657,11 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	pred := opts.Predicate
 	if shouldDelegateList(opts) {
 		return c.storage.GetList(ctx, key, opts, listObj)
+	}
+
+	match := opts.ResourceVersionMatch
+	if match != metav1.ResourceVersionMatchNotOlderThan && match != "" {
+		return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
 	}
 
 	// If resourceVersion is specified, serve it from cache.
@@ -714,6 +721,10 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		if filter(elem.Key, elem.Labels, elem.Fields) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
+	}
+	if listVal.IsNil() {
+		// Ensure that we never return a nil Items pointer in the result for consistency.
+		listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
 	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {

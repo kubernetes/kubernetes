@@ -101,8 +101,7 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 // It guarantees you to see all events and in the order they happened.
 // Due to this guarantee there is no way it can deal with 'Resource version too old error'. It will fail in this case.
 // (See `UntilWithSync` if you'd prefer to recover from all the errors including RV too old by re-listing
-//
-//	those items. In normal code you should care about being level driven so you'd not care about not seeing all the edges.)
+// those items. In normal code you should care about being level driven so you'd not care about not seeing all the edges.)
 //
 // The most frequent usage for Until would be a test where you want to verify exact order of events ("edges").
 func Until(ctx context.Context, initialResourceVersion string, watcherClient cache.Watcher, conditions ...ConditionFunc) (*watch.Event, error) {
@@ -137,7 +136,7 @@ func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.
 
 	if precondition != nil {
 		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
-			return nil, fmt.Errorf("UntilWithSync: unable to sync caches: %v", ctx.Err())
+			return nil, fmt.Errorf("UntilWithSync: unable to sync caches: %w", ctx.Err())
 		}
 
 		done, err := precondition(indexer)

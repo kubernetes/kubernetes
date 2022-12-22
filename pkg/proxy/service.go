@@ -429,14 +429,16 @@ func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP
 //   - produce a string set which stores all other ServicePortMap's ServicePortName.String().
 //
 // For example,
-//   - A{}
-//   - B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//   - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//   - produce string set {"ns/cluster-ip:http"}
-//   - A{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 345, "UDP"}}
-//   - B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//   - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//   - produce string set {"ns/cluster-ip:http"}
+//
+//	A{}
+//	B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
+//	  A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
+//	  produce string set {"ns/cluster-ip:http"}
+//
+//	A{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 345, "UDP"}}
+//	B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
+//	  A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
+//	  produce string set {"ns/cluster-ip:http"}
 func (sm *ServicePortMap) merge(other ServicePortMap) sets.String {
 	// existingPorts is going to store all identifiers of all services in `other` ServicePortMap.
 	existingPorts := sets.NewString()

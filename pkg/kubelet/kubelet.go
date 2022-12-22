@@ -32,11 +32,13 @@ import (
 	"time"
 
 	"github.com/opencontainers/selinux/go-selinux"
+
 	"k8s.io/client-go/informers"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"go.opentelemetry.io/otel/trace"
+
 	"k8s.io/mount-utils"
 	"k8s.io/utils/integer"
 	netutils "k8s.io/utils/net"
@@ -1572,15 +1574,15 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 // Arguments:
 //
 // updateType - whether this is a create (first time) or an update, should
-//
-//	only be used for metrics since this method must be reentrant
+// only be used for metrics since this method must be reentrant
 //
 // pod - the pod that is being set up
-// mirrorPod - the mirror pod known to the kubelet for this pod, if any
-// podStatus - the most recent pod status observed for this pod which can
 //
-//	be used to determine the set of actions that should be taken during
-//	this loop of syncPod
+// mirrorPod - the mirror pod known to the kubelet for this pod, if any
+//
+// podStatus - the most recent pod status observed for this pod which can
+// be used to determine the set of actions that should be taken during
+// this loop of syncPod
 //
 // The workflow is:
 //   - If the pod is being created, record pod worker start latency

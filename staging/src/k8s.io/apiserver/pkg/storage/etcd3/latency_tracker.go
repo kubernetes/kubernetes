@@ -47,8 +47,7 @@ func NewETCDLatencyTracker(delegate clientv3.KV) clientv3.KV {
 // tracking function TrackStorageLatency is thread safe.
 //
 // NOTE: Compact is an asynchronous process and is not associated with
-//
-//	any request, so we will not be tracking its latency.
+// any request, so we will not be tracking its latency.
 type clientV3KVLatencyTracker struct {
 	clientv3.KV
 }
