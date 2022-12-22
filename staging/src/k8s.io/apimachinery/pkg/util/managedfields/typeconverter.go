@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package managedfields
 
 import (
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/apimachinery/pkg/util/managedfields/internal"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 

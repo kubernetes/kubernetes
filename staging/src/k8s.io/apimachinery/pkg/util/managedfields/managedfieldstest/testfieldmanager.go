@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanagertest
+package managedfieldstest
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal/testing"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apimachinery/pkg/util/managedfields/internal/testing"
 )
 
 // TestFieldManager is a FieldManager that can be used in test to
@@ -55,12 +55,12 @@ type TestFieldManager interface {
 
 // NewTestFieldManager returns a new TestFieldManager built for the
 // given gvk, on the main resource.
-func NewTestFieldManager(typeConverter fieldmanager.TypeConverter, gvk schema.GroupVersionKind) TestFieldManager {
+func NewTestFieldManager(typeConverter managedfields.TypeConverter, gvk schema.GroupVersionKind) TestFieldManager {
 	return testing.NewTestFieldManagerImpl(typeConverter, gvk, "", nil)
 }
 
 // NewTestFieldManagerSubresource returns a new TestFieldManager built
 // for the given gvk, on the given sub-resource.
-func NewTestFieldManagerSubresource(typeConverter fieldmanager.TypeConverter, gvk schema.GroupVersionKind, subresource string) TestFieldManager {
+func NewTestFieldManagerSubresource(typeConverter managedfields.TypeConverter, gvk schema.GroupVersionKind, subresource string) TestFieldManager {
 	return testing.NewTestFieldManagerImpl(typeConverter, gvk, subresource, nil)
 }

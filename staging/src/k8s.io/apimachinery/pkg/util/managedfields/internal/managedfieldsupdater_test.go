@@ -23,19 +23,19 @@ import (
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/apimachinery/pkg/util/managedfields/internal"
 	"sigs.k8s.io/yaml"
 )
 
 func TestManagedFieldsUpdateDoesModifyTime(t *testing.T) {
 	var err error
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = updateObject(f, "fieldmanager_test", []byte(`{
 		"apiVersion": "v1",
@@ -76,7 +76,7 @@ func TestManagedFieldsUpdateDoesModifyTime(t *testing.T) {
 
 func TestManagedFieldsApplyDoesModifyTime(t *testing.T) {
 	var err error
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = applyObject(f, "fieldmanager_test", []byte(`{
 		"apiVersion": "v1",
@@ -117,7 +117,7 @@ func TestManagedFieldsApplyDoesModifyTime(t *testing.T) {
 
 func TestManagedFieldsUpdateWithoutChangesDoesNotModifyTime(t *testing.T) {
 	var err error
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = updateObject(f, "fieldmanager_test", []byte(`{
 		"apiVersion": "v1",
@@ -158,7 +158,7 @@ func TestManagedFieldsUpdateWithoutChangesDoesNotModifyTime(t *testing.T) {
 
 func TestManagedFieldsApplyWithoutChangesDoesNotModifyTime(t *testing.T) {
 	var err error
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = applyObject(f, "fieldmanager_test", []byte(`{
 		"apiVersion": "v1",
@@ -199,7 +199,7 @@ func TestManagedFieldsApplyWithoutChangesDoesNotModifyTime(t *testing.T) {
 
 func TestNonManagedFieldsUpdateDoesNotModifyTime(t *testing.T) {
 	var err error
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = updateObject(f, "fieldmanager_a_test", []byte(`{
 		"apiVersion": "v1",
@@ -262,7 +262,7 @@ func TestNonManagedFieldsUpdateDoesNotModifyTime(t *testing.T) {
 
 func TestNonManagedFieldsApplyDoesNotModifyTime(t *testing.T) {
 	var err error
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = applyObject(f, "fieldmanager_a_test", []byte(`{
 		"apiVersion": "v1",
@@ -325,7 +325,7 @@ func TestNonManagedFieldsApplyDoesNotModifyTime(t *testing.T) {
 
 func TestTakingOverManagedFieldsDuringUpdateDoesNotModifyPreviousManagerTime(t *testing.T) {
 	var err error
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = updateObject(f, "fieldmanager_a_test", []byte(`{
 		"apiVersion": "v1",
@@ -376,7 +376,7 @@ func TestTakingOverManagedFieldsDuringUpdateDoesNotModifyPreviousManagerTime(t *
 
 func TestTakingOverManagedFieldsDuringApplyDoesNotModifyPreviousManagerTime(t *testing.T) {
 	var err error
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
+	f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ConfigMap"))
 
 	err = applyObject(f, "fieldmanager_a_test", []byte(`{
 		"apiVersion": "v1",
@@ -435,7 +435,7 @@ func (NoopManager) Update(liveObj, newObj runtime.Object, managed internal.Manag
 	return nil, nil, nil
 }
 
-func updateObject(f fieldmanagertest.TestFieldManager, fieldManagerName string, object []byte) error {
+func updateObject(f managedfieldstest.TestFieldManager, fieldManagerName string, object []byte) error {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal(object, &obj.Object); err != nil {
 		return fmt.Errorf("error decoding YAML: %v", err)
@@ -446,7 +446,7 @@ func updateObject(f fieldmanagertest.TestFieldManager, fieldManagerName string, 
 	return nil
 }
 
-func applyObject(f fieldmanagertest.TestFieldManager, fieldManagerName string, object []byte) error {
+func applyObject(f managedfieldstest.TestFieldManager, fieldManagerName string, object []byte) error {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal(object, &obj.Object); err != nil {
 		return fmt.Errorf("error decoding YAML: %v", err)

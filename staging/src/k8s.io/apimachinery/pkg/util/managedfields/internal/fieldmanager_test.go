@@ -22,13 +22,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/apimachinery/pkg/util/managedfields/internal"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 var fakeTypeConverter = func() internal.TypeConverter {
 	data, err := ioutil.ReadFile(filepath.Join(
-		strings.Repeat(".."+string(filepath.Separator), 9),
+		strings.Repeat(".."+string(filepath.Separator), 8),
 		"api", "openapi-spec", "swagger.json"))
 	if err != nil {
 		panic(err)

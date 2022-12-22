@@ -24,8 +24,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	internaltesting "k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal/testing"
+	"k8s.io/apimachinery/pkg/util/managedfields/internal"
+	internaltesting "k8s.io/apimachinery/pkg/util/managedfields/internal/testing"
 	"sigs.k8s.io/yaml"
 )
 

@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apimachinery/pkg/util/managedfields/internal"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
@@ -138,7 +138,7 @@ func (f *TestFieldManagerImpl) ManagedFields() []metav1.ManagedFieldsEntry {
 }
 
 // NewTestFieldManager creates a new manager for the given GVK.
-func NewTestFieldManagerImpl(typeConverter fieldmanager.TypeConverter, gvk schema.GroupVersionKind, subresource string, chainFieldManager func(internal.Manager) internal.Manager) *TestFieldManagerImpl {
+func NewTestFieldManagerImpl(typeConverter managedfields.TypeConverter, gvk schema.GroupVersionKind, subresource string, chainFieldManager func(internal.Manager) internal.Manager) *TestFieldManagerImpl {
 	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
 	objectConverter := &fakeObjectConvertor{sameVersionConverter{}, apiVersion}
 	f, err := internal.NewStructuredMergeManager(
