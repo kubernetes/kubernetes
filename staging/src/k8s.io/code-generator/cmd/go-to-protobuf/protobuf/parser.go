@@ -62,7 +62,7 @@ func rewriteFile(name string, header []byte, rewriteFn func(*token.FileSet, *ast
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+
 	if _, err := f.Write(body); err != nil {
 		return err
 	}

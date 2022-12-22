@@ -63,13 +63,12 @@ func NewFakeOpenAPIV3Server(specsPath string) (*FakeOpenAPIServer, error) {
 	grouped := make(map[string][]byte)
 	var testV3Specs = make(map[string]*spec3.OpenAPI)
 
-	addSpec := func(path string) {
+	addSpec := func(path string) error {
 		file, err := os.Open(path)
 		if err != nil {
 			panic(err)
 		}
 
-		defer file.Close()
 		vals, err := io.ReadAll(file)
 		if err != nil {
 			panic(err)
@@ -79,6 +78,7 @@ func NewFakeOpenAPIV3Server(specsPath string) (*FakeOpenAPIServer, error) {
 		if err == nil {
 			grouped[rel[:(len(rel)-len(filepath.Ext(rel)))]] = vals
 		}
+		return file.Close()
 	}
 
 	filepath.WalkDir(specsPath, func(path string, d fs.DirEntry, err error) error {
