@@ -151,6 +151,10 @@ var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
 	progressReporter.ProcessSpecReport(report)
 })
 
+var _ = ginkgo.ReportBeforeSuite(func(report ginkgo.Report) {
+	progressReporter.SetTestsTotal(report.PreRunStats.SpecsThatWillRun)
+})
+
 var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
 	var err error
 	// The DetailsRepoerter will output details about every test (name, files, lines, etc) which helps

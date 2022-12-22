@@ -33,11 +33,10 @@ import (
 // ProgressReporter is a ginkgo reporter which tracks the total number of tests to be run/passed/failed/skipped.
 // As new tests are completed it updates the values and prints them to stdout and optionally, sends the updates
 // to the configured URL.
-// TODO: Number of test specs is not available now, we can add it back when this is fixed in the Ginkgo V2.
-// pls see: https://github.com/kubernetes/kubernetes/issues/109744
 type ProgressReporter struct {
 	LastMsg string `json:"msg"`
 
+	TestsTotal     int `json:"total"`
 	TestsCompleted int `json:"completed"`
 	TestsSkipped   int `json:"skipped"`
 	TestsFailed    int `json:"failed"`
@@ -106,6 +105,11 @@ func (reporter *ProgressReporter) serialize() []byte {
 
 func (reporter *ProgressReporter) SetStartMsg() {
 	reporter.LastMsg = "Test Suite starting"
+	reporter.SendUpdates()
+}
+
+func (reporter *ProgressReporter) SetTestsTotal(totalSpec int) {
+	reporter.TestsTotal = totalSpec
 	reporter.SendUpdates()
 }
 
