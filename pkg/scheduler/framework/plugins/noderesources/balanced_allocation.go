@@ -78,28 +78,25 @@ func NewBalancedAllocation(baArgs runtime.Object, h framework.Handle, fts featur
 		return nil, err
 	}
 
-	resToWeightMap := make(resourceToWeightMap)
-
-	for _, resource := range args.Resources {
-		resToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
-	}
-
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			Name:                BalancedAllocationName,
-			scorer:              balancedResourceScorer,
-			useRequested:        true,
-			resourceToWeightMap: resToWeightMap,
+			Name:         BalancedAllocationName,
+			scorer:       balancedResourceScorer,
+			useRequested: true,
+			resources:    args.Resources,
 		},
 	}, nil
 }
 
-func balancedResourceScorer(requested, allocable resourceToValueMap) int64 {
+func balancedResourceScorer(requested, allocable []int64) int64 {
 	var resourceToFractions []float64
 	var totalFraction float64
-	for name, value := range requested {
-		fraction := float64(value) / float64(allocable[name])
+	for i := range requested {
+		if allocable[i] == 0 {
+			continue
+		}
+		fraction := float64(requested[i]) / float64(allocable[i])
 		if fraction > 1 {
 			fraction = 1
 		}

@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -776,6 +777,118 @@ func TestFitScore(t *testing.T) {
 
 			if !reflect.DeepEqual(test.expectedPriorities, gotPriorities) {
 				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedPriorities, gotPriorities)
+			}
+		})
+	}
+}
+
+var benchmarkResourceSet = []config.ResourceSpec{
+	{Name: string(v1.ResourceCPU), Weight: 1},
+	{Name: string(v1.ResourceMemory), Weight: 1},
+	{Name: string(v1.ResourcePods), Weight: 1},
+	{Name: string(v1.ResourceStorage), Weight: 1},
+	{Name: string(v1.ResourceEphemeralStorage), Weight: 1},
+	{Name: string(extendedResourceA), Weight: 1},
+	{Name: string(extendedResourceB), Weight: 1},
+	{Name: string(kubernetesIOResourceA), Weight: 1},
+	{Name: string(kubernetesIOResourceB), Weight: 1},
+	{Name: string(hugePageResourceA), Weight: 1},
+}
+
+func BenchmarkTestFitScore(b *testing.B) {
+	tests := []struct {
+		name                 string
+		nodeResourcesFitArgs config.NodeResourcesFitArgs
+	}{
+		{
+			name: "RequestedToCapacityRatio with defaultResources",
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.RequestedToCapacityRatio,
+					Resources: defaultResources,
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: []config.UtilizationShapePoint{
+							{Utilization: 0, Score: 10},
+							{Utilization: 100, Score: 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "RequestedToCapacityRatio with 10 resources",
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.RequestedToCapacityRatio,
+					Resources: benchmarkResourceSet,
+					RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+						Shape: []config.UtilizationShapePoint{
+							{Utilization: 0, Score: 10},
+							{Utilization: 100, Score: 0},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "MostAllocated with defaultResources",
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.MostAllocated,
+					Resources: defaultResources,
+				},
+			},
+		},
+		{
+			name: "MostAllocated with 10 resources",
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.MostAllocated,
+					Resources: benchmarkResourceSet,
+				},
+			},
+		},
+		{
+			name: "LeastAllocated with defaultResources",
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.LeastAllocated,
+					Resources: defaultResources,
+				},
+			},
+		},
+		{
+			name: "LeastAllocated with 10 resources",
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.LeastAllocated,
+					Resources: benchmarkResourceSet,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		b.Run(test.name, func(b *testing.B) {
+			existingPods := []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "2000", "memory": "4000"}).Obj(),
+			}
+			nodes := []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+			}
+			state := framework.NewCycleState()
+			var nodeResourcesFunc = runtime.FactoryAdapter(plfeature.Features{}, NewFit)
+			pl := plugintesting.SetupPlugin(b, nodeResourcesFunc, &test.nodeResourcesFitArgs, cache.NewSnapshot(existingPods, nodes))
+			p := pl.(*Fit)
+
+			b.ResetTimer()
+
+			requestedPod := st.MakePod().Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj()
+			for i := 0; i < b.N; i++ {
+				_, status := p.Score(context.Background(), state, requestedPod, nodes[0].Name)
+				if !status.IsSuccess() {
+					b.Errorf("unexpected status: %v", status)
+				}
 			}
 		})
 	}
