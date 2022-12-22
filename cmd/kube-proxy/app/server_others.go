@@ -240,10 +240,10 @@ func newProxyServer(
 	} else if proxyMode == proxyconfigapi.ProxyModeIPVS {
 		kernelHandler := ipvs.NewLinuxKernelHandler()
 		ipsetInterface = utilipset.New(execer)
-		if err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface, config.IPVS.Scheduler); err != nil {
+		ipvsInterface = utilipvs.New()
+		if err := ipvs.CanUseIPVSProxier(ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
-		ipvsInterface = utilipvs.New()
 
 		klog.InfoS("Using ipvs Proxier")
 		if dualStack {

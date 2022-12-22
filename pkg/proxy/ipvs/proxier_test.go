@@ -75,21 +75,60 @@ func (f *fakeIPGetter) BindedIPs() (sets.String, error) {
 	return f.bindedIPs, nil
 }
 
-// fakeKernelHandler implements KernelHandler.
-type fakeKernelHandler struct {
-	modules       []string
-	kernelVersion string
+// fakeIpvs implements utilipvs.Interface
+type fakeIpvs struct {
+	ipvsErr string
+	vsCreated bool
+}
+func (f *fakeIpvs) Flush() error {
+	return nil
+}
+func (f *fakeIpvs) AddVirtualServer(*utilipvs.VirtualServer) error {
+	if f.ipvsErr == "AddVirtualServer" {
+		return fmt.Errorf("oops")
+	}
+	f.vsCreated = true
+	return nil
+}
+func (f *fakeIpvs) UpdateVirtualServer(*utilipvs.VirtualServer) error {
+	return nil
+}
+func (f *fakeIpvs) DeleteVirtualServer(*utilipvs.VirtualServer) error {
+	if f.ipvsErr == "DeleteVirtualServer" {
+		return fmt.Errorf("oops")
+	}
+	return nil
+}
+func (f *fakeIpvs) GetVirtualServer(*utilipvs.VirtualServer) (*utilipvs.VirtualServer, error) {
+	return nil, nil
+}
+func (f *fakeIpvs) GetVirtualServers() ([]*utilipvs.VirtualServer, error) {
+	if f.ipvsErr == "GetVirtualServers" {
+		return nil, fmt.Errorf("oops")
+	}
+	if f.vsCreated {
+		vs := []*utilipvs.VirtualServer{&utilipvs.VirtualServer{}}
+		return vs, nil
+	}
+	return nil, nil
+}
+func (f *fakeIpvs) AddRealServer(*utilipvs.VirtualServer, *utilipvs.RealServer) error {
+	return nil
+}
+func (f *fakeIpvs) GetRealServers(*utilipvs.VirtualServer) ([]*utilipvs.RealServer, error) {
+	return nil, nil
+}
+func (f *fakeIpvs) DeleteRealServer(*utilipvs.VirtualServer, *utilipvs.RealServer) error {
+	return nil
+}
+func (f *fakeIpvs) UpdateRealServer(*utilipvs.VirtualServer, *utilipvs.RealServer) error {
+	return nil
+}
+func (f *fakeIpvs) ConfigureTimeouts(time.Duration, time.Duration, time.Duration) error {
+	return nil
 }
 
-func (fake *fakeKernelHandler) GetModules() ([]string, error) {
-	return fake.modules, nil
-}
-
-func (fake *fakeKernelHandler) GetKernelVersion() (string, error) {
-	return fake.kernelVersion, nil
-}
-
-// fakeKernelHandler implements KernelHandler.
+// fakeIPSetVersioner implements IPSetVersioner.
 type fakeIPSetVersioner struct {
 	version string
 	err     error
@@ -273,88 +312,57 @@ func TestCleanupLeftovers(t *testing.T) {
 
 func TestCanUseIPVSProxier(t *testing.T) {
 	testCases := []struct {
-		mods          []string
+		name          string
 		scheduler     string
-		kernelVersion string
-		kernelErr     error
 		ipsetVersion  string
 		ipsetErr      error
+		ipvsErr       string
 		ok            bool
 	}{
-		// case 0, kernel error
 		{
-			mods:          []string{"foo", "bar", "baz"},
-			scheduler:     "",
-			kernelVersion: "4.19",
-			kernelErr:     fmt.Errorf("oops"),
-			ipsetVersion:  "0.0",
-			ok:            false,
+			name:          "happy days",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            true,
 		},
-		// case 1, ipset error
 		{
-			mods:          []string{"foo", "bar", "baz"},
+			name:          "ipset error",
 			scheduler:     "",
-			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ipsetErr:      fmt.Errorf("oops"),
 			ok:            false,
 		},
-		// case 2, missing required kernel modules and ipset version too low
 		{
-			mods:          []string{"foo", "bar", "baz"},
+			name:          "ipset version too low",
 			scheduler:     "rr",
-			kernelVersion: "4.19",
-			ipsetVersion:  "1.1",
-			ok:            false,
-		},
-		// case 4, ipset version too low
-		{
-			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
-			scheduler:     "rr",
-			kernelVersion: "4.19",
 			ipsetVersion:  "4.3.0",
 			ok:            false,
 		},
-		// case 5, ok for linux kernel 4.19
 		{
-			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
-			scheduler:     "rr",
-			kernelVersion: "4.19",
+			name:          "GetVirtualServers fail",
 			ipsetVersion:  MinIPSetCheckVersion,
-			ok:            true,
+			ipvsErr:       "GetVirtualServers",
+			ok:            false,
 		},
-		// case 6, ok for linux kernel 4.18
 		{
-			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
-			scheduler:     "rr",
-			kernelVersion: "4.18",
+			name:          "AddVirtualServer fail",
 			ipsetVersion:  MinIPSetCheckVersion,
-			ok:            true,
+			ipvsErr:       "AddVirtualServer",
+			ok:            false,
 		},
-		// case 7. ok when module list has extra modules
 		{
-			mods:          []string{"foo", "ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "bar"},
-			scheduler:     "rr",
-			kernelVersion: "4.19",
-			ipsetVersion:  "6.19",
-			ok:            true,
-		},
-		// case 9, ok for dh based IPVS scheduling
-		{
-			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_dh"},
-			scheduler:     "dh",
-			kernelVersion: "4.19",
+			name:          "DeleteVirtualServer fail",
 			ipsetVersion:  MinIPSetCheckVersion,
-			ok:            true,
+			ipvsErr:       "DeleteVirtualServer",
+			ok:            false,
 		},
 	}
 
-	for i := range testCases {
-		handle := &fakeKernelHandler{modules: testCases[i].mods, kernelVersion: testCases[i].kernelVersion}
-		versioner := &fakeIPSetVersioner{version: testCases[i].ipsetVersion, err: testCases[i].ipsetErr}
-		err := CanUseIPVSProxier(handle, versioner, testCases[i].scheduler)
-		if (err == nil) != testCases[i].ok {
-			t.Errorf("Case [%d], expect %v, got err: %v", i, testCases[i].ok, err)
+	for _, tc := range testCases {
+		ipvs := &fakeIpvs{tc.ipvsErr, false}
+		versioner := &fakeIPSetVersioner{version: tc.ipsetVersion, err: tc.ipsetErr}
+		err := CanUseIPVSProxier(ipvs, versioner, tc.scheduler)
+		if (err == nil) != tc.ok {
+			t.Errorf("Case [%s], expect %v, got err: %v", tc.name, tc.ok, err)
 		}
 	}
 }
