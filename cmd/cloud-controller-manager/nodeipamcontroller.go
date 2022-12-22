@@ -132,7 +132,7 @@ func startNodeIpamController(initContext app.ControllerInitContext, ccmConfig *c
 		ctx.InformerFactory.Core().V1().Nodes(),
 		clusterCIDRInformer,
 		cloud,
-		ctx.ClientBuilder.ClientOrDie(initContext.ClientName),
+		ctx.ClientBuilder.ClientOrDie(klog.FromContext(context.TODO()), initContext.ClientName),
 		clusterCIDRs,
 		serviceCIDR,
 		secondaryServiceCIDR,

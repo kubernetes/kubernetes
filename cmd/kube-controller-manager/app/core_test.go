@@ -29,6 +29,8 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestClientBuilder inherits ClientBuilder and can accept a given fake clientset.
@@ -37,19 +39,19 @@ type TestClientBuilder struct {
 }
 
 func (TestClientBuilder) Config(name string) (*restclient.Config, error) { return nil, nil }
-func (TestClientBuilder) ConfigOrDie(name string) *restclient.Config {
+func (TestClientBuilder) ConfigOrDie(logger klog.Logger, name string) *restclient.Config {
 	return &restclient.Config{}
 }
 
 func (TestClientBuilder) Client(name string) (clientset.Interface, error) { return nil, nil }
-func (m TestClientBuilder) ClientOrDie(name string) clientset.Interface {
+func (m TestClientBuilder) ClientOrDie(logger klog.Logger, name string) clientset.Interface {
 	return m.clientset
 }
 
 func (m TestClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
 	return m.clientset.Discovery(), nil
 }
-func (m TestClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
+func (m TestClientBuilder) DiscoveryClientOrDie(logger klog.Logger, name string) discovery.DiscoveryInterface {
 	ret, err := m.DiscoveryClient(name)
 	if err != nil {
 		panic(err)
@@ -108,6 +110,7 @@ func possibleDiscoveryResource() []*metav1.APIResourceList {
 type controllerInitFunc func(context.Context, ControllerContext) (controller.Interface, bool, error)
 
 func TestController_DiscoveryError(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
 	controllerInitFuncMap := map[string]controllerInitFunc{
 		"ResourceQuotaController":          startResourceQuotaController,
 		"GarbageCollectorController":       startGarbageCollectorController,
@@ -137,20 +140,20 @@ func TestController_DiscoveryError(t *testing.T) {
 		testClientset := NewFakeClientset(testDiscovery)
 		testClientBuilder := TestClientBuilder{clientset: testClientset}
 		testInformerFactory := informers.NewSharedInformerFactoryWithOptions(testClientset, time.Duration(1))
-		ctx := ControllerContext{
+		contCtx := ControllerContext{
 			ClientBuilder:                   testClientBuilder,
 			InformerFactory:                 testInformerFactory,
 			ObjectOrMetadataInformerFactory: testInformerFactory,
 			InformersStarted:                make(chan struct{}),
 		}
 		for funcName, controllerInit := range controllerInitFuncMap {
-			_, _, err := controllerInit(context.TODO(), ctx)
+			_, _, err := controllerInit(context.TODO(), contCtx)
 			if test.expectedErr != (err != nil) {
 				t.Errorf("%v test failed for use case: %v", funcName, name)
 			}
 		}
 		_, _, err := startModifiedNamespaceController(
-			context.TODO(), ctx, testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
+			ctx, contCtx, testClientset, testClientBuilder.ConfigOrDie(logger, "namespace-controller"))
 		if test.expectedErr != (err != nil) {
 			t.Errorf("Namespace Controller test failed for use case: %v", name)
 		}

@@ -224,7 +224,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
 	run := func(ctx context.Context, startSATokenController InitFunc, initializersFunc ControllerInitializersFunc) {
-		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx)
+		controllerContext, err := CreateControllerContext(ctx, c, rootClientBuilder, clientBuilder)
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
 		}
@@ -486,8 +486,8 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 // TODO: In general, any controller checking this needs to be dynamic so
 // users don't have to restart their controller manager if they change the apiserver.
 // Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
-func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
-	client := clientBuilder.ClientOrDie("controller-discovery")
+func GetAvailableResources(ctx context.Context, clientBuilder clientbuilder.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
+	client := clientBuilder.ClientOrDie(klog.FromContext(ctx), "controller-discovery")
 	discoveryClient := client.Discovery()
 	_, resourceMap, err := discoveryClient.ServerGroupsAndResources()
 	if err != nil {
@@ -514,11 +514,11 @@ func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) 
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
-func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder, ctx context.Context) (ControllerContext, error) {
+func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder) (ControllerContext, error) {
 	versionedClient := rootClientBuilder.ClientOrDie(klog.FromContext(ctx), "shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
-	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))
+	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie(klog.FromContext(ctx), "metadata-informers"))
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, ResyncPeriod(s)())
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
@@ -535,7 +535,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		restMapper.Reset()
 	}, 30*time.Second, ctx.Done())
 
-	availableResources, err := GetAvailableResources(rootClientBuilder)
+	availableResources, err := GetAvailableResources(ctx, rootClientBuilder)
 	if err != nil {
 		return ControllerContext{}, err
 	}

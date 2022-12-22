@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 // ControllerClientBuilder allows you to get clients and configs for controllers
@@ -34,9 +35,9 @@ import (
 // TODO: Make this depend on the separate controller utilities repo (issues/68947)
 type ControllerClientBuilder interface {
 	Config(name string) (*restclient.Config, error)
-	ConfigOrDie(name string) *restclient.Config
+	ConfigOrDie(logger klog.Logger, name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
-	ClientOrDie(name string) clientset.Interface
+	ClientOrDie(logger klog.Logger, name string) clientset.Interface
 }
 
 // Interface is an abstract, pluggable interface for cloud providers.
