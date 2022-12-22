@@ -52,7 +52,8 @@ func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, 
 func (b SimpleControllerClientBuilder) ConfigOrDie(logger klog.Logger, name string) *restclient.Config {
 	clientConfig, err := b.Config(name)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "error in ConfigOrDie")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return clientConfig
 }
@@ -71,7 +72,8 @@ func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface,
 func (b SimpleControllerClientBuilder) ClientOrDie(logger klog.Logger, name string) clientset.Interface {
 	client, err := b.Client(name)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "error in ClientOrDie")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return client
 }
@@ -96,7 +98,8 @@ func (b SimpleControllerClientBuilder) DiscoveryClient(name string) (discovery.D
 func (b SimpleControllerClientBuilder) DiscoveryClientOrDie(logger klog.Logger, name string) discovery.DiscoveryInterface {
 	client, err := b.DiscoveryClient(name)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "error in DiscoveryClientOrDie")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return client
 }

@@ -260,7 +260,7 @@ func getOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, nam
 	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
 	if _, err := coreClient.Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		if _, err = coreClient.Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-			klog.Warningf("create non-exist namespace %s failed:%v", namespace, err)
+			klog.FromContext(context.TODO()).Info("create non-exist namespace failed", "namespace", namespace, "error", err)
 		}
 	}
 
