@@ -291,3 +291,17 @@ func (ft *failingTransformer) TransformFromStorage(ctx context.Context, data []b
 func (ft *failingTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	return data, nil
 }
+
+type sortablePodList []example.Pod
+
+func (s sortablePodList) Len() int {
+	return len(s)
+}
+
+func (s sortablePodList) Less(i, j int) bool {
+	return computePodKey(&s[i]) < computePodKey(&s[j])
+}
+
+func (s sortablePodList) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
