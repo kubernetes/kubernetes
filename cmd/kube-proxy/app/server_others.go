@@ -165,11 +165,11 @@ func newProxyServer(
 		ipt[1] = iptInterface
 	}
 
-	for _, perFamilyIpt := range ipt {
-		if !perFamilyIpt.Present() {
-			klog.InfoS("kube-proxy running in single-stack mode, this ipFamily is not supported", "ipFamily", perFamilyIpt.Protocol())
-			dualStack = false
-		}
+	if !ipt[0].Present() {
+		return nil, fmt.Errorf("iptables is not supported for primary IP family %q", primaryProtocol)
+	} else if !ipt[1].Present() {
+		klog.InfoS("kube-proxy running in single-stack mode: secondary ipFamily is not supported", "ipFamily", ipt[1].Protocol())
+		dualStack = false
 	}
 
 	if proxyMode == proxyconfigapi.ProxyModeIPTables {
