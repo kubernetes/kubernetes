@@ -145,8 +145,10 @@ func newProxyServer(
 
 	klog.V(2).InfoS("DetectLocalMode", "LocalMode", string(detectLocalMode))
 
+	primaryFamily := v1.IPv4Protocol
 	primaryProtocol := utiliptables.ProtocolIPv4
 	if netutils.IsIPv6(nodeIP) {
+		primaryFamily = v1.IPv6Protocol
 		primaryProtocol = utiliptables.ProtocolIPv6
 	}
 	execer := exec.New()
@@ -216,6 +218,7 @@ func newProxyServer(
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
+				primaryFamily,
 				iptInterface,
 				utilsysctl.New(),
 				execer,
@@ -290,6 +293,7 @@ func newProxyServer(
 			}
 
 			proxier, err = ipvs.NewProxier(
+				primaryFamily,
 				iptInterface,
 				ipvsInterface,
 				ipsetInterface,
