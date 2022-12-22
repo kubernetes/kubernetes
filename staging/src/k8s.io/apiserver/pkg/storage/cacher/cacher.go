@@ -659,11 +659,6 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
-	match := opts.ResourceVersionMatch
-	if match != metav1.ResourceVersionMatchNotOlderThan && match != "" {
-		return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
-	}
-
 	// If resourceVersion is specified, serve it from cache.
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
