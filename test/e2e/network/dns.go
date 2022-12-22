@@ -559,11 +559,6 @@ var _ = common.SIGDescribe("DNS", func() {
 	})
 
 	ginkgo.It("should work with the pod containing more than 6 DNS search paths and longer than 256 search list characters", func(ctx context.Context) {
-		ginkgo.By("Getting the kube-dns IP")
-		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(ctx, "kube-dns", metav1.GetOptions{})
-		framework.ExpectNoError(err, "Failed to get kube-dns service")
-		kubednsIP := svc.Spec.ClusterIP
-
 		// All the names we need to be able to resolve.
 		namesToResolve := []string{
 			"kubernetes.default",
@@ -590,8 +585,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		pod.Spec.DNSPolicy = v1.DNSClusterFirst
 		pod.Spec.DNSConfig = &v1.PodDNSConfig{
-			Nameservers: []string{kubednsIP},
-			Searches:    testSearchPaths,
+			Searches: testSearchPaths,
 			Options: []v1.PodDNSConfigOption{
 				{
 					Name:  "ndots",
