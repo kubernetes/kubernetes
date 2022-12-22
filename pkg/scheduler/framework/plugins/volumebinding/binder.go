@@ -147,9 +147,9 @@ type InTreeToCSITranslator interface {
 //  2. Once all the assume operations are done in e), the scheduler processes the next Pod in the scheduler queue
 //     while the actual binding operation occurs in the background.
 type SchedulerVolumeBinder interface {
-	// GetPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
-	// and unbound with immediate binding (including prebound)
-	GetPodVolumes(pod *v1.Pod) (boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error)
+	// GetPodVolumeClaims returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning),
+	// unbound with immediate binding (including prebound) and PVs that belong to storage classes of unbound PVCs with delayed binding.
+	GetPodVolumeClaims(pod *v1.Pod) (podVolumeClaims *PodVolumeClaims, err error)
 
 	// GetEligibleNodes checks the existing bound claims of the pod to determine if the list of nodes can be
 	// potentially reduced down to a subset of eligible nodes based on the bound claims which then can be used
@@ -172,7 +172,7 @@ type SchedulerVolumeBinder interface {
 	// for volumes that still need to be created.
 	//
 	// This function is called by the scheduler VolumeBinding plugin and can be called in parallel
-	FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error)
+	FindPodVolumes(pod *v1.Pod, podVolumeClaims *PodVolumeClaims, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error)
 
 	// AssumePodVolumes will:
 	// 1. Take the PV matches for unbound PVCs and update the PV cache assuming
@@ -197,6 +197,17 @@ type SchedulerVolumeBinder interface {
 	//
 	// This function can be called in parallel.
 	BindPodVolumes(ctx context.Context, assumedPod *v1.Pod, podVolumes *PodVolumes) error
+}
+
+type PodVolumeClaims struct {
+	// boundClaims are the pod's bound PVCs.
+	boundClaims []*v1.PersistentVolumeClaim
+	// unboundClaimsDelayBinding are the pod's unbound with delayed binding (including provisioning) PVCs.
+	unboundClaimsDelayBinding []*v1.PersistentVolumeClaim
+	// unboundClaimsImmediate are the pod's unbound with immediate binding PVCs (i.e., supposed to be bound already) .
+	unboundClaimsImmediate []*v1.PersistentVolumeClaim
+	// unboundVolumesDelayBinding are PVs that belong to storage classes of the pod's unbound PVCs with delayed binding.
+	unboundVolumesDelayBinding map[string][]*v1.PersistentVolume
 }
 
 type volumeBinder struct {
@@ -263,7 +274,7 @@ func NewVolumeBinder(
 // FindPodVolumes finds the matching PVs for PVCs and nodes to provision PVs
 // for the given pod and node. If the node does not fit, conflict reasons are
 // returned.
-func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
+func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, podVolumeClaims *PodVolumeClaims, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
 	podVolumes = &PodVolumes{}
 
 	// Warning: Below log needs high verbosity as it can be printed several times (#60933).
@@ -318,22 +329,22 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 	}()
 
 	// Check PV node affinity on bound volumes
-	if len(boundClaims) > 0 {
-		boundVolumesSatisfied, boundPVsFound, err = b.checkBoundClaims(boundClaims, node, pod)
+	if len(podVolumeClaims.boundClaims) > 0 {
+		boundVolumesSatisfied, boundPVsFound, err = b.checkBoundClaims(podVolumeClaims.boundClaims, node, pod)
 		if err != nil {
 			return
 		}
 	}
 
 	// Find matching volumes and node for unbound claims
-	if len(claimsToBind) > 0 {
+	if len(podVolumeClaims.unboundClaimsDelayBinding) > 0 {
 		var (
 			claimsToFindMatching []*v1.PersistentVolumeClaim
 			claimsToProvision    []*v1.PersistentVolumeClaim
 		)
 
 		// Filter out claims to provision
-		for _, claim := range claimsToBind {
+		for _, claim := range podVolumeClaims.unboundClaimsDelayBinding {
 			if selectedNode, ok := claim.Annotations[volume.AnnSelectedNode]; ok {
 				if selectedNode != node.Name {
 					// Fast path, skip unmatched node.
@@ -349,7 +360,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 		// Find matching volumes
 		if len(claimsToFindMatching) > 0 {
 			var unboundClaims []*v1.PersistentVolumeClaim
-			unboundVolumesSatisfied, staticBindings, unboundClaims, err = b.findMatchingVolumes(pod, claimsToFindMatching, node)
+			unboundVolumesSatisfied, staticBindings, unboundClaims, err = b.findMatchingVolumes(pod, claimsToFindMatching, podVolumeClaims.unboundVolumesDelayBinding, node)
 			if err != nil {
 				return
 			}
@@ -804,40 +815,49 @@ func (b *volumeBinder) arePodVolumesBound(pod *v1.Pod) bool {
 	return true
 }
 
-// GetPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
-// and unbound with immediate binding (including prebound)
-func (b *volumeBinder) GetPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentVolumeClaim, unboundClaimsDelayBinding []*v1.PersistentVolumeClaim, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
-	boundClaims = []*v1.PersistentVolumeClaim{}
-	unboundClaimsImmediate = []*v1.PersistentVolumeClaim{}
-	unboundClaimsDelayBinding = []*v1.PersistentVolumeClaim{}
+// GetPodVolumeClaims returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning),
+// unbound with immediate binding (including prebound) and PVs that belong to storage classes of unbound PVCs with delayed binding.
+func (b *volumeBinder) GetPodVolumeClaims(pod *v1.Pod) (podVolumeClaims *PodVolumeClaims, err error) {
+	podVolumeClaims = &PodVolumeClaims{
+		boundClaims:               []*v1.PersistentVolumeClaim{},
+		unboundClaimsImmediate:    []*v1.PersistentVolumeClaim{},
+		unboundClaimsDelayBinding: []*v1.PersistentVolumeClaim{},
+	}
 
 	for _, vol := range pod.Spec.Volumes {
 		volumeBound, pvc, err := b.isVolumeBound(pod, &vol)
 		if err != nil {
-			return nil, nil, nil, err
+			return podVolumeClaims, err
 		}
 		if pvc == nil {
 			continue
 		}
 		if volumeBound {
-			boundClaims = append(boundClaims, pvc)
+			podVolumeClaims.boundClaims = append(podVolumeClaims.boundClaims, pvc)
 		} else {
 			delayBindingMode, err := volume.IsDelayBindingMode(pvc, b.classLister)
 			if err != nil {
-				return nil, nil, nil, err
+				return podVolumeClaims, err
 			}
 			// Prebound PVCs are treated as unbound immediate binding
 			if delayBindingMode && pvc.Spec.VolumeName == "" {
 				// Scheduler path
-				unboundClaimsDelayBinding = append(unboundClaimsDelayBinding, pvc)
+				podVolumeClaims.unboundClaimsDelayBinding = append(podVolumeClaims.unboundClaimsDelayBinding, pvc)
 			} else {
 				// !delayBindingMode || pvc.Spec.VolumeName != ""
 				// Immediate binding should have already been bound
-				unboundClaimsImmediate = append(unboundClaimsImmediate, pvc)
+				podVolumeClaims.unboundClaimsImmediate = append(podVolumeClaims.unboundClaimsImmediate, pvc)
 			}
 		}
 	}
-	return boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate, nil
+
+	podVolumeClaims.unboundVolumesDelayBinding = map[string][]*v1.PersistentVolume{}
+	for _, pvc := range podVolumeClaims.unboundClaimsDelayBinding {
+		// Get storage class name from each PVC
+		storageClassName := volume.GetPersistentVolumeClaimClass(pvc)
+		podVolumeClaims.unboundVolumesDelayBinding[storageClassName] = b.pvCache.ListPVs(storageClassName)
+	}
+	return podVolumeClaims, nil
 }
 
 func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node *v1.Node, pod *v1.Pod) (bool, bool, error) {
@@ -876,7 +896,7 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 
 // findMatchingVolumes tries to find matching volumes for given claims,
 // and return unbound claims for further provision.
-func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node) (foundMatches bool, bindings []*BindingInfo, unboundClaims []*v1.PersistentVolumeClaim, err error) {
+func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.PersistentVolumeClaim, unboundVolumesDelayBinding map[string][]*v1.PersistentVolume, node *v1.Node) (foundMatches bool, bindings []*BindingInfo, unboundClaims []*v1.PersistentVolumeClaim, err error) {
 	// Sort all the claims by increasing size request to get the smallest fits
 	sort.Sort(byPVCSize(claimsToBind))
 
@@ -887,10 +907,10 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 	for _, pvc := range claimsToBind {
 		// Get storage class name from each PVC
 		storageClassName := volume.GetPersistentVolumeClaimClass(pvc)
-		allPVs := b.pvCache.ListPVs(storageClassName)
+		pvs := unboundVolumesDelayBinding[storageClassName]
 
 		// Find a matching PV
-		pv, err := volume.FindMatchingVolume(pvc, allPVs, node, chosenPVs, true)
+		pv, err := volume.FindMatchingVolume(pvc, pvs, node, chosenPVs, true)
 		if err != nil {
 			return false, nil, nil, err
 		}
