@@ -720,53 +720,8 @@ func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 }
 
 // CanUseIPVSProxier checks if we can use the ipvs Proxier.
-// This is determined by checking if all the required kernel modules can be loaded. It may
-// return an error if it fails to get the kernel modules information without error, in which
-// case it will also return false.
+// Only the ipset version is checked. Necessary kernel functions are assumed to be present.
 func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler string) error {
-	mods, err := handle.GetModules()
-	if err != nil {
-		return fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
-	}
-	loadModules := sets.NewString()
-	loadModules.Insert(mods...)
-
-	kernelVersionStr, err := handle.GetKernelVersion()
-	if err != nil {
-		return fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
-	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
-	wantModules := sets.NewString()
-	// We check for the existence of the scheduler mod and will trigger a missingMods error if not found
-	if scheduler == "" {
-		scheduler = defaultScheduler
-	}
-	schedulerMod := "ip_vs_" + scheduler
-	mods = append(mods, schedulerMod)
-	wantModules.Insert(mods...)
-
-	modules := wantModules.Difference(loadModules).UnsortedList()
-	var missingMods []string
-	ConntrackiMissingCounter := 0
-	for _, mod := range modules {
-		if strings.Contains(mod, "nf_conntrack") {
-			ConntrackiMissingCounter++
-		} else {
-			missingMods = append(missingMods, mod)
-		}
-	}
-	if ConntrackiMissingCounter == 2 {
-		missingMods = append(missingMods, "nf_conntrack_ipv4(or nf_conntrack for Linux kernel 4.19 and later)")
-	}
-
-	if len(missingMods) != 0 {
-		return fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
-	}
-
 	// Check ipset version
 	versionString, err := ipsetver.GetVersion()
 	if err != nil {

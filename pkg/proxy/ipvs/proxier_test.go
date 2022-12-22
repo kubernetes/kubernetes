@@ -307,14 +307,6 @@ func TestCanUseIPVSProxier(t *testing.T) {
 			ipsetVersion:  "1.1",
 			ok:            false,
 		},
-		// case 3, missing required ip_vs_* kernel modules
-		{
-			mods:          []string{"ip_vs", "a", "bc", "def"},
-			scheduler:     "sed",
-			kernelVersion: "4.19",
-			ipsetVersion:  MinIPSetCheckVersion,
-			ok:            false,
-		},
 		// case 4, ipset version too low
 		{
 			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
@@ -347,14 +339,6 @@ func TestCanUseIPVSProxier(t *testing.T) {
 			ipsetVersion:  "6.19",
 			ok:            true,
 		},
-		// case 8, not ok for sed based IPVS scheduling
-		{
-			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
-			scheduler:     "sed",
-			kernelVersion: "4.19",
-			ipsetVersion:  MinIPSetCheckVersion,
-			ok:            false,
-		},
 		// case 9, ok for dh based IPVS scheduling
 		{
 			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_dh"},
@@ -362,14 +346,6 @@ func TestCanUseIPVSProxier(t *testing.T) {
 			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            true,
-		},
-		// case 10, non-existent scheduler, error due to modules not existing
-		{
-			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_dh"},
-			scheduler:     "foobar",
-			kernelVersion: "4.19",
-			ipsetVersion:  MinIPSetCheckVersion,
-			ok:            false,
 		},
 	}
 
