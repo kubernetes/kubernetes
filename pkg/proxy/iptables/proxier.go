@@ -260,13 +260,6 @@ func NewProxier(ipFamily v1.IPFamily,
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
 
-	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
-	nodePortAddresses = ipFamilyMap[ipFamily]
-	// Log the IPs not matching the ipFamily
-	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
-		klog.InfoS("Found node IPs of the wrong family", "ipFamily", ipFamily, "IPs", strings.Join(ips, ","))
-	}
-
 	proxier := &Proxier{
 		svcPortMap:               make(proxy.ServicePortMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),

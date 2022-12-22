@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -167,11 +168,22 @@ func newProxyServer(
 		ipt[1] = iptInterface
 	}
 
+	nodePortAddresses := config.NodePortAddresses
+
 	if !ipt[0].Present() {
 		return nil, fmt.Errorf("iptables is not supported for primary IP family %q", primaryProtocol)
 	} else if !ipt[1].Present() {
 		klog.InfoS("kube-proxy running in single-stack mode: secondary ipFamily is not supported", "ipFamily", ipt[1].Protocol())
 		dualStack = false
+
+		// Validate NodePortAddresses is single-stack
+		npaByFamily := proxyutil.MapCIDRsByIPFamily(config.NodePortAddresses)
+		secondaryFamily := proxyutil.OtherIPFamily(primaryFamily)
+		badAddrs := npaByFamily[secondaryFamily]
+		if len(badAddrs) > 0 {
+			klog.InfoS("Ignoring --nodeport-addresses of the wrong family", "ipFamily", secondaryFamily, "addresses", badAddrs)
+			nodePortAddresses = npaByFamily[primaryFamily]
+		}
 	}
 
 	if proxyMode == proxyconfigapi.ProxyModeIPTables {
@@ -206,7 +218,7 @@ func newProxyServer(
 				nodeIPTuple(config.BindAddress),
 				recorder,
 				healthzServer,
-				config.NodePortAddresses,
+				nodePortAddresses,
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
@@ -232,7 +244,7 @@ func newProxyServer(
 				nodeIP,
 				recorder,
 				healthzServer,
-				config.NodePortAddresses,
+				nodePortAddresses,
 			)
 		}
 
@@ -282,7 +294,7 @@ func newProxyServer(
 				recorder,
 				healthzServer,
 				config.IPVS.Scheduler,
-				config.NodePortAddresses,
+				nodePortAddresses,
 				kernelHandler,
 			)
 		} else {
@@ -314,7 +326,7 @@ func newProxyServer(
 				recorder,
 				healthzServer,
 				config.IPVS.Scheduler,
-				config.NodePortAddresses,
+				nodePortAddresses,
 				kernelHandler,
 			)
 		}

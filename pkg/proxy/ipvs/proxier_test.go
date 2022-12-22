@@ -2117,11 +2117,11 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::"), Mask: net.CIDRMask(64, 128)}}
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = []string{"100.101.102.0/24", "2001:db8::0/64"}
+	fp.nodePortAddresses = []string{"100.101.102.0/24"}
 
 	fp.syncProxyRules()
 
-	// Expect 2 (matching ipvs IPFamily field)  services and 1 destination
+	// Expect 2 services and 1 destination
 	epVS := &netlinktest.ExpectedVirtualServer{
 		VSNum: 2, IP: nodeIP.String(), Port: uint16(svcNodePort), Protocol: string(v1.ProtocolTCP),
 		RS: []netlinktest.ExpectedRealServer{{
@@ -2205,7 +2205,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::"), Mask: net.CIDRMask(64, 128)}}
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = []string{"100.101.102.0/24", "2001:db8::0/64"}
+	fp.nodePortAddresses = []string{"100.101.102.0/24"}
 
 	fp.syncProxyRules()
 
