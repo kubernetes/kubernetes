@@ -665,6 +665,10 @@ func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, schedul
 		return fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
 	}
 
+	if scheduler == "" {
+		scheduler = defaultScheduler
+	}
+
 	// Check is any virtual servers (vs) are configured. If any, we assume
 	// that this is a kube-proxy re-start and skip the checks.
 	vservers, err := ipvs.GetVirtualServers()
