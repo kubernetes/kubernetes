@@ -464,7 +464,7 @@ func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.
 				// but in the expected case we'll only make one.
 				for try := 0; try < len(ss.Addresses); try++ {
 					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
-					// TODO(thockin): do we really need this check?
+					// We only proxy to addresses that are actually pods.
 					if err := isValidAddress(ctx, &addr, r.pods); err != nil {
 						utilruntime.HandleError(fmt.Errorf("Address %v isn't valid (%v)", addr, err))
 						continue
