@@ -720,11 +720,20 @@ func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 }
 
 // CanUseIPVSProxier checks if we can use the ipvs Proxier.
-// If the ipvs already has virtual servers (VS) we assume this is a re-start and
-// skip the tests. If the ipvs is empty we try to add a VS with the passed scheduler.
-// If that works we assume that ipvs and the passed scheduler are supported.
-// The ipset version is also checked.
+// The ipset version and the scheduler are checked. If any virtual servers (VS)
+// already exist with the configured scheduler, we just return. Otherwise
+// we check if a dummy VS can be configured with the configured scheduler.
+// Kernel modules will be loaded automatically if necessary.
 func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, scheduler string) error {
+	// Check ipset version
+	versionString, err := ipsetver.GetVersion()
+	if err != nil {
+		return fmt.Errorf("error getting ipset version, error: %v", err)
+	}
+	if !checkMinVersion(versionString) {
+		return fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
+	}
+
 	// Check is any virtual servers (vs) are configured. If any, we assume
 	// that this is a kube-proxy re-start and skip the checks.
 	vservers, err := ipvs.GetVirtualServers()
@@ -734,19 +743,34 @@ func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, schedul
 	}
 	klog.V(5).InfoS("Virtual Servers", "count", len(vservers))
 	if len(vservers) > 0 {
-		klog.InfoS("Assuming kube-proxy re-start", "virtual-servers", len(vservers))
-		return nil
+		klog.V(5).InfoS("Virtual server exists", "count", len(vservers))
+		// This is most likely a kube-proxy re-start. We know that ipvs works
+		// and if any VS uses the configured scheduler, we are done.
+		for _, vs := range vservers {
+			if vs.Scheduler == scheduler {
+				return nil
+			}
+		}
+		klog.V(5).InfoS("No existing VS uses the configured scheduler", "scheduler", scheduler)
 	}
 
 	// BUG: If ipvs is not compiled into the kernel ipvs.GetVirtualServers
 	// does not return an error. Instead also ipvs.AddVirtualServer returns OK
 	// (no error)!
 
-	// This is the first time kube-proxy is loaded on the node. Try to
-	// insert a dummy VS with the passed scheduler. The VIP address can be
-	// anything since no traffic will be routed to ipvs yet.
+	// Try to insert a dummy VS with the passed scheduler.
+	// We should use a VIP address that is not used on the node.
+	// An address "198.51.100.0" from the TEST-NET-2 rage in https://datatracker.ietf.org/doc/html/rfc5737
+	// is used. These addresses are reserved for documentation. If the user is using
+	// this address for a VS anyway we *will* mess up, but that would be an invalid configuration.
+	// If the user have configured the address to an interface on the node (but not a VS)
+	// then traffic will temporary be routed to ipvs during the probe and dropped.
+	// The later case is also and invalid configuration, but the traffic impact will be minor.
+	// This should not be a problem if users honors reserved addresses, but cut/paste
+	// from documentation is not unheard of, so the restricion to not use the TEST-NET-2 range
+	// must be documented.
 	vs := utilipvs.VirtualServer{
-		Address: net.ParseIP("10.0.0.1"),
+		Address: net.ParseIP("198.51.100.0"),
 		Protocol: "TCP",
 		Port: 20000,
 		Scheduler: scheduler,
@@ -765,7 +789,7 @@ func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, schedul
 	klog.V(5).InfoS("Virtual Servers after adding dummy", "count", len(vservers))
 	if len(vservers) == 0 {
 		klog.InfoS("Dummy VS not created", "scheduler", scheduler)
-		return fmt.Errorf("Ipvs not supported")
+		return fmt.Errorf("Ipvs not supported") // This is a BUG work-around
 	}
 
 	klog.V(5).InfoS("Dummy VS created", "vs", vs)
@@ -774,14 +798,6 @@ func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, schedul
 		return err
 	}
 
-	// Check ipset version
-	versionString, err := ipsetver.GetVersion()
-	if err != nil {
-		return fmt.Errorf("error getting ipset version, error: %v", err)
-	}
-	if !checkMinVersion(versionString) {
-		return fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
-	}
 	return nil
 }
 
