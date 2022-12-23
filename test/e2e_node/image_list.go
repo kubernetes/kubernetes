@@ -47,7 +47,8 @@ const (
 	maxParallelImagePullCount = 5
 
 	// SampleDevicePluginDSYAML is the path of the daemonset template of the sample device plugin. // TODO: Parametrize it by making it a feature in TestFramework.
-	SampleDevicePluginDSYAML = "test/e2e/testing-manifests/sample-device-plugin.yaml"
+	SampleDevicePluginDSYAML                    = "test/e2e/testing-manifests/sample-device-plugin/sample-device-plugin.yaml"
+	SampleDevicePluginControlRegistrationDSYAML = "test/e2e/testing-manifests/sample-device-plugin/sample-device-plugin-control-registration.yaml"
 )
 
 // NodePrePullImageList is a list of images used in node e2e test. These images will be prepulled
