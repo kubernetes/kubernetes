@@ -90,6 +90,7 @@ dependencies:
   - name: "golang: upstream version"
     version: 1.19.4
     refPaths:
+    - path: .go-version
     - path: build/build-image/cross/VERSION
     - path: staging/publishing/rules.yaml
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
