@@ -698,7 +698,7 @@ func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, schedul
 	// then traffic will temporary be routed to ipvs during the probe and dropped.
 	// The later case is also and invalid configuration, but the traffic impact will be minor.
 	// This should not be a problem if users honors reserved addresses, but cut/paste
-	// from documentation is not unheard of, so the restricion to not use the TEST-NET-2 range
+	// from documentation is not unheard of, so the restriction to not use the TEST-NET-2 range
 	// must be documented.
 	vs := utilipvs.VirtualServer{
 		Address:   net.ParseIP("198.51.100.0"),
