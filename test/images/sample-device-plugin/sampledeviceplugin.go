@@ -18,8 +18,12 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strconv"
+	"syscall"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -73,6 +77,9 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Devic
 }
 
 func main() {
+	autoRegister := true
+	var err error
+
 	devs := []*pluginapi.Device{
 		{ID: "Dev-1", Health: pluginapi.Healthy},
 		{ID: "Dev-2", Health: pluginapi.Healthy},
@@ -84,7 +91,18 @@ func main() {
 		klog.Errorf("Empty pluginSocksDir")
 		return
 	}
+
+	if autoRegisterString := os.Getenv("AUTO_REGISTER"); autoRegisterString != "" {
+		autoRegister, err = strconv.ParseBool(autoRegisterString)
+		if err != nil {
+			klog.Errorf("invalid boolean value specified")
+			panic(err)
+		}
+
+	}
+
 	socketPath := pluginSocksDir + "/dp." + fmt.Sprintf("%d", time.Now().Unix())
+	triggerPath := pluginSocksDir + "/registered"
 
 	dp1 := plugin.NewDevicePluginStub(devs, socketPath, resourceName, false, false)
 	if err := dp1.Start(); err != nil {
@@ -92,6 +110,35 @@ func main() {
 
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
+
+	if !autoRegister {
+		l, err := net.Listen("unix", triggerPath)
+		klog.Infof("Started Listening at %s", triggerPath)
+		if err != nil {
+			panic(err)
+		}
+		defer l.Close()
+
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
+		go func(ln net.Listener, c chan os.Signal) {
+			sig := <-c
+			klog.Infof("Received termination signal %s: shutting down.", sig)
+			ln.Close()
+			os.Exit(0)
+		}(l, sigc)
+
+		klog.InfoS("Starting to accept connections")
+		// Accept new connections
+		conn, err := l.Accept()
+		if err != nil {
+			panic(err)
+		}
+
+		defer conn.Close()
+		klog.InfoS("Client connected!")
+
+	}
 	if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
 		panic(err)
 	}
