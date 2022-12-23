@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: sample-device-plugin-beta
+  namespace: kube-system
+  labels:
+    k8s-app: sample-device-plugin
+spec:
+  selector:
+    matchLabels:
+      k8s-app: sample-device-plugin
+  template:
+    metadata:
+      labels:
+        k8s-app: sample-device-plugin
+      annotations:
+    spec:
+      priorityClassName: system-node-critical
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
+      volumes:
+      - name: device-plugin
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+      - name: plugins-registry-probe-mode
+        hostPath:
+          path: /var/lib/kubelet/plugins_registry
+      - name: dev
+        hostPath:
+          path: /dev
+      containers:
+      - image: registry.k8s.io/e2e-test-images/sample-device-plugin:1.5
+        name: sample-device-plugin
+        env:
+        - name: PLUGIN_SOCK_DIR
+          value: "/var/lib/kubelet/device-plugins"
+        - name: REGISTER_CONTROL_FILE
+          value: "/var/lib/kubelet/device-plugins/sample/registration"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: device-plugin
+          mountPath: /var/lib/kubelet/device-plugins
+        - name: plugins-registry-probe-mode
+          mountPath: /var/lib/kubelet/plugins_registry
+        - name: dev
+          mountPath: /dev
+  updateStrategy:
+    type: RollingUpdate
