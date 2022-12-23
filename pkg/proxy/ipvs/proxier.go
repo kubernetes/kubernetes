@@ -24,7 +24,6 @@ import (
 	"net"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -606,7 +605,6 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 
 // KernelHandler can handle the current installed kernel modules.
 type KernelHandler interface {
-	GetModules() ([]string, error)
 	GetKernelVersion() (string, error)
 }
 
@@ -620,73 +618,6 @@ func NewLinuxKernelHandler() *LinuxKernelHandler {
 	return &LinuxKernelHandler{
 		executor: utilexec.New(),
 	}
-}
-
-// GetModules returns all installed kernel modules.
-func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
-	// Check whether IPVS required kernel modules are built-in
-	kernelVersionStr, err := handle.GetKernelVersion()
-	if err != nil {
-		return nil, err
-	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
-
-	var bmods, lmods []string
-
-	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
-	modulesFile, err := os.Open("/proc/modules")
-	if err == os.ErrNotExist {
-		klog.ErrorS(err, "Failed to read file /proc/modules, assuming this is a kernel without loadable modules support enabled")
-		kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
-		kConfig, err := os.ReadFile(kernelConfigFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Kernel Config file %s with error %w", kernelConfigFile, err)
-		}
-		for _, module := range ipvsModules {
-			if match, _ := regexp.Match("CONFIG_"+strings.ToUpper(module)+"=y", kConfig); match {
-				bmods = append(bmods, module)
-			}
-		}
-		return bmods, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file /proc/modules with error %w", err)
-	}
-	defer modulesFile.Close()
-
-	mods, err := getFirstColumn(modulesFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find loaded kernel modules: %v", err)
-	}
-
-	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
-	b, err := os.ReadFile(builtinModsFilePath)
-	if err != nil {
-		klog.ErrorS(err, "Failed to read builtin modules file, you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "filePath", builtinModsFilePath)
-	}
-
-	for _, module := range ipvsModules {
-		if match, _ := regexp.Match(module+".ko", b); match {
-			bmods = append(bmods, module)
-		} else {
-			// Try to load the required IPVS kernel modules if not built in
-			err := handle.executor.Command("modprobe", "--", module).Run()
-			if err != nil {
-				klog.InfoS("Failed to load kernel module with modprobe, "+
-					"you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "moduleName", module)
-			} else {
-				lmods = append(lmods, module)
-			}
-		}
-	}
-
-	mods = append(mods, bmods...)
-	mods = append(mods, lmods...)
-	return mods, nil
 }
 
 // getFirstColumn reads all the content from r into memory and return a
