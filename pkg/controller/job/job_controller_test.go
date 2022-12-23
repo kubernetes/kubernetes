@@ -1830,18 +1830,6 @@ func hasTrueCondition(job *batch.Job) *batch.JobConditionType {
 }
 
 func TestSyncPastDeadlineJobFinished(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
-	fakeClock := clocktesting.NewFakeClock(time.Now().Truncate(time.Second))
-	manager, sharedInformerFactory := newControllerFromClientWithClock(clientset, controller.NoResyncPeriodFunc, fakeClock)
-	manager.podStoreSynced = alwaysReady
-	manager.jobStoreSynced = alwaysReady
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	sharedInformerFactory.Start(ctx.Done())
-	sharedInformerFactory.WaitForCacheSync(ctx.Done())
-
-	go manager.Run(ctx, 1)
-
 	tests := []struct {
 		name         string
 		setStartTime bool
@@ -1860,6 +1848,18 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			clientset := fake.NewSimpleClientset()
+			fakeClock := clocktesting.NewFakeClock(time.Now().Truncate(time.Second))
+			manager, sharedInformerFactory := newControllerFromClientWithClock(clientset, controller.NoResyncPeriodFunc, fakeClock)
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			sharedInformerFactory.Start(ctx.Done())
+			sharedInformerFactory.WaitForCacheSync(ctx.Done())
+
+			go manager.Run(ctx, 1)
+
 			job := newJobWithName(tc.jobName, 1, 1, 6, batch.NonIndexedCompletion)
 			job.Spec.ActiveDeadlineSeconds = pointer.Int64(1)
 			if tc.setStartTime {
@@ -3694,7 +3694,9 @@ func TestWatchJobs(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	sharedInformerFactory.Start(stopCh)
-	go manager.Run(context.TODO(), 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go manager.Run(ctx, 1)
 
 	// We're sending new job to see if it reaches syncHandler.
 	testJob.Namespace = "bar"
@@ -3740,7 +3742,9 @@ func TestWatchPods(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	go sharedInformerFactory.Core().V1().Pods().Informer().Run(stopCh)
-	go manager.Run(context.TODO(), 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go manager.Run(ctx, 1)
 
 	pods := newPodList(1, v1.PodRunning, testJob)
 	testPod := pods[0]
@@ -3763,7 +3767,9 @@ func TestWatchOrphanPods(t *testing.T) {
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
 	go podInformer.Run(stopCh)
 	cache.WaitForCacheSync(stopCh, podInformer.HasSynced)
-	go manager.Run(context.TODO(), 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go manager.Run(ctx, 1)
 
 	// Create job but don't add it to the store.
 	cases := map[string]struct {
