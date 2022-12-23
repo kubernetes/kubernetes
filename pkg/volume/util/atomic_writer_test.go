@@ -21,6 +21,7 @@ package util
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -229,7 +230,7 @@ func TestPathsToRemove(t *testing.T) {
 		defer os.RemoveAll(targetDir)
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
-		err = writer.Write(tc.payload1)
+		err = writer.Write(tc.payload1, nil)
 		if err != nil {
 			t.Errorf("%v: unexpected error writing: %v", tc.name, err)
 			continue
@@ -397,7 +398,7 @@ IAAAAAAAsDyZDwU=`
 		defer os.RemoveAll(targetDir)
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
-		err = writer.Write(tc.payload)
+		err = writer.Write(tc.payload, nil)
 		if err != nil && tc.success {
 			t.Errorf("%v: unexpected error writing payload: %v", tc.name, err)
 			continue
@@ -574,7 +575,7 @@ func TestUpdate(t *testing.T) {
 
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 
-		err = writer.Write(tc.first)
+		err = writer.Write(tc.first, nil)
 		if err != nil {
 			t.Errorf("%v: unexpected error writing: %v", tc.name, err)
 			continue
@@ -585,7 +586,7 @@ func TestUpdate(t *testing.T) {
 			continue
 		}
 
-		err = writer.Write(tc.next)
+		err = writer.Write(tc.next, nil)
 		if err != nil {
 			if tc.shouldWrite {
 				t.Errorf("%v: unexpected error writing: %v", tc.name, err)
@@ -743,7 +744,7 @@ func TestMultipleUpdates(t *testing.T) {
 		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
 
 		for _, payload := range tc.payloads {
-			writer.Write(payload)
+			writer.Write(payload, nil)
 
 			checkVolumeContents(targetDir, tc.name, payload, t)
 		}
@@ -982,5 +983,56 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 				t.Fatalf("%v: symlink destination %q not same with expected data dir %q", tc.name, destination, expectedDest)
 			}
 		}
+	}
+}
+
+func TestSetPerms(t *testing.T) {
+	targetDir, err := utiltesting.MkTmpdir("atomic-write")
+	if err != nil {
+		t.Fatalf("unexpected error creating tmp dir: %v", err)
+	}
+	defer os.RemoveAll(targetDir)
+
+	// Test that setPerms() is called once and with valid timestamp directory.
+	payload1 := map[string]FileProjection{
+		"foo/bar.txt": {Mode: 0644, Data: []byte("foo")},
+		"bar/zab.txt": {Mode: 0644, Data: []byte("bar")},
+	}
+
+	var setPermsCalled int
+	writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
+	err = writer.Write(payload1, func(subPath string) error {
+		fileInfo, err := os.Stat(filepath.Join(targetDir, subPath))
+		if err != nil {
+			t.Fatalf("unexpected error getting file info: %v", err)
+		}
+		// Ensure that given timestamp directory really exists.
+		if !fileInfo.IsDir() {
+			t.Fatalf("subPath is not a directory: %v", subPath)
+		}
+		setPermsCalled++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error writing: %v", err)
+	}
+	if setPermsCalled != 1 {
+		t.Fatalf("unexpected number of calls to setPerms: %v", setPermsCalled)
+	}
+
+	// Test that errors from setPerms() are propagated.
+	payload2 := map[string]FileProjection{
+		"foo/bar.txt": {Mode: 0644, Data: []byte("foo2")},
+		"bar/zab.txt": {Mode: 0644, Data: []byte("bar2")},
+	}
+
+	err = writer.Write(payload2, func(_ string) error {
+		return fmt.Errorf("error in setPerms")
+	})
+	if err == nil {
+		t.Fatalf("expected error while writing but got nil")
+	}
+	if !strings.Contains(err.Error(), "error in setPerms") {
+		t.Fatalf("unexpected error while writing: %v", err)
 	}
 }
