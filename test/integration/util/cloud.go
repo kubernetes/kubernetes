@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"time"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
@@ -43,7 +44,7 @@ const (
 
 type mockTokenSource struct{}
 
-func (*mockTokenSource) Token() (*oauth2.Token, error) {
+func (*mockTokenSource) Token(ctx context.Context) (*oauth2.Token, error) {
 	return &oauth2.Token{
 		AccessToken:  "access",
 		TokenType:    "Bearer",

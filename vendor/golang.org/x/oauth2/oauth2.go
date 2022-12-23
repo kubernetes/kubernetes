@@ -64,7 +64,7 @@ type TokenSource interface {
 	// Token returns a token or an error.
 	// Token must be safe for concurrent use by multiple goroutines.
 	// The returned Token must not be modified.
-	Token() (*Token, error)
+	Token(ctx context.Context) (*Token, error)
 }
 
 // Endpoint represents an OAuth 2.0 provider's authorization and token
@@ -262,7 +262,7 @@ type tokenRefresher struct {
 // updates the tokenRefresher's refreshToken field.
 // Within this package, it is used by reuseTokenSource which
 // synchronizes calls to this method with its own mutex.
-func (tf *tokenRefresher) Token() (*Token, error) {
+func (tf *tokenRefresher) Token(ctx context.Context) (*Token, error) {
 	if tf.refreshToken == "" {
 		return nil, errors.New("oauth2: token expired and refresh token is not set")
 	}
@@ -295,13 +295,13 @@ type reuseTokenSource struct {
 // Token returns the current token if it's still valid, else will
 // refresh the current token (using r.Context for HTTP client
 // information) and return the new one.
-func (s *reuseTokenSource) Token() (*Token, error) {
+func (s *reuseTokenSource) Token(ctx context.Context) (*Token, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.t.Valid() {
 		return s.t, nil
 	}
-	t, err := s.new.Token()
+	t, err := s.new.Token(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +321,7 @@ type staticTokenSource struct {
 	t *Token
 }
 
-func (s staticTokenSource) Token() (*Token, error) {
+func (s staticTokenSource) Token(ctx context.Context) (*Token, error) {
 	return s.t, nil
 }
 
