@@ -77,9 +77,10 @@ func (f *fakeIPGetter) BindedIPs() (sets.String, error) {
 
 // fakeIpvs implements utilipvs.Interface
 type fakeIpvs struct {
-	ipvsErr string
+	ipvsErr   string
 	vsCreated bool
 }
+
 func (f *fakeIpvs) Flush() error {
 	return nil
 }
@@ -107,7 +108,7 @@ func (f *fakeIpvs) GetVirtualServers() ([]*utilipvs.VirtualServer, error) {
 		return nil, fmt.Errorf("oops")
 	}
 	if f.vsCreated {
-		vs := []*utilipvs.VirtualServer{&utilipvs.VirtualServer{}}
+		vs := []*utilipvs.VirtualServer{{}}
 		return vs, nil
 	}
 	return nil, nil
@@ -312,48 +313,48 @@ func TestCleanupLeftovers(t *testing.T) {
 
 func TestCanUseIPVSProxier(t *testing.T) {
 	testCases := []struct {
-		name          string
-		scheduler     string
-		ipsetVersion  string
-		ipsetErr      error
-		ipvsErr       string
-		ok            bool
+		name         string
+		scheduler    string
+		ipsetVersion string
+		ipsetErr     error
+		ipvsErr      string
+		ok           bool
 	}{
 		{
-			name:          "happy days",
-			ipsetVersion:  MinIPSetCheckVersion,
-			ok:            true,
+			name:         "happy days",
+			ipsetVersion: MinIPSetCheckVersion,
+			ok:           true,
 		},
 		{
-			name:          "ipset error",
-			scheduler:     "",
-			ipsetVersion:  MinIPSetCheckVersion,
-			ipsetErr:      fmt.Errorf("oops"),
-			ok:            false,
+			name:         "ipset error",
+			scheduler:    "",
+			ipsetVersion: MinIPSetCheckVersion,
+			ipsetErr:     fmt.Errorf("oops"),
+			ok:           false,
 		},
 		{
-			name:          "ipset version too low",
-			scheduler:     "rr",
-			ipsetVersion:  "4.3.0",
-			ok:            false,
+			name:         "ipset version too low",
+			scheduler:    "rr",
+			ipsetVersion: "4.3.0",
+			ok:           false,
 		},
 		{
-			name:          "GetVirtualServers fail",
-			ipsetVersion:  MinIPSetCheckVersion,
-			ipvsErr:       "GetVirtualServers",
-			ok:            false,
+			name:         "GetVirtualServers fail",
+			ipsetVersion: MinIPSetCheckVersion,
+			ipvsErr:      "GetVirtualServers",
+			ok:           false,
 		},
 		{
-			name:          "AddVirtualServer fail",
-			ipsetVersion:  MinIPSetCheckVersion,
-			ipvsErr:       "AddVirtualServer",
-			ok:            false,
+			name:         "AddVirtualServer fail",
+			ipsetVersion: MinIPSetCheckVersion,
+			ipvsErr:      "AddVirtualServer",
+			ok:           false,
 		},
 		{
-			name:          "DeleteVirtualServer fail",
-			ipsetVersion:  MinIPSetCheckVersion,
-			ipvsErr:       "DeleteVirtualServer",
-			ok:            false,
+			name:         "DeleteVirtualServer fail",
+			ipsetVersion: MinIPSetCheckVersion,
+			ipvsErr:      "DeleteVirtualServer",
+			ok:           false,
 		},
 	}
 
