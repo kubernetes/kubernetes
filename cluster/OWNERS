@@ -4,6 +4,7 @@ options:
   # make root approval non-recursive
   no_parent_owners: true
 reviewers:
+  - aojea
   - bentheelder
   - cheftako
   - dims
@@ -13,6 +14,7 @@ reviewers:
   - spiffxp
   - wojtek-t
 approvers:
+  - aojea
   - bentheelder
   - cheftako
   - dims
