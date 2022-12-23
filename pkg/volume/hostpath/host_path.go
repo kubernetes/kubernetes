@@ -21,17 +21,19 @@ import (
 	"os"
 	"regexp"
 
-	"k8s.io/mount-utils"
+	"github.com/opencontainers/selinux/go-selinux"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/validation"
+	"k8s.io/mount-utils"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -322,7 +324,17 @@ func (r *hostPathProvisioner) Provision(selectedNode *v1.Node, allowedTopologies
 		pv.Spec.AccessModes = r.plugin.GetAccessModes()
 	}
 
-	return pv, os.MkdirAll(pv.Spec.HostPath.Path, 0750)
+	if err := os.MkdirAll(pv.Spec.HostPath.Path, 0750); err != nil {
+		return nil, err
+	}
+	if selinux.GetEnabled() {
+		err := selinux.SetFileLabel(pv.Spec.HostPath.Path, config.KubeletContainersSharedSELinuxLabel)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set selinux label for %q: %v", pv.Spec.HostPath.Path, err)
+		}
+	}
+
+	return pv, nil
 }
 
 // hostPathDeleter deletes a hostPath PV from the cluster.
