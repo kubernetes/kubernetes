@@ -109,14 +109,14 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 					// complete <namespace>/<pod>
 					namespace := toComplete[:idx]
 					template := "{{ range .items }}{{ .metadata.namespace }}/{{ .metadata.name }}: {{ end }}"
-					comps = completion.CompGetFromTemplate(&template, f, namespace, cmd, []string{"pod"}, toComplete)
+					comps = completion.CompGetFromTemplate(&template, f, namespace, []string{"pod"}, toComplete)
 				} else {
 					// Complete namespaces followed by a /
-					for _, ns := range completion.CompGetResource(f, cmd, "namespace", toComplete) {
+					for _, ns := range completion.CompGetResource(f, "namespace", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s/", ns))
 					}
 					// Complete pod names followed by a :
-					for _, pod := range completion.CompGetResource(f, cmd, "pod", toComplete) {
+					for _, pod := range completion.CompGetResource(f, "pod", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s:", pod))
 					}
 

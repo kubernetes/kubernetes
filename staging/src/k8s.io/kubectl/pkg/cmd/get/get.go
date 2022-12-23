@@ -76,11 +76,11 @@ type GetOptions struct {
 	Namespace         string
 	ExplicitNamespace bool
 	Subresource       string
+	SortBy            string
 
 	ServerPrint bool
 
 	NoHeaders      bool
-	Sort           bool
 	IgnoreNotFound bool
 
 	genericclioptions.IOStreams
@@ -170,7 +170,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run(f, cmd, args))
+			cmdutil.CheckErr(o.Run(f, args))
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
@@ -211,11 +211,9 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.ExplicitNamespace = false
 	}
 
-	sortBy, err := cmd.Flags().GetString("sort-by")
-	if err != nil {
-		return err
+	if o.PrintFlags.HumanReadableFlags.SortBy != nil {
+		o.SortBy = *o.PrintFlags.HumanReadableFlags.SortBy
 	}
-	o.Sort = len(sortBy) > 0
 
 	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
 
@@ -264,8 +262,8 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 			return nil, err
 		}
 
-		if o.Sort {
-			printer = &SortingPrinter{Delegate: printer, SortField: sortBy}
+		if len(o.SortBy) > 0 {
+			printer = &SortingPrinter{Delegate: printer, SortField: o.SortBy}
 		}
 		if outputObjects != nil {
 			printer = &skipPrinter{delegate: printer, output: outputObjects}
@@ -278,7 +276,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	switch {
 	case o.Watch || o.WatchOnly:
-		if o.Sort {
+		if len(o.SortBy) > 0 {
 			fmt.Fprintf(o.IOStreams.ErrOut, "warning: --watch or --watch-only requested, --sort-by will be ignored\n")
 		}
 	default:
@@ -448,14 +446,14 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 	}, ","))
 
 	// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath
-	if o.Sort {
+	if len(o.SortBy) > 0 {
 		req.Param("includeObject", "Object")
 	}
 }
 
 // Run performs the get operation.
 // TODO: remove the need to pass these arguments, like other commands.
-func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 	if len(o.Raw) > 0 {
 		restClient, err := f.RESTClient()
 		if err != nil {
@@ -464,11 +462,11 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
 	if o.Watch || o.WatchOnly {
-		return o.watch(f, cmd, args)
+		return o.watch(f, args)
 	}
 
 	chunkSize := o.ChunkSize
-	if o.Sort {
+	if len(o.SortBy) > 0 {
 		// TODO(juanvallejo): in the future, we could have the client use chunking
 		// to gather all results, then sort them all at the end to reduce server load.
 		chunkSize = 0
@@ -513,14 +511,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		objs[ix] = infos[ix].Object
 	}
 
-	sorting, err := cmd.Flags().GetString("sort-by")
-	if err != nil {
-		return err
-	}
-
 	var positioner OriginalPositioner
-	if o.Sort {
-		sorter := NewRuntimeSorter(objs, sorting)
+	if len(o.SortBy) > 0 {
+		sorter := NewRuntimeSorter(objs, o.SortBy)
 		if err := sorter.Sort(); err != nil {
 			return err
 		}
@@ -632,7 +625,7 @@ func (s *separatorWriterWrapper) SetReady(state bool) {
 
 // watch starts a client-side watch of one or more resources.
 // TODO: remove the need for arguments here.
-func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).

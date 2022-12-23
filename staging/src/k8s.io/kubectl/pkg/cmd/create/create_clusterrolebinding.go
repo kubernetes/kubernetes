@@ -108,7 +108,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"clusterrole",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completion.CompGetResource(f, cmd, "clusterrole", toComplete), cobra.ShellCompDirectiveNoFileComp
+			return completion.CompGetResource(f, "clusterrole", toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 
 	return cmd
