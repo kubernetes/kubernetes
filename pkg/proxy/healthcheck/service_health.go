@@ -52,19 +52,18 @@ type ServiceHealthServer interface {
 }
 
 func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *utilproxy.NodePortAddresses) ServiceHealthServer {
-
-	nodeAddresses, err := nodePortAddresses.GetNodeAddresses(utilproxy.RealNetwork{})
-	if err != nil || len(nodeAddresses) == 0 {
-		klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
-		nodeAddresses = []string{utilproxy.IPv4ZeroCIDR}
-	}
+	var nodeAddresses []string
 
 	// if any of the addresses is zero cidr then we listen
 	// to old style :<port>
-	for _, addr := range nodeAddresses {
-		if utilproxy.IsZeroCIDR(addr) {
+	if nodePortAddresses.MatchAll() {
+		nodeAddresses = []string{""}
+	} else {
+		var err error
+		nodeAddresses, err = nodePortAddresses.GetNodeAddresses(utilproxy.RealNetwork{})
+		if err != nil {
+			klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
 			nodeAddresses = []string{""}
-			break
 		}
 	}
 

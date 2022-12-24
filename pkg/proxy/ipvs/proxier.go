@@ -1063,33 +1063,34 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	// Both nodeAddresses and nodeIPs can be reused for all nodePort services
+	// Both nodePortMatchAll and nodeIPs can be reused for all nodePort services
 	// and only need to be computed if we have at least one nodePort service.
 	var (
-		// List of node addresses to listen on if a nodePort is set.
-		nodeAddresses []string
+		// true if we accept nodeport traffic on all interfaces.
+		nodePortMatchAll bool
 		// List of node IP addresses to be used as IPVS services if nodePort is set.
 		nodeIPs []net.IP
 	)
 
 	if hasNodePort {
-		nodeAddresses, err = proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
-		if err != nil {
-			klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
+		nodePortMatchAll = proxier.nodePortAddresses.MatchAll()
+		if nodePortMatchAll {
+			nodeIPs, err = proxier.ipGetter.NodeIPs()
+			if err != nil {
+				klog.ErrorS(err, "Failed to list all node IPs from host")
+			}
 		} else {
-			for _, address := range nodeAddresses {
-				a := netutils.ParseIPSloppy(address)
-				if a.IsLoopback() {
-					continue
-				}
-				if utilproxy.IsZeroCIDR(address) {
-					nodeIPs, err = proxier.ipGetter.NodeIPs()
-					if err != nil {
-						klog.ErrorS(err, "Failed to list all node IPs from host")
+			nodeAddresses, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
+			} else {
+				for _, address := range nodeAddresses {
+					a := netutils.ParseIPSloppy(address)
+					if a.IsLoopback() {
+						continue
 					}
-					break
+					nodeIPs = append(nodeIPs, a)
 				}
-				nodeIPs = append(nodeIPs, a)
 			}
 		}
 	}
@@ -1333,29 +1334,34 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.NodePort() != 0 {
-			if len(nodeAddresses) == 0 || len(nodeIPs) == 0 {
+			if len(nodeIPs) == 0 {
 				// Skip nodePort configuration since an error occurred when
 				// computing nodeAddresses or nodeIPs.
 				continue
 			}
 
 			var lps []netutils.LocalPort
-			for _, address := range nodeAddresses {
+
+			if nodePortMatchAll {
 				lp := netutils.LocalPort{
 					Description: "nodePort for " + svcPortNameString,
-					IP:          address,
+					IP:          "",
 					IPFamily:    localPortIPFamily,
 					Port:        svcInfo.NodePort(),
 					Protocol:    netutils.Protocol(svcInfo.Protocol()),
 				}
-				if utilproxy.IsZeroCIDR(address) {
-					// Empty IP address means all
-					lp.IP = ""
-					lps = append(lps, lp)
-					// If we encounter a zero CIDR, then there is no point in processing the rest of the addresses.
-					break
-				}
 				lps = append(lps, lp)
+			} else {
+				for _, ip := range nodeIPs {
+					lp := netutils.LocalPort{
+						Description: "nodePort for " + svcPortNameString,
+						IP:          ip.String(),
+						IPFamily:    localPortIPFamily,
+						Port:        svcInfo.NodePort(),
+						Protocol:    netutils.Protocol(svcInfo.Protocol()),
+					}
+					lps = append(lps, lp)
+				}
 			}
 
 			// For ports on node IPs, open the actual port and hold it.
