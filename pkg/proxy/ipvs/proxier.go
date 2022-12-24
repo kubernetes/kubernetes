@@ -656,6 +656,15 @@ func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 // we check if a dummy VS can be configured with the configured scheduler.
 // Kernel modules will be loaded automatically if necessary.
 func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, scheduler string) error {
+	// BUG: https://github.com/moby/ipvs/issues/27
+	// If ipvs is not compiled into the kernel no error is returned and handle==nil.
+	// This in turn causes ipvs.GetVirtualServers and ipvs.AddVirtualServer
+	// to return ok (err==nil). If/when this bug is fixed parameter "ipvs" will be nil
+	// if ipvs is not supported by the kernel. Until then a re-read work-around is used.
+	if ipvs == nil {
+		return fmt.Errorf("Ipvs not supported by the kernel")
+	}
+
 	// Check ipset version
 	versionString, err := ipsetver.GetVersion()
 	if err != nil {
@@ -669,8 +678,7 @@ func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, schedul
 		scheduler = defaultScheduler
 	}
 
-	// Check is any virtual servers (vs) are configured. If any, we assume
-	// that this is a kube-proxy re-start and skip the checks.
+	// If any virtual server (VS) using the scheduler exist we skip the checks.
 	vservers, err := ipvs.GetVirtualServers()
 	if err != nil {
 		klog.ErrorS(err, "Can't read the ipvs")
@@ -678,20 +686,16 @@ func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, schedul
 	}
 	klog.V(5).InfoS("Virtual Servers", "count", len(vservers))
 	if len(vservers) > 0 {
-		klog.V(5).InfoS("Virtual server exists", "count", len(vservers))
 		// This is most likely a kube-proxy re-start. We know that ipvs works
 		// and if any VS uses the configured scheduler, we are done.
 		for _, vs := range vservers {
 			if vs.Scheduler == scheduler {
+				klog.V(5).InfoS("VS exist, Skipping checks")
 				return nil
 			}
 		}
 		klog.V(5).InfoS("No existing VS uses the configured scheduler", "scheduler", scheduler)
 	}
-
-	// BUG: If ipvs is not compiled into the kernel ipvs.GetVirtualServers
-	// does not return an error. Instead also ipvs.AddVirtualServer returns OK
-	// (no error)!
 
 	// Try to insert a dummy VS with the passed scheduler.
 	// We should use a VIP address that is not used on the node.
@@ -726,8 +730,8 @@ func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, schedul
 		klog.InfoS("Dummy VS not created", "scheduler", scheduler)
 		return fmt.Errorf("Ipvs not supported") // This is a BUG work-around
 	}
-
 	klog.V(5).InfoS("Dummy VS created", "vs", vs)
+
 	if err := ipvs.DeleteVirtualServer(&vs); err != nil {
 		klog.ErrorS(err, "Could not delete dummy VS")
 		return err
