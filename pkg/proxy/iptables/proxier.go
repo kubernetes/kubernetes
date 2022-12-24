@@ -1415,55 +1415,53 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finally, tail-call to the nodePorts chain.  This needs to be after all
 	// other service portal rules.
-	nodeAddresses, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
-	if err != nil {
-		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
-	}
-
-	for address := range nodeAddresses {
-		if utilproxy.IsZeroCIDR(address) {
-			destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
-			if isIPv6 {
-				// For IPv6, Regardless of the value of localhostNodePorts is true
-				// or false, we should disable access to the nodePort via localhost. Since it never works and always
-				// cause kernel warnings.
-				destinations = append(destinations, "!", "-d", "::1/128")
-			}
-
-			if !proxier.localhostNodePorts && !isIPv6 {
-				// If set localhostNodePorts to "false"(route_localnet=0), We should generate iptables rules that
-				// disable NodePort services to be accessed via localhost. Since it doesn't work and causes
-				// the kernel to log warnings if anyone tries.
-				destinations = append(destinations, "!", "-d", "127.0.0.0/8")
-			}
-
-			proxier.natRules.Write(
-				"-A", string(kubeServicesChain),
-				"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
-				destinations,
-				"-j", string(kubeNodePortsChain))
-			break
+	if proxier.nodePortAddresses.MatchAll() {
+		destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
+		if isIPv6 {
+			// For IPv6, Regardless of the value of localhostNodePorts is true
+			// or false, we should disable access to the nodePort via localhost. Since it never works and always
+			// cause kernel warnings.
+			destinations = append(destinations, "!", "-d", "::1/128")
 		}
 
-		// For ipv6, Regardless of the value of localhostNodePorts is true or false, we should disallow access
-		// to the nodePort via lookBack address.
-		if isIPv6 && utilproxy.IsLoopBack(address) {
-			klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv6 localhost address", "IP", address)
-			continue
+		if !proxier.localhostNodePorts && !isIPv6 {
+			// If set localhostNodePorts to "false"(route_localnet=0), We should generate iptables rules that
+			// disable NodePort services to be accessed via localhost. Since it doesn't work and causes
+			// the kernel to log warnings if anyone tries.
+			destinations = append(destinations, "!", "-d", "127.0.0.0/8")
 		}
 
-		// For ipv4, When localhostNodePorts is set to false, Ignore ipv4 lookBack address
-		if !isIPv6 && utilproxy.IsLoopBack(address) && !proxier.localhostNodePorts {
-			klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv4 localhost address", "IP", address)
-			continue
-		}
-
-		// create nodeport rules for each IP one by one
 		proxier.natRules.Write(
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
-			"-d", address,
+			destinations,
 			"-j", string(kubeNodePortsChain))
+	} else {
+		nodeAddresses, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
+		if err != nil {
+			klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
+		}
+		for address := range nodeAddresses {
+			// For ipv6, Regardless of the value of localhostNodePorts is true or false, we should disallow access
+			// to the nodePort via lookBack address.
+			if isIPv6 && utilproxy.IsLoopBack(address) {
+				klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv6 localhost address", "IP", address)
+				continue
+			}
+
+			// For ipv4, When localhostNodePorts is set to false, Ignore ipv4 lookBack address
+			if !isIPv6 && utilproxy.IsLoopBack(address) && !proxier.localhostNodePorts {
+				klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv4 localhost address", "IP", address)
+				continue
+			}
+
+			// create nodeport rules for each IP one by one
+			proxier.natRules.Write(
+				"-A", string(kubeServicesChain),
+				"-m", "comment", "--comment", `"kubernetes service nodeports; NOTE: this must be the last rule in this chain"`,
+				"-d", address,
+				"-j", string(kubeNodePortsChain))
+		}
 	}
 
 	// Drop the packets in INVALID state, which would potentially cause
@@ -1521,7 +1519,7 @@ func (proxier *Proxier) syncProxyRules() {
 	klog.V(9).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
 
 	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table
-	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
+	err := proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		if pErr, ok := err.(utiliptables.ParseError); ok {
 			lines := utiliptables.ExtractLines(proxier.iptablesData.Bytes(), pErr.Line(), 3)

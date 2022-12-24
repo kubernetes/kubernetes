@@ -31,6 +31,7 @@ type NodePortAddresses struct {
 
 	cidrs                []*net.IPNet
 	containsIPv4Loopback bool
+	matchAll             bool
 }
 
 // RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
@@ -71,6 +72,7 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 		if IsZeroCIDR(str) {
 			// Ignore everything else
 			npa.cidrs = []*net.IPNet{cidr}
+			npa.matchAll = true
 			break
 		}
 
@@ -84,27 +86,21 @@ func (npa *NodePortAddresses) String() string {
 	return fmt.Sprintf("%v", npa.cidrStrings)
 }
 
-// GetNodeAddresses returns all matched node IP addresses for npa's IP family. If npa's
-// CIDRs include "0.0.0.0/0" or "::/0", then that value will be returned verbatim in
-// the response and no actual IPs of that family will be returned. If no matching IPs are
-// found, GetNodeAddresses will return an error.
+// MatchAll returns true if npa matches all node IPs (of npa's given family)
+func (npa *NodePortAddresses) MatchAll() bool {
+	return npa.matchAll
+}
+
+// GetNodeAddresses return all matched node IP addresses for npa's CIDRs. If no matching
+// IPs are found, it returns an empty list.
 // NetworkInterfacer is injected for test purpose.
 func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Set[string], error) {
-	uniqueAddressList := sets.New[string]()
-
-	// First round of iteration to pick out `0.0.0.0/0` or `::/0` for the sake of excluding non-zero IPs.
-	for _, cidr := range npa.cidrStrings {
-		if IsZeroCIDR(cidr) {
-			uniqueAddressList.Insert(cidr)
-			return uniqueAddressList, nil
-		}
-	}
-
 	addrs, err := nw.InterfaceAddrs()
 	if err != nil {
 		return nil, fmt.Errorf("error listing all interfaceAddrs from host, error: %v", err)
 	}
 
+	uniqueAddressList := sets.New[string]()
 	for _, cidr := range npa.cidrs {
 		for _, addr := range addrs {
 			var ip net.IP
@@ -122,10 +118,6 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Set[s
 				uniqueAddressList.Insert(ip.String())
 			}
 		}
-	}
-
-	if uniqueAddressList.Len() == 0 {
-		return nil, fmt.Errorf("no addresses found for cidrs %v", npa.cidrStrings)
 	}
 
 	return uniqueAddressList, nil

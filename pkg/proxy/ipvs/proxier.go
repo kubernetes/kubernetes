@@ -1006,23 +1006,22 @@ func (proxier *Proxier) syncProxyRules() {
 	// can be reused for all nodePort services.
 	var nodeIPs []net.IP
 	if hasNodePort {
-		nodeAddrSet, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
-		if err != nil {
-			klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
+		if proxier.nodePortAddresses.MatchAll() {
+			for _, ipStr := range nodeAddressSet.UnsortedList() {
+				nodeIPs = append(nodeIPs, netutils.ParseIPSloppy(ipStr))
+			}
 		} else {
-			for _, address := range nodeAddrSet.UnsortedList() {
-				a := netutils.ParseIPSloppy(address)
-				if a.IsLoopback() {
-					continue
-				}
-				if utilproxy.IsZeroCIDR(address) {
-					nodeIPs = nil
-					for _, ipStr := range nodeAddressSet.UnsortedList() {
-						nodeIPs = append(nodeIPs, netutils.ParseIPSloppy(ipStr))
+			nodeAddrSet, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
+			} else {
+				for address := range nodeAddrSet {
+					a := netutils.ParseIPSloppy(address)
+					if a.IsLoopback() {
+						continue
 					}
-					break
+					nodeIPs = append(nodeIPs, a)
 				}
-				nodeIPs = append(nodeIPs, a)
 			}
 		}
 	}

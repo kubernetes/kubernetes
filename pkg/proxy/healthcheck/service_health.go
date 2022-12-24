@@ -59,20 +59,18 @@ type proxierHealthChecker interface {
 }
 
 func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *utilproxy.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
-
-	nodeAddresses, err := nodePortAddresses.GetNodeAddresses(utilproxy.RealNetwork{})
-	if err != nil || nodeAddresses.Len() == 0 {
-		klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
-		nodeAddresses = sets.New[string]()
-		nodeAddresses.Insert(utilproxy.IPv4ZeroCIDR)
-	}
+	var nodeAddresses sets.Set[string]
 
 	// if any of the addresses is zero cidr then we listen
 	// to old style :<port>
-	for _, addr := range nodeAddresses.UnsortedList() {
-		if utilproxy.IsZeroCIDR(addr) {
-			nodeAddresses = sets.New[string]("")
-			break
+	if nodePortAddresses.MatchAll() {
+		nodeAddresses = sets.New("")
+	} else {
+		var err error
+		nodeAddresses, err = nodePortAddresses.GetNodeAddresses(utilproxy.RealNetwork{})
+		if err != nil || nodeAddresses.Len() == 0 {
+			klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
+			nodeAddresses = sets.New(utilproxy.IPv4ZeroCIDR)
 		}
 	}
 

@@ -33,7 +33,8 @@ type InterfaceAddrsPair struct {
 
 func TestGetNodeAddresses(t *testing.T) {
 	type expectation struct {
-		ips sets.Set[string]
+		matchAll bool
+		ips      sets.Set[string]
 	}
 
 	testCases := []struct {
@@ -60,7 +61,8 @@ func TestGetNodeAddresses(t *testing.T) {
 					ips: sets.New[string]("10.20.30.51"),
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 			},
 		},
@@ -79,10 +81,12 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
-					ips: sets.New[string]("0.0.0.0/0"),
+					matchAll: true,
+					ips:      sets.New[string]("10.20.30.51", "127.0.0.1"),
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 			},
 		},
@@ -101,7 +105,8 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
-					ips: sets.New[string]("0.0.0.0/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 				v1.IPv6Protocol: {
 					ips: sets.New[string]("2001:db8::1", "::1"),
@@ -123,10 +128,12 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
-					ips: sets.New[string]("0.0.0.0/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      sets.New[string]("2001:db8::1", "::1"),
 				},
 			},
 		},
@@ -148,7 +155,8 @@ func TestGetNodeAddresses(t *testing.T) {
 					ips: sets.New[string]("127.0.0.1"),
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 			},
 		},
@@ -166,7 +174,8 @@ func TestGetNodeAddresses(t *testing.T) {
 					ips: sets.New[string]("127.0.1.1"),
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 			},
 		},
@@ -188,7 +197,8 @@ func TestGetNodeAddresses(t *testing.T) {
 					ips: sets.New[string]("10.20.30.51", "100.200.201.1"),
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 			},
 		},
@@ -210,7 +220,8 @@ func TestGetNodeAddresses(t *testing.T) {
 					ips: nil,
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 			},
 		},
@@ -229,10 +240,12 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
-					ips: sets.New[string]("0.0.0.0/0"),
+					matchAll: true,
+					ips:      sets.New[string]("192.168.1.2", "127.0.0.1"),
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 			},
 		},
@@ -251,10 +264,12 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
-					ips: sets.New[string]("0.0.0.0/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      sets.New[string]("2001:db8::1", "::1"),
 				},
 			},
 		},
@@ -269,10 +284,12 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
-					ips: sets.New[string]("0.0.0.0/0"),
+					matchAll: true,
+					ips:      sets.New[string]("1.2.3.4"),
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      nil,
 				},
 			},
 		},
@@ -297,7 +314,8 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
-					ips: sets.New[string]("0.0.0.0/0"),
+					matchAll: true,
+					ips:      sets.New[string]("1.2.3.4", "127.0.0.1"),
 				},
 				v1.IPv6Protocol: {
 					ips: sets.New[string]("2001:db8::1"),
@@ -328,7 +346,8 @@ func TestGetNodeAddresses(t *testing.T) {
 					ips: sets.New[string]("1.2.3.4"),
 				},
 				v1.IPv6Protocol: {
-					ips: sets.New[string]("::/0"),
+					matchAll: true,
+					ips:      sets.New[string]("2001:db8::1", "::1"),
 				},
 			},
 		},
@@ -344,11 +363,15 @@ func TestGetNodeAddresses(t *testing.T) {
 			for _, family := range []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol} {
 				npa := NewNodePortAddresses(family, tc.cidrs)
 
+				if npa.MatchAll() != tc.expected[family].matchAll {
+					t.Errorf("unexpected MatchAll(%s), expected: %v", family, tc.expected[family].matchAll)
+				}
+
 				addrList, err := npa.GetNodeAddresses(nw)
 				// The fake InterfaceAddrs() never returns an error, so
 				// the only error GetNodeAddresses will return is "no
 				// addresses found".
-				if err != nil && tc.expected[family].ips != nil {
+				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 
