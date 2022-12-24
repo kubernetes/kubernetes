@@ -334,6 +334,15 @@ func (in *JobStatus) DeepCopyInto(out *JobStatus) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.LastFailureTime != nil {
+		in, out := &in.LastFailureTime, &out.LastFailureTime
+		*out = (*in).DeepCopy()
+	}
+	if in.CurrentBackoff != nil {
+		in, out := &in.CurrentBackoff, &out.CurrentBackoff
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

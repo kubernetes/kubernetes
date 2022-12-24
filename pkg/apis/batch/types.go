@@ -415,6 +415,12 @@ type JobStatus struct {
 	// remains null.
 	// +optional
 	UncountedTerminatedPods *UncountedTerminatedPods
+
+	// +optional
+	LastFailureTime *metav1.Time
+
+	// +optional
+	CurrentBackoff *int32
 }
 
 // UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't

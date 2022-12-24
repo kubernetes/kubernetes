@@ -1169,7 +1169,9 @@ status:
     reason: reasonValue
     status: statusValue
     type: typeValue
+  currentBackoff: 11
   failed: 6
+  lastFailureTime: "2010-01-01T01:01:01Z"
   ready: 9
   startTime: "2002-01-01T01:01:01Z"
   succeeded: 5

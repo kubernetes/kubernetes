@@ -1718,6 +1718,8 @@
         "failedValue"
       ]
     },
-    "ready": 9
+    "ready": 9,
+    "lastFailureTime": "2010-01-01T01:01:01Z",
+    "currentBackoff": 11
   }
 }

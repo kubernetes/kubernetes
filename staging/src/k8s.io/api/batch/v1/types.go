@@ -401,6 +401,12 @@ type JobStatus struct {
 	// the feature gate JobReadyPods is enabled (enabled by default).
 	// +optional
 	Ready *int32 `json:"ready,omitempty" protobuf:"varint,9,opt,name=ready"`
+
+	// +optional
+	LastFailureTime *metav1.Time `json:"lastFailureTime,omitempty" protobuf:"bytes,10,opt,name=lastFailureTime"`
+
+	// +optional
+	CurrentBackoff *int32 `json:"currentBackoff,omitempty" protobuf:"varint,11,opt,name=currentBackoff"`
 }
 
 // UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't

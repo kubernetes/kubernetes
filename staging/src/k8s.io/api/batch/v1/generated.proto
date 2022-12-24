@@ -368,6 +368,12 @@ message JobStatus {
   // the feature gate JobReadyPods is enabled (enabled by default).
   // +optional
   optional int32 ready = 9;
+
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastFailureTime = 10;
+
+  // +optional
+  optional int32 currentBackoff = 11;
 }
 
 // JobTemplateSpec describes the data a Job should have when created from a template

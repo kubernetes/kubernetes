@@ -34,6 +34,8 @@ type JobStatusApplyConfiguration struct {
 	CompletedIndexes        *string                                    `json:"completedIndexes,omitempty"`
 	UncountedTerminatedPods *UncountedTerminatedPodsApplyConfiguration `json:"uncountedTerminatedPods,omitempty"`
 	Ready                   *int32                                     `json:"ready,omitempty"`
+	LastFailureTime         *metav1.Time                               `json:"lastFailureTime,omitempty"`
+	CurrentBackoff          *int32                                     `json:"currentBackoff,omitempty"`
 }
 
 // JobStatusApplyConfiguration constructs an declarative configuration of the JobStatus type for use with
@@ -116,5 +118,21 @@ func (b *JobStatusApplyConfiguration) WithUncountedTerminatedPods(value *Uncount
 // If called multiple times, the Ready field is set to the value of the last call.
 func (b *JobStatusApplyConfiguration) WithReady(value int32) *JobStatusApplyConfiguration {
 	b.Ready = &value
+	return b
+}
+
+// WithLastFailureTime sets the LastFailureTime field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LastFailureTime field is set to the value of the last call.
+func (b *JobStatusApplyConfiguration) WithLastFailureTime(value metav1.Time) *JobStatusApplyConfiguration {
+	b.LastFailureTime = &value
+	return b
+}
+
+// WithCurrentBackoff sets the CurrentBackoff field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CurrentBackoff field is set to the value of the last call.
+func (b *JobStatusApplyConfiguration) WithCurrentBackoff(value int32) *JobStatusApplyConfiguration {
+	b.CurrentBackoff = &value
 	return b
 }

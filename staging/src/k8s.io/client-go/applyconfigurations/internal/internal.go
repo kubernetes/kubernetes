@@ -3234,9 +3234,15 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.batch.v1.JobCondition
           elementRelationship: atomic
+    - name: currentBackoff
+      type:
+        scalar: numeric
     - name: failed
       type:
         scalar: numeric
+    - name: lastFailureTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: ready
       type:
         scalar: numeric

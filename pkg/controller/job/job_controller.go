@@ -741,7 +741,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 
 	activePods := controller.FilterActivePods(pods)
 	active := int32(len(activePods))
-	succeeded, failed := getStatus(&job, pods, uncounted, expectedRmFinalizers)
+	succeeded, failed, succeededPods, failedPods := getStatus(&job, pods, uncounted, expectedRmFinalizers)
 	var ready *int32
 	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
 		ready = pointer.Int32(countReadyPods(activePods))
@@ -751,6 +751,13 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	if job.Status.StartTime == nil && !jobSuspended(&job) {
 		now := metav1.NewTime(jm.clock.Now())
 		job.Status.StartTime = &now
+	}
+
+	oldBackoff := job.Status.CurrentBackoff
+	job.Status.CurrentBackoff = computeNewBackoff(oldBackoff, succeededPods, failedPods)
+	if len(failedPods) > 0 {
+		lastFinishedTime := getFinishedTime(failedPods[len(failedPods)-1])
+		job.Status.LastFailureTime = &lastFinishedTime
 	}
 
 	var manageJobErr error
@@ -870,7 +877,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	// This logic is linked to the issue: https://github.com/kubernetes/kubernetes/issues/56853 that aims to
 	// improve the Job backoff policy when parallelism > 1 and few Jobs failed but others succeed.
 	// In this case, we should clear the backoff delay.
-	forget = job.Status.Succeeded < succeeded
+	forget = true
 
 	if uncounted != nil {
 		needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !equalReady(ready, job.Status.Ready)
@@ -1373,15 +1380,18 @@ func getFailJobMessage(job *batch.Job, pods []*v1.Pod, uncounted sets.String) *s
 
 // getStatus returns number of succeeded and failed pods running a job. The number
 // of failed pods can be affected by the podFailurePolicy.
-func getStatus(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerminatedPods, expectedRmFinalizers sets.String) (succeeded, failed int32) {
+func getStatus(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerminatedPods, expectedRmFinalizers sets.String) (succeeded, failed int32, succeededPods, failedPods []*v1.Pod) {
 	if uncounted != nil {
 		succeeded = job.Status.Succeeded
 		failed = job.Status.Failed
 	}
-	succeeded += int32(countValidPodsWithFilter(job, pods, uncounted.Succeeded(), expectedRmFinalizers, func(p *v1.Pod) bool {
+
+	succeededPods = getValidPodsWithFilter(job, pods, uncounted.Succeeded(), expectedRmFinalizers, func(p *v1.Pod) bool {
 		return p.Status.Phase == v1.PodSucceeded
-	}))
-	failed += int32(countValidPodsWithFilter(job, pods, uncounted.Failed(), expectedRmFinalizers, func(p *v1.Pod) bool {
+	})
+	succeeded += int32(len(succeededPods))
+
+	failedPods = getValidPodsWithFilter(job, pods, uncounted.Failed(), expectedRmFinalizers, func(p *v1.Pod) bool {
 		if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
 			if !isPodFailed(p, job, uncounted != nil) {
 				return false
@@ -1391,8 +1401,83 @@ func getStatus(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerminatedPod
 		} else {
 			return isPodFailed(p, job, uncounted != nil)
 		}
-	}))
-	return succeeded, failed
+	})
+	failed += int32(len(failedPods))
+
+	finishedTimeSortFunction := func(p1, p2 *v1.Pod) bool {
+		p1FinishTime := getFinishedTime(p1)
+		p2FinishTime := getFinishedTime(p2)
+
+		return p1FinishTime.Before(&p2FinishTime)
+	}
+
+	sort.Slice(succeededPods, func(i, j int) bool {
+		return finishedTimeSortFunction(succeededPods[i], succeededPods[j])
+	})
+
+	sort.Slice(failedPods, func(i, j int) bool {
+		return finishedTimeSortFunction(failedPods[i], failedPods[j])
+	})
+
+	return succeeded, failed, succeededPods, failedPods
+}
+
+func getFinishedTime(p *v1.Pod) metav1.Time {
+	finishTime := p.Status.Conditions[0].LastTransitionTime
+	for _, cond := range p.Status.Conditions {
+		if finishTime.Before(&cond.LastTransitionTime) {
+			finishTime = cond.LastTransitionTime
+		}
+	}
+
+	return finishTime
+}
+
+func computeNewBackoff(oldBackoff *int32, succeededPods, failedPods []*v1.Pod) *int32 {
+	newBackoff := int32(0)
+	if oldBackoff != nil {
+		newBackoff = *oldBackoff
+	}
+
+	var i, j int
+
+	for i < len(succeededPods) && j < len(failedPods) {
+		sTime := getFinishedTime(succeededPods[i])
+		fTime := getFinishedTime(failedPods[j])
+
+		if sTime.Before(&fTime) {
+			newBackoff = 0
+			i = i + 1
+		} else {
+			if newBackoff == 0 {
+				newBackoff = int32(DefaultJobBackOff.Seconds())
+			} else {
+				newBackoff = newBackoff * 2
+				if newBackoff > int32(MaxJobBackOff.Seconds()) {
+					newBackoff = int32(MaxJobBackOff.Seconds())
+				}
+			}
+			j = j + 1
+		}
+	}
+
+	if i < len(succeededPods) {
+		newBackoff = 0
+	}
+
+	for j < len(failedPods) {
+		if newBackoff == 0 {
+			newBackoff = int32(DefaultJobBackOff.Seconds())
+		} else {
+			newBackoff = newBackoff * 2
+			if newBackoff > int32(MaxJobBackOff.Seconds()) {
+				newBackoff = int32(MaxJobBackOff.Seconds())
+			}
+		}
+		j = j + 1
+	}
+
+	return &newBackoff
 }
 
 // jobSuspended returns whether a Job is suspended while taking the feature
@@ -1464,7 +1549,20 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 		return active, metrics.JobSyncActionPodsDeleted, err
 	}
 
-	if active < wantActive {
+	shouldCreateNow := false
+	if job.Status.LastFailureTime != nil {
+		nextJobCreationTime := job.Status.LastFailureTime.Time.Add(time.Duration(*job.Status.CurrentBackoff) * time.Second)
+		now := time.Now()
+		if now.After(nextJobCreationTime) {
+			shouldCreateNow = true
+		} else {
+			jm.enqueueControllerDelayed(job, false, nextJobCreationTime.Sub(now))
+		}
+	} else {
+		shouldCreateNow = true
+	}
+
+	if active < wantActive && shouldCreateNow {
 		diff := wantActive - active
 		if diff > int32(MaxPodCreateDeletePerSync) {
 			diff = int32(MaxPodCreateDeletePerSync)
@@ -1636,6 +1734,33 @@ func countValidPodsWithFilter(job *batch.Job, pods []*v1.Pod, uncounted sets.Str
 		}
 	}
 	return result
+}
+
+func getValidPodsWithFilter(job *batch.Job, pods []*v1.Pod, uncounted sets.String, expectedRmFinalizers sets.String, filter func(*v1.Pod) bool) []*v1.Pod {
+	resultPods := []*v1.Pod{}
+	for _, p := range pods {
+		uid := string(p.UID)
+
+		if uncounted.Has(uid) {
+			resultPods = append(resultPods, p)
+		}
+
+		// Pods that don't have a completion finalizer are in the uncounted set or
+		// have already been accounted for in the Job status.
+		if uncounted != nil && (!hasJobTrackingFinalizer(p) || uncounted.Has(uid) || expectedRmFinalizers.Has(uid)) {
+			continue
+		}
+		if isIndexedJob(job) {
+			idx := getCompletionIndex(p.Annotations)
+			if idx == unknownCompletionIndex || idx >= int(*job.Spec.Completions) {
+				continue
+			}
+		}
+		if filter(p) {
+			resultPods = append(resultPods, p)
+		}
+	}
+	return resultPods
 }
 
 // getCompletionMode returns string representation of the completion mode. Used as a label value for metrics.
