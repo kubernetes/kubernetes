@@ -36,6 +36,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
@@ -128,6 +130,7 @@ func TestGCTerminated(t *testing.T) {
 			deletedPodNames: sets.NewString(),
 		},
 	}
+	_, ctx := ktesting.NewTestContext(t)
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -334,7 +337,7 @@ func TestGCOrphaned(t *testing.T) {
 			for _, pod := range test.pods {
 				pods = append(pods, pod)
 			}
-			client := setupNewSimpleClient(nodes, pods)
+			client := setupNewSimpleClient(ctx, nodes, pods)
 			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
 			for _, node := range test.initialInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)
@@ -449,7 +452,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				})
 			}
 			nodes := []*v1.Node{}
-			client := setupNewSimpleClient(nodes, pods)
+			client := setupNewSimpleClient(ctx, nodes, pods)
 			gcc, podInformer, _ := NewFromClient(client, -1)
 
 			for _, pod := range pods {
@@ -668,7 +671,8 @@ func testDeletingPodsMetrics(t *testing.T, inputDeletingPodsTotal int) {
 	}
 }
 
-func setupNewSimpleClient(nodes []*v1.Node, pods []*v1.Pod) *fake.Clientset {
+func setupNewSimpleClient(ctx context.Context, []*v1.Node, pods []*v1.Pod) *fake.Clientset {
+	logger := klog.FromContext(ctx)
 	podList := &v1.PodList{}
 	for _, podItem := range pods {
 		podList.Items = append(podList.Items, *podItem)

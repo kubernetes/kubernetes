@@ -97,11 +97,13 @@ func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podIn
 }
 
 func (gcc *PodGCController) Run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+
 	defer utilruntime.HandleCrash()
 
-	klog.Infof("Starting GC controller")
+	logger.Info("Starting GC controller")
 	defer gcc.nodeQueue.ShutDown()
-	defer klog.Infof("Shutting down GC controller")
+	defer logger.Info("Shutting down GC controller")
 
 	if !cache.WaitForNamedCacheSync("GC", ctx.Done(), gcc.podListerSynced, gcc.nodeListerSynced) {
 		return
@@ -112,19 +114,19 @@ func (gcc *PodGCController) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (gcc *PodGCController) gc(ctx context.Context) {
+func (gcc *PodGCController) gc(logger klog.Logger, ctx context.Context) {
 	pods, err := gcc.podLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("Error while listing all pods: %v", err)
+		logger.Error("Error while listing all pods: %v", err)
 		return
 	}
 	nodes, err := gcc.nodeLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("Error while listing all nodes: %v", err)
+		logger.Error("Error while listing all nodes: %v", err)
 		return
 	}
 	if gcc.terminatedPodThreshold > 0 {
-		gcc.gcTerminated(ctx, pods)
+		gcc.gcTerminating(logger, ctx, pods)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeOutOfServiceVolumeDetach) {
 		gcc.gcTerminating(ctx, pods)
@@ -145,8 +147,8 @@ func isPodTerminating(pod *v1.Pod) bool {
 	return pod.ObjectMeta.DeletionTimestamp != nil
 }
 
-func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
-	klog.V(4).Info("GC'ing terminating pods that are on out-of-service nodes")
+func (gcc *PodGCController) gcTerminating(logger klog.Logger, ctx context.Context, pods []*v1.Pod) {
+	logger.V(4).Info("GC'ing terminating pods that are on out-of-service nodes")
 	terminatingPods := []*v1.Pod{}
 	for _, pod := range pods {
 		if isPodTerminating(pod) {
@@ -291,7 +293,7 @@ func (gcc *PodGCController) checkIfNodeExists(ctx context.Context, name string) 
 }
 
 // gcUnscheduledTerminating deletes pods that are terminating and haven't been scheduled to a particular node.
-func (gcc *PodGCController) gcUnscheduledTerminating(ctx context.Context, pods []*v1.Pod) {
+func (gcc *PodGCController) gcUnscheduledTerminating(logger klog.Logger, ctx context.Context, pods []*v1.Pod) {
 	klog.V(4).Infof("GC'ing unscheduled pods which are terminating.")
 
 	for _, pod := range pods {
@@ -299,7 +301,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(ctx context.Context, pods [
 			continue
 		}
 
-		klog.V(2).InfoS("Found unscheduled terminating Pod not assigned to any Node, deleting.", "pod", klog.KObj(pod))
+		logger.V(2).Info("Found unscheduled terminating Pod not assigned to any Node, deleting.", "pod", klog.KObj(pod))
 		if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 			utilruntime.HandleError(err)
 		} else {
@@ -325,8 +327,8 @@ func (gcc *PodGCController) markFailedAndDeletePod(ctx context.Context, pod *v1.
 	return gcc.markFailedAndDeletePodWithCondition(ctx, pod, nil)
 }
 
-func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Context, pod *v1.Pod, condition *corev1apply.PodConditionApplyConfiguration) error {
-	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(pod.Namespace, pod.Name))
+func (gcc *PodGCController) markFailedAndDeletePodWithCondition(logger klog.Logger, ctx context.Context, pod *v1.Pod, condition *v1.PodCondition) error {
+	logger.Info("PodGC is force deleting Pod", "pod", logger.KRef(pod.Namespace, pod.Name))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 
 		// Extact the pod status as PodGC may or may not own the pod phase, if
