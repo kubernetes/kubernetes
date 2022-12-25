@@ -44,11 +44,11 @@ var _ = common.SIGDescribe("[Feature:ServiceCIDRs] ", func() {
 		ns string
 	)
 
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs = fr.ClientSet
 		ns = fr.Namespace.Name
 
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf(
@@ -58,7 +58,7 @@ var _ = common.SIGDescribe("[Feature:ServiceCIDRs] ", func() {
 
 	})
 
-	ginkgo.It("should serve on different Service CIDRs ", func() {
+	ginkgo.It("should serve on different Service CIDRs ", func(ctx context.Context) {
 		// create a new service CIDR
 		svcCIDR := &networkingv1alpha1.ServiceCIDR{
 			ObjectMeta: metav1.ObjectMeta{
@@ -68,14 +68,14 @@ var _ = common.SIGDescribe("[Feature:ServiceCIDRs] ", func() {
 				IPv4: "10.196.0.0/24",
 			},
 		}
-		_, err := cs.NetworkingV1alpha1().ServiceCIDRs().Create(context.TODO(), svcCIDR, metav1.CreateOptions{})
+		_, err := cs.NetworkingV1alpha1().ServiceCIDRs().Create(ctx, svcCIDR, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "error creating ServiceCIDR")
 
 		serviceName := "cidr1-test"
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
-		nodePortService, err := jig.CreateTCPService(func(svc *v1.Service) {
+		nodePortService, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.ClusterIP = "10.196.0.77"
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.Ports = []v1.ServicePort{
@@ -83,10 +83,10 @@ var _ = common.SIGDescribe("[Feature:ServiceCIDRs] ", func() {
 			}
 		})
 		framework.ExpectNoError(err)
-		err = jig.CreateServicePods(2)
+		err = jig.CreateServicePods(ctx, 2)
 		framework.ExpectNoError(err)
-		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
-		err = jig.CheckServiceReachability(nodePortService, execPod)
+		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
+		err = jig.CheckServiceReachability(ctx, nodePortService, execPod)
 		framework.ExpectNoError(err)
 	})
 
