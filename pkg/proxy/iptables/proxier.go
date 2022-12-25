@@ -206,8 +206,8 @@ type Proxier struct {
 	// localhostNodePorts indicates whether to generate iptables rules that
 	// disable NodePort services to be accessed via localhost.
 	localhostNodePorts bool
-	// Values are as a parameter to select the interfaces where nodePort works.
-	nodePortAddresses []string
+	// nodePortAddresses selects the interfaces where nodePort works.
+	nodePortAddresses *utilproxy.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer utilproxy.NetworkInterfacer
@@ -235,9 +235,11 @@ func NewProxier(ipFamily v1.IPFamily,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
-	nodePortAddresses []string,
+	nodePortAddressStrings []string,
 ) (*Proxier, error) {
-	if localhostNodePorts && utilproxy.ContainsIPv4Loopback(nodePortAddresses) {
+	nodePortAddresses := utilproxy.NewNodePortAddresses(nodePortAddressStrings)
+
+	if localhostNodePorts && nodePortAddresses.ContainsIPv4Loopback() {
 		// Set the route_localnet sysctl we need for exposing NodePorts on loopback addresses
 		// Refer to https://issues.k8s.io/90259
 		klog.InfoS("Setting route_localnet=1 to allow node-ports on localhost; to change this either disable iptables.localhostNodePorts (--iptables-localhost-nodeports) or set nodePortAddresses (--nodeport-addresses) to filter loopback addresses")
@@ -1416,7 +1418,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finally, tail-call to the nodePorts chain.  This needs to be after all
 	// other service portal rules.
-	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+	nodeAddresses, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 	}
