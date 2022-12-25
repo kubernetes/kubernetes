@@ -245,7 +245,8 @@ func TestGetNodeAddresses(t *testing.T) {
 				nw.AddInterfaceAddr(&pair.itf, pair.addrs)
 			}
 
-			addrList, err := GetNodeAddresses(tc.cidrs, nw)
+			npa := NewNodePortAddresses(tc.cidrs)
+			addrList, err := npa.GetNodeAddresses(nw)
 			// The fake InterfaceAddrs() never returns an error, so the only
 			// error GetNodeAddresses will return is "no addresses found".
 			if err != nil && tc.expected != nil {
@@ -272,11 +273,6 @@ func TestContainsIPv4Loopback(t *testing.T) {
 		{
 			name:        "all zeros ipv4",
 			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "0.0.0.0/0"},
-			want:        true,
-		},
-		{
-			name:        "all zeros ipv4 and invalid cidr",
-			cidrStrings: []string{"invalid.cidr", "192.168.0.0/16", "fd00:1:d::/64", "0.0.0.0/0"},
 			want:        true,
 		},
 		{
@@ -309,15 +305,11 @@ func TestContainsIPv4Loopback(t *testing.T) {
 			cidrStrings: []string{"128.0.2.0/28", "224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64"},
 			want:        false,
 		},
-		{
-			name:        "invalid cidr",
-			cidrStrings: []string{"invalid.ip/invalid.mask"},
-			want:        false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ContainsIPv4Loopback(tt.cidrStrings); got != tt.want {
+			npa := NewNodePortAddresses(tt.cidrStrings)
+			if got := npa.ContainsIPv4Loopback(); got != tt.want {
 				t.Errorf("ContainsIPv4Loopback() = %v, want %v", got, tt.want)
 			}
 		})

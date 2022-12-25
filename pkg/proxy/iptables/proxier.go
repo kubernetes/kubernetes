@@ -211,8 +211,8 @@ type Proxier struct {
 	// localhostNodePorts indicates whether we allow NodePort services to be accessed
 	// via localhost.
 	localhostNodePorts bool
-	// Values are as a parameter to select the interfaces where nodePort works.
-	nodePortAddresses []string
+	// nodePortAddresses selects the interfaces where nodePort works.
+	nodePortAddresses *utilproxy.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer utilproxy.NetworkInterfacer
@@ -240,9 +240,11 @@ func NewProxier(ipFamily v1.IPFamily,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
-	nodePortAddresses []string,
+	nodePortAddressStrings []string,
 ) (*Proxier, error) {
-	if !utilproxy.ContainsIPv4Loopback(nodePortAddresses) {
+	nodePortAddresses := utilproxy.NewNodePortAddresses(nodePortAddressStrings)
+
+	if !nodePortAddresses.ContainsIPv4Loopback() {
 		localhostNodePorts = false
 	}
 	if localhostNodePorts {
@@ -1460,7 +1462,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finally, tail-call to the nodePorts chain.  This needs to be after all
 	// other service portal rules.
-	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+	nodeAddresses, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 	}

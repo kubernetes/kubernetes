@@ -24,23 +24,38 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-// GetNodeAddresses return all matched node IP addresses based on given cidr slice.
-// Some callers, e.g. IPVS proxier, need concrete IPs, not ranges, which is why this exists.
+// NodePortAddresses is used to handle the --nodeport-addresses flag
+type NodePortAddresses struct {
+	cidrStrings []string
+}
+
+// NewNodePortAddresses takes the `--nodeport-addresses` value (which is assumed to
+// contain only valid CIDRs) and returns a NodePortAddresses object. If cidrStrings is
+// empty, this is treated as `["0.0.0.0/0", "::/0"]`.
+func NewNodePortAddresses(cidrStrings []string) *NodePortAddresses {
+	return &NodePortAddresses{
+		cidrStrings: cidrStrings,
+	}
+}
+
+func (npa *NodePortAddresses) String() string {
+	return fmt.Sprintf("%v", npa.cidrStrings)
+}
+
+// GetNodeAddresses return all matched node IP addresses for npa's CIDRs.
+// If npa's CIDRs include "0.0.0.0/0" and/or "::/0", then those values will be returned
+// verbatim in the response and no actual IPs of that family will be returned.
+// If no matching IPs are found, GetNodeAddresses will return an error.
 // NetworkInterfacer is injected for test purpose.
-// We expect the cidrs passed in is already validated.
-// Given an empty input `[]`, it will return `0.0.0.0/0` and `::/0` directly.
-// If multiple cidrs is given, it will return the minimal IP sets, e.g. given input `[1.2.0.0/16, 0.0.0.0/0]`, it will
-// only return `0.0.0.0/0`.
-// NOTE: GetNodeAddresses only accepts CIDRs, if you want concrete IPs, e.g. 1.2.3.4, then the input should be 1.2.3.4/32.
-func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error) {
+func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.String, error) {
 	uniqueAddressList := sets.NewString()
-	if len(cidrs) == 0 {
+	if len(npa.cidrStrings) == 0 {
 		uniqueAddressList.Insert(IPv4ZeroCIDR)
 		uniqueAddressList.Insert(IPv6ZeroCIDR)
 		return uniqueAddressList, nil
 	}
 	// First round of iteration to pick out `0.0.0.0/0` or `::/0` for the sake of excluding non-zero IPs.
-	for _, cidr := range cidrs {
+	for _, cidr := range npa.cidrStrings {
 		if IsZeroCIDR(cidr) {
 			uniqueAddressList.Insert(cidr)
 		}
@@ -52,7 +67,7 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 	}
 
 	// Second round of iteration to parse IPs based on cidr.
-	for _, cidr := range cidrs {
+	for _, cidr := range npa.cidrStrings {
 		if IsZeroCIDR(cidr) {
 			continue
 		}
@@ -82,20 +97,20 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 	}
 
 	if uniqueAddressList.Len() == 0 {
-		return nil, fmt.Errorf("no addresses found for cidrs %v", cidrs)
+		return nil, fmt.Errorf("no addresses found for cidrs %v", npa.cidrStrings)
 	}
 
 	return uniqueAddressList, nil
 }
 
-// ContainsIPv4Loopback returns true if the input is empty or one of the CIDR contains an IPv4 loopback address.
-func ContainsIPv4Loopback(cidrStrings []string) bool {
-	if len(cidrStrings) == 0 {
+// ContainsIPv4Loopback returns true if npa's CIDRs contain an IPv4 loopback address.
+func (npa *NodePortAddresses) ContainsIPv4Loopback() bool {
+	if len(npa.cidrStrings) == 0 {
 		return true
 	}
 	// RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
 	ipv4LoopbackStart := netutils.ParseIPSloppy("127.0.0.0")
-	for _, cidr := range cidrStrings {
+	for _, cidr := range npa.cidrStrings {
 		ip, ipnet, err := netutils.ParseCIDRSloppy(cidr)
 		if err != nil {
 			continue

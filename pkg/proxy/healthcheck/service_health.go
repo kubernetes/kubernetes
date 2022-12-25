@@ -52,9 +52,9 @@ type ServiceHealthServer interface {
 	SyncEndpoints(newEndpoints map[types.NamespacedName]int) error
 }
 
-func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses []string) ServiceHealthServer {
+func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *utilproxy.NodePortAddresses) ServiceHealthServer {
 
-	nodeAddresses, err := utilproxy.GetNodeAddresses(nodePortAddresses, utilproxy.RealNetwork{})
+	nodeAddresses, err := nodePortAddresses.GetNodeAddresses(utilproxy.RealNetwork{})
 	if err != nil || nodeAddresses.Len() == 0 {
 		klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
 		nodeAddresses = sets.NewString()
@@ -81,7 +81,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses []string) ServiceHealthServer {
+func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *utilproxy.NodePortAddresses) ServiceHealthServer {
 	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses)
 }
 

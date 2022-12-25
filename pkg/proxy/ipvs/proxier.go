@@ -276,8 +276,8 @@ type Proxier struct {
 	netlinkHandle NetLinkHandle
 	// ipsetList is the list of ipsets that ipvs proxier used.
 	ipsetList map[string]*IPSet
-	// Values are as a parameter to select the interfaces which nodeport works.
-	nodePortAddresses []string
+	// nodePortAddresses selects the interfaces where nodePort works.
+	nodePortAddresses *utilproxy.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer     utilproxy.NetworkInterfacer
@@ -327,7 +327,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
-	nodePortAddresses []string,
+	nodePortAddressStrings []string,
 	kernelHandler KernelHandler,
 ) (*Proxier, error) {
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
@@ -408,6 +408,8 @@ func NewProxier(ipFamily v1.IPFamily,
 		klog.InfoS("IPVS scheduler not specified, use rr by default")
 		scheduler = defaultScheduler
 	}
+
+	nodePortAddresses := utilproxy.NewNodePortAddresses(nodePortAddressStrings)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
 
@@ -1028,7 +1030,7 @@ func (proxier *Proxier) syncProxyRules() {
 	)
 
 	if hasNodePort {
-		nodeAddrSet, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+		nodeAddrSet, err := proxier.nodePortAddresses.GetNodeAddresses(proxier.networkInterfacer)
 		if err != nil {
 			klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
 		} else {

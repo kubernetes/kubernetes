@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	testingclock "k8s.io/utils/clock/testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -131,8 +132,9 @@ type healthzPayload struct {
 func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
+	nodePortAddresses := utilproxy.NewNodePortAddresses([]string{})
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, []string{})
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
@@ -435,8 +437,9 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 
 	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
+	nodePortAddresses := utilproxy.NewNodePortAddresses([]string{"127.0.0.0/8"})
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, []string{"127.0.0.0/8"})
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
