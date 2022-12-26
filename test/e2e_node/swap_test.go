@@ -23,36 +23,28 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/rand"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	testutils "k8s.io/kubernetes/test/utils"
-	admissionapi "k8s.io/pod-security-admission/api"
-	"path/filepath"
-	"strconv"
-
 	"github.com/google/cadvisor/machine"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/apimachinery/pkg/util/rand"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	testutils "k8s.io/kubernetes/test/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -286,9 +278,9 @@ var _ = SIGDescribe("Swap [LinuxOnly] [Serial]", func() {
 		if swapCapacity > revervedSwapSizeBytes {
 			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 				initialConfig.FailSwapOn = false
-				initialConfig.FeatureGates[string(kubefeatures.NodeSwap)] = true
+				initialConfig.FeatureGates[string(features.NodeSwap)] = true
 				// to test
-				initialConfig.FeatureGates[string(kubefeatures.PDBUnhealthyPodEvictionPolicy)] = true
+				initialConfig.FeatureGates[string(features.PDBUnhealthyPodEvictionPolicy)] = true
 				initialConfig.MemorySwap = kubeletconfig.MemorySwapConfiguration{
 					SwapBehavior: "LimitedSwap",
 				}

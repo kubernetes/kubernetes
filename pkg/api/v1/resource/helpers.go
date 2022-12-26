@@ -263,8 +263,7 @@ func reuseOrClearResourceList(reuse v1.ResourceList) v1.ResourceList {
 
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
 func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
-	requestQuantity := resource.Quantity{}
-
+	var requestQuantity resource.Quantity
 	switch resourceName {
 	case v1.ResourceCPU:
 		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
