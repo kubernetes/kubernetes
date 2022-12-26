@@ -28,15 +28,18 @@ import (
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudprovidernodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -276,6 +279,7 @@ func MachineInfo(nodeName string,
 			node.Status.NodeInfo.MachineID = info.MachineID
 			node.Status.NodeInfo.SystemUUID = info.SystemUUID
 
+			// TODO(pacoxu) init swap size: currently cadvisor has no swap info
 			for rName, rCap := range cadvisor.CapacityFromMachineInfo(info) {
 				node.Status.Capacity[rName] = rCap
 			}
@@ -305,7 +309,10 @@ func MachineInfo(nodeName string,
 					node.Status.Capacity[v1.ResourceEphemeralStorage] = v
 				}
 			}
-			//}
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+				node.Status.Capacity[nodev1.ResourceSwap] = getSwapCapacity()
+			}
 
 			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc()
 			for k, v := range devicePluginCapacity {

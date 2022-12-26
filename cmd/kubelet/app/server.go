@@ -44,6 +44,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -689,6 +690,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		if err != nil {
 			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
 		}
+
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
 		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
@@ -1261,6 +1263,12 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 	rl := make(v1.ResourceList)
 	for k, v := range m {
 		switch v1.ResourceName(k) {
+		case nodev1.ResourceSwap:
+			if !utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+				return nil, fmt.Errorf("cannot reserve swap resource as feature gate NodeSwap is disabled")
+			}
+			// swap can be handled the same way as memory/cpu
+			fallthrough
 		// CPU, memory, local storage, and PID resources are supported.
 		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
 			q, err := resource.ParseQuantity(v)
@@ -1268,9 +1276,10 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
 			}
 			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+				return nil, fmt.Errorf("resource quantity for %q cannot be negative %q", k, v)
 			}
 			rl[v1.ResourceName(k)] = q
+
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}

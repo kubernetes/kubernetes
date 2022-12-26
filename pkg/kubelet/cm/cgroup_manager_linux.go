@@ -26,13 +26,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/cgroups/v3/cgroup1"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -47,6 +50,8 @@ const (
 	MemoryMin string = "memory.min"
 	// MemoryHigh is memory.high for cgroup v2
 	MemoryHigh string = "memory.high"
+	// MemorySwapMax is swap usage hard limit: memory.swap.max for cgroup v2
+	MemorySwapMax string = "memory.swap.max"
 )
 
 var RootCgroupName = CgroupName([]string{})
@@ -257,6 +262,9 @@ func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 	// in https://github.com/opencontainers/runc/issues/1440
 	// once resolved, we can remove this code.
 	allowlistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd", "pids")
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) && swapControllerAvailable() {
+		allowlistControllers.Insert("swap")
+	}
 
 	if _, ok := m.subsystems.MountPoints["hugetlb"]; ok {
 		allowlistControllers.Insert("hugetlb")
@@ -358,6 +366,14 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	}
 	if resourceConfig.Memory != nil {
 		resources.Memory = *resourceConfig.Memory
+		if resourceConfig.Swap != nil && swapControllerAvailable() {
+			if libcontainercgroups.IsCgroup2UnifiedMode() {
+				resources.Unified[MemorySwapMax] = strconv.FormatInt(*resourceConfig.Swap, 10)
+			} else {
+				// In cgroup v1, MemorySwap means total memory usage (memory + swap).
+				resources.MemorySwap = *resourceConfig.Memory + *resourceConfig.Swap
+			}
+		}
 	}
 	if resourceConfig.CPUShares != nil {
 		if libcontainercgroups.IsCgroup2UnifiedMode() {
@@ -556,4 +572,34 @@ func (m *cgroupManagerImpl) MemoryUsage(name CgroupName) (int64, error) {
 	}
 	val, err := fscommon.GetCgroupParamUint(path, file)
 	return int64(val), err
+}
+
+var (
+	swapControllerAvailability     bool
+	swapControllerAvailabilityOnce sync.Once
+)
+
+func swapControllerAvailable() bool {
+	swapControllerAvailabilityOnce.Do(func() {
+		const warn = "Failed to detect the availability of the swap controller, assuming not available"
+		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
+		if libcontainercgroups.IsCgroup2UnifiedMode() {
+			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
+			_, unified, err := cgroup1.ParseCgroupFileUnified("/proc/self/cgroup")
+			if err != nil {
+				err = fmt.Errorf("failed to parse /proc/self/cgroup: %w", err)
+				klog.V(5).ErrorS(err, warn)
+				return
+			}
+			p = filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+		}
+		if _, err := os.Stat(p); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				klog.V(5).ErrorS(err, warn)
+			}
+			return
+		}
+		swapControllerAvailability = true
+	})
+	return swapControllerAvailability
 }

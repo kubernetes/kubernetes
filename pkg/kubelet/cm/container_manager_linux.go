@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/cadvisor/machine"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	"github.com/opencontainers/runc/libcontainer/configs"
@@ -38,6 +39,7 @@ import (
 
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -237,6 +239,18 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
+	// if swap are enabled, we report them as a schedulable resource on the node
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
+		swapCapacity, err := machine.GetMachineSwapCapacity()
+		if err != nil {
+			klog.ErrorS(err, "Failed to get swap capacity from cadvisor")
+		} else {
+			capacity[nodev1.ResourceSwap] = *resource.NewQuantity(
+				int64(swapCapacity),
+				resource.BinarySI)
+		}
+	}
+
 	for k, v := range capacity {
 		internalCapacity[k] = v
 	}
