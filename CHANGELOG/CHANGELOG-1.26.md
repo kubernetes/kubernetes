@@ -283,7 +283,7 @@ name | architectures
 - Enabled `kube-controller-manager` to support '--concurrent-horizontal-pod-autoscaler-syncs' flag to set the number of horizontal pod autoscaler controller workers. ([#108501](https://github.com/kubernetes/kubernetes/pull/108501), [@zroubalik](https://github.com/zroubalik))
 - Fixed spurious `field is immutable` errors validating updates to Event API objects via the `events.k8s.io/v1` API. ([#112183](https://github.com/kubernetes/kubernetes/pull/112183), [@liggitt](https://github.com/liggitt))
 - Graduated `ServiceInternalTrafficPolicy` feature to GA. ([#113496](https://github.com/kubernetes/kubernetes/pull/113496), [@avoltz](https://github.com/avoltz))
-- In 'kube-proxy`: The "userspace" proxy mode (deprecated for over a year) is no
+- In `kube-proxy`: The "userspace" proxy mode (deprecated for over a year) is no
   longer supported on either Linux or Windows. Users should use "iptables" or "ipvs"
   on Linux, or "kernelspace" on Windows.
    ([#112133](https://github.com/kubernetes/kubernetes/pull/112133), [@knabben](https://github.com/knabben))
@@ -472,7 +472,7 @@ name | architectures
 - For `kubectl`, `--server-side` now migrates ownership of all fields used by client-side-apply to the specified `--fieldmanager`. This prevents fields previously specified using kubectl from being able to live outside of server-side-apply's management and become undeleteable. ([#112905](https://github.com/kubernetes/kubernetes/pull/112905), [@alexzielenski](https://github.com/alexzielenski))
 - For raw block CSI volumes on Kubernetes, kubelet was incorrectly calling CSI `NodeStageVolume` for every single "map" (i.e. raw block "mount") operation for a volume already attached to the node. This change modified that behavior to ensure it is only called once per volume per node. ([#112403](https://github.com/kubernetes/kubernetes/pull/112403), [@akankshakumari393](https://github.com/akankshakumari393))
 - Improved `kubectl` display of invalid request errors returned by the API server. ([#112150](https://github.com/kubernetes/kubernetes/pull/112150), [@liggitt](https://github.com/liggitt))
-- In 'kube-apiserver`,`x-kubernetes-list-type` validation is now enforced when updating status of custom resources.' ([#111866](https://github.com/kubernetes/kubernetes/pull/111866), [@pacoxu](https://github.com/pacoxu))
+- In `kube-apiserver`,`x-kubernetes-list-type` validation is now enforced when updating status of custom resources. ([#111866](https://github.com/kubernetes/kubernetes/pull/111866), [@pacoxu](https://github.com/pacoxu))
 - In `kube-apiserver`, custom resources can now be specified in the `--encryption-provider-config` file and can be encrypted in etcd. ([#113015](https://github.com/kubernetes/kubernetes/pull/113015), [@ritazh](https://github.com/ritazh))
 - Increased the maximum backoff delay of the endpointslice controller to match the expected sequence of delays when syncing Services. ([#112353](https://github.com/kubernetes/kubernetes/pull/112353), [@dgrisonnet](https://github.com/dgrisonnet))
 - Known issue: Job field `.spec.podFailurePolicy.rules[*].onExitCode` might be ignored if the Pod is deleted before it terminates. ([#113856](https://github.com/kubernetes/kubernetes/pull/113856), [@alculquicondor](https://github.com/alculquicondor))
