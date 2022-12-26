@@ -17,8 +17,10 @@ limitations under the License.
 package cm
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -27,13 +29,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/cgroups/v3/cgroup1"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -51,8 +53,8 @@ const (
 	// MemoryMin is memory.min for cgroup v2
 	MemoryMin string = "memory.min"
 	// MemoryHigh is memory.high for cgroup v2
-	MemoryHigh             string = "memory.high"
-	Cgroup2MaxCpuLimit     string = "max"
+	MemoryHigh         string = "memory.high"
+	Cgroup2MaxCpuLimit string = "max"
 	// Cgroup2MaxSwapFilename is swap usage hard limit: memory.swap.max for cgroup v2
 	Cgroup2MaxSwapFilename string = "memory.swap.max"
 )
@@ -266,7 +268,7 @@ func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 	// once resolved, we can remove this code.
 	allowlistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd", "pids")
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) && swapControllerAvailable() {
-		allowlistControllers.Insert("swap")
+		allowlistControllers.Insert(string(nodev1.ResourceSwap))
 	}
 
 	if _, ok := m.subsystems.MountPoints["hugetlb"]; ok {
@@ -371,6 +373,9 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 		resources.Memory = *resourceConfig.Memory
 		if resourceConfig.Swap != nil && swapControllerAvailable() {
 			if libcontainercgroups.IsCgroup2UnifiedMode() {
+				if resources.Unified == nil {
+					resources.Unified = make(map[string]string)
+				}
 				resources.Unified[Cgroup2MaxSwapFilename] = strconv.FormatInt(*resourceConfig.Swap, 10)
 			} else {
 				// In cgroup v1, MemorySwap means total memory usage (memory + swap).
@@ -774,7 +779,7 @@ func swapControllerAvailable() bool {
 		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
 		if libcontainercgroups.IsCgroup2UnifiedMode() {
 			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
-			_, unified, err := cgroup1.ParseCgroupFileUnified("/proc/self/cgroup")
+			unified, err := parseCgroupFileUnified("/proc/self/cgroup")
 			if err != nil {
 				err = fmt.Errorf("failed to parse /proc/self/cgroup: %w", err)
 				klog.V(5).ErrorS(err, warn)
@@ -791,4 +796,39 @@ func swapControllerAvailable() bool {
 		swapControllerAvailability = true
 	})
 	return swapControllerAvailability
+}
+
+// parseCgroupFileUnified returns the unified path.
+func parseCgroupFileUnified(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	return parseCgroupFromReaderUnified(f)
+}
+
+func parseCgroupFromReaderUnified(r io.Reader) (string, error) {
+	var (
+		unified = ""
+		s       = bufio.NewScanner(r)
+	)
+	for s.Scan() {
+		var (
+			text  = s.Text()
+			parts = strings.SplitN(text, ":", 3)
+		)
+		if len(parts) < 3 {
+			return unified, fmt.Errorf("invalid cgroup entry: %q", text)
+		}
+		for _, subs := range strings.Split(parts[1], ",") {
+			if subs == "" {
+				unified = parts[2]
+			}
+		}
+	}
+	if err := s.Err(); err != nil {
+		return unified, err
+	}
+	return unified, nil
 }

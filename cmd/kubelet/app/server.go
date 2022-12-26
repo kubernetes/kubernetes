@@ -1250,7 +1250,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		switch v1.ResourceName(k) {
 		case nodev1.ResourceSwap:
 			if !utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
-				return nil, fmt.Errorf("cannot reserve swap resource as feature gate NodeSwap is disabled")
+				return nil, fmt.Errorf("cannot reserve quantity %q of %q resource as feature gate NodeSwap is disabled", v, k)
 			}
 			// swap can be handled the same way as memory/cpu
 			fallthrough
@@ -1261,7 +1261,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
 			}
 			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative %q", k, v)
+				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %q", k, v)
 			}
 			rl[v1.ResourceName(k)] = q
 
