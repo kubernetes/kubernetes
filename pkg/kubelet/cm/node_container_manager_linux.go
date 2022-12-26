@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -143,11 +144,14 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 	// Enforce MemoryQoS for cgroups of kube-reserved/system-reserved. For more information,
 	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) {
+		if rp.Unified == nil {
+			rp.Unified = make(map[string]string)
+		}
 		if rp.Memory != nil {
-			if rp.Unified == nil {
-				rp.Unified = make(map[string]string)
-			}
 			rp.Unified[MemoryMin] = strconv.FormatInt(*rp.Memory, 10)
+		}
+		if rp.Swap != nil && swapControllerAvailable() {
+			rp.Unified[MemorySwapMax] = strconv.FormatInt(*rp.Swap, 10)
 		}
 	}
 
@@ -176,6 +180,10 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 		// Memory is defined in bytes.
 		val := q.Value()
 		rc.Memory = &val
+	}
+	if q, exists := rl[nodev1.ResourceSwap]; exists {
+		val := q.Value()
+		rc.Swap = &val
 	}
 	if q, exists := rl[v1.ResourceCPU]; exists {
 		// CPU is defined in milli-cores.

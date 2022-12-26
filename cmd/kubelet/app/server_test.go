@@ -18,36 +18,76 @@ package app
 
 import (
 	"testing"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
 	testCases := []struct {
-		kubeReserved   map[string]string
-		systemReserved map[string]string
-		errorExpected  bool
-		name           string
+		kubeReserved        map[string]string
+		systemReserved      map[string]string
+		nodeSwapFeatureGate bool
+		errorExpected       bool
+		name                string
 	}{
 		{
-			kubeReserved:   map[string]string{"cpu": "200m", "memory": "-150G", "ephemeral-storage": "10Gi"},
-			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ki"},
-			errorExpected:  true,
-			name:           "negative quantity value",
+			kubeReserved:        map[string]string{"cpu": "200m", "memory": "-150G", "ephemeral-storage": "10Gi", "pid": "1000"},
+			systemReserved:      map[string]string{"cpu": "200m", "memory": "15Ki"},
+			nodeSwapFeatureGate: false,
+			errorExpected:       true,
+			name:                "negative quantity value",
 		},
 		{
-			kubeReserved:   map[string]string{"cpu": "200m", "memory": "150Gi", "ephemeral-storage": "10Gi"},
-			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ky"},
-			errorExpected:  true,
-			name:           "invalid quantity unit",
+			kubeReserved:        map[string]string{"cpu": "200m", "memory": "150Gi", "ephemeral-storage": "10Gi", "pid": "0"},
+			systemReserved:      map[string]string{"cpu": "200m", "memory": "15Ky"},
+			nodeSwapFeatureGate: false,
+			errorExpected:       true,
+			name:                "invalid quantity unit",
 		},
 		{
-			kubeReserved:   map[string]string{"cpu": "200m", "memory": "15G", "ephemeral-storage": "10Gi"},
-			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ki"},
-			errorExpected:  false,
-			name:           "Valid resource quantity",
+			kubeReserved:        map[string]string{"cpu": "200m", "memory": "15G", "ephemeral-storage": "10Gi", "pid": "10000"},
+			systemReserved:      map[string]string{"cpu": "200m", "memory": "15Ki"},
+			nodeSwapFeatureGate: false,
+			errorExpected:       false,
+			name:                "valid resource quantity",
+		},
+		{
+			systemReserved:      map[string]string{"swap": "-100m"},
+			nodeSwapFeatureGate: true,
+			errorExpected:       true,
+			name:                "invalid negative swap",
+		},
+		{
+			systemReserved:      map[string]string{"swap": "-100xx"},
+			nodeSwapFeatureGate: true,
+			errorExpected:       true,
+			name:                "invalid swap unit",
+		},
+		{
+			systemReserved:      map[string]string{"swap": "100m"},
+			nodeSwapFeatureGate: true,
+			errorExpected:       false,
+			name:                "valid swap",
+		},
+		{
+			systemReserved:      map[string]string{"swap": "100m"},
+			nodeSwapFeatureGate: false,
+			errorExpected:       true,
+			name:                "valid swap but feature gate disabled",
+		},
+		{
+			systemReserved:      map[string]string{"swap": "-100m"},
+			nodeSwapFeatureGate: false,
+			errorExpected:       true,
+			name:                "invalid swap but feature gate disabled",
 		},
 	}
 
 	for _, test := range testCases {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, test.nodeSwapFeatureGate)()
+
 		_, err1 := parseResourceList(test.kubeReserved)
 		_, err2 := parseResourceList(test.systemReserved)
 		if test.errorExpected {
