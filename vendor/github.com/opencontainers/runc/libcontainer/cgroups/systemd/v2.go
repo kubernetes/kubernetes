@@ -138,7 +138,7 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 				"memory.low":      "MemoryLow",
 				"memory.min":      "MemoryMin",
 				"memory.max":      "MemoryMax",
-				"memory.swap.max": "MemorySwapMax",
+				"memory.swap.max": "Cgroup2MaxSwapFilename",
 			}
 			props = append(props,
 				newProp(m[k], num))
@@ -203,7 +203,7 @@ func genV2ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]syst
 	}
 	if swap != 0 {
 		properties = append(properties,
-			newProp("MemorySwapMax", uint64(swap)))
+			newProp("Cgroup2MaxSwapFilename", uint64(swap)))
 	}
 
 	if r.CpuWeight != 0 {

@@ -151,7 +151,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 			rp.Unified[MemoryMin] = strconv.FormatInt(*rp.Memory, 10)
 		}
 		if rp.Swap != nil && swapControllerAvailable() {
-			rp.Unified[MemorySwapMax] = strconv.FormatInt(*rp.Swap, 10)
+			rp.Unified[Cgroup2MaxSwapFilename] = strconv.FormatInt(*rp.Swap, 10)
 		}
 	}
 
