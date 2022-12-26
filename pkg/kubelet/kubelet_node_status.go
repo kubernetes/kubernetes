@@ -26,18 +26,21 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -114,6 +117,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
 	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
 	requiresUpdate = kl.reconcileHugePageResource(node, existingNode) || requiresUpdate
+	requiresUpdate = kl.reconcileSwapResource(node, existingNode) || requiresUpdate
 	if requiresUpdate {
 		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
 			klog.ErrorS(err, "Unable to reconcile node with API server,error updating node", "node", klog.KObj(node))
@@ -168,6 +172,39 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 			requiresUpdate = true
 		}
 	}
+	return requiresUpdate
+}
+
+// reconcileSwapResource will update swap capacity and remove swap if the feature is disabled
+func (kl *Kubelet) reconcileSwapResource(initialNode, existingNode *v1.Node) bool {
+	capacity, found := existingNode.Status.Capacity[nodev1.ResourceSwap]
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
+		if !found {
+			return false
+		}
+		delete(existingNode.Status.Capacity, nodev1.ResourceSwap)
+		delete(existingNode.Status.Allocatable, nodev1.ResourceSwap)
+		klog.InfoS("Removing swap resource from node object since feature gate NodeSwap is disabled")
+		return true
+	}
+
+	requiresUpdate := updateDefaultResources(initialNode, existingNode)
+	initialCapacity := initialNode.Status.Capacity[nodev1.ResourceSwap]
+	initialAllocatable := initialNode.Status.Allocatable[nodev1.ResourceSwap]
+
+	// Add or update capacity if it the size was previously unsupported or has changed
+	if capacity.Cmp(initialCapacity) != 0 {
+		existingNode.Status.Capacity[nodev1.ResourceSwap] = initialCapacity.DeepCopy()
+		requiresUpdate = true
+	}
+
+	allocatable := existingNode.Status.Allocatable[nodev1.ResourceSwap]
+	// Add or update allocatable if it the size was previously unsupported or has changed
+	if allocatable.Cmp(initialAllocatable) != 0 {
+		existingNode.Status.Allocatable[nodev1.ResourceSwap] = initialAllocatable.DeepCopy()
+		requiresUpdate = true
+	}
+
 	return requiresUpdate
 }
 
