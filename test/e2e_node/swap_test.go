@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2023 The Kubernetes Authors.
 
@@ -19,6 +22,10 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"strconv"
+	"strings"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +41,18 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	"path/filepath"
 	"strconv"
+
+	"github.com/google/cadvisor/machine"
+	"github.com/onsi/ginkgo/v2"
+
+	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -41,6 +60,9 @@ const (
 	cgroupV1SwapLimitFile = "/memory/memory.memsw.limit_in_bytes"
 	cgroupV2SwapLimitFile = "memory.swap.max"
 	cgroupV1MemLimitFile  = "/memory/memory.limit_in_bytes"
+
+	reservedSwapSize      = "256Mi"
+	revervedSwapSizeBytes = 256 * 1024 * 1024
 )
 
 var _ = SIGDescribe("Swap [NodeConformance][LinuxOnly]", func() {
@@ -251,4 +273,66 @@ func isLimitedSwap(f *framework.Framework, pod *v1.Pod) bool {
 	framework.ExpectNoError(err, "cannot get kubelet config")
 
 	return kubeletCfg.MemorySwap.SwapBehavior == types.LimitedSwap
+}
+
+// Serial because the test updates kubelet configuration.
+var _ = SIGDescribe("Swap [LinuxOnly] [Serial]", func() {
+	f := framework.NewDefaultFramework("system-reserved-swap")
+	ginkgo.Context("With config updated with swap reserved", func() {
+		swapCapacity, err := machine.GetMachineSwapCapacity()
+		framework.Logf("Machine swap capacity is: %q", swapCapacity)
+		framework.ExpectNoError(err)
+		// skip the test if the swap capacity is less thant 256Mi.
+		if swapCapacity > revervedSwapSizeBytes {
+			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+				initialConfig.FailSwapOn = false
+				initialConfig.FeatureGates[string(kubefeatures.NodeSwap)] = true
+				// to test
+				initialConfig.FeatureGates[string(kubefeatures.PDBUnhealthyPodEvictionPolicy)] = true
+				initialConfig.MemorySwap = kubeletconfig.MemorySwapConfiguration{
+					SwapBehavior: "LimitedSwap",
+				}
+				if initialConfig.SystemReserved == nil {
+					initialConfig.SystemReserved = map[string]string{}
+				}
+				framework.Logf("System reserved swap is: %q", reservedSwapSize)
+				initialConfig.SystemReserved[string(nodev1.ResourceSwap)] = reservedSwapSize
+			})
+			ginkgo.It("node should not allocate reserved swap size", func(ctx context.Context) {
+				unified := IsCgroup2UnifiedMode()
+				if !unified {
+					ginkgo.Skip("skipping swap test for cgroup v1")
+				}
+
+				ginkgo.By("by check node status")
+				nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+				framework.ExpectNoError(err)
+				// Assuming that there is only one node, because this is a node e2e test.
+				framework.ExpectEqual(len(nodeList.Items), 1)
+				allocateble := nodev1.Swap(nodeList.Items[0].Status.Allocatable)
+				capacity := nodev1.Swap(nodeList.Items[0].Status.Capacity)
+				reserved := resource.MustParse(reservedSwapSize)
+				reserved.Add(*allocateble)
+				framework.ExpectEqual(reserved.Cmp(*capacity), 0)
+				// check cgroup limit
+				limitsize, err := getCgroupLimit()
+				framework.ExpectNoError(err)
+				framework.ExpectEqual(swapCapacity-revervedSwapSizeBytes, limitsize, "total swap - systemreserved swap = cgourpv2 swap limit")
+			})
+		}
+
+	})
+})
+
+func getCgroupLimit() (uint64, error) {
+	cgroupfilename := fmt.Sprintf("/sys/fs/cgroup/memory/%s/memory.swap.max", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable)))))
+	bs, err := ioutil.ReadFile(cgroupfilename)
+	if err != nil {
+		return 0, err
+	}
+	size, err := strconv.Atoi(strings.TrimSuffix(string(bs), "\n"))
+	if err != nil {
+		return 0, err
+	}
+	return uint64(size), nil
 }
