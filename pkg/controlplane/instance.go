@@ -83,6 +83,7 @@ import (
 	flowcontrolv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservice"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
@@ -395,7 +396,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	// install legacy rest storage
-
 	if err := m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter); err != nil {
 		return nil, err
 	}
@@ -577,14 +577,39 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		return nil
 	}
 
-	controllerName := "bootstrap-controller"
 	client := kubernetes.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	// Kubernetes clusters create a kubernetes.default Service used
+	// for InCluster configuration.
+	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	if err != nil {
+		return fmt.Errorf("failed to get listener address: %w", err)
+	}
+
+	defaultServiceController, err := defaultservice.NewController(
+		// Service
+		c.ExtraConfig.APIServerServiceIP,
+		c.ExtraConfig.APIServerServicePort,
+		c.ExtraConfig.KubernetesServiceNodePort,
+		// Endpoints
+		c.GenericConfig.PublicAddress,
+		publicServicePort,
+		c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
+		c.ExtraConfig.EndpointReconcilerConfig.Interval,
+		c.ExtraConfig.EndpointReconcilerType,
+		client,
+	)
+	if err != nil {
+		return fmt.Errorf("error creating kubernetes.default service controller: %v", err)
+	}
+	m.GenericAPIServer.AddPostStartHookOrDie("start-default-service-controller", defaultServiceController.PostStartHook)
+	m.GenericAPIServer.AddPreShutdownHookOrDie("start-default-service-controller", defaultServiceController.PreShutdownHook)
+
 	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, client)
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)
 	}
-	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
-	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
+	m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", bootstrapController.PostStartHook)
+	m.GenericAPIServer.AddPreShutdownHookOrDie("bootstrap-controller", bootstrapController.PreShutdownHook)
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
 		return fmt.Errorf("error in registering group versions: %v", err)
