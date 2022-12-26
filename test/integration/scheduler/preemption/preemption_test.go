@@ -155,7 +155,7 @@ func TestPreemption(t *testing.T) {
 	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Filter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -1124,7 +1124,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
-					SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+					SchedulerName: pointer.String(v1.DefaultSchedulerName),
 					Plugins:       tt.customPlugins,
 				}},
 			})
