@@ -252,7 +252,7 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 	}
 	objGVK := objGVKs[0]
 	if gvk != nil && len(gvk.Kind) > 0 {
-		return errors.NewBadRequest(fmt.Sprintf("%s in version %q cannot be handled as a %s: %v", gvk.Kind, gvk.Version, objGVK.Kind, baseErr))
+		return errors.NewBadRequest(fmt.Sprintf("%s in version %q cannot be handled as a(n) %s: %v", gvk.Kind, gvk.Version, objGVK.Kind, baseErr))
 	}
 	summary := summarizeData(body, 30)
 	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v (%s)", objGVK.Kind, baseErr, summary))

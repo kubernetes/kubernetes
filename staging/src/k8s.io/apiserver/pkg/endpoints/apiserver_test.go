@@ -3277,7 +3277,7 @@ func TestCreateChecksDecode(t *testing.T) {
 	b, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
+	} else if !strings.Contains(string(b), "cannot be handled as a(n) Simple") {
 		t.Errorf("unexpected response: %s", string(b))
 	}
 }
@@ -3554,7 +3554,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 	b, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
+	} else if !strings.Contains(string(b), "cannot be handled as a(n) Simple") {
 		t.Errorf("unexpected response: %s", string(b))
 	}
 }
