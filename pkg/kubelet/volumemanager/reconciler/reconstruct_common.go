@@ -135,7 +135,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		podDir := filepath.Join(podDir, podName)
 
 		// Find filesystem volume information
-		// ex. filesystem volume: /pods/{podUid}/volume/{escapeQualifiedPluginName}/{volumeName}
+		// ex. filesystem volume: /pods/{podUid}/volumes/{escapeQualifiedPluginName}/{volumeName}
 		volumesDirs := map[v1.PersistentVolumeMode]string{
 			v1.PersistentVolumeFilesystem: filepath.Join(podDir, config.DefaultKubeletVolumesDirName),
 		}
