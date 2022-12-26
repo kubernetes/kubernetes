@@ -21,6 +21,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+// Swap, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+const ResourceSwap core.ResourceName = "swap"
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RuntimeClass defines a class of container runtime supported in the cluster.

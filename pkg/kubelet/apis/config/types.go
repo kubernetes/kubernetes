@@ -360,12 +360,13 @@ type KubeletConfiguration struct {
 
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for non-kubernetes components.
-	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
+	// Currently only cpu, memory, local ephemeral storage for root file system, pid (process IDs) and swap are supported
+	// Since 1.24, swap is supported when NodeSwap is enabled
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	SystemReserved map[string]string
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for kubernetes system components.
-	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
+	// Currently only cpu, memory, local ephemeral storage for root file system, pid (process IDs), and swap are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	KubeReserved map[string]string
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.

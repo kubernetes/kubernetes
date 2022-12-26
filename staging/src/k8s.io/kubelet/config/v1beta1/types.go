@@ -599,14 +599,14 @@ type KubeletConfiguration struct {
 
 	/* the following fields are meant for Node Allocatable */
 
-	// systemReserved is a set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G)
+	// systemReserved is a set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=500Mi,ephemeral-storage=1Gi,pid=100,swap=500Mi)
 	// pairs that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	// Default: nil
 	// +optional
 	SystemReserved map[string]string `json:"systemReserved,omitempty"`
-	// kubeReserved is a set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// kubeReserved is a set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=500Mi,ephemeral-storage=1Gi,pid=100,swap=500Mi) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently cpu, memory and local storage for root file system are supported.
 	// See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
