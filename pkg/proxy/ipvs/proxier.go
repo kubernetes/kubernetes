@@ -24,7 +24,6 @@ import (
 	"net"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -606,7 +605,6 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *pro
 
 // KernelHandler can handle the current installed kernel modules.
 type KernelHandler interface {
-	GetModules() ([]string, error)
 	GetKernelVersion() (string, error)
 }
 
@@ -620,73 +618,6 @@ func NewLinuxKernelHandler() *LinuxKernelHandler {
 	return &LinuxKernelHandler{
 		executor: utilexec.New(),
 	}
-}
-
-// GetModules returns all installed kernel modules.
-func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
-	// Check whether IPVS required kernel modules are built-in
-	kernelVersionStr, err := handle.GetKernelVersion()
-	if err != nil {
-		return nil, err
-	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
-
-	var bmods, lmods []string
-
-	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
-	modulesFile, err := os.Open("/proc/modules")
-	if err == os.ErrNotExist {
-		klog.ErrorS(err, "Failed to read file /proc/modules, assuming this is a kernel without loadable modules support enabled")
-		kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
-		kConfig, err := os.ReadFile(kernelConfigFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read Kernel Config file %s with error %w", kernelConfigFile, err)
-		}
-		for _, module := range ipvsModules {
-			if match, _ := regexp.Match("CONFIG_"+strings.ToUpper(module)+"=y", kConfig); match {
-				bmods = append(bmods, module)
-			}
-		}
-		return bmods, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file /proc/modules with error %w", err)
-	}
-	defer modulesFile.Close()
-
-	mods, err := getFirstColumn(modulesFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find loaded kernel modules: %v", err)
-	}
-
-	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
-	b, err := os.ReadFile(builtinModsFilePath)
-	if err != nil {
-		klog.ErrorS(err, "Failed to read builtin modules file, you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "filePath", builtinModsFilePath)
-	}
-
-	for _, module := range ipvsModules {
-		if match, _ := regexp.Match(module+".ko", b); match {
-			bmods = append(bmods, module)
-		} else {
-			// Try to load the required IPVS kernel modules if not built in
-			err := handle.executor.Command("modprobe", "--", module).Run()
-			if err != nil {
-				klog.InfoS("Failed to load kernel module with modprobe, "+
-					"you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "moduleName", module)
-			} else {
-				lmods = append(lmods, module)
-			}
-		}
-	}
-
-	mods = append(mods, bmods...)
-	mods = append(mods, lmods...)
-	return mods, nil
 }
 
 // getFirstColumn reads all the content from r into memory and return a
@@ -720,51 +651,18 @@ func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 }
 
 // CanUseIPVSProxier checks if we can use the ipvs Proxier.
-// This is determined by checking if all the required kernel modules can be loaded. It may
-// return an error if it fails to get the kernel modules information without error, in which
-// case it will also return false.
-func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler string) error {
-	mods, err := handle.GetModules()
-	if err != nil {
-		return fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
-	}
-	loadModules := sets.NewString()
-	loadModules.Insert(mods...)
-
-	kernelVersionStr, err := handle.GetKernelVersion()
-	if err != nil {
-		return fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
-	}
-	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
-	if err != nil {
-		return fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
-	}
-	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
-	wantModules := sets.NewString()
-	// We check for the existence of the scheduler mod and will trigger a missingMods error if not found
-	if scheduler == "" {
-		scheduler = defaultScheduler
-	}
-	schedulerMod := "ip_vs_" + scheduler
-	mods = append(mods, schedulerMod)
-	wantModules.Insert(mods...)
-
-	modules := wantModules.Difference(loadModules).UnsortedList()
-	var missingMods []string
-	ConntrackiMissingCounter := 0
-	for _, mod := range modules {
-		if strings.Contains(mod, "nf_conntrack") {
-			ConntrackiMissingCounter++
-		} else {
-			missingMods = append(missingMods, mod)
-		}
-	}
-	if ConntrackiMissingCounter == 2 {
-		missingMods = append(missingMods, "nf_conntrack_ipv4(or nf_conntrack for Linux kernel 4.19 and later)")
-	}
-
-	if len(missingMods) != 0 {
-		return fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
+// The ipset version and the scheduler are checked. If any virtual servers (VS)
+// already exist with the configured scheduler, we just return. Otherwise
+// we check if a dummy VS can be configured with the configured scheduler.
+// Kernel modules will be loaded automatically if necessary.
+func CanUseIPVSProxier(ipvs utilipvs.Interface, ipsetver IPSetVersioner, scheduler string) error {
+	// BUG: https://github.com/moby/ipvs/issues/27
+	// If ipvs is not compiled into the kernel no error is returned and handle==nil.
+	// This in turn causes ipvs.GetVirtualServers and ipvs.AddVirtualServer
+	// to return ok (err==nil). If/when this bug is fixed parameter "ipvs" will be nil
+	// if ipvs is not supported by the kernel. Until then a re-read work-around is used.
+	if ipvs == nil {
+		return fmt.Errorf("Ipvs not supported by the kernel")
 	}
 
 	// Check ipset version
@@ -775,6 +673,70 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler 
 	if !checkMinVersion(versionString) {
 		return fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
 	}
+
+	if scheduler == "" {
+		scheduler = defaultScheduler
+	}
+
+	// If any virtual server (VS) using the scheduler exist we skip the checks.
+	vservers, err := ipvs.GetVirtualServers()
+	if err != nil {
+		klog.ErrorS(err, "Can't read the ipvs")
+		return err
+	}
+	klog.V(5).InfoS("Virtual Servers", "count", len(vservers))
+	if len(vservers) > 0 {
+		// This is most likely a kube-proxy re-start. We know that ipvs works
+		// and if any VS uses the configured scheduler, we are done.
+		for _, vs := range vservers {
+			if vs.Scheduler == scheduler {
+				klog.V(5).InfoS("VS exist, Skipping checks")
+				return nil
+			}
+		}
+		klog.V(5).InfoS("No existing VS uses the configured scheduler", "scheduler", scheduler)
+	}
+
+	// Try to insert a dummy VS with the passed scheduler.
+	// We should use a VIP address that is not used on the node.
+	// An address "198.51.100.0" from the TEST-NET-2 rage in https://datatracker.ietf.org/doc/html/rfc5737
+	// is used. These addresses are reserved for documentation. If the user is using
+	// this address for a VS anyway we *will* mess up, but that would be an invalid configuration.
+	// If the user have configured the address to an interface on the node (but not a VS)
+	// then traffic will temporary be routed to ipvs during the probe and dropped.
+	// The later case is also and invalid configuration, but the traffic impact will be minor.
+	// This should not be a problem if users honors reserved addresses, but cut/paste
+	// from documentation is not unheard of, so the restriction to not use the TEST-NET-2 range
+	// must be documented.
+	vs := utilipvs.VirtualServer{
+		Address:   netutils.ParseIPSloppy("198.51.100.0"),
+		Protocol:  "TCP",
+		Port:      20000,
+		Scheduler: scheduler,
+	}
+	if err := ipvs.AddVirtualServer(&vs); err != nil {
+		klog.ErrorS(err, "Could not create dummy VS", "scheduler", scheduler)
+		return err
+	}
+
+	// To overcome the BUG described above we check that the VS is *really* added.
+	vservers, err = ipvs.GetVirtualServers()
+	if err != nil {
+		klog.ErrorS(err, "ipvs.GetVirtualServers")
+		return err
+	}
+	klog.V(5).InfoS("Virtual Servers after adding dummy", "count", len(vservers))
+	if len(vservers) == 0 {
+		klog.InfoS("Dummy VS not created", "scheduler", scheduler)
+		return fmt.Errorf("Ipvs not supported") // This is a BUG work-around
+	}
+	klog.V(5).InfoS("Dummy VS created", "vs", vs)
+
+	if err := ipvs.DeleteVirtualServer(&vs); err != nil {
+		klog.ErrorS(err, "Could not delete dummy VS")
+		return err
+	}
+
 	return nil
 }
 

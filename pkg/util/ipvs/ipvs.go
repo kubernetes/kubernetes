@@ -21,8 +21,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // Interface is an injectable interface for running ipvs commands.  Implementations must be goroutine-safe.
@@ -71,22 +69,6 @@ const (
 	FlagHashed = 0x2
 )
 
-// IPVS required kernel modules.
-const (
-	// KernelModuleIPVS is the kernel module "ip_vs"
-	KernelModuleIPVS string = "ip_vs"
-	// KernelModuleIPVSRR is the kernel module "ip_vs_rr"
-	KernelModuleIPVSRR string = "ip_vs_rr"
-	// KernelModuleIPVSWRR is the kernel module "ip_vs_wrr"
-	KernelModuleIPVSWRR string = "ip_vs_wrr"
-	// KernelModuleIPVSSH is the kernel module "ip_vs_sh"
-	KernelModuleIPVSSH string = "ip_vs_sh"
-	// KernelModuleNfConntrackIPV4 is the module "nf_conntrack_ipv4"
-	KernelModuleNfConntrackIPV4 string = "nf_conntrack_ipv4"
-	// KernelModuleNfConntrack is the kernel module "nf_conntrack"
-	KernelModuleNfConntrack string = "nf_conntrack"
-)
-
 // Equal check the equality of virtual server.
 // We don't use struct == since it doesn't work because of slice.
 func (svc *VirtualServer) Equal(other *VirtualServer) bool {
@@ -120,17 +102,6 @@ func (rs *RealServer) String() string {
 func (rs *RealServer) Equal(other *RealServer) bool {
 	return rs.Address.Equal(other.Address) &&
 		rs.Port == other.Port
-}
-
-// GetRequiredIPVSModules returns the required ipvs modules for the given linux kernel version.
-func GetRequiredIPVSModules(kernelVersion *version.Version) []string {
-	// "nf_conntrack_ipv4" has been removed since v4.19
-	// see https://github.com/torvalds/linux/commit/a0ae2562c6c4b2721d9fddba63b7286c13517d9f
-	if kernelVersion.LessThan(version.MustParseGeneric("4.19")) {
-		return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrackIPV4}
-	}
-	return []string{KernelModuleIPVS, KernelModuleIPVSRR, KernelModuleIPVSWRR, KernelModuleIPVSSH, KernelModuleNfConntrack}
-
 }
 
 // IsRsGracefulTerminationNeeded returns true if protocol requires graceful termination for the stale connections
