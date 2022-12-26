@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
@@ -80,8 +81,13 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		dest := filepath.Join(backupDir, constants.KubeletConfigurationFileName)
 		if !dryRun {
 			fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
-			if err := os.Rename(src, dest); err != nil {
-				return errors.Wrap(err, "error backing up the kubelet config file")
+			// call `cp` instead of `rename` here since the kubelet config file and back up directory (/etc/kubernetes/tmp/)
+			// might on the filesystem with differnt mount points in the test environment, such as kinder.
+			// This will lead to a failure to move the file from the source to dest since `rename` normally doesn't work
+			// across different mount points on most Unix system.
+			output, err := kubeadmutil.CopyDir(src, dest)
+			if err != nil {
+				return errors.Wrapf(err, "error backing up the kubelet config file, output: %q", output)
 			}
 		} else {
 			fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
