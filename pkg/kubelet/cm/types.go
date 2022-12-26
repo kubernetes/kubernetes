@@ -35,6 +35,8 @@ type ResourceConfig struct {
 	HugePageLimit map[int64]int64
 	// Maximum number of pids
 	PidsLimit *int64
+	// Swap limit (in bytes).
+	Swap *int64
 	// Unified for cgroup v2
 	Unified map[string]string
 }
