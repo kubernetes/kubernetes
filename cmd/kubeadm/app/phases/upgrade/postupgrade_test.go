@@ -156,14 +156,14 @@ func TestWriteKubeletConfigFiles(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		err := writeKubeletConfigFiles(nil, tc.cfg, tc.patchesDir, tc.dryrun, os.Stdout)
+		err := WriteKubeletConfigFiles(tc.cfg, tc.patchesDir, tc.dryrun, os.Stdout)
 		if err != nil && tc.errPattern != "" {
 			if match, _ := regexp.MatchString(tc.errPattern, err.Error()); !match {
 				t.Fatalf("Expected error contains %q, got %v", tc.errPattern, err.Error())
 			}
 		}
 		if err == nil && len(tc.errPattern) != 0 {
-			t.Fatalf("writeKubeletConfigFiles didn't return error expected %s", tc.errPattern)
+			t.Fatalf("WriteKubeletConfigFiles didn't return error expected %s", tc.errPattern)
 		}
 	}
 }
