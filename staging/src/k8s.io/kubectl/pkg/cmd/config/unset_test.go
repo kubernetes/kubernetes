@@ -17,136 +17,157 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
-	"os"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type unsetConfigTest struct {
-	description string
-	config      clientcmdapi.Config
-	args        []string
-	expected    string
-	expectedErr string
+	name           string
+	startingConfig *clientcmdapi.Config
+	args           []string
+	expectedConfig *clientcmdapi.Config
+	expectedOut    string
+	completeError  string
+	runError       string
 }
 
-func TestUnsetConfigString(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Kind:       "Config",
-		APIVersion: "v1",
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"minikube":   {Server: "https://192.168.99.100:8443"},
-			"my-cluster": {Server: "https://192.168.0.1:3434"},
-		},
-		Contexts: map[string]*clientcmdapi.Context{
-			"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
-			"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
-		},
-		CurrentContext: "minikube",
-	}
-	test := unsetConfigTest{
-		description: "Testing for kubectl config unset a value",
-		config:      conf,
-		args:        []string{"current-context"},
-		expected:    `Property "current-context" unset.` + "\n",
-	}
-	test.run(t)
-}
+func TestUnset(t *testing.T) {
+	t.Parallel()
 
-func TestUnsetConfigMap(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Kind:       "Config",
-		APIVersion: "v1",
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"minikube":   {Server: "https://192.168.99.100:8443"},
-			"my-cluster": {Server: "https://192.168.0.1:3434"},
-		},
-		Contexts: map[string]*clientcmdapi.Context{
-			"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
-			"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
-		},
-		CurrentContext: "minikube",
-	}
-	test := unsetConfigTest{
-		description: "Testing for kubectl config unset a map",
-		config:      conf,
-		args:        []string{"clusters"},
-		expected:    `Property "clusters" unset.` + "\n",
-	}
-	test.run(t)
-}
+	initConfigCurrentContext := clientcmdapi.NewConfig()
+	initConfigCurrentContext.CurrentContext = "otherkube"
 
-func TestUnsetUnexistConfig(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Kind:       "Config",
-		APIVersion: "v1",
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"minikube":   {Server: "https://192.168.99.100:8443"},
-			"my-cluster": {Server: "https://192.168.0.1:3434"},
-		},
-		Contexts: map[string]*clientcmdapi.Context{
-			"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
-			"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
-		},
-		CurrentContext: "minikube",
+	expectedConfigEmpty := clientcmdapi.NewConfig()
+
+	initConfigClusters := clientcmdapi.NewConfig()
+	testClusters := clientcmdapi.NewCluster()
+	testClusters.Server = "https://192.168.99.100:8443"
+	initConfigClusters.Clusters = map[string]*clientcmdapi.Cluster{
+		"minikube": testClusters,
 	}
 
-	test := unsetConfigTest{
-		description: "Testing for kubectl config unset a unexist map key",
-		config:      conf,
-		args:        []string{"contexts.foo.namespace"},
-		expectedErr: "current map key `foo` is invalid",
-	}
-	test.run(t)
-
-}
-
-func (test unsetConfigTest) run(t *testing.T) {
-	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer os.Remove(fakeKubeFile.Name())
-	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = fakeKubeFile.Name()
-	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigUnset(buf, pathOptions)
-	opts := &unsetOptions{configAccess: pathOptions}
-	err = opts.complete(cmd, test.args)
-	if err == nil {
-		err = opts.run(buf)
-	}
-	if test.expectedErr == "" && err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
+	initConfigContexts := clientcmdapi.NewConfig()
+	testContext := clientcmdapi.NewContext()
+	testContext.Cluster = "minikube"
+	testContext.AuthInfo = "minikube"
+	initConfigContexts.Contexts = map[string]*clientcmdapi.Context{
+		"minikube": testContext,
 	}
 
-	if err != nil && err.Error() != test.expectedErr {
-		t.Fatalf("expected error:\n %v\nbut got error:\n%v", test.expectedErr, err)
+	initConfigAuthInfos := clientcmdapi.NewConfig()
+	testAuthInfo := clientcmdapi.NewAuthInfo()
+	testAuthInfo.ClientKey = "./fake-client-key"
+	testAuthInfo.ImpersonateUserExtra = nil // Required because set nils out this value if it doesn't get set
+	initConfigAuthInfos.AuthInfos = map[string]*clientcmdapi.AuthInfo{
+		"test-user": testAuthInfo,
 	}
-	if len(test.expected) != 0 {
-		if buf.String() != test.expected {
-			t.Errorf("Failed in :%q\n expected %v\n but got %v", test.description, test.expected, buf.String())
-		}
-	}
-	if test.args[0] == "current-context" {
-		if config.CurrentContext != "" {
-			t.Errorf("Failed in :%q\n expected current-context nil,but got %v", test.description, config.CurrentContext)
-		}
-	} else if test.args[0] == "clusters" {
-		if len(config.Clusters) != 0 {
-			t.Errorf("Failed in :%q\n expected clusters nil map, but got %v", test.description, config.Clusters)
-		}
+
+	for _, test := range []unsetConfigTest{
+		{
+			name:           "CurrentContext",
+			args:           []string{"current-context"},
+			startingConfig: initConfigCurrentContext,
+			expectedConfig: expectedConfigEmpty,
+			expectedOut:    "Property \"current-context\" unset.\n",
+		}, {
+			name:           "Clusters",
+			args:           []string{"clusters"},
+			startingConfig: initConfigClusters,
+			expectedConfig: expectedConfigEmpty,
+			expectedOut:    "Property \"clusters\" unset.\n",
+		}, {
+			name:           "NonexistentCluster",
+			args:           []string{"clusters.foo.namespace"},
+			startingConfig: initConfigClusters,
+			expectedConfig: initConfigClusters,
+			// TODO: this is not actually the expected error but this isn't meant to be a user facing change
+			expectedOut: "Property \"clusters.foo.namespace\" unset.\n",
+		}, {
+			name:           "Contexts",
+			args:           []string{"contexts"},
+			startingConfig: initConfigContexts,
+			expectedConfig: expectedConfigEmpty,
+			expectedOut:    "Property \"contexts\" unset.\n",
+		}, {
+			name:           "NonexistentContext",
+			args:           []string{"contexts.foo.namespace"},
+			startingConfig: initConfigContexts,
+			expectedConfig: initConfigContexts,
+			runError:       "current map key `foo` is invalid",
+		}, {
+			name:           "AuthInfos",
+			args:           []string{"users"},
+			startingConfig: initConfigAuthInfos,
+			expectedConfig: expectedConfigEmpty,
+			expectedOut:    "Property \"users\" unset.\n",
+		}, {
+			name:           "NonexistentAuthInfos",
+			args:           []string{"users.foo.username"},
+			startingConfig: initConfigAuthInfos,
+			expectedConfig: initConfigAuthInfos,
+			runError:       "current map key `foo` is invalid",
+		}, {
+			name:           "ErrorEmptyArgs",
+			args:           []string{},
+			startingConfig: initConfigContexts,
+			expectedConfig: initConfigContexts,
+			completeError:  "unexpected args: ",
+		}, {
+			name:           "ErrorTwoArgs",
+			args:           []string{"clusters.my-cluster", "clusters.mu-cluster"},
+			startingConfig: initConfigContexts,
+			expectedConfig: initConfigContexts,
+			completeError:  "unexpected args: [clusters.my-cluster clusters.mu-cluster]",
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(*test.startingConfig)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			defer removeTempFile(t, fakeKubeFile.Name())
+
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
+
+			streams, _, buffOut, _ := genericclioptions.NewTestIOStreams()
+
+			options := NewUnsetOptions(streams, pathOptions)
+
+			err = options.Complete(test.args)
+			if len(test.completeError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.completeError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+				return
+			} else if len(test.completeError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.completeError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
+			}
+
+			err = options.RunUnset()
+			if len(test.runError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.runError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+				return
+			} else if len(test.runError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.runError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
+			}
+
+			if len(test.expectedOut) != 0 {
+				checkOutputResults(t, buffOut.String(), test.expectedOut)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+			}
+		})
 	}
 }

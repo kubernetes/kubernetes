@@ -17,22 +17,23 @@ limitations under the License.
 package config
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"reflect"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubectl/pkg/util/templates"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 )
 
-type unsetOptions struct {
-	configAccess clientcmd.ConfigAccess
-	propertyName string
+type UnsetOptions struct {
+	PropertyName string
+
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
 }
 
 var (
@@ -50,9 +51,7 @@ var (
 )
 
 // NewCmdConfigUnset returns a Command instance for 'config unset' sub command
-func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &unsetOptions{configAccess: configAccess}
-
+func NewCmdConfigUnset(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "unset PROPERTY_NAME",
 		DisableFlagsInUseLine: true,
@@ -60,8 +59,9 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 		Long:                  unsetLong,
 		Example:               unsetExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.complete(cmd, args))
-			cmdutil.CheckErr(options.run(out))
+			options := NewUnsetOptions(streams, configAccess)
+			cmdutil.CheckErr(options.Complete(args))
+			cmdutil.CheckErr(options.RunUnset())
 
 		},
 	}
@@ -69,18 +69,30 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 	return cmd
 }
 
-func (o unsetOptions) run(out io.Writer) error {
-	err := o.validate()
+// NewUnsetOptions creates the options for the command
+func NewUnsetOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *UnsetOptions {
+	return &UnsetOptions{
+		ConfigAccess: configAccess,
+		IOStreams:    ioStreams,
+	}
+}
+
+func (o *UnsetOptions) Complete(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("unexpected args: %v", args)
+	}
+
+	o.PropertyName = args[0]
+	return nil
+}
+
+func (o *UnsetOptions) RunUnset() error {
+	config, _, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
 
-	config, err := o.configAccess.GetStartingConfig()
-	if err != nil {
-		return err
-	}
-
-	steps, err := newNavigationSteps(o.propertyName)
+	steps, err := newNavigationSteps(o.PropertyName)
 	if err != nil {
 		return err
 	}
@@ -89,28 +101,11 @@ func (o unsetOptions) run(out io.Writer) error {
 		return err
 	}
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
+	if err := clientcmd.ModifyConfig(o.ConfigAccess, *config, false); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(out, "Property %q unset.\n", o.propertyName); err != nil {
+	if _, err := fmt.Fprintf(o.IOStreams.Out, "Property %q unset.\n", o.PropertyName); err != nil {
 		return err
 	}
-	return nil
-}
-
-func (o *unsetOptions) complete(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return helpErrorf(cmd, "Unexpected args: %v", args)
-	}
-
-	o.propertyName = args[0]
-	return nil
-}
-
-func (o unsetOptions) validate() error {
-	if len(o.propertyName) == 0 {
-		return errors.New("you must specify a property")
-	}
-
 	return nil
 }
