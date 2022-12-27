@@ -68,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	"k8s.io/utils/clock"
 	netutils "k8s.io/utils/net"
 )
 
@@ -578,6 +579,25 @@ func startTTLAfterFinishedController(ctx context.Context, controllerContext Cont
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
 	).Run(ctx, int(controllerContext.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs))
+	return nil, true, nil
+}
+
+func startLegacySATokenCleaner(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	cleanUpPeriod := controllerContext.ComponentConfig.LegacySATokenCleaner.CleanUpPeriod.Duration
+	legacySATokenCleaner, err := serviceaccountcontroller.NewLegacySATokenCleaner(
+		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
+		controllerContext.InformerFactory.Core().V1().Secrets(),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.ClientBuilder.ClientOrDie("legacy-service-account-token-cleaner"),
+		clock.RealClock{},
+		serviceaccountcontroller.LegacySATokenCleanerOptions{
+			CleanUpPeriod: cleanUpPeriod,
+			SyncInterval:  serviceaccountcontroller.DefaultCleanerSyncInterval,
+		})
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to start the legacy service account token cleaner: %v", err)
+	}
+	go legacySATokenCleaner.Run(ctx)
 	return nil, true, nil
 }
 

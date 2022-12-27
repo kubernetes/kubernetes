@@ -483,6 +483,9 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		register("resource-claim-controller", startResourceClaimController)
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenCleanUp) {
+		register("legacy-service-account-token-cleaner", startLegacySATokenCleaner)
+	}
 
 	return controllers
 }

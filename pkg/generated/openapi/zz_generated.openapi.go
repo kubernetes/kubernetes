@@ -1064,6 +1064,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-controller-manager/config/v1alpha1.HPAControllerConfiguration":                       schema_k8sio_kube_controller_manager_config_v1alpha1_HPAControllerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.JobControllerConfiguration":                       schema_k8sio_kube_controller_manager_config_v1alpha1_JobControllerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.KubeControllerManagerConfiguration":               schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerConfiguration(ref),
+		"k8s.io/kube-controller-manager/config/v1alpha1.LegacySATokenCleanerConfiguration":                schema_k8sio_kube_controller_manager_config_v1alpha1_LegacySATokenCleanerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.NamespaceControllerConfiguration":                 schema_k8sio_kube_controller_manager_config_v1alpha1_NamespaceControllerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.NodeIPAMControllerConfiguration":                  schema_k8sio_kube_controller_manager_config_v1alpha1_NodeIPAMControllerConfiguration(ref),
 		"k8s.io/kube-controller-manager/config/v1alpha1.NodeLifecycleControllerConfiguration":             schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControllerConfiguration(ref),
@@ -53044,9 +53045,16 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerC
 							Ref:         ref("k8s.io/kube-controller-manager/config/v1alpha1.CronJobControllerConfiguration"),
 						},
 					},
+					"LegacySATokenCleaner": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LegacySATokenCleanerConfiguration holds configuration for LegacySATokenCleaner related features.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-controller-manager/config/v1alpha1.LegacySATokenCleanerConfiguration"),
+						},
+					},
 					"NamespaceController": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NamespaceControllerConfiguration holds configuration for NamespaceController related features. NamespaceControllerConfiguration holds configuration for NamespaceController related features.",
+							Description: "NamespaceControllerConfiguration holds configuration for NamespaceController related features.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/kube-controller-manager/config/v1alpha1.NamespaceControllerConfiguration"),
 						},
@@ -53122,11 +53130,34 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerC
 						},
 					},
 				},
-				Required: []string{"Generic", "KubeCloudShared", "AttachDetachController", "CSRSigningController", "DaemonSetController", "DeploymentController", "StatefulSetController", "DeprecatedController", "EndpointController", "EndpointSliceController", "EndpointSliceMirroringController", "EphemeralVolumeController", "GarbageCollectorController", "HPAController", "JobController", "CronJobController", "NamespaceController", "NodeIPAMController", "NodeLifecycleController", "PersistentVolumeBinderController", "PodGCController", "ReplicaSetController", "ReplicationController", "ResourceQuotaController", "SAController", "ServiceController", "TTLAfterFinishedController"},
+				Required: []string{"Generic", "KubeCloudShared", "AttachDetachController", "CSRSigningController", "DaemonSetController", "DeploymentController", "StatefulSetController", "DeprecatedController", "EndpointController", "EndpointSliceController", "EndpointSliceMirroringController", "EphemeralVolumeController", "GarbageCollectorController", "HPAController", "JobController", "CronJobController", "LegacySATokenCleaner", "NamespaceController", "NodeIPAMController", "NodeLifecycleController", "PersistentVolumeBinderController", "PodGCController", "ReplicaSetController", "ReplicationController", "ResourceQuotaController", "SAController", "ServiceController", "TTLAfterFinishedController"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration", "k8s.io/cloud-provider/controllers/service/config/v1alpha1.ServiceControllerConfiguration", "k8s.io/controller-manager/config/v1alpha1.GenericControllerManagerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.AttachDetachControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.CSRSigningControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.CronJobControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DaemonSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DeploymentControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DeprecatedControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointSliceControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointSliceMirroringControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EphemeralVolumeControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.GarbageCollectorControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.HPAControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.JobControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NamespaceControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NodeIPAMControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NodeLifecycleControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.PersistentVolumeBinderControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.PodGCControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ReplicaSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ReplicationControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ResourceQuotaControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.SAControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.StatefulSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.TTLAfterFinishedControllerConfiguration"},
+			"k8s.io/cloud-provider/config/v1alpha1.KubeCloudSharedConfiguration", "k8s.io/cloud-provider/controllers/service/config/v1alpha1.ServiceControllerConfiguration", "k8s.io/controller-manager/config/v1alpha1.GenericControllerManagerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.AttachDetachControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.CSRSigningControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.CronJobControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DaemonSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DeploymentControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.DeprecatedControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointSliceControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EndpointSliceMirroringControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.EphemeralVolumeControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.GarbageCollectorControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.HPAControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.JobControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.LegacySATokenCleanerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NamespaceControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NodeIPAMControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.NodeLifecycleControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.PersistentVolumeBinderControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.PodGCControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ReplicaSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ReplicationControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.ResourceQuotaControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.SAControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.StatefulSetControllerConfiguration", "k8s.io/kube-controller-manager/config/v1alpha1.TTLAfterFinishedControllerConfiguration"},
+	}
+}
+
+func schema_k8sio_kube_controller_manager_config_v1alpha1_LegacySATokenCleanerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LegacySATokenCleanerConfiguration contains elements describing LegacySATokenCleaner",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"CleanUpPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CleanUpPeriod is the period of time since the last usage of an auto-generated service account token before it can be deleted.",
+							Default:     0,
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+				},
+				Required: []string{"CleanUpPeriod"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
 	}
 }
 

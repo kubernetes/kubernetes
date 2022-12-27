@@ -16,6 +16,10 @@ limitations under the License.
 
 package config
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 // SAControllerConfiguration contains elements describing ServiceAccountController.
 type SAControllerConfiguration struct {
 	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
@@ -27,4 +31,10 @@ type SAControllerConfiguration struct {
 	// rootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string
+}
+
+type LegacySATokenCleanerConfiguration struct {
+	// CleanUpPeriod is the period of time since the last usage of an
+	// auto-generated service account token before it can be deleted.
+	CleanUpPeriod metav1.Duration
 }
