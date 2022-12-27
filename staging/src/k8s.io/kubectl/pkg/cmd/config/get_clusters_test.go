@@ -32,7 +32,6 @@ type getClustersTest struct {
 	args           []string
 	expectedConfig *clientcmdapi.Config
 	expectedOut    string
-	runError       string
 }
 
 func TestGetClusters(t *testing.T) {

@@ -35,7 +35,6 @@ type viewRunTest struct {
 	startingConfig *clientcmdapi.Config
 	options        *ViewOptions
 	expectedOut    string
-	toOptionsError string
 	runError       string
 }
 

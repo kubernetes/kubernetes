@@ -28,10 +28,7 @@ import (
 type testGetUser struct {
 	name           string
 	startingConfig *clientcmdapi.Config
-	args           []string
 	expectedOut    string
-	completeError  string
-	runError       string
 }
 
 func TestGetUsersRun(t *testing.T) {

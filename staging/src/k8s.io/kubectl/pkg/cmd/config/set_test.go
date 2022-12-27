@@ -33,7 +33,6 @@ type setRunTest struct {
 	options        *SetOptions
 	expectedConfig *clientcmdapi.Config
 	expectedOut    string
-	toOptionsError string
 	runError       string
 }
 

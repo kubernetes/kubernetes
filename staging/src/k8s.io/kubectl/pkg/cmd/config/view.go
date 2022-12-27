@@ -193,14 +193,3 @@ func (o *ViewOptions) RunView() error {
 
 	return o.PrintObject(convertedObj, o.IOStreams.Out)
 }
-
-// getStartingConfig returns the Config object built from the sources specified by the options, the filename read (only if it was a single file), and an error if something goes wrong
-func (o *ViewOptions) getStartingConfig() (*clientcmdapi.Config, error) {
-	switch {
-	case !o.Merge:
-		return clientcmd.LoadFromFile(o.ConfigAccess.GetExplicitFile())
-
-	default:
-		return o.ConfigAccess.GetStartingConfig()
-	}
-}

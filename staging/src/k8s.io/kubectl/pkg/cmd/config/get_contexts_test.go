@@ -34,7 +34,6 @@ type getContextsRunTest struct {
 	options        *GetContextsOptions
 	expectedConfig *clientcmdapi.Config
 	expectedOut    string
-	toOptionsError string
 	runError       string
 }
 
