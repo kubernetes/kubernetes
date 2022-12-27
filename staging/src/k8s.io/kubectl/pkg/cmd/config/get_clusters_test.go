@@ -17,67 +17,76 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
-	"os"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type getClustersTest struct {
-	config   clientcmdapi.Config
-	expected string
+	name           string
+	startingConfig *clientcmdapi.Config
+	args           []string
+	expectedConfig *clientcmdapi.Config
+	expectedOut    string
+	runError       string
 }
 
 func TestGetClusters(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"minikube": {Server: "https://192.168.0.99"},
+	t.Parallel()
+
+	startingConf := clientcmdapi.NewConfig()
+	startingConf.Clusters = map[string]*clientcmdapi.Cluster{
+		"minikube": {Server: "https://192.168.0.99"},
+	}
+
+	startingConfEmpty := clientcmdapi.NewConfig()
+
+	for _, test := range []getClustersTest{
+		{
+			name:           "WithClusters",
+			startingConfig: startingConf,
+			args:           []string{},
+			expectedConfig: startingConf,
+			expectedOut: `NAME
+minikube`,
+		}, {
+			name:           "EmptyClusters",
+			startingConfig: startingConfEmpty,
+			args:           []string{},
+			expectedConfig: startingConfEmpty,
+			expectedOut:    "NAME\n",
 		},
-	}
-	test := getClustersTest{
-		config: conf,
-		expected: `NAME
-minikube
-`,
-	}
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(*test.startingConfig)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-	test.run(t)
-}
+			defer removeTempFile(t, fakeKubeFile.Name())
 
-func TestGetClustersEmpty(t *testing.T) {
-	test := getClustersTest{
-		config:   clientcmdapi.Config{},
-		expected: "NAME\n",
-	}
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
 
-	test.run(t)
-}
+			streams, _, buffOut, _ := genericclioptions.NewTestIOStreams()
 
-func (test getClustersTest) run(t *testing.T) {
-	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer os.Remove(fakeKubeFile.Name())
-	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+			options := NewGetClusterOptions(streams, pathOptions)
 
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = fakeKubeFile.Name()
-	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigGetClusters(buf, pathOptions)
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v", err)
-	}
-	if len(test.expected) != 0 {
-		if buf.String() != test.expected {
-			t.Errorf("expected %v, but got %v", test.expected, buf.String())
-		}
-		return
+			err = options.RunGetClusters()
+			if err != nil {
+				t.Errorf("Unexpected error running command: %v", err)
+			}
+
+			if len(test.expectedOut) != 0 {
+				checkOutputResults(t, buffOut.String(), test.expectedOut)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+			}
+		})
 	}
 }

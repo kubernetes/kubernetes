@@ -18,9 +18,10 @@ package config
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -33,31 +34,50 @@ var (
 		kubectl config get-clusters`)
 )
 
+// GetClusterOptions holds the data needed to run the command
+type GetClusterOptions struct {
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
+}
+
 // NewCmdConfigGetClusters creates a command object for the "get-clusters" action, which
 // lists all clusters defined in the kubeconfig.
-func NewCmdConfigGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigGetClusters(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get-clusters",
 		Short:   i18n.T("Display clusters defined in the kubeconfig"),
 		Long:    i18n.T("Display clusters defined in the kubeconfig."),
 		Example: getClustersExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runGetClusters(out, configAccess))
+			options := NewGetClusterOptions(streams, configAccess)
+			cmdutil.CheckErr(options.RunGetClusters())
 		},
 	}
 
 	return cmd
 }
 
-func runGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess) error {
-	config, err := configAccess.GetStartingConfig()
+// NewGetClusterOptions creates the options for the command
+func NewGetClusterOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *GetClusterOptions {
+	return &GetClusterOptions{
+		ConfigAccess: configAccess,
+		IOStreams:    ioStreams,
+	}
+}
+
+func (o *GetClusterOptions) RunGetClusters() error {
+	config, _, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "NAME\n")
+	if _, nil := fmt.Fprintf(o.IOStreams.Out, "NAME\n"); err != nil {
+		return err
+	}
 	for name := range config.Clusters {
-		fmt.Fprintf(out, "%s\n", name)
+		if _, nil := fmt.Fprintf(o.IOStreams.Out, "%s\n", name); err != nil {
+			return err
+		}
 	}
 
 	return nil
