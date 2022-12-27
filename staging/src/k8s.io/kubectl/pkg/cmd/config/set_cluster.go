@@ -17,13 +17,13 @@ limitations under the License.
 package config
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -31,17 +31,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
-
-type setClusterOptions struct {
-	configAccess          clientcmd.ConfigAccess
-	name                  string
-	server                cliflag.StringFlag
-	tlsServerName         cliflag.StringFlag
-	insecureSkipTLSVerify cliflag.Tristate
-	certificateAuthority  cliflag.StringFlag
-	embedCAData           cliflag.Tristate
-	proxyURL              cliflag.StringFlag
-}
 
 var (
 	setClusterLong = templates.LongDesc(i18n.T(`
@@ -66,9 +55,34 @@ var (
 		kubectl config set-cluster e2e --proxy-url=https://1.2.3.4`)
 )
 
+type SetClusterFlags struct {
+	certificateAuthority  cliflag.StringFlag
+	embedCAData           bool
+	insecureSkipTLSVerify bool
+	proxyURL              cliflag.StringFlag
+	server                cliflag.StringFlag
+	tlsServerName         cliflag.StringFlag
+
+	configAccess clientcmd.ConfigAccess
+	ioStreams    genericclioptions.IOStreams
+}
+
+type SetClusterOptions struct {
+	CertificateAuthority  cliflag.StringFlag
+	EmbedCAData           bool
+	InsecureSkipTLSVerify bool
+	Name                  string
+	ProxyURL              cliflag.StringFlag
+	Server                cliflag.StringFlag
+	TlsServerName         cliflag.StringFlag
+
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
+}
+
 // NewCmdConfigSetCluster returns a Command instance for 'config set-cluster' sub command
-func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &setClusterOptions{configAccess: configAccess}
+func NewCmdConfigSetCluster(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	flags := NewSetClusterFlags(streams, configAccess)
 
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true] [--%v=example.com]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure, clientcmd.FlagTLSServerName),
@@ -77,122 +91,142 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 		Long:                  setClusterLong,
 		Example:               setClusterExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.complete(cmd))
-			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Cluster %q set.\n", options.name)
+			options, err := flags.ToOptions(args)
+			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.RunSetCluster())
 		},
 	}
 
-	options.insecureSkipTLSVerify.Default(false)
-
-	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in kubeconfig")
-	cmd.Flags().Var(&options.tlsServerName, clientcmd.FlagTLSServerName, clientcmd.FlagTLSServerName+" for the cluster entry in kubeconfig")
-	f := cmd.Flags().VarPF(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, "", clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
-	f.NoOptDefVal = "true"
-	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "Path to "+clientcmd.FlagCAFile+" file for the cluster entry in kubeconfig")
-	cmd.MarkFlagFilename(clientcmd.FlagCAFile)
-	f = cmd.Flags().VarPF(&options.embedCAData, clientcmd.FlagEmbedCerts, "", clientcmd.FlagEmbedCerts+" for the cluster entry in kubeconfig")
-	f.NoOptDefVal = "true"
-	cmd.Flags().Var(&options.proxyURL, clientcmd.FlagProxyURL, clientcmd.FlagProxyURL+" for the cluster entry in kubeconfig")
+	if err := flags.AddFlags(cmd); err != nil {
+		cmdutil.CheckErr(err)
+	}
 
 	return cmd
 }
 
-func (o setClusterOptions) run() error {
-	err := o.validate()
+func NewSetClusterFlags(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *SetClusterFlags {
+	return &SetClusterFlags{
+		configAccess:          configAccess,
+		ioStreams:             streams,
+		server:                cliflag.StringFlag{},
+		tlsServerName:         cliflag.StringFlag{},
+		insecureSkipTLSVerify: false,
+		certificateAuthority:  cliflag.StringFlag{},
+		embedCAData:           false,
+		proxyURL:              cliflag.StringFlag{},
+	}
+}
+
+func (flags *SetClusterFlags) ToOptions(args []string) (*SetClusterOptions, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("unexpected args: %v", args)
+	}
+	if flags.insecureSkipTLSVerify && flags.certificateAuthority.Provided() {
+		return nil, fmt.Errorf("you cannot specify a certificate authority and insecure mode at the same time")
+	}
+	if flags.embedCAData {
+		if !flags.certificateAuthority.Provided() {
+			return nil, fmt.Errorf("you must specify a --%s to embed", clientcmd.FlagCAFile)
+		}
+		if _, err := os.Stat(flags.certificateAuthority.Value()); err != nil {
+			return nil, fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagCAFile, flags.certificateAuthority.Value(), err)
+		}
+	}
+
+	options := &SetClusterOptions{
+		ConfigAccess:          flags.configAccess,
+		IOStreams:             flags.ioStreams,
+		Name:                  args[0],
+		Server:                flags.server,
+		TlsServerName:         flags.tlsServerName,
+		InsecureSkipTLSVerify: flags.insecureSkipTLSVerify,
+		CertificateAuthority:  flags.certificateAuthority,
+		EmbedCAData:           flags.embedCAData,
+		ProxyURL:              flags.proxyURL,
+	}
+
+	return options, nil
+}
+
+// AddFlags registers flags for a cli
+func (flags *SetClusterFlags) AddFlags(cmd *cobra.Command) error {
+	cmd.Flags().Var(&flags.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&flags.tlsServerName, clientcmd.FlagTLSServerName, clientcmd.FlagTLSServerName+" for the cluster entry in kubeconfig")
+	cmd.Flags().BoolVar(&flags.insecureSkipTLSVerify, clientcmd.FlagInsecure, false, clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&flags.certificateAuthority, clientcmd.FlagCAFile, "Path to "+clientcmd.FlagCAFile+" file for the cluster entry in kubeconfig")
+	if err := cmd.MarkFlagFilename(clientcmd.FlagCAFile); err != nil {
+		return err
+	}
+	cmd.Flags().BoolVar(&flags.embedCAData, clientcmd.FlagEmbedCerts, false, clientcmd.FlagEmbedCerts+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&flags.proxyURL, clientcmd.FlagProxyURL, clientcmd.FlagProxyURL+" for the cluster entry in kubeconfig")
+	return nil
+}
+
+func (o *SetClusterOptions) RunSetCluster() error {
+	config, _, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
 
-	config, err := o.configAccess.GetStartingConfig()
-	if err != nil {
-		return err
-	}
-
-	startingStanza, exists := config.Clusters[o.name]
+	startingStanza, exists := config.Clusters[o.Name]
 	if !exists {
 		startingStanza = clientcmdapi.NewCluster()
 	}
 	cluster := o.modifyCluster(*startingStanza)
-	config.Clusters[o.name] = &cluster
+	config.Clusters[o.Name] = &cluster
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.ConfigAccess, *config, true); err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(o.IOStreams.Out, "Cluster %q set.\n", o.Name)
+	if err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (o *setClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluster) clientcmdapi.Cluster {
+func (o *SetClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluster) clientcmdapi.Cluster {
 	modifiedCluster := existingCluster
 
-	if o.server.Provided() {
-		modifiedCluster.Server = o.server.Value()
+	if o.Server.Provided() {
+		modifiedCluster.Server = o.Server.Value()
 		// specifying a --server on the command line, overrides the TLSServerName that was specified in the kubeconfig file.
 		// if both are specified, then the next if block will write the new TLSServerName.
 		modifiedCluster.TLSServerName = ""
 	}
-	if o.tlsServerName.Provided() {
-		modifiedCluster.TLSServerName = o.tlsServerName.Value()
+	if o.TlsServerName.Provided() {
+		modifiedCluster.TLSServerName = o.TlsServerName.Value()
 	}
-	if o.insecureSkipTLSVerify.Provided() {
-		modifiedCluster.InsecureSkipTLSVerify = o.insecureSkipTLSVerify.Value()
+	if o.InsecureSkipTLSVerify {
+		modifiedCluster.InsecureSkipTLSVerify = o.InsecureSkipTLSVerify
 		// Specifying insecure mode clears any certificate authority
 		if modifiedCluster.InsecureSkipTLSVerify {
 			modifiedCluster.CertificateAuthority = ""
 			modifiedCluster.CertificateAuthorityData = nil
 		}
 	}
-	if o.certificateAuthority.Provided() {
-		caPath := o.certificateAuthority.Value()
-		if o.embedCAData.Value() {
-			modifiedCluster.CertificateAuthorityData, _ = os.ReadFile(caPath)
+	if o.CertificateAuthority.Provided() {
+		caPath := o.CertificateAuthority
+		if o.EmbedCAData {
+			modifiedCluster.CertificateAuthorityData, _ = os.ReadFile(caPath.Value())
 			modifiedCluster.InsecureSkipTLSVerify = false
 			modifiedCluster.CertificateAuthority = ""
 		} else {
-			caPath, _ = filepath.Abs(caPath)
-			modifiedCluster.CertificateAuthority = caPath
+			caPathAbs, _ := filepath.Abs(caPath.Value())
+			modifiedCluster.CertificateAuthority = caPathAbs
 			// Specifying a certificate authority file clears certificate authority data and insecure mode
-			if caPath != "" {
+			if caPath.Provided() {
 				modifiedCluster.InsecureSkipTLSVerify = false
 				modifiedCluster.CertificateAuthorityData = nil
 			}
 		}
 	}
 
-	if o.proxyURL.Provided() {
-		modifiedCluster.ProxyURL = o.proxyURL.Value()
+	if o.ProxyURL.Provided() {
+		modifiedCluster.ProxyURL = o.ProxyURL.Value()
 	}
 
 	return modifiedCluster
-}
-
-func (o *setClusterOptions) complete(cmd *cobra.Command) error {
-	args := cmd.Flags().Args()
-	if len(args) != 1 {
-		return helpErrorf(cmd, "Unexpected args: %v", args)
-	}
-
-	o.name = args[0]
-	return nil
-}
-
-func (o setClusterOptions) validate() error {
-	if len(o.name) == 0 {
-		return errors.New("you must specify a non-empty cluster name")
-	}
-	if o.insecureSkipTLSVerify.Value() && o.certificateAuthority.Value() != "" {
-		return errors.New("you cannot specify a certificate authority and insecure mode at the same time")
-	}
-	if o.embedCAData.Value() {
-		caPath := o.certificateAuthority.Value()
-		if caPath == "" {
-			return fmt.Errorf("you must specify a --%s to embed", clientcmd.FlagCAFile)
-		}
-		if _, err := os.Stat(caPath); err != nil {
-			return fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagCAFile, caPath, err)
-		}
-	}
-
-	return nil
 }

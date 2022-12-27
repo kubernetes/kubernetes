@@ -21,206 +21,307 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
-type setClusterTest struct {
-	description    string
-	config         clientcmdapi.Config
-	args           []string
-	flags          []string
-	expected       string
-	expectedConfig clientcmdapi.Config
+type setClusterRunTest struct {
+	name           string
+	startingConfig *clientcmdapi.Config
+	options        *SetClusterOptions
+	expectedConfig *clientcmdapi.Config
+	expectedOut    string
+	runError       string
 }
 
-func TestCreateCluster(t *testing.T) {
-	conf := clientcmdapi.Config{}
-	test := setClusterTest{
-		description: "Testing 'kubectl config set-cluster' with a new cluster",
-		config:      conf,
-		args:        []string{"my-cluster"},
-		flags: []string{
-			"--server=http://192.168.0.1",
-			"--tls-server-name=my-cluster-name",
-		},
-		expected: `Cluster "my-cluster" set.` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"my-cluster": {Server: "http://192.168.0.1", TLSServerName: "my-cluster-name"},
-			},
-		},
-	}
-	test.run(t)
+type setClusterToOptionsTest struct {
+	name            string
+	args            []string
+	flags           *SetClusterFlags
+	expectedOptions *SetClusterOptions
+	expectedError   string
 }
 
-func TestCreateClusterWithProxy(t *testing.T) {
-	conf := clientcmdapi.Config{}
-	test := setClusterTest{
-		description: "Testing 'kubectl config set-cluster' with a new cluster",
-		config:      conf,
-		args:        []string{"my-cluster"},
-		flags: []string{
-			"--server=http://192.168.0.1",
-			"--tls-server-name=my-cluster-name",
-			"--proxy-url=http://192.168.0.2",
-		},
-		expected: `Cluster "my-cluster" set.` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"my-cluster": {
-					Server:        "http://192.168.0.1",
-					TLSServerName: "my-cluster-name",
-					ProxyURL:      "http://192.168.0.2",
-				},
-			},
-		},
+func TestRunSetCluster(t *testing.T) {
+	t.Parallel()
+
+	startingConfigEmpty := clientcmdapi.NewConfig()
+
+	expectedConfig := clientcmdapi.NewConfig()
+	testCluster1 := clientcmdapi.NewCluster()
+	testCluster1.Server = "https://1.2.3.4:8283"
+	expectedConfig.Clusters = map[string]*clientcmdapi.Cluster{
+		"my-cluster": testCluster1,
 	}
-	test.run(t)
+
+	serverFlag := cliflag.StringFlag{}
+	if err := serverFlag.Set("https://1.2.3.4:8283"); err != nil {
+		t.Errorf("unexpected error setting serverFlag: %v", err)
+	}
+
+	for _, test := range []setClusterRunTest{
+		{
+			name:           "CurrentContext",
+			startingConfig: startingConfigEmpty,
+			options: &SetClusterOptions{
+				Name:   "my-cluster",
+				Server: serverFlag,
+			},
+			expectedConfig: expectedConfig,
+			expectedOut:    "Cluster \"my-cluster\" set.\n",
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(*test.startingConfig)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			defer removeTempFile(t, fakeKubeFile.Name())
+
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
+
+			streams, _, buffOut, _ := genericclioptions.NewTestIOStreams()
+
+			test.options.IOStreams = streams
+			test.options.ConfigAccess = pathOptions
+
+			err = test.options.RunSetCluster()
+			if len(test.runError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.runError)
+				return
+			} else if len(test.runError) != 0 && err == nil {
+				t.Errorf("expected error %q running to options but non received", test.runError)
+				return
+			} else if err != nil {
+				t.Errorf("unexpected error running to options: %v", err)
+			}
+
+			if len(test.expectedOut) != 0 {
+				checkOutputResults(t, buffOut.String(), test.expectedOut)
+				checkOutputConfig(t, test.options.ConfigAccess, test.expectedConfig, cmp.Options{})
+			}
+		})
+	}
 }
 
-func TestModifyCluster(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"my-cluster": {Server: "https://192.168.0.1", TLSServerName: "to-be-cleared"},
-		},
+func TestSetClusterToOptions(t *testing.T) {
+	t.Parallel()
+
+	serverFlag := cliflag.StringFlag{}
+	if err := serverFlag.Set("https://1.2.3.4:8283"); err != nil {
+		t.Errorf("unexpected error setting serverFlag: %v", err)
 	}
-	test := setClusterTest{
-		description: "Testing 'kubectl config set-cluster' with an existing cluster",
-		config:      conf,
-		args:        []string{"my-cluster"},
-		flags: []string{
-			"--server=https://192.168.0.99",
-		},
-		expected: `Cluster "my-cluster" set.` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"my-cluster": {Server: "https://192.168.0.99"},
+
+	certificateAuthorityFlag := cliflag.StringFlag{}
+	if err := certificateAuthorityFlag.Set("cert.ca"); err != nil {
+		t.Errorf("unexpected error setting serverFlag: %v", err)
+	}
+
+	proxyURLFlag := cliflag.StringFlag{}
+	if err := proxyURLFlag.Set("http://proxy.fake/"); err != nil {
+		t.Errorf("unexpected error setting serverFlag: %v", err)
+	}
+
+	tlsServerNameFlag := cliflag.StringFlag{}
+	if err := tlsServerNameFlag.Set("tls-server.fake"); err != nil {
+		t.Errorf("unexpected error setting serverFlag: %v", err)
+	}
+
+	for _, test := range []setClusterToOptionsTest{
+		{
+			name: "DefaultBoolsSetValues",
+			args: []string{"my-cluster"},
+			flags: &SetClusterFlags{
+				certificateAuthority:  certificateAuthorityFlag,
+				embedCAData:           false,
+				insecureSkipTLSVerify: false,
+				proxyURL:              proxyURLFlag,
+				server:                serverFlag,
+				tlsServerName:         tlsServerNameFlag,
 			},
+			expectedOptions: &SetClusterOptions{
+				Name:                  "my-cluster",
+				CertificateAuthority:  certificateAuthorityFlag,
+				EmbedCAData:           false,
+				InsecureSkipTLSVerify: false,
+				ProxyURL:              proxyURLFlag,
+				Server:                serverFlag,
+				TlsServerName:         tlsServerNameFlag,
+			},
+		}, {
+			name:          "ErrorZeroArgs",
+			args:          []string{},
+			flags:         &SetClusterFlags{},
+			expectedError: "unexpected args: ",
+		}, {
+			name:          "ErrorTwoArgs",
+			args:          []string{"my-cluster", "bad-arg"},
+			flags:         &SetClusterFlags{},
+			expectedError: "unexpected args: [my-cluster bad-arg]",
+		}, {
+			name: "ErrorInsecureAndCertAuthority",
+			args: []string{"my-cluster"},
+			flags: &SetClusterFlags{
+				insecureSkipTLSVerify: true,
+				certificateAuthority:  certificateAuthorityFlag,
+			},
+			expectedError: "you cannot specify a certificate authority and insecure mode at the same time",
+		}, {
+			name: "ErrorEmbededCADataNoCertAuthority",
+			args: []string{"my-cluster"},
+			flags: &SetClusterFlags{
+				embedCAData: true,
+			},
+			expectedError: "you must specify a --certificate-authority to embed",
+		}, {
+			name: "ErrorCertFileNotFound",
+			args: []string{"my-cluster"},
+			flags: &SetClusterFlags{
+				embedCAData:          true,
+				certificateAuthority: certificateAuthorityFlag,
+			},
+			expectedError: "could not stat certificate-authority file",
 		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(*clientcmdapi.NewConfig())
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			defer removeTempFile(t, fakeKubeFile.Name())
+
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
+
+			streams, _, _, _ := genericclioptions.NewTestIOStreams()
+
+			test.flags.configAccess = pathOptions
+			test.flags.ioStreams = streams
+
+			options, err := test.flags.ToOptions(test.args)
+			if len(test.expectedError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.expectedError)
+				return
+			} else if len(test.expectedError) != 0 && err == nil {
+				t.Errorf("expected error %q running to options but non received", test.expectedError)
+				return
+			} else if err != nil {
+				t.Errorf("unexpected error running to options: %v", err)
+			}
+
+			// finish options for proper comparison
+			test.expectedOptions.IOStreams = streams
+			test.expectedOptions.ConfigAccess = pathOptions
+
+			cmpOptions := cmpopts.IgnoreUnexported(
+				cliflag.StringFlag{},
+				bytes.Buffer{})
+			if cmp.Diff(test.expectedOptions, options, cmpOptions) != "" {
+				t.Errorf("expected options did not match actual options (-want, +got):\n%v", cmp.Diff(test.expectedOptions, options, cmpOptions))
+			}
+		})
 	}
-	test.run(t)
 }
 
-// TestModifyClusterWithProxy tests setting proxy-url in kubeconfig
-func TestModifyClusterWithProxy(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"my-cluster": {Server: "https://192.168.0.1", TLSServerName: "to-be-cleared"},
-		},
-	}
-	test := setClusterTest{
-		description: "Testing 'kubectl config set-cluster' with an existing cluster",
-		config:      conf,
-		args:        []string{"my-cluster"},
-		flags: []string{
-			"--server=https://192.168.0.99",
-			"--proxy-url=https://192.168.0.100",
-		},
-		expected: `Cluster "my-cluster" set.` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"my-cluster": {Server: "https://192.168.0.99", ProxyURL: "https://192.168.0.100"},
-			},
-		},
-	}
-	test.run(t)
-}
+// To avoid complication I've broken out testing when a cert file that needs to be written out into this function
+func TestCertAuthorityFile(t *testing.T) {
+	t.Parallel()
 
-// TestModifyClusterWithProxyOverride tests updating proxy-url
-// in kubeconfig which already exists
-func TestModifyClusterWithProxyOverride(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"my-cluster": {
-				Server:        "https://192.168.0.1",
-				TLSServerName: "to-be-cleared",
-				ProxyURL:      "https://192.168.0.2",
-			},
-		},
+	certificateAuthorityFlag := cliflag.StringFlag{}
+	if err := certificateAuthorityFlag.Set("cert.ca"); err != nil {
+		t.Errorf("unexpected error setting serverFlag: %v", err)
 	}
-	test := setClusterTest{
-		description: "Testing 'kubectl config set-cluster' with an existing cluster",
-		config:      conf,
-		args:        []string{"my-cluster"},
-		flags: []string{
-			"--server=https://192.168.0.99",
-			"--proxy-url=https://192.168.0.100",
-		},
-		expected: `Cluster "my-cluster" set.` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"my-cluster": {Server: "https://192.168.0.99", ProxyURL: "https://192.168.0.100"},
-			},
-		},
-	}
-	test.run(t)
-}
 
-func TestModifyClusterServerAndTLS(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"my-cluster": {Server: "https://192.168.0.1"},
-		},
-	}
-	test := setClusterTest{
-		description: "Testing 'kubectl config set-cluster' with an existing cluster",
-		config:      conf,
-		args:        []string{"my-cluster"},
-		flags: []string{
-			"--server=https://192.168.0.99",
-			"--tls-server-name=my-cluster-name",
-		},
-		expected: `Cluster "my-cluster" set.` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"my-cluster": {Server: "https://192.168.0.99", TLSServerName: "my-cluster-name"},
+	for _, test := range []setClusterToOptionsTest{
+		{
+			name: "EmbedCertData",
+			args: []string{"my-cluster"},
+			flags: &SetClusterFlags{
+				certificateAuthority: certificateAuthorityFlag,
+				embedCAData:          true,
+			},
+			expectedOptions: &SetClusterOptions{
+				Name:                  "my-cluster",
+				CertificateAuthority:  certificateAuthorityFlag,
+				EmbedCAData:           true,
+				InsecureSkipTLSVerify: false,
+				ProxyURL:              cliflag.StringFlag{},
+				Server:                cliflag.StringFlag{},
+				TlsServerName:         cliflag.StringFlag{},
 			},
 		},
-	}
-	test.run(t)
-}
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(*clientcmdapi.NewConfig())
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-func (test setClusterTest) run(t *testing.T) {
-	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer os.Remove(fakeKubeFile.Name())
-	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = fakeKubeFile.Name()
-	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigSetCluster(buf, pathOptions)
-	cmd.SetArgs(test.args)
-	cmd.Flags().Parse(test.flags)
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v, args: %v, flags: %v", err, test.args, test.flags)
-	}
-	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
-	}
-	if len(test.expected) != 0 {
-		if buf.String() != test.expected {
-			t.Errorf("Failed in %q\n expected %v\n but got %v", test.description, test.expected, buf.String())
-		}
-	}
-	if len(test.args) > 0 {
-		cluster, ok := config.Clusters[test.args[0]]
-		if !ok {
-			t.Errorf("expected cluster %v, but got nil", test.args[0])
-			return
-		}
-		if cluster.Server != test.expectedConfig.Clusters[test.args[0]].Server {
-			t.Errorf("Fail in %q\n expected cluster server %v\n but got %v\n ", test.description, test.expectedConfig.Clusters[test.args[0]].Server, cluster.Server)
-		}
-		if cluster.TLSServerName != test.expectedConfig.Clusters[test.args[0]].TLSServerName {
-			t.Errorf("Fail in %q\n expected cluster TLS server name %q\n but got %q\n ", test.description, test.expectedConfig.Clusters[test.args[0]].TLSServerName, cluster.TLSServerName)
-		}
+			defer removeTempFile(t, fakeKubeFile.Name())
+
+			fakeCAFile, err := os.CreateTemp(os.TempDir(), "")
+			if err != nil {
+				t.Errorf("error creating fake certificate authority file: %v", err)
+			}
+
+			defer removeTempFile(t, fakeCAFile.Name())
+
+			if err := test.flags.certificateAuthority.Set(fakeCAFile.Name()); err != nil {
+				t.Errorf("error overwriting provided CA flag: %v", err)
+			}
+			fakeCertData := []byte("I guess it doesn't matter what goes in here\n")
+			if _, err := fakeCAFile.Write(fakeCertData); err != nil {
+				t.Errorf("error writing fake certificate authority file: %v", err)
+			}
+
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
+
+			streams, _, _, _ := genericclioptions.NewTestIOStreams()
+
+			test.flags.configAccess = pathOptions
+			test.flags.ioStreams = streams
+
+			options, err := test.flags.ToOptions(test.args)
+			if len(test.expectedError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.expectedError)
+				return
+			} else if len(test.expectedError) != 0 && err == nil {
+				t.Errorf("expected error %q running command but non received", test.expectedError)
+				return
+			} else if err != nil {
+				t.Errorf("unexpected error running to options: %v", err)
+			}
+
+			// finish options for proper comparison
+			test.expectedOptions.IOStreams = streams
+			test.expectedOptions.ConfigAccess = pathOptions
+
+			// set CA to the real name of the fake CA file that was generated for proper DeepEqual testing
+			if err := options.CertificateAuthority.Set(fakeCAFile.Name()); err != nil {
+				t.Errorf("unexpected error overwriting CA file name: %v", err)
+			}
+
+			cmpOptions := cmpopts.IgnoreUnexported(
+				cliflag.StringFlag{},
+				bytes.Buffer{})
+			if cmp.Diff(test.expectedOptions, options, cmpOptions) != "" {
+				t.Errorf("expected options did not match actual options (-want, +got):\n%v", cmp.Diff(test.expectedOptions, options, cmpOptions))
+			}
+		})
 	}
 }
