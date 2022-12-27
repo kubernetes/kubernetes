@@ -36,19 +36,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
-// GetContextsOptions contains the assignable options from the args.
-type GetContextsOptions struct {
-	configAccess clientcmd.ConfigAccess
-	nameOnly     bool
-	showHeaders  bool
-	contextNames []string
-
-	outputFormat string
-	noHeaders    bool
-
-	genericclioptions.IOStreams
-}
-
 var (
 	getContextsLong = templates.LongDesc(i18n.T(`Display one or many contexts from the kubeconfig file.`))
 
@@ -60,90 +47,116 @@ var (
 		kubectl config get-contexts my-context`)
 )
 
+// GetContextsFlags contains the assignable options from the args.
+type GetContextsFlags struct {
+	notShowHeaders bool
+	output         string
+
+	configAccess clientcmd.ConfigAccess
+	ioStreams    genericclioptions.IOStreams
+}
+
+// GetContextsOptions contains the assignable options from the args.
+type GetContextsOptions struct {
+	ContextNames   []string
+	NameOnly       bool
+	NotShowHeaders bool
+
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
+}
+
 // NewCmdConfigGetContexts creates a command object for the "get-contexts" action, which
 // retrieves one or more contexts from a kubeconfig.
 func NewCmdConfigGetContexts(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &GetContextsOptions{
-		configAccess: configAccess,
-
-		IOStreams: streams,
-	}
+	flags := NewGetContextFlags(streams, configAccess)
 
 	cmd := &cobra.Command{
-		Use:                   "get-contexts [(-o|--output=)name)]",
+		Use:                   "get-contexts [(-o|--output=)name)] [--no-headers]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Describe one or many contexts"),
 		Long:                  getContextsLong,
 		Example:               getContextsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args))
-			cmdutil.CheckErr(options.Validate())
+			options, err := flags.ToOptions(args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(options.RunGetContexts())
 		},
 	}
 
-	cmd.Flags().BoolVar(&options.noHeaders, "no-headers", options.noHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
-	cmd.Flags().StringVarP(&options.outputFormat, "output", "o", options.outputFormat, `Output format. One of: (name).`)
+	flags.AddFlags(cmd)
+
 	return cmd
 }
 
-// Complete assigns GetContextsOptions from the args.
-func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string) error {
-	supportedOutputTypes := sets.NewString("", "name")
-	if !supportedOutputTypes.Has(o.outputFormat) {
-		return fmt.Errorf("--output %v is not available in kubectl config get-contexts; resetting to default output format", o.outputFormat)
+func NewGetContextFlags(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *GetContextsFlags {
+	return &GetContextsFlags{
+		notShowHeaders: false,
+		output:         "",
+		configAccess:   configAccess,
+		ioStreams:      streams,
 	}
-	o.contextNames = args
-	o.nameOnly = false
-	if o.outputFormat == "name" {
-		o.nameOnly = true
-	}
-	o.showHeaders = true
-	if cmdutil.GetFlagBool(cmd, "no-headers") || o.nameOnly {
-		o.showHeaders = false
-	}
-
-	return nil
 }
 
-// Validate ensures the of output format
-func (o *GetContextsOptions) Validate() error {
-	return nil
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *GetContextsFlags) ToOptions(args []string) (*GetContextsOptions, error) {
+	if err := flags.validateOutputType(); err != nil {
+		return nil, err
+	}
+	nameOnly := false
+	if flags.output == "name" {
+		nameOnly = true
+	}
+	o := &GetContextsOptions{
+		ConfigAccess:   flags.configAccess,
+		IOStreams:      flags.ioStreams,
+		NameOnly:       nameOnly,
+		NotShowHeaders: flags.notShowHeaders,
+		ContextNames:   args,
+	}
+
+	return o, nil
+}
+
+// AddFlags registers flags for a cli
+func (flags *GetContextsFlags) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&flags.notShowHeaders, "no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
+	cmd.Flags().StringVarP(&flags.output, "output", "o", "", `Output format. One of: (name).`)
 }
 
 // RunGetContexts implements all the necessary functionality for context retrieval.
-func (o GetContextsOptions) RunGetContexts() error {
-	config, err := o.configAccess.GetStartingConfig()
+func (o *GetContextsOptions) RunGetContexts() error {
+	config, _, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
 
-	out, found := o.Out.(*tabwriter.Writer)
+	out, found := o.IOStreams.Out.(*tabwriter.Writer)
 	if !found {
-		out = printers.GetNewTabWriter(o.Out)
+		out = printers.GetNewTabWriter(o.IOStreams.Out)
 		defer out.Flush()
 	}
 
 	// Build a list of context names to print, and warn if any requested contexts are not found.
-	// Do this before printing the headers so it doesn't look ugly.
-	allErrs := []error{}
-	toPrint := []string{}
-	if len(o.contextNames) == 0 {
+	// Do this before printing the headers, so it doesn't look ugly.
+	var allErrs []error
+	var toPrint []string
+	if len(o.ContextNames) == 0 {
 		for name := range config.Contexts {
 			toPrint = append(toPrint, name)
 		}
 	} else {
-		for _, name := range o.contextNames {
+		for _, name := range o.ContextNames {
 			_, ok := config.Contexts[name]
 			if ok {
 				toPrint = append(toPrint, name)
 			} else {
-				allErrs = append(allErrs, fmt.Errorf("context %v not found", name))
+				allErrs = append(allErrs, fmt.Errorf("context \"%v\" not found", name))
 			}
 		}
 	}
-	if o.showHeaders {
-		err = printContextHeaders(out, o.nameOnly)
+	if !o.NotShowHeaders {
+		err = printContextHeaders(out, o.NameOnly)
 		if err != nil {
 			allErrs = append(allErrs, err)
 		}
@@ -151,13 +164,27 @@ func (o GetContextsOptions) RunGetContexts() error {
 
 	sort.Strings(toPrint)
 	for _, name := range toPrint {
-		err = printContext(name, config.Contexts[name], out, o.nameOnly, config.CurrentContext == name)
+		err = printContext(name, config.Contexts[name], out, o.NameOnly, config.CurrentContext == name)
 		if err != nil {
 			allErrs = append(allErrs, err)
 		}
 	}
 
 	return utilerrors.NewAggregate(allErrs)
+}
+
+// validateOutputType ensures the type of output format
+func (flags *GetContextsFlags) validateOutputType() error {
+	validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
+	supportedOutputTypes := sets.NewString("", "name")
+	outputFormat := flags.output
+	if !validOutputTypes.Has(outputFormat) {
+		return fmt.Errorf("output must be one of '' or 'name': %v", outputFormat)
+	}
+	if !supportedOutputTypes.Has(outputFormat) {
+		return fmt.Errorf("--output %v is not available in kubectl config get-contexts", outputFormat)
+	}
+	return nil
 }
 
 func printContextHeaders(out io.Writer, nameOnly bool) error {
