@@ -17,185 +17,108 @@ limitations under the License.
 package config
 
 import (
-	"reflect"
-	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
-func TestDeleteUserComplete(t *testing.T) {
-	var tests = []struct {
-		name string
-		args []string
-		err  string
-	}{
-		{
-			name: "no args",
-			args: []string{},
-			err:  "user to delete is required",
-		},
-		{
-			name: "user provided",
-			args: []string{"minikube"},
-			err:  "",
-		},
-	}
-
-	for i := range tests {
-		test := tests[i]
-		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
-			defer tf.Cleanup()
-
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
-			pathOptions, err := tf.PathOptionsWithConfig(clientcmdapi.Config{})
-			if err != nil {
-				t.Fatalf("unexpected error executing command: %v", err)
-			}
-
-			cmd := NewCmdConfigDeleteUser(ioStreams, pathOptions)
-			cmd.SetOut(out)
-			options := NewDeleteUserOptions(ioStreams, pathOptions)
-
-			if err := options.Complete(cmd, test.args); err != nil {
-				if test.err == "" {
-					t.Fatalf("unexpected error executing command: %v", err)
-				}
-
-				if !strings.Contains(err.Error(), test.err) {
-					t.Fatalf("expected error to contain %v, got %v", test.err, err.Error())
-				}
-
-				return
-			}
-
-			if options.configFile != pathOptions.GlobalFile {
-				t.Fatalf("expected configFile to be %v, got %v", pathOptions.GlobalFile, options.configFile)
-			}
-		})
-	}
+type deleteUserTest struct {
+	name           string
+	startingConfig *clientcmdapi.Config
+	args           []string
+	expectedConfig *clientcmdapi.Config
+	expectedOut    string
+	completeError  string
+	runError       string
 }
 
-func TestDeleteUserValidate(t *testing.T) {
-	var tests = []struct {
-		name   string
-		user   string
-		config clientcmdapi.Config
-		err    string
-	}{
-		{
-			name: "user not in config",
-			user: "kube",
-			config: clientcmdapi.Config{
-				AuthInfos: map[string]*clientcmdapi.AuthInfo{
-					"minikube": {Username: "minikube"},
-				},
-			},
-			err: "cannot delete user kube",
-		},
-		{
-			name: "user in config",
-			user: "kube",
-			config: clientcmdapi.Config{
-				AuthInfos: map[string]*clientcmdapi.AuthInfo{
-					"minikube": {Username: "minikube"},
-					"kube":     {Username: "kube"},
-				},
-			},
-			err: "",
-		},
+func TestDeleteUser(t *testing.T) {
+	t.Parallel()
+
+	startConf := clientcmdapi.NewConfig()
+	startConf.AuthInfos = map[string]*clientcmdapi.AuthInfo{
+		"minikube":  {Username: "minikube"},
+		"otherkube": {Username: "otherkube"},
 	}
 
-	for i := range tests {
-		test := tests[i]
-		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
-			defer tf.Cleanup()
+	resultConfDeleteMinikube := clientcmdapi.NewConfig()
+	resultConfDeleteMinikube.AuthInfos = map[string]*clientcmdapi.AuthInfo{
+		"otherkube": {Username: "otherkube"},
+	}
 
-			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
-			pathOptions, err := tf.PathOptionsWithConfig(test.config)
+	for _, test := range []deleteUserTest{
+		{
+			name:           "DeleteUser",
+			startingConfig: startConf,
+			args:           []string{"minikube"},
+			expectedConfig: resultConfDeleteMinikube,
+			expectedOut:    "deleted user \"minikube\" from",
+		}, {
+			name:           "ErrorNoArgs",
+			startingConfig: startConf,
+			args:           []string{},
+			expectedConfig: startConf,
+			completeError:  "unexpected args: []",
+		}, {
+			name:           "ErrorMultipleArgs",
+			startingConfig: startConf,
+			args:           []string{"minikube", "test"},
+			expectedConfig: startConf,
+			completeError:  "unexpected args: [minikube test]",
+		}, {
+			name:           "ErrorNonexistentUser",
+			startingConfig: startConf,
+			args:           []string{"test"},
+			expectedConfig: startConf,
+			runError:       "user \"test\" does not exist in config file",
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(*test.startingConfig)
 			if err != nil {
-				t.Fatalf("unexpected error executing command: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 
-			options := NewDeleteUserOptions(ioStreams, pathOptions)
-			options.config = &test.config
-			options.user = test.user
+			defer removeTempFile(t, fakeKubeFile.Name())
 
-			if err := options.Validate(); err != nil {
-				if !strings.Contains(err.Error(), test.err) {
-					t.Fatalf("expected: %s but got %s", test.err, err.Error())
-				}
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
 
+			streams, _, buffOut, _ := genericclioptions.NewTestIOStreams()
+
+			options := NewDeleteUserOptions(streams, pathOptions)
+
+			err = options.Complete(test.args)
+			if len(test.completeError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.completeError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
 				return
-			}
-		})
-	}
-}
-
-func TestDeleteUserRun(t *testing.T) {
-	var tests = []struct {
-		name          string
-		user          string
-		config        clientcmdapi.Config
-		expectedUsers []string
-		out           string
-	}{
-		{
-			name: "delete user",
-			user: "kube",
-			config: clientcmdapi.Config{
-				AuthInfos: map[string]*clientcmdapi.AuthInfo{
-					"minikube": {Username: "minikube"},
-					"kube":     {Username: "kube"},
-				},
-			},
-			expectedUsers: []string{"minikube"},
-			out:           "deleted user kube from",
-		},
-	}
-
-	for i := range tests {
-		test := tests[i]
-		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
-			defer tf.Cleanup()
-
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
-			pathOptions, err := tf.PathOptionsWithConfig(test.config)
-			if err != nil {
-				t.Fatalf("unexpected error executing command: %v", err)
+			} else if len(test.completeError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.completeError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
 			}
 
-			options := NewDeleteUserOptions(ioStreams, pathOptions)
-			options.config = &test.config
-			options.configFile = pathOptions.GlobalFile
-			options.user = test.user
-
-			if err := options.Run(); err != nil {
-				t.Fatalf("unexpected error executing command: %v", err)
+			err = options.RunDeleteUser()
+			if len(test.runError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.runError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+				return
+			} else if len(test.runError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.runError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
 			}
 
-			if got := out.String(); !strings.Contains(got, test.out) {
-				t.Fatalf("expected: %s but got %s", test.out, got)
-			}
-
-			config, err := clientcmd.LoadFromFile(options.configFile)
-			if err != nil {
-				t.Fatalf("unexpected error executing command: %v", err)
-			}
-
-			users := make([]string, 0, len(config.AuthInfos))
-			for user := range config.AuthInfos {
-				users = append(users, user)
-			}
-
-			if !reflect.DeepEqual(test.expectedUsers, users) {
-				t.Fatalf("expected %v, got %v", test.expectedUsers, users)
+			if len(test.expectedOut) != 0 {
+				checkOutputResults(t, buffOut.String(), test.expectedOut)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
 			}
 		})
 	}

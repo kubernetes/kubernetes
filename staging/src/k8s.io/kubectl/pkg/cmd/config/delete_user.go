@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -38,27 +37,14 @@ var (
 
 // DeleteUserOptions holds the data needed to run the command
 type DeleteUserOptions struct {
-	user string
+	User string
 
-	configAccess clientcmd.ConfigAccess
-	config       *clientcmdapi.Config
-	configFile   string
-
-	genericclioptions.IOStreams
-}
-
-// NewDeleteUserOptions creates the options for the command
-func NewDeleteUserOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *DeleteUserOptions {
-	return &DeleteUserOptions{
-		configAccess: configAccess,
-		IOStreams:    ioStreams,
-	}
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
 }
 
 // NewCmdConfigDeleteUser returns a Command instance for 'config delete-user' sub command
 func NewCmdConfigDeleteUser(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	o := NewDeleteUserOptions(streams, configAccess)
-
 	cmd := &cobra.Command{
 		Use:                   "delete-user NAME",
 		DisableFlagsInUseLine: true,
@@ -67,56 +53,51 @@ func NewCmdConfigDeleteUser(streams genericclioptions.IOStreams, configAccess cl
 		Example:               deleteUserExample,
 		ValidArgsFunction:     completion.UserCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(cmd, args))
-			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run())
+			o := NewDeleteUserOptions(streams, configAccess)
+			cmdutil.CheckErr(o.Complete(args))
+			cmdutil.CheckErr(o.RunDeleteUser())
 		},
 	}
 
 	return cmd
 }
 
+// NewDeleteUserOptions creates the options for the command
+func NewDeleteUserOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *DeleteUserOptions {
+	return &DeleteUserOptions{
+		ConfigAccess: configAccess,
+		IOStreams:    ioStreams,
+	}
+}
+
 // Complete sets up the command to run
-func (o *DeleteUserOptions) Complete(cmd *cobra.Command, args []string) error {
-	config, err := o.configAccess.GetStartingConfig()
+func (o *DeleteUserOptions) Complete(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("unexpected args: %v", args)
+	}
+	o.User = args[0]
+	return nil
+}
+
+// RunDeleteUser performs the command
+func (o *DeleteUserOptions) RunDeleteUser() error {
+	config, configFile, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
-	o.config = config
 
-	if len(args) != 1 {
-		return cmdutil.UsageErrorf(cmd, "user to delete is required")
+	if _, ok := config.AuthInfos[o.User]; !ok {
+		return fmt.Errorf("user \"%s\" does not exist in config file %s", o.User, configFile)
 	}
-	o.user = args[0]
+	delete(config.AuthInfos, o.User)
 
-	configFile := o.configAccess.GetDefaultFilename()
-	if o.configAccess.IsExplicitFile() {
-		configFile = o.configAccess.GetExplicitFile()
-	}
-	o.configFile = configFile
-
-	return nil
-}
-
-// Validate ensures the command has enough info to run
-func (o *DeleteUserOptions) Validate() error {
-	_, ok := o.config.AuthInfos[o.user]
-	if !ok {
-		return fmt.Errorf("cannot delete user %s, not in %s", o.user, o.configFile)
-	}
-
-	return nil
-}
-
-// Run performs the command
-func (o *DeleteUserOptions) Run() error {
-	delete(o.config.AuthInfos, o.user)
-
-	if err := clientcmd.ModifyConfig(o.configAccess, *o.config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.ConfigAccess, *config, true); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "deleted user %s from %s\n", o.user, o.configFile)
+	if _, err := fmt.Fprintf(o.IOStreams.Out, "deleted user \"%s\" from %s\n", o.User, configFile); err != nil {
+		return err
+	}
 
 	return nil
 }
