@@ -18,9 +18,10 @@ package config
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -34,8 +35,16 @@ var (
 		kubectl config delete-cluster minikube`)
 )
 
+// DeleteClusterOptions holds the data needed to run the command
+type DeleteClusterOptions struct {
+	Cluster string
+
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
+}
+
 // NewCmdConfigDeleteCluster returns a Command instance for 'config delete-cluster' sub command
-func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigDeleteCluster(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "delete-cluster NAME",
 		DisableFlagsInUseLine: true,
@@ -44,43 +53,50 @@ func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAcces
 		Example:               deleteClusterExample,
 		ValidArgsFunction:     completion.ClusterCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runDeleteCluster(out, configAccess, cmd))
+			options := NewDeleteClusterOptions(streams, configAccess)
+			cmdutil.CheckErr(options.Complete(args))
+			cmdutil.CheckErr(options.RunDeleteCluster())
 		},
 	}
 
 	return cmd
 }
 
-func runDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess, cmd *cobra.Command) error {
-	config, err := configAccess.GetStartingConfig()
+// NewDeleteClusterOptions creates the options for the command
+func NewDeleteClusterOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *DeleteClusterOptions {
+	return &DeleteClusterOptions{
+		ConfigAccess: configAccess,
+		IOStreams:    ioStreams,
+	}
+}
+
+func (o *DeleteClusterOptions) Complete(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("unexpected args: %v", args)
+	}
+	o.Cluster = args[0]
+	return nil
+}
+
+func (o *DeleteClusterOptions) RunDeleteCluster() error {
+	config, configFile, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
 
-	args := cmd.Flags().Args()
-	if len(args) != 1 {
-		cmd.Help()
-		return nil
+	if _, ok := config.Clusters[o.Cluster]; !ok {
+		return fmt.Errorf("cannot delete cluster \"%s\", not in file %s", o.Cluster, configFile)
 	}
 
-	configFile := configAccess.GetDefaultFilename()
-	if configAccess.IsExplicitFile() {
-		configFile = configAccess.GetExplicitFile()
-	}
+	delete(config.Clusters, o.Cluster)
 
-	name := args[0]
-	_, ok := config.Clusters[name]
-	if !ok {
-		return fmt.Errorf("cannot delete cluster %s, not in %s", name, configFile)
-	}
-
-	delete(config.Clusters, name)
-
-	if err := clientcmd.ModifyConfig(configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.ConfigAccess, *config, true); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "deleted cluster %s from %s\n", name, configFile)
+	if _, err := fmt.Fprintf(o.IOStreams.Out, "deleted cluster \"%s\" from %s\n", o.Cluster, configFile); err != nil {
+		return err
+	}
 
 	return nil
 }

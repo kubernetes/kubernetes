@@ -17,80 +17,103 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
-	"fmt"
-	"os"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type deleteClusterTest struct {
-	config           clientcmdapi.Config
-	clusterToDelete  string
-	expectedClusters []string
-	expectedOut      string
+	name           string
+	startingConfig *clientcmdapi.Config
+	args           []string
+	expectedConfig *clientcmdapi.Config
+	expectedOut    string
+	completeError  string
+	runError       string
 }
 
 func TestDeleteCluster(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"minikube":  {Server: "https://192.168.0.99"},
-			"otherkube": {Server: "https://192.168.0.100"},
+	t.Parallel()
+
+	startingConf := clientcmdapi.NewConfig()
+	startingConf.Clusters = map[string]*clientcmdapi.Cluster{
+		"minikube":  {Server: "https://192.168.0.99"},
+		"otherkube": {Server: "https://192.168.0.100"},
+	}
+
+	resultConfDeleteMinikube := clientcmdapi.NewConfig()
+	resultConfDeleteMinikube.Clusters = map[string]*clientcmdapi.Cluster{
+		"otherkube": {Server: "https://192.168.0.100"},
+	}
+
+	for _, test := range []deleteClusterTest{
+		{
+			name:           "DeleteCluster",
+			startingConfig: startingConf,
+			args:           []string{"minikube"},
+			expectedConfig: resultConfDeleteMinikube,
+			expectedOut:    "deleted cluster \"minikube\" from",
+		}, {
+			name:           "ErrorMultipleArgs",
+			startingConfig: startingConf,
+			args:           []string{"minikube", "test"},
+			expectedConfig: startingConf,
+			completeError:  "unexpected args: [minikube test]",
+		}, {
+			name:           "ErrorNonexistentCluster",
+			startingConfig: startingConf,
+			args:           []string{"test"},
+			expectedConfig: startingConf,
+			runError:       "cannot delete cluster \"test\", not in file",
 		},
-	}
-	test := deleteClusterTest{
-		config:           conf,
-		clusterToDelete:  "minikube",
-		expectedClusters: []string{"otherkube"},
-		expectedOut:      "deleted cluster minikube from %s\n",
-	}
+	} {
+		test := test
+		t.Run(test.name, func(f *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(*test.startingConfig)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-	test.run(t)
-}
+			defer removeTempFile(t, fakeKubeFile.Name())
 
-func (test deleteClusterTest) run(t *testing.T) {
-	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer os.Remove(fakeKubeFile.Name())
-	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
 
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = fakeKubeFile.Name()
-	pathOptions.EnvVar = ""
+			streams, _, buffOut, _ := genericclioptions.NewTestIOStreams()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigDeleteCluster(buf, pathOptions)
-	cmd.SetArgs([]string{test.clusterToDelete})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v", err)
-	}
+			options := NewDeleteClusterOptions(streams, pathOptions)
 
-	expectedOutWithFile := fmt.Sprintf(test.expectedOut, fakeKubeFile.Name())
-	if expectedOutWithFile != buf.String() {
-		t.Errorf("expected output %s, but got %s", expectedOutWithFile, buf.String())
-		return
-	}
+			err = options.Complete(test.args)
+			if len(test.completeError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.completeError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+				return
+			} else if len(test.completeError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.completeError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
+			}
 
-	// Verify cluster was removed from kubeconfig file
-	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
-	}
+			err = options.RunDeleteCluster()
+			if len(test.runError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.runError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+				return
+			} else if len(test.runError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.runError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
+			}
 
-	clusters := make([]string, 0, len(config.Clusters))
-	for k := range config.Clusters {
-		clusters = append(clusters, k)
-	}
-
-	if !reflect.DeepEqual(test.expectedClusters, clusters) {
-		t.Errorf("expected clusters %v, but found %v in kubeconfig", test.expectedClusters, clusters)
+			if len(test.expectedOut) != 0 {
+				checkOutputResults(t, buffOut.String(), test.expectedOut)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+			}
+		})
 	}
 }
