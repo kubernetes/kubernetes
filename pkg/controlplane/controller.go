@@ -49,9 +49,8 @@ const (
 )
 
 // Controller is the controller manager for the core bootstrap Kubernetes
-// controller loops, which manage creating the "kubernetes" service, the
-// "default", "kube-system" and "kube-public" namespaces, and provide the IP
-// repair check on service IPs
+// controller loops, which manage creating the "kubernetes" service and
+// provide the IP repair check on service IPs
 type Controller struct {
 	client kubernetes.Interface
 
@@ -68,9 +67,6 @@ type Controller struct {
 
 	EndpointReconciler reconcilers.EndpointReconciler
 	EndpointInterval   time.Duration
-
-	SystemNamespaces         []string
-	SystemNamespacesInterval time.Duration
 
 	PublicIP net.IP
 
@@ -101,16 +97,11 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		}
 	}
 
-	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, corev1.NamespaceNodeLease}
-
 	return &Controller{
 		client: client,
 
 		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
-
-		SystemNamespaces:         systemNamespaces,
-		SystemNamespacesInterval: 1 * time.Minute,
 
 		ServiceClusterIPRegistry:          legacyRESTStorage.ServiceClusterIPAllocator,
 		ServiceClusterIPRange:             c.ExtraConfig.ServiceIPRange,
@@ -181,7 +172,7 @@ func (c *Controller) Start() {
 		repairNodePorts.RunUntil(wg.Done, stopCh)
 	}
 
-	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, runRepairClusterIPs, runRepairNodePorts)
+	c.runner = async.NewRunner(c.RunKubernetesService, runRepairClusterIPs, runRepairNodePorts)
 	c.runner.Start()
 
 	// For backward compatibility, we ensure that if we never are able
@@ -223,18 +214,6 @@ func (c *Controller) Stop() {
 		// don't block server shutdown forever if we can't reach etcd to remove ourselves
 		klog.Warning("RemoveEndpoints() timed out")
 	}
-}
-
-// RunKubernetesNamespaces periodically makes sure that all internal namespaces exist
-func (c *Controller) RunKubernetesNamespaces(ch chan struct{}) {
-	wait.Until(func() {
-		// Loop the system namespace list, and create them if they do not exist
-		for _, ns := range c.SystemNamespaces {
-			if err := createNamespaceIfNeeded(c.client.CoreV1(), ns); err != nil {
-				runtime.HandleError(fmt.Errorf("unable to create required kubernetes system namespace %s: %v", ns, err))
-			}
-		}
-	}, c.SystemNamespacesInterval, ch)
 }
 
 // RunKubernetesService periodically updates the kubernetes service
