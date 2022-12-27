@@ -18,20 +18,15 @@ package config
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
-
-// CurrentContextOptions holds the command-line options for 'config current-context' sub command
-type CurrentContextOptions struct {
-	ConfigAccess clientcmd.ConfigAccess
-}
 
 var (
 	currentContextLong = templates.LongDesc(i18n.T(`
@@ -42,35 +37,56 @@ var (
 		kubectl config current-context`)
 )
 
-// NewCmdConfigCurrentContext returns a Command instance for 'config current-context' sub command
-func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &CurrentContextOptions{ConfigAccess: configAccess}
+// CurrentContextOptions holds the command-line options for 'config current-context' sub command
+type CurrentContextOptions struct {
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
+}
 
+// NewCmdConfigCurrentContext returns a Command instance for 'config current-context' sub command
+func NewCmdConfigCurrentContext(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "current-context",
 		Short:   i18n.T("Display the current-context"),
 		Long:    currentContextLong,
 		Example: currentContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(RunCurrentContext(out, options))
+			options := NewCurrentContextOptions(streams, configAccess)
+			cmdutil.CheckErr(options.Complete(args))
+			cmdutil.CheckErr(options.RunCurrentContext())
 		},
 	}
 
 	return cmd
 }
 
+func NewCurrentContextOptions(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *CurrentContextOptions {
+	return &CurrentContextOptions{
+		ConfigAccess: configAccess,
+		IOStreams:    streams,
+	}
+}
+
+func (o *CurrentContextOptions) Complete(args []string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("unexpected args: %v", args)
+	}
+	return nil
+}
+
 // RunCurrentContext performs the execution of 'config current-context' sub command
-func RunCurrentContext(out io.Writer, options *CurrentContextOptions) error {
-	config, err := options.ConfigAccess.GetStartingConfig()
+func (o *CurrentContextOptions) RunCurrentContext() error {
+	config, _, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
 
 	if config.CurrentContext == "" {
-		err = fmt.Errorf("current-context is not set")
-		return err
+		return fmt.Errorf("current-context is not set")
 	}
 
-	fmt.Fprintf(out, "%s\n", config.CurrentContext)
+	if _, err := fmt.Fprintf(o.IOStreams.Out, "%s\n", config.CurrentContext); err != nil {
+		return err
+	}
 	return nil
 }

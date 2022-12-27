@@ -17,76 +17,69 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
-	"os"
-	"strings"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type currentContextTest struct {
+	name           string
 	startingConfig clientcmdapi.Config
+	expectedOutput string
 	expectedError  string
 }
 
-func newFederalContextConfig() clientcmdapi.Config {
-	return clientcmdapi.Config{
-		CurrentContext: "federal-context",
-	}
-}
-
-func TestCurrentContextWithSetContext(t *testing.T) {
-	test := currentContextTest{
-		startingConfig: newFederalContextConfig(),
-		expectedError:  "",
-	}
-
-	test.run(t)
-}
-
-func TestCurrentContextWithUnsetContext(t *testing.T) {
-	test := currentContextTest{
-		startingConfig: *clientcmdapi.NewConfig(),
-		expectedError:  "current-context is not set",
-	}
-
-	test.run(t)
-}
-
-func (test currentContextTest) run(t *testing.T) {
-	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer os.Remove(fakeKubeFile.Name())
-	err = clientcmd.WriteToFile(test.startingConfig, fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = fakeKubeFile.Name()
-	pathOptions.EnvVar = ""
-	options := CurrentContextOptions{
-		ConfigAccess: pathOptions,
-	}
-
-	buf := bytes.NewBuffer([]byte{})
-	err = RunCurrentContext(buf, &options)
-	if len(test.expectedError) != 0 {
-		if err == nil {
-			t.Errorf("Did not get %v", test.expectedError)
-		} else {
-			if !strings.Contains(err.Error(), test.expectedError) {
-				t.Errorf("Expected %v, but got %v", test.expectedError, err)
+func TestCurrentContext(t *testing.T) {
+	t.Parallel()
+	for _, test := range []currentContextTest{
+		{
+			name: "WithSetContext",
+			startingConfig: clientcmdapi.Config{
+				CurrentContext: "federal-context",
+			},
+			expectedOutput: "federal-context\n",
+		}, {
+			name:           "WithNoSetContext",
+			startingConfig: clientcmdapi.Config{},
+			expectedError:  "current-context is not set",
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(test.startingConfig)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
-		}
-		return
-	}
 
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+			defer removeTempFile(t, fakeKubeFile.Name())
+
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
+
+			streams, _, buffOut, _ := genericclioptions.NewTestIOStreams()
+
+			options := NewCurrentContextOptions(streams, pathOptions)
+			if err := options.Complete([]string{}); err != nil {
+				t.Fatalf("unexpected error completing options:\n%v\n", err)
+			}
+			err = options.RunCurrentContext()
+			if len(test.expectedError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.expectedError)
+				return
+			} else if len(test.expectedError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.expectedError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
+			}
+
+			if len(test.expectedOutput) != 0 {
+				if buffOut.String() != test.expectedOutput {
+					t.Fatalf("expected out: %v\ngot: %v\n", test.expectedOutput, buffOut.String())
+				}
+			}
+		})
 	}
 }
