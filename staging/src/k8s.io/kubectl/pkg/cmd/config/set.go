@@ -18,27 +18,18 @@ package config
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
-	"io"
 	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
-	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
-
-type setOptions struct {
-	configAccess  clientcmd.ConfigAccess
-	propertyName  string
-	propertyValue string
-	setRawBytes   cliflag.Tristate
-}
 
 var (
 	setLong = templates.LongDesc(i18n.T(`
@@ -64,9 +55,25 @@ var (
 	kubectl config set users.cluster-admin.client-key-data cert_data_here --set-raw-bytes=true`)
 )
 
+type SetFlags struct {
+	setRawBytes bool
+
+	configAccess clientcmd.ConfigAccess
+	ioStreams    genericclioptions.IOStreams
+}
+
+type SetOptions struct {
+	PropertyName  string
+	PropertyValue string
+	SetRawBytes   bool
+
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
+}
+
 // NewCmdConfigSet returns a Command instance for 'config set' sub command
-func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &setOptions{configAccess: configAccess}
+func NewCmdConfigSet(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	flags := NewSetFlags(streams, configAccess)
 
 	cmd := &cobra.Command{
 		Use:                   "set PROPERTY_NAME PROPERTY_VALUE",
@@ -75,67 +82,70 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 		Long:                  setLong,
 		Example:               setExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.complete(cmd))
-			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Property %q set.\n", options.propertyName)
+			options, err := flags.ToOptions(args)
+			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.RunSet())
 		},
 	}
 
-	f := cmd.Flags().VarPF(&options.setRawBytes, "set-raw-bytes", "", "When writing a []byte PROPERTY_VALUE, write the given string directly without base64 decoding.")
-	f.NoOptDefVal = "true"
+	flags.AddFlags(cmd)
+
 	return cmd
 }
 
-func (o setOptions) run() error {
-	err := o.validate()
-	if err != nil {
-		return err
+func NewSetFlags(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *SetFlags {
+	return &SetFlags{
+		configAccess: configAccess,
+		ioStreams:    streams,
+		setRawBytes:  false,
 	}
-
-	config, err := o.configAccess.GetStartingConfig()
-	if err != nil {
-		return err
-	}
-	steps, err := newNavigationSteps(o.propertyName)
-	if err != nil {
-		return err
-	}
-
-	setRawBytes := false
-	if o.setRawBytes.Provided() {
-		setRawBytes = o.setRawBytes.Value()
-	}
-
-	err = modifyConfig(reflect.ValueOf(config), steps, o.propertyValue, false, setRawBytes)
-	if err != nil {
-		return err
-	}
-
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
-		return err
-	}
-
-	return nil
 }
 
-func (o *setOptions) complete(cmd *cobra.Command) error {
-	endingArgs := cmd.Flags().Args()
-	if len(endingArgs) != 2 {
-		return helpErrorf(cmd, "Unexpected args: %v", endingArgs)
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *SetFlags) ToOptions(args []string) (*SetOptions, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("unexpected args: %v", args)
 	}
 
-	o.propertyValue = endingArgs[1]
-	o.propertyName = endingArgs[0]
-	return nil
+	options := &SetOptions{
+		ConfigAccess:  flags.configAccess,
+		PropertyName:  args[0],
+		PropertyValue: args[1],
+		SetRawBytes:   flags.setRawBytes,
+		IOStreams:     flags.ioStreams,
+	}
+
+	return options, nil
 }
 
-func (o setOptions) validate() error {
-	if len(o.propertyValue) == 0 {
-		return errors.New("you cannot use set to unset a property")
+// AddFlags registers flags for a cli
+func (flags *SetFlags) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&flags.setRawBytes, "set-raw-bytes", false, "When writing a []byte PROPERTY_VALUE, write the given string directly without base64 decoding.")
+}
+
+func (o *SetOptions) RunSet() error {
+	config, _, err := loadConfig(o.ConfigAccess)
+	if err != nil {
+		return err
 	}
 
-	if len(o.propertyName) == 0 {
-		return errors.New("you must specify a property")
+	steps, err := newNavigationSteps(o.PropertyName)
+	if err != nil {
+		return err
+	}
+
+	err = modifyConfig(reflect.ValueOf(config), steps, o.PropertyValue, false, o.SetRawBytes)
+	if err != nil {
+		return err
+	}
+
+	if err := clientcmd.ModifyConfig(o.ConfigAccess, *config, false); err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(o.IOStreams.Out, "Property %q set.\n", o.PropertyName)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -232,7 +242,7 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			currFieldTypeYamlName := strings.Split(currYamlTag, ",")[0]
 
 			if currFieldTypeYamlName == currStep.stepValue {
-				thisMapHasNoValue := (currFieldValue.Kind() == reflect.Map && currFieldValue.IsNil())
+				thisMapHasNoValue := currFieldValue.Kind() == reflect.Map && currFieldValue.IsNil()
 
 				if thisMapHasNoValue {
 					newValue := reflect.MakeMap(currFieldValue.Type())
