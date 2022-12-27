@@ -17,476 +17,490 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"os"
+	"os/exec"
 	"reflect"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	cliflag "k8s.io/component-base/cli/flag"
 )
 
-func stringFlagFor(s string) cliflag.StringFlag {
-	var f cliflag.StringFlag
-	f.Set(s)
-	return f
-}
+func TestSetCredentials(t *testing.T) {
+	var tests = []struct {
+		name       string
+		initConfig clientcmdapi.Config
+		args       []string
+		flags      []string
+		expected   string
 
-func TestSetCredentialsOptions(t *testing.T) {
-	tests := []struct {
-		name            string
-		flags           []string
-		wantParseErr    bool
-		wantCompleteErr bool
-		wantValidateErr bool
-
-		wantOptions *setCredentialsOptions
+		expectedConfig *clientcmdapi.Config
 	}{
 		{
-			name: "test1",
-			flags: []string{
-				"me",
-			},
-			wantOptions: &setCredentialsOptions{
-				name: "me",
+			name:       "Set credential name",
+			initConfig: clientcmdapi.Config{},
+			args:       []string{"me"},
+			flags:      []string{},
+			expected:   "User \"me\" set.\n",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": new(clientcmdapi.AuthInfo),
+				},
 			},
 		},
 		{
-			name: "test2",
+			name:       "Set credential token",
+			initConfig: clientcmdapi.Config{},
+			args:       []string{"me"},
 			flags: []string{
-				"me",
 				"--token=foo",
 			},
-			wantOptions: &setCredentialsOptions{
-				name:  "me",
-				token: stringFlagFor("foo"),
+			expected: "User \"me\" set.\n",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Token: "foo",
+					},
+				},
 			},
 		},
 		{
-			name: "test3",
+			name:       "Set credential username and password",
+			initConfig: clientcmdapi.Config{},
+			args:       []string{"me"},
 			flags: []string{
-				"me",
 				"--username=jane",
 				"--password=bar",
 			},
-			wantOptions: &setCredentialsOptions{
-				name:     "me",
-				username: stringFlagFor("jane"),
-				password: stringFlagFor("bar"),
+			expected: "User \"me\" set.\n",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Username: "jane",
+						Password: "bar",
+					},
+				},
 			},
 		},
 		{
-			name: "test4",
-			// Cannot provide both token and basic auth.
-			flags: []string{
-				"me",
-				"--token=foo",
-				"--username=jane",
-				"--password=bar",
-			},
-			wantValidateErr: true,
-		},
-		{
-			name: "test5",
+			name:       "Set credential auth provider and auth provider args",
+			initConfig: clientcmdapi.Config{},
+			args:       []string{"me"},
 			flags: []string{
 				"--auth-provider=oidc",
 				"--auth-provider-arg=client-id=foo",
 				"--auth-provider-arg=client-secret=bar",
-				"me",
 			},
-			wantOptions: &setCredentialsOptions{
-				name:         "me",
-				authProvider: stringFlagFor("oidc"),
-				authProviderArgs: map[string]string{
-					"client-id":     "foo",
-					"client-secret": "bar",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						AuthProvider: &clientcmdapi.AuthProviderConfig{
+							Name: "oidc",
+							Config: map[string]string{
+								"client-id":     "foo",
+								"client-secret": "bar",
+							},
+						},
+					},
 				},
-				authProviderArgsToRemove: []string{},
 			},
 		},
 		{
-			name: "test6",
+			name: "Remove credential auth provider args with oidc",
+			initConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						AuthProvider: &clientcmdapi.AuthProviderConfig{
+							Name: "oidc",
+							Config: map[string]string{
+								"cliend-id":     "foo",
+								"client-secret": "bar",
+							},
+						},
+					},
+				},
+			},
+			args: []string{"me"},
 			flags: []string{
 				"--auth-provider=oidc",
 				"--auth-provider-arg=client-id-",
 				"--auth-provider-arg=client-secret-",
-				"me",
 			},
-			wantOptions: &setCredentialsOptions{
-				name:             "me",
-				authProvider:     stringFlagFor("oidc"),
-				authProviderArgs: map[string]string{},
-				authProviderArgsToRemove: []string{
-					"client-id",
-					"client-secret",
+			expected: "User \"me\" set.\n",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						AuthProvider: &clientcmdapi.AuthProviderConfig{
+							Name:   "oidc",
+							Config: map[string]string{},
+						},
+					},
 				},
 			},
 		},
 		{
-			name: "test7",
+			name: "Remove credential auth provider args without oidc",
+			initConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						AuthProvider: &clientcmdapi.AuthProviderConfig{
+							Name: "oidc",
+							Config: map[string]string{
+								"cliend-id":     "foo",
+								"client-secret": "bar",
+							},
+						},
+					},
+				},
+			},
+			args: []string{"me"},
 			flags: []string{
 				"--auth-provider-arg=client-id-", // auth provider name not required
 				"--auth-provider-arg=client-secret-",
-				"me",
 			},
-			wantOptions: &setCredentialsOptions{
-				name:             "me",
-				authProviderArgs: map[string]string{},
-				authProviderArgsToRemove: []string{
-					"client-id",
-					"client-secret",
+			expected: "User \"me\" set.\n",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						AuthProvider: &clientcmdapi.AuthProviderConfig{
+							Name:   "oidc",
+							Config: map[string]string{},
+						},
+					},
 				},
 			},
 		},
 		{
-			name: "test8",
-			flags: []string{
-				"--auth-provider=oidc",
-				"--auth-provider-arg=client-id", // values must be of form 'key=value' or 'key-'
-				"me",
-			},
-			wantCompleteErr: true,
-		},
-		{
-			name:  "test9",
-			flags: []string{
-				// No name for authinfo provided.
-			},
-			wantCompleteErr: true,
-		},
-		{
-			name: "test10",
+			name:       "Set exec command",
+			initConfig: clientcmdapi.Config{},
+			args:       []string{"me"},
 			flags: []string{
 				"--exec-command=example-client-go-exec-plugin",
-				"me",
 			},
-			wantOptions: &setCredentialsOptions{
-				name:        "me",
-				execCommand: stringFlagFor("example-client-go-exec-plugin"),
+			expected: "User \"me\" set.\n",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command: "example-client-go-exec-plugin",
+						},
+					},
+				},
 			},
 		},
 		{
-			name: "test11",
+			name:       "Set exec command with exec args",
+			initConfig: clientcmdapi.Config{},
+			args:       []string{"me"},
 			flags: []string{
 				"--exec-command=example-client-go-exec-plugin",
 				"--exec-arg=arg1",
 				"--exec-arg=arg2",
-				"me",
 			},
-			wantOptions: &setCredentialsOptions{
-				name:        "me",
-				execCommand: stringFlagFor("example-client-go-exec-plugin"),
-				execArgs:    []string{"arg1", "arg2"},
+			expected: "User \"me\" set.\n",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command: "example-client-go-exec-plugin",
+							Args: []string{
+								"arg1",
+								"arg2",
+							},
+						},
+					},
+				},
 			},
 		},
 		{
-			name: "test12",
+			name: "Set exec command, set exec env vars, and remove exec env vars",
+			initConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "env-remove1",
+									Value: "val1",
+								},
+								{
+									Name:  "env-remove2",
+									Value: "val2",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: []string{"me"},
 			flags: []string{
 				"--exec-command=example-client-go-exec-plugin",
 				"--exec-env=key1=val1",
 				"--exec-env=key2=val2",
 				"--exec-env=env-remove1-",
 				"--exec-env=env-remove2-",
-				"me",
 			},
-			wantOptions: &setCredentialsOptions{
-				name:            "me",
-				execCommand:     stringFlagFor("example-client-go-exec-plugin"),
-				execEnv:         map[string]string{"key1": "val1", "key2": "val2"},
-				execEnvToRemove: []string{"env-remove1", "env-remove2"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			buff := new(bytes.Buffer)
-
-			opts := new(setCredentialsOptions)
-			cmd := newCmdConfigSetCredentials(buff, opts)
-			if err := cmd.ParseFlags(tt.flags); err != nil {
-				if !tt.wantParseErr {
-					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buff)
-				}
-				return
-			}
-			if tt.wantParseErr {
-				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buff)
-				return
-			}
-
-			if err := opts.complete(cmd); err != nil {
-				if !tt.wantCompleteErr {
-					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buff)
-				}
-				return
-			}
-			if tt.wantCompleteErr {
-				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buff)
-				return
-			}
-
-			if err := opts.validate(); err != nil {
-				if !tt.wantValidateErr {
-					t.Errorf("case %s: flags %q: validate failed: %v", tt.name, tt.flags, err)
-				}
-				return
-			}
-
-			if tt.wantValidateErr {
-				t.Errorf("case %s: flags %q: expected validate to fail", tt.name, tt.flags)
-				return
-			}
-
-			if !reflect.DeepEqual(opts, tt.wantOptions) {
-				t.Errorf("case %s: flags %q: mis-matched options,\nwanted=%#v\ngot=   %#v", tt.name, tt.flags, tt.wantOptions, opts)
-			}
-		})
-	}
-}
-
-func TestModifyExistingAuthInfo(t *testing.T) {
-	tests := []struct {
-		name            string
-		flags           []string
-		wantParseErr    bool
-		wantCompleteErr bool
-		wantValidateErr bool
-
-		existingAuthInfo clientcmdapi.AuthInfo
-		wantAuthInfo     clientcmdapi.AuthInfo
-	}{
-		{
-			name: "1. create new exec config",
-			flags: []string{
-				"--exec-command=example-client-go-exec-plugin",
-				"--exec-api-version=client.authentication.k8s.io/v1",
-				"me",
-			},
-			existingAuthInfo: clientcmdapi.AuthInfo{},
-			wantAuthInfo: clientcmdapi.AuthInfo{
-				Exec: &clientcmdapi.ExecConfig{
-					Command:    "example-client-go-exec-plugin",
-					APIVersion: "client.authentication.k8s.io/v1",
+			expected: "User \"me\" set.\n",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command: "example-client-go-exec-plugin",
+							Env: []clientcmdapi.ExecEnvVar{
+								{
+									Name:  "key1",
+									Value: "val1",
+								},
+								{
+									Name:  "key2",
+									Value: "val2",
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		{
-			name: "2. redefine exec args",
+			name: "Update exec args",
+			initConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command:    "example-client-go-exec-plugin",
+							APIVersion: "client.authentication.k8s.io/v1beta1",
+							Args:       []string{"existing-arg1", "existing-arg2"},
+						},
+					},
+				},
+			},
+			args: []string{"me"},
 			flags: []string{
 				"--exec-arg=new-arg1",
 				"--exec-arg=new-arg2",
-				"me",
 			},
-			existingAuthInfo: clientcmdapi.AuthInfo{
-				Exec: &clientcmdapi.ExecConfig{
-					Command:    "example-client-go-exec-plugin",
-					APIVersion: "client.authentication.k8s.io/v1beta1",
-					Args:       []string{"existing-arg1", "existing-arg2"},
-				},
-			},
-			wantAuthInfo: clientcmdapi.AuthInfo{
-				Exec: &clientcmdapi.ExecConfig{
-					Command:    "example-client-go-exec-plugin",
-					APIVersion: "client.authentication.k8s.io/v1beta1",
-					Args:       []string{"new-arg1", "new-arg2"},
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command:    "example-client-go-exec-plugin",
+							APIVersion: "client.authentication.k8s.io/v1beta1",
+							Args:       []string{"new-arg1", "new-arg2"},
+						},
+					},
 				},
 			},
 		},
 		{
-			name: "3. reset exec args",
+			name: "Delete exec args",
+			initConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command:    "example-client-go-exec-plugin",
+							APIVersion: "client.authentication.k8s.io/v1beta1",
+							Args:       []string{"existing-arg1", "existing-arg2"},
+						},
+					},
+				},
+			},
+			args: []string{"me"},
 			flags: []string{
 				"--exec-command=example-client-go-exec-plugin",
-				"me",
 			},
-			existingAuthInfo: clientcmdapi.AuthInfo{
-				Exec: &clientcmdapi.ExecConfig{
-					Command:    "example-client-go-exec-plugin",
-					APIVersion: "client.authentication.k8s.io/v1beta1",
-					Args:       []string{"existing-arg1", "existing-arg2"},
-				},
-			},
-			wantAuthInfo: clientcmdapi.AuthInfo{
-				Exec: &clientcmdapi.ExecConfig{
-					Command:    "example-client-go-exec-plugin",
-					APIVersion: "client.authentication.k8s.io/v1beta1",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command:    "example-client-go-exec-plugin",
+							APIVersion: "client.authentication.k8s.io/v1beta1",
+						},
+					},
 				},
 			},
 		},
 		{
-			name: "4. modify exec env variables",
+			name: "Update existing exec env variables",
+			args: []string{"me"},
 			flags: []string{
 				"--exec-command=example-client-go-exec-plugin",
 				"--exec-env=name1=value1000",
 				"--exec-env=name3=value3",
 				"--exec-env=name2-",
 				"--exec-env=non-existing-",
-				"me",
 			},
-			existingAuthInfo: clientcmdapi.AuthInfo{
-				Exec: &clientcmdapi.ExecConfig{
-					Command:    "existing-command",
-					APIVersion: "client.authentication.k8s.io/v1beta1",
-					Env: []clientcmdapi.ExecEnvVar{
-						{Name: "name1", Value: "value1"},
-						{Name: "name2", Value: "value2"},
+			initConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command:    "existing-command",
+							APIVersion: "client.authentication.k8s.io/v1beta1",
+							Env: []clientcmdapi.ExecEnvVar{
+								{Name: "name1", Value: "value1"},
+								{Name: "name2", Value: "value2"},
+							},
+						},
 					},
 				},
 			},
-			wantAuthInfo: clientcmdapi.AuthInfo{
-				Exec: &clientcmdapi.ExecConfig{
-					Command:    "example-client-go-exec-plugin",
-					APIVersion: "client.authentication.k8s.io/v1beta1",
-					Env: []clientcmdapi.ExecEnvVar{
-						{Name: "name1", Value: "value1000"},
-						{Name: "name3", Value: "value3"},
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						Exec: &clientcmdapi.ExecConfig{
+							Command:    "existing-command",
+							APIVersion: "client.authentication.k8s.io/v1beta1",
+							Env: []clientcmdapi.ExecEnvVar{
+								{Name: "name1", Value: "value1000"},
+								{Name: "name3", Value: "value3"},
+							},
+						},
 					},
 				},
 			},
 		},
 		{
-			name: "5. modify auth provider arguments",
+			name: "Update auth provider arguments",
+			args: []string{"me"},
 			flags: []string{
 				"--auth-provider=new-auth-provider",
 				"--auth-provider-arg=key1=val1000",
 				"--auth-provider-arg=key3=val3",
 				"--auth-provider-arg=key2-",
 				"--auth-provider-arg=non-existing-",
-				"me",
 			},
-			existingAuthInfo: clientcmdapi.AuthInfo{
-				AuthProvider: &clientcmdapi.AuthProviderConfig{
-					Name: "auth-provider",
-					Config: map[string]string{
-						"key1": "val1",
-						"key2": "val2",
+			initConfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						AuthProvider: &clientcmdapi.AuthProviderConfig{
+							Name: "auth-provider",
+							Config: map[string]string{
+								"key1": "val1",
+								"key2": "val2",
+							},
+						},
 					},
 				},
 			},
-			wantAuthInfo: clientcmdapi.AuthInfo{
-				AuthProvider: &clientcmdapi.AuthProviderConfig{
-					Name: "new-auth-provider",
-					Config: map[string]string{
-						"key1": "val1000",
-						"key3": "val3",
+			expectedConfig: &clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"me": {
+						AuthProvider: &clientcmdapi.AuthProviderConfig{
+							Name: "new-auth-provider",
+							Config: map[string]string{
+								"key1": "val1000",
+								"key3": "val3",
+							},
+						},
 					},
 				},
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buff := new(bytes.Buffer)
+			fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			defer removeTempFile(t, fakeKubeFile.Name())
+			err = clientcmd.WriteToFile(tt.initConfig, fakeKubeFile.Name())
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-			opts := new(setCredentialsOptions)
-			cmd := newCmdConfigSetCredentials(buff, opts)
-			if err := cmd.ParseFlags(tt.flags); err != nil {
-				if !tt.wantParseErr {
-					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buff)
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdConfigSetCredentials(streams, pathOptions)
+			cmd.SetArgs(tt.args)
+			if err := cmd.Flags().Parse(tt.flags); err != nil {
+				t.Fatalf("unexpected error parsing flags: %v", err)
+			}
+			err = cmd.Execute()
+			if err != nil {
+				t.Fatalf("unexpected error executing command: %v,kubectl set-context args: %v,flags: %v", err, tt.args, tt.flags)
+			}
+			config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
+			if err != nil {
+				t.Fatalf("unexpected error loading kubeconfig file: %v", err)
+			}
+			if tt.expected != "" {
+				if buf.String() != tt.expected {
+					t.Errorf("Fail in %q:\n expected %v\n but got %v\n", tt.name, tt.expected, buf.String())
 				}
-				return
 			}
-			if tt.wantParseErr {
-				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buff)
-				return
-			}
-
-			if err := opts.complete(cmd); err != nil {
-				if !tt.wantCompleteErr {
-					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buff)
+			if tt.expectedConfig != nil {
+				if reflect.DeepEqual(tt.expectedConfig, config) {
+					t.Errorf("Fail in %q:\n expected %v\n but found %v in kubeconfig\n", tt.name, tt.expectedConfig, config)
 				}
-				return
-			}
-			if tt.wantCompleteErr {
-				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buff)
-				return
-			}
-
-			if err := opts.validate(); err != nil {
-				if !tt.wantValidateErr {
-					t.Errorf("case %s: flags %q: validate failed: %v", tt.name, tt.flags, err)
-				}
-				return
-			}
-
-			if tt.wantValidateErr {
-				t.Errorf("case %s: flags %q: expected validate to fail", tt.name, tt.flags)
-				return
-			}
-
-			modifiedAuthInfo := opts.modifyAuthInfo(tt.existingAuthInfo)
-
-			if !reflect.DeepEqual(modifiedAuthInfo, tt.wantAuthInfo) {
-				t.Errorf("case %s: flags %q: mis-matched auth info,\nwanted=%#v\ngot=   %#v", tt.name, tt.flags, tt.wantAuthInfo, modifiedAuthInfo)
 			}
 		})
 	}
 }
 
-type setCredentialsTest struct {
-	description    string
-	config         clientcmdapi.Config
-	args           []string
-	flags          []string
-	expected       string
-	expectedConfig clientcmdapi.Config
-}
+func TestSetCredentialsErrors(t *testing.T) {
+	var tests = []struct {
+		name        string
+		initConfig  clientcmdapi.Config
+		args        []string
+		flags       []string
+		expected    string
+		expectedErr bool
 
-func TestSetCredentials(t *testing.T) {
-	conf := clientcmdapi.Config{}
-	test := setCredentialsTest{
-		description: "Testing set credentials",
-		config:      conf,
-		args:        []string{"cluster-admin"},
-		flags: []string{
-			"--username=admin",
-			"--password=uXFGweU9l35qcif",
+		expectedConfig *clientcmdapi.Config
+	}{
+		{
+			name:       "Error: Malformed auth provider arg",
+			initConfig: clientcmdapi.Config{},
+			args:       []string{"me"},
+			flags: []string{
+				"--auth-provider=oidc",
+				"--auth-provider-arg=client-id", // values must be of form 'key=value' or 'key-'
+			},
+			expected:    "",
+			expectedErr: true,
 		},
-		expected: `User "cluster-admin" set.` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			AuthInfos: map[string]*clientcmdapi.AuthInfo{
-				"cluster-admin": {Username: "admin", Password: "uXFGweU9l35qcif"}},
+		{
+			name:        "Error: No name provided",
+			initConfig:  clientcmdapi.Config{},
+			args:        []string{},
+			flags:       []string{},
+			expected:    "",
+			expectedErr: true,
 		},
 	}
-	test.run(t)
-}
-func (test setCredentialsTest) run(t *testing.T) {
-	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer os.Remove(fakeKubeFile.Name())
-	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(tt.initConfig)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = fakeKubeFile.Name()
-	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigSetCredentials(buf, pathOptions)
-	cmd.SetArgs(test.args)
-	cmd.Flags().Parse(test.flags)
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v,kubectl config set-credentials  args: %v,flags: %v", err, test.args, test.flags)
-	}
-	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
-	}
-	if len(test.expected) != 0 {
-		if buf.String() != test.expected {
-			t.Errorf("Fail in %q:\n expected %v\n but got %v\n", test.description, test.expected, buf.String())
-		}
-	}
-	if test.expectedConfig.AuthInfos != nil {
-		expectAuthInfo := test.expectedConfig.AuthInfos[test.args[0]]
-		actualAuthInfo := config.AuthInfos[test.args[0]]
-		if expectAuthInfo.Username != actualAuthInfo.Username || expectAuthInfo.Password != actualAuthInfo.Password {
-			t.Errorf("Fail in %q:\n expected AuthInfo%v\n but found %v in kubeconfig\n", test.description, expectAuthInfo, actualAuthInfo)
-		}
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
+			streams, _, _, _ := genericclioptions.NewTestIOStreams()
+
+			cmdSetCredentials := NewCmdConfigSetCredentials(streams, pathOptions)
+			cmdSetCredentials.SetArgs(tt.args)
+			if err := cmdSetCredentials.Flags().Parse(tt.flags); err != nil {
+				t.Fatalf("unexpected error parsing flags: %v", err)
+			}
+
+			// Disable exit codes causing testing errors when we expect them
+			if os.Getenv("CRASH") == "1" {
+				cmdSetCredentials.Execute()
+				return
+			}
+			cmd := exec.Command(os.Args[0], "-test.run=^TestSetCredentialsErrors$")
+			cmd.Env = append(os.Environ(), "CRASH=1")
+			err = cmd.Run()
+			if execErr, ok := err.(*exec.ExitError); ok && !execErr.Success() {
+				return
+			}
+			t.Fatalf("expected an error but found none")
+		})
 	}
 }
