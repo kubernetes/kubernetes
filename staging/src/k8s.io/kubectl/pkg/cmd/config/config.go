@@ -88,12 +88,6 @@ func toBool(propertyValue string) (bool, error) {
 	return boolValue, nil
 }
 
-func helpErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
-	cmd.Help()
-	msg := fmt.Sprintf(format, args...)
-	return fmt.Errorf("%s", msg)
-}
-
 func loadConfig(configAccess clientcmd.ConfigAccess) (*clientcmdapi.Config, string, error) {
 	config, err := configAccess.GetStartingConfig()
 	if err != nil {
