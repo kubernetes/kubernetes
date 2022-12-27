@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -91,4 +92,18 @@ func helpErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	cmd.Help()
 	msg := fmt.Sprintf(format, args...)
 	return fmt.Errorf("%s", msg)
+}
+
+func loadConfig(configAccess clientcmd.ConfigAccess) (*clientcmdapi.Config, string, error) {
+	config, err := configAccess.GetStartingConfig()
+	if err != nil {
+		return nil, "", err
+	}
+
+	configFile := configAccess.GetDefaultFilename()
+	if configAccess.IsExplicitFile() {
+		configFile = configAccess.GetExplicitFile()
+	}
+
+	return config, configFile, nil
 }
