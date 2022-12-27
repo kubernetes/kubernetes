@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
 	"path"
 	"strconv"
 
@@ -55,22 +54,21 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, streams genericclioptions.
 	// file paths are common to all sub commands
 	cmd.PersistentFlags().StringVar(&pathOptions.LoadingRules.ExplicitPath, pathOptions.ExplicitFileFlag, pathOptions.LoadingRules.ExplicitPath, "use a particular kubeconfig file")
 
-	// TODO(juanvallejo): update all subcommands to work with genericclioptions.IOStreams
 	cmd.AddCommand(NewCmdConfigView(streams, pathOptions))
-	cmd.AddCommand(NewCmdConfigSetCluster(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigSetCredentials(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigSetContext(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigSet(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigUnset(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigCurrentContext(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigUseContext(streams.Out, pathOptions))
+	cmd.AddCommand(NewCmdConfigSetCluster(streams, pathOptions))
+	cmd.AddCommand(NewCmdConfigSetCredentials(streams, pathOptions))
+	cmd.AddCommand(NewCmdConfigSetContext(streams, pathOptions))
+	cmd.AddCommand(NewCmdConfigSet(streams, pathOptions))
+	cmd.AddCommand(NewCmdConfigUnset(streams, pathOptions))
+	cmd.AddCommand(NewCmdConfigCurrentContext(streams, pathOptions))
+	cmd.AddCommand(NewCmdConfigUseContext(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigGetContexts(streams, pathOptions))
-	cmd.AddCommand(NewCmdConfigGetClusters(streams.Out, pathOptions))
+	cmd.AddCommand(NewCmdConfigGetClusters(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigGetUsers(streams, pathOptions))
-	cmd.AddCommand(NewCmdConfigDeleteCluster(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigDeleteContext(streams.Out, streams.ErrOut, pathOptions))
+	cmd.AddCommand(NewCmdConfigDeleteCluster(streams, pathOptions))
+	cmd.AddCommand(NewCmdConfigDeleteContext(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigDeleteUser(streams, pathOptions))
-	cmd.AddCommand(NewCmdConfigRenameContext(streams.Out, pathOptions))
+	cmd.AddCommand(NewCmdConfigRenameContext(streams, pathOptions))
 
 	return cmd
 }
