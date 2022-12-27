@@ -179,7 +179,7 @@ func testGenMdFile(ctx context.Context, tcase *testCase) (string, string, error)
 }
 
 // Sets up the test directory as per the testCase and returns
-// either error or the test dir path
+// either error or the mdFile having the test scenario
 func testSetup(ctx context.Context, tcase *testCase) (string, string, error) {
 	var genMdFile, genMutatedMdFile string
 	logger := klog.FromContext(ctx)
