@@ -18,9 +18,10 @@ package config
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -34,8 +35,16 @@ var (
 		kubectl config delete-context minikube`)
 )
 
+// DeleteContextOptions holds the data needed to run the command
+type DeleteContextOptions struct {
+	Context string
+
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
+}
+
 // NewCmdConfigDeleteContext returns a Command instance for 'config delete-context' sub command
-func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigDeleteContext(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "delete-context NAME",
 		DisableFlagsInUseLine: true,
@@ -44,47 +53,56 @@ func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.Con
 		Example:               deleteContextExample,
 		ValidArgsFunction:     completion.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runDeleteContext(out, errOut, configAccess, cmd))
+			options := NewDeleteContextOptions(streams, configAccess)
+			cmdutil.CheckErr(options.Complete(args))
+			cmdutil.CheckErr(options.RunDeleteContext())
 		},
 	}
 
 	return cmd
 }
 
-func runDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess, cmd *cobra.Command) error {
-	config, err := configAccess.GetStartingConfig()
+// NewDeleteContextOptions creates the options for the command
+func NewDeleteContextOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *DeleteContextOptions {
+	return &DeleteContextOptions{
+		ConfigAccess: configAccess,
+		IOStreams:    ioStreams,
+	}
+}
+
+func (o *DeleteContextOptions) Complete(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("unexpected args: %v", args)
+	}
+	o.Context = args[0]
+	return nil
+}
+
+func (o *DeleteContextOptions) RunDeleteContext() error {
+	config, configFile, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
 
-	args := cmd.Flags().Args()
-	if len(args) != 1 {
-		cmd.Help()
-		return nil
+	if _, ok := config.Contexts[o.Context]; !ok {
+		return fmt.Errorf("context \"%s\" does not exist in config file %s", o.Context, configFile)
 	}
 
-	configFile := configAccess.GetDefaultFilename()
-	if configAccess.IsExplicitFile() {
-		configFile = configAccess.GetExplicitFile()
+	if config.CurrentContext == o.Context {
+		if _, err := fmt.Fprint(o.IOStreams.Out, "warning: this removed your active context, use \"kubectl config use-context\" to select a different one\n"); err != nil {
+			return err
+		}
 	}
 
-	name := args[0]
-	_, ok := config.Contexts[name]
-	if !ok {
-		return fmt.Errorf("cannot delete context %s, not in %s", name, configFile)
-	}
+	delete(config.Contexts, o.Context)
 
-	if config.CurrentContext == name {
-		fmt.Fprint(errOut, "warning: this removed your active context, use \"kubectl config use-context\" to select a different one\n")
-	}
-
-	delete(config.Contexts, name)
-
-	if err := clientcmd.ModifyConfig(configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.ConfigAccess, *config, true); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "deleted context %s from %s\n", name, configFile)
+	if _, err := fmt.Fprintf(o.IOStreams.Out, "deleted context \"%s\" from %s\n", o.Context, configFile); err != nil {
+		return err
+	}
 
 	return nil
 }
