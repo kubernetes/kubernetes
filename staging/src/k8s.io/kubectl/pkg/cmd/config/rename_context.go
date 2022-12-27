@@ -19,23 +19,16 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
-
-// RenameContextOptions contains the options for running the rename-context cli command.
-type RenameContextOptions struct {
-	configAccess clientcmd.ConfigAccess
-	contextName  string
-	newName      string
-}
 
 const (
 	renameContextUse = "rename-context CONTEXT_NAME NEW_NAME"
@@ -58,10 +51,17 @@ var (
 		kubectl config rename-context old-name new-name`)
 )
 
-// NewCmdConfigRenameContext creates a command object for the "rename-context" action
-func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &RenameContextOptions{configAccess: configAccess}
+// RenameContextOptions contains the options for running the rename-context cli command.
+type RenameContextOptions struct {
+	ContextName string
+	NewName     string
 
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
+}
+
+// NewCmdConfigRenameContext creates a command object for the "rename-context" action
+func NewCmdConfigRenameContext(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   renameContextUse,
 		DisableFlagsInUseLine: true,
@@ -70,66 +70,72 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 		Example:               renameContextExample,
 		ValidArgsFunction:     completion.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args, out))
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.RunRenameContext(out))
+			options := NewRenameContextOptions(streams, configAccess)
+			cmdutil.CheckErr(options.Complete(args))
+			cmdutil.CheckErr(options.RunRenameContext())
 		},
 	}
+
 	return cmd
 }
 
-// Complete assigns RenameContextOptions from the args.
-func (o *RenameContextOptions) Complete(cmd *cobra.Command, args []string, out io.Writer) error {
-	if len(args) != 2 {
-		return helpErrorf(cmd, "Unexpected args: %v", args)
+// NewRenameContextOptions creates the options for the command
+func NewRenameContextOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *RenameContextOptions {
+	return &RenameContextOptions{
+		ConfigAccess: configAccess,
+		IOStreams:    ioStreams,
 	}
-
-	o.contextName = args[0]
-	o.newName = args[1]
-	return nil
 }
 
-// Validate makes sure that provided values for command-line options are valid
-func (o RenameContextOptions) Validate() error {
-	if len(o.newName) == 0 {
-		return errors.New("You must specify a new non-empty context name")
+// Complete assigns RenameContextOptions from the args.
+func (o *RenameContextOptions) Complete(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("unexpected args: %v", args)
 	}
+
+	o.ContextName = args[0]
+	o.NewName = args[1]
+
+	if len(o.ContextName) == 0 {
+		return errors.New("you must specify an original non-empty context name")
+	}
+	if len(o.NewName) == 0 {
+		return errors.New("you must specify a new non-empty context name")
+	}
+
 	return nil
 }
 
 // RunRenameContext performs the execution for 'config rename-context' sub command
-func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
-	config, err := o.configAccess.GetStartingConfig()
+func (o *RenameContextOptions) RunRenameContext() error {
+	config, configFile, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
 
-	configFile := o.configAccess.GetDefaultFilename()
-	if o.configAccess.IsExplicitFile() {
-		configFile = o.configAccess.GetExplicitFile()
-	}
-
-	context, exists := config.Contexts[o.contextName]
+	context, exists := config.Contexts[o.ContextName]
 	if !exists {
-		return fmt.Errorf("cannot rename the context %q, it's not in %s", o.contextName, configFile)
+		return fmt.Errorf("cannot rename the context %q, it's not in %s", o.ContextName, configFile)
 	}
 
-	_, newExists := config.Contexts[o.newName]
+	_, newExists := config.Contexts[o.NewName]
 	if newExists {
-		return fmt.Errorf("cannot rename the context %q, the context %q already exists in %s", o.contextName, o.newName, configFile)
+		return fmt.Errorf("cannot rename the context %q, the context %q already exists in %s", o.ContextName, o.NewName, configFile)
 	}
 
-	config.Contexts[o.newName] = context
-	delete(config.Contexts, o.contextName)
+	config.Contexts[o.NewName] = context
+	delete(config.Contexts, o.ContextName)
 
-	if config.CurrentContext == o.contextName {
-		config.CurrentContext = o.newName
+	if config.CurrentContext == o.ContextName {
+		config.CurrentContext = o.NewName
 	}
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.ConfigAccess, *config, true); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "Context %q renamed to %q.\n", o.contextName, o.newName)
+	if _, err := fmt.Fprintf(o.IOStreams.Out, "Context %q renamed to %q\n", o.ContextName, o.NewName); err != nil {
+		return err
+	}
 	return nil
 }

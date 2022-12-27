@@ -17,139 +17,140 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
-	"fmt"
-	"os"
-	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-const (
-	currentContext            = "current-context"
-	newContext                = "new-context"
-	nonexistentCurrentContext = "nonexistent-current-context"
-	existentNewContext        = "existent-new-context"
-)
-
-var (
-	contextData = clientcmdapi.NewContext()
-)
-
 type renameContextTest struct {
-	description    string
-	initialConfig  clientcmdapi.Config // initial config
-	expectedConfig clientcmdapi.Config // expected config
-	args           []string            // kubectl rename-context args
-	expectedOut    string              // expected out message
-	expectedErr    string              // expected error message
+	name           string
+	startingConfig *clientcmdapi.Config
+	args           []string
+	expectedConfig *clientcmdapi.Config
+	expectedOut    string
+	completeError  string
+	runError       string
 }
 
 func TestRenameContext(t *testing.T) {
-	initialConfig := clientcmdapi.Config{
-		CurrentContext: currentContext,
-		Contexts:       map[string]*clientcmdapi.Context{currentContext: contextData}}
-
-	expectedConfig := clientcmdapi.Config{
-		CurrentContext: newContext,
-		Contexts:       map[string]*clientcmdapi.Context{newContext: contextData}}
-
-	test := renameContextTest{
-		description:    "Testing for kubectl config rename-context whose context to be renamed is the CurrentContext",
-		initialConfig:  initialConfig,
-		expectedConfig: expectedConfig,
-		args:           []string{currentContext, newContext},
-		expectedOut:    fmt.Sprintf("Context %q renamed to %q.\n", currentContext, newContext),
-		expectedErr:    "",
-	}
-	test.run(t)
-}
-
-func TestRenameNonexistentContext(t *testing.T) {
-	initialConfig := clientcmdapi.Config{
-		CurrentContext: currentContext,
-		Contexts:       map[string]*clientcmdapi.Context{currentContext: contextData}}
-
-	test := renameContextTest{
-		description:    "Testing for kubectl config rename-context whose context to be renamed no exists",
-		initialConfig:  initialConfig,
-		expectedConfig: initialConfig,
-		args:           []string{nonexistentCurrentContext, newContext},
-		expectedOut:    "",
-		expectedErr:    fmt.Sprintf("cannot rename the context %q, it's not in", nonexistentCurrentContext),
-	}
-	test.run(t)
-}
-
-func TestRenameToAlreadyExistingContext(t *testing.T) {
-	initialConfig := clientcmdapi.Config{
-		CurrentContext: currentContext,
-		Contexts: map[string]*clientcmdapi.Context{
-			currentContext:     contextData,
-			existentNewContext: contextData}}
-
-	test := renameContextTest{
-		description:    "Testing for kubectl config rename-context whose the new name is already in another context.",
-		initialConfig:  initialConfig,
-		expectedConfig: initialConfig,
-		args:           []string{currentContext, existentNewContext},
-		expectedOut:    "",
-		expectedErr:    fmt.Sprintf("cannot rename the context %q, the context %q already exists", currentContext, existentNewContext),
-	}
-	test.run(t)
-}
-
-func (test renameContextTest) run(t *testing.T) {
-	fakeKubeFile, _ := os.CreateTemp(os.TempDir(), "")
-	defer os.Remove(fakeKubeFile.Name())
-	err := clientcmd.WriteToFile(test.initialConfig, fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	t.Parallel()
+	startingConfigSingleContext := clientcmdapi.NewConfig()
+	startingConfigSingleContext.CurrentContext = "current-context"
+	startingConfigSingleContext.Contexts = map[string]*clientcmdapi.Context{
+		"current-context": clientcmdapi.NewContext(),
 	}
 
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = fakeKubeFile.Name()
-	pathOptions.EnvVar = ""
-	options := RenameContextOptions{
-		configAccess: pathOptions,
-		contextName:  test.args[0],
-		newName:      test.args[1],
+	startingConfigMultipleContext := clientcmdapi.NewConfig()
+	startingConfigMultipleContext.CurrentContext = "current-context"
+	startingConfigMultipleContext.Contexts = map[string]*clientcmdapi.Context{
+		"current-context":      clientcmdapi.NewContext(),
+		"existent-new-context": clientcmdapi.NewContext(),
 	}
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigRenameContext(buf, options.configAccess)
 
-	options.Complete(cmd, test.args, buf)
-	options.Validate()
-	err = options.RunRenameContext(buf)
+	resultConfig := clientcmdapi.NewConfig()
+	resultConfig.CurrentContext = "new-context"
+	resultConfig.Contexts = map[string]*clientcmdapi.Context{
+		"new-context": clientcmdapi.NewContext(),
+	}
 
-	if len(test.expectedErr) != 0 {
-		if err == nil {
-			t.Errorf("Did not get %v", test.expectedErr)
-		} else {
-			if !strings.Contains(err.Error(), test.expectedErr) {
-				t.Errorf("Expected error %v, but got %v", test.expectedErr, err)
+	for _, test := range []renameContextTest{
+		{
+			name:           "RenameCurrentContext",
+			args:           []string{"current-context", "new-context"},
+			startingConfig: startingConfigSingleContext,
+			expectedConfig: resultConfig,
+			expectedOut:    "Context \"current-context\" renamed to \"new-context\"",
+		}, {
+			name:           "ErrorRenameNonexistentContext",
+			args:           []string{"fake-context", "new-context"},
+			startingConfig: startingConfigSingleContext,
+			expectedConfig: startingConfigSingleContext,
+			runError:       "cannot rename the context \"fake-context\", it's not in",
+		}, {
+			name:           "ErrorRenameToExistingContext",
+			args:           []string{"current-context", "existent-new-context"},
+			startingConfig: startingConfigMultipleContext,
+			expectedConfig: startingConfigMultipleContext,
+			runError:       "cannot rename the context \"current-context\", the context \"existent-new-context\" already exists",
+		}, {
+			name:           "ErrorZeroArgs",
+			args:           []string{},
+			startingConfig: startingConfigSingleContext,
+			expectedConfig: startingConfigSingleContext,
+			completeError:  "unexpected args:",
+		}, {
+			name:           "ErrorOneArg",
+			args:           []string{"current-context"},
+			startingConfig: startingConfigSingleContext,
+			expectedConfig: startingConfigSingleContext,
+			completeError:  "unexpected args: [current-context]",
+		}, {
+			name:           "ErrorThreeArg",
+			args:           []string{"current-context", "existing-context", "fake-context"},
+			startingConfig: startingConfigSingleContext,
+			expectedConfig: startingConfigSingleContext,
+			completeError:  "unexpected args: [current-context existing-context fake-context]",
+		}, {
+			name:           "ErrorEmptyExistingName",
+			args:           []string{"", "fake-context"},
+			startingConfig: startingConfigSingleContext,
+			expectedConfig: startingConfigSingleContext,
+			completeError:  "you must specify an original non-empty context name",
+		}, {
+			name:           "ErrorEmptyNewName",
+			args:           []string{"fake-context", ""},
+			startingConfig: startingConfigSingleContext,
+			expectedConfig: startingConfigSingleContext,
+			completeError:  "you must specify a new non-empty context name",
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(*test.startingConfig)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
-		}
-		return
-	}
 
-	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
-	}
+			defer removeTempFile(t, fakeKubeFile.Name())
 
-	_, oldExists := config.Contexts[currentContext]
-	_, newExists := config.Contexts[newContext]
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
 
-	if (!newExists) || (oldExists) || (config.CurrentContext != newContext) {
-		t.Errorf("Failed in: %q\n expected %v\n but got %v", test.description, test.expectedConfig, *config)
-	}
+			streams, _, buffOut, _ := genericclioptions.NewTestIOStreams()
 
-	if len(test.expectedOut) != 0 {
-		if buf.String() != test.expectedOut {
-			t.Errorf("Failed in:%q\n expected out %v\n but got %v", test.description, test.expectedOut, buf.String())
-		}
+			options := NewRenameContextOptions(streams, pathOptions)
+
+			err = options.Complete(test.args)
+			if len(test.completeError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.completeError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+				return
+			} else if len(test.completeError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.completeError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
+			}
+
+			err = options.RunRenameContext()
+			if len(test.runError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.runError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+				return
+			} else if len(test.runError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.runError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
+			}
+
+			if len(test.expectedOut) != 0 {
+				checkOutputResults(t, buffOut.String(), test.expectedOut)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+			}
+		})
 	}
 }
