@@ -18,7 +18,10 @@ package config
 
 import (
 	"errors"
+	"fmt"
+
 	"github.com/spf13/cobra"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/tools/clientcmd"
@@ -30,23 +33,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
-
-// ViewOptions holds the command-line options for 'config view' sub command
-type ViewOptions struct {
-	PrintFlags  *genericclioptions.PrintFlags
-	PrintObject printers.ResourcePrinterFunc
-
-	ConfigAccess clientcmd.ConfigAccess
-	Merge        cliflag.Tristate
-	Flatten      bool
-	Minify       bool
-	RawByteData  bool
-
-	Context      string
-	OutputFormat string
-
-	genericclioptions.IOStreams
-}
 
 var (
 	viewLong = templates.LongDesc(i18n.T(`
@@ -65,14 +51,36 @@ var (
 		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
 )
 
-// NewCmdConfigView returns a Command instance for 'config view' sub command
-func NewCmdConfigView(streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
-	o := &ViewOptions{
-		PrintFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
-		ConfigAccess: ConfigAccess,
+type ViewFlags struct {
+	context      cliflag.StringFlag
+	flatten      bool
+	merge        bool
+	minify       bool
+	outputFormat cliflag.StringFlag
+	printFlags   *genericclioptions.PrintFlags
+	rawByteData  bool
 
-		IOStreams: streams,
-	}
+	configAccess clientcmd.ConfigAccess
+	ioStreams    genericclioptions.IOStreams
+}
+
+// ViewOptions holds the command-line options for 'config view' sub command
+type ViewOptions struct {
+	Context      cliflag.StringFlag
+	Flatten      bool
+	Merge        bool
+	Minify       bool
+	OutputFormat cliflag.StringFlag
+	PrintObject  printers.ResourcePrinterFunc
+	RawByteData  bool
+
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
+}
+
+// NewCmdConfigView returns a Command instance for 'config view' sub command
+func NewCmdConfigView(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	flags := NewViewFlags(streams, configAccess)
 
 	cmd := &cobra.Command{
 		Use:     "view",
@@ -80,63 +88,87 @@ func NewCmdConfigView(streams genericclioptions.IOStreams, ConfigAccess clientcm
 		Long:    viewLong,
 		Example: viewExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(cmd, args))
-			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run())
+			options, err := flags.ToOptions(args)
+			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.RunView())
 		},
 	}
 
-	o.PrintFlags.AddFlags(cmd)
+	flags.AddFlags(cmd)
 
-	o.Merge.Default(true)
-	mergeFlag := cmd.Flags().VarPF(&o.Merge, "merge", "", "Merge the full hierarchy of kubeconfig files")
-	mergeFlag.NoOptDefVal = "true"
-	cmd.Flags().BoolVar(&o.RawByteData, "raw", o.RawByteData, "Display raw byte data and sensitive data")
-	cmd.Flags().BoolVar(&o.Flatten, "flatten", o.Flatten, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
-	cmd.Flags().BoolVar(&o.Minify, "minify", o.Minify, "Remove all information not used by current-context from the output")
 	return cmd
 }
 
-// Complete completes the required command-line options
-func (o *ViewOptions) Complete(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
+func NewViewFlags(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *ViewFlags {
+	return &ViewFlags{
+		printFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
+		configAccess: configAccess,
+		ioStreams:    streams,
+		merge:        true,
+		flatten:      false,
+		minify:       false,
+		rawByteData:  false,
+		context:      cliflag.StringFlag{},
+		outputFormat: cliflag.StringFlag{},
 	}
-	if o.ConfigAccess.IsExplicitFile() {
-		if !o.Merge.Provided() {
-			o.Merge.Set("false")
+}
+
+// AddFlags registers flags for a cli
+func (flags *ViewFlags) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().Var(&flags.context, "context", "Specify context to display")
+	cmd.Flags().BoolVar(&flags.flatten, "flatten", false, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
+	cmd.Flags().BoolVar(&flags.merge, "merge", true, "Merge the full hierarchy of kubeconfig files")
+	cmd.Flags().BoolVar(&flags.minify, "minify", false, "Remove all information not used by current-context from the output")
+	flags.printFlags.AddFlags(cmd)
+	cmd.Flags().BoolVar(&flags.rawByteData, "raw", false, "Display raw byte data")
+}
+
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *ViewFlags) ToOptions(args []string) (*ViewOptions, error) {
+	if len(args) != 0 {
+		return nil, fmt.Errorf("received unepxected argument: %v", args)
+	}
+
+	printer, err := flags.printFlags.ToPrinter()
+	if err != nil {
+		return nil, err
+	}
+
+	if flags.configAccess.IsExplicitFile() {
+		if !flags.merge {
+			flags.merge = false
 		}
 	}
 
-	printer, err := o.PrintFlags.ToPrinter()
-	if err != nil {
-		return err
-	}
-	o.PrintObject = printer.PrintObj
-	o.Context = cmdutil.GetFlagString(cmd, "context")
-
-	return nil
-}
-
-// Validate makes sure that provided values for command-line options are valid
-func (o ViewOptions) Validate() error {
-	if !o.Merge.Value() && !o.ConfigAccess.IsExplicitFile() {
-		return errors.New("if merge==false a precise file must be specified")
+	if !flags.merge && !flags.configAccess.IsExplicitFile() {
+		return nil, errors.New("if merge==false a precise file must be specified")
 	}
 
-	return nil
+	options := &ViewOptions{
+		ConfigAccess: flags.configAccess,
+		Context:      flags.context,
+		Flatten:      flags.flatten,
+		IOStreams:    flags.ioStreams,
+		Merge:        flags.merge,
+		Minify:       flags.minify,
+		PrintObject:  printer.PrintObj,
+		OutputFormat: flags.outputFormat,
+		RawByteData:  flags.rawByteData,
+	}
+
+	return options, nil
 }
 
-// Run performs the execution of 'config view' sub command
-func (o ViewOptions) Run() error {
-	config, err := o.loadConfig()
+// RunView performs the execution of 'config view' sub command
+func (o *ViewOptions) RunView() error {
+	config, _, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
 
 	if o.Minify {
-		if len(o.Context) > 0 {
-			config.CurrentContext = o.Context
+		if o.Context.Provided() {
+			config.CurrentContext = o.Context.Value()
 		}
 		if err := clientcmdapi.MinifyConfig(config); err != nil {
 			return err
@@ -159,23 +191,13 @@ func (o ViewOptions) Run() error {
 		return err
 	}
 
-	return o.PrintObject(convertedObj, o.Out)
-}
-
-func (o ViewOptions) loadConfig() (*clientcmdapi.Config, error) {
-	err := o.Validate()
-	if err != nil {
-		return nil, err
-	}
-
-	config, err := o.getStartingConfig()
-	return config, err
+	return o.PrintObject(convertedObj, o.IOStreams.Out)
 }
 
 // getStartingConfig returns the Config object built from the sources specified by the options, the filename read (only if it was a single file), and an error if something goes wrong
 func (o *ViewOptions) getStartingConfig() (*clientcmdapi.Config, error) {
 	switch {
-	case !o.Merge.Value():
+	case !o.Merge:
 		return clientcmd.LoadFromFile(o.ConfigAccess.GetExplicitFile())
 
 	default:
