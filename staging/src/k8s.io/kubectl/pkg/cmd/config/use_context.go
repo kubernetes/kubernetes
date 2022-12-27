@@ -17,14 +17,12 @@ limitations under the License.
 package config
 
 import (
-	"errors"
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -37,15 +35,15 @@ var (
 		kubectl config use-context minikube`)
 )
 
-type useContextOptions struct {
-	configAccess clientcmd.ConfigAccess
-	contextName  string
+type UseContextOptions struct {
+	ContextName string
+
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
 }
 
 // NewCmdConfigUseContext returns a Command instance for 'config use-context' sub command
-func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &useContextOptions{configAccess: configAccess}
-
+func NewCmdConfigUseContext(streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "use-context CONTEXT_NAME",
 		DisableFlagsInUseLine: true,
@@ -55,51 +53,60 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 		Example:               useContextExample,
 		ValidArgsFunction:     completion.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.complete(cmd))
-			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Switched to context %q.\n", options.contextName)
+			options := NewUseContextOptions(streams, ConfigAccess)
+			cmdutil.CheckErr(options.Complete(args))
+			cmdutil.CheckErr(options.Validate())
+			cmdutil.CheckErr(options.RunUseContext())
 		},
 	}
 
 	return cmd
 }
 
-func (o useContextOptions) run() error {
-	config, err := o.configAccess.GetStartingConfig()
-	if err != nil {
-		return err
+// NewUseContextOptions creates the options for the command
+func NewUseContextOptions(IOStreams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *UseContextOptions {
+	return &UseContextOptions{
+		ConfigAccess: ConfigAccess,
+		IOStreams:    IOStreams,
 	}
-
-	err = o.validate(config)
-	if err != nil {
-		return err
-	}
-
-	config.CurrentContext = o.contextName
-
-	return clientcmd.ModifyConfig(o.configAccess, *config, true)
 }
 
-func (o *useContextOptions) complete(cmd *cobra.Command) error {
-	endingArgs := cmd.Flags().Args()
-	if len(endingArgs) != 1 {
-		return helpErrorf(cmd, "Unexpected args: %v", endingArgs)
+func (o *UseContextOptions) Complete(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("unexpected args: %v", args)
 	}
 
-	o.contextName = endingArgs[0]
+	o.ContextName = args[0]
+
 	return nil
 }
 
-func (o useContextOptions) validate(config *clientcmdapi.Config) error {
-	if len(o.contextName) == 0 {
-		return errors.New("empty context names are not allowed")
+func (o *UseContextOptions) Validate() error {
+	if len(o.ContextName) == 0 {
+		return fmt.Errorf("empty context names are not allowed")
+	}
+	return nil
+}
+
+func (o *UseContextOptions) RunUseContext() error {
+	config, _, err := loadConfig(o.ConfigAccess)
+	if err != nil {
+		return err
 	}
 
-	for name := range config.Contexts {
-		if name == o.contextName {
-			return nil
-		}
+	if _, exists := config.Contexts[o.ContextName]; !exists {
+		return fmt.Errorf("can not set current-context to %q, context does not exist", o.ContextName)
 	}
 
-	return fmt.Errorf("no context exists with the name: %q", o.contextName)
+	config.CurrentContext = o.ContextName
+
+	if err := clientcmd.ModifyConfig(o.ConfigAccess, *config, true); err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(o.IOStreams.Out, "Switched to context %q.\n", o.ContextName); err != nil {
+		cmdutil.CheckErr(err)
+	}
+
+	return nil
 }

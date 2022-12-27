@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,87 +17,124 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
-	"os"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type useContextTest struct {
-	description    string
-	config         clientcmdapi.Config //initiate kubectl config
-	args           []string            //kubectl config use-context args
-	expected       string              //expect out
-	expectedConfig clientcmdapi.Config //expect kubectl config
+	name           string
+	startingConfig *clientcmdapi.Config
+	args           []string
+	expectedConfig *clientcmdapi.Config
+	expectedOut    string
+	completeError  string
+	runError       string
 }
 
 func TestUseContext(t *testing.T) {
-	conf := clientcmdapi.Config{
-		Kind:       "Config",
-		APIVersion: "v1",
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"minikube":   {Server: "https://192.168.99.100:8443"},
-			"my-cluster": {Server: "https://192.168.0.1:3434"},
-		},
-		Contexts: map[string]*clientcmdapi.Context{
-			"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
-			"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
-		},
-		CurrentContext: "minikube",
-	}
-	test := useContextTest{
-		description: "Testing for kubectl config use-context",
-		config:      conf,
-		args:        []string{"my-cluster"},
-		expected:    `Switched to context "my-cluster".` + "\n",
-		expectedConfig: clientcmdapi.Config{
-			Kind:       "Config",
-			APIVersion: "v1",
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"minikube":   {Server: "https://192.168.99.100:8443"},
-				"my-cluster": {Server: "https://192.168.0.1:3434"},
-			},
-			Contexts: map[string]*clientcmdapi.Context{
-				"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
-				"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
-			},
-			CurrentContext: "my-cluster",
-		},
-	}
-	test.run(t)
-}
+	t.Parallel()
 
-func (test useContextTest) run(t *testing.T) {
-	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	startConfig := clientcmdapi.NewConfig()
+	startConfig.CurrentContext = "otherkube"
+	testContext1 := clientcmdapi.NewContext()
+	testContext1.AuthInfo = "mu-cluster"
+	testContext1.Cluster = "my-cluster"
+	testContext2 := clientcmdapi.NewContext()
+	testContext2.AuthInfo = "mu-cluster"
+	testContext2.Cluster = "my-cluster"
+	startConfig.Contexts = map[string]*clientcmdapi.Context{
+		"otherkube": testContext1,
+		"minikube":  testContext2,
 	}
-	defer os.Remove(fakeKubeFile.Name())
-	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+
+	expectedConfig := clientcmdapi.NewConfig()
+	expectedConfig.CurrentContext = "minikube"
+	testContext3 := clientcmdapi.NewContext()
+	testContext3.AuthInfo = "mu-cluster"
+	testContext3.Cluster = "my-cluster"
+	testContext4 := clientcmdapi.NewContext()
+	testContext4.AuthInfo = "mu-cluster"
+	testContext4.Cluster = "my-cluster"
+	expectedConfig.Contexts = map[string]*clientcmdapi.Context{
+		"otherkube": testContext3,
+		"minikube":  testContext4,
 	}
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = fakeKubeFile.Name()
-	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigUseContext(buf, pathOptions)
-	cmd.SetArgs(test.args)
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v,kubectl config use-context args: %v", err, test.args)
-	}
-	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
-	if err != nil {
-		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
-	}
-	if len(test.expected) != 0 {
-		if buf.String() != test.expected {
-			t.Errorf("Failed in :%q\n expected %v\n, but got %v\n", test.description, test.expected, buf.String())
-		}
-	}
-	if test.expectedConfig.CurrentContext != config.CurrentContext {
-		t.Errorf("Failed in :%q\n expected config %v, but found %v\n in kubeconfig\n", test.description, test.expectedConfig, config)
+
+	for _, test := range []useContextTest{
+		{
+			name:           "UseContext",
+			startingConfig: startConfig,
+			args:           []string{"minikube"},
+			expectedConfig: expectedConfig,
+			expectedOut:    "Switched to context \"minikube\"",
+		}, {
+			name:           "ErrorNonexistentContext",
+			startingConfig: startConfig,
+			args:           []string{"foo"},
+			expectedConfig: startConfig,
+			runError:       "can not set current-context to \"foo\", context does not exist",
+		}, {
+			name:           "ErrorZeroArgs",
+			startingConfig: startConfig,
+			args:           []string{},
+			expectedConfig: startConfig,
+			completeError:  "unexpected args: ",
+		}, {
+			name:           "ErrorTwoArgs",
+			startingConfig: startConfig,
+			args:           []string{"context1", "context2"},
+			expectedConfig: startConfig,
+			completeError:  "unexpected args: [context1 context2]",
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			fakeKubeFile, err := generateTestKubeConfig(*test.startingConfig)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			defer removeTempFile(t, fakeKubeFile.Name())
+
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
+
+			streams, _, buffOut, _ := genericclioptions.NewTestIOStreams()
+
+			options := NewUseContextOptions(streams, pathOptions)
+
+			err = options.Complete(test.args)
+			if len(test.completeError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.completeError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+				return
+			} else if len(test.completeError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.completeError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
+			}
+
+			err = options.RunUseContext()
+			if len(test.runError) != 0 && err != nil {
+				checkOutputResults(t, err.Error(), test.runError)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+				return
+			} else if len(test.runError) != 0 && err == nil {
+				t.Fatalf("expected error %q running command but non received", test.runError)
+			} else if err != nil {
+				t.Fatalf("unexpected error running to options: %v", err)
+			}
+
+			if len(test.expectedOut) != 0 {
+				checkOutputResults(t, buffOut.String(), test.expectedOut)
+				checkOutputConfig(t, options.ConfigAccess, test.expectedConfig, cmp.Options{})
+			}
+		})
 	}
 }
