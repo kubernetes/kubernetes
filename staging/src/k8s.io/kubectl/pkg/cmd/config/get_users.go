@@ -37,40 +37,38 @@ var (
 
 // GetUsersOptions holds the data needed to run the command
 type GetUsersOptions struct {
-	configAccess clientcmd.ConfigAccess
-
-	genericclioptions.IOStreams
-}
-
-// NewGetUsersOptions creates the options for the command
-func NewGetUsersOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *GetUsersOptions {
-	return &GetUsersOptions{
-		configAccess: configAccess,
-		IOStreams:    ioStreams,
-	}
+	ConfigAccess clientcmd.ConfigAccess
+	IOStreams    genericclioptions.IOStreams
 }
 
 // NewCmdConfigGetUsers creates a command object for the "get-users" action, which
 // lists all users defined in the kubeconfig.
 func NewCmdConfigGetUsers(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	o := NewGetUsersOptions(streams, configAccess)
-
 	cmd := &cobra.Command{
 		Use:     "get-users",
 		Short:   i18n.T("Display users defined in the kubeconfig"),
 		Long:    i18n.T("Display users defined in the kubeconfig."),
 		Example: getUsersExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Run())
+			options := NewGetUsersOptions(streams, configAccess)
+			cmdutil.CheckErr(options.RunGetUsers())
 		},
 	}
 
 	return cmd
 }
 
-// Run performs the command
-func (o *GetUsersOptions) Run() error {
-	config, err := o.configAccess.GetStartingConfig()
+// NewGetUsersOptions creates the options for the command
+func NewGetUsersOptions(ioStreams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *GetUsersOptions {
+	return &GetUsersOptions{
+		ConfigAccess: configAccess,
+		IOStreams:    ioStreams,
+	}
+}
+
+// RunGetUsers performs the command
+func (o *GetUsersOptions) RunGetUsers() error {
+	config, _, err := loadConfig(o.ConfigAccess)
 	if err != nil {
 		return err
 	}
@@ -81,9 +79,13 @@ func (o *GetUsersOptions) Run() error {
 	}
 	sort.Strings(users)
 
-	fmt.Fprintf(o.Out, "NAME\n")
+	if _, err := fmt.Fprintf(o.IOStreams.Out, "NAME\n"); err != nil {
+		return err
+	}
 	for _, user := range users {
-		fmt.Fprintf(o.Out, "%s\n", user)
+		if _, err := fmt.Fprintf(o.IOStreams.Out, "%s\n", user); err != nil {
+			return err
+		}
 	}
 
 	return nil

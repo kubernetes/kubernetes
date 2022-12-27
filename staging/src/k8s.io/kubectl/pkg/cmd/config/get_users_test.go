@@ -19,56 +19,71 @@ package config
 import (
 	"testing"
 
+	"k8s.io/client-go/tools/clientcmd"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
+type testGetUser struct {
+	name           string
+	startingConfig *clientcmdapi.Config
+	args           []string
+	expectedOut    string
+	completeError  string
+	runError       string
+}
+
 func TestGetUsersRun(t *testing.T) {
-	var tests = []struct {
-		name     string
-		config   clientcmdapi.Config
-		expected string
-	}{
+	t.Parallel()
+
+	startingConfEmpty := clientcmdapi.NewConfig()
+
+	startingConfMultipleUsers := clientcmdapi.NewConfig()
+	startingConfMultipleUsers.AuthInfos = map[string]*clientcmdapi.AuthInfo{
+		"minikube": {Username: "minikube"},
+		"admin":    {Username: "admin"},
+	}
+
+	for _, test := range []testGetUser{
 		{
-			name:     "no users",
-			config:   clientcmdapi.Config{},
-			expected: "NAME\n",
+			name:           "NoUsers",
+			startingConfig: startingConfEmpty,
+			expectedOut:    "NAME\n",
 		},
 		{
-			name: "some users",
-			config: clientcmdapi.Config{
-				AuthInfos: map[string]*clientcmdapi.AuthInfo{
-					"minikube": {Username: "minikube"},
-					"admin":    {Username: "admin"},
-				},
-			},
-			expected: `NAME
+			name:           "Users",
+			startingConfig: startingConfMultipleUsers,
+			expectedOut: `NAME
 admin
 minikube
 `,
 		},
-	}
-
-	for i := range tests {
-		test := tests[i]
+	} {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
-			defer tf.Cleanup()
-
-			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
-			pathOptions, err := tf.PathOptionsWithConfig(test.config)
+			fakeKubeFile, err := generateTestKubeConfig(*test.startingConfig)
 			if err != nil {
-				t.Fatalf("unexpected error executing command: %v", err)
-			}
-			options := NewGetUsersOptions(ioStreams, pathOptions)
-
-			if err = options.Run(); err != nil {
-				t.Fatalf("unexpected error executing command: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if got := out.String(); got != test.expected {
-				t.Fatalf("expected: %s but got %s", test.expected, got)
+			defer removeTempFile(t, fakeKubeFile.Name())
+
+			pathOptions := clientcmd.NewDefaultPathOptions()
+			pathOptions.GlobalFile = fakeKubeFile.Name()
+			pathOptions.EnvVar = ""
+
+			streams, _, buffOut, _ := genericclioptions.NewTestIOStreams()
+
+			options := NewGetUsersOptions(streams, pathOptions)
+
+			err = options.RunGetUsers()
+			if err != nil {
+				t.Errorf("Unexpected error running command: %v", err)
+			}
+
+			if len(test.expectedOut) != 0 {
+				checkOutputResults(t, buffOut.String(), test.expectedOut)
 			}
 		})
 	}
