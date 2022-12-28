@@ -25,13 +25,14 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-// NodePortAddresses is used to handle the --nodeport-addresses flag
+// NodePortAddresses is used to handle the --nodeport-addresses and
+// --iptables-localhost-nodeports flags
 type NodePortAddresses struct {
 	cidrStrings []string
 
-	cidrs                []*net.IPNet
-	containsIPv4Loopback bool
-	matchAll             bool
+	cidrs          []*net.IPNet
+	allowLocalhost bool
+	matchAll       bool
 }
 
 // RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
@@ -41,8 +42,9 @@ var ipv4LoopbackStart = net.IPv4(127, 0, 0, 0)
 // assumed to contain only valid CIDRs, potentially of both IP families) and returns a
 // NodePortAddresses object for the given family. If there are no CIDRs of the given
 // family then the CIDR "0.0.0.0/0" or "::/0" will be added (even if there are CIDRs of
-// the other family).
-func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAddresses {
+// the other family). Loopback IPs will be disallowed unless family is v1.IPv4Protocol and
+// allowIPv4Localhost is true.
+func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string, allowIPv4Localhost bool) *NodePortAddresses {
 	npa := &NodePortAddresses{}
 
 	// Filter CIDRs to correct family
@@ -63,10 +65,8 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAdd
 	for _, str := range npa.cidrStrings {
 		_, cidr, _ := netutils.ParseCIDRSloppy(str)
 
-		if netutils.IsIPv4CIDR(cidr) {
-			if cidr.IP.IsLoopback() || cidr.Contains(ipv4LoopbackStart) {
-				npa.containsIPv4Loopback = true
-			}
+		if family == v1.IPv4Protocol && allowIPv4Localhost && (cidr.IP.IsLoopback() || cidr.Contains(ipv4LoopbackStart)) {
+			npa.allowLocalhost = true
 		}
 
 		if IsZeroCIDR(str) {
@@ -114,6 +114,10 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) ([]string, 
 				continue
 			}
 
+			if ip.IsLoopback() && !npa.allowLocalhost {
+				continue
+			}
+
 			if cidr.Contains(ip) {
 				uniqueAddressList.Insert(ip.String())
 			}
@@ -127,7 +131,10 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) ([]string, 
 	return uniqueAddressList.List(), nil
 }
 
-// ContainsIPv4Loopback returns true if npa's CIDRs contain an IPv4 loopback address.
-func (npa *NodePortAddresses) ContainsIPv4Loopback() bool {
-	return npa.containsIPv4Loopback
+// AllowLocalhost returns true if npa allows localhost NodePort connections in its IP
+// family. Localhost NodePort connections are never allowed for IPv6. For IPv4, they
+// are allowed only if npa was constructed with allowIPv4Localhost=true and a set of
+// CIDRs that includes loopback IPs.
+func (npa *NodePortAddresses) AllowLocalhost() bool {
+	return npa.allowLocalhost
 }

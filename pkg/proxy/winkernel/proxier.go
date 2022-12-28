@@ -706,7 +706,7 @@ func NewProxier(
 	}
 
 	// windows listens to all node addresses
-	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nil)
+	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nil, false)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
 
 	hns, supportedFeatures := newHostNetworkService()

@@ -203,9 +203,6 @@ type Proxier struct {
 	// optimize for performance over debuggability.
 	largeClusterMode bool
 
-	// localhostNodePorts indicates whether to generate iptables rules that
-	// disable NodePort services to be accessed via localhost.
-	localhostNodePorts bool
 	// nodePortAddresses selects the interfaces where nodePort works.
 	nodePortAddresses *utilproxy.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
@@ -237,9 +234,9 @@ func NewProxier(ipFamily v1.IPFamily,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddressStrings []string,
 ) (*Proxier, error) {
-	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings, localhostNodePorts)
 
-	if localhostNodePorts && nodePortAddresses.ContainsIPv4Loopback() {
+	if nodePortAddresses.AllowLocalhost() {
 		// Set the route_localnet sysctl we need for exposing NodePorts on loopback addresses
 		// Refer to https://issues.k8s.io/90259
 		klog.InfoS("Setting route_localnet=1 to allow node-ports on localhost; to change this either disable iptables.localhostNodePorts (--iptables-localhost-nodeports) or set nodePortAddresses (--nodeport-addresses) to filter loopback addresses")
@@ -285,7 +282,6 @@ func NewProxier(ipFamily v1.IPFamily,
 		filterRules:              utilproxy.LineBuffer{},
 		natChains:                utilproxy.LineBuffer{},
 		natRules:                 utilproxy.LineBuffer{},
-		localhostNodePorts:       localhostNodePorts,
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        utilproxy.RealNetwork{},
 	}
@@ -1420,18 +1416,12 @@ func (proxier *Proxier) syncProxyRules() {
 	isIPv6 := proxier.iptables.IsIPv6()
 	if proxier.nodePortAddresses.MatchAll() {
 		destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
-		if isIPv6 {
-			// For IPv6, Regardless of the value of localhostNodePorts is true
-			// or false, we should disable access to the nodePort via localhost. Since it never works and always
-			// cause kernel warnings.
-			destinations = append(destinations, "!", "-d", "::1/128")
-		}
-
-		if !proxier.localhostNodePorts && !isIPv6 {
-			// If set localhostNodePorts to "false"(route_localnet=0), We should generate iptables rules that
-			// disable NodePort services to be accessed via localhost. Since it doesn't work and causes
-			// the kernel to log warnings if anyone tries.
-			destinations = append(destinations, "!", "-d", "127.0.0.0/8")
+		if !proxier.nodePortAddresses.AllowLocalhost() {
+			if isIPv6 {
+				destinations = append(destinations, "!", "-d", "::1/128")
+			} else {
+				destinations = append(destinations, "!", "-d", "127.0.0.0/8")
+			}
 		}
 
 		proxier.natRules.Write(
@@ -1445,19 +1435,6 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 		}
 		for _, address := range nodeAddresses {
-			// For ipv6, Regardless of the value of localhostNodePorts is true or false, we should disallow access
-			// to the nodePort via lookBack address.
-			if isIPv6 && utilproxy.IsLoopBack(address) {
-				klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv6 localhost address", "IP", address)
-				continue
-			}
-
-			// For ipv4, When localhostNodePorts is set to false, Ignore ipv4 lookBack address
-			if !isIPv6 && utilproxy.IsLoopBack(address) && !proxier.localhostNodePorts {
-				klog.ErrorS(nil, "disallow nodePort services to be accessed via ipv4 localhost address", "IP", address)
-				continue
-			}
-
 			// create nodeport rules for each IP one by one
 			proxier.natRules.Write(
 				"-A", string(kubeServicesChain),

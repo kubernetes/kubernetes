@@ -424,8 +424,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		natChains:                utilproxy.LineBuffer{},
 		natRules:                 utilproxy.LineBuffer{},
 		nodeIP:                   netutils.ParseIPSloppy(testNodeIP),
-		localhostNodePorts:       true,
-		nodePortAddresses:        utilproxy.NewNodePortAddresses(ipfamily, nil),
+		nodePortAddresses:        utilproxy.NewNodePortAddresses(ipfamily, nil, true),
 		networkInterfacer:        networkInterfacer,
 	}
 	p.setInitialized(true)
@@ -2540,7 +2539,8 @@ func TestNodePort(t *testing.T) {
 func TestHealthCheckNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	// --nodeport-addresses=127.0.0.0/8 --iptables-localhost-nodeports=true
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"}, true)
 
 	svcIP := "172.30.0.42"
 	svcPort := 80
@@ -3261,7 +3261,8 @@ func TestEnableLocalhostNodePortsIPv4(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
-	fp.localhostNodePorts = true
+	// --nodeport-addresses="" --iptables-localhost-nodeports=true
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, nil, true)
 
 	expected := dedent.Dedent(`
         *filter
@@ -3355,7 +3356,8 @@ func TestDisableLocalhostNodePortsIPv4(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
-	fp.localhostNodePorts = false
+	// --nodeport-addresses="" --iptables-localhost-nodeports=false
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, nil, false)
 
 	expected := dedent.Dedent(`
 	*filter
@@ -3449,9 +3451,8 @@ func TestDisableLocalhostNodePortsIPv4WithNodeAddress(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
-	fp.localhostNodePorts = false
-	fp.networkInterfacer.InterfaceAddrs()
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	// --nodeport-addresses=127.0.0.0/8 --iptables-localhost-nodeports=false
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"}, false)
 
 	expected := dedent.Dedent(`
         *filter
@@ -3544,7 +3545,8 @@ func TestEnableLocalhostNodePortsIPv6(t *testing.T) {
 	ipt := iptablestest.NewIPv6Fake()
 	fp := NewFakeProxier(ipt)
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
-	fp.localhostNodePorts = true
+	// --nodeport-addresses="" --iptables-localhost-nodeports=true
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv6Protocol, nil, true)
 
 	expected := dedent.Dedent(`
 		*filter
@@ -3638,7 +3640,8 @@ func TestDisableLocalhostNodePortsIPv6(t *testing.T) {
 	ipt := iptablestest.NewIPv6Fake()
 	fp := NewFakeProxier(ipt)
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
-	fp.localhostNodePorts = false
+	// --nodeport-addresses="" --iptables-localhost-nodeports=false
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv6Protocol, nil, false)
 
 	expected := dedent.Dedent(`
 		*filter
@@ -3732,7 +3735,8 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
+	// --nodeport-addresses=192.168.0.0/24,2001:db8::/64 --iptables-localhost-nodeports=true
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"}, true)
 
 	expected := dedent.Dedent(`
 		*filter
@@ -3780,7 +3784,8 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"})
+	// --nodeport-addresses=192.168.0.0/24,2001:db8::/64 --iptables-localhost-nodeports=true
+	fp.nodePortAddresses = utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"192.168.0.0/24", "2001:db8::/64"}, true)
 
 	expected := dedent.Dedent(`
 		*filter

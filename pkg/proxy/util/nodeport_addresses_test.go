@@ -35,6 +35,7 @@ func TestGetNodeAddresses(t *testing.T) {
 	type expectation struct {
 		matchAll bool
 		ips      sets.String
+		lbIPs    sets.String
 	}
 
 	testCases := []struct {
@@ -82,7 +83,8 @@ func TestGetNodeAddresses(t *testing.T) {
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
 					matchAll: true,
-					ips:      sets.NewString("10.20.30.51", "127.0.0.1"),
+					ips:      sets.NewString("10.20.30.51"),
+					lbIPs:    sets.NewString("127.0.0.1"),
 				},
 				v1.IPv6Protocol: {
 					matchAll: true,
@@ -109,7 +111,7 @@ func TestGetNodeAddresses(t *testing.T) {
 					ips:      nil,
 				},
 				v1.IPv6Protocol: {
-					ips: sets.NewString("2001:db8::1", "::1"),
+					ips: sets.NewString("2001:db8::1"),
 				},
 			},
 		},
@@ -133,7 +135,7 @@ func TestGetNodeAddresses(t *testing.T) {
 				},
 				v1.IPv6Protocol: {
 					matchAll: true,
-					ips:      sets.NewString("2001:db8::1", "::1"),
+					ips:      sets.NewString("2001:db8::1"),
 				},
 			},
 		},
@@ -152,7 +154,8 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
-					ips: sets.NewString("127.0.0.1"),
+					ips:   nil,
+					lbIPs: sets.NewString("127.0.0.1"),
 				},
 				v1.IPv6Protocol: {
 					matchAll: true,
@@ -171,7 +174,8 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
-					ips: sets.NewString("127.0.1.1"),
+					ips:   nil,
+					lbIPs: sets.NewString("127.0.1.1"),
 				},
 				v1.IPv6Protocol: {
 					matchAll: true,
@@ -241,7 +245,8 @@ func TestGetNodeAddresses(t *testing.T) {
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
 					matchAll: true,
-					ips:      sets.NewString("192.168.1.2", "127.0.0.1"),
+					ips:      sets.NewString("192.168.1.2"),
+					lbIPs:    sets.NewString("127.0.0.1"),
 				},
 				v1.IPv6Protocol: {
 					matchAll: true,
@@ -269,7 +274,7 @@ func TestGetNodeAddresses(t *testing.T) {
 				},
 				v1.IPv6Protocol: {
 					matchAll: true,
-					ips:      sets.NewString("2001:db8::1", "::1"),
+					ips:      sets.NewString("2001:db8::1"),
 				},
 			},
 		},
@@ -315,7 +320,8 @@ func TestGetNodeAddresses(t *testing.T) {
 			expected: map[v1.IPFamily]expectation{
 				v1.IPv4Protocol: {
 					matchAll: true,
-					ips:      sets.NewString("1.2.3.4", "127.0.0.1"),
+					ips:      sets.NewString("1.2.3.4"),
+					lbIPs:    sets.NewString("127.0.0.1"),
 				},
 				v1.IPv6Protocol: {
 					ips: sets.NewString("2001:db8::1"),
@@ -347,7 +353,7 @@ func TestGetNodeAddresses(t *testing.T) {
 				},
 				v1.IPv6Protocol: {
 					matchAll: true,
-					ips:      sets.NewString("2001:db8::1", "::1"),
+					ips:      sets.NewString("2001:db8::1"),
 				},
 			},
 		},
@@ -361,32 +367,45 @@ func TestGetNodeAddresses(t *testing.T) {
 			}
 
 			for _, family := range []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol} {
-				npa := NewNodePortAddresses(family, tc.cidrs)
+				npa := NewNodePortAddresses(family, tc.cidrs, false)
 
 				if npa.MatchAll() != tc.expected[family].matchAll {
 					t.Errorf("unexpected MatchAll(%s), expected: %v", family, tc.expected[family].matchAll)
 				}
 
 				addrList, err := npa.GetNodeAddresses(nw)
+				expectedIPs := tc.expected[family].ips
+
 				// The fake InterfaceAddrs() never returns an error, so
 				// the only error GetNodeAddresses will return is "no
 				// addresses found".
-				if err != nil && tc.expected[family].ips != nil {
-					t.Errorf("unexpected error: %v", err)
+				if err != nil && len(expectedIPs) != 0 {
+					t.Errorf("unexpected error for %s: %v", family, err)
 				}
+				if !sets.NewString(addrList...).Equal(expectedIPs) {
+					t.Errorf("unexpected mismatch for %s, expected: %v, got: %v", family, expectedIPs, addrList)
+				}
+			}
 
-				if !sets.NewString(addrList...).Equal(tc.expected[family].ips) {
-					t.Errorf("unexpected mismatch for %s, expected: %v, got: %v", family, tc.expected[family].ips, addrList)
-				}
+			// Now with allowIPv4Localhost=true
+			npa := NewNodePortAddresses(v1.IPv4Protocol, tc.cidrs, true)
+			addrList, err := npa.GetNodeAddresses(nw)
+			expectedIPs := tc.expected[v1.IPv4Protocol].ips.Union(tc.expected[v1.IPv4Protocol].lbIPs)
+			if err != nil && len(expectedIPs) != 0 {
+				t.Errorf("unexpected error for ipv4Localhost=true: %v", err)
+			}
+			if !sets.NewString(addrList...).Equal(expectedIPs) {
+				t.Errorf("unexpected mismatch with ipv4Localhost=true, expected: %v, got: %v", expectedIPs, addrList)
 			}
 		})
 	}
 }
 
-func TestContainsIPv4Loopback(t *testing.T) {
+func TestAllowLocalhost(t *testing.T) {
 	tests := []struct {
 		name        string
 		cidrStrings []string
+		disallow    bool
 		want        bool
 	}{
 		{
@@ -404,13 +423,37 @@ func TestContainsIPv4Loopback(t *testing.T) {
 			want:        false,
 		},
 		{
+			name:        "all zeros ipv4 but disallowed",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "0.0.0.0/0"},
+			disallow:    true,
+			want:        false,
+		},
+		{
+			name:        "all zeros ipv6 but disallowed",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::/0"},
+			disallow:    true,
+			want:        false,
+		},
+		{
 			name:        "ipv4 loopback",
 			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "127.0.0.0/8"},
 			want:        true,
 		},
 		{
+			name:        "ipv4 loopback but disallowed",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "127.0.0.0/8"},
+			disallow:    true,
+			want:        false,
+		},
+		{
 			name:        "ipv6 loopback",
 			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::1/128"},
+			want:        false,
+		},
+		{
+			name:        "ipv6 loopback but disallowed",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::1/128"},
+			disallow:    true,
 			want:        false,
 		},
 		{
@@ -431,14 +474,14 @@ func TestContainsIPv4Loopback(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			npa := NewNodePortAddresses(v1.IPv4Protocol, tt.cidrStrings)
-			if got := npa.ContainsIPv4Loopback(); got != tt.want {
-				t.Errorf("IPv4 ContainsIPv4Loopback() = %v, want %v", got, tt.want)
+			npa := NewNodePortAddresses(v1.IPv4Protocol, tt.cidrStrings, !tt.disallow)
+			if got := npa.AllowLocalhost(); got != tt.want {
+				t.Errorf("IPv4 AllowLocalhost = %v, want %v", got, tt.want)
 			}
-			// ContainsIPv4Loopback should always be false for family=IPv6
-			npa = NewNodePortAddresses(v1.IPv6Protocol, tt.cidrStrings)
-			if got := npa.ContainsIPv4Loopback(); got {
-				t.Errorf("IPv6 ContainsIPv4Loopback() = %v, want %v", got, false)
+			// AllowLocalhost should always be false for family=IPv6
+			npa = NewNodePortAddresses(v1.IPv6Protocol, tt.cidrStrings, !tt.disallow)
+			if npa.AllowLocalhost() {
+				t.Errorf("IPv6 AllowLocalhost = true, want false")
 			}
 		})
 	}

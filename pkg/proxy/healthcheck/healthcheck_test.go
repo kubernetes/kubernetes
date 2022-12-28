@@ -133,7 +133,7 @@ type healthzPayload struct {
 func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
-	nodePortAddresses := utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{})
+	nodePortAddresses := utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{}, true)
 
 	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses)
 	hcs := hcsi.(*server)
@@ -438,7 +438,7 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 
 	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
-	nodePortAddresses := utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	nodePortAddresses := utilproxy.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"}, true)
 
 	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses)
 	hcs := hcsi.(*server)

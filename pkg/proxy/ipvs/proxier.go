@@ -457,7 +457,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		scheduler = defaultScheduler
 	}
 
-	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings, false)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
 
@@ -1086,9 +1086,6 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				for _, address := range nodeAddresses {
 					a := netutils.ParseIPSloppy(address)
-					if a.IsLoopback() {
-						continue
-					}
 					nodeIPs = append(nodeIPs, a)
 				}
 			}
