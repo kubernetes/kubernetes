@@ -220,6 +220,41 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 
 // AddFlags adds command line flags for the configuration.
 func AddFlags(c *LoggingConfiguration, fs *pflag.FlagSet) {
+	addFlags(c, fs)
+}
+
+// AddGoFlags is a variant of AddFlags for a standard FlagSet.
+func AddGoFlags(c *LoggingConfiguration, fs *flag.FlagSet) {
+	addFlags(c, goFlagSet{FlagSet: fs})
+}
+
+// flagSet is the interface implemented by pflag.FlagSet, with
+// just those methods defined which are needed by addFlags.
+type flagSet interface {
+	BoolVar(p *bool, name string, value bool, usage string)
+	DurationVar(p *time.Duration, name string, value time.Duration, usage string)
+	StringVar(p *string, name string, value string, usage string)
+	Var(value pflag.Value, name string, usage string)
+	VarP(value pflag.Value, name, shorthand, usage string)
+}
+
+// goFlagSet implements flagSet for a stdlib flag.FlagSet.
+type goFlagSet struct {
+	*flag.FlagSet
+}
+
+func (fs goFlagSet) Var(value pflag.Value, name string, usage string) {
+	fs.FlagSet.Var(value, name, usage)
+}
+
+func (fs goFlagSet) VarP(value pflag.Value, name, shorthand, usage string) {
+	// Ignore shorthand, it's not needed and not supported.
+	fs.FlagSet.Var(value, name, usage)
+}
+
+// addFlags can be used with both flag.FlagSet and pflag.FlagSet. The internal
+// interface definition avoids duplicating this code.
+func addFlags(c *LoggingConfiguration, fs flagSet) {
 	formats := logRegistry.list()
 	fs.StringVar(&c.Format, "logging-format", c.Format, fmt.Sprintf("Sets the log format. Permitted formats: %s.", formats))
 	// No new log formats should be added after generation is of flag options
