@@ -455,6 +455,17 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 	return nil
 }
 
+func (s *sharedIndexInformer) SetStore(store ThreadSafeStore) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.started {
+		return fmt.Errorf("informer has already started")
+	}
+	s.indexer = NewIndexerWithStore(DeletionHandlingMetaNamespaceKeyFunc, store)
+	return nil
+}
+
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 

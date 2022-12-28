@@ -274,3 +274,10 @@ func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
 		keyFunc:      keyFunc,
 	}
 }
+
+func NewIndexerWithStore(keyFunc KeyFunc, cacheStorage ThreadSafeStore) Indexer {
+	return &cache{
+		cacheStorage: cacheStorage,
+		keyFunc:      keyFunc,
+	}
+}
