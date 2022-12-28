@@ -367,7 +367,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 			return err
 		}
 
-		err = writer.Write(payload)
+		err = writer.Write(payload, nil /*setPerms*/)
 		if err != nil {
 			klog.Errorf("failed to write payload to dir: %v", err)
 			return err
