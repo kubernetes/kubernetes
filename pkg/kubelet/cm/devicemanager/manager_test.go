@@ -111,7 +111,7 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	m, _, p, _ := setupInProbeMode(t, []*pluginapi.Device{}, func(n string, d []pluginapi.Device) {}, socketName, pluginSocketName)
+	m, _, p, _ := setupInProbeMode(t, []*pluginapi.Device{}, func(n string, d []pluginapi.Device) {}, socketName, pluginSocketName, nil)
 	cleanup(t, m, p)
 }
 
@@ -201,7 +201,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 		{ID: "Dev3", Health: pluginapi.Healthy},
 	}
 
-	m, ch, p1, _ := setupInProbeMode(t, devs, nil, socketName, pluginSocketName)
+	m, ch, p1, _ := setupInProbeMode(t, devs, nil, socketName, pluginSocketName, nil)
 
 	// Wait for the first callback to be issued.
 	select {
@@ -252,9 +252,10 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	cleanup(t, m, p1)
 }
 
-func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string) (Manager, <-chan interface{}) {
+func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string,
+	topology []cadvisorapi.Node) (Manager, <-chan interface{}) {
 	topologyStore := topologymanager.NewFakeManager()
-	m, err := newManagerImpl(socketName, nil, topologyStore)
+	m, err := newManagerImpl(socketName, topology, topologyStore)
 	require.NoError(t, err)
 	updateChan := make(chan interface{})
 
@@ -302,13 +303,13 @@ func runPluginManager(pluginManager pluginmanager.PluginManager) {
 }
 
 func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub) {
-	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
+	m, updateChan := setupDeviceManager(t, devs, callback, socketName, nil)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
 	return m, updateChan, p
 }
 
-func setupInProbeMode(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub, pluginmanager.PluginManager) {
-	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
+func setupInProbeMode(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string, topology []cadvisorapi.Node) (Manager, <-chan interface{}, *plugin.Stub, pluginmanager.PluginManager) {
+	m, updateChan := setupDeviceManager(t, devs, callback, socketName, topology)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
 	pm := setupPluginManager(t, pluginSocketName, m)
 	return m, updateChan, p, pm
@@ -1402,4 +1403,45 @@ func TestReadPreNUMACheckpoint(t *testing.T) {
 	// TODO: we should not calling private methods, but among the existing tests we do anyway
 	err = m.readCheckpoint()
 	require.NoError(t, err)
+}
+
+func TestGetTopologyHintsWithUpdates(t *testing.T) {
+	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
+	defer os.RemoveAll(socketDir)
+	testPod := makePod(v1.ResourceList{
+		testResourceName: *resource.NewQuantity(int64(1), resource.DecimalSI)})
+	require.NoError(t, err)
+
+	devs := []*pluginapi.Device{}
+	for i := 0; i < 5000; i++ {
+		devs = append(devs, &pluginapi.Device{
+			ID:     fmt.Sprintf("dev-%d", i),
+			Health: pluginapi.Healthy,
+			Topology: &pluginapi.TopologyInfo{
+				Nodes: []*pluginapi.NUMANode{
+					{ID: 0},
+				},
+			}})
+	}
+	topology := []cadvisorapi.Node{
+		{Id: 0},
+	}
+	m, ch, p1, _ := setupInProbeMode(t, devs, nil, socketName, pluginSocketName, topology)
+
+	<-ch
+	go func() {
+		p1.Update(devs)
+	}()
+
+	updated := false
+	for i := 0; i < 5000 && !updated; i++ {
+		m.GetTopologyHints(testPod, &testPod.Spec.Containers[0])
+		select {
+		case <-ch:
+			updated = true
+		default:
+		}
+	}
+
+	cleanup(t, m, p1)
 }
