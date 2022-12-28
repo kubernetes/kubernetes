@@ -1840,8 +1840,6 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	sharedInformerFactory.Start(ctx.Done())
 	sharedInformerFactory.WaitForCacheSync(ctx.Done())
 
-	go manager.Run(ctx, 1)
-
 	tests := []struct {
 		name         string
 		setStartTime bool
@@ -1861,13 +1859,17 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			job := newJobWithName(tc.jobName, 1, 1, 6, batch.NonIndexedCompletion)
-			job.Spec.ActiveDeadlineSeconds = pointer.Int64(1)
+			jobKey, err := controller.KeyFunc(job)
+			if err != nil {
+				t.Errorf("failed to generate job key for performing sync job: %v", err)
+			}
+			job.Spec.ActiveDeadlineSeconds = pointer.Int64(2)
 			if tc.setStartTime {
 				start := metav1.NewTime(fakeClock.Now().Add(-time.Second))
 				job.Status.StartTime = &start
 			}
 
-			_, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
+			_, err = clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
 			if err != nil {
 				t.Errorf("Could not create Job: %v", err)
 			}
@@ -1876,15 +1878,12 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 				t.Fatalf("Failed to insert job in index: %v", err)
 			}
 
-			var j *batch.Job
-			err = wait.PollImmediate(200*time.Microsecond, 3*time.Second, func() (done bool, err error) {
-				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
-				if err != nil {
-					return false, err
-				}
-				return j.Status.StartTime != nil, nil
-			})
+			_, err = manager.syncJob(ctx, jobKey)
 			if err != nil {
+				t.Errorf("failed to perform sync job operation: %v", err)
+			}
+			j, err := clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
+			if err != nil || j.Status.StartTime == nil {
 				t.Errorf("Job failed to ensure that start time was set: %v", err)
 			}
 			for _, c := range j.Status.Conditions {
@@ -1893,16 +1892,18 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 					break
 				}
 			}
-			manager.clock.Sleep(time.Second)
-			err = wait.Poll(200*time.Millisecond, 3*time.Second, func() (done bool, err error) {
+			manager.clock.Sleep(3 * time.Second)
+			err = wait.PollImmediate(200*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+				_, err = manager.syncJob(ctx, jobKey)
+				if err != nil {
+					return false, err
+				}
 				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
 				if err != nil {
-					return false, nil
+					return false, err
 				}
-				if len(j.Status.Conditions) == 1 && j.Status.Conditions[0].Reason == "DeadlineExceeded" {
-					return true, nil
-				}
-				return false, nil
+				manager.clock.Sleep(200 * time.Millisecond)
+				return len(j.Status.Conditions) != 0 && j.Status.Conditions[0].Reason == "DeadlineExceeded", nil
 			})
 			if err != nil {
 				t.Errorf("Job failed to enforce activeDeadlineSeconds configuration. Expected condition with Reason 'DeadlineExceeded' was not found in %v", j.Status)
