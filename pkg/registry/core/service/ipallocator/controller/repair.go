@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -25,11 +24,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
+	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -57,7 +56,7 @@ import (
 // TODO: perform repair?
 type Repair struct {
 	interval      time.Duration
-	serviceClient corev1client.ServicesGetter
+	serviceLister listers.ServiceLister
 
 	networkByFamily   map[v1.IPFamily]*net.IPNet                    // networks we operate on, by their family
 	allocatorByFamily map[v1.IPFamily]rangeallocation.RangeRegistry // allocators we use, by their family
@@ -73,7 +72,7 @@ const numRepairsBeforeLeakCleanup = 3
 
 // NewRepair creates a controller that periodically ensures that all clusterIPs are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, eventClient eventsv1client.EventsV1Interface, network *net.IPNet, alloc rangeallocation.RangeRegistry, secondaryNetwork *net.IPNet, secondaryAlloc rangeallocation.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, serviceLister listers.ServiceLister, eventClient eventsv1client.EventsV1Interface, network *net.IPNet, alloc rangeallocation.RangeRegistry, secondaryNetwork *net.IPNet, secondaryAlloc rangeallocation.RangeRegistry) *Repair {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: eventClient})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "ipallocator-repair-controller")
 
@@ -103,7 +102,7 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 
 	return &Repair{
 		interval:      interval,
-		serviceClient: serviceClient,
+		serviceLister: serviceLister,
 
 		networkByFamily:   networkByFamily,
 		allocatorByFamily: allocatorByFamily,
@@ -115,7 +114,7 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 }
 
 // RunUntil starts the controller until the provided ch is closed.
-func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
+func (c *Repair) RunUntil(onFirstSuccess func(), stopCh <-chan struct{}) {
 	c.broadcaster.StartRecordingToSink(stopCh)
 	defer c.broadcaster.Shutdown()
 
@@ -199,7 +198,7 @@ func (c *Repair) doRunOnce() error {
 	// the service collection. The caching layer keeps per-collection RVs,
 	// and this is proper, since in theory the collections could be hosted
 	// in separate etcd (or even non-etcd) instances.
-	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	list, err := c.serviceLister.Services(v1.NamespaceAll).List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
@@ -212,8 +211,8 @@ func (c *Repair) doRunOnce() error {
 	}
 
 	// Check every Service's ClusterIP, and rebuild the state as we think it should be.
-	for _, svc := range list.Items {
-		if !helper.IsServiceIPSet(&svc) {
+	for _, svc := range list {
+		if !helper.IsServiceIPSet(svc) {
 			// didn't need a cluster IP
 			continue
 		}
@@ -222,7 +221,7 @@ func (c *Repair) doRunOnce() error {
 			ip := netutils.ParseIPSloppy(ip)
 			if ip == nil {
 				// cluster IP is corrupt
-				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPNotValid", "ClusterIPValidation", "Cluster IP %s is not a valid IP; please recreate service", ip)
+				c.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPNotValid", "ClusterIPValidation", "Cluster IP %s is not a valid IP; please recreate service", ip)
 				runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", ip, svc.Name, svc.Namespace))
 				continue
 			}
@@ -230,7 +229,7 @@ func (c *Repair) doRunOnce() error {
 			family := getFamilyByIP(ip)
 			if _, ok := rebuiltByFamily[family]; !ok {
 				// this service is using an IPFamily no longer configured on cluster
-				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPNotValid", "ClusterIPValidation", "Cluster IP %s(%s) is of ip family that is no longer configured on cluster; please recreate service", ip, family)
+				c.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPNotValid", "ClusterIPValidation", "Cluster IP %s(%s) is of ip family that is no longer configured on cluster; please recreate service", ip, family)
 				runtime.HandleError(fmt.Errorf("the cluster IP %s(%s) for service %s/%s is of ip family that is no longer configured on cluster; please recreate", ip, family, svc.Name, svc.Namespace))
 				continue
 			}
@@ -245,25 +244,25 @@ func (c *Repair) doRunOnce() error {
 					actualStored.Release(ip)
 				} else {
 					// cluster IP doesn't seem to be allocated
-					c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPNotAllocated", "ClusterIPAllocation", "Cluster IP [%v]:%s is not allocated; repairing", family, ip)
+					c.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPNotAllocated", "ClusterIPAllocation", "Cluster IP [%v]:%s is not allocated; repairing", family, ip)
 					runtime.HandleError(fmt.Errorf("the cluster IP [%v]:%s for service %s/%s is not allocated; repairing", family, ip, svc.Name, svc.Namespace))
 				}
 				delete(c.leaksByFamily[family], ip.String()) // it is used, so it can't be leaked
 			case ipallocator.ErrAllocated:
 				// cluster IP is duplicate
-				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPAlreadyAllocated", "ClusterIPAllocation", "Cluster IP [%v]:%s was assigned to multiple services; please recreate service", family, ip)
+				c.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPAlreadyAllocated", "ClusterIPAllocation", "Cluster IP [%v]:%s was assigned to multiple services; please recreate service", family, ip)
 				runtime.HandleError(fmt.Errorf("the cluster IP [%v]:%s for service %s/%s was assigned to multiple services; please recreate", family, ip, svc.Name, svc.Namespace))
 			case err.(*ipallocator.ErrNotInRange):
 				// cluster IP is out of range
-				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ClusterIPOutOfRange", "ClusterIPAllocation", "Cluster IP [%v]:%s is not within the service CIDR %s; please recreate service", family, ip, c.networkByFamily[family])
+				c.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPOutOfRange", "ClusterIPAllocation", "Cluster IP [%v]:%s is not within the service CIDR %s; please recreate service", family, ip, c.networkByFamily[family])
 				runtime.HandleError(fmt.Errorf("the cluster IP [%v]:%s for service %s/%s is not within the service CIDR %s; please recreate", family, ip, svc.Name, svc.Namespace, c.networkByFamily[family]))
 			case ipallocator.ErrFull:
 				// somehow we are out of IPs
 				cidr := actualAlloc.CIDR()
-				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "ServiceCIDRFull", "ClusterIPAllocation", "Service CIDR %v is full; you must widen the CIDR in order to create new services for Cluster IP [%v]:%s", cidr, family, ip)
+				c.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ServiceCIDRFull", "ClusterIPAllocation", "Service CIDR %v is full; you must widen the CIDR in order to create new services for Cluster IP [%v]:%s", cidr, family, ip)
 				return fmt.Errorf("the service CIDR %v is full; you must widen the CIDR in order to create new services for Cluster IP [%v]:%s", cidr, family, ip)
 			default:
-				c.recorder.Eventf(&svc, nil, v1.EventTypeWarning, "UnknownError", "ClusterIPAllocation", "Unable to allocate cluster IP [%v]:%s due to an unknown error", family, ip)
+				c.recorder.Eventf(svc, nil, v1.EventTypeWarning, "UnknownError", "ClusterIPAllocation", "Unable to allocate cluster IP [%v]:%s due to an unknown error", family, ip)
 				return fmt.Errorf("unable to allocate cluster IP [%v]:%s for service %s/%s due to an unknown error, exiting: %v", family, ip, svc.Name, svc.Namespace, err)
 			}
 		}

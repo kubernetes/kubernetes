@@ -27,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/kubernetes/fake"
+	listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )
@@ -54,11 +56,13 @@ func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 
 func TestRepair(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	serviceLister := listers.NewServiceLister(serviceStore)
 	registry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "100-200"},
 	}
 	pr, _ := net.ParsePortRange(registry.item.Range)
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	r := NewRepair(0, serviceLister, fakeClient.EventsV1(), *pr, registry)
 
 	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
@@ -71,7 +75,7 @@ func TestRepair(t *testing.T) {
 		item:      &api.RangeAllocation{Range: "100-200"},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	r = NewRepair(0, serviceLister, fakeClient.EventsV1(), *pr, registry)
 	if err := r.runOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
@@ -92,6 +96,8 @@ func TestRepairLeak(t *testing.T) {
 	}
 
 	fakeClient := fake.NewSimpleClientset()
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	serviceLister := listers.NewServiceLister(serviceStore)
 	registry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
 			ObjectMeta: metav1.ObjectMeta{
@@ -102,7 +108,7 @@ func TestRepairLeak(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	r := NewRepair(0, serviceLister, fakeClient.EventsV1(), *pr, registry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
 		if err := r.runOnce(); err != nil {
@@ -142,44 +148,50 @@ func TestRepairWithExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fakeClient := fake.NewSimpleClientset(
-		&corev1.Service{
+	fakeClient := fake.NewSimpleClientset()
+	services := []*corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "one"},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{{NodePort: 111}},
 			},
 		},
-		&corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "two"},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{{NodePort: 122}, {NodePort: 133}},
 			},
 		},
-		&corev1.Service{ // outside range, will be dropped
+		{ // outside range, will be dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "three", Name: "three"},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{{NodePort: 201}},
 			},
 		},
-		&corev1.Service{ // empty, ignored
+		{ // empty, ignored
 			ObjectMeta: metav1.ObjectMeta{Namespace: "four", Name: "four"},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{{}},
 			},
 		},
-		&corev1.Service{ // duplicate, dropped
+		{ // duplicate, dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "five", Name: "five"},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{{NodePort: 111}},
 			},
 		},
-		&corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "six", Name: "six"},
 			Spec: corev1.ServiceSpec{
 				HealthCheckNodePort: 144,
 			},
 		},
-	)
+	}
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	for _, svc := range services {
+		serviceStore.Add(svc)
+	}
+	serviceLister := listers.NewServiceLister(serviceStore)
 
 	registry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
@@ -190,7 +202,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	r := NewRepair(0, serviceLister, fakeClient.EventsV1(), *pr, registry)
 	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}

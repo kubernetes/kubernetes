@@ -45,6 +45,7 @@ var (
 		"[+]poststarthook/bootstrap-controller ok",
 		"[+]poststarthook/start-default-service-controller ok",
 		"[+]poststarthook/start-system-namespaces-controller ok",
+		"[+]poststarthook/start-services-repair-controller ok",
 		"[+]poststarthook/scheduling/bootstrap-system-priority-classes ok",
 		"[+]poststarthook/start-cluster-authentication-info-controller ok",
 		"[+]poststarthook/start-kube-aggregator-informers ok",
@@ -54,6 +55,7 @@ var (
 		"[+]autoregister-completion ok",
 		"[+]poststarthook/apiservice-openapi-controller ok",
 	)
+
 	requiredLivezChecks = sets.NewString(
 		"[+]ping ok",
 		"[+]log ok",
@@ -66,6 +68,7 @@ var (
 		"[+]poststarthook/bootstrap-controller ok",
 		"[+]poststarthook/start-default-service-controller ok",
 		"[+]poststarthook/start-system-namespaces-controller ok",
+		"[+]poststarthook/start-services-repair-controller ok",
 		"[+]poststarthook/scheduling/bootstrap-system-priority-classes ok",
 		"[+]poststarthook/start-cluster-authentication-info-controller ok",
 		"[+]poststarthook/start-kube-aggregator-informers ok",
@@ -88,6 +91,7 @@ var (
 		"[+]poststarthook/bootstrap-controller ok",
 		"[+]poststarthook/start-default-service-controller ok",
 		"[+]poststarthook/start-system-namespaces-controller ok",
+		"[+]poststarthook/start-services-repair-controller ok",
 		"[+]poststarthook/scheduling/bootstrap-system-priority-classes ok",
 		"[+]poststarthook/start-cluster-authentication-info-controller ok",
 		"[+]poststarthook/start-kube-aggregator-informers ok",

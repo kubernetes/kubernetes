@@ -25,6 +25,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	netutils "k8s.io/utils/net"
@@ -53,11 +55,13 @@ func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 
 func TestRepair(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	serviceLister := listers.NewServiceLister(serviceStore)
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
 	}
 	_, cidr, _ := netutils.ParseCIDRSloppy(ipregistry.item.Range)
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
+	r := NewRepair(0, serviceLister, fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 
 	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
@@ -70,7 +74,7 @@ func TestRepair(t *testing.T) {
 		item:      &api.RangeAllocation{Range: "192.168.1.0/24"},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
+	r = NewRepair(0, serviceLister, fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 	if err := r.runOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
@@ -91,6 +95,8 @@ func TestRepairLeak(t *testing.T) {
 	}
 
 	fakeClient := fake.NewSimpleClientset()
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	serviceLister := listers.NewServiceLister(serviceStore)
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
 			ObjectMeta: metav1.ObjectMeta{
@@ -101,7 +107,7 @@ func TestRepairLeak(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
+	r := NewRepair(0, serviceLister, fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
 		if err := r.runOnce(); err != nil {
@@ -141,8 +147,8 @@ func TestRepairWithExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fakeClient := fake.NewSimpleClientset(
-		&corev1.Service{
+	services := []*corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "one"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.1",
@@ -150,7 +156,7 @@ func TestRepairWithExisting(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
-		&corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "two", Name: "two"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.100",
@@ -158,7 +164,7 @@ func TestRepairWithExisting(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
-		&corev1.Service{ // outside CIDR, will be dropped
+		{ // outside CIDR, will be dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "three", Name: "three"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.0.1",
@@ -166,14 +172,14 @@ func TestRepairWithExisting(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
-		&corev1.Service{ // empty, ignored
+		{ // empty, ignored
 			ObjectMeta: metav1.ObjectMeta{Namespace: "four", Name: "four"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "",
 				ClusterIPs: []string{""},
 			},
 		},
-		&corev1.Service{ // duplicate, dropped
+		{ // duplicate, dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "five", Name: "five"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.1",
@@ -181,14 +187,20 @@ func TestRepairWithExisting(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
-		&corev1.Service{ // headless
+		{ // headless
 			ObjectMeta: metav1.ObjectMeta{Namespace: "six", Name: "six"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "None",
 				ClusterIPs: []string{"None"},
 			},
 		},
-	)
+	}
+	fakeClient := fake.NewSimpleClientset()
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	for _, svc := range services {
+		serviceStore.Add(svc)
+	}
+	serviceLister := listers.NewServiceLister(serviceStore)
 
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
@@ -199,7 +211,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
+	r := NewRepair(0, serviceLister, fakeClient.EventsV1(), cidr, ipregistry, nil, nil)
 	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
@@ -282,6 +294,8 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			fakeClient := makeFakeClientSet()
+			serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			serviceLister := listers.NewServiceLister(serviceStore)
 			primaryRegistry := makeRangeRegistry(t, tc.primaryNet.String())
 			var secondaryRegistry *mockRangeRegistry
 
@@ -289,7 +303,7 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 				secondaryRegistry = makeRangeRegistry(t, tc.secondaryNet.String())
 			}
 
-			repair := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), tc.primaryNet, primaryRegistry, tc.secondaryNet, secondaryRegistry)
+			repair := NewRepair(0, serviceLister, fakeClient.EventsV1(), tc.primaryNet, primaryRegistry, tc.secondaryNet, secondaryRegistry)
 			if len(repair.allocatorByFamily) != len(tc.expectedFamilies) {
 				t.Fatalf("expected to have allocator by family count:%v got %v", len(tc.expectedFamilies), len(repair.allocatorByFamily))
 			}
@@ -324,6 +338,8 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 
 func TestRepairDualStack(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	serviceLister := listers.NewServiceLister(serviceStore)
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
 	}
@@ -333,7 +349,7 @@ func TestRepairDualStack(t *testing.T) {
 
 	_, cidr, _ := netutils.ParseCIDRSloppy(ipregistry.item.Range)
 	_, secondaryCIDR, _ := netutils.ParseCIDRSloppy(secondaryIPRegistry.item.Range)
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
+	r := NewRepair(0, serviceLister, fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 
 	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
@@ -354,7 +370,7 @@ func TestRepairDualStack(t *testing.T) {
 		updateErr: fmt.Errorf("test error"),
 	}
 
-	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
+	r = NewRepair(0, serviceLister, fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 	if err := r.runOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
@@ -389,6 +405,8 @@ func TestRepairLeakDualStack(t *testing.T) {
 	}
 
 	fakeClient := fake.NewSimpleClientset()
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	serviceLister := listers.NewServiceLister(serviceStore)
 
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
@@ -409,7 +427,7 @@ func TestRepairLeakDualStack(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
+	r := NewRepair(0, serviceLister, fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
 		if err := r.runOnce(); err != nil {
@@ -481,8 +499,9 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fakeClient := fake.NewSimpleClientset(
-		&corev1.Service{
+	fakeClient := fake.NewSimpleClientset()
+	services := []*corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x1", Name: "one-v4-v6"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.1",
@@ -490,7 +509,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol},
 			},
 		},
-		&corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x2", Name: "one-v6-v4"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "2000::1",
@@ -498,7 +517,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv6Protocol, corev1.IPv4Protocol},
 			},
 		},
-		&corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x3", Name: "two-6"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "2000::2",
@@ -506,7 +525,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv6Protocol},
 			},
 		},
-		&corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x4", Name: "two-4"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.90",
@@ -515,7 +534,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			},
 		},
 		// outside CIDR, will be dropped
-		&corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x5", Name: "out-v4"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.0.1",
@@ -523,7 +542,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
-		&corev1.Service{ // outside CIDR, will be dropped
+		{ // outside CIDR, will be dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x6", Name: "out-v6"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "3000::1",
@@ -531,7 +550,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv6Protocol},
 			},
 		},
-		&corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x6", Name: "out-v4-v6"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.0.1",
@@ -539,7 +558,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol},
 			},
 		},
-		&corev1.Service{
+		{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x6", Name: "out-v6-v4"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "3000::1",
@@ -548,11 +567,11 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			},
 		},
 
-		&corev1.Service{ // empty, ignored
+		{ // empty, ignored
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x7", Name: "out-empty"},
 			Spec:       corev1.ServiceSpec{ClusterIP: ""},
 		},
-		&corev1.Service{ // duplicate, dropped
+		{ // duplicate, dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x8", Name: "duplicate"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.1",
@@ -560,7 +579,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
-		&corev1.Service{ // duplicate, dropped
+		{ // duplicate, dropped
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x9", Name: "duplicate-v6"},
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "2000::2",
@@ -569,11 +588,16 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			},
 		},
 
-		&corev1.Service{ // headless
+		{ // headless
 			ObjectMeta: metav1.ObjectMeta{Namespace: "x10", Name: "headless"},
 			Spec:       corev1.ServiceSpec{ClusterIP: "None"},
 		},
-	)
+	}
+	serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	for _, svc := range services {
+		serviceStore.Add(svc)
+	}
+	serviceLister := listers.NewServiceLister(serviceStore)
 
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{
@@ -595,7 +619,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
+	r := NewRepair(0, serviceLister, fakeClient.EventsV1(), cidr, ipregistry, secondaryCIDR, secondaryIPRegistry)
 	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}

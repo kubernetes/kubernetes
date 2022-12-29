@@ -17,38 +17,27 @@ limitations under the License.
 package controlplane
 
 import (
-	"net"
-	"sync"
+	"context"
+	"strings"
 	"time"
 
-	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
-	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
-	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller"
-	"k8s.io/kubernetes/pkg/util/async"
 )
 
-// Controller is the controller manager for the core bootstrap Kubernetes
-// controller loops, and provide the IP repair check on service IPs
+// Controller is only used to keep backwards compatibility
+// and publish the "poststarthook/bootstrap-controller" health/readyz/livez handler
+// All its functions were split to the following controllers:
+// - start-default-service-controller
+// - start-system-namespaces-controller
+// - start-services-repair-controller
+// and its state depend on the state of the previous.
 type Controller struct {
 	client kubernetes.Interface
-
-	ServiceClusterIPRegistry          rangeallocation.RangeRegistry
-	ServiceClusterIPRange             net.IPNet
-	SecondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
-	SecondaryServiceClusterIPRange    net.IPNet
-
-	ServiceClusterIPInterval time.Duration
-
-	ServiceNodePortRegistry rangeallocation.RangeRegistry
-	ServiceNodePortInterval time.Duration
-	ServiceNodePortRange    utilnet.PortRange
-
-	runner *async.Runner
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
@@ -56,82 +45,33 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 
 	return &Controller{
 		client: client,
-
-		ServiceClusterIPRegistry:          legacyRESTStorage.ServiceClusterIPAllocator,
-		ServiceClusterIPRange:             c.ExtraConfig.ServiceIPRange,
-		SecondaryServiceClusterIPRegistry: legacyRESTStorage.SecondaryServiceClusterIPAllocator,
-		SecondaryServiceClusterIPRange:    c.ExtraConfig.SecondaryServiceIPRange,
-
-		ServiceClusterIPInterval: c.ExtraConfig.RepairServicesInterval,
-
-		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
-		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		ServiceNodePortInterval: c.ExtraConfig.RepairServicesInterval,
 	}, nil
+}
+
+// Start checks the controllers are ready
+func (c *Controller) Start(stopCh <-chan struct{}) {
+	klog.Infof("Starting bootstrap-controller")
+	defer klog.Infof("Shutting down bootstrap-controller")
+	requiredChecks := sets.NewString(
+		"[+]poststarthook/start-default-service-controller ok",
+		"[+]poststarthook/start-system-namespaces-controller ok",
+		"[+]poststarthook/start-services-repair-controller ok",
+	)
+	wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+		body, err := c.client.CoreV1().RESTClient().Get().RequestURI("/healthz?verbose=1").DoRaw(context.Background())
+		if err == nil {
+			klog.Fatal("API server ready but bootstrap controller is not ready")
+		}
+		checks := sets.NewString(strings.Split(string(body), "\n")...)
+		if missing := requiredChecks.Difference(checks); missing.Len() > 0 {
+			return false, nil
+		}
+		return true, nil
+	}, stopCh)
 }
 
 // PostStartHook initiates the core controller loops that must exist for bootstrapping.
 func (c *Controller) PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
-	c.Start()
+	c.Start(hookContext.StopCh)
 	return nil
-}
-
-// PreShutdownHook triggers the actions needed to shut down the API Server cleanly.
-func (c *Controller) PreShutdownHook() error {
-	c.Stop()
-	return nil
-}
-
-// Start begins the core controller loops that must exist for bootstrapping
-// a cluster.
-func (c *Controller) Start() {
-	if c.runner != nil {
-		return
-	}
-
-	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.client.CoreV1(), c.client.EventsV1(), &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
-	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.client.CoreV1(), c.client.EventsV1(), c.ServiceNodePortRange, c.ServiceNodePortRegistry)
-
-	// We start both repairClusterIPs and repairNodePorts to ensure repair
-	// loops of ClusterIPs and NodePorts.
-	// We run both repair loops using RunUntil public interface.
-	// However, we want to fail liveness/readiness until the first
-	// successful repair loop, so we basically pass appropriate
-	// callbacks to RunUtil methods.
-	// Additionally, we ensure that we don't wait for it for longer
-	// than 1 minute for backward compatibility of failing the whole
-	// apiserver if we can't repair them.
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	runRepairClusterIPs := func(stopCh chan struct{}) {
-		repairClusterIPs.RunUntil(wg.Done, stopCh)
-	}
-	runRepairNodePorts := func(stopCh chan struct{}) {
-		repairNodePorts.RunUntil(wg.Done, stopCh)
-	}
-
-	c.runner = async.NewRunner(runRepairClusterIPs, runRepairNodePorts)
-	c.runner.Start()
-
-	// For backward compatibility, we ensure that if we never are able
-	// to repair clusterIPs and/or nodeports, we not only fail the liveness
-	// and/or readiness, but also explicitly fail.
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		wg.Wait()
-	}()
-	select {
-	case <-done:
-	case <-time.After(time.Minute):
-		klog.Fatalf("Unable to perform initial IP and Port allocation check")
-	}
-}
-
-// Stop cleans up this API Servers endpoint reconciliation leases so another master can take over more quickly.
-func (c *Controller) Stop() {
-	if c.runner != nil {
-		c.runner.Stop()
-	}
 }

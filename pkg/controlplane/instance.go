@@ -85,6 +85,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservice"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
+	"k8s.io/kubernetes/pkg/controlplane/controller/servicesrepair"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
@@ -611,12 +612,26 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 	m.GenericAPIServer.AddPostStartHookOrDie("start-default-service-controller", defaultServiceController.PostStartHook)
 	m.GenericAPIServer.AddPreShutdownHookOrDie("start-default-service-controller", defaultServiceController.PreShutdownHook)
 
+	// repair Services ClusterIPs and NodePorts
+	m.GenericAPIServer.AddPostStartHookOrDie("start-services-repair-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		go servicesrepair.NewController(
+			client,
+			c.ExtraConfig.VersionedInformers.Core().V1().Services(),
+			legacyRESTStorage.ServiceClusterIPAllocator,
+			c.ExtraConfig.ServiceIPRange,
+			legacyRESTStorage.SecondaryServiceClusterIPAllocator,
+			c.ExtraConfig.SecondaryServiceIPRange,
+			legacyRESTStorage.ServiceNodePortAllocator,
+			c.ExtraConfig.ServiceNodePortRange,
+			c.ExtraConfig.RepairServicesInterval).Run(hookContext.StopCh)
+		return nil
+	})
+
 	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, client)
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)
 	}
 	m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", bootstrapController.PostStartHook)
-	m.GenericAPIServer.AddPreShutdownHookOrDie("bootstrap-controller", bootstrapController.PreShutdownHook)
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
 		return fmt.Errorf("error in registering group versions: %v", err)
