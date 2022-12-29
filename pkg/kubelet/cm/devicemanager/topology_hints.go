@@ -136,7 +136,7 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 	return deviceHints
 }
 
-func (m *ManagerImpl) deviceHasTopologyAlignment(resource string) bool {
+func (m *ManagerImpl) deviceHasTopologyAlignmentLocked(resource string) bool {
 	// If any device has Topology NUMANodes available, we assume they care about alignment.
 	for _, device := range m.allDevices[resource] {
 		if device.Topology != nil && len(device.Topology.Nodes) > 0 {
@@ -144,6 +144,12 @@ func (m *ManagerImpl) deviceHasTopologyAlignment(resource string) bool {
 		}
 	}
 	return false
+}
+
+func (m *ManagerImpl) deviceHasTopologyAlignment(resource string) bool {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.deviceHasTopologyAlignmentLocked(resource)
 }
 
 func (m *ManagerImpl) getAvailableDevices(resource string) sets.String {

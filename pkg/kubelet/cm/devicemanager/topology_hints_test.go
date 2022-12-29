@@ -456,7 +456,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 		}
 
 		alignment := make(map[int]int)
-		if m.deviceHasTopologyAlignment(tc.resource) {
+		if m.deviceHasTopologyAlignmentLocked(tc.resource) {
 			for d := range allocated {
 				if m.allDevices[tc.resource][d].Topology != nil {
 					alignment[int(m.allDevices[tc.resource][d].Topology.Nodes[0].ID)]++
