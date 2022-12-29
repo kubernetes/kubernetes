@@ -373,6 +373,13 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeProxyFirewallChain, utiliptables.ChainForward, "kubernetes load balancer firewall", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
+}
+
+// Duplicates of chains created in pkg/kubelet/kubelet_network_linux.go; we create these
+// on startup but do not delete them in CleanupLeftovers.
+var iptablesKubeletJumpChains = []iptablesJumpChain{
+	// Move this to iptablesJumpChains once IPTablesOwnershipCleanup is GA and kubelet
+	// no longer creates this chain,
 	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
 }
 
@@ -875,7 +882,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// already exist, so we'll skip this step when doing a partial sync, to
 		// save us from having to invoke /sbin/iptables 20 times on each sync
 		// (which will be very slow on hosts with lots of iptables rules).
-		for _, jump := range iptablesJumpChains {
+		for _, jump := range append(iptablesJumpChains, iptablesKubeletJumpChains...) {
 			if _, err := proxier.iptables.EnsureChain(jump.table, jump.dstChain); err != nil {
 				klog.ErrorS(err, "Failed to ensure chain exists", "table", jump.table, "chain", jump.dstChain)
 				return
