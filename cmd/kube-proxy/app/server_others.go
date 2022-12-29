@@ -167,7 +167,7 @@ func newProxyServer(
 
 	for _, perFamilyIpt := range ipt {
 		if !perFamilyIpt.Present() {
-			klog.V(0).InfoS("kube-proxy running in single-stack mode, this ipFamily is not supported", "ipFamily", perFamilyIpt.Protocol())
+			klog.InfoS("kube-proxy running in single-stack mode, this ipFamily is not supported", "ipFamily", perFamilyIpt.Protocol())
 			dualStack = false
 		}
 	}
