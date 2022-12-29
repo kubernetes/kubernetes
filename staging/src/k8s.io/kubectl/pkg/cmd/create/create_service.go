@@ -281,7 +281,7 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeNodePort)
 
 	cmd := &cobra.Command{
-		Use:                   "nodeport NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
+		Use:                   "service nodeport NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a NodePort service"),
 		Long:                  serviceNodePortLong,
@@ -318,7 +318,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericcliopti
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeLoadBalancer)
 
 	cmd := &cobra.Command{
-		Use:                   "loadbalancer NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
+		Use:                   "service loadbalancer NAME [--tcp=port:targetPort] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a LoadBalancer service"),
 		Long:                  serviceLoadBalancerLong,
@@ -358,7 +358,7 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericcliopti
 	o := NewServiceOptions(ioStreams, corev1.ServiceTypeExternalName)
 
 	cmd := &cobra.Command{
-		Use:                   "externalname NAME --external-name external.name [--dry-run=server|client|none]",
+		Use:                   "service externalname NAME --external-name external.name [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create an ExternalName service"),
 		Long:                  serviceExternalNameLong,
