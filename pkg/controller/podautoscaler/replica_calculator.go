@@ -79,7 +79,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 	removeMetricsForPods(metrics, ignoredPods)
 	removeMetricsForPods(metrics, unreadyPods)
 	if len(metrics) == 0 {
-		return 0, 0, 0, time.Time{}, fmt.Errorf("did not receive metrics for any ready pods")
+		return 0, 0, 0, time.Time{}, fmt.Errorf("did not receive metrics for targetted pods (pods might be unready)")
 	}
 
 	requests, err := calculatePodRequests(podList, container, resource)
@@ -191,7 +191,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	removeMetricsForPods(metrics, unreadyPods)
 
 	if len(metrics) == 0 {
-		return 0, 0, fmt.Errorf("did not receive metrics for any ready pods")
+		return 0, 0, fmt.Errorf("did not receive metrics for targetted pods (pods might be unready)")
 	}
 
 	usageRatio, usage := metricsclient.GetMetricUsageRatio(metrics, targetUsage)
