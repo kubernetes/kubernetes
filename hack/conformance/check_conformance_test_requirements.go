@@ -56,7 +56,7 @@ func checkAllProviders(e2eFile string) error {
 		line := scanner.Text()
 		if regStartConformance.MatchString(line) {
 			if inConformanceCode {
-				return errors.New("Missed the end of previous conformance test. There might be a bug in this script.")
+				return errors.New("missed the end of previous conformance test. there might be a bug in this script")
 			}
 			inConformanceCode = true
 		}
@@ -72,10 +72,10 @@ func checkAllProviders(e2eFile string) error {
 		}
 	}
 	if inConformanceCode {
-		return errors.New("Missed the end of previous conformance test. There might be a bug in this script.")
+		return errors.New("missed the end of previous conformance test. there might be a bug in this script")
 	}
 	if checkFailed {
-		return errors.New("We need to fix the above errors.")
+		return errors.New("we need to fix the above errors")
 	}
 	return nil
 }

@@ -503,16 +503,16 @@ func reverseSelect(key Key, want ...Key) expectation {
 
 func emptyMap(m *BiMultimap) error {
 	if len(m.labeledObjects) != 0 {
-		return fmt.Errorf("Found %v labeledObjects. Wanted none.", len(m.labeledObjects))
+		return fmt.Errorf("found %v labeledObjects. wanted none", len(m.labeledObjects))
 	}
 	if len(m.selectingObjects) != 0 {
-		return fmt.Errorf("Found %v selectingObjects. Wanted none.", len(m.selectingObjects))
+		return fmt.Errorf("found %v selectingObjects. wanted none", len(m.selectingObjects))
 	}
 	if len(m.labeledBySelecting) != 0 {
-		return fmt.Errorf("Found %v cached labeledBySelecting associations. Wanted none.", len(m.labeledBySelecting))
+		return fmt.Errorf("found %v cached labeledBySelecting associations. wanted none", len(m.labeledBySelecting))
 	}
 	if len(m.selectingByLabeled) != 0 {
-		return fmt.Errorf("Found %v cached selectingByLabeled associations. Wanted none.", len(m.selectingByLabeled))
+		return fmt.Errorf("found %v cached selectingByLabeled associations. wanted none", len(m.selectingByLabeled))
 	}
 	return nil
 }
