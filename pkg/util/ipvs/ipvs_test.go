@@ -79,7 +79,7 @@ func TestVirtualServerEqual(t *testing.T) {
 				Timeout:   0,
 			},
 			svcB: &VirtualServer{
-				Address:   netutils.ParseIPSloppy("2012::beeef"),
+				Address:   netutils.ParseIPSloppy("2012::beef"),
 				Protocol:  "UDP",
 				Port:      0,
 				Scheduler: "wrr",
@@ -199,7 +199,7 @@ func TestVirtualServerEqual(t *testing.T) {
 				Timeout:   0,
 			},
 			svcB: &VirtualServer{
-				Address:   netutils.ParseIPSloppy("2012::beeef"),
+				Address:   netutils.ParseIPSloppy("2012::beef"),
 				Protocol:  "SCTP",
 				Port:      0,
 				Scheduler: "wrr",
