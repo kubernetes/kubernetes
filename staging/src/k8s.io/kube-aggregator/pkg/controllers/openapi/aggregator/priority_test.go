@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32, svc *apiregistrationv1.ServiceReference) apiregistrationv1.APIService {
@@ -48,19 +47,15 @@ func TestAPIServiceSort(t *testing.T) {
 	list := []openAPISpecInfo{
 		{
 			apiService: newAPIServiceForTest("FirstService", "Group1", 10, 5, &apiregistrationv1.ServiceReference{}),
-			spec:       &spec.Swagger{},
 		},
 		{
 			apiService: newAPIServiceForTest("SecondService", "Group2", 15, 3, &apiregistrationv1.ServiceReference{}),
-			spec:       &spec.Swagger{},
 		},
 		{
 			apiService: newAPIServiceForTest("FirstServiceInternal", "Group1", 16, 3, &apiregistrationv1.ServiceReference{}),
-			spec:       &spec.Swagger{},
 		},
 		{
 			apiService: newAPIServiceForTest("ThirdService", "Group3", 15, 3, &apiregistrationv1.ServiceReference{}),
-			spec:       &spec.Swagger{},
 		},
 		{
 			apiService: newAPIServiceForTest("local_service_1", "Group4", 15, 1, nil),
