@@ -705,6 +705,20 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	translatedUID := m.podManager.TranslatePodUID(pod.UID)
 	// Type convert original uid just for the purpose of comparison.
 	if len(translatedUID) > 0 && translatedUID != kubetypes.ResolvedPodUID(uid) {
+		if kubetypes.IsMirrorPod(pod) {
+			// if the mirror pod for its static pod has not received by pod manager(at kubelet start time),
+			// we should not delete static pod status immediately, otherwise we may lose initial pod status like
+			// UnexpectedAdmissionError
+			staticPod, ok := m.podManager.GetPodByUID(uid)
+			if ok {
+				_, ok := m.podManager.GetMirrorPodByPod(staticPod)
+				if !ok {
+					klog.V(2).InfoS("MirrorPod has not been received by pod manager yet, skipping cleanup pod status",
+						"pod", klog.KObj(pod))
+					return
+				}
+			}
+		}
 		klog.V(2).InfoS("Pod was deleted and then recreated, skipping status update",
 			"pod", klog.KObj(pod),
 			"oldPodUID", uid,

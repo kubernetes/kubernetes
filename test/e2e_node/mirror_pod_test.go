@@ -24,6 +24,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubelet/apis/config"
+
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -196,6 +200,72 @@ var _ = SIGDescribe("MirrorPod", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 	})
+
+	ginkgo.Context("static pod admit failed when kubelet start", func() {
+		var (
+			oldCfg, newCfg                 *config.KubeletConfiguration
+			ns, podPath                    string
+			staticPodNames, mirrorPodNames []string
+			err                            error
+		)
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			oldCfg, err = getCurrentKubeletConfig(ctx)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.AfterEach(func(ctx context.Context) {
+			// rollback kubelet config
+			updateKubeletConfig(ctx, f, oldCfg, true)
+
+			for idx, staticPodName := range staticPodNames {
+				ginkgo.By("delete the static pod " + staticPodName)
+				err = deleteStaticPod(podPath, staticPodName, ns)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("wait for the mirror pod " + mirrorPodNames[idx] + " to disappear")
+				gomega.Eventually(func() error {
+					return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodNames[idx], ns)
+				}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+			}
+		})
+		ginkgo.It("should become Failed and have reason UnexpectedAdmissionError [NodeConformance] [Serial]", func(ctx context.Context) {
+			ns = f.Namespace.Name
+			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+
+			staticPodNames = []string{"static-pod1" + string(uuid.NewUUID()), "static-pod2" + string(uuid.NewUUID())}
+			mirrorPodNames = []string{staticPodNames[0] + "-" + framework.TestContext.NodeName, staticPodNames[1] + "-" + framework.TestContext.NodeName}
+
+			for idx, staticPodName := range staticPodNames {
+				ginkgo.By("create the static pod " + staticPodName)
+				err := createStaticPod(podPath, staticPodName, ns,
+					imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("wait for the mirror pod " + mirrorPodNames[idx] + " to be running")
+				gomega.Eventually(func() error {
+					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodNames[idx], ns)
+				}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+			}
+
+			// modify maxPods to 1 to trigger admission failure for static pod
+			newCfg = oldCfg.DeepCopy()
+			newCfg.MaxPods = 1
+			updateKubeletConfig(ctx, f, newCfg, true)
+
+			ginkgo.By("wait for the mirror pod to be failed")
+			gomega.Eventually(func() error {
+				// one pod should admit failed
+				err1 := checkMirrorPodAdmitFailed(ctx, f.ClientSet, mirrorPodNames[0], ns)
+				if err1 == nil {
+					return nil
+				}
+				err2 := checkMirrorPodAdmitFailed(ctx, f.ClientSet, mirrorPodNames[1], ns)
+				return err2
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+		})
+	})
 })
 
 func staticPodPath(dir, name, namespace string) string {
@@ -253,6 +323,20 @@ func checkMirrorPodRunning(ctx context.Context, cl clientset.Interface, name, na
 		if pod.Status.ContainerStatuses[i].State.Running == nil {
 			return fmt.Errorf("expected the mirror pod %q with container %q to be running (got containers=%v)", name, pod.Status.ContainerStatuses[i].Name, pod.Status.ContainerStatuses[i].State)
 		}
+	}
+	return validateMirrorPod(ctx, cl, pod)
+}
+
+func checkMirrorPodAdmitFailed(ctx context.Context, cl clientset.Interface, name, namespace string) error {
+	pod, err := cl.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
+	}
+	if pod.Status.Phase != v1.PodFailed {
+		return fmt.Errorf("expected the mirror pod %q to be failed, got %q", name, pod.Status.Phase)
+	}
+	if pod.Status.Reason != admission.ErrorReasonUnexpected {
+		return fmt.Errorf("expected the mirror pod %q to be UnexpectedAdmissionError, got %q", name, pod.Status.Reason)
 	}
 	return validateMirrorPod(ctx, cl, pod)
 }

@@ -1937,3 +1937,35 @@ func getPodStatus() v1.PodStatus {
 		Message: "Message",
 	}
 }
+
+func TestStaticPodSyncWithoutMirrorPod(t *testing.T) {
+	staticPod := getTestPod()
+	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
+	mirrorPod := getTestPod()
+	mirrorPod.UID = "mirror-12345678"
+	mirrorPod.Annotations = map[string]string{
+		kubetypes.ConfigSourceAnnotationKey: "api",
+		kubetypes.ConfigMirrorAnnotationKey: "mirror",
+	}
+	client := fake.NewSimpleClientset(mirrorPod)
+	m := newTestManager(client)
+
+	t.Logf("Create the static pod")
+	m.podManager.AddPod(staticPod)
+	assert.True(t, kubetypes.IsStaticPod(staticPod), "SetUp error: staticPod")
+
+	status := getRandomPodStatus()
+	now := metav1.Now()
+	status.StartTime = &now
+	m.SetPodStatus(staticPod, status)
+
+	t.Logf("Should not sync pod to apiserver because there is no corresponding mirror pod for the static pod and should not call deletePodStatus.")
+	syncRequest := <-m.podStatusChannel
+	m.syncPod(syncRequest.podUID, syncRequest.status)
+
+	t.Logf("Should be able to get the static pod status from status manager")
+	retrievedStatus := expectPodStatus(t, m, staticPod)
+	normalizeStatus(staticPod, &status)
+	assert.True(t, isPodStatusByKubeletEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
+
+}
