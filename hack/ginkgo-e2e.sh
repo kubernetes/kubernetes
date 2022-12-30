@@ -152,9 +152,9 @@ if [[ "${GINKGO_UNTIL_IT_FAILS:-}" == true ]]; then
   ginkgo_args+=("--untilItFails=true")
 fi
 
-FLAKE_ATTEMPTS=1
+FLAKE_ATTEMPTS=0
 if [[ "${GINKGO_TOLERATE_FLAKES}" == "y" ]]; then
-  FLAKE_ATTEMPTS=2
+  FLAKE_ATTEMPTS=1
 fi
 ginkgo_args+=("--flake-attempts=${FLAKE_ATTEMPTS}")
 
