@@ -1536,9 +1536,6 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			if !reflect.DeepEqual(got, tc.expectedReturnVal) {
 				t.Errorf("EndpointSliceUpdate return value got: %v, want %v", got, tc.expectedReturnVal)
 			}
-			if tc.endpointChangeTracker.items == nil {
-				t.Errorf("Expected ect.items to not be nil")
-			}
 
 			pendingChanges := tc.endpointChangeTracker.PendingChanges()
 			if !pendingChanges.Equal(tc.expectedChangedEndpoints) {

@@ -518,11 +518,6 @@ func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
 		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
 		endpointsMap:   make(EndpointsMap),
 		endpointsChanges: &EndpointChangeTracker{
-			hostname:                  testHostname,
-			items:                     make(map[types.NamespacedName]*endpointsChange),
-			makeEndpointInfo:          nil,
-			ipFamily:                  ipFamily,
-			recorder:                  nil,
 			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 			trackerStartTime:          t,
 			processEndpointsMapChange: nil,
