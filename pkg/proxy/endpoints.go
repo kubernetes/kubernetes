@@ -293,7 +293,9 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 		// we want to measure. So we simply ignore it in this cases.
 		// TODO(wojtek-t, robscott): Address the problem for EndpointSlice deletion
 		// when other EndpointSlice for that service still exist.
-		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() && !removeSlice && t.After(ect.trackerStartTime) {
+		if removeSlice {
+			delete(ect.lastChangeTriggerTimes, namespacedName)
+		} else if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() && t.After(ect.trackerStartTime) {
 			ect.lastChangeTriggerTimes[namespacedName] =
 				append(ect.lastChangeTriggerTimes[namespacedName], t)
 		}
