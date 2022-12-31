@@ -50,10 +50,10 @@ import (
 )
 
 func TestSchedulerCreation(t *testing.T) {
-	invalidRegistry := map[string]frameworkruntime.PluginFactory{
+	invalidRegistry := map[set]frameworkruntime.PluginFactory{
 		defaultbinder.Name: defaultbinder.New,
 	}
-	validRegistry := map[string]frameworkruntime.PluginFactory{
+	validRegistry := map[set]frameworkruntime.PluginFactory{
 		"Foo": defaultbinder.New,
 	}
 	cases := []struct {
@@ -517,12 +517,12 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 	tests := []struct {
 		name string
 		// the plugin registration ordering must not matter, being map traversal random
-		entrypoints map[string]frameworkruntime.PluginFactory
+		entrypoints map[set]frameworkruntime.PluginFactory
 		wantErr     string
 	}{
 		{
 			name: "register indexer, no conflicts",
-			entrypoints: map[string]frameworkruntime.PluginFactory{
+			entrypoints: map[set]frameworkruntime.PluginFactory{
 				"AddIndexer": func(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
@@ -535,7 +535,7 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 		{
 			name: "register the same indexer name multiple times, conflict",
 			// order of registration doesn't matter
-			entrypoints: map[string]frameworkruntime.PluginFactory{
+			entrypoints: map[set]frameworkruntime.PluginFactory{
 				"AddIndexer1": func(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
@@ -556,7 +556,7 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 		{
 			name: "register the same indexer body with different names, no conflicts",
 			// order of registration doesn't matter
-			entrypoints: map[string]frameworkruntime.PluginFactory{
+			entrypoints: map[set]frameworkruntime.PluginFactory{
 				"AddIndexer1": func(obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 					podInformer := handle.SharedInformerFactory().Core().V1().Pods()
 					err := podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
