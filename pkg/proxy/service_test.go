@@ -526,6 +526,7 @@ func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
 			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 			trackerStartTime:          t,
 			processEndpointsMapChange: nil,
+			endpointSliceCache:        NewEndpointSliceCache(testHostname, ipFamily, nil, nil),
 		},
 	}
 }
