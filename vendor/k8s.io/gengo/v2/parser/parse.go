@@ -80,7 +80,7 @@ func New(includeTestFiles bool, buildTags ...string) *Builder {
 	}
 }
 
-//FIXME: comment
+// FIXME: comment
 func (b *Builder) AddDirs(dirs []string) error {
 	_, err := b.loadDirs(dirs)
 	return err
@@ -141,7 +141,7 @@ func (b *Builder) loadDirs(dirs []string) ([]*packages.Package, error) {
 	return pkgs, nil
 }
 
-//FIXME: this should be "addPkgsTo"?
+// FIXME: this should be "addPkgsTo"?
 func (b *Builder) AddDirsTo(dirs []string, u *types.Universe) error {
 	pkgs, err := b.loadDirs(dirs)
 	if err != nil {
@@ -161,7 +161,7 @@ func (b *Builder) AddDirsTo(dirs []string, u *types.Universe) error {
 	return nil
 }
 
-//FIXME: comment
+// FIXME: comment
 func (b *Builder) processPkg(pkg *packages.Package, userRequested bool) {
 	klog.V(5).Infof("processPkg %q", pkg.ID)
 
@@ -245,7 +245,7 @@ func (b *Builder) addCommentsToType(obj tc.Object, t *types.Type) {
 	}
 }
 
-//FIXME: hack - store in Builder
+// FIXME: hack - store in Builder
 var typesFound = map[importPathString]bool{}
 
 // findTypesIn finalizes the package import and searches through the package
@@ -280,6 +280,7 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 	//FIXME: store the pkg instead of these fields
 	u.Package(string(pkgPath)).Name = pkg.Name
 	u.Package(string(pkgPath)).Path = pkg.ID // FIXME or pkgPath?  see go core vendor weirdness (handled in go2make)
+	//FIXME: .Path is set by the index op above
 	u.Package(string(pkgPath)).SourcePath = absPath
 
 	for i, f := range pkg.Syntax {
