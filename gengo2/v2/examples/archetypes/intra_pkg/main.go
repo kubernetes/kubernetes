@@ -81,16 +81,17 @@ func validateArgs(stdArgs *args.GeneratorArgs) error {
 // FIXME: just say []NameSystem instead of a type
 func getGlobalNamers() namer.NameSystems {
 	return namer.NameSystems{
-		// FIXME: why 0?
+		// This namer is used for generating UpperCamelCase names.  Since we
+		// only handle types within a package, we don't need any additional
+		// parts of the package name (the 0 argument).
 		"public": namer.NewPublicNamer(0),
-		// FIXME: why do this with no import tracking?
-		"raw": namer.NewRawNamer("", nil),
 	}
 }
 
 // getDefaultNamer returns the default name system for ordering the types to be
 // processed by the generators in this package.
 func getDefaultNamer() string {
+	// For this tool, order only matters within a package, so this will suffice.
 	return "public"
 }
 
