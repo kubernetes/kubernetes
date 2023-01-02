@@ -645,6 +645,14 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContext)
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContextList)
+
+	ipAddressColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "ParentRef", Type: "string", Description: networkingv1alpha1.IPAddressSpec{}.SwaggerDoc()["parentRef"]},
+	}
+
+	h.TableHandler(ipAddressColumnDefinitions, printIPAddress)
+	h.TableHandler(ipAddressColumnDefinitions, printIPAddressList)
 }
 
 // Pass ports=nil for all ports.
@@ -2771,6 +2779,41 @@ func printClusterCIDRList(list *networking.ClusterCIDRList, options printers.Gen
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printClusterCIDR(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printIPAddress(obj *networking.IPAddress, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	parentRefName := "<none>"
+	if obj.Spec.ParentRef != nil {
+		gr := schema.GroupResource{
+			Group:    obj.Spec.ParentRef.Group,
+			Resource: obj.Spec.ParentRef.Resource,
+		}
+		parentRefName = strings.ToLower(gr.String())
+		if obj.Spec.ParentRef.Namespace != "" {
+			parentRefName += "/" + obj.Spec.ParentRef.Namespace
+		}
+		parentRefName += "/" + obj.Spec.ParentRef.Name
+	}
+	age := translateTimestampSince(obj.CreationTimestamp)
+	row.Cells = append(row.Cells, obj.Name, parentRefName, age)
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printIPAddressList(list *networking.IPAddressList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printIPAddress(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
