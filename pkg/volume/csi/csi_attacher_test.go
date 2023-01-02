@@ -25,7 +25,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"reflect"
-	goruntime "runtime"
 	"sync"
 	"testing"
 	"time"
@@ -1105,7 +1104,6 @@ func TestAttacherMountDevice(t *testing.T) {
 		expectedVolumeMountGroup       string
 		driverSupportsVolumeMountGroup bool
 		shouldFail                     bool
-		skipOnWindows                  bool
 		createAttachment               bool
 		populateDeviceMountPath        bool
 		exitError                      error
@@ -1209,11 +1207,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			createAttachment:        true,
 			populateDeviceMountPath: true,
 			shouldFail:              true,
-			// NOTE: We're skipping this test on Windows because os.Chmod is not working as intended, which means that
-			// this test won't fail on Windows due to permission denied errors.
-			// TODO: Remove the skip once Windows file permissions support is added.
-			// https://github.com/kubernetes/kubernetes/pull/110921
-			skipOnWindows: true,
 			spec:          volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), true),
 		},
 		{
@@ -1263,9 +1256,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			}
 		}
 		t.Run(tc.testName, func(t *testing.T) {
-			if tc.skipOnWindows && goruntime.GOOS == "windows" {
-				t.Skipf("Skipping test case on Windows: %s", tc.testName)
-			}
 			t.Logf("Running test case: %s", tc.testName)
 
 			// Setup

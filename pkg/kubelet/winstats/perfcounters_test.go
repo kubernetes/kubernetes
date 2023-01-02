@@ -20,13 +20,49 @@ limitations under the License.
 package winstats
 
 import (
+	"net"
+	"os/exec"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+func pingLocalhost() (*exec.Cmd, error) {
+	// We don't have Networking counters for the loopback interface,
+	// so we need to use the actual interface.
+	address := ""
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, addr := range addrs {
+		// skip the loopback interface.
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
+			address = ipnet.IP.String()
+			break
+		}
+	}
+
+	// -t - Ping the specified host until stopped.
+	cmd := exec.Command("ping", "-t", address)
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	return cmd, nil
+}
+
 func TestPerfCounter(t *testing.T) {
+	// We're pinging localhost to generate traffic for the Networking counters.
+	cmd, err := pingLocalhost()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	defer cmd.Process.Kill()
+
 	testCases := map[string]struct {
 		counter        string
 		skipCheck      bool
