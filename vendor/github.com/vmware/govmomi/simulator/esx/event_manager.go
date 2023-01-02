@@ -93,7 +93,7 @@ var EventInfo = []types.EventDescriptionEventDetail{
 		Key:         "VmMigratedEvent",
 		Description: "VM migrated",
 		Category:    "info",
-		FullFormat:  "Migration of virtual machine {{.Vm.Name}} from {{.SourceHost.Name}, {{.SourceDatastore.Name}} to {{.Host.Name}, {{.Ds.Name}} completed",
+		FullFormat:  "Migration of virtual machine {{.Vm.Name}} from {{.SourceHost.Name}}, {{.SourceDatastore.Name}} to {{.Host.Name}}, {{.Ds.Name}} completed",
 	},
 	{
 		Key:         "VmBeingMigratedEvent",
@@ -232,6 +232,24 @@ var EventInfo = []types.EventDescriptionEventDetail{
 		Description: "VM relocated",
 		Category:    "info",
 		FullFormat:  "Completed the relocation of the virtual machine",
+	},
+	{
+		Key:         "CustomizationFailed",
+		Description: "An error occurred during customization",
+		Category:    "info",
+		FullFormat:  "An error occurred during customization on VM {{.Vm.Name}}",
+	},
+	{
+		Key:         "CustomizationStartedEvent",
+		Description: "Started customization",
+		Category:    "info",
+		FullFormat:  "Started customization of VM {{.Vm.Name}}",
+	},
+	{
+		Key:         "CustomizationSucceeded",
+		Description: "Customization succeeded",
+		Category:    "info",
+		FullFormat:  "Customization of VM {{.Vm.Name}} succeeded",
 	},
 	{
 		Key:         "DrsVmMigratedEvent",
