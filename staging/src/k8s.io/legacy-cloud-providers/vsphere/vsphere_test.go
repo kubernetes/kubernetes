@@ -165,7 +165,8 @@ func configFromSimWithTLS(tlsConfig *tls.Config, insecureAllowed bool) (VSphereC
 	model.Service.ServeMux.Handle(path, handler)
 
 	// vAPI simulator
-	path, handler = vapi.New(s.URL, vpx.Setting)
+	paths, handler := vapi.New(s.URL, vpx.Setting)
+	path = paths[0]
 	model.Service.ServeMux.Handle(path, handler)
 
 	// Lookup Service simulator
