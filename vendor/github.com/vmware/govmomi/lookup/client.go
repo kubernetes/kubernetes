@@ -25,6 +25,7 @@ import (
 
 	"github.com/vmware/govmomi/lookup/methods"
 	"github.com/vmware/govmomi/lookup/types"
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
 	vim "github.com/vmware/govmomi/vim25/types"
@@ -47,12 +48,28 @@ var (
 type Client struct {
 	*soap.Client
 
+	RoundTripper soap.RoundTripper
+
 	ServiceContent types.LookupServiceContent
 }
 
 // NewClient returns a client targeting the SSO Lookup Service API endpoint.
 func NewClient(ctx context.Context, c *vim25.Client) (*Client, error) {
-	sc := c.Client.NewServiceClient(Path, Namespace)
+	// PSC may be external, attempt to derive from sts.uri
+	path := &url.URL{Path: Path}
+	if c.ServiceContent.Setting != nil {
+		m := object.NewOptionManager(c, *c.ServiceContent.Setting)
+		opts, err := m.Query(ctx, "config.vpxd.sso.sts.uri")
+		if err == nil && len(opts) == 1 {
+			u, err := url.Parse(opts[0].GetOptionValue().Value.(string))
+			if err == nil {
+				path.Scheme = u.Scheme
+				path.Host = u.Host
+			}
+		}
+	}
+
+	sc := c.Client.NewServiceClient(path.String(), Namespace)
 	sc.Version = Version
 
 	req := types.RetrieveServiceContent{
@@ -64,7 +81,12 @@ func NewClient(ctx context.Context, c *vim25.Client) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{sc, res.Returnval}, nil
+	return &Client{sc, sc, res.Returnval}, nil
+}
+
+// RoundTrip dispatches to the RoundTripper field.
+func (c *Client) RoundTrip(ctx context.Context, req, res soap.HasFault) error {
+	return c.RoundTripper.RoundTrip(ctx, req, res)
 }
 
 func (c *Client) List(ctx context.Context, filter *types.LookupServiceRegistrationFilter) ([]types.LookupServiceRegistrationInfo, error) {
