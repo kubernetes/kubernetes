@@ -17,6 +17,8 @@ limitations under the License.
 package fuzzer
 
 import (
+	"net/netip"
+
 	fuzz "github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/networking"
@@ -74,5 +76,35 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
+		func(obj *networking.IPAddress, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			// length in bytes of the IP Family: IPv4: 4 bytes IPv6: 16 bytes
+			boolean := []bool{false, true}
+			is6 := boolean[c.Rand.Intn(2)]
+			ip := generateRandomIP(is6, c)
+			obj.Name = ip
+		},
 	}
+}
+
+func generateRandomIP(is6 bool, c fuzz.Continue) string {
+	n := 4
+	if is6 {
+		n = 16
+	}
+	bytes := make([]byte, n)
+	for i := 0; i < n; i++ {
+		bytes[i] = uint8(c.Rand.Intn(255))
+	}
+
+	ip, ok := netip.AddrFromSlice(bytes)
+	if ok {
+		return ip.String()
+	}
+	// this should not happen but is better to
+	// return a good IP address than nothing
+	if is6 {
+		return "2001:db8::1"
+	}
+	return "192.168.1.1"
 }
