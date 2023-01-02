@@ -18,6 +18,7 @@ package wsstream
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -248,7 +249,7 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 		conn.resetTimeout()
 		var data []byte
 		if err := websocket.Message.Receive(ws, &data); err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				klog.Errorf("Error on socket receive: %v", err)
 			}
 			break

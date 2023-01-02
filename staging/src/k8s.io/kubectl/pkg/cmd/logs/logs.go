@@ -432,7 +432,7 @@ func DefaultConsumeRequest(request rest.ResponseWrapper, out io.Writer) error {
 		}
 
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				return err
 			}
 			return nil

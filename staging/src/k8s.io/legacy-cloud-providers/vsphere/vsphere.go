@@ -874,7 +874,7 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 			if err == nil {
 				klog.V(4).Infof("InstanceID: Found node %q", convertToString(nodeName))
 				instanceID, err = instanceIDInternal()
-			} else if err == vclib.ErrNoVMFound {
+			} else if errors.Is(err, vclib.ErrNoVMFound) {
 				return "", cloudprovider.InstanceNotFound
 			}
 		}
@@ -1016,7 +1016,7 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		vsi, err := vs.getVSphereInstance(nodeName)
 		if err != nil {
 			// If node doesn't exist, disk is already detached from node.
-			if err == vclib.ErrNoVMFound {
+			if errors.Is(err, vclib.ErrNoVMFound) {
 				klog.Infof("Node %q does not exist, disk %s is already detached from node.", convertToString(nodeName), volPath)
 				return nil
 			}
@@ -1030,7 +1030,7 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
 			// If node doesn't exist, disk is already detached from node.
-			if err == vclib.ErrNoVMFound {
+			if errors.Is(err, vclib.ErrNoVMFound) {
 				klog.Infof("Node %q does not exist, disk %s is already detached from node.", convertToString(nodeName), volPath)
 				return nil
 			}
@@ -1083,7 +1083,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 		}
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
-			if err == vclib.ErrNoVMFound {
+			if errors.Is(err, vclib.ErrNoVMFound) {
 				klog.Warningf("Node %q does not exist, vsphere CP will assume disk %v is not attached to it.", nodeName, volPath)
 				// make the disk as detached and return false without error.
 				return false, volPath, nil
@@ -1112,7 +1112,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 	if err != nil {
 		if vclib.IsManagedObjectNotFoundError(err) {
 			err = vs.nodeManager.RediscoverNode(nodeName)
-			if err == vclib.ErrNoVMFound {
+			if errors.Is(err, vclib.ErrNoVMFound) {
 				isAttached, err = false, nil
 			} else if err == nil {
 				isAttached, newVolumePath, err = diskIsAttachedInternal(volPath, nodeName)
@@ -1223,7 +1223,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			for _, nodeName := range nodesToRetry {
 				err = vs.nodeManager.RediscoverNode(nodeName)
 				if err != nil {
-					if err == vclib.ErrNoVMFound {
+					if errors.Is(err, vclib.ErrNoVMFound) {
 						klog.V(4).Infof("node %s not found. err: %+v", nodeName, err)
 						continue
 					}
@@ -2048,7 +2048,7 @@ func (vs *VSphere) GetZoneToHosts(ctx context.Context, vsi *VSphereInstance) (ma
 
 	hostToZone, err := getHostsInTagCategory(ctx, vs.cfg.Labels.Zone)
 	if err != nil {
-		if err == ErrNoZoneTagInVC {
+		if errors.Is(err, ErrNoZoneTagInVC) {
 			return zoneToHosts, nil
 		}
 		klog.Errorf("Get hosts in tag category %s failed: %+v", vs.cfg.Labels.Zone, err)
@@ -2057,7 +2057,7 @@ func (vs *VSphere) GetZoneToHosts(ctx context.Context, vsi *VSphereInstance) (ma
 
 	hostToRegion, err := getHostsInTagCategory(ctx, vs.cfg.Labels.Region)
 	if err != nil {
-		if err == ErrNoZoneTagInVC {
+		if errors.Is(err, ErrNoZoneTagInVC) {
 			return zoneToHosts, nil
 		}
 		klog.Errorf("Get hosts in tag category %s failed: %+v", vs.cfg.Labels.Region, err)

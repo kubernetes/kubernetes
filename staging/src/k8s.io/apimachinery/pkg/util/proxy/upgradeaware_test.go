@@ -649,7 +649,7 @@ func TestProxyUpgradeErrorResponseTerminates(t *testing.T) {
 			// try to read from the connection to verify it was closed
 			b := make([]byte, 1)
 			conn.SetReadDeadline(time.Now().Add(time.Second))
-			if _, err := conn.Read(b); err != io.EOF {
+			if _, err := conn.Read(b); !errors.Is(err, io.EOF) {
 				t.Errorf("expected EOF, got %v", err)
 			}
 

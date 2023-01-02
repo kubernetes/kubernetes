@@ -17,6 +17,7 @@ limitations under the License.
 package spdy
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -105,7 +106,7 @@ func runServer(t *testing.T, backendUrl chan<- string, serverDone chan<- struct{
 
 	buf := make([]byte, 1)
 	_, err = stream.Read(buf)
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Errorf("server: unexpected read error: %v", err)
 		return
 	}

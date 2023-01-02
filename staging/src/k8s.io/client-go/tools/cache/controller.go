@@ -187,7 +187,7 @@ func (c *controller) processLoop() {
 	for {
 		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
 		if err != nil {
-			if err == ErrFIFOClosed {
+			if errors.Is(err, ErrFIFOClosed) {
 				return
 			}
 			if c.config.RetryOnError {

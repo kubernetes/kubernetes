@@ -19,6 +19,7 @@ package resource
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,7 +31,7 @@ import (
 
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -99,9 +100,9 @@ func (i *Info) Visit(fn VisitorFunc) error {
 func (i *Info) Get() (err error) {
 	obj, err := NewHelper(i.Client, i.Mapping).WithSubresource(i.Subresource).Get(i.Namespace, i.Name)
 	if err != nil {
-		if errors.IsNotFound(err) && len(i.Namespace) > 0 && i.Namespace != metav1.NamespaceDefault && i.Namespace != metav1.NamespaceAll {
+		if apierrors.IsNotFound(err) && len(i.Namespace) > 0 && i.Namespace != metav1.NamespaceDefault && i.Namespace != metav1.NamespaceAll {
 			err2 := i.Client.Get().AbsPath("api", "v1", "namespaces", i.Namespace).Do(context.TODO()).Error()
-			if err2 != nil && errors.IsNotFound(err2) {
+			if err2 != nil && apierrors.IsNotFound(err2) {
 				return err2
 			}
 		}
@@ -564,7 +565,7 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 	for {
 		ext := runtime.RawExtension{}
 		if err := d.Decode(&ext); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return fmt.Errorf("error parsing %s: %v", v.Source, err)

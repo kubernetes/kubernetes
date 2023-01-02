@@ -21,6 +21,7 @@ package vsphere
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -192,7 +193,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 				if err != nil {
 					klog.V(4).Infof("Error while looking for vm=%+v in vc=%s and datacenter=%s: %v",
 						vm, res.vc, res.datacenter.Name(), err)
-					if err != vclib.ErrNoVMFound {
+					if !errors.Is(err, vclib.ErrNoVMFound) {
 						setGlobalErr(err)
 					} else {
 						klog.V(4).Infof("Did not find node %s in vc=%s and datacenter=%s",

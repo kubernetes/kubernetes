@@ -848,7 +848,7 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, err
 	ssName, instanceID, vm, err := ss.getVmssVM(nodeName, azcache.CacheReadTypeDefault)
 	if err != nil {
 		// VM is availability set, but not cached yet in availabilitySetNodesCache.
-		if err == ErrorNotVmssInstance {
+		if errors.Is(err, ErrorNotVmssInstance) {
 			return ss.availabilitySet.GetPrimaryInterface(nodeName)
 		}
 
@@ -1626,7 +1626,7 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID,
 
 		nodeName, _, err := ss.GetNodeNameByIPConfigurationID(ipConfigurationID)
 		if err != nil {
-			if err == ErrorNotVmssInstance { // Do nothing for the VMAS nodes.
+			if errors.Is(err, ErrorNotVmssInstance) { // Do nothing for the VMAS nodes.
 				continue
 			}
 

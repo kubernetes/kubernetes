@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,7 +33,7 @@ import (
 	"golang.org/x/net/html/atom"
 	"k8s.io/klog/v2"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -103,13 +104,13 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := rt.RoundTrip(req)
 
 	if err != nil {
-		return nil, errors.NewServiceUnavailable(fmt.Sprintf("error trying to reach service: %v", err))
+		return nil, apierrors.NewServiceUnavailable(fmt.Sprintf("error trying to reach service: %v", err))
 	}
 
 	if redirect := resp.Header.Get("Location"); redirect != "" {
 		targetURL, err := url.Parse(redirect)
 		if err != nil {
-			return nil, errors.NewInternalError(fmt.Errorf("error trying to parse Location header: %v", err))
+			return nil, apierrors.NewInternalError(fmt.Errorf("error trying to parse Location header: %v", err))
 		}
 		resp.Header.Set("Location", t.rewriteURL(targetURL, req.URL, req.Host))
 		return resp, nil
@@ -208,7 +209,7 @@ func rewriteHTML(reader io.Reader, writer io.Writer, urlRewriter func(*url.URL) 
 			_, err = writer.Write(tokenizer.Raw())
 		}
 	}
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil

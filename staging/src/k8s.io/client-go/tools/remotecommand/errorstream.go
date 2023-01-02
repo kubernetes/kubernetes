@@ -17,6 +17,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -40,7 +41,7 @@ func watchErrorStream(errorStream io.Reader, d errorStreamDecoder) chan error {
 
 		message, err := io.ReadAll(errorStream)
 		switch {
-		case err != nil && err != io.EOF:
+		case err != nil && !errors.Is(err, io.EOF):
 			errorChan <- fmt.Errorf("error reading from error stream: %s", err)
 		case len(message) > 0:
 			errorChan <- d.decode(message)

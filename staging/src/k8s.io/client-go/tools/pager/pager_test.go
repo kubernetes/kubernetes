@@ -18,12 +18,13 @@ package pager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -111,7 +112,7 @@ func (p *testPager) PagedList(ctx context.Context, options metav1.ListOptions) (
 func (p *testPager) ExpiresOnSecondPage(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 	if p.continuing {
 		p.done = true
-		return nil, errors.NewResourceExpired("this list has expired")
+		return nil, apierrors.NewResourceExpired("this list has expired")
 	}
 	return p.PagedList(ctx, options)
 }
@@ -120,7 +121,7 @@ func (p *testPager) ExpiresOnSecondPageThenFullList(ctx context.Context, options
 	if p.continuing {
 		p.reset()
 		p.expectPage = 0
-		return nil, errors.NewResourceExpired("this list has expired")
+		return nil, apierrors.NewResourceExpired("this list has expired")
 	}
 	return p.PagedList(ctx, options)
 }
@@ -229,7 +230,7 @@ func TestListPager_List(t *testing.T) {
 				t.Errorf("ListPager.List() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if tt.isExpired != errors.IsResourceExpired(err) {
+			if tt.isExpired != apierrors.IsResourceExpired(err) {
 				t.Errorf("ListPager.List() error = %v, isExpired %v", err, tt.isExpired)
 				return
 			}
@@ -346,7 +347,7 @@ func TestListPager_EachListItem(t *testing.T) {
 				t.Errorf("ListPager.EachListItem() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if tt.isExpired != errors.IsResourceExpired(err) {
+			if tt.isExpired != apierrors.IsResourceExpired(err) {
 				t.Errorf("ListPager.EachListItem() error = %v, isExpired %v", err, tt.isExpired)
 				return
 			}
@@ -455,7 +456,7 @@ func TestListPager_eachListPageBuffered(t *testing.T) {
 				return nil
 			}
 			err := p.eachListChunkBuffered(context.Background(), metav1.ListOptions{}, fn)
-			if tt.pagesProcessed > 0 && err == processorErr {
+			if tt.pagesProcessed > 0 && errors.Is(err, processorErr) {
 				// expected
 			} else if err != nil {
 				t.Fatal(err)

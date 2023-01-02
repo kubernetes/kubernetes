@@ -146,7 +146,7 @@ func getSharedDatastoresInK8SCluster(ctx context.Context, nodeManager *NodeManag
 		klog.V(9).Infof("Getting accessible datastores for node %s", nodeVmDetail.NodeName)
 		accessibleDatastores, err := getAccessibleDatastores(ctx, &nodeVmDetail, nodeManager)
 		if err != nil {
-			if err == vclib.ErrNoVMFound {
+			if errors.Is(err, vclib.ErrNoVMFound) {
 				klog.V(9).Infof("Got NoVMFound error for node %s", nodeVmDetail.NodeName)
 				continue
 			}

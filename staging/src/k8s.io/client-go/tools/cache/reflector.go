@@ -132,9 +132,9 @@ func DefaultWatchErrorHandler(r *Reflector, err error) {
 		// has a semantic that it returns data at least as fresh as provided RV.
 		// So first try to LIST with setting RV to resource version of last observed object.
 		klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.typeDescription, err)
-	case err == io.EOF:
+	case errors.Is(err, io.EOF):
 		// watch closed normally
-	case err == io.ErrUnexpectedEOF:
+	case errors.Is(err, io.ErrUnexpectedEOF):
 		klog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.typeDescription, err)
 	default:
 		utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.typeDescription, err))

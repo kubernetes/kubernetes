@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -106,7 +107,7 @@ stuff: 1
 	}
 	b = make([]byte, 15)
 	n, err = r.Read(b)
-	if err != io.EOF || n != 0 {
+	if !errors.Is(err, io.EOF) || n != 0 {
 		t.Fatalf("expected EOF: %d / %v", n, err)
 	}
 }
@@ -206,7 +207,7 @@ stuff: 1
 		t.Fatalf("unexpected object: %#v", obj)
 	}
 	obj = generic{}
-	if err := s.Decode(&obj); err != io.EOF {
+	if err := s.Decode(&obj); !errors.Is(err, io.EOF) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -349,7 +350,7 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 			}
 			objs = append(objs, out)
 		}
-		if err != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			switch {
 			case testCase.err && err == nil:
 				t.Errorf("%d: unexpected non-error", i)
@@ -420,7 +421,7 @@ func testReadLines(t *testing.T, lineLengths []int) {
 	var readLines [][]byte
 	for range lines {
 		bytes, err := lineReader.Read()
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			t.Fatalf("failed to read lines: %v", err)
 		}
 		readLines = append(readLines, bytes)

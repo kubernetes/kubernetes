@@ -17,6 +17,7 @@ limitations under the License.
 package testutil
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -79,7 +80,7 @@ func ParseMetrics(data string, output *Metrics) error {
 	for {
 		var v model.Vector
 		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// Expected loop termination condition.
 				return nil
 			}

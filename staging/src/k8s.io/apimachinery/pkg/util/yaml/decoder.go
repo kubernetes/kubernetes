@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -121,7 +122,7 @@ func NewYAMLToJSONDecoder(r io.Reader) *YAMLToJSONDecoder {
 // yaml.Unmarshal.
 func (d *YAMLToJSONDecoder) Decode(into interface{}) error {
 	bytes, err := d.reader.Read()
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 
@@ -311,7 +312,7 @@ func (r *YAMLReader) Read() ([]byte, error) {
 	var buffer bytes.Buffer
 	for {
 		line, err := r.reader.Read()
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 
@@ -329,11 +330,11 @@ func (r *YAMLReader) Read() ([]byte, error) {
 			if buffer.Len() != 0 {
 				return buffer.Bytes(), nil
 			}
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil, err
 			}
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			if buffer.Len() != 0 {
 				// If we're at EOF, we have a final, non-terminated line. Return it.
 				return buffer.Bytes(), nil

@@ -17,6 +17,7 @@ limitations under the License.
 package workqueue
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -60,7 +61,7 @@ func TestSimpleQueue(t *testing.T) {
 
 		return false, nil
 	})
-	if err != wait.ErrWaitTimeout {
+	if !errors.Is(err, wait.ErrWaitTimeout) {
 		t.Errorf("expected timeout, got: %v", err)
 	}
 

@@ -488,7 +488,7 @@ func (o *CopyOptions) untarAll(ns, pod string, prefix string, src remotePath, de
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				return err
 			}
 			break

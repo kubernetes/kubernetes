@@ -132,7 +132,7 @@ func IsUsageError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return err == missingResourceError
+	return errors.Is(err, missingResourceError)
 }
 
 type FilenameOptions struct {
@@ -1216,7 +1216,7 @@ func expandIfFilePattern(pattern string) ([]string, error) {
 		if err == nil && len(matches) == 0 {
 			return nil, fmt.Errorf(pathNotExistError, pattern)
 		}
-		if err == filepath.ErrBadPattern {
+		if errors.Is(err, filepath.ErrBadPattern) {
 			return nil, fmt.Errorf("pattern %q is not valid: %v", pattern, err)
 		}
 		return matches, err

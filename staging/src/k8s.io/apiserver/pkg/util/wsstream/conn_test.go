@@ -18,6 +18,7 @@ package wsstream
 
 import (
 	"encoding/base64"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -92,7 +93,7 @@ func TestRawConn(t *testing.T) {
 		t.Errorf("writes should be ignored")
 	}
 	data = make([]byte, 1024)
-	if n, err := conn.channels[2].Read(data); n != 0 || err != io.EOF {
+	if n, err := conn.channels[2].Read(data); n != 0 || !errors.Is(err, io.EOF) {
 		t.Errorf("reads should be ignored")
 	}
 
@@ -103,7 +104,7 @@ func TestRawConn(t *testing.T) {
 
 	// verify that a read from a Write channel doesn't block
 	data = make([]byte, 1024)
-	if n, err := conn.channels[4].Read(data); n != 0 || err != io.EOF {
+	if n, err := conn.channels[4].Read(data); n != 0 || !errors.Is(err, io.EOF) {
 		t.Errorf("reads should be ignored")
 	}
 

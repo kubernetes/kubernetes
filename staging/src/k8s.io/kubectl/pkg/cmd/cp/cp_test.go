@@ -19,6 +19,7 @@ package cp
 import (
 	"archive/tar"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,7 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -539,7 +540,7 @@ func TestTarDestinationName(t *testing.T) {
 	tarReader := tar.NewReader(reader)
 	for {
 		hdr, err := tarReader.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -664,10 +665,10 @@ func TestCopyToPod(t *testing.T) {
 			//If error is NotFound error , it indicates that the
 			//request has been sent correctly.
 			//Treat this as no error.
-			if test.expectedErr && errors.IsNotFound(err) {
+			if test.expectedErr && apierrors.IsNotFound(err) {
 				t.Errorf("expected error but didn't get one")
 			}
-			if !test.expectedErr && !errors.IsNotFound(err) {
+			if !test.expectedErr && !apierrors.IsNotFound(err) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})

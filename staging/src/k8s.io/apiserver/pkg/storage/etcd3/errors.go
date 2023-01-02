@@ -17,6 +17,7 @@ limitations under the License.
 package etcd3
 
 import (
+	goerrors "errors"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage"
 
@@ -26,7 +27,7 @@ import (
 
 func interpretWatchError(err error) error {
 	switch {
-	case err == etcdrpc.ErrCompacted:
+	case goerrors.Is(err, etcdrpc.ErrCompacted):
 		return errors.NewResourceExpired("The resourceVersion for the provided watch is too old.")
 	}
 	return err
@@ -48,7 +49,7 @@ const (
 
 func interpretListError(err error, paging bool, continueKey, keyPrefix string) error {
 	switch {
-	case err == etcdrpc.ErrCompacted:
+	case goerrors.Is(err, etcdrpc.ErrCompacted):
 		if paging {
 			return handleCompactedErrorForPaging(continueKey, keyPrefix)
 		}

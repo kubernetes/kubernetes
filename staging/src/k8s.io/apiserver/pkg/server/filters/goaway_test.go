@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -229,7 +230,7 @@ func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan
 				if err != nil {
 					// urlWatch will receive io.EOF,
 					// urlWatchWithGoaway will receive http2.GoAwayError
-					if err == io.EOF {
+					if errors.Is(err, io.EOF) {
 						err = nil
 					} else if _, ok := err.(http2.GoAwayError); ok {
 						err = nil

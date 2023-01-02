@@ -22,6 +22,7 @@ package v1beta1
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -81,7 +82,7 @@ func WaitForBase64PluginToBeUp(plugin *Base64Plugin) error {
 		return gRPCErr == nil, nil
 	})
 
-	if pollErr == wait.ErrWaitTimeout {
+	if errors.Is(pollErr, wait.ErrWaitTimeout) {
 		return fmt.Errorf("failed to start kms-plugin, error: %v", gRPCErr)
 	}
 

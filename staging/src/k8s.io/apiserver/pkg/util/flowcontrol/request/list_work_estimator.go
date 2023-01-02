@@ -17,6 +17,7 @@ limitations under the License.
 package request
 
 import (
+	"errors"
 	"math"
 	"net/http"
 	"net/url"
@@ -72,13 +73,13 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 
 	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {
-	case err == ObjectCountStaleErr:
+	case errors.Is(err, ObjectCountStaleErr):
 		// object count going stale is indicative of degradation, so we should
 		// be conservative here and allocate maximum seats to this list request.
 		// NOTE: if a CRD is removed, its count will go stale first and then the
 		// pruner will eventually remove the CRD from the cache.
 		return WorkEstimate{InitialSeats: e.config.MaximumSeats}
-	case err == ObjectCountNotFoundErr:
+	case errors.Is(err, ObjectCountNotFoundErr):
 		// there are multiple scenarios in which we can see this error:
 		//  a. the type is truly unknown, a typo on the caller's part.
 		//  b. the count has gone stale for too long and the pruner

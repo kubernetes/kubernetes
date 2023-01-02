@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -395,7 +396,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 		// we have failed to ensure that account is ready for us to create
 		// the default vhd container
 		if err != nil {
-			if err == kwait.ErrWaitTimeout {
+			if errors.Is(err, kwait.ErrWaitTimeout) {
 				return fmt.Errorf("azureDisk - timed out waiting for storage account %s to become ready", storageAccountName)
 			}
 			return err

@@ -397,7 +397,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 		return err
 	})
 	if err != nil {
-		if err == wait.ErrWaitTimeout {
+		if errors.Is(err, wait.ErrWaitTimeout) {
 			return gottenObj, false, errWaitTimeoutWithName
 		}
 		return gottenObj, false, err
@@ -504,7 +504,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 		return err
 	})
 	if err != nil {
-		if err == wait.ErrWaitTimeout {
+		if errors.Is(err, wait.ErrWaitTimeout) {
 			return result, false, errWaitTimeoutWithName
 		}
 		return result, false, err

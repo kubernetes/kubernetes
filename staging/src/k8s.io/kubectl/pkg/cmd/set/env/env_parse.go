@@ -18,6 +18,7 @@ package env
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -130,7 +131,7 @@ func readEnv(r io.Reader, envVarType string) ([]v1.EnvVar, error) {
 		}
 	}
 
-	if err := scanner.Err(); err != nil && err != io.EOF {
+	if err := scanner.Err(); err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
 

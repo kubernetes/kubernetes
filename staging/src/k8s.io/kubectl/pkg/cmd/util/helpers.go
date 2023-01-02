@@ -160,7 +160,7 @@ func checkErr(err error, handleErr func(string, int)) {
 	}
 
 	switch {
-	case err == ErrExit:
+	case errors.Is(err, ErrExit):
 		handleErr("", DefaultErrorExitCode)
 	case isInvalidReasonStatusError(err):
 		status := err.(*apierrors.StatusError).Status()
@@ -582,7 +582,7 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 	buffer := make([]byte, 1024)
 	for {
 		count, err := reader.Read(buffer)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

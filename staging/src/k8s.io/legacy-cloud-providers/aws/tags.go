@@ -20,6 +20,7 @@ limitations under the License.
 package aws
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -239,7 +240,7 @@ func (t *awsTagging) createTags(client EC2, resourceID string, lifecycle Resourc
 		lastErr = err
 		return false, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		// return real CreateTags error instead of timeout
 		err = lastErr
 	}

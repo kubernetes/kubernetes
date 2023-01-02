@@ -18,6 +18,7 @@ package streaming
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"testing"
@@ -42,7 +43,7 @@ func TestEmptyDecoder(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	d := &fakeDecoder{}
 	_, _, err := NewDecoder(ioutil.NopCloser(buf), d).Decode(nil, nil)
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Fatal(err)
 	}
 }
@@ -78,7 +79,7 @@ func TestDecoder(t *testing.T) {
 	if _, _, err := dec.Decode(nil, nil); err != nil || !bytes.Equal(d.got, frames[3]) {
 		t.Fatalf("unexpected %v %v", err, len(d.got))
 	}
-	if _, _, err := dec.Decode(nil, nil); err != io.EOF {
+	if _, _, err := dec.Decode(nil, nil); !errors.Is(err, io.EOF) {
 		t.Fatalf("unexpected %v %v", err, len(d.got))
 	}
 }

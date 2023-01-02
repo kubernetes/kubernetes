@@ -18,6 +18,7 @@ package framer
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"testing"
@@ -63,7 +64,7 @@ func TestRead(t *testing.T) {
 		t.Fatalf("unexpected: %v %d %v", err, n, buf)
 	}
 	// read EOF
-	if n, err := r.Read(buf); err != io.EOF && n != 0 {
+	if n, err := r.Read(buf); !errors.Is(err, io.EOF) && n != 0 {
 		t.Fatalf("unexpected: %v %d", err, n)
 	}
 }
@@ -94,7 +95,7 @@ func TestReadLarge(t *testing.T) {
 		t.Fatalf("unexpected: %v %d %v", err, n, buf)
 	}
 	// read EOF
-	if n, err := r.Read(buf); err != io.EOF && n != 0 {
+	if n, err := r.Read(buf); !errors.Is(err, io.EOF) && n != 0 {
 		t.Fatalf("unexpected: %v %d", err, n)
 	}
 }
@@ -115,7 +116,7 @@ func TestReadInvalidFrame(t *testing.T) {
 		t.Fatalf("unexpected: %v %d %v", err, n, buf)
 	}
 	// read EOF
-	if n, err := r.Read(buf); err != io.EOF && n != 0 {
+	if n, err := r.Read(buf); !errors.Is(err, io.EOF) && n != 0 {
 		t.Fatalf("unexpected: %v %d", err, n)
 	}
 }
@@ -133,7 +134,7 @@ func TestJSONFrameReader(t *testing.T) {
 	if n, err := r.Read(buf); err != nil || n != 5 || string(buf[:n]) != `["a"]` {
 		t.Fatalf("unexpected: %v %d %q", err, n, buf)
 	}
-	if n, err := r.Read(buf); err != io.EOF || n != 0 {
+	if n, err := r.Read(buf); !errors.Is(err, io.EOF) || n != 0 {
 		t.Fatalf("unexpected: %v %d %q", err, n, buf)
 	}
 }
@@ -170,7 +171,7 @@ func TestJSONFrameReaderShortBuffer(t *testing.T) {
 		t.Fatalf("unexpected: %v %d %q", err, n, buf)
 	}
 
-	if n, err := r.Read(buf); err != io.EOF || n != 0 {
+	if n, err := r.Read(buf); !errors.Is(err, io.EOF) || n != 0 {
 		t.Fatalf("unexpected: %v %d %q", err, n, buf)
 	}
 }

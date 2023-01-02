@@ -20,6 +20,7 @@ package framer
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"io"
 )
 
@@ -91,7 +92,7 @@ func (r *lengthDelimitedFrameReader) Read(data []byte) (int, error) {
 	}
 	n, err := io.ReadAtLeast(r.r, data[:max], int(max))
 	r.remaining -= n
-	if err == io.ErrShortBuffer || r.remaining > 0 {
+	if errors.Is(err, io.ErrShortBuffer) || r.remaining > 0 {
 		return n, io.ErrShortBuffer
 	}
 	if err != nil {

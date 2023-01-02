@@ -334,7 +334,7 @@ func (az *Cloud) getLocalInstanceProviderID(metadata *InstanceMetadata, nodeName
 	// Get scale set name and instanceID from vmName for vmss.
 	ssName, instanceID, err := extractVmssVMName(metadata.Compute.Name)
 	if err != nil {
-		if err == ErrorNotVmssInstance {
+		if errors.Is(err, ErrorNotVmssInstance) {
 			// Compose machineID for standard Node.
 			return az.getStandardMachineID(subscriptionID, resourceGroup, nodeName), nil
 		}

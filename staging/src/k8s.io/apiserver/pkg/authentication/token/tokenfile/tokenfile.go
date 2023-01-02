@@ -19,6 +19,7 @@ package tokenfile
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -55,7 +56,7 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 	reader.FieldsPerRecord = -1
 	for {
 		record, err := reader.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

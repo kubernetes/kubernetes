@@ -19,6 +19,7 @@ package net
 import (
 	"bufio"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -108,7 +109,7 @@ func getIPv4DefaultRoutes(input io.Reader) ([]Route, error) {
 	scanner := bufio.NewReader(input)
 	for {
 		line, err := scanner.ReadString('\n')
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		//ignore the headers in the route info
@@ -146,7 +147,7 @@ func getIPv6DefaultRoutes(input io.Reader) ([]Route, error) {
 	scanner := bufio.NewReader(input)
 	for {
 		line, err := scanner.ReadString('\n')
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		fields := strings.Fields(line)

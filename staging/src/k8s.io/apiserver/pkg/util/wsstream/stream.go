@@ -18,6 +18,7 @@ package wsstream
 
 import (
 	"encoding/base64"
+	"errors"
 	"io"
 	"net/http"
 	"sync"
@@ -157,7 +158,7 @@ func messageCopy(ws *websocket.Conn, r io.Reader, base64Encode, ping bool, timeo
 		resetTimeout(ws, timeout)
 		n, err := r.Read(buf)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return err

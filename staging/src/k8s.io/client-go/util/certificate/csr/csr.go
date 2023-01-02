@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -293,7 +294,7 @@ func WaitForCertificate(ctx context.Context, client clientset.Interface, reqName
 			return false, nil
 		},
 	)
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		return nil, wait.ErrWaitTimeout
 	}
 	if err != nil {

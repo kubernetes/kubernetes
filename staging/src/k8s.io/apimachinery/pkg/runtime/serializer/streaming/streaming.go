@@ -20,6 +20,7 @@ package streaming
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 
@@ -75,7 +76,7 @@ func (d *decoder) Decode(defaults *schema.GroupVersionKind, into runtime.Object)
 	base := 0
 	for {
 		n, err := d.reader.Read(d.buf[base:])
-		if err == io.ErrShortBuffer {
+		if errors.Is(err, io.ErrShortBuffer) {
 			if n == 0 {
 				return nil, nil, fmt.Errorf("got short buffer with n=0, base=%d, cap=%d", base, cap(d.buf))
 			}

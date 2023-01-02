@@ -17,6 +17,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -54,7 +55,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	cp := func(s string, dst io.Writer, src io.Reader) {
 		klog.V(6).Infof("Copying %s", s)
 		defer klog.V(6).Infof("Done copying %s", s)
-		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
+		if _, err := io.Copy(dst, src); err != nil && !errors.Is(err, io.EOF) {
 			klog.Errorf("Error copying %s: %v", s, err)
 		}
 		if s == v1.StreamTypeStdout || s == v1.StreamTypeStderr {
@@ -111,7 +112,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	// always read from errorStream
 	go func() {
 		message, err := io.ReadAll(p.errorStream)
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			errorChan <- fmt.Errorf("Error reading from error stream: %s", err)
 			return
 		}

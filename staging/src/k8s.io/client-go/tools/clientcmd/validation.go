@@ -62,7 +62,7 @@ func IsContextNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
-	if _, ok := err.(*errContextNotFound); ok || err == ErrNoContext {
+	if _, ok := err.(*errContextNotFound); ok || errors.Is(err, ErrNoContext) {
 		return true
 	}
 	return strings.Contains(err.Error(), "context was not found for specified context")

@@ -19,6 +19,7 @@ package rawhttp
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -88,7 +89,7 @@ func raw(restClient *rest.RESTClient, streams genericclioptions.IOStreams, url, 
 	defer stream.Close()
 
 	_, err = io.Copy(streams.Out, stream)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil

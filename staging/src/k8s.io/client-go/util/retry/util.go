@@ -17,9 +17,10 @@ limitations under the License.
 package retry
 
 import (
+	"errors"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -59,7 +60,7 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 			return false, err
 		}
 	})
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		err = lastErr
 	}
 	return err
@@ -101,5 +102,5 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 //
 // TODO: Make Backoff an interface?
 func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
-	return OnError(backoff, errors.IsConflict, fn)
+	return OnError(backoff, apierrors.IsConflict, fn)
 }

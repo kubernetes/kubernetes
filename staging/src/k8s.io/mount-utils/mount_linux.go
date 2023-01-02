@@ -456,7 +456,7 @@ func (mounter *SafeFormatAndMount) checkAndRepairFilesystem(source string) error
 	if err != nil {
 		ee, isExitError := err.(utilexec.ExitError)
 		switch {
-		case err == utilexec.ErrExecutableNotFound:
+		case errors.Is(err, utilexec.ErrExecutableNotFound):
 			klog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
 		case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
 			klog.Infof("Device %s has errors which were corrected by fsck.", source)

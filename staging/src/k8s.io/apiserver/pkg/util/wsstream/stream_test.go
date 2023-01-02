@@ -19,6 +19,7 @@ package wsstream
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -287,7 +288,7 @@ func expectWebSocketFrames(r *Reader, t *testing.T, fn func(*websocket.Conn), fr
 		}
 	}
 	var data []byte
-	if err := websocket.Message.Receive(ws, &data); err != io.EOF {
+	if err := websocket.Message.Receive(ws, &data); !errors.Is(err, io.EOF) {
 		return fmt.Errorf("expected no more frames: %v (%v)", err, data)
 	}
 	return <-errCh

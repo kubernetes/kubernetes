@@ -2035,7 +2035,7 @@ func TestWatchTable(t *testing.T) {
 			for {
 				var event metav1.WatchEvent
 				_, _, err := d.Decode(nil, &event)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				if err != nil {

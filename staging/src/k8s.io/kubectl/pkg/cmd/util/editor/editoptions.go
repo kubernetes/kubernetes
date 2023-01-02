@@ -888,7 +888,7 @@ func hasLines(r io.Reader) (bool, error) {
 			return true, nil
 		}
 	}
-	if err := s.Err(); err != nil && err != io.EOF {
+	if err := s.Err(); err != nil && !errors.Is(err, io.EOF) {
 		return false, err
 	}
 	return false, nil

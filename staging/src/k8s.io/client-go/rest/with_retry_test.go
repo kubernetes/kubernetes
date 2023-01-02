@@ -80,7 +80,7 @@ func TestIsNextRetry(t *testing.T) {
 			response:   nil,
 			err:        fakeError,
 			retryableErrFunc: func(_ *http.Request, err error) bool {
-				if err == fakeError {
+				if errors.Is(err, fakeError) {
 					return true
 				}
 				return false
@@ -162,7 +162,7 @@ func TestIsNextRetry(t *testing.T) {
 			response:   retryAfterResponse(),
 			err:        fakeError,
 			retryableErrFunc: func(_ *http.Request, err error) bool {
-				if err == fakeError {
+				if errors.Is(err, fakeError) {
 					return true
 				}
 				return false
@@ -393,7 +393,7 @@ func TestWrapPreviousError(t *testing.T) {
 		if retry.currentErr != context.Canceled {
 			t.Errorf("Expected current error: %v, but got: %v", context.Canceled, retry.currentErr)
 		}
-		if retry.previousErr != io.EOF {
+		if !errors.Is(retry.previousErr, io.EOF) {
 			t.Errorf("Expected previous error: %v, but got: %v", io.EOF, retry.previousErr)
 		}
 	})

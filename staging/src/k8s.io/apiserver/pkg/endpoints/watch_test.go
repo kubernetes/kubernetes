@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -34,7 +35,7 @@ import (
 
 	"golang.org/x/net/websocket"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -665,7 +666,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
+	errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
 	watcher.Error(&errStatus)
 	watcher.Stop()
 
@@ -716,7 +717,7 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error"))
+	errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error"))
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, errStatus))
 	defer s.Close()
@@ -864,7 +865,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 
 	// Make sure we can't receive any more events through the timeout watch
 	err = decoder.Decode(&got)
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Errorf("Unexpected non-error")
 	}
 }

@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
@@ -46,7 +47,7 @@ func TestCompact(t *testing.T) {
 	}
 
 	obj, err := client.Get(ctx, "/somekey", clientv3.WithRev(putResp.Header.Revision))
-	if err != etcdrpc.ErrCompacted {
+	if !errors.Is(err, etcdrpc.ErrCompacted) {
 		t.Errorf("Expecting ErrCompacted, but get=%v err=%v", obj, err)
 	}
 }

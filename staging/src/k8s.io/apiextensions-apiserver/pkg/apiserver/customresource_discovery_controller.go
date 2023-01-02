@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -309,7 +310,7 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}, synchedCh chan<- struc
 			}
 		}
 		return true, nil
-	}, stopCh); err == wait.ErrWaitTimeout {
+	}, stopCh); errors.Is(err, wait.ErrWaitTimeout) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for discovery endpoint to initialize"))
 		return
 	} else if err != nil {
