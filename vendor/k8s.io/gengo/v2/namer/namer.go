@@ -130,7 +130,7 @@ type NameSystems map[string]Namer
 // default lowercase private namer. You'll have to add a suffix or prefix.
 type NameStrategy struct {
 	Prefix, Suffix string
-	Join           func(pre string, parts []string, post string) string
+	Join           func(parts ...string) string
 
 	// Add non-meaningful package directory names here (e.g. "proto") and
 	// they will be ignored.
@@ -168,30 +168,14 @@ func IL(in string) string {
 // Joiner lets you specify functions that preprocess the various components of
 // a name before joining them. You can construct e.g. camelCase or CamelCase or
 // any other way of joining words. (See the IC and IL convenience functions.)
-func Joiner(first, others func(string) string) func(pre string, in []string, post string) string {
-	return func(pre string, in []string, post string) string {
-		tmp := []string{others(pre)}
+func Joiner(first, others func(string) string) func(in ...string) string {
+	return func(in ...string) string {
+		tmp := make([]string, 0, len(in))
 		for i := range in {
 			tmp = append(tmp, others(in[i]))
 		}
-		tmp = append(tmp, others(post))
 		return first(strings.Join(tmp, ""))
 	}
-}
-
-func (ns *NameStrategy) removePrefixAndSuffix(s string) string {
-	// The join function may have changed capitalization.
-	lowerIn := strings.ToLower(s)
-	lowerP := strings.ToLower(ns.Prefix)
-	lowerS := strings.ToLower(ns.Suffix)
-	b, e := 0, len(s)
-	if strings.HasPrefix(lowerIn, lowerP) {
-		b = len(ns.Prefix)
-	}
-	if strings.HasSuffix(lowerIn, lowerS) {
-		e -= len(ns.Suffix)
-	}
-	return s[b:e]
 }
 
 var (
@@ -215,10 +199,27 @@ func (ns *NameStrategy) Name(t *types.Type) string {
 	if ns.Names == nil {
 		ns.Names = Names{}
 	}
-	if s, ok := ns.Names[t]; ok {
-		return s
+	if name, ok := ns.Names[t]; ok {
+		return name
 	}
 
+	// Some implementations of Join are not no-op wrt empty parts.
+	parts := make([]string, 0, 3)
+	if ns.Prefix != "" {
+		parts = append(parts, ns.Prefix)
+	}
+	parts = append(parts, ns.name(t))
+	if ns.Suffix != "" {
+		parts = append(parts, ns.Suffix)
+	}
+
+	name := ns.Join(parts...)
+	ns.Names[t] = name
+	return name
+}
+
+// name is like Name but without the prefix and suffix.
+func (ns *NameStrategy) name(t *types.Type) string {
 	if t.Name.Package != "" {
 		dirs := append(ns.filterDirs(t.Name.Package), t.Name.Name)
 		i := ns.PrependPackageNames + 1
@@ -226,8 +227,7 @@ func (ns *NameStrategy) Name(t *types.Type) string {
 		if i > dn {
 			i = dn
 		}
-		name := ns.Join(ns.Prefix, dirs[dn-i:], ns.Suffix)
-		ns.Names[t] = name
+		name := ns.Join(dirs[dn-i:]...)
 		return name
 	}
 
@@ -235,65 +235,73 @@ func (ns *NameStrategy) Name(t *types.Type) string {
 	var name string
 	switch t.Kind {
 	case types.Builtin:
-		name = ns.Join(ns.Prefix, []string{t.Name.Name}, ns.Suffix)
+		name = t.Name.Name
 	case types.Map:
-		name = ns.Join(ns.Prefix, []string{
+		name = ns.Join(
 			"Map",
-			ns.removePrefixAndSuffix(ns.Name(t.Key)),
+			ns.name(t.Key),
 			"To",
-			ns.removePrefixAndSuffix(ns.Name(t.Elem)),
-		}, ns.Suffix)
+			ns.name(t.Elem))
 	case types.Slice:
-		name = ns.Join(ns.Prefix, []string{
+		name = ns.Join(
 			"Slice",
-			ns.removePrefixAndSuffix(ns.Name(t.Elem)),
-		}, ns.Suffix)
+			ns.name(t.Elem))
 	case types.Array:
-		name = ns.Join(ns.Prefix, []string{
+		name = ns.Join(
 			"Array",
-			ns.removePrefixAndSuffix(fmt.Sprintf("%d", t.Len)),
-			ns.removePrefixAndSuffix(ns.Name(t.Elem)),
-		}, ns.Suffix)
+			fmt.Sprintf("%d", t.Len),
+			ns.name(t.Elem))
 	case types.Pointer:
-		name = ns.Join(ns.Prefix, []string{
+		name = ns.Join(
 			"Pointer",
-			ns.removePrefixAndSuffix(ns.Name(t.Elem)),
-		}, ns.Suffix)
+			ns.name(t.Elem))
 	case types.Struct:
-		names := []string{"Struct"}
+		parts := []string{"Struct"}
 		for _, m := range t.Members {
-			names = append(names, ns.removePrefixAndSuffix(ns.Name(m.Type)))
+			parts = append(parts, ns.name(m.Type))
 		}
-		name = ns.Join(ns.Prefix, names, ns.Suffix)
+		name = ns.Join(parts...)
 	case types.Chan:
-		name = ns.Join(ns.Prefix, []string{
+		name = ns.Join(
 			"Chan",
-			ns.removePrefixAndSuffix(ns.Name(t.Elem)),
-		}, ns.Suffix)
+			ns.name(t.Elem))
 	case types.Interface:
 		// TODO: add to name test
-		names := []string{"Interface"}
-		for _, m := range t.Methods {
-			// TODO: include function signature
-			names = append(names, m.Name.Name)
+		if len(t.Methods) == 0 {
+			name = "Any"
+		} else if t.Name.Name == "error" {
+			name = "Error"
+		} else {
+			parts := []string{"Interface"}
+			for n, m := range t.Methods {
+				parts = append(parts, ns.nameFunc(n, m.Signature))
+			}
+			name = ns.Join(parts...)
 		}
-		name = ns.Join(ns.Prefix, names, ns.Suffix)
 	case types.Func:
 		// TODO: add to name test
-		parts := []string{"Func"}
-		for _, pt := range t.Signature.Parameters {
-			parts = append(parts, ns.removePrefixAndSuffix(ns.Name(pt)))
-		}
-		parts = append(parts, "Returns")
-		for _, rt := range t.Signature.Results {
-			parts = append(parts, ns.removePrefixAndSuffix(ns.Name(rt)))
-		}
-		name = ns.Join(ns.Prefix, parts, ns.Suffix)
+		name = ns.nameFunc("Func", t.Signature)
 	default:
 		name = "unnameable_" + string(t.Kind)
 	}
-	ns.Names[t] = name
 	return name
+}
+
+// nameFunc returns a name string for a function or method.  The name argument
+// can be used to indicate the method name when naming interfaces.
+func (ns *NameStrategy) nameFunc(name string, sig *types.Signature) string {
+	parts := make([]string, 0, 2+len(sig.Parameters)+len(sig.Results))
+	parts = append(parts, name)
+	for _, pt := range sig.Parameters {
+		parts = append(parts, ns.name(pt))
+	}
+	if len(sig.Results) > 0 {
+		parts = append(parts, "Returns")
+		for _, rt := range sig.Results {
+			parts = append(parts, ns.name(rt))
+		}
+	}
+	return ns.Join(parts...)
 }
 
 // ImportTracker allows a raw namer to keep track of the packages needed for
