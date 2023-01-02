@@ -17,7 +17,6 @@ limitations under the License.
 package ipallocator
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -26,38 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	netutils "k8s.io/utils/net"
 )
-
-// Interface manages the allocation of IP addresses out of a range. Interface
-// should be threadsafe.
-type Interface interface {
-	Allocate(net.IP) error
-	AllocateNext() (net.IP, error)
-	Release(net.IP) error
-	ForEach(func(net.IP))
-	CIDR() net.IPNet
-	IPFamily() api.IPFamily
-	Has(ip net.IP) bool
-	Destroy()
-	EnableMetrics()
-
-	// DryRun offers a way to try operations without persisting them.
-	DryRun() Interface
-}
-
-var (
-	ErrFull              = errors.New("range is full")
-	ErrAllocated         = errors.New("provided IP is already allocated")
-	ErrMismatchedNetwork = errors.New("the provided network does not match the current range")
-)
-
-type ErrNotInRange struct {
-	IP         net.IP
-	ValidRange string
-}
-
-func (e *ErrNotInRange) Error() string {
-	return fmt.Sprintf("the provided IP (%v) is not in the valid range. The range of valid IPs is %s", e.IP, e.ValidRange)
-}
 
 // Range is a contiguous block of IPs that can be allocated atomically.
 //
@@ -88,6 +55,8 @@ type Range struct {
 	// metrics is a metrics recorder that can be disabled
 	metrics metricsRecorderInterface
 }
+
+var _ Interface = (*Range)(nil)
 
 // New creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
 func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorWithOffsetFactory) (*Range, error) {
