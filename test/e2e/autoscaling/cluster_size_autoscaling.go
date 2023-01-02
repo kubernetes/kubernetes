@@ -364,7 +364,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		if status.target != target {
 			klog.Warningf("Final number of nodes (%v) does not match initial scale-up target (%v).", status.target, target)
 		}
-		gomega.Expect(status.timestamp.Add(freshStatusLimit)).ToNot(gomega.BeTemporally("<", time.Now()))
+		gomega.Expect(status.timestamp.Add(freshStatusLimit)).To(gomega.BeTemporally(">=", time.Now()))
 		framework.ExpectEqual(status.status, caNoScaleUpStatus)
 		framework.ExpectEqual(status.ready, status.target)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
