@@ -187,12 +187,13 @@ func verifyWrappedX509UnkownAuthorityErr(t *testing.T, err error) {
 	if !ok {
 		t.Fatalf("Expected to receive an url.Error, got '%s' (%#v)", err.Error(), err)
 	}
-	x509Err, ok := urlErr.Err.(x509.UnknownAuthorityError)
+	verificationErr, ok := urlErr.Err.(*tls.CertificateVerificationError)
 	if !ok {
-		t.Fatalf("Expected to receive a wrapped x509.UnknownAuthorityError, got: '%s' (%#v)", urlErr.Error(), urlErr)
+		t.Fatalf("Expected to receive a wrapped *tls.CertificateVerificationError, got: '%s' (%#v)", urlErr.Err.Error(), urlErr.Err)
 	}
-	if msg := x509Err.Error(); msg != "x509: certificate signed by unknown authority" {
-		t.Fatalf("Expected 'signed by unknown authority' error, got: '%s'", msg)
+	_, ok = verificationErr.Err.(x509.UnknownAuthorityError)
+	if !ok {
+		t.Fatalf("Expected to receive a wrapped x509.UnknownAuthorityError, got: '%s' (%#v)", verificationErr.Err.Error(), verificationErr.Err)
 	}
 }
 
