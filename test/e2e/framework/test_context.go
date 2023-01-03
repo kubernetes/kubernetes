@@ -32,6 +32,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
+	"github.com/onsi/gomega"
 	gomegaformat "github.com/onsi/gomega/format"
 
 	restclient "k8s.io/client-go/rest"
@@ -471,6 +472,15 @@ func AfterReadingAllFlags(t *TestContextType) {
 		}
 		os.Exit(0)
 	}
+
+	// Reconfigure gomega defaults. The poll interval should be suitable
+	// for most tests. The timeouts are more subjective and tests may want
+	// to override them, but these defaults are still better for E2E than the
+	// ones from Gomega (1s timeout, 10ms interval).
+	gomega.SetDefaultEventuallyPollingInterval(t.timeouts.Poll)
+	gomega.SetDefaultConsistentlyPollingInterval(t.timeouts.Poll)
+	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
+	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
 
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {

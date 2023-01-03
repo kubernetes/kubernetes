@@ -47,10 +47,12 @@ type TimeoutContext struct {
 	Poll time.Duration
 
 	// PodStart is how long to wait for the pod to be started.
+	// This value is the default for gomega.Eventually.
 	PodStart time.Duration
 
 	// PodStartShort is same as `PodStart`, but shorter.
 	// Use it in a case-by-case basis, mostly when you are sure pod start will not be delayed.
+	// This value is the default for gomega.Consistently.
 	PodStartShort time.Duration
 
 	// PodStartSlow is same as `PodStart`, but longer.
@@ -118,6 +120,8 @@ func NewTimeoutContext() *TimeoutContext {
 
 // PollInterval defines how long to wait between API server queries while
 // waiting for some condition.
+//
+// This value is the default for gomega.Eventually and gomega.Consistently.
 func PollInterval() time.Duration {
 	return TestContext.timeouts.Poll
 }
