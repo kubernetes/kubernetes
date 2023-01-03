@@ -27,8 +27,7 @@ type SimplePackage struct {
 	// Import path of the package, and the location on disk of the package.
 	PackagePath string
 	// The location of the package on disk.
-	//FIXME: ever used?
-	Source string
+	PackageDir string
 
 	// Emitted at the top of every file.
 	HeaderText []byte
@@ -48,7 +47,7 @@ type SimplePackage struct {
 
 func (d *SimplePackage) Name() string       { return d.PackageName }
 func (d *SimplePackage) Path() string       { return d.PackagePath }
-func (d *SimplePackage) SourcePath() string { return d.Source }
+func (d *SimplePackage) SourcePath() string { return d.PackageDir }
 
 func (d *SimplePackage) Filter(c *Context, t *types.Type) bool {
 	if d.FilterFunc != nil {

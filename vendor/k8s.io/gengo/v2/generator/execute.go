@@ -219,11 +219,11 @@ func (c *Context) addNameSystems(namers map[string]namer.Namer) *Context {
 // import path. e.g.: '/path/to/home/path/to/gopath/src/' The package knows its
 // import path already, this will be appended to 'outDir'.
 func (c *Context) ExecutePackage(outDir string, p Package) error {
-	path := p.SourcePath()
-	klog.V(5).Infof("Processing package %q, disk location %q", p.Name(), path)
+	srcPath := p.SourcePath()
+	klog.V(5).Infof("Processing package %q, disk location %q", p.Name(), srcPath)
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(p.Filter)
-	os.MkdirAll(path, 0755)
+	os.MkdirAll(srcPath, 0755)
 	files := map[string]*File{}
 	for _, g := range p.Generators(packageContext) {
 		// Filter out types the *generator* doesn't care about.
@@ -282,7 +282,7 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 
 	var errors []error
 	for _, f := range files {
-		finalPath := filepath.Join(path, f.Name)
+		finalPath := filepath.Join(srcPath, f.Name)
 		assembler, ok := c.FileTypes[f.FileType]
 		if !ok {
 			return fmt.Errorf("the file type %q registered for file %q does not exist in the context", f.FileType, f.Name)
