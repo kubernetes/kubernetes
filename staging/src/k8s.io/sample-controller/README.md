@@ -126,6 +126,9 @@ type User struct {
 }
 ```
 
+Note, json tag `json:` is needed to generate informer externalversions package.
+Otherwise, informer internalversion package is generated.
+
 ## Validation
 
 To validate custom resources, use the [`CustomResourceValidation`](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions/#validation) feature. Validation in the form of a [structured schema](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema) is mandatory to be provided for `apiextensions.k8s.io/v1`.
