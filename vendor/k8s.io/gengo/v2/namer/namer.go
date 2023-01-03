@@ -106,9 +106,6 @@ type Namer interface {
 	Name(*types.Type) string
 }
 
-// NameSystems is a map of a system name to a namer for that system.
-type NameSystems map[string]Namer
-
 // NameStrategy is a general Namer. The easiest way to use it is to copy the
 // Public/PrivateNamer variables, and modify the members you wish to change.
 //

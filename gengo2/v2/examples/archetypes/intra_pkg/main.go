@@ -78,9 +78,8 @@ func validateArgs(stdArgs *args.GeneratorArgs) error {
 
 // getGlobalNamers returns the name systems available to all generators in
 // all packages in this tool.  Individual generators can add their own later.
-// FIXME: just say []NameSystem instead of a type
-func getGlobalNamers() namer.NameSystems {
-	return namer.NameSystems{
+func getGlobalNamers() map[string]namer.Namer {
+	return map[string]namer.Namer{
 		// This namer is used for generating UpperCamelCase names.  Since we
 		// only handle types within a package, we don't need any additional
 		// parts of the package name (the 0 argument).
@@ -161,9 +160,9 @@ func newGenerator(outputFileBase, targetPackage string, namePrefix string) gener
 	}
 }
 
-func (g *xOrErrorGenerator) Namers(c *generator.Context) namer.NameSystems {
+func (g *xOrErrorGenerator) Namers(c *generator.Context) map[string]namer.Namer {
 	// Have the raw namer for this file track what it imports.
-	return namer.NameSystems{
+	return map[string]namer.Namer{
 		"raw": namer.NewRawNamer(g.targetPackage, g.imports),
 	}
 }

@@ -43,7 +43,7 @@ type DefaultGen struct {
 
 func (d DefaultGen) Name() string                                        { return d.OptionalName }
 func (d DefaultGen) Filter(*Context, *types.Type) bool                   { return true }
-func (d DefaultGen) Namers(*Context) namer.NameSystems                   { return nil }
+func (d DefaultGen) Namers(*Context) map[string]namer.Namer              { return nil }
 func (d DefaultGen) Imports(*Context) []string                           { return []string{} }
 func (d DefaultGen) PackageVars(*Context) []string                       { return []string{} }
 func (d DefaultGen) PackageConsts(*Context) []string                     { return []string{} }

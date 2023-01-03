@@ -197,13 +197,13 @@ func (c *Context) filteredBy(f func(*Context, *types.Type) bool) *Context {
 
 // make a new context; inheret c.Namers, but add on 'namers'. In case of a name
 // collision, the namer in 'namers' wins.
-func (c *Context) addNameSystems(namers namer.NameSystems) *Context {
+func (c *Context) addNameSystems(namers map[string]namer.Namer) *Context {
 	if namers == nil {
 		return c
 	}
 	c2 := *c
 	// Copy the existing name systems so we don't corrupt a parent context
-	c2.Namers = namer.NameSystems{}
+	c2.Namers = map[string]namer.Namer{}
 	for k, v := range c.Namers {
 		c2.Namers[k] = v
 	}

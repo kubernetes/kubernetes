@@ -103,7 +103,7 @@ type Generator interface {
 	// functions.
 	//
 	// A use case for this is to return a namer that tracks imports.
-	Namers(*Context) namer.NameSystems
+	Namers(*Context) map[string]namer.Namer
 
 	// Init should write an init function, and any other content that's not
 	// generated per-type. (It's not intended for generator specific
@@ -152,7 +152,7 @@ type Generator interface {
 type Context struct {
 	// A map from the naming system to the names for that system. E.g., you
 	// might have public names and several private naming systems.
-	Namers namer.NameSystems
+	Namers map[string]namer.Namer
 
 	// All the types, in case you want to look up something.
 	Universe types.Universe
@@ -188,14 +188,14 @@ type Context struct {
 
 // NewContext generates a context from the given builder, naming systems, and
 // the naming system you wish to construct the canonical ordering from.
-func NewContext(b *parser.Builder, nameSystems namer.NameSystems, canonicalOrderName string) (*Context, error) {
+func NewContext(b *parser.Builder, nameSystems map[string]namer.Namer, canonicalOrderName string) (*Context, error) {
 	universe, err := b.FindTypes()
 	if err != nil {
 		return nil, err
 	}
 
 	c := &Context{
-		Namers:   namer.NameSystems{},
+		Namers:   map[string]namer.Namer{},
 		Universe: universe,
 		Inputs:   b.FindPackages(),
 		FileTypes: map[string]FileType{
