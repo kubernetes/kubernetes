@@ -462,7 +462,7 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		}
 
 		if len(strings.TrimSpace(clusterCIDRs[1])) == 0 {
-			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no IPv6 cluster CIDR defined, , defaulting to no-op detect-local for IPv6")
+			klog.InfoS("Detect-local-mode set to ClusterCIDR, but no IPv6 cluster CIDR defined, defaulting to no-op detect-local for IPv6")
 		} else {
 			localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(clusterCIDRs[1], ipt[1])
 		}
