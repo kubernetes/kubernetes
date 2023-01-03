@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"
@@ -75,6 +76,7 @@ const (
 const (
 	configFile               = "config/performance-config.yaml"
 	extensionPointsLabelName = "extension_point"
+	resultLabelName          = "result"
 )
 
 var (
@@ -84,8 +86,11 @@ var (
 				label:  extensionPointsLabelName,
 				values: []string{"Filter", "Score"},
 			},
-			"scheduler_scheduling_attempt_duration_seconds": nil,
-			"scheduler_pod_scheduling_duration_seconds":     nil,
+			"scheduler_scheduling_attempt_duration_seconds": {
+				label:  resultLabelName,
+				values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
+			},
+			"scheduler_pod_scheduling_duration_seconds": nil,
 		},
 	}
 )
