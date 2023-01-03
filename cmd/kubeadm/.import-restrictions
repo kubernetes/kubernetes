@@ -17,5 +17,4 @@ rules:
   - selectorRegexp: gopkg[.]in
     allowedPrefixes:
       - gopkg.in/inf.v0
-      - gopkg.in/square/go-jose.v2
       - gopkg.in/yaml.v2

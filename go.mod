@@ -33,6 +33,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.9.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
+	github.com/go-jose/go-jose/v3 v3.0.0
 	github.com/go-logr/logr v1.2.3
 	github.com/godbus/dbus/v5 v5.0.6
 	github.com/gogo/protobuf v1.3.2
@@ -89,7 +90,6 @@ require (
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/gcfg.v1 v1.2.0
-	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.0.0
@@ -239,6 +239,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
+	gopkg.in/square/go-jose.v2 v2.2.2 // indirect
 	gopkg.in/warnings.v0 v0.1.1 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
