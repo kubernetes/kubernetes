@@ -35,6 +35,9 @@ var defaultTimeouts = TimeoutContext{
 	SnapshotCreate:            5 * time.Minute,
 	SnapshotDelete:            5 * time.Minute,
 	SnapshotControllerMetrics: 5 * time.Minute,
+	SystemPodsStartup:         10 * time.Minute,
+	NodeSchedulable:           30 * time.Minute,
+	SystemDaemonsetStartup:    5 * time.Minute,
 }
 
 // TimeoutContext contains timeout settings for several actions.
@@ -88,12 +91,23 @@ type TimeoutContext struct {
 
 	// SnapshotControllerMetrics is how long to wait for snapshot controller metrics.
 	SnapshotControllerMetrics time.Duration
+
+	// SystemPodsStartup is how long to wait for system pods to be running.
+	SystemPodsStartup time.Duration
+
+	// NodeSchedulable is how long to wait for all nodes to be schedulable.
+	NodeSchedulable time.Duration
+
+	// SystemDaemonsetStartup is how long to wait for all system daemonsets to be ready.
+	SystemDaemonsetStartup time.Duration
 }
 
-// NewTimeoutContextWithDefaults returns a TimeoutContext with default values.
-func NewTimeoutContextWithDefaults() *TimeoutContext {
-	// Make a copy, otherwise the caller would have the ability to
-	// modify the defaults
-	copy := defaultTimeouts
+// NewTimeoutContext returns a TimeoutContext with all values set either to
+// hard-coded defaults or a value that was configured when running the E2E
+// suite. Should be called after command line parsing.
+func NewTimeoutContext() *TimeoutContext {
+	// Make a copy, otherwise the caller would have the ability to modify
+	// the original values.
+	copy := TestContext.timeouts
 	return &copy
 }

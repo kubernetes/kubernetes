@@ -1967,7 +1967,7 @@ func (v *azureFileVolume) DeleteVolume(ctx context.Context) {
 }
 
 func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
-	timeouts := framework.NewTimeoutContextWithDefaults()
+	timeouts := framework.NewTimeoutContext()
 	timeouts.PodStart = time.Minute * 15
 	timeouts.PodDelete = time.Minute * 15
 	timeouts.PVDelete = time.Minute * 20

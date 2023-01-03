@@ -179,7 +179,7 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 		BaseName:  baseName,
 		Options:   options,
 		ClientSet: client,
-		Timeouts:  NewTimeoutContextWithDefaults(),
+		Timeouts:  NewTimeoutContext(),
 	}
 
 	// The order is important here: if the extension calls ginkgo.BeforeEach
