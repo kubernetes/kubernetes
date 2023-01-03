@@ -119,8 +119,8 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 		expectError     bool
 	}{
 		"unspecified RuntimeClass": {rcn: nil, expectedHandler: ""},
-		"valid RuntimeClass":       {rcn: pointer.StringPtr(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
-		"missing RuntimeClass":     {rcn: pointer.StringPtr("phantom"), expectError: true},
+		"valid RuntimeClass":       {rcn: pointer.String(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
+		"missing RuntimeClass":     {rcn: pointer.String("phantom"), expectError: true},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {

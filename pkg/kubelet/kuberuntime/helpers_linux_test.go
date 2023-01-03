@@ -260,7 +260,7 @@ func TestFieldProfile(t *testing.T) {
 			description: "SeccompProfileTypeLocalhost should return localhost",
 			scmpProfile: &v1.SeccompProfile{
 				Type:             v1.SeccompProfileTypeLocalhost,
-				LocalhostProfile: utilpointer.StringPtr("profile.json"),
+				LocalhostProfile: utilpointer.String("profile.json"),
 			},
 			rootPath:        "/test/",
 			expectedProfile: "localhost//test/profile.json",
@@ -316,7 +316,7 @@ func TestFieldProfileDefaultSeccomp(t *testing.T) {
 			description: "SeccompProfileTypeLocalhost should return localhost",
 			scmpProfile: &v1.SeccompProfile{
 				Type:             v1.SeccompProfileTypeLocalhost,
-				LocalhostProfile: utilpointer.StringPtr("profile.json"),
+				LocalhostProfile: utilpointer.String("profile.json"),
 			},
 			rootPath:        "/test/",
 			expectedProfile: "localhost//test/profile.json",

@@ -811,8 +811,8 @@ func TestContainerLogs(t *testing.T) {
 		podLogOption *v1.PodLogOptions
 	}{
 		"without tail":     {"", &v1.PodLogOptions{}},
-		"with tail":        {"?tailLines=5", &v1.PodLogOptions{TailLines: pointer.Int64Ptr(5)}},
-		"with legacy tail": {"?tail=5", &v1.PodLogOptions{TailLines: pointer.Int64Ptr(5)}},
+		"with tail":        {"?tailLines=5", &v1.PodLogOptions{TailLines: pointer.Int64(5)}},
+		"with legacy tail": {"?tail=5", &v1.PodLogOptions{TailLines: pointer.Int64(5)}},
 		"with tail all":    {"?tail=all", &v1.PodLogOptions{}},
 		"with follow":      {"?follow=1", &v1.PodLogOptions{Follow: true}},
 	}

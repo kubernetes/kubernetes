@@ -54,7 +54,7 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 
 func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
 	if obj.EnableServer == nil {
-		obj.EnableServer = utilpointer.BoolPtr(true)
+		obj.EnableServer = utilpointer.Bool(true)
 	}
 	if obj.SyncFrequency == zeroDuration {
 		obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
@@ -72,10 +72,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.Port = ports.KubeletPort
 	}
 	if obj.Authentication.Anonymous.Enabled == nil {
-		obj.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
+		obj.Authentication.Anonymous.Enabled = utilpointer.Bool(false)
 	}
 	if obj.Authentication.Webhook.Enabled == nil {
-		obj.Authentication.Webhook.Enabled = utilpointer.BoolPtr(true)
+		obj.Authentication.Webhook.Enabled = utilpointer.Bool(true)
 	}
 	if obj.Authentication.Webhook.CacheTTL == zeroDuration {
 		obj.Authentication.Webhook.CacheTTL = metav1.Duration{Duration: 2 * time.Minute}
@@ -90,28 +90,28 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.Authorization.Webhook.CacheUnauthorizedTTL = metav1.Duration{Duration: 30 * time.Second}
 	}
 	if obj.RegistryPullQPS == nil {
-		obj.RegistryPullQPS = utilpointer.Int32Ptr(5)
+		obj.RegistryPullQPS = utilpointer.Int32(5)
 	}
 	if obj.RegistryBurst == 0 {
 		obj.RegistryBurst = 10
 	}
 	if obj.EventRecordQPS == nil {
-		obj.EventRecordQPS = utilpointer.Int32Ptr(5)
+		obj.EventRecordQPS = utilpointer.Int32(5)
 	}
 	if obj.EventBurst == 0 {
 		obj.EventBurst = 10
 	}
 	if obj.EnableDebuggingHandlers == nil {
-		obj.EnableDebuggingHandlers = utilpointer.BoolPtr(true)
+		obj.EnableDebuggingHandlers = utilpointer.Bool(true)
 	}
 	if obj.HealthzPort == nil {
-		obj.HealthzPort = utilpointer.Int32Ptr(10248)
+		obj.HealthzPort = utilpointer.Int32(10248)
 	}
 	if obj.HealthzBindAddress == "" {
 		obj.HealthzBindAddress = "127.0.0.1"
 	}
 	if obj.OOMScoreAdj == nil {
-		obj.OOMScoreAdj = utilpointer.Int32Ptr(int32(qos.KubeletOOMScoreAdj))
+		obj.OOMScoreAdj = utilpointer.Int32(int32(qos.KubeletOOMScoreAdj))
 	}
 	if obj.StreamingConnectionIdleTimeout == zeroDuration {
 		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
@@ -137,16 +137,16 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.ImageGCHighThresholdPercent == nil {
 		// default is below docker's default dm.min_free_space of 90%
-		obj.ImageGCHighThresholdPercent = utilpointer.Int32Ptr(85)
+		obj.ImageGCHighThresholdPercent = utilpointer.Int32(85)
 	}
 	if obj.ImageGCLowThresholdPercent == nil {
-		obj.ImageGCLowThresholdPercent = utilpointer.Int32Ptr(80)
+		obj.ImageGCLowThresholdPercent = utilpointer.Int32(80)
 	}
 	if obj.VolumeStatsAggPeriod == zeroDuration {
 		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
 	}
 	if obj.CgroupsPerQOS == nil {
-		obj.CgroupsPerQOS = utilpointer.BoolPtr(true)
+		obj.CgroupsPerQOS = utilpointer.Bool(true)
 	}
 	if obj.CgroupDriver == "" {
 		obj.CgroupDriver = "cgroupfs"
@@ -185,13 +185,13 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.ResolverConfig = utilpointer.String(kubetypes.ResolvConfDefault)
 	}
 	if obj.CPUCFSQuota == nil {
-		obj.CPUCFSQuota = utilpointer.BoolPtr(true)
+		obj.CPUCFSQuota = utilpointer.Bool(true)
 	}
 	if obj.CPUCFSQuotaPeriod == nil {
 		obj.CPUCFSQuotaPeriod = &metav1.Duration{Duration: 100 * time.Millisecond}
 	}
 	if obj.NodeStatusMaxImages == nil {
-		obj.NodeStatusMaxImages = utilpointer.Int32Ptr(50)
+		obj.NodeStatusMaxImages = utilpointer.Int32(50)
 	}
 	if obj.MaxOpenFiles == 0 {
 		obj.MaxOpenFiles = 1000000
@@ -200,37 +200,37 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.ContentType = "application/vnd.kubernetes.protobuf"
 	}
 	if obj.KubeAPIQPS == nil {
-		obj.KubeAPIQPS = utilpointer.Int32Ptr(5)
+		obj.KubeAPIQPS = utilpointer.Int32(5)
 	}
 	if obj.KubeAPIBurst == 0 {
 		obj.KubeAPIBurst = 10
 	}
 	if obj.SerializeImagePulls == nil {
-		obj.SerializeImagePulls = utilpointer.BoolPtr(true)
+		obj.SerializeImagePulls = utilpointer.Bool(true)
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 	}
 	if obj.EnableControllerAttachDetach == nil {
-		obj.EnableControllerAttachDetach = utilpointer.BoolPtr(true)
+		obj.EnableControllerAttachDetach = utilpointer.Bool(true)
 	}
 	if obj.MakeIPTablesUtilChains == nil {
-		obj.MakeIPTablesUtilChains = utilpointer.BoolPtr(true)
+		obj.MakeIPTablesUtilChains = utilpointer.Bool(true)
 	}
 	if obj.IPTablesMasqueradeBit == nil {
-		obj.IPTablesMasqueradeBit = utilpointer.Int32Ptr(DefaultIPTablesMasqueradeBit)
+		obj.IPTablesMasqueradeBit = utilpointer.Int32(DefaultIPTablesMasqueradeBit)
 	}
 	if obj.IPTablesDropBit == nil {
-		obj.IPTablesDropBit = utilpointer.Int32Ptr(DefaultIPTablesDropBit)
+		obj.IPTablesDropBit = utilpointer.Int32(DefaultIPTablesDropBit)
 	}
 	if obj.FailSwapOn == nil {
-		obj.FailSwapOn = utilpointer.BoolPtr(true)
+		obj.FailSwapOn = utilpointer.Bool(true)
 	}
 	if obj.ContainerLogMaxSize == "" {
 		obj.ContainerLogMaxSize = "10Mi"
 	}
 	if obj.ContainerLogMaxFiles == nil {
-		obj.ContainerLogMaxFiles = utilpointer.Int32Ptr(5)
+		obj.ContainerLogMaxFiles = utilpointer.Int32(5)
 	}
 	if obj.ConfigMapAndSecretChangeDetectionStrategy == "" {
 		obj.ConfigMapAndSecretChangeDetectionStrategy = kubeletconfigv1beta1.WatchChangeDetectionStrategy
@@ -244,25 +244,25 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	// Use the Default LoggingConfiguration option
 	logsapi.SetRecommendedLoggingConfiguration(&obj.Logging)
 	if obj.EnableSystemLogHandler == nil {
-		obj.EnableSystemLogHandler = utilpointer.BoolPtr(true)
+		obj.EnableSystemLogHandler = utilpointer.Bool(true)
 	}
 	if obj.EnableProfilingHandler == nil {
-		obj.EnableProfilingHandler = utilpointer.BoolPtr(true)
+		obj.EnableProfilingHandler = utilpointer.Bool(true)
 	}
 	if obj.EnableDebugFlagsHandler == nil {
-		obj.EnableDebugFlagsHandler = utilpointer.BoolPtr(true)
+		obj.EnableDebugFlagsHandler = utilpointer.Bool(true)
 	}
 	if obj.SeccompDefault == nil {
-		obj.SeccompDefault = utilpointer.BoolPtr(false)
+		obj.SeccompDefault = utilpointer.Bool(false)
 	}
 	if obj.MemoryThrottlingFactor == nil {
-		obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor)
+		obj.MemoryThrottlingFactor = utilpointer.Float64(DefaultMemoryThrottlingFactor)
 	}
 	if obj.RegisterNode == nil {
-		obj.RegisterNode = utilpointer.BoolPtr(true)
+		obj.RegisterNode = utilpointer.Bool(true)
 	}
 	if obj.LocalStorageCapacityIsolation == nil {
-		obj.LocalStorageCapacityIsolation = utilpointer.BoolPtr(true)
+		obj.LocalStorageCapacityIsolation = utilpointer.Bool(true)
 	}
 	if obj.ContainerRuntimeEndpoint == "" {
 		obj.ContainerRuntimeEndpoint = "unix:///run/containerd/containerd.sock"
