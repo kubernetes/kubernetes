@@ -112,30 +112,33 @@ func (g *GeneratorArgs) AddFlagsTo(fs *pflag.FlagSet) {
 	fs.StringVar(&g.TrimPathPrefix, "trim-path-prefix", g.TrimPathPrefix, "If set, trim the specified prefix from --output-package when generating files.")
 }
 
-// LoadGoBoilerplate loads the boilerplate file passed to --go-header-file.
-func (g *GeneratorArgs) LoadGoBoilerplate() ([]byte, error) {
-	var b []byte
+// GoBoilerplate loads the boilerplate file passed to --go-header-file.
+func (g *GeneratorArgs) GoBoilerplate() ([]byte, error) {
+	buf := bytes.Buffer{}
+
+	if g.GeneratedBuildTag != "" {
+		s := fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", g.GeneratedBuildTag, g.GeneratedBuildTag)
+		buf.WriteString(s)
+	}
 
 	if g.GoHeaderFilePath != "" {
-		var err error
-		b, err = ioutil.ReadFile(g.GoHeaderFilePath)
+		b, err := ioutil.ReadFile(g.GoHeaderFilePath)
 		if err != nil {
 			return nil, err
 		}
 		b = bytes.Replace(b, []byte("YEAR"), []byte(strconv.Itoa(time.Now().UTC().Year())), -1)
+		buf.Write(b)
+		buf.WriteByte('\n')
 	}
 
 	if g.GeneratedByCommentTemplate != "" {
-		if len(b) != 0 {
-			b = append(b, byte('\n'))
-		}
 		generatorName := path.Base(os.Args[0])
 		generatedByComment := strings.Replace(g.GeneratedByCommentTemplate, "GENERATOR_NAME", generatorName, -1)
 		s := fmt.Sprintf("%s\n\n", generatedByComment)
-		b = append(b, []byte(s)...)
+		buf.WriteString(s)
 	}
 
-	return b, nil
+	return buf.Bytes(), nil
 }
 
 // NewBuilder makes a new parser.Builder and populates it with the input

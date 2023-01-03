@@ -96,12 +96,10 @@ func getDefaultNamer() string {
 
 // getPackages returns a set of packages to be processed by this tool.
 func getPackages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
-	// FIXME: move inside execute
-	boilerplate, err := arguments.LoadGoBoilerplate()
+	boilerplate, err := arguments.GoBoilerplate()
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
-	header := append([]byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag)), boilerplate...)
 
 	customArgs := arguments.CustomArgs.(*customArgs) // already validated
 	namePrefix := customArgs.NamePrefix
@@ -120,7 +118,7 @@ func getPackages(context *generator.Context, arguments *args.GeneratorArgs) []ge
 				PackageName: pkg.Name,
 				PackagePath: pkg.Path,
 				Source:      pkg.SourcePath,
-				HeaderText:  header,
+				HeaderText:  boilerplate,
 				FilterFunc: func(c *generator.Context, t *types.Type) bool {
 					// This is called for every type in c.Universe, but we only
 					// want to process types in this package.
