@@ -450,6 +450,7 @@ type KubeletConfiguration struct {
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+
 	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
 	// See https://kep.k8s.io/2832 for more details.
 	// +featureGate=KubeletTracing
@@ -465,6 +466,16 @@ type KubeletConfiguration struct {
 	// disabled. Once disabled, user should not set request/limit for container's ephemeral storage, or sizeLimit for emptyDir.
 	// +optional
 	LocalStorageCapacityIsolation bool
+
+	// ContainerRuntimeEndpoint is the endpoint of container runtime.
+	// unix domain sockets supported on Linux while npipes and tcp endpoints are supported for windows.
+	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'
+	ContainerRuntimeEndpoint string
+
+	// ImageServiceEndpoint is the endpoint of container image service.
+	// If not specified the default value is ContainerRuntimeEndpoint
+	// +optional
+	ImageServiceEndpoint string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

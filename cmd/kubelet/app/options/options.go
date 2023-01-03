@@ -98,10 +98,6 @@ type KubeletFlags struct {
 	// Source: https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities
 	WindowsPriorityClass string
 
-	// remoteRuntimeEndpoint is the endpoint of remote runtime service
-	RemoteRuntimeEndpoint string
-	// remoteImageEndpoint is the endpoint of remote image service
-	RemoteImageEndpoint string
 	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
 	ExperimentalMounterPath string
 	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
@@ -191,13 +187,6 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 
 	if f.ContainerRuntime != kubetypes.RemoteContainerRuntime {
 		return fmt.Errorf("unsupported CRI runtime: %q, only %q is currently supported", f.ContainerRuntime, kubetypes.RemoteContainerRuntime)
-	}
-
-	// Note: maybe we can test it for being a valid socket address as an additional improvement.
-	// The only problem with it will be that some setups may not specify 'unix://' prefix.
-	// So just check empty for back compat.
-	if f.RemoteRuntimeEndpoint == "" {
-		return fmt.Errorf("the container runtime endpoint address was not specified or empty, use --container-runtime-endpoint to set")
 	}
 
 	return nil
@@ -323,9 +312,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	fs.StringVar(&f.RootDirectory, "root-dir", f.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 
-	fs.StringVar(&f.RemoteRuntimeEndpoint, "container-runtime-endpoint", f.RemoteRuntimeEndpoint, "The endpoint of remote runtime service. Unix Domain Sockets are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")
-	fs.StringVar(&f.RemoteImageEndpoint, "image-service-endpoint", f.RemoteImageEndpoint, "The endpoint of remote image service. If not specified, it will be the same with --container-runtime-endpoint by default. Unix Domain Socket are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")
-
 	// EXPERIMENTAL FLAGS
 	bindableNodeLabels := cliflag.ConfigurationMap(f.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", fmt.Sprintf("<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be key=value pairs separated by ','. Labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", ")))
@@ -398,6 +384,10 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.Var(&utilflag.IPVar{Val: &c.Address}, "address", "The IP address for the Kubelet to serve on (set to '0.0.0.0' or '::' for listening in all interfaces and IP families)")
 	fs.Int32Var(&c.Port, "port", c.Port, "The port for the Kubelet to serve on.")
 	fs.Int32Var(&c.ReadOnlyPort, "read-only-port", c.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
+
+	// runtime flags
+	fs.StringVar(&c.ContainerRuntimeEndpoint, "container-runtime-endpoint", c.ContainerRuntimeEndpoint, "The endpoint of container runtime service. Unix Domain Sockets are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")
+	fs.StringVar(&c.ImageServiceEndpoint, "image-service-endpoint", c.ImageServiceEndpoint, "The endpoint of container image service. If not specified, it will be the same with --container-runtime-endpoint by default. Unix Domain Socket are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")
 
 	// Authentication
 	fs.BoolVar(&c.Authentication.Anonymous.Enabled, "anonymous-auth", c.Authentication.Anonymous.Enabled, ""+
