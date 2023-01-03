@@ -40,10 +40,11 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against PodSchedulings.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &resource.PodScheduling{} },
-		NewListFunc:              func() runtime.Object { return &resource.PodSchedulingList{} },
-		PredicateFunc:            podscheduling.Match,
-		DefaultQualifiedResource: resource.Resource("podschedulings"),
+		NewFunc:                   func() runtime.Object { return &resource.PodScheduling{} },
+		NewListFunc:               func() runtime.Object { return &resource.PodSchedulingList{} },
+		PredicateFunc:             podscheduling.Match,
+		DefaultQualifiedResource:  resource.Resource("podschedulings"),
+		SingularQualifiedResource: resource.Resource("podscheduling"),
 
 		CreateStrategy:      podscheduling.Strategy,
 		UpdateStrategy:      podscheduling.Strategy,

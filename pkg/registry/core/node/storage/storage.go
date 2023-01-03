@@ -96,10 +96,11 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 // NewStorage returns a NodeStorage object that will work against nodes.
 func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Node{} },
-		NewListFunc:              func() runtime.Object { return &api.NodeList{} },
-		PredicateFunc:            node.MatchNode,
-		DefaultQualifiedResource: api.Resource("nodes"),
+		NewFunc:                   func() runtime.Object { return &api.Node{} },
+		NewListFunc:               func() runtime.Object { return &api.NodeList{} },
+		PredicateFunc:             node.MatchNode,
+		DefaultQualifiedResource:  api.Resource("nodes"),
+		SingularQualifiedResource: api.Resource("node"),
 
 		CreateStrategy:      node.Strategy,
 		UpdateStrategy:      node.Strategy,

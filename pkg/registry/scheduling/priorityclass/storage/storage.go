@@ -41,9 +41,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against priority classes.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &scheduling.PriorityClass{} },
-		NewListFunc:              func() runtime.Object { return &scheduling.PriorityClassList{} },
-		DefaultQualifiedResource: scheduling.Resource("priorityclasses"),
+		NewFunc:                   func() runtime.Object { return &scheduling.PriorityClass{} },
+		NewListFunc:               func() runtime.Object { return &scheduling.PriorityClassList{} },
+		DefaultQualifiedResource:  scheduling.Resource("priorityclasses"),
+		SingularQualifiedResource: scheduling.Resource("priorityclass"),
 
 		CreateStrategy: priorityclass.Strategy,
 		UpdateStrategy: priorityclass.Strategy,

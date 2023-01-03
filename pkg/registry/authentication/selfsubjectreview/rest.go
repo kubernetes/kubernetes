@@ -93,3 +93,9 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 
 	return selfSAR, nil
 }
+
+var _ rest.SingularNameProvider = &REST{}
+
+func (r *REST) GetSingularName() string {
+	return "selfsubjectrulesreview"
+}

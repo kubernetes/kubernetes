@@ -84,9 +84,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against statefulsets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apps.StatefulSet{} },
-		NewListFunc:              func() runtime.Object { return &apps.StatefulSetList{} },
-		DefaultQualifiedResource: apps.Resource("statefulsets"),
+		NewFunc:                   func() runtime.Object { return &apps.StatefulSet{} },
+		NewListFunc:               func() runtime.Object { return &apps.StatefulSetList{} },
+		DefaultQualifiedResource:  apps.Resource("statefulsets"),
+		SingularQualifiedResource: apps.Resource("statefulset"),
 
 		CreateStrategy:      statefulset.Strategy,
 		UpdateStrategy:      statefulset.Strategy,

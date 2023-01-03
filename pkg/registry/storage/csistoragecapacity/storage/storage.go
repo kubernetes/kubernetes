@@ -38,9 +38,10 @@ type REST struct {
 // NewStorage returns a RESTStorage object that will work against CSIStorageCapacity
 func NewStorage(optsGetter generic.RESTOptionsGetter) (*CSIStorageCapacityStorage, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &storageapi.CSIStorageCapacity{} },
-		NewListFunc:              func() runtime.Object { return &storageapi.CSIStorageCapacityList{} },
-		DefaultQualifiedResource: storageapi.Resource("csistoragecapacities"),
+		NewFunc:                   func() runtime.Object { return &storageapi.CSIStorageCapacity{} },
+		NewListFunc:               func() runtime.Object { return &storageapi.CSIStorageCapacityList{} },
+		DefaultQualifiedResource:  storageapi.Resource("csistoragecapacities"),
+		SingularQualifiedResource: storageapi.Resource("csistoragecapacity"),
 
 		TableConvertor: rest.NewDefaultTableConvertor(storageapi.Resource("csistoragecapacities")),
 

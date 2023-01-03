@@ -551,6 +551,10 @@ func (p *testGetterStorage) Get(ctx context.Context, name string, options *metav
 	return nil, nil
 }
 
+func (p *testGetterStorage) GetSingularName() string {
+	return "getter"
+}
+
 type testNoVerbsStorage struct {
 	Version string
 }
@@ -569,6 +573,10 @@ func (p *testNoVerbsStorage) New() runtime.Object {
 }
 
 func (p *testNoVerbsStorage) Destroy() {
+}
+
+func (p *testNoVerbsStorage) GetSingularName() string {
+	return "noverb"
 }
 
 func fakeVersion() version.Info {

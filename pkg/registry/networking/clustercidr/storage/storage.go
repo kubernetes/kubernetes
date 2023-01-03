@@ -36,9 +36,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against ClusterCIDRs.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &networkingapi.ClusterCIDR{} },
-		NewListFunc:              func() runtime.Object { return &networkingapi.ClusterCIDRList{} },
-		DefaultQualifiedResource: networkingapi.Resource("clustercidrs"),
+		NewFunc:                   func() runtime.Object { return &networkingapi.ClusterCIDR{} },
+		NewListFunc:               func() runtime.Object { return &networkingapi.ClusterCIDRList{} },
+		DefaultQualifiedResource:  networkingapi.Resource("clustercidrs"),
+		SingularQualifiedResource: networkingapi.Resource("clustercidr"),
 
 		CreateStrategy: clustercidr.Strategy,
 		UpdateStrategy: clustercidr.Strategy,
