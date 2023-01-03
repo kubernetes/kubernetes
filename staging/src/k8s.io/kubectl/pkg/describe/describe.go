@@ -814,7 +814,9 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		if len(pod.Status.NominatedNodeName) > 0 {
 			w.Write(LEVEL_0, "NominatedNodeName:\t%s\n", pod.Status.NominatedNodeName)
 		}
-
+		if pod.Spec.Affinity != nil {
+			describeAffinity("Affinity", pod.Spec.Affinity, w)
+		}
 		if len(pod.Spec.InitContainers) > 0 {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
@@ -1491,14 +1493,20 @@ func printVolumeNodeAffinity(w PrefixWriter, affinity *corev1.VolumeNodeAffinity
 	w.WriteLine("")
 
 	if affinity.Required != nil {
-		w.Write(LEVEL_1, "Required Terms:\t")
-		if len(affinity.Required.NodeSelectorTerms) == 0 {
-			w.WriteLine("<none>")
-		} else {
-			w.WriteLine("")
-			for i, term := range affinity.Required.NodeSelectorTerms {
-				printNodeSelectorTermsMultilineWithIndent(w, LEVEL_2, fmt.Sprintf("Term %v", i), "\t", term.MatchExpressions)
-			}
+		printNodeSelectorMultilineWithIndent(w, LEVEL_1, "Required Terms", affinity.Required)
+	}
+}
+
+func printNodeSelectorMultilineWithIndent(w PrefixWriter, indentLevel int, title string, nodeSelector *corev1.NodeSelector) {
+	w.Write(indentLevel, "%s:\t", title)
+	if len(nodeSelector.NodeSelectorTerms) == 0 {
+		w.WriteLine("<none>")
+	} else {
+		w.WriteLine("")
+		for i, term := range nodeSelector.NodeSelectorTerms {
+			w.Write(indentLevel+1, fmt.Sprintf("Term %v:\n", i))
+			printNodeSelectorTermsMultilineWithIndent(w, indentLevel+2, "Match Expressions", "\t", term.MatchExpressions)
+			printNodeSelectorTermsMultilineWithIndent(w, indentLevel+2, "Match Fields", "\t", term.MatchFields)
 		}
 	}
 }
@@ -1722,6 +1730,101 @@ func printPersistentVolumeClaim(w PrefixWriter, pvc *corev1.PersistentVolumeClai
 		}
 		w.Write(LEVEL_1, "Kind:\t%v\n", pvc.Spec.DataSource.Kind)
 		w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
+	}
+}
+
+func printPreferredSchedulingTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title string, preferredTerms []corev1.PreferredSchedulingTerm) {
+	w.Write(indentLevel, "%s:\t", title)
+	if len(preferredTerms) == 0 {
+		w.WriteLine("<none>")
+	} else {
+		w.WriteLine("")
+		for i, term := range preferredTerms {
+			w.Write(indentLevel+1, fmt.Sprintf("Term %v:\n", i))
+			w.Write(indentLevel+2, "Weight %v:\n", term.Weight)
+			w.Write(indentLevel+2, "Preference:\t\n")
+			printNodeSelectorTermsMultilineWithIndent(w, indentLevel+3, "Match Expressions", "\t", term.Preference.MatchExpressions)
+			printNodeSelectorTermsMultilineWithIndent(w, indentLevel+3, "Match Fields", "\t", term.Preference.MatchFields)
+		}
+	}
+}
+
+func describeNodeAffinity(affinity *corev1.NodeAffinity, w PrefixWriter, indentLevel int) {
+	if affinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		printNodeSelectorMultilineWithIndent(w, indentLevel, "Required Terms", affinity.RequiredDuringSchedulingIgnoredDuringExecution)
+	}
+	printPreferredSchedulingTermsMultilineWithIndent(w, indentLevel, "Preferred Terms", affinity.PreferredDuringSchedulingIgnoredDuringExecution)
+}
+
+func printPodAffinityTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title string, requiredTerms []corev1.PodAffinityTerm) {
+	w.Write(indentLevel, "%s:\t", title)
+	if len(requiredTerms) == 0 {
+		w.WriteLine("<none>")
+	} else {
+		w.WriteLine("")
+		for i, term := range requiredTerms {
+			w.Write(indentLevel+1, fmt.Sprintf("Term %v:\n", i))
+			w.Write(indentLevel+2, "Label Selector:\t%s\n", metav1.FormatLabelSelector(term.LabelSelector))
+			w.Write(indentLevel+2, "Namespaces:\t%s\n", term.Namespaces)
+			w.Write(indentLevel+2, "Topology Key:\t%s\n", term.TopologyKey)
+			w.Write(indentLevel+2, "Namespace Selector:\t%s\n", metav1.FormatLabelSelector(term.NamespaceSelector))
+		}
+	}
+}
+
+func printWeightedPodAffinityTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title string, preferredTerms []corev1.WeightedPodAffinityTerm) {
+	w.Write(indentLevel, "%s:\t", title)
+	if len(preferredTerms) == 0 {
+		w.WriteLine("<none>")
+	} else {
+		w.WriteLine("")
+		for i, term := range preferredTerms {
+			w.Write(indentLevel+1, fmt.Sprintf("Term %v:\n", i))
+			w.Write(indentLevel+2, "Weight:\t%d\n", term.Weight)
+			w.Write(indentLevel+2, "Pod Affinity Term:\t\n")
+			w.Write(indentLevel+3, "Label Selector:\t%s\n", metav1.FormatLabelSelector(term.PodAffinityTerm.LabelSelector))
+			w.Write(indentLevel+3, "Namespaces:\t%s\n", term.PodAffinityTerm.Namespaces)
+			w.Write(indentLevel+3, "Topology Key:\t%s\n", term.PodAffinityTerm.TopologyKey)
+			w.Write(indentLevel+3, "Namespace Selector:\t%s\n", metav1.FormatLabelSelector(term.PodAffinityTerm.NamespaceSelector))
+		}
+	}
+}
+
+func describePodAffinity(podAffinity *corev1.PodAffinity, w PrefixWriter, indentLevel int) {
+	printPodAffinityTermsMultilineWithIndent(w, indentLevel, "Required Terms", podAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+	printWeightedPodAffinityTermsMultilineWithIndent(w, indentLevel, "Preferred Terms", podAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+}
+
+func describePodAntiAffinity(podAntiAffinity *corev1.PodAntiAffinity, w PrefixWriter, indentLevel int) {
+	printPodAffinityTermsMultilineWithIndent(w, indentLevel, "Required Terms", podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+	printWeightedPodAffinityTermsMultilineWithIndent(w, indentLevel, "Preferred Terms", podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+}
+
+func describeAffinity(label string, affinity *corev1.Affinity, w PrefixWriter) {
+	w.Write(LEVEL_0, "%v:\n", label)
+
+	w.Write(LEVEL_1, "Node Affinity:\t")
+	if affinity.NodeAffinity == nil {
+		w.WriteLine("<none>")
+	} else {
+		w.WriteLine("")
+		describeNodeAffinity(affinity.NodeAffinity, w, LEVEL_2)
+	}
+
+	w.Write(LEVEL_1, "Pod Affinity:\t")
+	if affinity.PodAffinity == nil {
+		w.WriteLine("<none>")
+	} else {
+		w.WriteLine("")
+		describePodAffinity(affinity.PodAffinity, w, LEVEL_2)
+	}
+
+	w.Write(LEVEL_1, "Pod Anti-affinity:\t")
+	if affinity.PodAntiAffinity == nil {
+		w.WriteLine("<none>")
+	} else {
+		w.WriteLine("")
+		describePodAntiAffinity(affinity.PodAntiAffinity, w, LEVEL_2)
 	}
 }
 
@@ -2154,6 +2257,9 @@ func DescribePodTemplate(template *corev1.PodTemplateSpec, w PrefixWriter) {
 	}
 	if len(template.Spec.ServiceAccountName) > 0 {
 		w.Write(LEVEL_1, "Service Account:\t%s\n", template.Spec.ServiceAccountName)
+	}
+	if template.Spec.Affinity != nil {
+		describeAffinity("Affinity", template.Spec.Affinity, w)
 	}
 	if len(template.Spec.InitContainers) > 0 {
 		describeContainers("Init Containers", template.Spec.InitContainers, nil, nil, w, "  ")
@@ -2897,15 +3003,7 @@ func (c *ClusterCIDRDescriber) describeClusterCIDRV1alpha1(cc *networkingv1alpha
 
 		w.Write(LEVEL_0, "NodeSelector:\n")
 		if cc.Spec.NodeSelector != nil {
-			w.Write(LEVEL_1, "NodeSelector Terms:")
-			if len(cc.Spec.NodeSelector.NodeSelectorTerms) == 0 {
-				w.WriteLine("<none>")
-			} else {
-				w.WriteLine("")
-				for i, term := range cc.Spec.NodeSelector.NodeSelectorTerms {
-					printNodeSelectorTermsMultilineWithIndent(w, LEVEL_2, fmt.Sprintf("Term %v", i), "\t", term.MatchExpressions)
-				}
-			}
+			printNodeSelectorMultilineWithIndent(w, LEVEL_1, "NodeSelector Terms", cc.Spec.NodeSelector)
 		}
 
 		if cc.Spec.PerNodeHostBits != 0 {
