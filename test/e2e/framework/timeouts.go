@@ -19,6 +19,7 @@ package framework
 import "time"
 
 var defaultTimeouts = TimeoutContext{
+	Poll:                      2 * time.Second, // from the former e2e/framework/pod poll interval
 	PodStart:                  5 * time.Minute,
 	PodStartShort:             2 * time.Minute,
 	PodStartSlow:              15 * time.Minute,
@@ -42,6 +43,9 @@ var defaultTimeouts = TimeoutContext{
 
 // TimeoutContext contains timeout settings for several actions.
 type TimeoutContext struct {
+	// Poll is how long to wait between API calls when waiting for some condition.
+	Poll time.Duration
+
 	// PodStart is how long to wait for the pod to be started.
 	PodStart time.Duration
 
@@ -110,4 +114,10 @@ func NewTimeoutContext() *TimeoutContext {
 	// the original values.
 	copy := TestContext.timeouts
 	return &copy
+}
+
+// PollInterval defines how long to wait between API server queries while
+// waiting for some condition.
+func PollInterval() time.Duration {
+	return TestContext.timeouts.Poll
 }
