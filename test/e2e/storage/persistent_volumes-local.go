@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -108,6 +109,19 @@ var setupLocalVolumeMap = map[localVolumeType]utils.LocalVolumeType{
 	BlockFsWithoutFormatLocalVolumeType:     utils.LocalVolumeBlock, // block device in Filesystem mode (default in this test suite)
 }
 
+// setupLocalVolumeMapKeys returns all keys in a sorted slice. This is needed
+// to define tests in a deterministic order.
+func setupLocalVolumeMapKeys() []localVolumeType {
+	var keys []localVolumeType
+	for key := range setupLocalVolumeMap {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+	return keys
+}
+
 type localTestVolume struct {
 	// Local test resource
 	ltr *utils.LocalTestResource
@@ -181,7 +195,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		}
 	})
 
-	for tempTestVolType := range setupLocalVolumeMap {
+	for _, tempTestVolType := range setupLocalVolumeMapKeys() {
 
 		// New variable required for gingko test closures
 		testVolType := tempTestVolType

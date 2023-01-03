@@ -1,3 +1,71 @@
+## 2.6.1
+
+### Features
+- Override formatter colors from envvars - this is a new feature but an alternative approach involving config files might be taken in the future (#1095) [60240d1]
+
+### Fixes
+- GinkgoRecover now supports ignoring panics that match a specific, hidden, interface [301f3e2]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.24.0 to 1.24.1 (#1077) [3643823]
+- Bump golang.org/x/tools from 0.2.0 to 0.4.0 (#1090) [f9f856e]
+- Bump nokogiri from 1.13.9 to 1.13.10 in /docs (#1091) [0d7087e]
+
+## 2.6.0
+
+### Features
+- `ReportBeforeSuite` provides access to the suite report before the suite begins.
+- Add junit config option for omitting leafnodetype (#1088) [956e6d2]
+- Add support to customize junit report config to omit spec labels (#1087) [de44005]
+
+### Fixes
+- Fix stack trace pruning so that it has a chance of working on windows [2165648]
+
+## 2.5.1
+
+### Fixes
+- skipped tests only show as 'S' when running with -v [3ab38ae]
+- Fix typo in docs/index.md (#1082) [55fc58d]
+- Fix typo in docs/index.md (#1081) [8a14f1f]
+- Fix link notation in docs/index.md (#1080) [2669612]
+- Fix typo in `--progress` deprecation message (#1076) [b4b7edc]
+
+### Maintenance
+- chore: Included githubactions in the dependabot config (#976) [baea341]
+- Bump golang.org/x/sys from 0.1.0 to 0.2.0 (#1075) [9646297]
+
+## 2.5.0
+
+### Ginkgo output now includes a timeline-view of the spec
+
+This commit changes Ginkgo's default output.  Spec details are now
+presented as a **timeline** that includes events that occur during the spec
+lifecycle interleaved with any GinkgoWriter content.  This makes is much easier
+to understand the flow of a spec and where a given failure occurs.
+
+The --progress, --slow-spec-threshold, --always-emit-ginkgo-writer flags
+and the SuppressProgressReporting decorator have all been deprecated.  Instead
+the existing -v and -vv flags better capture the level of verbosity to display.  However,
+a new --show-node-events flag is added to include node `> Enter` and `< Exit` events
+in the spec timeline.
+
+In addition, JUnit reports now include the timeline (rendered with -vv) and custom JUnit
+reports can be configured and generated using
+`GenerateJUnitReportWithConfig(report types.Report, dst string, config JunitReportConfig)`
+
+Code should continue to work unchanged with this version of Ginkgo - however if you have tooling that
+was relying on the specific output format of Ginkgo you _may_ run into issues.  Ginkgo's console output is not guaranteed to be stable for tooling and automation purposes.  You should, instead, use Ginkgo's JSON format
+to build tooling on top of as it has stronger guarantees to be stable from version to version.
+
+### Features
+- Provide details about which timeout expired [0f2fa27]
+
+### Fixes
+- Add Support Policy to docs [c70867a]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.22.1 to 1.23.0 (#1070) [bb3b4e2]
+
 ## 2.4.0
 
 ### Features

@@ -83,6 +83,13 @@ func (d deprecations) Nodot() Deprecation {
 	}
 }
 
+func (d deprecations) SuppressProgressReporting() Deprecation {
+	return Deprecation{
+		Message: "Improvements to how reporters emit timeline information means that SuppressProgressReporting is no longer necessary and has been deprecated.",
+		Version: "2.5.0",
+	}
+}
+
 type DeprecationTracker struct {
 	deprecations map[Deprecation][]CodeLocation
 	lock         *sync.Mutex

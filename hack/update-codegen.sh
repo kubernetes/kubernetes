@@ -130,8 +130,8 @@ function codegen::prerelease() {
     fi
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
-        grep --color=never -l '+k8s:prerelease-lifecycle-gen=true' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -n1 dirname \
+        grep -l -Z --color=never '+k8s:prerelease-lifecycle-gen=true' "${ALL_K8S_TAG_FILES[@]}" \
+            | xargs -0 -n1 dirname \
             | LC_ALL=C sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:prerelease-lifecycle-gen tagged dirs"
@@ -189,8 +189,8 @@ function codegen::deepcopy() {
     fi
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
-        grep --color=never -l '+k8s:deepcopy-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -n1 dirname \
+        grep -l -Z --color=never '+k8s:deepcopy-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+            | xargs -0 -n1 dirname \
             | LC_ALL=C sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:deepcopy-gen tagged dirs"
@@ -255,8 +255,8 @@ function codegen::defaults() {
     fi
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
-        grep --color=never -l '+k8s:defaulter-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -n1 dirname \
+        grep -l -Z --color=never '+k8s:defaulter-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+            | xargs -0 -n1 dirname \
             | LC_ALL=C sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:defaulter-gen tagged dirs"
@@ -326,8 +326,8 @@ function codegen::conversions() {
     fi
     local tag_dirs=()
     kube::util::read-array tag_dirs < <(\
-        grep --color=never -l '^// *+k8s:conversion-gen=' "${ALL_K8S_TAG_FILES[@]}" \
-            | xargs -n1 dirname \
+        grep -l -Z --color=never '^// *+k8s:conversion-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+            | xargs -0 -n1 dirname \
             | LC_ALL=C sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:conversion-gen tagged dirs"
@@ -536,10 +536,9 @@ function codegen::openapi() {
 
         local tag_dirs=()
         kube::util::read-array tag_dirs < <(
-            grep --color=never -l '+k8s:openapi-gen=' $(indirect_array "${prefix}_tag_files") \
-                | xargs -n1 dirname \
-                | LC_ALL=C sort -u
-            )
+            grep -l -Z --color=never '+k8s:openapi-gen=' $(indirect_array "${prefix}_tag_files") \
+                | xargs -0 -n1 dirname \
+                | LC_ALL=C sort -u)
 
         if [[ "${DBG_CODEGEN}" == 1 ]]; then
             kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:openapi-gen tagged dirs for ${prefix}"
@@ -598,8 +597,10 @@ function codegen::applyconfigs() {
     local ext_apis=()
     kube::util::read-array ext_apis < <(
       cd "${KUBE_ROOT}/staging/src"
-      find k8s.io/api -name types.go -print0 | xargs -0 -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
-    )
+      find k8s.io/api -name types.go -print0 \
+          | xargs -0 -n1 dirname \
+          | grep -v pkg.apis.policy.v1alpha1 \
+          | LC_ALL=C sort -u)
     ext_apis+=("k8s.io/apimachinery/pkg/apis/meta/v1")
 
     kube::log::status "Generating apply-config code for ${#ext_apis[@]} targets"
@@ -680,8 +681,9 @@ function codegen::listers() {
     local ext_apis=()
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
-        find k8s.io/api -name types.go -print0 | xargs -0 -n1 dirname | sort
-    )
+        find k8s.io/api -name types.go -print0 \
+            | xargs -0 -n1 dirname \
+            | LC_ALL=C sort -u)
 
     kube::log::status "Generating lister code for ${#ext_apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -714,8 +716,10 @@ function codegen::informers() {
     local ext_apis=()
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
-        find k8s.io/api -name types.go -print0 | xargs -0 -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
-    )
+        find k8s.io/api -name types.go -print0 \
+            | xargs -0 -n1 dirname \
+            | grep -v pkg.apis.policy.v1alpha1 \
+            | LC_ALL=C sort -u)
 
     kube::log::status "Generating informer code for ${#ext_apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then

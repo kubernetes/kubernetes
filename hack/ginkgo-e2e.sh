@@ -134,7 +134,6 @@ fi
 # Some arguments (like --nodes) are only supported when using the CLI.
 # Those get set below when choosing the program.
 ginkgo_args=(
-  "--slow-spec-threshold=${GINKGO_SLOW_SPEC_THRESHOLD:-300s}"
   "--poll-progress-after=${GINKGO_POLL_PROGRESS_AFTER:-300s}"
   "--poll-progress-interval=${GINKGO_POLL_PROGRESS_INTERVAL:-20s}"
   "--source-root=${KUBE_ROOT}"
@@ -163,6 +162,18 @@ if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
   ginkgo_args+=("--no-color")
 fi
 
+if [[ -n "${E2E_REPORT_DIR:-}" ]]; then
+    report_dir="${E2E_REPORT_DIR}"
+else
+    # Some jobs don't use E2E_REPORT_DIR and instead pass --report-dir=<dir>
+    # as parameter.
+    for arg in "${@}"; do
+        # shellcheck disable=SC2001
+        # (style): See if you can use ${variable//search/replace} instead.
+        case "$arg" in -report-dir=*|--report-dir=*) report_dir="$(echo "$arg" | sed -e 's/^[^=]*=//')";; esac
+    done
+fi
+
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
@@ -183,6 +194,19 @@ case "${E2E_TEST_DEBUG_TOOL:-ginkgo}" in
       program+=("--nodes=25")
     fi
     program+=("${ginkgo_args[@]:+${ginkgo_args[@]}}")
+
+    if [[ -n "${report_dir:-}" ]]; then
+        # The JUnit report written by the E2E suite gets truncated to avoid
+        # overwhelming the tools that need to process it. For manual analysis
+        # it is useful to have the full reports in both formats that Ginkgo
+        # supports:
+        # - JUnit for comparison with the truncated report.
+        # - JSON because it is a faithful representation of
+        #   all available information.
+        #
+        # This has to be passed to the CLI, the suite doesn't support --output-dir.
+        program+=("--output-dir=${report_dir}" "--junit-report=ginkgo_report.xml" "--json-report=ginkgo_report.json")
+    fi
     ;;
   delve) program=("dlv" "exec") ;;
   gdb) program=("gdb") ;;
@@ -192,7 +216,7 @@ esac
 # Move Ginkgo arguments that are understood by the suite when not using
 # the CLI.
 suite_args=()
-if [ "${E2E_TEST_DEBUG_TOOL}" != "ginkgo" ]; then
+if [ "${E2E_TEST_DEBUG_TOOL:-ginkgo}" != "ginkgo" ]; then
   for arg in "${ginkgo_args[@]}"; do
     suite_args+=("--ginkgo.${arg#--}")
   done
@@ -230,4 +254,4 @@ case "${GINKGO_SHOW_COMMAND:-${CI:-no}}" in y|yes|true) set -x ;; esac
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
   "${suite_args[@]:+${suite_args[@]}}" \
-  "${@:-}"
+  "${@}"

@@ -198,7 +198,8 @@ name | architectures
 ### (No, really, you MUST read this before you upgrade)
 
 - Deprecated beta APIs scheduled for removal in `v1.26` are no longer served. See https://kubernetes.io/docs/reference/using-api/deprecation-guide/#v1-26 for more information. ([#111973](https://github.com/kubernetes/kubernetes/pull/111973), [@liggitt](https://github.com/liggitt))
- 
+- The in-tree cloud provider for OpenStack (and the cinder volume provider) has been removed. Please use the external cloud provider and csi driver from [cloud-provider-openstack](https://github.com/kubernetes/cloud-provider-openstack) instead. ([#67782](https://github.com/kubernetes/kubernetes/pull/67782), [@dims](https://github.com/dims))
+
 ## Changes by Kind
 
 ### Deprecation
@@ -399,7 +400,7 @@ name | architectures
 - If `ComponentSLIs` feature gate is enabled, then `/metrics/slis` becomes available on kubelet, allowing you to scrape health check metrics. ([#113030](https://github.com/kubernetes/kubernetes/pull/113030), [@Richabanker](https://github.com/Richabanker)) [SIG Node]
 - If `ComponentSLIs` feature gate is enabled, then `/metrics/slis` now becomes available on cloud-controller-manager allowing you to scrape health check metrics. ([#113340](https://github.com/kubernetes/kubernetes/pull/113340), [@Richabanker](https://github.com/Richabanker))
 - If more than one StorageClass is designated as default (via the "storageclass.kubernetes.io/is-default-class" annotation), choose the newest one instead of throwing an error.' ([#110559](https://github.com/kubernetes/kubernetes/pull/110559), [@danishprakash](https://github.com/danishprakash))
-- In 'client-go` `SharedInformerFactory` will now support waiting for goroutines during shutdown.
+- In `client-go` `SharedInformerFactory` will now support waiting for goroutines during shutdown.
    ([#112200](https://github.com/kubernetes/kubernetes/pull/112200), [@pohly](https://github.com/pohly))
 - In `kubeadm`, command `kubeadm join phase control-plane-prepare certs` now supports to run with `dry-run` mode on it's own. ([#113005](https://github.com/kubernetes/kubernetes/pull/113005), [@chendave](https://github.com/chendave))
 - Kube-apiserver: `gzip` compression switched from level 4 to level 1 to improve large list call latencies in exchange for higher network bandwidth usage (10-50% higher). This increases the headroom before very large unpaged list calls exceed request timeout limits. ([#112299](https://github.com/kubernetes/kubernetes/pull/112299), [@shyamjvs](https://github.com/shyamjvs))
@@ -454,7 +455,6 @@ name | architectures
 - Correct the calculating error in `podTopologySpread` plugin to avoid unexpected scheduling results. ([#112507](https://github.com/kubernetes/kubernetes/pull/112507), [@kerthcet](https://github.com/kerthcet))
 - Etcd: Updated to v3.5.5. ([#112489](https://github.com/kubernetes/kubernetes/pull/112489), [@dims](https://github.com/dims))
 - Fixed Admission controllers that caused unnecessary significant load on `apiserver'. ([#112696](https://github.com/kubernetes/kubernetes/pull/112696), [@aimuz](https://github.com/aimuz))
-- Fixed `DaemonSet` to update the status even if it fails to create a pod. ([#112127](https://github.com/kubernetes/kubernetes/pull/112127), [@gjkim42](https://github.com/gjkim42))
 - Fixed a bug where a change in the `appProtocol` for a Service did not trigger a load balancer update. ([#112785](https://github.com/kubernetes/kubernetes/pull/112785), [@MartinForReal](https://github.com/MartinForReal)) [SIG Cloud Provider and Network]
 - Fixed a bug where the kubelet choose the wrong container by its name when running `kubectl exec`. ([#113041](https://github.com/kubernetes/kubernetes/pull/113041), [@saschagrunert](https://github.com/saschagrunert))
 - Fixed an ephemeral port exhaustion bug caused by improper connection management that occurred when a large number of objects were handled by `kubectl` while exec auth was in use. ([#112017](https://github.com/kubernetes/kubernetes/pull/112017), [@enj](https://github.com/enj))
@@ -556,7 +556,6 @@ name | architectures
 - Service session affinity timeout tests are no longer required for Kubernetes network plugin conformance due to variations in existing implementations. New conformance tests will be developed to better express conformance in future releases. ([#112806](https://github.com/kubernetes/kubernetes/pull/112806), [@dcbw](https://github.com/dcbw)) [SIG Architecture, Network and Testing]
 - The `IndexedJob` and `SuspendJob` feature gates that graduated to GA in 1.24 and were unconditionally enabled have been removed in v1.26. ([#112589](https://github.com/kubernetes/kubernetes/pull/112589), [@SataQiu](https://github.com/SataQiu))
 - The `e2e.test` binary no longer emits JSON structs to document progress. ([#113212](https://github.com/kubernetes/kubernetes/pull/113212), [@pohly](https://github.com/pohly))
-- The in-tree cloud provider for OpenStack (and the cinder volume provider) has been removed. Please use the external cloud provider and csi driver from [cloud-provider-openstack](https://github.com/kubernetes/cloud-provider-openstack) instead. ([#67782](https://github.com/kubernetes/kubernetes/pull/67782), [@dims](https://github.com/dims))
 - The metric `etcd_db_total_size_in_bytes` is renamed to `apiserver_storage_db_total_size_in_bytes`. ([#113310](https://github.com/kubernetes/kubernetes/pull/113310), [@logicalhan](https://github.com/logicalhan)) [SIG API Machinery]
 - Updated `cri-tools` to [v1.25.0(https://github.com/kubernetes-sigs/cri-tools/releases/tag/v1.25.0) ([#112058](https://github.com/kubernetes/kubernetes/pull/112058), [@saschagrunert](https://github.com/saschagrunert))
 - `GlusterFS` in-tree storage driver which was deprecated in kubernetes 1.25 release is now removed entirely in 1.26. ([#112015](https://github.com/kubernetes/kubernetes/pull/112015), [@humblec](https://github.com/humblec))
@@ -1115,7 +1114,6 @@ name | architectures
 - Fix cost estimation of token creation request for service account in Priority and Fairness. ([#113206](https://github.com/kubernetes/kubernetes/pull/113206), [@marseel](https://github.com/marseel)) [SIG API Machinery]
 - Fix that disruption controller changes the status of a stale disruption condition after 2 min when the PodDisruptionConditions feature gate is enabled ([#113580](https://github.com/kubernetes/kubernetes/pull/113580), [@mimowo](https://github.com/mimowo)) [SIG Auth]
 - Fix the PodAndContainerStatsFromCRI feature, instead of supplementing with stats from cAdvisor. ([#113291](https://github.com/kubernetes/kubernetes/pull/113291), [@mengjiao-liu](https://github.com/mengjiao-liu)) [SIG Instrumentation and Node]
-- Fixed DaemonSet to update the status even if it fails to create a pod. ([#112127](https://github.com/kubernetes/kubernetes/pull/112127), [@gjkim42](https://github.com/gjkim42)) [SIG Apps and Testing]
 - For `kubectl`, `--server-side` now migrates ownership of all fields used by client-side-apply to the specified `--fieldmanager`. This prevents fields previously specified using kubectl from being able to live outside of server-side-apply's management and become undeleteable. ([#112905](https://github.com/kubernetes/kubernetes/pull/112905), [@alexzielenski](https://github.com/alexzielenski)) [SIG API Machinery, CLI and Testing]
 - Kubectl apply: warning that kubectl will ignore no-namespaced resource `pv & namespace` in a future release if the namespace is specified and allowlist is not specified ([#110907](https://github.com/kubernetes/kubernetes/pull/110907), [@pacoxu](https://github.com/pacoxu)) [SIG CLI]
 - Kubelet: Fixes a startup crash in devicemanager ([#113021](https://github.com/kubernetes/kubernetes/pull/113021), [@rphillips](https://github.com/rphillips)) [SIG Node]
@@ -1659,7 +1657,8 @@ name | architectures
 ### (No, really, you MUST read this before you upgrade)
 
  - Deprecated beta APIs scheduled for removal in 1.26 are no longer served. See https://kubernetes.io/docs/reference/using-api/deprecation-guide/#v1-26 for more information. ([#111973](https://github.com/kubernetes/kubernetes/pull/111973), [@liggitt](https://github.com/liggitt)) [SIG API Machinery]
- 
+ - The in-tree cloud provider for OpenStack (and the cinder volume provider) has now been removed. Please use the external cloud provider and csi driver from https://github.com/kubernetes/cloud-provider-openstack instead. ([#67782](https://github.com/kubernetes/kubernetes/pull/67782), [@dims](https://github.com/dims)) [SIG API Machinery, Apps, Auth, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Node, Release, Scheduling, Storage and Testing]
+
 ## Changes by Kind
 
 ### Deprecation
@@ -1775,7 +1774,6 @@ name | architectures
 - Release-note ([#111708](https://github.com/kubernetes/kubernetes/pull/111708), [@yangjunmyfm192085](https://github.com/yangjunmyfm192085)) [SIG Apps, Instrumentation and Network]
 - Scheduler dumper now exposes a summary to indicate the number of pending pods in each internal queue. ([#111726](https://github.com/kubernetes/kubernetes/pull/111726), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling and Testing]
 - The IndexedJob and SuspendJob feature gates that graduated to GA in 1.24 and were unconditionally enabled have been removed in v1.26 ([#112589](https://github.com/kubernetes/kubernetes/pull/112589), [@SataQiu](https://github.com/SataQiu)) [SIG Apps]
-- The in-tree cloud provider for OpenStack (and the cinder volume provider) has now been removed. Please use the external cloud provider and csi driver from https://github.com/kubernetes/cloud-provider-openstack instead. ([#67782](https://github.com/kubernetes/kubernetes/pull/67782), [@dims](https://github.com/dims)) [SIG API Machinery, Apps, Auth, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Node, Release, Scheduling, Storage and Testing]
 
 ## Dependencies
 

@@ -26,7 +26,7 @@ type httpServer struct {
 	handler  *ServerHandler
 }
 
-//Create a new server, automatically selecting a port
+// Create a new server, automatically selecting a port
 func newHttpServer(parallelTotal int, reporter reporters.Reporter) (*httpServer, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -38,7 +38,7 @@ func newHttpServer(parallelTotal int, reporter reporters.Reporter) (*httpServer,
 	}, nil
 }
 
-//Start the server.  You don't need to `go s.Start()`, just `s.Start()`
+// Start the server.  You don't need to `go s.Start()`, just `s.Start()`
 func (server *httpServer) Start() {
 	httpServer := &http.Server{}
 	mux := http.NewServeMux()
@@ -52,6 +52,8 @@ func (server *httpServer) Start() {
 	mux.HandleFunc("/progress-report", server.emitProgressReport)
 
 	//synchronization endpoints
+	mux.HandleFunc("/report-before-suite-completed", server.handleReportBeforeSuiteCompleted)
+	mux.HandleFunc("/report-before-suite-state", server.handleReportBeforeSuiteState)
 	mux.HandleFunc("/before-suite-completed", server.handleBeforeSuiteCompleted)
 	mux.HandleFunc("/before-suite-state", server.handleBeforeSuiteState)
 	mux.HandleFunc("/have-nonprimary-procs-finished", server.handleHaveNonprimaryProcsFinished)
@@ -63,12 +65,12 @@ func (server *httpServer) Start() {
 	go httpServer.Serve(server.listener)
 }
 
-//Stop the server
+// Stop the server
 func (server *httpServer) Close() {
 	server.listener.Close()
 }
 
-//The address the server can be reached it.  Pass this into the `ForwardingReporter`.
+// The address the server can be reached it.  Pass this into the `ForwardingReporter`.
 func (server *httpServer) Address() string {
 	return "http://" + server.listener.Addr().String()
 }
@@ -93,7 +95,7 @@ func (server *httpServer) RegisterAlive(node int, alive func() bool) {
 // Streaming Endpoints
 //
 
-//The server will forward all received messages to Ginkgo reporters registered with `RegisterReporters`
+// The server will forward all received messages to Ginkgo reporters registered with `RegisterReporters`
 func (server *httpServer) decode(writer http.ResponseWriter, request *http.Request, object interface{}) bool {
 	defer request.Body.Close()
 	if json.NewDecoder(request.Body).Decode(object) != nil {
@@ -162,6 +164,23 @@ func (server *httpServer) emitProgressReport(writer http.ResponseWriter, request
 		return
 	}
 	server.handleError(server.handler.EmitProgressReport(report, voidReceiver), writer)
+}
+
+func (server *httpServer) handleReportBeforeSuiteCompleted(writer http.ResponseWriter, request *http.Request) {
+	var state types.SpecState
+	if !server.decode(writer, request, &state) {
+		return
+	}
+
+	server.handleError(server.handler.ReportBeforeSuiteCompleted(state, voidReceiver), writer)
+}
+
+func (server *httpServer) handleReportBeforeSuiteState(writer http.ResponseWriter, request *http.Request) {
+	var state types.SpecState
+	if server.handleError(server.handler.ReportBeforeSuiteState(voidSender, &state), writer) {
+		return
+	}
+	json.NewEncoder(writer).Encode(state)
 }
 
 func (server *httpServer) handleBeforeSuiteCompleted(writer http.ResponseWriter, request *http.Request) {

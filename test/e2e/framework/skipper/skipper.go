@@ -38,8 +38,6 @@ import (
 
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	// Long term this should get replaced with https://github.com/onsi/ginkgo/issues/1069.
-	framework.Logf(msg)
 	ginkgo.Skip(msg, caller+1)
 	panic("unreachable")
 }

@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/integer"
 	"k8s.io/utils/pointer"
 )
@@ -123,11 +124,17 @@ type Controller struct {
 	recorder    record.EventRecorder
 
 	podUpdateBatchPeriod time.Duration
+
+	clock clock.WithTicker
 }
 
 // NewController creates a new Job controller that keeps the relevant pods
 // in sync with their corresponding Job objects.
 func NewController(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) *Controller {
+	return newControllerWithClock(podInformer, jobInformer, kubeClient, &clock.RealClock{})
+}
+
+func newControllerWithClock(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, clock clock.WithTicker) *Controller {
 	eventBroadcaster := record.NewBroadcaster()
 
 	jm := &Controller{
@@ -138,10 +145,11 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 		},
 		expectations:          controller.NewControllerExpectations(),
 		finalizerExpectations: newUIDTrackingExpectations(),
-		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job"),
-		orphanQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job_orphan_pod"),
+		queue:                 workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "job"), workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff)),
+		orphanQueue:           workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "job_orphan_pod"), workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff)),
 		broadcaster:           eventBroadcaster,
 		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+		clock:                 clock,
 	}
 	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
 		jm.podUpdateBatchPeriod = podUpdateBatchPeriod
@@ -436,9 +444,7 @@ func (jm *Controller) updateJob(old, cur interface{}) {
 		}
 		oldADS := oldJob.Spec.ActiveDeadlineSeconds
 		if oldADS == nil || *oldADS != *curADS {
-			now := metav1.Now()
-			start := curJob.Status.StartTime.Time
-			passed := now.Time.Sub(start)
+			passed := jm.clock.Since(curJob.Status.StartTime.Time)
 			total := time.Duration(*curADS) * time.Second
 			// AddAfter will handle total < passed
 			jm.queue.AddAfter(key, total-passed)
@@ -572,9 +578,9 @@ func (jm Controller) processNextOrphanPod(ctx context.Context) bool {
 
 // syncOrphanPod removes the tracking finalizer from an orphan pod if found.
 func (jm Controller) syncOrphanPod(ctx context.Context, key string) error {
-	startTime := time.Now()
+	startTime := jm.clock.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing orphan pod %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing orphan pod %q (%v)", key, jm.clock.Since(startTime))
 	}()
 
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -664,9 +670,9 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job, withFinal
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
 func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rErr error) {
-	startTime := time.Now()
+	startTime := jm.clock.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing job %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing job %q (%v)", key, jm.clock.Since(startTime))
 	}()
 
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -708,7 +714,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 			result = "error"
 		}
 
-		metrics.JobSyncDurationSeconds.WithLabelValues(completionMode, result, action).Observe(time.Since(startTime).Seconds())
+		metrics.JobSyncDurationSeconds.WithLabelValues(completionMode, result, action).Observe(jm.clock.Since(startTime).Seconds())
 		metrics.JobSyncNum.WithLabelValues(completionMode, result, action).Inc()
 	}()
 
@@ -743,7 +749,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 
 	// Job first start. Set StartTime only if the job is not in the suspended state.
 	if job.Status.StartTime == nil && !jobSuspended(&job) {
-		now := metav1.Now()
+		now := metav1.NewTime(jm.clock.Now())
 		job.Status.StartTime = &now
 	}
 
@@ -759,14 +765,14 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 
 	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
 		if failureTargetCondition := findConditionByType(job.Status.Conditions, batch.JobFailureTarget); failureTargetCondition != nil {
-			finishedCondition = newFailedConditionForFailureTarget(failureTargetCondition)
+			finishedCondition = newFailedConditionForFailureTarget(failureTargetCondition, jm.clock.Now())
 		} else if failJobMessage := getFailJobMessage(&job, pods, uncounted.Failed()); failJobMessage != nil {
 			if uncounted != nil {
 				// Prepare the interim FailureTarget condition to record the failure message before the finalizers (allowing removal of the pods) are removed.
-				finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, jobConditionReasonPodFailurePolicy, *failJobMessage)
+				finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, jobConditionReasonPodFailurePolicy, *failJobMessage, jm.clock.Now())
 			} else {
 				// Prepare the Failed job condition for the legacy path without finalizers (don't use the interim FailureTarget condition).
-				finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, jobConditionReasonPodFailurePolicy, *failJobMessage)
+				finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, jobConditionReasonPodFailurePolicy, *failJobMessage, jm.clock.Now())
 			}
 		}
 	}
@@ -774,11 +780,11 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
 			// check if the number of pod restart exceeds backoff (for restart OnFailure only)
 			// OR if the number of failed jobs increased since the last syncJob
-			finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, "BackoffLimitExceeded", "Job has reached the specified backoff limit")
-		} else if pastActiveDeadline(&job) {
-			finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, "DeadlineExceeded", "Job was active longer than specified deadline")
+			finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, "BackoffLimitExceeded", "Job has reached the specified backoff limit", jm.clock.Now())
+		} else if jm.pastActiveDeadline(&job) {
+			finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, "DeadlineExceeded", "Job was active longer than specified deadline", jm.clock.Now())
 		} else if job.Spec.ActiveDeadlineSeconds != nil && !jobSuspended(&job) {
-			syncDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(job.Status.StartTime.Time)
+			syncDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second - jm.clock.Since(job.Status.StartTime.Time)
 			klog.V(2).InfoS("Job has activeDeadlineSeconds configuration. Will sync this job again", "job", key, "nextSyncIn", syncDuration)
 			jm.queue.AddAfter(key, syncDuration)
 		}
@@ -827,7 +833,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 			complete = succeeded >= *job.Spec.Completions && active == 0
 		}
 		if complete {
-			finishedCondition = newCondition(batch.JobComplete, v1.ConditionTrue, "", "")
+			finishedCondition = newCondition(batch.JobComplete, v1.ConditionTrue, "", "", jm.clock.Now())
 		} else if manageJobCalled {
 			// Update the conditions / emit events only if manageJob was called in
 			// this syncJob. Otherwise wait for the right syncJob call to make
@@ -835,7 +841,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 			if job.Spec.Suspend != nil && *job.Spec.Suspend {
 				// Job can be in the suspended state only if it is NOT completed.
 				var isUpdated bool
-				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended")
+				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended", jm.clock.Now())
 				if isUpdated {
 					suspendCondChanged = true
 					jm.recorder.Event(&job, v1.EventTypeNormal, "Suspended", "Job suspended")
@@ -843,7 +849,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 			} else {
 				// Job not suspended.
 				var isUpdated bool
-				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "JobResumed", "Job resumed")
+				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "JobResumed", "Job resumed", jm.clock.Now())
 				if isUpdated {
 					suspendCondChanged = true
 					jm.recorder.Event(&job, v1.EventTypeNormal, "Resumed", "Job resumed")
@@ -853,7 +859,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 					// consistent with resuming a Job created in the suspended state.
 					// (ActiveDeadlineSeconds is interpreted as the number of seconds a
 					// Job is continuously active.)
-					now := metav1.Now()
+					now := metav1.NewTime(jm.clock.Now())
 					job.Status.StartTime = &now
 				}
 			}
@@ -1109,7 +1115,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 
 			// Prepare the final Failed condition to update the job status with after the finalizers are removed.
 			// It is also used in the enactJobFinished function for reporting.
-			finishedCond = newFailedConditionForFailureTarget(finishedCond)
+			finishedCond = newFailedConditionForFailureTarget(finishedCond, jm.clock.Now())
 		}
 	}
 	var err error
@@ -1261,7 +1267,7 @@ func (jm *Controller) enactJobFinished(job *batch.Job, finishedCond *batch.JobCo
 			return false
 		}
 	}
-	job.Status.Conditions, _ = ensureJobConditionStatus(job.Status.Conditions, finishedCond.Type, finishedCond.Status, finishedCond.Reason, finishedCond.Message)
+	job.Status.Conditions, _ = ensureJobConditionStatus(job.Status.Conditions, finishedCond.Type, finishedCond.Status, finishedCond.Reason, finishedCond.Message, jm.clock.Now())
 	if finishedCond.Type == batch.JobComplete {
 		job.Status.CompletionTime = &finishedCond.LastTransitionTime
 	}
@@ -1296,8 +1302,8 @@ func filterInUncountedUIDs(uncounted []types.UID, include sets.String) []types.U
 
 // newFailedConditionForFailureTarget creates a job Failed condition based on
 // the interim FailureTarget condition.
-func newFailedConditionForFailureTarget(condition *batch.JobCondition) *batch.JobCondition {
-	return newCondition(batch.JobFailed, v1.ConditionTrue, condition.Reason, condition.Message)
+func newFailedConditionForFailureTarget(condition *batch.JobCondition, now time.Time) *batch.JobCondition {
+	return newCondition(batch.JobFailed, v1.ConditionTrue, condition.Reason, condition.Message, now)
 }
 
 // pastBackoffLimitOnFailure checks if container restartCounts sum exceeds BackoffLimit
@@ -1329,23 +1335,21 @@ func pastBackoffLimitOnFailure(job *batch.Job, pods []*v1.Pod) bool {
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if
 // it is exceeded. If the job is currently suspended, the function will always
 // return false.
-func pastActiveDeadline(job *batch.Job) bool {
+func (jm *Controller) pastActiveDeadline(job *batch.Job) bool {
 	if job.Spec.ActiveDeadlineSeconds == nil || job.Status.StartTime == nil || jobSuspended(job) {
 		return false
 	}
-	now := metav1.Now()
-	start := job.Status.StartTime.Time
-	duration := now.Time.Sub(start)
+	duration := jm.clock.Since(job.Status.StartTime.Time)
 	allowedDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds) * time.Second
 	return duration >= allowedDuration
 }
 
-func newCondition(conditionType batch.JobConditionType, status v1.ConditionStatus, reason, message string) *batch.JobCondition {
+func newCondition(conditionType batch.JobConditionType, status v1.ConditionStatus, reason, message string, now time.Time) *batch.JobCondition {
 	return &batch.JobCondition{
 		Type:               conditionType,
 		Status:             status,
-		LastProbeTime:      metav1.Now(),
-		LastTransitionTime: metav1.Now(),
+		LastProbeTime:      metav1.NewTime(now),
+		LastTransitionTime: metav1.NewTime(now),
 		Reason:             reason,
 		Message:            message,
 	}
@@ -1720,17 +1724,17 @@ func errorFromChannel(errCh <-chan error) error {
 // (because going from nothing to false is meaningless); it can, however,
 // update the status condition to false. The function returns a bool to let the
 // caller know if the list was changed (either appended or updated).
-func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditionType, status v1.ConditionStatus, reason, message string) ([]batch.JobCondition, bool) {
+func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditionType, status v1.ConditionStatus, reason, message string, now time.Time) ([]batch.JobCondition, bool) {
 	if condition := findConditionByType(list, cType); condition != nil {
 		if condition.Status != status || condition.Reason != reason || condition.Message != message {
-			*condition = *newCondition(cType, status, reason, message)
+			*condition = *newCondition(cType, status, reason, message, now)
 			return list, true
 		}
 		return list, false
 	}
 	// A condition with that type doesn't exist in the list.
 	if status != v1.ConditionFalse {
-		return append(list, *newCondition(cType, status, reason, message)), true
+		return append(list, *newCondition(cType, status, reason, message, now)), true
 	}
 	return list, false
 }

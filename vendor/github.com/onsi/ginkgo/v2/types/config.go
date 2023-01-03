@@ -26,7 +26,6 @@ type SuiteConfig struct {
 	FailOnPending         bool
 	FailFast              bool
 	FlakeAttempts         int
-	EmitSpecProgress      bool
 	DryRun                bool
 	PollProgressAfter     time.Duration
 	PollProgressInterval  time.Duration
@@ -81,13 +80,12 @@ func (vl VerbosityLevel) LT(comp VerbosityLevel) bool {
 
 // Configuration for Ginkgo's reporter
 type ReporterConfig struct {
-	NoColor                bool
-	SlowSpecThreshold      time.Duration
-	Succinct               bool
-	Verbose                bool
-	VeryVerbose            bool
-	FullTrace              bool
-	AlwaysEmitGinkgoWriter bool
+	NoColor        bool
+	Succinct       bool
+	Verbose        bool
+	VeryVerbose    bool
+	FullTrace      bool
+	ShowNodeEvents bool
 
 	JSONReport     string
 	JUnitReport    string
@@ -110,9 +108,7 @@ func (rc ReporterConfig) WillGenerateReport() bool {
 }
 
 func NewDefaultReporterConfig() ReporterConfig {
-	return ReporterConfig{
-		SlowSpecThreshold: 5 * time.Second,
-	}
+	return ReporterConfig{}
 }
 
 // Configuration for the Ginkgo CLI
@@ -235,6 +231,9 @@ type deprecatedConfig struct {
 	SlowSpecThresholdWithFLoatUnits float64
 	Stream                          bool
 	Notify                          bool
+	EmitSpecProgress                bool
+	SlowSpecThreshold               time.Duration
+	AlwaysEmitGinkgoWriter          bool
 }
 
 // Flags
@@ -275,8 +274,6 @@ var SuiteConfigFlags = GinkgoFlags{
 
 	{KeyPath: "S.DryRun", Name: "dry-run", SectionKey: "debug", DeprecatedName: "dryRun", DeprecatedDocLink: "changed-command-line-flags",
 		Usage: "If set, ginkgo will walk the test hierarchy without actually running anything.  Best paired with -v."},
-	{KeyPath: "S.EmitSpecProgress", Name: "progress", SectionKey: "debug",
-		Usage: "If set, ginkgo will emit progress information as each spec runs to the GinkgoWriter."},
 	{KeyPath: "S.PollProgressAfter", Name: "poll-progress-after", SectionKey: "debug", UsageDefaultValue: "0",
 		Usage: "Emit node progress reports periodically if node hasn't completed after this duration."},
 	{KeyPath: "S.PollProgressInterval", Name: "poll-progress-interval", SectionKey: "debug", UsageDefaultValue: "10s",
@@ -303,6 +300,8 @@ var SuiteConfigFlags = GinkgoFlags{
 
 	{KeyPath: "D.RegexScansFilePath", DeprecatedName: "regexScansFilePath", DeprecatedDocLink: "removed--regexscansfilepath", DeprecatedVersion: "2.0.0"},
 	{KeyPath: "D.DebugParallel", DeprecatedName: "debug", DeprecatedDocLink: "removed--debug", DeprecatedVersion: "2.0.0"},
+	{KeyPath: "D.EmitSpecProgress", DeprecatedName: "progress", SectionKey: "debug",
+		DeprecatedVersion: "2.5.0", Usage: ".  The functionality provided by --progress was confusing and is no longer needed.  Use --show-node-events instead to see node entry and exit events included in the timeline of failed and verbose specs.  Or you can run with -vv to always see all node events.  Lastly, --poll-progress-after and the PollProgressAfter decorator now provide a better mechanism for debugging specs that tend to get stuck."},
 }
 
 // ParallelConfigFlags provides flags for the Ginkgo test process (not the CLI)
@@ -319,8 +318,6 @@ var ParallelConfigFlags = GinkgoFlags{
 var ReporterConfigFlags = GinkgoFlags{
 	{KeyPath: "R.NoColor", Name: "no-color", SectionKey: "output", DeprecatedName: "noColor", DeprecatedDocLink: "changed-command-line-flags",
 		Usage: "If set, suppress color output in default reporter."},
-	{KeyPath: "R.SlowSpecThreshold", Name: "slow-spec-threshold", SectionKey: "output", UsageArgument: "duration", UsageDefaultValue: "5s",
-		Usage: "Specs that take longer to run than this threshold are flagged as slow by the default reporter."},
 	{KeyPath: "R.Verbose", Name: "v", SectionKey: "output",
 		Usage: "If set, emits more output including GinkgoWriter contents."},
 	{KeyPath: "R.VeryVerbose", Name: "vv", SectionKey: "output",
@@ -329,8 +326,8 @@ var ReporterConfigFlags = GinkgoFlags{
 		Usage: "If set, default reporter prints out a very succinct report"},
 	{KeyPath: "R.FullTrace", Name: "trace", SectionKey: "output",
 		Usage: "If set, default reporter prints out the full stack trace when a failure occurs"},
-	{KeyPath: "R.AlwaysEmitGinkgoWriter", Name: "always-emit-ginkgo-writer", SectionKey: "output", DeprecatedName: "reportPassed", DeprecatedDocLink: "renamed--reportpassed",
-		Usage: "If set, default reporter prints out captured output of passed tests."},
+	{KeyPath: "R.ShowNodeEvents", Name: "show-node-events", SectionKey: "output",
+		Usage: "If set, default reporter prints node > Enter and < Exit events when specs fail"},
 
 	{KeyPath: "R.JSONReport", Name: "json-report", UsageArgument: "filename.json", SectionKey: "output",
 		Usage: "If set, Ginkgo will generate a JSON-formatted test report at the specified location."},
@@ -343,6 +340,8 @@ var ReporterConfigFlags = GinkgoFlags{
 		Usage: "use --slow-spec-threshold instead and pass in a duration string (e.g. '5s', not '5.0')"},
 	{KeyPath: "D.NoisyPendings", DeprecatedName: "noisyPendings", DeprecatedDocLink: "removed--noisypendings-and--noisyskippings", DeprecatedVersion: "2.0.0"},
 	{KeyPath: "D.NoisySkippings", DeprecatedName: "noisySkippings", DeprecatedDocLink: "removed--noisypendings-and--noisyskippings", DeprecatedVersion: "2.0.0"},
+	{KeyPath: "D.SlowSpecThreshold", DeprecatedName: "slow-spec-threshold", SectionKey: "output", Usage: "--slow-spec-threshold has been deprecated and will be removed in a future version of Ginkgo.  This feature has proved to be more noisy than useful.  You can use --poll-progress-after, instead, to get more actionable feedback about potentially slow specs and understand where they might be getting stuck.", DeprecatedVersion: "2.5.0"},
+	{KeyPath: "D.AlwaysEmitGinkgoWriter", DeprecatedName: "always-emit-ginkgo-writer", SectionKey: "output", Usage: " - use -v instead, or one of Ginkgo's machine-readable report formats to get GinkgoWriter output for passing specs."},
 }
 
 // BuildTestSuiteFlagSet attaches to the CommandLine flagset and provides flags for the Ginkgo test process

@@ -176,6 +176,14 @@ func TestGetListNonRecursive(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestList(ctx, t, cacher, true)
+}
+
+// TODO(wojtek-t): We should extend the generic RunTestList test to cover the
+// scenarios that are not yet covered by it and get rid of this test.
+func TestListDeprecated(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 	cacher, _, err := newTestCacher(etcdStorage)
@@ -265,42 +273,6 @@ func TestList(t *testing.T) {
 		if e, a := *expected, item; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected: %#v, got: %#v", e, a)
 		}
-	}
-}
-
-// TestTooLargeResourceVersionList ensures that a list request for a resource version higher than available
-// in the watch cache completes (does not wait indefinitely) and results in a ResourceVersionTooLarge error.
-func TestTooLargeResourceVersionList(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
-	defer server.Terminate(t)
-	cacher, v, err := newTestCacher(etcdStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	podFoo := makeTestPod("foo")
-	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
-
-	// Set up List at fooCreated.ResourceVersion + 10
-	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	listRV := strconv.Itoa(int(rv + 10))
-
-	result := &example.PodList{}
-	options := storage.ListOptions{
-		ResourceVersion: listRV,
-		Predicate:       storage.Everything,
-		Recursive:       true,
-	}
-	err = cacher.GetList(context.TODO(), "pods/ns", options, result)
-	if !errors.IsTimeout(err) {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if !storage.IsTooLargeResourceVersion(err) {
-		t.Errorf("expected 'Too large resource version' cause in error but got: %v", err)
 	}
 }
 

@@ -105,6 +105,11 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 		return nil, false, nil
 	}
 
+	// Cannot run cloud ipam controller if cloud provider is nil (--cloud-provider not set or set to 'external')
+	if controllerContext.Cloud == nil && controllerContext.ComponentConfig.KubeCloudShared.CIDRAllocatorType == string(ipam.CloudAllocatorType) {
+		return nil, false, errors.New("--cidr-allocator-type is set to 'CloudAllocator' but cloud provider is not configured")
+	}
+
 	clusterCIDRs, err := validateCIDRs(controllerContext.ComponentConfig.KubeCloudShared.ClusterCIDR)
 	if err != nil {
 		return nil, false, err

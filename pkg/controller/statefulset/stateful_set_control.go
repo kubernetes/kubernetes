@@ -573,7 +573,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
 			klog.V(2).InfoS("Pod of StatefulSet is terminating for update",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
-			err := ssc.podControl.DeleteStatefulPod(set, replicas[target])
+			if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
+				if !errors.IsNotFound(err) {
+					return &status, err
+				}
+			}
 			status.CurrentReplicas--
 			return &status, err
 		}

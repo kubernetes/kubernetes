@@ -24,6 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
+	pkgversion "k8s.io/apimachinery/pkg/version"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/version"
 
@@ -57,9 +59,24 @@ func NewKubeVersionGetter(client clientset.Interface) VersionGetter {
 
 // ClusterVersion gets API server version
 func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, error) {
-	clusterVersionInfo, err := g.client.Discovery().ServerVersion()
-	if err != nil {
-		return "", nil, errors.Wrap(err, "Couldn't fetch cluster version from the API Server")
+	var (
+		clusterVersionInfo *pkgversion.Info
+		err                error
+	)
+	// If we are dry-running, do not attempt to fetch the /version resource and just return
+	// the stored FakeServerVersion, which is done when constructing the dry-run client in
+	// common.go#getClient()
+	// The problem here is that during upgrade dry-run client reactors are backed by a dynamic client
+	// via NewClientBackedDryRunGetterFromKubeconfig() and for GetActions there seems to be no analog to
+	// Discovery().Serverversion() resource for a dynamic client(?).
+	fakeclientDiscovery, ok := g.client.Discovery().(*fakediscovery.FakeDiscovery)
+	if ok {
+		clusterVersionInfo = fakeclientDiscovery.FakedServerVersion
+	} else {
+		clusterVersionInfo, err = g.client.Discovery().ServerVersion()
+		if err != nil {
+			return "", nil, errors.Wrap(err, "Couldn't fetch cluster version from the API Server")
+		}
 	}
 
 	clusterVersion, err := versionutil.ParseSemantic(clusterVersionInfo.String())
