@@ -33,6 +33,7 @@ approvers:
   - msau42
   - neolit123
   - oomichi
+  - pohly
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
   - SataQiu
