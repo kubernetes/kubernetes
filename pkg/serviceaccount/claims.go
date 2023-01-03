@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
+	"github.com/go-jose/go-jose/v3/jwt"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/klog/v2"
 
@@ -90,7 +90,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 	}
 
 	if warnafter != 0 {
-		pc.Kubernetes.WarnAfter = jwt.NewNumericDate(now.Add(time.Duration(warnafter) * time.Second))
+		pc.Kubernetes.WarnAfter = *jwt.NewNumericDate(now.Add(time.Duration(warnafter) * time.Second))
 	}
 
 	return sc, pc

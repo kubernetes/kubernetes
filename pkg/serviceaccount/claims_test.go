@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
+	"github.com/go-jose/go-jose/v3/jwt"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -61,6 +61,9 @@ func TestClaims(t *testing.T) {
 			UID:       "mysecret-uid",
 		},
 	}
+	referenceDate := jwt.NumericDate(1514764800)
+	expiry100s := jwt.NumericDate(1514764800 + 100)
+	expiry1day := jwt.NumericDate(1514764800 + 60*60*24)
 	cs := []struct {
 		// input
 		sa        core.ServiceAccount
@@ -85,9 +88,9 @@ func TestClaims(t *testing.T) {
 
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800),
+				IssuedAt:  &referenceDate,
+				NotBefore: &referenceDate,
+				Expiry:    &referenceDate,
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -107,9 +110,9 @@ func TestClaims(t *testing.T) {
 
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 100),
+				IssuedAt:  &referenceDate,
+				NotBefore: &referenceDate,
+				Expiry:    &expiry100s,
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -130,9 +133,9 @@ func TestClaims(t *testing.T) {
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
 				Audience:  []string{"1"},
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 100),
+				IssuedAt:  &referenceDate,
+				NotBefore: &referenceDate,
+				Expiry:    &expiry100s,
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -152,9 +155,9 @@ func TestClaims(t *testing.T) {
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
 				Audience:  []string{"1", "2"},
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 100),
+				IssuedAt:  &referenceDate,
+				NotBefore: &referenceDate,
+				Expiry:    &expiry100s,
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -175,9 +178,9 @@ func TestClaims(t *testing.T) {
 
 			sc: &jwt.Claims{
 				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NumericDate(1514764800),
-				NotBefore: jwt.NumericDate(1514764800),
-				Expiry:    jwt.NumericDate(1514764800 + 60*60*24),
+				IssuedAt:  &referenceDate,
+				NotBefore: &referenceDate,
+				Expiry:    &expiry1day,
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -276,14 +279,14 @@ func TestValidatePrivateClaims(t *testing.T) {
 			name:      "expired",
 			getter:    fakeGetter{serviceAccount, nil, nil},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Namespace: "ns"}},
-			expiry:    jwt.NewNumericDate(now().Add(-1_000 * time.Hour)),
+			expiry:    *jwt.NewNumericDate(now().Add(-1_000 * time.Hour)),
 			expectErr: "service account token has expired",
 		},
 		{
 			name:      "not yet valid",
 			getter:    fakeGetter{serviceAccount, nil, nil},
 			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Namespace: "ns"}},
-			notBefore: jwt.NewNumericDate(now().Add(1_000 * time.Hour)),
+			notBefore: *jwt.NewNumericDate(now().Add(1_000 * time.Hour)),
 			expectErr: "service account token is not valid yet",
 		},
 		{
@@ -369,7 +372,7 @@ func TestValidatePrivateClaims(t *testing.T) {
 			if tc.expiry != 0 {
 				expiry = tc.expiry
 			}
-			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: expiry, NotBefore: tc.notBefore}, tc.private)
+			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: &expiry, NotBefore: &tc.notBefore}, tc.private)
 			if len(tc.expectErr) > 0 {
 				if errStr := errString(err); tc.expectErr != errStr {
 					t.Fatalf("expected error %q but got %q", tc.expectErr, errStr)

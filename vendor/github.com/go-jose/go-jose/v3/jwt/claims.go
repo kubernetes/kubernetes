@@ -21,36 +21,38 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/json"
+	"github.com/go-jose/go-jose/v3/json"
 )
 
 // Claims represents public claim values (as specified in RFC 7519).
 type Claims struct {
-	Issuer    string      `json:"iss,omitempty"`
-	Subject   string      `json:"sub,omitempty"`
-	Audience  Audience    `json:"aud,omitempty"`
-	Expiry    NumericDate `json:"exp,omitempty"`
-	NotBefore NumericDate `json:"nbf,omitempty"`
-	IssuedAt  NumericDate `json:"iat,omitempty"`
-	ID        string      `json:"jti,omitempty"`
+	Issuer    string       `json:"iss,omitempty"`
+	Subject   string       `json:"sub,omitempty"`
+	Audience  Audience     `json:"aud,omitempty"`
+	Expiry    *NumericDate `json:"exp,omitempty"`
+	NotBefore *NumericDate `json:"nbf,omitempty"`
+	IssuedAt  *NumericDate `json:"iat,omitempty"`
+	ID        string       `json:"jti,omitempty"`
 }
 
 // NumericDate represents date and time as the number of seconds since the
-// epoch, including leap seconds. Non-integer values can be represented
+// epoch, ignoring leap seconds. Non-integer values can be represented
 // in the serialized format, but we round to the nearest second.
+// See RFC7519 Section 2: https://tools.ietf.org/html/rfc7519#section-2
 type NumericDate int64
 
 // NewNumericDate constructs NumericDate from time.Time value.
-func NewNumericDate(t time.Time) NumericDate {
+func NewNumericDate(t time.Time) *NumericDate {
 	if t.IsZero() {
-		return NumericDate(0)
+		return nil
 	}
 
 	// While RFC 7519 technically states that NumericDate values may be
 	// non-integer values, we don't bother serializing timestamps in
 	// claims with sub-second accurancy and just round to the nearest
 	// second instead. Not convined sub-second accuracy is useful here.
-	return NumericDate(t.Unix())
+	out := NumericDate(t.Unix())
+	return &out
 }
 
 // MarshalJSON serializes the given NumericDate into its JSON representation.
@@ -72,11 +74,14 @@ func (n *NumericDate) UnmarshalJSON(b []byte) error {
 }
 
 // Time returns time.Time representation of NumericDate.
-func (n NumericDate) Time() time.Time {
-	return time.Unix(int64(n), 0)
+func (n *NumericDate) Time() time.Time {
+	if n == nil {
+		return time.Time{}
+	}
+	return time.Unix(int64(*n), 0)
 }
 
-// Audience represents the recipents that the token is intended for.
+// Audience represents the recipients that the token is intended for.
 type Audience []string
 
 // UnmarshalJSON reads an audience from its JSON representation.
@@ -106,6 +111,15 @@ func (s *Audience) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// MarshalJSON converts audience to json representation.
+func (s Audience) MarshalJSON() ([]byte, error) {
+	if len(s) == 1 {
+		return json.Marshal(s[0])
+	}
+	return json.Marshal([]string(s))
+}
+
+//Contains checks whether a given string is included in the Audience
 func (s Audience) Contains(v string) bool {
 	for _, a := range s {
 		if a == v {

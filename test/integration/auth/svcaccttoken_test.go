@@ -32,8 +32,8 @@ import (
 	"testing"
 	"time"
 
-	jose "gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v3/jwt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -200,7 +200,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		}
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -266,7 +266,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `"test-pod"`, "kubernetes.io", "pod", "name")
 		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -339,7 +339,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -446,8 +446,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		// Give some tolerance to avoid flakiness since we are using real time.
 		var leeway int64 = 2
-		actualExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(24*365) * time.Hour))
-		assumedExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
+		actualExpiry := *jwt.NewNumericDate(time.Now().Add(time.Duration(24*365) * time.Hour))
+		assumedExpiry := *jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
 		exp, err := strconv.ParseInt(getSubObject(t, getPayload(t, treq.Status.Token), "exp"), 10, 64)
 		if err != nil {
 			t.Fatalf("error parsing exp: %v", err)
@@ -500,8 +500,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		// Give some tolerance to avoid flakiness since we are using real time.
 		var leeway int64 = 10
-		actualExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(60*60) * time.Second))
-		assumedExpiry := jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
+		actualExpiry := *jwt.NewNumericDate(time.Now().Add(time.Duration(60*60) * time.Second))
+		assumedExpiry := *jwt.NewNumericDate(time.Now().Add(time.Duration(requestExp) * time.Second))
 
 		warnAfter := getSubObject(t, getPayload(t, treq.Status.Token), "kubernetes.io", "warnafter")
 		if warnAfter != "null" {
@@ -558,7 +558,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		}
 		warningHandler.assertEqual(t, nil)
 
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 
 		doTokenReview(t, cs, treq, false)
 	})
@@ -588,7 +588,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `"test-pod"`, "kubernetes.io", "pod", "name")
 		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -631,7 +631,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -676,7 +676,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, nil)
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
@@ -722,7 +722,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		warningHandler.assertEqual(t, []string{fmt.Sprintf("requested expiration of %d seconds shortened to %d seconds", tooLongExpirationTime, maxExpirationSeconds)})
 
 		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
-		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"api"`, "aud")
 		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
 		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")

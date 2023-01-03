@@ -28,8 +28,8 @@ import (
 	"testing"
 
 	restful "github.com/emicklei/go-restful/v3"
+	jose "github.com/go-jose/go-jose/v3"
 	"github.com/google/go-cmp/cmp"
-	jose "gopkg.in/square/go-jose.v2"
 
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -135,18 +135,22 @@ func TestServeKeys(t *testing.T) {
 			},
 			WantKeys: []jose.JSONWebKey{
 				{
-					Algorithm:    "RS256",
-					Key:          wantPubRSA,
-					KeyID:        rsaKeyID,
-					Use:          "sig",
-					Certificates: []*x509.Certificate{},
+					Algorithm:                   "RS256",
+					Key:                         wantPubRSA,
+					KeyID:                       rsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
 				},
 				{
-					Algorithm:    "ES256",
-					Key:          wantPubECDSA,
-					KeyID:        ecdsaKeyID,
-					Use:          "sig",
-					Certificates: []*x509.Certificate{},
+					Algorithm:                   "ES256",
+					Key:                         wantPubECDSA,
+					KeyID:                       ecdsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
 				},
 			},
 		},
@@ -158,18 +162,22 @@ func TestServeKeys(t *testing.T) {
 			},
 			WantKeys: []jose.JSONWebKey{
 				{
-					Algorithm:    "RS256",
-					Key:          wantPubRSA,
-					KeyID:        rsaKeyID,
-					Use:          "sig",
-					Certificates: []*x509.Certificate{},
+					Algorithm:                   "RS256",
+					Key:                         wantPubRSA,
+					KeyID:                       rsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
 				},
 				{
-					Algorithm:    "ES256",
-					Key:          wantPubECDSA,
-					KeyID:        ecdsaKeyID,
-					Use:          "sig",
-					Certificates: []*x509.Certificate{},
+					Algorithm:                   "ES256",
+					Key:                         wantPubECDSA,
+					KeyID:                       ecdsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
 				},
 			},
 		},
