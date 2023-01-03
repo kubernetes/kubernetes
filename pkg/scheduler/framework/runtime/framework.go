@@ -722,22 +722,23 @@ func (f *frameworkImpl) RunFilterPlugins(
 	state *framework.CycleState,
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
-) framework.PluginToStatus {
-	statuses := make(framework.PluginToStatus)
+) *framework.Status {
+	var status *framework.Status
+
 	for _, pl := range f.filterPlugins {
-		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
-		if !pluginStatus.IsSuccess() {
-			if !pluginStatus.IsUnschedulable() {
+		status = f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
+		if !status.IsSuccess() {
+			if !status.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
 				// Success or Unschedulable.
-				pluginStatus = framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), pluginStatus.AsError()))
+				status = framework.AsStatus(fmt.Errorf("running %q filter plugin: %w", pl.Name(), status.AsError()))
 			}
-			pluginStatus.SetFailedPlugin(pl.Name())
-			return map[string]*framework.Status{pl.Name(): pluginStatus}
+			status.SetFailedPlugin(pl.Name())
+			return status
 		}
 	}
 
-	return statuses
+	return status
 }
 
 func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.FilterPlugin, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
@@ -832,8 +833,7 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 			break
 		}
 
-		statusMap := f.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
-		status = statusMap.Merge()
+		status = f.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
 		if !status.IsSuccess() && !status.IsUnschedulable() {
 			return status
 		}

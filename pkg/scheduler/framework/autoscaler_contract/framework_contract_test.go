@@ -32,7 +32,7 @@ import (
 
 type frameworkContract interface {
 	RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status)
-	RunFilterPlugins(context.Context, *framework.CycleState, *v1.Pod, *framework.NodeInfo) framework.PluginToStatus
+	RunFilterPlugins(context.Context, *framework.CycleState, *v1.Pod, *framework.NodeInfo) *framework.Status
 }
 
 func TestFrameworkContract(t *testing.T) {

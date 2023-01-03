@@ -757,7 +757,7 @@ type PluginsRunner interface {
 	// preemption, we may pass a copy of the original nodeInfo object that has some pods
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
-	RunFilterPlugins(context.Context, *CycleState, *v1.Pod, *NodeInfo) PluginToStatus
+	RunFilterPlugins(context.Context, *CycleState, *v1.Pod, *NodeInfo) *Status
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.

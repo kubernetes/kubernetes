@@ -67,6 +67,15 @@ const (
 var _ framework.ScorePlugin = &TestScoreWithNormalizePlugin{}
 var _ framework.ScorePlugin = &TestScorePlugin{}
 
+var cmpOpts = []cmp.Option{
+	cmp.Comparer(func(s1 *framework.Status, s2 *framework.Status) bool {
+		if s1 == nil || s2 == nil {
+			return s1.IsSuccess() && s2.IsSuccess()
+		}
+		return s1.Code() == s2.Code() && s1.FailedPlugin() == s2.FailedPlugin() && s1.Message() == s2.Message()
+	}),
+}
+
 func newScoreWithNormalizePlugin1(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
 	var inj injectedResult
 	if err := DecodeInto(injArgs, &inj); err != nil {
@@ -1442,10 +1451,9 @@ func TestRunPreFilterPluginsStatus(t *testing.T) {
 
 func TestFilterPlugins(t *testing.T) {
 	tests := []struct {
-		name          string
-		plugins       []*TestPlugin
-		wantStatus    *framework.Status
-		wantStatusMap framework.PluginToStatus
+		name       string
+		plugins    []*TestPlugin
+		wantStatus *framework.Status
 	}{
 		{
 			name: "SuccessFilter",
@@ -1455,8 +1463,7 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(framework.Success)},
 				},
 			},
-			wantStatus:    nil,
-			wantStatusMap: framework.PluginToStatus{},
+			wantStatus: nil,
 		},
 		{
 			name: "ErrorFilter",
@@ -1467,9 +1474,6 @@ func TestFilterPlugins(t *testing.T) {
 				},
 			},
 			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin": framework.AsStatus(fmt.Errorf(`running "TestPlugin" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin"),
-			},
 		},
 		{
 			name: "UnschedulableFilter",
@@ -1480,9 +1484,6 @@ func TestFilterPlugins(t *testing.T) {
 				},
 			},
 			wantStatus: framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin": framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin"),
-			},
 		},
 		{
 			name: "UnschedulableAndUnresolvableFilter",
@@ -1494,9 +1495,6 @@ func TestFilterPlugins(t *testing.T) {
 				},
 			},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, injectFilterReason).WithFailedPlugin("TestPlugin"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin": framework.NewStatus(framework.UnschedulableAndUnresolvable, injectFilterReason).WithFailedPlugin("TestPlugin"),
-			},
 		},
 		// following tests cover multiple-plugins scenarios
 		{
@@ -1512,9 +1510,6 @@ func TestFilterPlugins(t *testing.T) {
 				},
 			},
 			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin1": framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
-			},
 		},
 		{
 			name: "UnschedulableAndUnschedulableFilters",
@@ -1529,9 +1524,20 @@ func TestFilterPlugins(t *testing.T) {
 				},
 			},
 			wantStatus: framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin1"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin1": framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin1"),
+		},
+		{
+			name: "UnschedulableAndUnschedulableAndUnresolvableFilters",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(framework.UnschedulableAndUnresolvable)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(framework.Unschedulable)},
+				},
 			},
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, injectFilterReason).WithFailedPlugin("TestPlugin1"),
 		},
 		{
 			name: "SuccessAndSuccessFilters",
@@ -1540,14 +1546,12 @@ func TestFilterPlugins(t *testing.T) {
 					name: "TestPlugin1",
 					inj:  injectedResult{FilterStatus: int(framework.Success)},
 				},
-
 				{
 					name: "TestPlugin2",
 					inj:  injectedResult{FilterStatus: int(framework.Success)},
 				},
 			},
-			wantStatus:    nil,
-			wantStatusMap: framework.PluginToStatus{},
+			wantStatus: nil,
 		},
 		{
 			name: "ErrorAndSuccessFilters",
@@ -1562,9 +1566,6 @@ func TestFilterPlugins(t *testing.T) {
 				},
 			},
 			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin1": framework.AsStatus(fmt.Errorf(`running "TestPlugin1" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin1"),
-			},
 		},
 		{
 			name: "SuccessAndErrorFilters",
@@ -1580,9 +1581,6 @@ func TestFilterPlugins(t *testing.T) {
 				},
 			},
 			wantStatus: framework.AsStatus(fmt.Errorf(`running "TestPlugin2" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin2"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin2": framework.AsStatus(fmt.Errorf(`running "TestPlugin2" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin2"),
-			},
 		},
 		{
 			name: "SuccessAndUnschedulableFilters",
@@ -1591,16 +1589,12 @@ func TestFilterPlugins(t *testing.T) {
 					name: "TestPlugin1",
 					inj:  injectedResult{FilterStatus: int(framework.Success)},
 				},
-
 				{
 					name: "TestPlugin2",
 					inj:  injectedResult{FilterStatus: int(framework.Unschedulable)},
 				},
 			},
 			wantStatus: framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin2"),
-			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin2": framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin2"),
-			},
 		},
 	}
 
@@ -1625,17 +1619,14 @@ func TestFilterPlugins(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
 			f, err := newFrameworkWithQueueSortAndBind(registry, profile, ctx.Done())
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
-			gotStatusMap := f.RunFilterPlugins(ctx, nil, pod, nil)
-			gotStatus := gotStatusMap.Merge()
-			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
-				t.Errorf("wrong status code. got: %v, want:%v", gotStatus, tt.wantStatus)
-			}
-			if !reflect.DeepEqual(gotStatusMap, tt.wantStatusMap) {
-				t.Errorf("wrong status map. got: %+v, want: %+v", gotStatusMap, tt.wantStatusMap)
+			gotStatus := f.RunFilterPlugins(ctx, nil, pod, nil)
+			if diff := cmp.Diff(gotStatus, tt.wantStatus, cmpOpts...); diff != "" {
+				t.Errorf("Unexpected status: (-got, +want):\n%s", diff)
 			}
 		})
 	}
@@ -1864,8 +1855,8 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			}
 			tt.nodeInfo.SetNode(tt.node)
 			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, nil, tt.pod, tt.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
-				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
+			if diff := cmp.Diff(gotStatus, tt.wantStatus, cmpOpts...); diff != "" {
+				t.Errorf("Unexpected status: (-got, +want):\n%s", diff)
 			}
 		})
 	}
