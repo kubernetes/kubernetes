@@ -114,7 +114,7 @@ func getPackages(context *generator.Context, arguments *args.GeneratorArgs) []ge
 		}
 
 		packages = append(packages,
-			&generator.DefaultPackage{
+			&generator.SimplePackage{
 				PackageName: pkg.Name,
 				PackagePath: pkg.Path,
 				Source:      pkg.SourcePath,
