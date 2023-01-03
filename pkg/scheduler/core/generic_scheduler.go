@@ -454,6 +454,9 @@ func PodPassesFiltersOnNode(
 
 		statusMap := ph.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
 		status = statusMap.Merge()
+		if strings.Contains(pod.Namespace, "tenant") {
+			status = statusMap.MergeTenant()
+		}
 		if !status.IsSuccess() && !status.IsUnschedulable() {
 			return false, status, status.AsError()
 		}

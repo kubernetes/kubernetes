@@ -21,6 +21,7 @@ package framework
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -76,6 +77,8 @@ const (
 
 // This list should be exactly the same as the codes iota defined above in the same order.
 var codes = []string{"Success", "Error", "Unschedulable", "UnschedulableAndUnresolvable", "Wait", "Skip"}
+
+var ignoreTaints = []string{"node.coreweave.cloud/reserved"}
 
 func (c Code) String() string {
 	return codes[c]
@@ -205,6 +208,28 @@ func (p PluginToStatus) Merge() *Status {
 		finalStatus.code = UnschedulableAndUnresolvable
 	} else if hasUnschedulable {
 		finalStatus.code = Unschedulable
+	}
+	return finalStatus
+}
+
+func (p PluginToStatus) MergeTenant() *Status {
+	status := p.Merge()
+
+	finalStatus := NewStatus(Success)
+	finalStatus.code = status.code
+
+	for k, reason := range status.Reasons() {
+		fmt.Printf("Reason %v: %v\n", k, reason)
+
+		if strings.Contains(reason, "node(s) had taint") {
+			for _, v := range ignoreTaints {
+				if !strings.Contains(reason, fmt.Sprintf("had taint {%s", v)) {
+					finalStatus.AppendReason(reason)
+				}
+			}
+		} else {
+			finalStatus.AppendReason(reason)
+		}
 	}
 	return finalStatus
 }
