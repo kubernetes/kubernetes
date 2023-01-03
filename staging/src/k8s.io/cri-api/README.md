@@ -6,14 +6,16 @@ without the need to recompile. CRI consists of a protocol buffers and gRPC API.
 Read more about CRI API at [kubernetes docs](https://kubernetes.io/docs/concepts/architecture/cri/).
 
 The repository [kubernetes/cri-api](https://github.com/kubernetes/cri-api) is a mirror of https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cri-api.
-Please do NOT file issues or submit PRs against the [kubernetes/cri-api](https://github.com/kubernetes/cri-api)
+Please do **not** file issues or submit PRs against the [kubernetes/cri-api](https://github.com/kubernetes/cri-api)
 repository as it is readonly, all development is done in [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).
 
-CRI API is defined in [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes)
-repository and is ONLY intended to be used for kubelet to container runtime interactions.
-It is NOT a common purpose container runtime API for general use and intended
-to be Kubernetes-centric. We try to avoid it, but there may be logic in container
-runtime optimized for the order or specific parameters of call kubelet makes.
+The CRI API is defined in [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes)
+repository and is **only** intended to be used for kubelet to container runtime 
+interactions, or for node-level troubleshooting using a tool such as `crictl`.
+It is **not** a common purpose container runtime API for general use, and is intended
+to be Kubernetes-centric. We try to avoid it, but there may be logic within a container
+runtime that optimizes for the order or specific parameters of call(s) that the kubelet
+makes.
 
 ## Version skew policy
 
@@ -39,7 +41,7 @@ the version skew policy.
 
 CRI API has two versions:
 - Major semantic version (known versions are `v1alpha2` ([removed in 1.26](https://kubernetes.io/blog/2022/12/09/kubernetes-v1-26-release/#cri-v1alpha2-removed)), `v1`).
-- Kubernetes version (`@1.23`). Note, the library cri-api is versioned as `0.23` as it doesn't guarantee Go types backward compatibility.
+- Kubernetes version (for example: `@1.23`). Note, the `cri-api` Golang library is versioned as `0.23` as it doesn't guarantee Go types backward compatibility.
 
 Major semantic version (e.g. `v1`) is used to introduce breaking changes
 and major new features that are incompatible with the current API.
@@ -97,7 +99,7 @@ The recommended feature development flow is following:
 
 ## Change history
 
-Here is the change history of CRI API.
+Here is the change history of the Container Runtime Interface protocol:
 
 ### v1.20
 
