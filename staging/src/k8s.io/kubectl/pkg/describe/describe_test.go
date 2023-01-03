@@ -5727,12 +5727,14 @@ func TestDescribeClusterCIDR(t *testing.T) {
 Labels:       <none>
 Annotations:  <none>
 NodeSelector:
-  NodeSelector Terms:
-    Term 0:       foo in [bar]
-PerNodeHostBits:  8
-IPv4:             10.1.0.0/16
-IPv6:             fd00:1:1::/64
-Events:           <none>` + "\n",
+  NodeSelector Terms:  
+    Term 0:
+      Match Expressions:  foo in [bar]
+      Match Fields:       <none>
+PerNodeHostBits:          8
+IPv4:                     10.1.0.0/16
+IPv6:                     fd00:1:1::/64
+Events:                   <none>` + "\n",
 		},
 	}
 
