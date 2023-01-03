@@ -69,9 +69,6 @@ type FileType interface {
 	VerifyFile(f *File, path string) error
 }
 
-// Packages is a list of packages to generate.
-type Packages []Package
-
 // Generator is the contract for anything that wants to do auto-generation.
 // It's expected that the io.Writers passed to the below functions will be
 // ErrorTrackers; this allows implementations to not check for io errors,

@@ -96,8 +96,7 @@ func getDefaultNamer() string {
 }
 
 // getPackages returns a set of packages to be processed by this tool.
-// FIXME: just say []generator.Package instead
-func getPackages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
+func getPackages(context *generator.Context, arguments *args.GeneratorArgs) []generator.Package {
 	// FIXME: move inside execute
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
@@ -108,7 +107,7 @@ func getPackages(context *generator.Context, arguments *args.GeneratorArgs) gene
 	customArgs := arguments.CustomArgs.(*customArgs) // already validated
 	namePrefix := customArgs.NamePrefix
 
-	var packages generator.Packages
+	var packages []generator.Package
 
 	for _, in := range context.Inputs {
 		klog.V(5).Infof("Considering pkg %q", in)

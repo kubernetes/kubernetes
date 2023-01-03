@@ -45,7 +45,7 @@ func errs2strings(errors []error) []string {
 // should be a physical path on disk, not an import path. e.g.:
 // /path/to/home/path/to/gopath/src/
 // Each package has its import path already, this will be appended to 'outDir'.
-func (c *Context) ExecutePackages(outDir string, packages Packages) error {
+func (c *Context) ExecutePackages(outDir string, packages []Package) error {
 	var errors []error
 	for _, p := range packages {
 		if err := c.ExecutePackage(outDir, p); err != nil {
