@@ -14,6 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package cpuset represents a collection of CPUs in a 'set' data structure.
+//
+// It can be used to represent core IDs, hyper thread siblings, CPU nodes, or processor IDs.
+//
+// The only special thing about this package is that
+// methods are provided to convert back and forth from Linux 'list' syntax.
+// See http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS for details.
+//
+// Future work can migrate this to use a 'set' library, and relax the dubious 'immutable' property.
 package cpuset
 
 import (
