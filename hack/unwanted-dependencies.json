@@ -210,6 +210,7 @@
       ],
       "google.golang.org/appengine": [
         "cloud.google.com/go/compute",
+        "github.com/coreos/go-oidc/v3",
         "github.com/prometheus/client_golang",
         "github.com/prometheus/common",
         "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",

@@ -1,4 +1,4 @@
-= vendor/github.com/coreos/go-oidc licensed under: =
+= vendor/github.com/coreos/go-oidc/v3 licensed under: =
 
 Apache License
                            Version 2.0, January 2004
@@ -203,4 +203,4 @@ Apache License
    limitations under the License.
 
 
-= vendor/github.com/coreos/go-oidc/LICENSE d2794c0df5b907fdace235a619d80314
+= vendor/github.com/coreos/go-oidc/v3/LICENSE d2794c0df5b907fdace235a619d80314

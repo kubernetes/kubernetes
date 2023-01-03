@@ -29,7 +29,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"

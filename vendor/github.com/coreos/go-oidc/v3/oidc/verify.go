@@ -12,14 +12,26 @@ import (
 	"strings"
 	"time"
 
+	jose "github.com/go-jose/go-jose/v3"
 	"golang.org/x/oauth2"
-	jose "gopkg.in/square/go-jose.v2"
 )
 
 const (
 	issuerGoogleAccounts         = "https://accounts.google.com"
 	issuerGoogleAccountsNoScheme = "accounts.google.com"
 )
+
+// TokenExpiredError indicates that Verify failed because the token was expired. This
+// error does NOT indicate that the token is not also invalid for other reasons. Other
+// checks might have failed if the expiration check had not failed.
+type TokenExpiredError struct {
+	// Expiry is the time when the token expired.
+	Expiry time.Time
+}
+
+func (e *TokenExpiredError) Error() string {
+	return fmt.Sprintf("oidc: token is expired (Token Expiry: %v)", e.Expiry)
+}
 
 // KeySet is a set of publc JSON Web Keys that can be used to validate the signature
 // of JSON web tokens. This is expected to be backed by a remote key set through
@@ -52,19 +64,13 @@ type IDTokenVerifier struct {
 // This constructor can be used to create a verifier directly using the issuer URL and
 // JSON Web Key Set URL without using discovery:
 //
-//		keySet := oidc.NewRemoteKeySet(ctx, "https://www.googleapis.com/oauth2/v3/certs")
-//		verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
+//	keySet := oidc.NewRemoteKeySet(ctx, "https://www.googleapis.com/oauth2/v3/certs")
+//	verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
 //
-// Since KeySet is an interface, this constructor can also be used to supply custom
-// public key sources. For example, if a user wanted to supply public keys out-of-band
-// and hold them statically in-memory:
+// Or a static key set (e.g. for testing):
 //
-//		// Custom KeySet implementation.
-//		keySet := newStatisKeySet(publicKeys...)
-//
-//		// Verifier uses the custom KeySet implementation.
-//		verifier := oidc.NewVerifier("https://auth.example.com", keySet, config)
-//
+//	keySet := &oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{pub1, pub2}}
+//	verifier := oidc.NewVerifier("https://accounts.google.com", keySet, config)
 func NewVerifier(issuerURL string, keySet KeySet, config *Config) *IDTokenVerifier {
 	return &IDTokenVerifier{keySet: keySet, config: config, issuer: issuerURL}
 }
@@ -100,13 +106,35 @@ type Config struct {
 
 	// Time function to check Token expiry. Defaults to time.Now
 	Now func() time.Time
+
+	// InsecureSkipSignatureCheck causes this package to skip JWT signature validation.
+	// It's intended for special cases where providers (such as Azure), use the "none"
+	// algorithm.
+	//
+	// This option can only be enabled safely when the ID Token is received directly
+	// from the provider after the token exchange.
+	//
+	// This option MUST NOT be used when receiving an ID Token from sources other
+	// than the token endpoint.
+	InsecureSkipSignatureCheck bool
+}
+
+// VerifierContext returns an IDTokenVerifier that uses the provider's key set to
+// verify JWTs. As opposed to Verifier, the context is used for all requests to
+// the upstream JWKs endpoint.
+func (p *Provider) VerifierContext(ctx context.Context, config *Config) *IDTokenVerifier {
+	return p.newVerifier(NewRemoteKeySet(ctx, p.jwksURL), config)
 }
 
 // Verifier returns an IDTokenVerifier that uses the provider's key set to verify JWTs.
 //
-// The returned IDTokenVerifier is tied to the Provider's context and its behavior is
-// undefined once the Provider's context is canceled.
+// The returned verifier uses a background context for all requests to the upstream
+// JWKs endpoint. To control that context, use VerifierContext instead.
 func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
+	return p.newVerifier(p.remoteKeySet(), config)
+}
+
+func (p *Provider) newVerifier(keySet KeySet, config *Config) *IDTokenVerifier {
 	if len(config.SupportedSigningAlgs) == 0 && len(p.algorithms) > 0 {
 		// Make a copy so we don't modify the config values.
 		cp := &Config{}
@@ -114,7 +142,7 @@ func (p *Provider) Verifier(config *Config) *IDTokenVerifier {
 		cp.SupportedSigningAlgs = p.algorithms
 		config = cp
 	}
-	return NewVerifier(p.issuer, p.remoteKeySet, config)
+	return NewVerifier(p.issuer, keySet, config)
 }
 
 func parseJWT(p string) ([]byte, error) {
@@ -171,46 +199,26 @@ func resolveDistributedClaim(ctx context.Context, verifier *IDTokenVerifier, src
 	return token.claims, nil
 }
 
-func parseClaim(raw []byte, name string, v interface{}) error {
-	var parsed map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return err
-	}
-
-	val, ok := parsed[name]
-	if !ok {
-		return fmt.Errorf("claim doesn't exist: %s", name)
-	}
-
-	return json.Unmarshal([]byte(val), v)
-}
-
-// Verify parses a raw ID Token, verifies it's been signed by the provider, preforms
+// Verify parses a raw ID Token, verifies it's been signed by the provider, performs
 // any additional checks depending on the Config, and returns the payload.
 //
 // Verify does NOT do nonce validation, which is the callers responsibility.
 //
 // See: https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 //
-//    oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
-//    if err != nil {
-//        // handle error
-//    }
+//	oauth2Token, err := oauth2Config.Exchange(ctx, r.URL.Query().Get("code"))
+//	if err != nil {
+//	    // handle error
+//	}
 //
-//    // Extract the ID Token from oauth2 token.
-//    rawIDToken, ok := oauth2Token.Extra("id_token").(string)
-//    if !ok {
-//        // handle error
-//    }
+//	// Extract the ID Token from oauth2 token.
+//	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+//	if !ok {
+//	    // handle error
+//	}
 //
-//    token, err := verifier.Verify(ctx, rawIDToken)
-//
+//	token, err := verifier.Verify(ctx, rawIDToken)
 func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDToken, error) {
-	jws, err := jose.ParseSigned(rawIDToken)
-	if err != nil {
-		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
-	}
-
 	// Throw out tokens with invalid claims before trying to verify the token. This lets
 	// us do cheap checks before possibly re-syncing keys.
 	payload, err := parseJWT(rawIDToken)
@@ -282,18 +290,29 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		nowTime := now()
 
 		if t.Expiry.Before(nowTime) {
-			return nil, fmt.Errorf("oidc: token is expired (Token Expiry: %v)", t.Expiry)
+			return nil, &TokenExpiredError{Expiry: t.Expiry}
 		}
 
 		// If nbf claim is provided in token, ensure that it is indeed in the past.
 		if token.NotBefore != nil {
 			nbfTime := time.Time(*token.NotBefore)
-			leeway := 1 * time.Minute
+			// Set to 5 minutes since this is what other OpenID Connect providers do to deal with clock skew.
+			// https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/6.12.2/src/Microsoft.IdentityModel.Tokens/TokenValidationParameters.cs#L149-L153
+			leeway := 5 * time.Minute
 
 			if nowTime.Add(leeway).Before(nbfTime) {
 				return nil, fmt.Errorf("oidc: current time %v before the nbf (not before) time: %v", nowTime, nbfTime)
 			}
 		}
+	}
+
+	if v.config.InsecureSkipSignatureCheck {
+		return t, nil
+	}
+
+	jws, err := jose.ParseSigned(rawIDToken)
+	if err != nil {
+		return nil, fmt.Errorf("oidc: malformed jwt: %v", err)
 	}
 
 	switch len(jws.Signatures) {
@@ -316,6 +335,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	t.sigAlgorithm = sig.Header.Algorithm
 
+	ctx = context.WithValue(ctx, parsedJWTKey, jws)
 	gotPayload, err := v.keySet.VerifySignature(ctx, rawIDToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify signature: %v", err)
