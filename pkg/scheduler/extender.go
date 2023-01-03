@@ -44,6 +44,8 @@ type HTTPExtender struct {
 	preemptVerb      string
 	filterVerb       string
 	prioritizeVerb   string
+	preBindVerb      string
+	unreserveVerb    string
 	bindVerb         string
 	weight           int64
 	client           *http.Client
@@ -105,6 +107,8 @@ func NewHTTPExtender(config *schedulerapi.Extender) (framework.Extender, error) 
 		preemptVerb:      config.PreemptVerb,
 		filterVerb:       config.FilterVerb,
 		prioritizeVerb:   config.PrioritizeVerb,
+		preBindVerb:      config.PreBindVerb,
+		unreserveVerb:    config.UnreserveVerb,
 		bindVerb:         config.BindVerb,
 		weight:           config.Weight,
 		client:           client,
@@ -172,6 +176,18 @@ func (h *HTTPExtender) ProcessPreemption(
 	}
 	// Do not override <nodeNameToVictims>.
 	return newNodeNameToVictims, nil
+}
+
+// SupportsPreBind returns true if an extender supports prebind.
+// An extender should have prebind verb defined and enabled its own node cache.
+func (h *HTTPExtender) SupportsPreBind() bool {
+	return len(h.preBindVerb) > 0
+}
+
+// SupportsUnreserve returns true if an extender supports unreserve.
+// An extender should have unreserve verb defined and enabled its own node cache.
+func (h *HTTPExtender) SupportsUnreserve() bool {
+	return len(h.unreserveVerb) > 0
 }
 
 // convertToVictims converts "nodeNameToMetaVictims" from object identifiers,
@@ -380,6 +396,48 @@ func (h *HTTPExtender) Bind(binding *v1.Binding) error {
 // IsBinder returns whether this extender is configured for the Bind method.
 func (h *HTTPExtender) IsBinder() bool {
 	return h.bindVerb != ""
+}
+
+// PreBind delegates the action of preBinding a pod to a node to the extender.
+func (h *HTTPExtender) PreBind(binding *v1.Binding) error {
+	var result extenderv1.ExtenderBindingResult
+	if h.preBindVerb == "" {
+		return fmt.Errorf("Unexpected empty preBindVerb in extender")
+	}
+	req := &extenderv1.ExtenderBindingArgs{
+		PodName:      binding.Name,
+		PodNamespace: binding.Namespace,
+		PodUID:       binding.UID,
+		Node:         binding.Target.Name,
+	}
+	if err := h.send(h.preBindVerb, req, &result); err != nil {
+		return err
+	}
+	if result.Error != "" {
+		return fmt.Errorf(result.Error)
+	}
+	return nil
+}
+
+// Unreserve delegates the action of unreserving resources assinged to a pod by preBind action to the extender.
+func (h *HTTPExtender) Unreserve(binding *v1.Binding) error {
+	var result extenderv1.ExtenderBindingResult
+	if h.unreserveVerb == "" {
+		return fmt.Errorf("Unexpected empty unreserveVerb in extender")
+	}
+	req := &extenderv1.ExtenderBindingArgs{
+		PodName:      binding.Name,
+		PodNamespace: binding.Namespace,
+		PodUID:       binding.UID,
+		Node:         binding.Target.Name,
+	}
+	if err := h.send(h.unreserveVerb, req, &result); err != nil {
+		return err
+	}
+	if result.Error != "" {
+		return fmt.Errorf(result.Error)
+	}
+	return nil
 }
 
 // Helper function to send messages to the extender

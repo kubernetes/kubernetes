@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -244,8 +245,20 @@ func (sched *Scheduler) bindingCycle(
 		return status
 	}
 
+	// Call "prebind" extenders.
+	invokedExtenders, status := sched.extendersPreBinding(assumedPod, scheduleResult.SuggestedHost)
+	if !status.IsSuccess() {
+		return status
+	}
+
 	// Run "bind" plugins.
 	if status := sched.bind(ctx, fwk, assumedPod, scheduleResult.SuggestedHost, state); !status.IsSuccess() {
+		if len(invokedExtenders) > 0 {
+			err := sched.extendersUnreserving(assumedPod, scheduleResult.SuggestedHost, invokedExtenders)
+			if err != nil {
+				klog.ErrorS(err, "failed to do Unreserve")
+			}
+		}
 		return status
 	}
 
@@ -953,4 +966,60 @@ func updatePod(ctx context.Context, client clientset.Interface, pod *v1.Pod, con
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
 	return util.PatchPodStatus(ctx, client, pod, podStatusCopy)
+}
+
+// extendersPreBinding calls preBind action of extenders, and return
+// the successfully invoked extenders. On errors, the unreserve action
+// will be invoked of successful extenders.
+func (sched *Scheduler) extendersPreBinding(pod *v1.Pod, node string) ([]framework.Extender, *framework.Status) {
+	var invokedExtenders []framework.Extender
+	binding := &v1.Binding{
+		ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
+		Target:     v1.ObjectReference{Kind: "Node", Name: node},
+	}
+	for _, extender := range sched.Extenders {
+		if !extender.IsInterested(pod) || !extender.SupportsPreBind() {
+			continue
+		}
+
+		klog.V(4).InfoS("calling preBind action", "pod", klog.KObj(pod), "extender", extender.Name())
+		err := extender.PreBind(binding)
+		if err != nil {
+			errUnreserve := sched.extendersUnreserving(pod, node, invokedExtenders)
+			if errUnreserve != nil {
+				klog.ErrorS(errUnreserve, "failed to do Unreserve", "pod", klog.KObj(pod))
+			}
+			err = fmt.Errorf("error while calling preBind action of extender %s: %v", extender.Name(), err)
+			return nil, framework.AsStatus(err)
+		}
+
+		invokedExtenders = append(invokedExtenders, extender)
+	}
+
+	return invokedExtenders, nil
+}
+
+// extendersUnreserving calls the unreserve action of extenders in the reverse order
+// of invokedExtenders
+func (sched *Scheduler) extendersUnreserving(pod *v1.Pod, node string, invokedExtenders []framework.Extender) error {
+	var errs []error
+	binding := &v1.Binding{
+		ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
+		Target:     v1.ObjectReference{Kind: "Node", Name: node},
+	}
+	count := len(invokedExtenders)
+	for i := count - 1; i >= 0; i-- {
+		extender := invokedExtenders[i]
+		if !extender.IsInterested(pod) || !extender.SupportsUnreserve() {
+			continue
+		}
+
+		klog.V(4).InfoS("calling unreserve action", "pod", klog.KObj(pod), "extender", extender.Name())
+		err := extender.Unreserve(binding)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error while calling unreserve action of extender %s: %v", extender.Name(), err))
+		}
+	}
+
+	return errors.NewAggregate(errs)
 }

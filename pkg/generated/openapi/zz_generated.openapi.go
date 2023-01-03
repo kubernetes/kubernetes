@@ -53296,6 +53296,20 @@ func schema_k8sio_kube_scheduler_config_v1_Extender(ref common.ReferenceCallback
 							Format:      "int64",
 						},
 					},
+					"preBindVerb": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verb for the preBind call, empty if not supported. This verb is appended to the URLPrefix when issuing the preBind call to extender.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"unreserveVerb": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verb for the unreserve call, empty if not supported. This verb is appended to the URLPrefix when issuing the unreserve call to extender.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"bindVerb": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender. If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender can implement this function.",
@@ -54424,6 +54438,20 @@ func schema_k8sio_kube_scheduler_config_v1beta2_Extender(ref common.ReferenceCal
 							Format:      "int64",
 						},
 					},
+					"preBindVerb": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verb for the preBind call, empty if not supported. This verb is appended to the URLPrefix when issuing the preBind call to extender.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"unreserveVerb": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verb for the unreserve call, empty if not supported. This verb is appended to the URLPrefix when issuing the unreserve call to extender.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"bindVerb": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender. If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender can implement this function.",
@@ -55542,6 +55570,20 @@ func schema_k8sio_kube_scheduler_config_v1beta3_Extender(ref common.ReferenceCal
 							Description: "The numeric multiplier for the node scores that the prioritize call generates. The weight should be a positive integer",
 							Type:        []string{"integer"},
 							Format:      "int64",
+						},
+					},
+					"preBindVerb": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verb for the preBind call, empty if not supported. This verb is appended to the URLPrefix when issuing the preBind call to extender.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"unreserveVerb": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verb for the unreserve call, empty if not supported. This verb is appended to the URLPrefix when issuing the unreserve call to extender.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"bindVerb": {

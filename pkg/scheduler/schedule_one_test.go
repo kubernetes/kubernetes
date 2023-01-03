@@ -135,6 +135,22 @@ func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
 	return pod != nil && pod.Name == f.interestedPodName
 }
 
+func (f *fakeExtender) PreBind(binding *v1.Binding) error {
+	return nil
+}
+
+func (f *fakeExtender) Unreserve(binding *v1.Binding) error {
+	return nil
+}
+
+func (f *fakeExtender) SupportsPreBind() bool {
+	return false
+}
+
+func (f *fakeExtender) SupportsUnreserve() bool {
+	return false
+}
+
 type falseMapPlugin struct{}
 
 func newFalseMapPlugin() frameworkruntime.PluginFactory {

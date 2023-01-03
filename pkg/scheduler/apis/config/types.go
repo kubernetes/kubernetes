@@ -270,6 +270,10 @@ type Extender struct {
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
 	Weight int64
+	// Verb for the preBind call, empty if not supported. This verb is appended to the URLPrefix when issuing the preBind call to extender.
+	PreBindVerb string
+	// Verb for the unreserve call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	UnreserveVerb string
 	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.

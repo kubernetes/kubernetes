@@ -279,6 +279,8 @@ func autoConvert_v1beta2_Extender_To_config_Extender(in *v1beta2.Extender, out *
 	out.PreemptVerb = in.PreemptVerb
 	out.PrioritizeVerb = in.PrioritizeVerb
 	out.Weight = in.Weight
+	out.PreBindVerb = in.PreBindVerb
+	out.UnreserveVerb = in.UnreserveVerb
 	out.BindVerb = in.BindVerb
 	out.EnableHTTPS = in.EnableHTTPS
 	out.TLSConfig = (*config.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
@@ -300,6 +302,8 @@ func autoConvert_config_Extender_To_v1beta2_Extender(in *config.Extender, out *v
 	out.PreemptVerb = in.PreemptVerb
 	out.PrioritizeVerb = in.PrioritizeVerb
 	out.Weight = in.Weight
+	out.PreBindVerb = in.PreBindVerb
+	out.UnreserveVerb = in.UnreserveVerb
 	out.BindVerb = in.BindVerb
 	out.EnableHTTPS = in.EnableHTTPS
 	out.TLSConfig = (*v1beta2.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))

@@ -40,6 +40,12 @@ type Extender interface {
 	// the scores computed by Kubernetes scheduler. The total scores are used to do the host selection.
 	Prioritize(pod *v1.Pod, nodes []*v1.Node) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error)
 
+	// Prebind delegates the action of preBinding a pod to a node to the extender.
+	PreBind(binding *v1.Binding) error
+
+	// Unreserve delegates the action of unreserving resources assinged to a pod by preBind action to the extender.
+	Unreserve(binding *v1.Binding) error
+
 	// Bind delegates the action of binding a pod to a node to the extender.
 	Bind(binding *v1.Binding) error
 
@@ -69,4 +75,10 @@ type Extender interface {
 	// IsIgnorable returns true indicates scheduling should not fail when this extender
 	// is unavailable. This gives scheduler ability to fail fast and tolerate non-critical extenders as well.
 	IsIgnorable() bool
+
+	// SupportsPreBind returns if the scheduler extender support prebind or not.
+	SupportsPreBind() bool
+
+	// SupportsUnreserve returns if the scheduler extender support unreserve or not.
+	SupportsUnreserve() bool
 }

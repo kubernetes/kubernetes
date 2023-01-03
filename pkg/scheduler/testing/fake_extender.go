@@ -377,4 +377,26 @@ func (f *FakeExtender) IsInterested(pod *v1.Pod) bool {
 	return !f.UnInterested
 }
 
+// PreBind implements the extender PreBind function.
+func (f *FakeExtender) PreBind(binding *v1.Binding) error {
+	return nil
+}
+
+// Unreserve implements the extender Unreserve function.
+func (f *FakeExtender) Unreserve(binding *v1.Binding) error {
+	return nil
+}
+
+// SupportsPreBind returns true if an extender supports preBind.
+// An extender should have preBind verb defined and enabled its own node cache.
+func (h *FakeExtender) SupportsPreBind() bool {
+	return false
+}
+
+// SupportsUnreserve returns true if an extender supports unreserve.
+// An extender should have unreserve verb defined and enabled its own node cache.
+func (h *FakeExtender) SupportsUnreserve() bool {
+	return false
+}
+
 var _ framework.Extender = &FakeExtender{}
