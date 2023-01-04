@@ -125,6 +125,8 @@ function codegen::prerelease() {
         done
     fi
 
+    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+
     ./hack/run-in-gopath.sh "${gen_prerelease_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
