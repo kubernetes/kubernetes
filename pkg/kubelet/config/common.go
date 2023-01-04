@@ -20,11 +20,11 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"regexp"
 	"strings"
-        "io/ioutil"
-        "net/http"
-        "regexp"
-        "unsafe"
+	"unsafe"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +71,6 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 		}
 
 		if errReadSource != nil {
-			klog.Errorf("Generated UID", "pod", klog.KObj(pod), "source", source, "error", errReadSource.Error())
 			return errReadSource
 		}
 
