@@ -149,6 +149,8 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 		Addr:      s.config.Addr,
 		Handler:   s.handler,
 		TLSConfig: s.config.TLSConfig,
+		// TODO(fuweid): allow user to configure streaming server
+		ReadHeaderTimeout: 30 * time.Minute, // Fix linter G112: Potential Slowloris Attack because ReadHeaderTimeout is not configured in the http.Server
 	}
 
 	return s, nil

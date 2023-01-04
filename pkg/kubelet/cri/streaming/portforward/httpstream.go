@@ -51,7 +51,7 @@ func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 	}
 	defer conn.Close()
 
-	klog.V(5).InfoS("Connection setting port forwarding streaming connection idle timeout", "connection", conn, "idleTimeout", idleTimeout)
+	klog.V(5).InfoS("Connection setting port forwarding streaming connection idle timeout", "idleTimeout", idleTimeout)
 	conn.SetIdleTimeout(idleTimeout)
 
 	h := &httpStreamHandler{
@@ -63,7 +63,7 @@ func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 		uid:                   uid,
 		forwarder:             portForwarder,
 	}
-	h.run()
+	h.run(req.Context()) // TODO confirm this is correct
 
 	return nil
 }
@@ -122,11 +122,11 @@ func (h *httpStreamHandler) getStreamPair(requestID string) (*httpStreamPair, bo
 	defer h.streamPairsLock.Unlock()
 
 	if p, ok := h.streamPairs[requestID]; ok {
-		klog.V(5).InfoS("Connection request found existing stream pair", "connection", h.conn, "request", requestID)
+		klog.V(5).InfoS("Connection request found existing stream pair", "request", requestID)
 		return p, false
 	}
 
-	klog.V(5).InfoS("Connection request creating new stream pair", "connection", h.conn, "request", requestID)
+	klog.V(5).InfoS("Connection request creating new stream pair", "request", requestID)
 
 	p := newPortForwardPair(requestID)
 	h.streamPairs[requestID] = p
@@ -140,11 +140,11 @@ func (h *httpStreamHandler) getStreamPair(requestID string) (*httpStreamPair, bo
 func (h *httpStreamHandler) monitorStreamPair(p *httpStreamPair, timeout <-chan time.Time) {
 	select {
 	case <-timeout:
-		err := fmt.Errorf("(conn=%v, request=%s) timed out waiting for streams", h.conn, p.requestID)
+		err := fmt.Errorf("request %q timed out waiting for streams", p.requestID)
 		utilruntime.HandleError(err)
 		p.printError(err.Error())
 	case <-p.complete:
-		klog.V(5).InfoS("Connection request successfully received error and data streams", "connection", h.conn, "request", p.requestID)
+		klog.V(5).InfoS("Connection request successfully received error and data streams", "request", p.requestID)
 	}
 	h.removeStreamPair(p.requestID)
 }
@@ -175,7 +175,7 @@ func (h *httpStreamHandler) removeStreamPair(requestID string) {
 func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 	requestID := stream.Headers().Get(api.PortForwardRequestIDHeader)
 	if len(requestID) == 0 {
-		klog.V(5).InfoS("Connection stream received without requestID header", "connection", h.conn)
+		klog.V(5).InfoS("Connection stream received without requestID header")
 		// If we get here, it's because the connection came from an older client
 		// that isn't generating the request id header
 		// (https://github.com/kubernetes/kubernetes/blob/843134885e7e0b360eb5441e85b1410a8b1a7a0c/pkg/client/unversioned/portforward/portforward.go#L258-L287)
@@ -202,7 +202,7 @@ func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 			requestID = strconv.Itoa(int(stream.Identifier()) - 2)
 		}
 
-		klog.V(5).InfoS("Connection automatically assigning request ID from stream type and stream ID", "connection", h.conn, "request", requestID, "streamType", streamType, "stream", stream.Identifier())
+		klog.V(5).InfoS("Connection automatically assigning request ID from stream type and stream ID", "request", requestID, "streamType", streamType, "stream", stream.Identifier())
 	}
 	return requestID
 }
@@ -210,18 +210,18 @@ func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 // run is the main loop for the httpStreamHandler. It processes new
 // streams, invoking portForward for each complete stream pair. The loop exits
 // when the httpstream.Connection is closed.
-func (h *httpStreamHandler) run() {
-	klog.V(5).InfoS("Connection waiting for port forward streams", "connection", h.conn)
+func (h *httpStreamHandler) run(ctx context.Context) {
+	klog.V(5).InfoS("Connection waiting for port forward streams")
 Loop:
 	for {
 		select {
 		case <-h.conn.CloseChan():
-			klog.V(5).InfoS("Connection upgraded connection closed", "connection", h.conn)
+			klog.V(5).InfoS("Connection upgraded connection closed")
 			break Loop
 		case stream := <-h.streamChan:
 			requestID := h.requestID(stream)
 			streamType := stream.Headers().Get(api.StreamType)
-			klog.V(5).InfoS("Connection request received new type of stream", "connection", h.conn, "request", requestID, "streamType", streamType)
+			klog.V(5).InfoS("Connection request received new type of stream", "request", requestID, "streamType", streamType)
 
 			p, created := h.getStreamPair(requestID)
 			if created {
@@ -232,7 +232,7 @@ Loop:
 				utilruntime.HandleError(errors.New(msg))
 				p.printError(msg)
 			} else if complete {
-				go h.portForward(p)
+				go h.portForward(ctx, p)
 			}
 		}
 	}
@@ -240,17 +240,16 @@ Loop:
 
 // portForward invokes the httpStreamHandler's forwarder.PortForward
 // function for the given stream pair.
-func (h *httpStreamHandler) portForward(p *httpStreamPair) {
-	ctx := context.Background()
+func (h *httpStreamHandler) portForward(ctx context.Context, p *httpStreamPair) {
 	defer p.dataStream.Close()
 	defer p.errorStream.Close()
 
 	portString := p.dataStream.Headers().Get(api.PortHeader)
 	port, _ := strconv.ParseInt(portString, 10, 32)
 
-	klog.V(5).InfoS("Connection request invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
+	klog.V(5).InfoS("Connection request invoking forwarder.PortForward for port", "request", p.requestID, "port", portString)
 	err := h.forwarder.PortForward(ctx, h.pod, h.uid, int32(port), p.dataStream)
-	klog.V(5).InfoS("Connection request done invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
+	klog.V(5).InfoS("Connection request done invoking forwarder.PortForward for port", "request", p.requestID, "port", portString)
 
 	if err != nil {
 		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
