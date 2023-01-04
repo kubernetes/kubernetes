@@ -48,12 +48,19 @@ type ImpersonateTokenSource struct {
 	// Each service account must be granted roles/iam.serviceAccountTokenCreator
 	// on the next service account in the chain. Optional.
 	Delegates []string
+	// TokenLifetimeSeconds is the number of seconds the impersonation token will
+	// be valid for.
+	TokenLifetimeSeconds int
 }
 
 // Token performs the exchange to get a temporary service account token to allow access to GCP.
 func (its ImpersonateTokenSource) Token() (*oauth2.Token, error) {
+	lifetimeString := "3600s"
+	if its.TokenLifetimeSeconds != 0 {
+		lifetimeString = fmt.Sprintf("%ds", its.TokenLifetimeSeconds)
+	}
 	reqBody := generateAccessTokenReq{
-		Lifetime:  "3600s",
+		Lifetime:  lifetimeString,
 		Scope:     its.Scopes,
 		Delegates: its.Delegates,
 	}
