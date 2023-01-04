@@ -134,6 +134,78 @@ func TestSyncServiceNoSelector(t *testing.T) {
 	assert.Len(t, client.Actions(), 0)
 }
 
+func TestServiceExternalNameTypeSync(t *testing.T) {
+	serviceName := "testing-1"
+	namespace := metav1.NamespaceDefault
+
+	testCases := []struct {
+		desc    string
+		service *v1.Service
+	}{
+		{
+			desc: "External name with selector and ports should not receive endpoint slices",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace},
+				Spec: v1.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Ports:    []v1.ServicePort{{Port: 80}},
+					Type:     v1.ServiceTypeExternalName,
+				},
+			},
+		},
+		{
+			desc: "External name with ports should not receive endpoint slices",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{Port: 80}},
+					Type:  v1.ServiceTypeExternalName,
+				},
+			},
+		},
+		{
+			desc: "External name with selector should not receive endpoint slices",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace},
+				Spec: v1.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Type:     v1.ServiceTypeExternalName,
+				},
+			},
+		},
+		{
+			desc: "External name without selector and ports should not receive endpoint slices",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeExternalName,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			client, esController := newController([]string{"node-1"}, time.Duration(0))
+
+			pod := newPod(1, namespace, true, 0, false)
+			err := esController.podStore.Add(pod)
+			assert.NoError(t, err)
+
+			err = esController.serviceStore.Add(tc.service)
+			assert.NoError(t, err)
+
+			err = esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
+			assert.NoError(t, err)
+			assert.Len(t, client.Actions(), 0)
+
+			sliceList, err := client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{})
+			assert.NoError(t, err)
+			assert.Len(t, sliceList.Items, 0, "Expected 0 endpoint slices")
+		})
+	}
+}
+
 // Ensure SyncService for service with pending deletion results in no action
 func TestSyncServicePendingDeletion(t *testing.T) {
 	ns := metav1.NamespaceDefault
