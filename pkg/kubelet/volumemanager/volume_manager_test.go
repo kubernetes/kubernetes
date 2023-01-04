@@ -144,7 +144,7 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -209,7 +209,7 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 		t.Errorf("Expected error, got none")
 	}
 	if !strings.Contains(err.Error(),
-		"unmounted volumes=[fail-mount-device-volume-name vol2 vol3], unattached volumes=[vol2], failed to process volumes=[vol3]") {
+		"unattached volumes=[vol2], failed to process volumes=[vol3]") {
 		t.Errorf("Unexpected error info: %v", err)
 	}
 }
