@@ -88,8 +88,6 @@ func (p *v1PodResourcesServer) GetAllocatableResources(ctx context.Context, req 
 		return nil, fmt.Errorf("Pod Resources API GetAllocatableResources disabled")
 	}
 
-	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
-
 	return &v1.AllocatableResourcesResponse{
 		Devices: p.devicesProvider.GetAllocatableDevices(),
 		CpuIds:  p.cpusProvider.GetAllocatableCPUs(),
