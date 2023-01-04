@@ -138,7 +138,6 @@ type NodeConfig struct {
 	SystemCgroupsName     string
 	KubeletCgroupsName    string
 	KubeletOOMScoreAdj    int32
-	ContainerRuntime      string
 	CgroupsPerQOS         bool
 	CgroupRoot            string
 	CgroupDriver          string
