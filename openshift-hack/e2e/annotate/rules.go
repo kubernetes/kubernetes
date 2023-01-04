@@ -113,6 +113,10 @@ var (
 
 			`Topology Hints should distribute endpoints evenly`,
 		},
+		// tests that need to be temporarily disabled while the rebase is in progress
+		"[Disabled:RebaseInProgress]": {
+			`Kubectl client Kubectl events should show event when pod is created`, // TODO: needs oc with 1.26 kubectl
+		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
 			`\[Driver: rbd\]`,           // OpenShift 4.x does not support Ceph RBD (use CSI instead)
