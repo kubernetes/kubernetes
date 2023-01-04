@@ -69,7 +69,7 @@ func TestPodAndPodDesc(t *testing.T) {
 	testCases := []struct {
 		caseName      string
 		podName       string
-		podNamesapce  string
+		podNamespace  string
 		podUID        types.UID
 		expectedValue string
 	}{
@@ -78,7 +78,7 @@ func TestPodAndPodDesc(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		realPodDesc := PodDesc(testCase.podName, testCase.podNamesapce, testCase.podUID)
+		realPodDesc := PodDesc(testCase.podName, testCase.podNamespace, testCase.podUID)
 		assert.Equalf(t, testCase.expectedValue, realPodDesc, "Failed to test: %s", testCase.caseName)
 	}
 }
@@ -89,19 +89,19 @@ func TestPodWithDeletionTimestamp(t *testing.T) {
 	testCases := []struct {
 		caseName               string
 		isPodNil               bool
-		isdeletionTimestampNil bool
+		isDeletionTimestampNil bool
 		deletionTimestamp      metav1.Time
 		expectedValue          string
 	}{
-		{"timestamp_is_nil_case", false, true, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75)"},
-		{"timestamp_is_normal_case", false, false, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75):DeletionTimestamp=2017-09-26T14:37:50Z"},
+		{"deletion_timestamp_is_nil_case", false, true, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75)"},
+		{"deletion_timestamp_is_normal_case", false, false, normalDeletionTime, "test-pod_default(551f5a43-9f2f-11e7-a589-fa163e148d75):DeletionTimestamp=2017-09-26T14:37:50Z"},
 		{"pod_is_nil_case", true, false, normalDeletionTime, "<nil>"},
 	}
 
 	for _, testCase := range testCases {
 		fakePod := fakeCreatePodWithDeletionTimestamp("test-pod", metav1.NamespaceDefault, "551f5a43-9f2f-11e7-a589-fa163e148d75", &testCase.deletionTimestamp)
 
-		if testCase.isdeletionTimestampNil {
+		if testCase.isDeletionTimestampNil {
 			fakePod.SetDeletionTimestamp(nil)
 		}
 		if testCase.isPodNil {
