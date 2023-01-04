@@ -18,7 +18,7 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/vmware/govmomi v0.20.3
 	golang.org/x/crypto v0.1.0
-	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
+	golang.org/x/oauth2 v0.3.0
 	google.golang.org/api v0.60.0
 	gopkg.in/gcfg.v1 v1.2.0
 	k8s.io/api v0.0.0
