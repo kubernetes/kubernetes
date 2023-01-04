@@ -63,8 +63,6 @@ func completeTest(ctx context.Context, f *framework.Framework, c clientset.Inter
 //
 //	next pod. Adding concurrency is a TODO item.
 func completeMultiTest(ctx context.Context, f *framework.Framework, c clientset.Interface, ns string, pvols e2epv.PVMap, claims e2epv.PVCMap, expectPhase v1.PersistentVolumePhase) error {
-	var err error
-
 	// 1. verify each PV permits write access to a client pod
 	ginkgo.By("Checking pod has write access to PersistentVolumes")
 	for pvcKey := range claims {
@@ -88,10 +86,7 @@ func completeMultiTest(ctx context.Context, f *framework.Framework, c clientset.
 
 	// 2. delete each PVC, wait for its bound PV to reach `expectedPhase`
 	ginkgo.By("Deleting PVCs to invoke reclaim policy")
-	if err = e2epv.DeletePVCandValidatePVGroup(ctx, c, f.Timeouts, ns, pvols, claims, expectPhase); err != nil {
-		return err
-	}
-	return nil
+	return e2epv.DeletePVCandValidatePVGroup(ctx, c, f.Timeouts, ns, pvols, claims, expectPhase)
 }
 
 var _ = utils.SIGDescribe("PersistentVolumes", func() {

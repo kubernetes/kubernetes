@@ -208,13 +208,8 @@ func (o *SetResourcesOptions) Validate() error {
 	if len(o.Limits) == 0 && len(o.Requests) == 0 {
 		return fmt.Errorf("you must specify an update to requests or limits (in the form of --requests/--limits)")
 	}
-
 	o.ResourceRequirements, err = generateversioned.HandleResourceRequirementsV1(map[string]string{"limits": o.Limits, "requests": o.Requests})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Run performs the execution of 'set resources' sub command

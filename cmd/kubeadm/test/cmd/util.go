@@ -53,10 +53,7 @@ func RunCmd(command string, args ...string) (string, string, int, error) {
 func RunSubCommand(t *testing.T, subCmds []*cobra.Command, command string, args ...string) error {
 	subCmd := getSubCommand(t, subCmds, command)
 	subCmd.SetArgs(args)
-	if err := subCmd.Execute(); err != nil {
-		return err
-	}
-	return nil
+	return subCmd.Execute()
 }
 
 func getSubCommand(t *testing.T, subCmds []*cobra.Command, name string) *cobra.Command {

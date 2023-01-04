@@ -45,10 +45,7 @@ func (n *CAdvisorE2ERemote) SetupTestPackage(tardir, systemSpecName string) erro
 		return err
 	}
 	// transfer the entire directory to each node
-	if err := runCommand("cp", "-R", cadvisorRootDir, fmt.Sprintf("%s/", tardir)); err != nil {
-		return err
-	}
-	return nil
+	return runCommand("cp", "-R", cadvisorRootDir, fmt.Sprintf("%s/", tardir))
 }
 
 func runCommand(command string, args ...string) error {

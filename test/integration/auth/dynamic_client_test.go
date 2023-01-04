@@ -110,10 +110,6 @@ func testClientBuilder(dymClient clientset.Interface, ns, saName string) error {
 	if err != nil {
 		return err
 	}
-
 	_, err = dymClient.CoreV1().ServiceAccounts(ns).Get(context.TODO(), saName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

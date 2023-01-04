@@ -1555,12 +1555,7 @@ func ScheduleGpuPod(ctx context.Context, f *framework.Framework, id string, gpuT
 	if gpuType != "" {
 		config.NodeSelector = map[string]string{gpuLabel: gpuType}
 	}
-
-	err := e2erc.RunRC(ctx, *config)
-	if err != nil {
-		return err
-	}
-	return nil
+	return e2erc.RunRC(ctx, *config)
 }
 
 // Create an RC running a given number of pods with anti-affinity
@@ -1580,10 +1575,7 @@ func runAntiAffinityPods(ctx context.Context, f *framework.Framework, namespace 
 		return err
 	}
 	_, err = f.ClientSet.CoreV1().ReplicationControllers(namespace).Get(ctx, id, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func runVolumeAntiAffinityPods(ctx context.Context, f *framework.Framework, namespace string, pods int, id string, podLabels, antiAffinityLabels map[string]string, volumes []v1.Volume) error {
@@ -1603,10 +1595,7 @@ func runVolumeAntiAffinityPods(ctx context.Context, f *framework.Framework, name
 		return err
 	}
 	_, err = f.ClientSet.CoreV1().ReplicationControllers(namespace).Get(ctx, id, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 var emptyDirVolumes = []v1.Volume{

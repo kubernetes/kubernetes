@@ -781,12 +781,7 @@ func updateKernelArguments(instance *compute.Instance, image string, kernelArgs 
 		klog.Errorf("failed to run command %s: out: %s, err: %v", cmd, out, err)
 		return err
 	}
-
-	if err := rebootInstance(instance); err != nil {
-		return err
-	}
-
-	return nil
+	return rebootInstance(instance)
 }
 
 func rebootInstance(instance *compute.Instance) error {

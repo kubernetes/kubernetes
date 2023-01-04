@@ -408,13 +408,8 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-
 	o.Mapper, err = f.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Run executes a create subcommand using the specified options

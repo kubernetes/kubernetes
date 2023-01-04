@@ -227,11 +227,7 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	// Warning printer
 	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
 	o.applier, err = NewProfileApplier(o.Profile)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate checks that the provided debug options are specified.

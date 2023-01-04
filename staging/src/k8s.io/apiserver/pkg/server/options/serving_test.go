@@ -406,12 +406,7 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 	}
 
 	os.MkdirAll(filepath.Dir(keyFileName), os.FileMode(0755))
-	err = ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0755))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ioutil.WriteFile(keyFileName, keyPem, os.FileMode(0755))
 }
 
 func caCertFromBundle(bundlePath string) (*x509.Certificate, error) {

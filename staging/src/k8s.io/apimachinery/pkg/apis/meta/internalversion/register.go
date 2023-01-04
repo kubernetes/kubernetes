@@ -75,10 +75,7 @@ func addToGroupVersion(scheme *runtime.Scheme) error {
 		&metav1.UpdateOptions{})
 
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
-	if err := metav1beta1.RegisterConversions(scheme); err != nil {
-		return err
-	}
-	return nil
+	return metav1beta1.RegisterConversions(scheme)
 }
 
 // Unlike other API groups, meta internal knows about all meta external versions, but keeps

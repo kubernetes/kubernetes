@@ -30,10 +30,7 @@ import (
 // Convert_apps_DeploymentSpec_To_v1_DeploymentSpec is defined here, because public
 // conversion is not auto-generated due to existing warnings.
 func Convert_apps_DeploymentSpec_To_v1_DeploymentSpec(in *apps.DeploymentSpec, out *appsv1.DeploymentSpec, s conversion.Scope) error {
-	if err := autoConvert_apps_DeploymentSpec_To_v1_DeploymentSpec(in, out, s); err != nil {
-		return err
-	}
-	return nil
+	return autoConvert_apps_DeploymentSpec_To_v1_DeploymentSpec(in, out, s)
 }
 
 func Convert_v1_Deployment_To_apps_Deployment(in *appsv1.Deployment, out *apps.Deployment, s conversion.Scope) error {
@@ -93,10 +90,7 @@ func Convert_apps_DaemonSet_To_v1_DaemonSet(in *apps.DaemonSet, out *appsv1.Daem
 // Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec is defined here, because public
 // conversion is not auto-generated due to existing warnings.
 func Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out *appsv1.DaemonSetSpec, s conversion.Scope) error {
-	if err := autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in, out, s); err != nil {
-		return err
-	}
-	return nil
+	return autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in, out, s)
 }
 
 func Convert_v1_DaemonSet_To_apps_DaemonSet(in *appsv1.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {

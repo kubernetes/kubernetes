@@ -167,11 +167,7 @@ func (c *Controller) syncConfigMap() error {
 	if err := createNamespaceIfNeeded(c.namespaceClient, authConfigMap.Namespace); err != nil {
 		return err
 	}
-	if err := writeConfigMap(c.configMapClient, authConfigMap); err != nil {
-		return err
-	}
-
-	return nil
+	return writeConfigMap(c.configMapClient, authConfigMap)
 }
 
 func createNamespaceIfNeeded(nsClient corev1client.NamespacesGetter, ns string) error {

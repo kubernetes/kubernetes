@@ -940,11 +940,7 @@ func (dsc *DaemonSetsController) manage(ctx context.Context, ds *apps.DaemonSet,
 	podsToDelete = append(podsToDelete, getUnscheduledPodsWithoutNode(nodeList, nodeToDaemonPods)...)
 
 	// Label new pods using the hash label value of the current history when creating them
-	if err = dsc.syncNodes(ctx, ds, podsToDelete, nodesNeedingDaemonPods, hash); err != nil {
-		return err
-	}
-
-	return nil
+	return dsc.syncNodes(ctx, ds, podsToDelete, nodesNeedingDaemonPods, hash)
 }
 
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes

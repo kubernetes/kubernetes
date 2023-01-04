@@ -1118,10 +1118,7 @@ func (g *Cloud) deleteWrongNetworkTieredResources(lbName, lbRef string, desiredN
 	if err := deleteFWDRuleWithWrongTier(g, g.region, lbName, logPrefix, desiredNetTier); err != nil {
 		return err
 	}
-	if err := deleteAddressWithWrongTier(g, g.region, lbName, logPrefix, desiredNetTier); err != nil {
-		return err
-	}
-	return nil
+	return deleteAddressWithWrongTier(g, g.region, lbName, logPrefix, desiredNetTier)
 }
 
 // deleteFWDRuleWithWrongTier checks the network tier of existing forwarding

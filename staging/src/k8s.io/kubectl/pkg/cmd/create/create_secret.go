@@ -197,13 +197,8 @@ func (o *CreateSecretOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
 	}
-
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate checks if CreateSecretOptions has sufficient value to run

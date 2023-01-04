@@ -92,10 +92,8 @@ func (o unsetOptions) run(out io.Writer) error {
 	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(out, "Property %q unset.\n", o.propertyName); err != nil {
-		return err
-	}
-	return nil
+	_, err = fmt.Fprintf(out, "Property %q unset.\n", o.propertyName)
+	return err
 }
 
 func (o *unsetOptions) complete(cmd *cobra.Command, args []string) error {

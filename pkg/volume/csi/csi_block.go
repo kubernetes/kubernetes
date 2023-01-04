@@ -493,11 +493,7 @@ func (m *csiBlockMapper) cleanupOrphanDeviceFiles() error {
 	// At this point it contains only "data/vol_data.json" and empty "dev/".
 	volumeDir := getVolumePluginDir(m.specName, m.plugin.host)
 	mounter := m.plugin.host.GetMounter(m.plugin.GetPluginName())
-	if err := removeall.RemoveAllOneFilesystem(mounter, volumeDir); err != nil {
-		return err
-	}
-
-	return nil
+	return removeall.RemoveAllOneFilesystem(mounter, volumeDir)
 }
 
 // UnmapPodDevice unmaps the block device path.

@@ -486,10 +486,7 @@ func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGr
 
 	var mounterArgs volume.MounterArgs
 	mounterArgs.FsGroup = &fsGroup
-	if err := mounter.SetUp(mounterArgs); err != nil {
-		return err
-	}
-	return nil
+	return mounter.SetUp(mounterArgs)
 }
 
 func TestConstructVolumeSpec(t *testing.T) {

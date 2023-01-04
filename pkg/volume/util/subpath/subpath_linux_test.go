@@ -1407,10 +1407,7 @@ func validateDirEmpty(dir string) error {
 
 func validateDirExists(dir string) error {
 	_, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func validateDirNotExists(dir string) error {
@@ -1425,8 +1422,6 @@ func validateDirNotExists(dir string) error {
 }
 
 func validateFileExists(file string) error {
-	if _, err := os.Stat(file); err != nil {
-		return err
-	}
-	return nil
+	_, err := os.Stat(file)
+	return err
 }

@@ -317,10 +317,7 @@ func StopServeHostnameService(ctx context.Context, clientset clientset.Interface
 	if err := e2erc.DeleteRCAndWaitForGC(ctx, clientset, ns, name); err != nil {
 		return err
 	}
-	if err := clientset.CoreV1().Services(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
-		return err
-	}
-	return nil
+	return clientset.CoreV1().Services(ns).Delete(ctx, name, metav1.DeleteOptions{})
 }
 
 // verifyServeHostnameServiceUp wgets the given serviceIP:servicePort from the

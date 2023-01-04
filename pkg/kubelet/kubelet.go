@@ -2586,12 +2586,7 @@ func (kl *Kubelet) CheckpointContainer(
 	)
 
 	options.ContainerId = string(container.ID.ID)
-
-	if err := kl.containerRuntime.CheckpointContainer(ctx, options); err != nil {
-		return err
-	}
-
-	return nil
+	return kl.containerRuntime.CheckpointContainer(ctx, options)
 }
 
 // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.

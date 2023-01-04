@@ -488,10 +488,8 @@ func addReferencedServiceAccountToken(c clientset.Interface, ns string, name str
 		Name:            secret.Name,
 		ResourceVersion: secret.ResourceVersion,
 	})
-	if _, err = c.CoreV1().ServiceAccounts(ns).Update(context.TODO(), sa, metav1.UpdateOptions{}); err != nil {
-		return err
-	}
-	return nil
+	_, err = c.CoreV1().ServiceAccounts(ns).Update(context.TODO(), sa, metav1.UpdateOptions{})
+	return err
 }
 
 type testOperation func() error

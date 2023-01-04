@@ -101,10 +101,8 @@ func checkPublicGCR() error {
 	if len(output) == 0 {
 		return fmt.Errorf("failed to pull %s", image)
 	}
-	if _, err := runCommand("docker", "rmi", "-f", image); err != nil {
-		return err
-	}
-	return nil
+	_, err = runCommand("docker", "rmi", "-f", image)
+	return err
 }
 
 var _ = SIGDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][NodeFeature:GKEEnv]", func() {

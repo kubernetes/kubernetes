@@ -1585,11 +1585,8 @@ func createV1beta1ValidationWebhook(etcdClient *clientv3.Client, etcdStoragePref
 	}
 
 	// make sure we can get the webhook
-	if _, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.TODO(), webhookConfig.Name, metav1.GetOptions{}); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.TODO(), webhookConfig.Name, metav1.GetOptions{})
+	return err
 }
 
 func createV1beta1MutationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix string, client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionregistrationv1beta1.RuleWithOperations) error {
@@ -1638,11 +1635,8 @@ func createV1beta1MutationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix
 	}
 
 	// make sure we can get the webhook
-	if _, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.TODO(), webhookConfig.Name, metav1.GetOptions{}); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.TODO(), webhookConfig.Name, metav1.GetOptions{})
+	return err
 }
 
 func createV1ValidationWebhook(client clientset.Interface, endpoint, convertedEndpoint string, convertedRules []admissionregistrationv1.RuleWithOperations) error {

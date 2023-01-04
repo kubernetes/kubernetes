@@ -59,12 +59,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubea
 	if err != nil {
 		return err
 	}
-
-	if err := printOrCreateKubeProxyObjects(cmByte, dsByte, client, out, printManifest); err != nil {
-		return err
-	}
-
-	return nil
+	return printOrCreateKubeProxyObjects(cmByte, dsByte, client, out, printManifest)
 }
 
 // Create SA, RBACRules or print manifests of them to out if printManifest is true

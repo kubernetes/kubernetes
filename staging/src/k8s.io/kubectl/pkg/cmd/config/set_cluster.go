@@ -115,12 +115,7 @@ func (o setClusterOptions) run() error {
 	}
 	cluster := o.modifyCluster(*startingStanza)
 	config.Clusters[o.name] = &cluster
-
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
-		return err
-	}
-
-	return nil
+	return clientcmd.ModifyConfig(o.configAccess, *config, true)
 }
 
 func (o *setClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluster) clientcmdapi.Cluster {

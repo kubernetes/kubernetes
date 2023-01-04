@@ -136,13 +136,8 @@ func (a *acrProvider) loadConfig(rdr io.Reader) error {
 	if err != nil {
 		klog.Errorf("Failed to load azure credential file: %v", err)
 	}
-
 	a.environment, err = auth.ParseAzureEnvironment(a.config.Cloud, a.config.ResourceManagerEndpoint, a.config.IdentitySystem)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (a *acrProvider) Enabled() bool {

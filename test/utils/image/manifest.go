@@ -114,10 +114,7 @@ func readFromURL(url string, writer io.Writer) error {
 		return fmt.Errorf("%v returned %d", url, r.StatusCode)
 	}
 	_, err = io.Copy(writer, r.Body)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 var (

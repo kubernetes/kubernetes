@@ -515,10 +515,7 @@ func createKubeConfigAndCSR(kubeConfigDir string, kubeadmConfig *kubeadmapi.Init
 		return err
 	}
 	// Write CSR to disk
-	if err := pkiutil.WriteCSR(kubeConfigDir, name, clientCSR); err != nil {
-		return err
-	}
-	return nil
+	return pkiutil.WriteCSR(kubeConfigDir, name, clientCSR)
 }
 
 // CreateDefaultKubeConfigsAndCSRFiles is used in ExternalCA mode to create

@@ -398,10 +398,8 @@ func (r *RuntimeSorter) Sort() error {
 	// if not dealing with a Table response from the server, assume
 	// all objects are runtime.Object as usual, and sort using old method.
 	var err error
-	if r.positioner, err = SortObjects(r.decoder, r.objects, r.field); err != nil {
-		return err
-	}
-	return nil
+	r.positioner, err = SortObjects(r.decoder, r.objects, r.field)
+	return err
 }
 
 // OriginalPosition returns the original position of a runtime object

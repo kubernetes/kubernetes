@@ -128,20 +128,12 @@ func (fake *fakeDiskManager) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 func (fake *fakeDiskManager) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	globalPath := c.manager.MakeGlobalPDName(*c.iscsiDisk)
-	err := os.RemoveAll(globalPath)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(globalPath)
 }
 
 func (fake *fakeDiskManager) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mntPath string) error {
 	globalPath := c.manager.MakeGlobalVDPDName(*c.iscsiDisk)
-	err := os.RemoveAll(globalPath)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(globalPath)
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec) {

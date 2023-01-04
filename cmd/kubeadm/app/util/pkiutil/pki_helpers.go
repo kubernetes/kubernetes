@@ -724,10 +724,6 @@ func VerifyCertChain(cert *x509.Certificate, intermediates []*x509.Certificate, 
 		Intermediates: intermediatePool,
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	}
-
-	if _, err := cert.Verify(verifyOptions); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := cert.Verify(verifyOptions)
+	return err
 }

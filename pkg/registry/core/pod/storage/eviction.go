@@ -420,11 +420,8 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	// If the pod is not deleted within a reasonable time limit PDB controller will assume that it won't
 	// be deleted at all and remove it from DisruptedPod map.
 	pdb.Status.DisruptedPods[podName] = metav1.Time{Time: time.Now()}
-	if _, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).UpdateStatus(context.TODO(), &pdb, metav1.UpdateOptions{}); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).UpdateStatus(context.TODO(), &pdb, metav1.UpdateOptions{})
+	return err
 }
 
 // getPodDisruptionBudgets returns any PDBs that match the pod or err if there's an error.

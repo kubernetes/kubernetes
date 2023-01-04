@@ -204,13 +204,8 @@ func (o *ReplaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.Schema = schema
 	o.Builder = f.NewBuilder
 	o.BuilderArgs = args
-
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (o *ReplaceOptions) Validate() error {

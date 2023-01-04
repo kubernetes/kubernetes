@@ -41,37 +41,25 @@ import (
 func addMasterReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Adding a new master replica, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "true", "false")
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func removeMasterReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Removing an existing master replica, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "false", "false")
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func addWorkerNodes(zone string) error {
 	framework.Logf(fmt.Sprintf("Adding worker nodes, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "false", "true")
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func removeWorkerNodes(zone string) error {
 	framework.Logf(fmt.Sprintf("Removing worker nodes, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "true", "true")
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func verifyRCs(ctx context.Context, c clientset.Interface, ns string, names []string) {

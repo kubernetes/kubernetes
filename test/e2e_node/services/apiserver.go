@@ -109,12 +109,7 @@ func (a *APIServer) Start() error {
 			return
 		}
 	}()
-
-	err = readinessCheck("apiserver", []string{getAPIServerHealthCheckURL()}, errCh)
-	if err != nil {
-		return err
-	}
-	return nil
+	return readinessCheck("apiserver", []string{getAPIServerHealthCheckURL()}, errCh)
 }
 
 // Stop stops the apiserver. Currently, there is no way to stop the apiserver.

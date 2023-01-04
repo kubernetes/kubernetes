@@ -398,10 +398,7 @@ func IssueSSHCommandWithResult(ctx context.Context, cmd, provider string, node *
 // IssueSSHCommand tries to execute a SSH command
 func IssueSSHCommand(ctx context.Context, cmd, provider string, node *v1.Node) error {
 	_, err := IssueSSHCommandWithResult(ctx, cmd, provider, node)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // nodeAddresses returns the first address of the given type of each node.

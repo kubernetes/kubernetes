@@ -4844,13 +4844,7 @@ func (c *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, serv
 	if err != nil {
 		return nil
 	}
-
-	err = c.updateInstanceSecurityGroupsForLoadBalancer(lb, instances, service.Annotations)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.updateInstanceSecurityGroupsForLoadBalancer(lb, instances, service.Annotations)
 }
 
 // Returns the instance with the specified ID

@@ -173,10 +173,7 @@ func runGenCSR(out io.Writer, config *genCSRConfig) error {
 	if err := certsphase.CreateDefaultKeysAndCSRFiles(out, config.kubeadmConfig); err != nil {
 		return err
 	}
-	if err := kubeconfigphase.CreateDefaultKubeConfigsAndCSRFiles(out, config.kubeConfigDir, config.kubeadmConfig); err != nil {
-		return err
-	}
-	return nil
+	return kubeconfigphase.CreateDefaultKubeConfigsAndCSRFiles(out, config.kubeConfigDir, config.kubeadmConfig)
 }
 
 // newCmdCertificateKey returns cobra.Command for certificate key generate

@@ -27,10 +27,7 @@ func convertEmbeddedTestToEmbeddedTestExternal(in *EmbeddedTest, out *EmbeddedTe
 	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Object, &out.Object, s); err != nil {
 		return err
 	}
-	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.EmptyObject, &out.EmptyObject, s); err != nil {
-		return err
-	}
-	return nil
+	return runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.EmptyObject, &out.EmptyObject, s)
 }
 
 func convertEmbeddedTestExternalToEmbeddedTest(in *EmbeddedTestExternal, out *EmbeddedTest, s conversion.Scope) error {
@@ -39,10 +36,7 @@ func convertEmbeddedTestExternalToEmbeddedTest(in *EmbeddedTestExternal, out *Em
 	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Object, &out.Object, s); err != nil {
 		return err
 	}
-	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.EmptyObject, &out.EmptyObject, s); err != nil {
-		return err
-	}
-	return nil
+	return runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.EmptyObject, &out.EmptyObject, s)
 }
 
 func convertObjectTestToObjectTestExternal(in *ObjectTest, out *ObjectTestExternal, s conversion.Scope) error {
@@ -91,34 +85,22 @@ func convertExternalSimpleToInternalSimple(in *ExternalSimple, out *InternalSimp
 
 func convertInternalExtensionTypeToExternalExtensionType(in *InternalExtensionType, out *ExternalExtensionType, s conversion.Scope) error {
 	out.TypeMeta = in.TypeMeta
-	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Extension, &out.Extension, s); err != nil {
-		return err
-	}
-	return nil
+	return runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Extension, &out.Extension, s)
 }
 
 func convertExternalExtensionTypeToInternalExtensionType(in *ExternalExtensionType, out *InternalExtensionType, s conversion.Scope) error {
 	out.TypeMeta = in.TypeMeta
-	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Extension, &out.Extension, s); err != nil {
-		return err
-	}
-	return nil
+	return runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Extension, &out.Extension, s)
 }
 
 func convertInternalOptionalExtensionTypeToExternalOptionalExtensionType(in *InternalOptionalExtensionType, out *ExternalOptionalExtensionType, s conversion.Scope) error {
 	out.TypeMeta = in.TypeMeta
-	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Extension, &out.Extension, s); err != nil {
-		return err
-	}
-	return nil
+	return runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Extension, &out.Extension, s)
 }
 
 func convertExternalOptionalExtensionTypeToInternalOptionalExtensionType(in *ExternalOptionalExtensionType, out *InternalOptionalExtensionType, s conversion.Scope) error {
 	out.TypeMeta = in.TypeMeta
-	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Extension, &out.Extension, s); err != nil {
-		return err
-	}
-	return nil
+	return runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Extension, &out.Extension, s)
 }
 
 func convertTestType1ToExternalTestType1(in *TestType1, out *ExternalTestType1, s conversion.Scope) error {

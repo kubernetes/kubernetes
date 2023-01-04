@@ -277,11 +277,7 @@ func (c *NamingConditionController) sync(key string) error {
 
 	// we updated our status, so we may be releasing a name.  When this happens, we need to rekick everything in our group
 	// if we fail to rekick, just return as normal.  We'll get everything on a resync
-	if err := c.requeueAllOtherGroupCRDs(key); err != nil {
-		return err
-	}
-
-	return nil
+	return c.requeueAllOtherGroupCRDs(key)
 }
 
 func (c *NamingConditionController) Run(stopCh <-chan struct{}) {

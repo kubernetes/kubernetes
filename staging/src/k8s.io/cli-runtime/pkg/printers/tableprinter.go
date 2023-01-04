@@ -85,10 +85,8 @@ func NewTablePrinter(options PrintOptions) ResourcePrinter {
 }
 
 func printHeader(columnNames []string, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
-		return err
-	}
-	return nil
+	_, err := fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t"))
+	return err
 }
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.

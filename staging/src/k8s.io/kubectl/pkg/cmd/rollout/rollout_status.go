@@ -133,13 +133,8 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 
 	o.BuilderArgs = args
 	o.StatusViewerFn = polymorphichelpers.StatusViewerFn
-
 	o.DynamicClient, err = f.DynamicClient()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate makes sure all the provided values for command-line options are valid

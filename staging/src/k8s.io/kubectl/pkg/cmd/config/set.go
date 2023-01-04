@@ -110,12 +110,7 @@ func (o setOptions) run() error {
 	if err != nil {
 		return err
 	}
-
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
-		return err
-	}
-
-	return nil
+	return clientcmd.ModifyConfig(o.configAccess, *config, false)
 }
 
 func (o *setOptions) complete(cmd *cobra.Command) error {

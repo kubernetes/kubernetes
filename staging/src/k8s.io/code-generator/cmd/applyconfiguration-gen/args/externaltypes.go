@@ -63,11 +63,7 @@ func (s *externalApplyConfigurationValue) Set(val string) error {
 	if err != nil {
 		return err
 	}
-	if err := s.set(vs); err != nil {
-		return err
-	}
-
-	return nil
+	return s.set(vs)
 }
 
 func (s *externalApplyConfigurationValue) Type() string {

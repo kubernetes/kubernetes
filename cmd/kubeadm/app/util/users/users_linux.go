@@ -299,11 +299,7 @@ func removeUsersAndGroupsImpl(pathUsers, pathGroups string) error {
 	if err := writeFile(fUsers, fileUsers); err != nil {
 		return err
 	}
-	if err := writeFile(fGroups, fileGroups); err != nil {
-		return err
-	}
-
-	return nil
+	return writeFile(fGroups, fileGroups)
 }
 
 // parseLoginDefs can be used to parse an /etc/login.defs file and obtain system ranges for UID and GID.
@@ -627,10 +623,7 @@ func writeFile(f *os.File, str string) error {
 	if _, err := f.Write([]byte(str)); err != nil {
 		return err
 	}
-	if err := f.Truncate(int64(len(str))); err != nil {
-		return err
-	}
-	return nil
+	return f.Truncate(int64(len(str)))
 }
 
 // UpdatePathOwnerAndPermissions updates the owner and permissions of the given path.

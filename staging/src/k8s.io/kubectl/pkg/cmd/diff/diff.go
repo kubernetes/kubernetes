@@ -582,10 +582,7 @@ func (d *Differ) Diff(obj Object, printer Printer, showManagedFields bool) error
 	if err := d.From.Print(obj.Name(), from, printer); err != nil {
 		return err
 	}
-	if err := d.To.Print(obj.Name(), to, printer); err != nil {
-		return err
-	}
-	return nil
+	return d.To.Print(obj.Name(), to, printer)
 }
 
 func omitManagedFields(o runtime.Object) runtime.Object {

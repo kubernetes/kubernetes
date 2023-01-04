@@ -531,11 +531,7 @@ func strategicPatchObject(
 			return errors.NewBadRequest(err.Error())
 		}
 	}
-
-	if err := applyPatchToObject(requestContext, defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs, validationDirective); err != nil {
-		return err
-	}
-	return nil
+	return applyPatchToObject(requestContext, defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj, strictErrs, validationDirective)
 }
 
 // applyPatch is called every time GuaranteedUpdate asks for the updated object,

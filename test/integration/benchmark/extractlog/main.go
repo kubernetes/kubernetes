@@ -54,8 +54,5 @@ func extractRawLog(r io.Reader) error {
 		// Print the raw log to stdout.
 		fmt.Println(l)
 	}
-	if err := scan.Err(); err != nil {
-		return err
-	}
-	return nil
+	return scan.Err()
 }

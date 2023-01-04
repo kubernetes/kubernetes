@@ -238,10 +238,8 @@ func waitForNodesReadyAfterUpgrade(ctx context.Context, f *framework.Framework) 
 		return fmt.Errorf("couldn't detect number of nodes")
 	}
 	framework.Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", framework.RestartNodeReadyAgainTimeout, numNodes)
-	if _, err := e2enode.CheckReady(ctx, f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout); err != nil {
-		return err
-	}
-	return nil
+	_, err = e2enode.CheckReady(ctx, f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout)
+	return err
 }
 
 // checkNodesVersions validates the nodes versions

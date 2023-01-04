@@ -428,11 +428,7 @@ func waitForReadyStatus(t *testing.T, m *manager, ready bool) error {
 		return status.ContainerStatuses[0].Ready == ready, nil
 	}
 	t.Logf("Polling for ready state %v", ready)
-	if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {
-		return err
-	}
-
-	return nil
+	return wait.Poll(interval, wait.ForeverTestTimeout, condition)
 }
 
 // cleanup running probes to avoid leaking goroutines.

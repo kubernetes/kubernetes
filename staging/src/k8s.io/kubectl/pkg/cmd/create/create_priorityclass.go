@@ -142,13 +142,8 @@ func (o *PriorityClassOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
 	}
-
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Run calls the CreateSubcommandOptions.Run in the PriorityClassOptions instance

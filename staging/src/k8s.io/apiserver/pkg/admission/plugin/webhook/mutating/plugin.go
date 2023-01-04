@@ -64,10 +64,7 @@ func NewMutatingWebhook(configFile io.Reader) (*Plugin, error) {
 
 // ValidateInitialization implements the InitializationValidator interface.
 func (a *Plugin) ValidateInitialization() error {
-	if err := a.Webhook.ValidateInitialization(); err != nil {
-		return err
-	}
-	return nil
+	return a.Webhook.ValidateInitialization()
 }
 
 // Admit makes an admission decision based on the request attributes.

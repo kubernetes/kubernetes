@@ -51,10 +51,8 @@ func (v *dotVertex) MarshalDOT(w io.Writer) error {
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "  ];\n"); err != nil {
-		return err
-	}
-	return nil
+	_, err := fmt.Fprintf(w, "  ];\n")
+	return err
 }
 
 func (v *dotVertex) String() string {
@@ -305,10 +303,8 @@ func marshalDOT(w io.Writer, nodes []*dotVertex, edges []dotEdge) error {
 			}
 		}
 	}
-	if _, err := w.Write([]byte("}\n")); err != nil {
-		return err
-	}
-	return nil
+	_, err := w.Write([]byte("}\n"))
+	return err
 }
 
 func (h *debugHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {

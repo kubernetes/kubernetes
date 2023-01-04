@@ -684,11 +684,7 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 	if err != nil {
 		return err
 	}
-	if err = printer.PrintObj(info.Object, o.Out); err != nil {
-		return err
-	}
-
-	return nil
+	return printer.PrintObj(info.Object, o.Out)
 }
 
 // Saves the last-applied-configuration annotation in a separate SSA field manager

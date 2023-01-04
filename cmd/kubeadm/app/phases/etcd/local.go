@@ -173,11 +173,8 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	}
 
 	fmt.Printf("[etcd] Waiting for the new etcd member to join the cluster. This can take up to %v\n", etcdHealthyCheckInterval*etcdHealthyCheckRetries)
-	if _, err := etcdClient.WaitForClusterAvailable(etcdHealthyCheckRetries, etcdHealthyCheckInterval); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = etcdClient.WaitForClusterAvailable(etcdHealthyCheckRetries, etcdHealthyCheckInterval)
+	return err
 }
 
 // GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current configuration
@@ -298,9 +295,5 @@ func prepareAndWriteEtcdStaticPod(manifestDir string, patchesDir string, cfg *ku
 	}
 
 	// writes etcd StaticPod to disk
-	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
-		return err
-	}
-
-	return nil
+	return staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec)
 }

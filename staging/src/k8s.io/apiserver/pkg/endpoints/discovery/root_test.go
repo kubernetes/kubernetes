@@ -59,10 +59,7 @@ func decodeResponse(t *testing.T, resp *http.Response, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, obj); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(data, obj)
 }
 
 func getGroupList(t *testing.T, server *httptest.Server) (*metav1.APIGroupList, error) {

@@ -683,11 +683,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 
 	// copy set and update its status
 	set = set.DeepCopy()
-	if err := ssc.statusUpdater.UpdateStatefulSetStatus(ctx, set, status); err != nil {
-		return err
-	}
-
-	return nil
+	return ssc.statusUpdater.UpdateStatefulSetStatus(ctx, set, status)
 }
 
 var _ StatefulSetControlInterface = &defaultStatefulSetControl{}

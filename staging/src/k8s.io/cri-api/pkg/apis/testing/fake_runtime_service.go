@@ -693,12 +693,7 @@ func (r *FakeRuntimeService) ReopenContainerLog(_ context.Context, containerID s
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "ReopenContainerLog")
-
-	if err := r.popError("ReopenContainerLog"); err != nil {
-		return err
-	}
-
-	return nil
+	return r.popError("ReopenContainerLog")
 }
 
 // CheckpointContainer emulates call to checkpoint a container in the FakeRuntimeService.
@@ -707,12 +702,7 @@ func (r *FakeRuntimeService) CheckpointContainer(_ context.Context, options *run
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "CheckpointContainer")
-
-	if err := r.popError("CheckpointContainer"); err != nil {
-		return err
-	}
-
-	return nil
+	return r.popError("CheckpointContainer")
 }
 
 func (f *FakeRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {

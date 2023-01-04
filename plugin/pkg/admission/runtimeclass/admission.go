@@ -105,12 +105,7 @@ func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attribute
 	if err := setOverhead(attributes, pod, runtimeClass); err != nil {
 		return err
 	}
-
-	if err := setScheduling(attributes, pod, runtimeClass); err != nil {
-		return err
-	}
-
-	return nil
+	return setScheduling(attributes, pod, runtimeClass)
 }
 
 // Validate makes sure that pod adhere's to RuntimeClass's definition
@@ -124,11 +119,7 @@ func (r *RuntimeClass) Validate(ctx context.Context, attributes admission.Attrib
 	if err != nil {
 		return err
 	}
-	if err := validateOverhead(attributes, pod, runtimeClass); err != nil {
-		return err
-	}
-
-	return nil
+	return validateOverhead(attributes, pod, runtimeClass)
 }
 
 // NewRuntimeClass creates a new RuntimeClass admission control handler

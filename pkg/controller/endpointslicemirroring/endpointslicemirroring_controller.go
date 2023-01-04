@@ -318,13 +318,7 @@ func (c *Controller) syncEndpoints(key string) error {
 	if c.endpointSliceTracker.StaleSlices(svc, endpointSlices) {
 		return endpointsliceutil.NewStaleInformerCache("EndpointSlice informer cache is out of date")
 	}
-
-	err = c.reconciler.reconcile(endpoints, endpointSlices)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.reconciler.reconcile(endpoints, endpointSlices)
 }
 
 // queueEndpoints queues the Endpoints resource for processing.

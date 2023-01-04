@@ -35,10 +35,7 @@ import (
 
 func validateDirExists(dir string) error {
 	_, err := os.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func validateDirNotExists(dir string) error {

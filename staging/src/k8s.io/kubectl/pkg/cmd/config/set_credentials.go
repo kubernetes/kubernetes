@@ -204,12 +204,7 @@ func (o setCredentialsOptions) run() error {
 	}
 	authInfo := o.modifyAuthInfo(*startingStanza)
 	config.AuthInfos[o.name] = &authInfo
-
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
-		return err
-	}
-
-	return nil
+	return clientcmd.ModifyConfig(o.configAccess, *config, true)
 }
 
 func (o *setCredentialsOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.AuthInfo) clientcmdapi.AuthInfo {

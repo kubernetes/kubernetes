@@ -153,13 +153,8 @@ func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
 	}
-
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate checks to the PodDisruptionBudgetOpts to see if there is sufficient information run the command

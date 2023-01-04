@@ -536,10 +536,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 	if err := ed.mounter.Unmount(dir); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(dir); err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(dir)
 }
 
 func (ed *emptyDir) getMetaDir() string {

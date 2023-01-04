@@ -567,9 +567,5 @@ func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 	if err := options.Validate(); err != nil {
 		return err
 	}
-
-	if err := options.Run(); err != nil {
-		return err
-	}
-	return nil
+	return options.Run()
 }
