@@ -35,6 +35,8 @@ func main() {
 	klog.InitFlags(nil)
 	gengo := getArgs()
 
+	//TODO: cull args - OutputBase is used in generators, not in gengo
+	//TODO: types for pkg local name vs import path vs on disk path
 	if err := gengo.Execute(getGlobalNamers(), getDefaultNamer(), getPackages); err != nil {
 		klog.Fatalf("ERROR: %v", err)
 	}
