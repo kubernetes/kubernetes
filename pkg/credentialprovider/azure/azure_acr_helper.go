@@ -53,7 +53,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -185,7 +184,7 @@ func performTokenExchange(
 
 	var content []byte
 	limitedReader := &io.LimitedReader{R: exchange.Body, N: maxReadLength}
-	if content, err = ioutil.ReadAll(limitedReader); err != nil {
+	if content, err = io.ReadAll(limitedReader); err != nil {
 		return "", fmt.Errorf("Www-Authenticate: error reading response from %s", authEndpoint)
 	}
 

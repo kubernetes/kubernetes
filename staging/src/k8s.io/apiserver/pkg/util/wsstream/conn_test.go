@@ -19,7 +19,6 @@ package wsstream
 import (
 	"encoding/base64"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -57,7 +56,7 @@ func TestRawConn(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		data, err := ioutil.ReadAll(conn.channels[0])
+		data, err := io.ReadAll(conn.channels[0])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -139,7 +138,7 @@ func TestBase64Conn(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		data, err := ioutil.ReadAll(conn.channels[0])
+		data, err := io.ReadAll(conn.channels[0])
 		if err != nil {
 			t.Fatal(err)
 		}

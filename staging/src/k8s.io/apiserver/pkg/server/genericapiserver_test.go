@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -231,7 +230,7 @@ func TestInstallAPIGroups(t *testing.T) {
 			continue
 		}
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("[%d] unexpected error reading body at path %q: %v", i, path, err)
 			continue
@@ -275,7 +274,7 @@ func TestInstallAPIGroups(t *testing.T) {
 			continue
 		}
 
-		body, err = ioutil.ReadAll(resp.Body)
+		body, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("[%d] unexpected error reading body at path %q: %v", i, path, err)
 			continue
@@ -366,7 +365,7 @@ func TestUpdateOpenAPISpec(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	assert.NoError(err)
 	assert.Equal(oldSpec, body)
 	resp.Body.Close()
@@ -385,7 +384,7 @@ func TestUpdateOpenAPISpec(t *testing.T) {
 	defer resp.Body.Close()
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	assert.NoError(err)
 	assert.Equal(newSpec, body)
 }

@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
@@ -39,7 +38,7 @@ import (
 )
 
 func objBody(obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(corev1Codec, obj))))
+	return io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(corev1Codec, obj))))
 }
 
 func header() http.Header {
@@ -250,7 +249,7 @@ func TestHelperCreate(t *testing.T) {
 			if tt.Req != nil && !tt.Req(client.Req) {
 				t.Errorf("%d: unexpected request: %#v", i, client.Req)
 			}
-			body, err := ioutil.ReadAll(client.Req.Body)
+			body, err := io.ReadAll(client.Req.Body)
 			if err != nil {
 				t.Fatalf("%d: unexpected error: %#v", i, err)
 			}
@@ -711,7 +710,7 @@ func TestHelperReplace(t *testing.T) {
 			if tt.Req != nil && (client.Req == nil || !tt.Req(tt.ExpectPath, client.Req)) {
 				t.Fatalf("unexpected request: %#v", client.Req)
 			}
-			body, err := ioutil.ReadAll(client.Req.Body)
+			body, err := io.ReadAll(client.Req.Body)
 			if err != nil {
 				t.Fatalf("unexpected error: %#v", err)
 			}
