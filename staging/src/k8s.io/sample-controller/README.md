@@ -126,8 +126,7 @@ type User struct {
 }
 ```
 
-Note, json tag `json:` is needed to generate informer externalversions package.
-Otherwise, informer internalversion package is generated.
+Note, the JSON tag `json:` is required on all user facing fields within your type. Typically API types contain only user facing fields. When the JSON tag is omitted from the field, Kubernetes generators consider the field to be internal and will not expose the field in their generated external output. For example, this means that the field would not be included in a generated CRD schema.
 
 ## Validation
 
