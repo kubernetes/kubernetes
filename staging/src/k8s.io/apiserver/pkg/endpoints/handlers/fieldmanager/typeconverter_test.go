@@ -17,7 +17,9 @@ limitations under the License.
 package fieldmanager_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -27,25 +29,23 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"k8s.io/kube-openapi/pkg/util/proto"
-	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-var testSchema = prototesting.Fake{
-	Path: filepath.Join("testdata", "swagger.json"),
-}
+var testSchema = func() *spec.Swagger {
+	data, err := ioutil.ReadFile(filepath.Join("testdata", "swagger.json"))
+	if err != nil {
+		panic(err)
+	}
+	spec := spec.Swagger{}
+	if err := json.Unmarshal(data, &spec); err != nil {
+		panic(err)
+	}
+	return &spec
+}()
 
 func TestTypeConverter(t *testing.T) {
-	d, err := testSchema.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("Failed to parse OpenAPI schema: %v", err)
-	}
-	m, err := proto.NewOpenAPIData(d)
-	if err != nil {
-		t.Fatalf("Failed to build OpenAPI models: %v", err)
-	}
-
-	tc, err := fieldmanager.NewTypeConverter(m, false)
+	tc, err := fieldmanager.NewTypeConverter(testSchema, false)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}
@@ -177,16 +177,7 @@ spec:
 		b.Fatalf("Failed to parse yaml object: %v", err)
 	}
 
-	d, err := testSchema.OpenAPISchema()
-	if err != nil {
-		b.Fatalf("Failed to parse OpenAPI schema: %v", err)
-	}
-	m, err := proto.NewOpenAPIData(d)
-	if err != nil {
-		b.Fatalf("Failed to build OpenAPI models: %v", err)
-	}
-
-	tc, err := fieldmanager.NewTypeConverter(m, false)
+	tc, err := fieldmanager.NewTypeConverter(testSchema, false)
 	if err != nil {
 		b.Fatalf("Failed to build TypeConverter: %v", err)
 	}

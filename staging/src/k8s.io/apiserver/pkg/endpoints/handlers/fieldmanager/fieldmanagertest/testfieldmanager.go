@@ -17,8 +17,10 @@ limitations under the License.
 package fieldmanagertest
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 
@@ -28,39 +30,34 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"k8s.io/kube-openapi/pkg/util/proto"
-	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
-var kubernetesSwaggerSchema = prototesting.Fake{
-	Path: filepath.Join(
+var builtinConverter = func() fieldmanager.TypeConverter {
+	data, err := ioutil.ReadFile(filepath.Join(
 		strings.Repeat(".."+string(filepath.Separator), 8),
-		"api", "openapi-spec", "swagger.json"),
-}
-
-// NewBuiltinTypeConverter creates a TypeConverter with all the built-in
-// types defined, given the committed kubernetes swagger.json.
-func NewBuiltinTypeConverter() fieldmanager.TypeConverter {
-	tc, err := fieldmanager.NewTypeConverter(newFakeOpenAPIModels(), false)
+		"api", "openapi-spec", "swagger.json"))
+	if err != nil {
+		panic(err)
+	}
+	spec := spec.Swagger{}
+	if err := json.Unmarshal(data, &spec); err != nil {
+		panic(err)
+	}
+	tc, err := fieldmanager.NewTypeConverter(&spec, false)
 	if err != nil {
 		panic(fmt.Errorf("Failed to build TypeConverter: %v", err))
 	}
 	return tc
-}
+}()
 
-func newFakeOpenAPIModels() proto.Models {
-	d, err := kubernetesSwaggerSchema.OpenAPISchema()
-	if err != nil {
-		panic(err)
-	}
-	m, err := proto.NewOpenAPIData(d)
-	if err != nil {
-		panic(err)
-	}
-	return m
+// NewBuiltinTypeConverter creates a TypeConverter with all the built-in
+// types defined, given the committed kubernetes swagger.json.
+func NewBuiltinTypeConverter() fieldmanager.TypeConverter {
+	return builtinConverter
 }
 
 type fakeObjectConvertor struct {

@@ -17,7 +17,9 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -25,26 +27,25 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-openapi/pkg/util/proto"
-	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-var testSchema = prototesting.Fake{
-	Path: filepath.Join("testdata", "swagger.json"),
-}
+var testSchema = func() *spec.Swagger {
+	data, err := ioutil.ReadFile(filepath.Join("testdata", "swagger.json"))
+	if err != nil {
+		panic(err)
+	}
+	spec := spec.Swagger{}
+	if err := json.Unmarshal(data, &spec); err != nil {
+		panic(err)
+	}
+	return &spec
+}()
 
 // TestVersionConverter tests the version converter
 func TestVersionConverter(t *testing.T) {
-	d, err := testSchema.OpenAPISchema()
-	if err != nil {
-		t.Fatalf("Failed to parse OpenAPI schema: %v", err)
-	}
-	m, err := proto.NewOpenAPIData(d)
-	if err != nil {
-		t.Fatalf("Failed to build OpenAPI models: %v", err)
-	}
-	tc, err := NewTypeConverter(m, false)
+	tc, err := NewTypeConverter(testSchema, false)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}
