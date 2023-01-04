@@ -518,13 +518,6 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			expClaimAnnotations:  map[string]string{volume.AnnStorageProvisioner: migratedPlugin, volume.AnnMigratedTo: migratedDriver},
 		},
 		{
-			name:                 "migration on with Beta storage provisioner annontation",
-			volumeAnnotations:    map[string]string{volume.AnnDynamicallyProvisioned: migratedPlugin},
-			expVolumeAnnotations: map[string]string{volume.AnnDynamicallyProvisioned: migratedPlugin, volume.AnnMigratedTo: migratedDriver},
-			claimAnnotations:     map[string]string{volume.AnnBetaStorageProvisioner: migratedPlugin},
-			expClaimAnnotations:  map[string]string{volume.AnnBetaStorageProvisioner: migratedPlugin, volume.AnnMigratedTo: migratedDriver},
-		},
-		{
 			name:                 "migration off",
 			volumeAnnotations:    map[string]string{volume.AnnDynamicallyProvisioned: nonmigratedPlugin},
 			expVolumeAnnotations: map[string]string{volume.AnnDynamicallyProvisioned: nonmigratedPlugin},
@@ -537,13 +530,6 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			expVolumeAnnotations: map[string]string{volume.AnnDynamicallyProvisioned: nonmigratedPlugin},
 			claimAnnotations:     map[string]string{volume.AnnStorageProvisioner: nonmigratedPlugin, volume.AnnMigratedTo: nonmigratedDriver},
 			expClaimAnnotations:  map[string]string{volume.AnnStorageProvisioner: nonmigratedPlugin},
-		},
-		{
-			name:                 "migration off removes migrated to (rollback) with Beta storage provisioner annontation",
-			volumeAnnotations:    map[string]string{volume.AnnDynamicallyProvisioned: nonmigratedPlugin, volume.AnnMigratedTo: nonmigratedDriver},
-			expVolumeAnnotations: map[string]string{volume.AnnDynamicallyProvisioned: nonmigratedPlugin},
-			claimAnnotations:     map[string]string{volume.AnnBetaStorageProvisioner: nonmigratedPlugin, volume.AnnMigratedTo: nonmigratedDriver},
-			expClaimAnnotations:  map[string]string{volume.AnnBetaStorageProvisioner: nonmigratedPlugin},
 		},
 		{
 			name:                 "migration on, other plugin not affected",

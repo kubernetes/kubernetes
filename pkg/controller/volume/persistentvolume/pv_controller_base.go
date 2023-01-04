@@ -457,16 +457,8 @@ func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINam
 	}
 	provisioner, ok := ann[provisionerKey]
 	if !ok {
-		if claim {
-			// Also check beta AnnStorageProvisioner annontation to make sure
-			provisioner, ok = ann[storagehelpers.AnnBetaStorageProvisioner]
-			if !ok {
-				return false
-			}
-		} else {
-			// Volume Statically provisioned.
-			return false
-		}
+		// Volume Statically provisioned.
+		return false
 	}
 
 	migratedToDriver := ann[storagehelpers.AnnMigratedTo]
@@ -641,8 +633,6 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context,
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
-	// TODO: remove the beta storage provisioner anno after the deprecation period
-	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnBetaStorageProvisioner, provisionerName)
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnStorageProvisioner, provisionerName)
 	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
 	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})

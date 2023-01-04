@@ -70,9 +70,7 @@ const (
 	// AnnStorageProvisioner annotation is added to a PVC that is supposed to be dynamically
 	// provisioned. Its value is name of volume plugin that is supposed to provision
 	// a volume for this PVC.
-	// TODO: remove beta anno once deprecation period ends
-	AnnStorageProvisioner     = "volume.kubernetes.io/storage-provisioner"
-	AnnBetaStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
+	AnnStorageProvisioner = "volume.kubernetes.io/storage-provisioner"
 
 	//PVDeletionProtectionFinalizer is the finalizer added by the external-provisioner on the PV
 	PVDeletionProtectionFinalizer = "external-provisioner.volume.kubernetes.io/finalizer"

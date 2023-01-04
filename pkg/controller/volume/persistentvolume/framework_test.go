@@ -475,7 +475,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case storagehelpers.AnnBetaStorageProvisioner, storagehelpers.AnnStorageProvisioner:
+			case storagehelpers.AnnStorageProvisioner:
 				claim.Annotations[a] = mockPluginName
 			default:
 				claim.Annotations[a] = "yes"
