@@ -152,10 +152,7 @@ func (p *podEvaluator) GroupResource() schema.GroupResource {
 // Handles returns true if the evaluator should handle the specified attributes.
 func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	op := a.GetOperation()
-	if op == admission.Create {
-		return true
-	}
-	return false
+	return op == admission.Create
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -379,10 +376,7 @@ func isBestEffort(pod *corev1.Pod) bool {
 }
 
 func isTerminating(pod *corev1.Pod) bool {
-	if pod.Spec.ActiveDeadlineSeconds != nil && *pod.Spec.ActiveDeadlineSeconds >= int64(0) {
-		return true
-	}
-	return false
+	return pod.Spec.ActiveDeadlineSeconds != nil && *pod.Spec.ActiveDeadlineSeconds >= int64(0)
 }
 
 func podMatchesSelector(pod *corev1.Pod, selector corev1.ScopedResourceSelectorRequirement) (bool, error) {

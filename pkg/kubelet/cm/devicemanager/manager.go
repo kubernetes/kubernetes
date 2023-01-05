@@ -989,10 +989,7 @@ func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
 	_, allocatedResource := m.allocatedDevices[resource]
 	// Return true if this is either an active device plugin resource or
 	// a resource we have previously allocated.
-	if registeredResource || allocatedResource {
-		return true
-	}
-	return false
+	return registeredResource || allocatedResource
 }
 
 // GetAllocatableDevices returns information about all the healthy devices known to the manager

@@ -143,10 +143,7 @@ func (sysd SystemdInitSystem) ServiceIsActive(service string) bool {
 	// Ignoring error here, command returns non-0 if in "activating" status:
 	outBytes, _ := exec.Command("systemctl", args...).Output()
 	output := strings.TrimSpace(string(outBytes))
-	if output == "active" || output == "activating" {
-		return true
-	}
-	return false
+	return output == "active" || output == "activating"
 }
 
 // GetInitSystem returns an InitSystem for the current system, or nil

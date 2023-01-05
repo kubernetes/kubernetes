@@ -438,10 +438,7 @@ func routeListEqual(list1, list2 []*cloudprovider.Route) bool {
 			}
 		}
 	}
-	if len(seen) == len(list1) {
-		return true
-	}
-	return false
+	return len(seen) == len(list1)
 }
 
 func flatten(list []*cloudprovider.Route) []cloudprovider.Route {

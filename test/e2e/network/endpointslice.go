@@ -856,8 +856,5 @@ func endpointSlicesEqual(endpoints *v1.Endpoints, endpointSliceList *discoveryv1
 	}
 
 	framework.Logf("EndpointSlices addresses: %v , ports: %v", sliceAddresses.List(), slicePorts.List())
-	if sliceAddresses.Equal(epAddresses) && slicePorts.Equal(epPorts) {
-		return true
-	}
-	return false
+	return sliceAddresses.Equal(epAddresses) && slicePorts.Equal(epPorts)
 }

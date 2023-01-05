@@ -184,10 +184,7 @@ func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 		return true
 	}
 	// Require a refresh if within 20% of the TTL plus a jitter from the expiration time.
-	if now.After(exp.Add(-1*time.Duration((*tr.Spec.ExpirationSeconds*20)/100)*time.Second - jitter)) {
-		return true
-	}
-	return false
+	return now.After(exp.Add(-1*time.Duration((*tr.Spec.ExpirationSeconds*20)/100)*time.Second - jitter))
 }
 
 // keys should be nonconfidential and safe to log

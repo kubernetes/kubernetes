@@ -142,10 +142,7 @@ func KubernetesVersionToImageTag(version string) string {
 // KubernetesIsCIVersion checks if user requested CI version
 func KubernetesIsCIVersion(version string) bool {
 	subs := kubeBucketPrefixes.FindAllStringSubmatch(version, 1)
-	if len(subs) == 1 && len(subs[0]) == 4 && strings.HasPrefix(subs[0][2], "ci") {
-		return true
-	}
-	return false
+	return len(subs) == 1 && len(subs[0]) == 4 && strings.HasPrefix(subs[0][2], "ci")
 }
 
 // Internal helper: returns normalized build version (with "v" prefix if needed)

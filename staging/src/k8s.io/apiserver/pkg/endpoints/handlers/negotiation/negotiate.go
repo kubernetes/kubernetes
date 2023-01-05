@@ -107,10 +107,7 @@ func isPrettyPrint(req *http.Request) bool {
 	}
 	userAgent := req.UserAgent()
 	// This covers basic all browsers and cli http tools
-	if strings.HasPrefix(userAgent, "curl") || strings.HasPrefix(userAgent, "Wget") || strings.HasPrefix(userAgent, "Mozilla/5.0") {
-		return true
-	}
-	return false
+	return strings.HasPrefix(userAgent, "curl") || strings.HasPrefix(userAgent, "Wget") || strings.HasPrefix(userAgent, "Mozilla/5.0")
 }
 
 // EndpointRestrictions is an interface that allows content-type negotiation

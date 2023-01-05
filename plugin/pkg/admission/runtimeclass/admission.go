@@ -229,9 +229,5 @@ func validateOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1
 
 func shouldIgnore(attributes admission.Attributes) bool {
 	// Ignore all calls to subresources or resources other than pods.
-	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
-		return true
-	}
-
-	return false
+	return len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods")
 }

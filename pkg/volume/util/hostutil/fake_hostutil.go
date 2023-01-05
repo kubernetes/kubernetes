@@ -87,10 +87,8 @@ func (hu *FakeHostUtil) GetFileType(pathname string) (FileType, error) {
 
 // PathExists checks if pathname exists.
 func (hu *FakeHostUtil) PathExists(pathname string) (bool, error) {
-	if _, ok := hu.Filesystem[pathname]; ok {
-		return true, nil
-	}
-	return false, nil
+	_, ok := hu.Filesystem[pathname]
+	return ok, nil
 }
 
 // EvalHostSymlinks returns the path name after evaluating symlinks.

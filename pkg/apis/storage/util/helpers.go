@@ -47,9 +47,5 @@ func IsDefaultAnnotation(obj metav1.ObjectMeta) bool {
 	if obj.Annotations[IsDefaultStorageClassAnnotation] == "true" {
 		return true
 	}
-	if obj.Annotations[BetaIsDefaultStorageClassAnnotation] == "true" {
-		return true
-	}
-
-	return false
+	return obj.Annotations[BetaIsDefaultStorageClassAnnotation] == "true"
 }

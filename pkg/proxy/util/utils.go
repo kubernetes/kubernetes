@@ -112,10 +112,7 @@ func ContainsIPv4Loopback(cidrStrings []string) bool {
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR
 func IsZeroCIDR(cidr string) bool {
-	if cidr == IPv4ZeroCIDR || cidr == IPv6ZeroCIDR {
-		return true
-	}
-	return false
+	return cidr == IPv4ZeroCIDR || cidr == IPv6ZeroCIDR
 }
 
 // IsLoopBack checks if a given IP address is a loopback address.

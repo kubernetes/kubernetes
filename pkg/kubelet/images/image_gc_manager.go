@@ -425,8 +425,6 @@ func (ev byLastUsedAndDetected) Less(i, j int) bool {
 
 func isImageUsed(imageID string, imagesInUse sets.String) bool {
 	// Check the image ID.
-	if _, ok := imagesInUse[imageID]; ok {
-		return true
-	}
-	return false
+	_, ok := imagesInUse[imageID]
+	return ok
 }

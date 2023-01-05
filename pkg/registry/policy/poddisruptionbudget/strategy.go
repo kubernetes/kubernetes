@@ -203,8 +203,5 @@ func unhealthyPodEvictionPolicyInUse(oldPDBSpec *policy.PodDisruptionBudgetSpec)
 	if oldPDBSpec == nil {
 		return false
 	}
-	if oldPDBSpec.UnhealthyPodEvictionPolicy != nil {
-		return true
-	}
-	return false
+	return oldPDBSpec.UnhealthyPodEvictionPolicy != nil
 }

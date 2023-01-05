@@ -51,19 +51,13 @@ func NewNSEnter(mounter mount.Interface, ne *nsenter.Nsenter, rootDir string) In
 
 // isDriveLetterPath returns true if the given path is empty or it ends with ":" or ":\" or ":\\"
 func isDriveLetterorEmptyPath(path string) bool {
-	if path == "" || strings.HasSuffix(path, ":\\\\") || strings.HasSuffix(path, ":") || strings.HasSuffix(path, ":\\") {
-		return true
-	}
-	return false
+	return path == "" || strings.HasSuffix(path, ":\\\\") || strings.HasSuffix(path, ":") || strings.HasSuffix(path, ":\\")
 }
 
 // isVolumePrefix returns true if the given path name starts with "Volume" or volume prefix including
 // "\\.\", "\\?\" for device path or "UNC" or "\\" for UNC path. Otherwise, it returns false.
 func isDeviceOrUncPath(path string) bool {
-	if strings.HasPrefix(path, "Volume") || strings.HasPrefix(path, "\\\\?\\") || strings.HasPrefix(path, "\\\\.\\") || strings.HasPrefix(path, "UNC") {
-		return true
-	}
-	return false
+	return strings.HasPrefix(path, "Volume") || strings.HasPrefix(path, "\\\\?\\") || strings.HasPrefix(path, "\\\\.\\") || strings.HasPrefix(path, "UNC")
 }
 
 // getUpperPath removes the last level of directory.

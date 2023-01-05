@@ -445,12 +445,7 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 	if _, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
 		return true
 	}
-
-	if claim.Spec.StorageClassName != nil {
-		return true
-	}
-
-	return false
+	return claim.Spec.StorageClassName != nil
 }
 
 func toResourceNames(resources core.ResourceList) []core.ResourceName {

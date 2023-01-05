@@ -142,11 +142,7 @@ func HasAuthenticationCredentials(config *clientcmdapi.Config) bool {
 	}
 
 	// authprovider authentication
-	if authInfo.AuthProvider != nil && len(authInfo.AuthProvider.Name) != 0 {
-		return true
-	}
-
-	return false
+	return authInfo.AuthProvider != nil && len(authInfo.AuthProvider.Name) != 0
 }
 
 // EnsureAuthenticationInfoAreEmbedded check if some authentication info are provided as external key/certificate

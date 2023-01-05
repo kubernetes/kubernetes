@@ -420,10 +420,7 @@ func (h *HTTPExtender) IsInterested(pod *v1.Pod) bool {
 	if h.hasManagedResources(pod.Spec.Containers) {
 		return true
 	}
-	if h.hasManagedResources(pod.Spec.InitContainers) {
-		return true
-	}
-	return false
+	return h.hasManagedResources(pod.Spec.InitContainers)
 }
 
 func (h *HTTPExtender) hasManagedResources(containers []v1.Container) bool {

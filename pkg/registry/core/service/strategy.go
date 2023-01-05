@@ -291,10 +291,7 @@ func sameIPFamilyPolicy(oldSvc, newSvc *api.Service) bool {
 }
 
 func needsNodePort(svc *api.Service) bool {
-	if svc.Spec.Type == api.ServiceTypeNodePort || svc.Spec.Type == api.ServiceTypeLoadBalancer {
-		return true
-	}
-	return false
+	return svc.Spec.Type == api.ServiceTypeNodePort || svc.Spec.Type == api.ServiceTypeLoadBalancer
 }
 
 func sameNodePorts(oldSvc, newSvc *api.Service) bool {

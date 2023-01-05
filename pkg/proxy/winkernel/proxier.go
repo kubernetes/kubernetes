@@ -1098,10 +1098,8 @@ func isNetworkNotFoundError(err error) bool {
 	if _, ok := err.(hcn.NetworkNotFoundError); ok {
 		return true
 	}
-	if _, ok := err.(hcsshim.NetworkNotFoundError); ok {
-		return true
-	}
-	return false
+	_, ok := err.(hcsshim.NetworkNotFoundError)
+	return ok
 }
 
 // isAllEndpointsTerminating function will return true if all the endpoints are terminating.

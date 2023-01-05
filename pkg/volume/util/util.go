@@ -446,10 +446,7 @@ func IsWindowsUNCPath(goos, path string) bool {
 		return false
 	}
 	// Check for UNC prefix \\
-	if strings.HasPrefix(path, `\\`) {
-		return true
-	}
-	return false
+	return strings.HasPrefix(path, `\\`)
 }
 
 // IsWindowsLocalPath checks if path is a local path

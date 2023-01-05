@@ -61,11 +61,7 @@ func (t *VolumeModeDowngradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 	if upgCtx.Versions[0].Version.LessThan(blockVersion) {
 		return true
 	}
-	if !upgCtx.Versions[1].Version.LessThan(blockVersion) {
-		return true
-	}
-
-	return false
+	return !upgCtx.Versions[1].Version.LessThan(blockVersion)
 }
 
 // Setup creates a block pv and then verifies that a pod can consume it.  The pod writes data to the volume.

@@ -156,10 +156,7 @@ func (grm *goRoutineMap) IsOperationPending(operationName string) bool {
 	grm.lock.RLock()
 	defer grm.lock.RUnlock()
 	existingOp, exists := grm.operations[operationName]
-	if exists && existingOp.operationPending {
-		return true
-	}
-	return false
+	return exists && existingOp.operationPending
 }
 
 func (grm *goRoutineMap) Wait() {

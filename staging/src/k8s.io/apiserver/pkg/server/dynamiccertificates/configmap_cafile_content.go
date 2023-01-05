@@ -179,11 +179,7 @@ func (c *ConfigMapCAController) hasCAChanged(caBundle []byte) bool {
 	if !ok {
 		return true
 	}
-	if !bytes.Equal(existing.caBundle, caBundle) {
-		return true
-	}
-
-	return false
+	return !bytes.Equal(existing.caBundle, caBundle)
 }
 
 // RunOnce runs a single sync loop

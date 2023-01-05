@@ -158,10 +158,7 @@ func pathMatches(path, spec string) bool {
 		return true
 	}
 	// Allow a trailing * subpath match
-	if strings.HasSuffix(spec, "*") && strings.HasPrefix(path, strings.TrimRight(spec, "*")) {
-		return true
-	}
-	return false
+	return strings.HasSuffix(spec, "*") && strings.HasPrefix(path, strings.TrimRight(spec, "*"))
 }
 
 // Check whether the rule's resource fields match the request attrs.

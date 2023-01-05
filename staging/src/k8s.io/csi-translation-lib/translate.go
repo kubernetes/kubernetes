@@ -136,10 +136,8 @@ func (CSITranslator) IsMigratableIntreePluginByName(inTreePluginName string) boo
 // IsMigratedCSIDriverByName tests whether there exists an in-tree plugin with logic
 // to migrate to the CSI driver with given name
 func (CSITranslator) IsMigratedCSIDriverByName(csiPluginName string) bool {
-	if _, ok := inTreePlugins[csiPluginName]; ok {
-		return true
-	}
-	return false
+	_, ok := inTreePlugins[csiPluginName]
+	return ok
 }
 
 // GetInTreePluginNameFromSpec returns the plugin name

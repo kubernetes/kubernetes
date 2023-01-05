@@ -132,10 +132,8 @@ func IsTimeout(err error) bool {
 	if err == wait.ErrWaitTimeout {
 		return true
 	}
-	if _, ok := err.(*timeoutError); ok {
-		return true
-	}
-	return false
+	_, ok := err.(*timeoutError)
+	return ok
 }
 
 // errorBadPodsStates create error message of basic info of bad pods for debugging.

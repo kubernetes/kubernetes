@@ -504,10 +504,7 @@ func (s podFastDeleteScenario) Verifier(pod *v1.Pod) podScenarioVerifier {
 }
 
 func (s podFastDeleteScenario) IsLastEvent(event watch.Event) bool {
-	if event.Type == watch.Deleted {
-		return true
-	}
-	return false
+	return event.Type == watch.Deleted
 }
 
 func (s podFastDeleteScenario) Action(ctx context.Context, pod *v1.Pod) (podScenarioVerifier, string, error) {

@@ -103,10 +103,7 @@ func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 	if oldPVCSpec == nil {
 		return false
 	}
-	if oldPVCSpec.DataSource != nil || oldPVCSpec.DataSourceRef != nil {
-		return true
-	}
-	return false
+	return oldPVCSpec.DataSource != nil || oldPVCSpec.DataSourceRef != nil
 }
 
 func dataSourceIsPvcOrSnapshot(dataSource *core.TypedLocalObjectReference) bool {
@@ -131,10 +128,7 @@ func dataSourceRefInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 	if oldPVCSpec == nil {
 		return false
 	}
-	if oldPVCSpec.DataSourceRef != nil {
-		return true
-	}
-	return false
+	return oldPVCSpec.DataSourceRef != nil
 }
 
 // NormalizeDataSources ensures that DataSource and DataSourceRef have the same contents
@@ -174,22 +168,14 @@ func resizeStatusInUse(oldPVC *core.PersistentVolumeClaim) bool {
 	if oldPVC == nil {
 		return false
 	}
-	if oldPVC.Status.ResizeStatus != nil {
-		return true
-	}
-	return false
+	return oldPVC.Status.ResizeStatus != nil
 }
 
 func allocatedResourcesInUse(oldPVC *core.PersistentVolumeClaim) bool {
 	if oldPVC == nil {
 		return false
 	}
-
-	if oldPVC.Status.AllocatedResources != nil {
-		return true
-	}
-
-	return false
+	return oldPVC.Status.AllocatedResources != nil
 }
 
 func GetWarningsForPersistentVolumeClaim(pv *core.PersistentVolumeClaim) []string {

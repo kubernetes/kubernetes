@@ -729,10 +729,7 @@ func IsTooManyRequests(err error) bool {
 	// IsTooManyRequests' checking of code predates the checking of the code in
 	// the other Is* functions. In order to maintain backward compatibility, this
 	// does not check that the reason is unknown.
-	if code == http.StatusTooManyRequests {
-		return true
-	}
-	return false
+	return code == http.StatusTooManyRequests
 }
 
 // IsRequestEntityTooLargeError determines if err is an error which indicates
@@ -747,10 +744,7 @@ func IsRequestEntityTooLargeError(err error) bool {
 	// IsRequestEntityTooLargeError's checking of code predates the checking of
 	// the code in the other Is* functions. In order to maintain backward
 	// compatibility, this does not check that the reason is unknown.
-	if code == http.StatusRequestEntityTooLarge {
-		return true
-	}
-	return false
+	return code == http.StatusRequestEntityTooLarge
 }
 
 // IsUnexpectedServerError returns true if the server response was not in the expected API format,

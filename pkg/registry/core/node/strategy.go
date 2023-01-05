@@ -109,10 +109,7 @@ func nodeConfigSourceInUse(node *api.Node) bool {
 	if node == nil {
 		return false
 	}
-	if node.Spec.ConfigSource != nil {
-		return true
-	}
-	return false
+	return node.Spec.ConfigSource != nil
 }
 
 // Validate validates a new node.
@@ -178,10 +175,7 @@ func nodeStatusConfigInUse(node *api.Node) bool {
 	if node == nil {
 		return false
 	}
-	if node.Status.Config != nil {
-		return true
-	}
-	return false
+	return node.Status.Config != nil
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

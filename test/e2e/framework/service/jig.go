@@ -889,10 +889,7 @@ func testReachabilityOverNodePorts(ctx context.Context, nodes *v1.NodeList, sp v
 // parsable or the loopback address. Otherwise it will return `false`.
 func isInvalidOrLocalhostAddress(ip string) bool {
 	parsedIP := netutils.ParseIPSloppy(ip)
-	if parsedIP == nil || parsedIP.IsLoopback() {
-		return true
-	}
-	return false
+	return parsedIP == nil || parsedIP.IsLoopback()
 }
 
 // testEndpointReachability tests reachability to endpoints (i.e. IP, ServiceName) and ports. Test request is initiated from specified execPod.

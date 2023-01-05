@@ -157,12 +157,7 @@ func (bsc *BaseStableCollector) Create(version *semver.Version, self StableColle
 			bsc.trackRegistrableDescriptor(d)
 		}
 	}
-
-	if len(bsc.registerable) > 0 {
-		return true
-	}
-
-	return false
+	return len(bsc.registerable) > 0
 }
 
 // ClearState will clear all the states marked by Create.

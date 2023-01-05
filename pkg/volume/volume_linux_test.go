@@ -334,10 +334,7 @@ func verifyDirectoryPermission(path string, readonly bool) bool {
 
 	unixPerms |= execMask
 	filePerm := info.Mode().Perm()
-	if (unixPerms&filePerm == unixPerms) && (info.Mode()&os.ModeSetgid != 0) {
-		return true
-	}
-	return false
+	return (unixPerms&filePerm == unixPerms) && (info.Mode()&os.ModeSetgid != 0)
 }
 
 func TestSetVolumeOwnershipOwner(t *testing.T) {

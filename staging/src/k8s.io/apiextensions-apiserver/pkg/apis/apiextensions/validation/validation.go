@@ -510,10 +510,7 @@ func hasAnyStatusEnabled(crd *apiextensions.CustomResourceDefinitionSpec) bool {
 
 // hasStatusEnabled returns true if given CRD Subresources has non-nil Status set.
 func hasStatusEnabled(subresources *apiextensions.CustomResourceSubresources) bool {
-	if subresources != nil && subresources.Status != nil {
-		return true
-	}
-	return false
+	return subresources != nil && subresources.Status != nil
 }
 
 // hasPerVersionSchema returns true if a CRD uses per-version schema.

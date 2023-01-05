@@ -335,8 +335,6 @@ func hasExcludedLabels(labels map[string]string) bool {
 	if _, ok := labels["node-role.kubernetes.io/control-plane"]; ok {
 		return true
 	}
-	if _, ok := labels["node-role.kubernetes.io/master"]; ok {
-		return true
-	}
-	return false
+	_, ok := labels["node-role.kubernetes.io/master"]
+	return ok
 }

@@ -110,11 +110,8 @@ func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (boo
 func (q *graceTerminateRSList) exist(uniqueRS string) (*listItem, bool) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-
-	if rs, ok := q.list[uniqueRS]; ok {
-		return rs, true
-	}
-	return nil, false
+	rs, ok := q.list[uniqueRS]
+	return rs, ok
 }
 
 // GracefulTerminationManager manage rs graceful termination information and do graceful termination work

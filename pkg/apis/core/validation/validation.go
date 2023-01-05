@@ -418,10 +418,8 @@ func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath 
 }
 
 func IsMatchedVolume(name string, volumes map[string]core.VolumeSource) bool {
-	if _, ok := volumes[name]; ok {
-		return true
-	}
-	return false
+	_, ok := volumes[name]
+	return ok
 }
 
 // isMatched checks whether the volume with the given name is used by a
@@ -438,10 +436,8 @@ func isMatchedDevice(name string, volumes map[string]core.VolumeSource) (isMatch
 }
 
 func mountNameAlreadyExists(name string, devices map[string]string) bool {
-	if _, ok := devices[name]; ok {
-		return true
-	}
-	return false
+	_, ok := devices[name]
+	return ok
 }
 
 func mountPathAlreadyExists(mountPath string, devices map[string]string) bool {
@@ -455,10 +451,8 @@ func mountPathAlreadyExists(mountPath string, devices map[string]string) bool {
 }
 
 func deviceNameAlreadyExists(name string, mounts map[string]string) bool {
-	if _, ok := mounts[name]; ok {
-		return true
-	}
-	return false
+	_, ok := mounts[name]
+	return ok
 }
 
 func devicePathAlreadyExists(devicePath string, mounts map[string]string) bool {

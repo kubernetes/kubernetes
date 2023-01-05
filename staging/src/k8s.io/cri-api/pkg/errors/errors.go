@@ -30,9 +30,5 @@ func IsNotFound(err error) bool {
 	if !ok {
 		return ok
 	}
-	if s.Code() == codes.NotFound {
-		return true
-	}
-
-	return false
+	return s.Code() == codes.NotFound
 }

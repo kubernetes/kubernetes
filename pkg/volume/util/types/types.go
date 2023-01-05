@@ -138,10 +138,8 @@ func IsOperationFinishedError(err error) bool {
 	if _, ok := err.(*UncertainProgressError); ok {
 		return false
 	}
-	if _, ok := err.(*TransientOperationFailure); ok {
-		return false
-	}
-	return true
+	_, ok := err.(*TransientOperationFailure)
+	return !ok
 }
 
 // IsFilesystemMismatchError checks if mount failed because requested filesystem
@@ -154,10 +152,8 @@ func IsFilesystemMismatchError(err error) bool {
 // IsUncertainProgressError checks if given error is of type that indicates
 // operation might be in-progress in background.
 func IsUncertainProgressError(err error) bool {
-	if _, ok := err.(*UncertainProgressError); ok {
-		return true
-	}
-	return false
+	_, ok := err.(*UncertainProgressError)
+	return ok
 }
 
 const (

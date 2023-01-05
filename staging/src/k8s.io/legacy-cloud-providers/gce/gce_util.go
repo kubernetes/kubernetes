@@ -408,9 +408,5 @@ func usesL4RBS(service *v1.Service, forwardingRule *compute.ForwardingRule) bool
 		return true
 	}
 	// Detect RBS by existing forwarding rule with Backend Service attached
-	if forwardingRule != nil && forwardingRule.BackendService != "" {
-		return true
-	}
-
-	return false
+	return forwardingRule != nil && forwardingRule.BackendService != ""
 }

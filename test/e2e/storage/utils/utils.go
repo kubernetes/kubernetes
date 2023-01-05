@@ -442,10 +442,7 @@ func isSudoPresent(ctx context.Context, nodeIP string, provider string) bool {
 	framework.Logf("Checking if sudo command is present")
 	sshResult, err := e2essh.SSH(ctx, "sudo --version", nodeIP, provider)
 	framework.ExpectNoError(err, "SSH to %q errored.", nodeIP)
-	if !strings.Contains(sshResult.Stderr, "command not found") {
-		return true
-	}
-	return false
+	return !strings.Contains(sshResult.Stderr, "command not found")
 }
 
 // CheckReadWriteToPath check that path can b e read and written

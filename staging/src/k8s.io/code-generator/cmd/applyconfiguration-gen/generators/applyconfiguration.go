@@ -133,10 +133,7 @@ func blocklisted(t *types.Type, member types.Member) bool {
 		return true
 	}
 	// Hide any fields which are en route to deletion.
-	if strings.HasPrefix(member.Name, "ZZZ_") {
-		return true
-	}
-	return false
+	return strings.HasPrefix(member.Name, "ZZZ_")
 }
 
 func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams) {

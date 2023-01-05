@@ -38,11 +38,7 @@ func hasNodeExpansionSecrets(oldPVSpec *api.PersistentVolumeSpec) bool {
 	if oldPVSpec == nil || oldPVSpec.CSI == nil {
 		return false
 	}
-
-	if oldPVSpec.CSI.NodeExpandSecretRef != nil {
-		return true
-	}
-	return false
+	return oldPVSpec.CSI.NodeExpandSecretRef != nil
 }
 
 func GetWarningsForPersistentVolume(pv *api.PersistentVolume) []string {

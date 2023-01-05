@@ -80,10 +80,7 @@ func skipListerFunc(verb string, url url.URL) bool {
 	if verb != "GET" {
 		return false
 	}
-	if strings.HasSuffix(url.Path, "/pods") || strings.Contains(url.Path, "/replicasets") {
-		return true
-	}
-	return false
+	return strings.HasSuffix(url.Path, "/pods") || strings.Contains(url.Path, "/replicasets")
 }
 
 var alwaysReady = func() bool { return true }

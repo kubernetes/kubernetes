@@ -188,10 +188,7 @@ func shouldUpdateSpec(accessor metav1.Object) bool {
 	// In either case, if the operator hasn't changed the spec, we can safely auto update.
 	// Please note that we can't protect the changes made by the operator in the following scenario:
 	// - The operator deletes and recreates the same object with a variant spec (generation resets to 1).
-	if accessor.GetGeneration() == 1 {
-		return true
-	}
-	return false
+	return accessor.GetGeneration() == 1
 }
 
 // shouldUpdateAnnotation determines whether the current value of the auto-update annotation

@@ -163,10 +163,7 @@ func IsCriticalPod(pod *v1.Pod) bool {
 	if IsMirrorPod(pod) {
 		return true
 	}
-	if pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority) {
-		return true
-	}
-	return false
+	return pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority)
 }
 
 // Preemptable returns true if preemptor pod can preempt preemptee pod

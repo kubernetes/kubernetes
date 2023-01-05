@@ -247,8 +247,5 @@ func CleanUpDummyVMs(ctx context.Context, folder *vclib.Folder) error {
 
 func isAlreadyExists(path string, err error) bool {
 	errorMessage := fmt.Sprintf("Cannot complete the operation because the file or folder %s already exists", path)
-	if errorMessage == err.Error() {
-		return true
-	}
-	return false
+	return errorMessage == err.Error()
 }

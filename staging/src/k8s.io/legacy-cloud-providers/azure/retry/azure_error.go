@@ -164,11 +164,7 @@ func isSuccessHTTPResponse(resp *http.Response) bool {
 	}
 
 	// HTTP 2xx suggests a successful response
-	if 199 < resp.StatusCode && resp.StatusCode < 300 {
-		return true
-	}
-
-	return false
+	return 199 < resp.StatusCode && resp.StatusCode < 300
 }
 
 func getRawError(resp *http.Response, err error) error {
@@ -218,11 +214,7 @@ func shouldRetryHTTPRequest(resp *http.Response, err error) bool {
 	}
 
 	// should retry when error is not nil and no http.Response.
-	if err != nil {
-		return true
-	}
-
-	return false
+	return err != nil
 }
 
 // getRetryAfter gets the retryAfter from http response.
@@ -307,9 +299,5 @@ func HasStatusForbiddenOrIgnoredError(err error) bool {
 	if strings.Contains(err.Error(), fmt.Sprintf("HTTPStatusCode: %d", http.StatusNotFound)) {
 		return true
 	}
-
-	if strings.Contains(err.Error(), fmt.Sprintf("HTTPStatusCode: %d", http.StatusForbidden)) {
-		return true
-	}
-	return false
+	return strings.Contains(err.Error(), fmt.Sprintf("HTTPStatusCode: %d", http.StatusForbidden))
 }

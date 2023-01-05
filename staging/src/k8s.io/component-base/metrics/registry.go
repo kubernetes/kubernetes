@@ -70,12 +70,7 @@ func shouldHide(currentVersion *semver.Version, deprecatedVersion *semver.Versio
 	if err != nil {
 		panic("failed to make version from current version")
 	}
-
-	if deprecatedVersion.LT(guardVersion) {
-		return true
-	}
-
-	return false
+	return deprecatedVersion.LT(guardVersion)
 }
 
 // ValidateShowHiddenMetricsVersion checks invalid version for which show hidden metrics.

@@ -142,8 +142,5 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 func isRequestExemptFromWatchEvents(requestInfo *apirequest.RequestInfo) bool {
 	// Creating token for service account does not produce any event,
 	// but still serviceaccounts can have multiple watchers.
-	if requestInfo.Resource == "serviceaccounts" && requestInfo.Subresource == "token" {
-		return true
-	}
-	return false
+	return requestInfo.Resource == "serviceaccounts" && requestInfo.Subresource == "token"
 }

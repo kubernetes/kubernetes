@@ -80,10 +80,8 @@ type TimestampedEntry struct {
 // getTimestampedEntry returns the TimestampedEntry stored under the given key.
 func (c *ExpirationCache) getTimestampedEntry(key string) (*TimestampedEntry, bool) {
 	item, _ := c.cacheStorage.Get(key)
-	if tsEntry, ok := item.(*TimestampedEntry); ok {
-		return tsEntry, true
-	}
-	return nil, false
+	tsEntry, ok := item.(*TimestampedEntry)
+	return tsEntry, ok
 }
 
 // getOrExpire retrieves the object from the TimestampedEntry if and only if it hasn't

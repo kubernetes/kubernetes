@@ -154,12 +154,7 @@ func isInitContainerFailed(status *kubecontainer.Status) bool {
 	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
 		return true
 	}
-
-	if status.State == kubecontainer.ContainerStateUnknown {
-		return true
-	}
-
-	return false
+	return status.State == kubecontainer.ContainerStateUnknown
 }
 
 // getStableKey generates a key (string) to uniquely identify a

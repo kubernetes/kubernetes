@@ -142,11 +142,7 @@ func shouldIgnore(attributes admission.Attributes) bool {
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return true
 	}
-
-	if isUpdateWithNoNewImages(attributes) {
-		return true
-	}
-	return false
+	return isUpdateWithNoNewImages(attributes)
 }
 
 // NewAlwaysPullImages creates a new always pull images admission control handler

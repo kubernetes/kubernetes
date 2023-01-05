@@ -467,10 +467,7 @@ func isKubernetesLabel(key string) bool {
 	if namespace == "kubernetes.io" || strings.HasSuffix(namespace, ".kubernetes.io") {
 		return true
 	}
-	if namespace == "k8s.io" || strings.HasSuffix(namespace, ".k8s.io") {
-		return true
-	}
-	return false
+	return namespace == "k8s.io" || strings.HasSuffix(namespace, ".k8s.io")
 }
 
 func getLabelNamespace(key string) string {

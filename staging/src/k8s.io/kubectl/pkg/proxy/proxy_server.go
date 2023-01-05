@@ -102,10 +102,7 @@ func (f *FilterServer) accept(method, path, host string) bool {
 	if matchesRegexp(method, f.RejectMethods) {
 		return false
 	}
-	if matchesRegexp(path, f.AcceptPaths) && matchesRegexp(host, f.AcceptHosts) {
-		return true
-	}
-	return false
+	return matchesRegexp(path, f.AcceptPaths) && matchesRegexp(host, f.AcceptHosts)
 }
 
 // HandlerFor makes a shallow copy of f which passes its requests along to the

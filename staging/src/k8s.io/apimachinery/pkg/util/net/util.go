@@ -32,10 +32,7 @@ func IPNetEqual(ipnet1, ipnet2 *net.IPNet) bool {
 	if ipnet1 == nil || ipnet2 == nil {
 		return false
 	}
-	if reflect.DeepEqual(ipnet1.Mask, ipnet2.Mask) && ipnet1.Contains(ipnet2.IP) && ipnet2.Contains(ipnet1.IP) {
-		return true
-	}
-	return false
+	return reflect.DeepEqual(ipnet1.Mask, ipnet2.Mask) && ipnet1.Contains(ipnet2.IP) && ipnet2.Contains(ipnet1.IP)
 }
 
 // Returns if the given err is "connection reset by peer" error.

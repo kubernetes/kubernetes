@@ -701,8 +701,6 @@ func (c claims) unmarshalClaim(name string, v interface{}) error {
 }
 
 func (c claims) hasClaim(name string) bool {
-	if _, ok := c[name]; !ok {
-		return false
-	}
-	return true
+	_, ok := c[name]
+	return ok
 }

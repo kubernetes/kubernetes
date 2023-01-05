@@ -1071,10 +1071,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[st
 
 // setHasItemOrAll is helper function that return true if item is present in the set (case insensitive) or special key 'all' is present
 func setHasItemOrAll(s sets.Set[string], item string) bool {
-	if s.Has("all") || s.Has(strings.ToLower(item)) {
-		return true
-	}
-	return false
+	return s.Has("all") || s.Has(strings.ToLower(item))
 }
 
 // normalizeURLString returns the normalized string, or an error if it can't be parsed into an URL object.

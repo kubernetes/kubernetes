@@ -348,10 +348,8 @@ func isEmptyUnstructuredObject(in runtime.Object) bool {
 	if _, ok := u.Object["kind"]; !ok {
 		return false
 	}
-	if _, ok := u.Object["apiVersion"]; !ok {
-		return false
-	}
-	return true
+	_, ok = u.Object["apiVersion"]
+	return ok
 }
 
 // validateConvertedObject checks that ObjectMeta fields match, with the exception of

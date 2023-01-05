@@ -513,11 +513,7 @@ func needsCleanup(service *v1.Service) bool {
 	}
 
 	// Service doesn't want loadBalancer but owns loadBalancer finalizer also need to be cleaned up.
-	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
-		return true
-	}
-
-	return false
+	return service.Spec.Type != v1.ServiceTypeLoadBalancer
 }
 
 // needsUpdate checks if load balancer needs to be updated due to change in attributes.

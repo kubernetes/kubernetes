@@ -280,10 +280,7 @@ func boolPtrChanged(ptr1, ptr2 *bool) bool {
 	if (ptr1 == nil) != (ptr2 == nil) {
 		return true
 	}
-	if ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2 {
-		return true
-	}
-	return false
+	return ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2
 }
 
 // stringPtrChanged returns true if a set of string pointers have different values.
@@ -291,10 +288,7 @@ func stringPtrChanged(ptr1, ptr2 *string) bool {
 	if (ptr1 == nil) != (ptr2 == nil) {
 		return true
 	}
-	if ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2 {
-		return true
-	}
-	return false
+	return ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2
 }
 
 // EndpointSubsetsEqualIgnoreResourceVersion returns true if EndpointSubsets

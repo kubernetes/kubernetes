@@ -36,10 +36,7 @@ import (
 // TODO: replace with `framework.NodeOSDistroIs` when #81245 is complete
 func NodeOSDistroIs(distro string) bool {
 	var nodeOsDistro *flag.Flag = flag.Lookup("node-os-distro")
-	if nodeOsDistro != nil && nodeOsDistro.Value.String() == distro {
-		return true
-	}
-	return false
+	return nodeOsDistro != nil && nodeOsDistro.Value.String() == distro
 }
 
 // GenerateScriptCmd generates the corresponding command lines to execute a command.

@@ -185,11 +185,7 @@ func verbMatches(p abac.Policy, a authorizer.Attributes) bool {
 	}
 
 	// Allow if policy is not readonly
-	if !p.Spec.Readonly {
-		return true
-	}
-
-	return false
+	return !p.Spec.Readonly
 }
 
 func nonResourceMatches(p abac.Policy, a authorizer.Attributes) bool {

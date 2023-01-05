@@ -986,10 +986,8 @@ func (nc *Controller) processNoTaintBaseEviction(ctx context.Context, node *v1.N
 const labelNodeDisruptionExclusion = "node.kubernetes.io/exclude-disruption"
 
 func isNodeExcludedFromDisruptionChecks(node *v1.Node) bool {
-	if _, ok := node.Labels[labelNodeDisruptionExclusion]; ok {
-		return true
-	}
-	return false
+	_, ok := node.Labels[labelNodeDisruptionExclusion]
+	return ok
 }
 
 // tryUpdateNodeHealth checks a given node's conditions and tries to update it. Returns grace period to

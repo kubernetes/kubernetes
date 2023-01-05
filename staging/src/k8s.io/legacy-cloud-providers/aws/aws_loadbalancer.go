@@ -77,10 +77,7 @@ var (
 )
 
 func isNLB(annotations map[string]string) bool {
-	if annotations[ServiceAnnotationLoadBalancerType] == "nlb" {
-		return true
-	}
-	return false
+	return annotations[ServiceAnnotationLoadBalancerType] == "nlb"
 }
 
 func isLBExternal(annotations map[string]string) bool {

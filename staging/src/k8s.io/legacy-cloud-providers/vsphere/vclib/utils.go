@@ -38,11 +38,7 @@ func IsNotFound(err error) bool {
 	}
 
 	_, ok = err.(*find.DefaultNotFoundError)
-	if ok {
-		return true
-	}
-
-	return false
+	return ok
 }
 
 func getFinder(dc *Datacenter) *find.Finder {

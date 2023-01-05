@@ -276,8 +276,5 @@ func CreatePersistentVolumeClaimWithRetries(c clientset.Interface, namespace str
 
 // isGenerateNameConflict returns whether the error is generateName conflict or not.
 func isGenerateNameConflict(meta metav1.ObjectMeta, err error) bool {
-	if apierrors.IsAlreadyExists(err) && meta.Name == "" {
-		return true
-	}
-	return false
+	return apierrors.IsAlreadyExists(err) && meta.Name == ""
 }

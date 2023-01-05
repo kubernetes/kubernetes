@@ -230,10 +230,7 @@ func (grm *nestedPendingOperations) IsOperationPending(
 
 	opKey := operationKey{volumeName, podName, nodeName}
 	exist, previousOpIndex := grm.isOperationExists(opKey)
-	if exist && grm.operations[previousOpIndex].operationPending {
-		return true
-	}
-	return false
+	return exist && grm.operations[previousOpIndex].operationPending
 }
 
 // This is an internal function and caller should acquire and release the lock

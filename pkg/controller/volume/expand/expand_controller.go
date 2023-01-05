@@ -375,10 +375,7 @@ func (expc *expandController) isNodeExpandComplete(pvc *v1.PersistentVolumeClaim
 
 	// since we allow shrinking volumes, we must compare both pvc status and capacity
 	// with pv spec capacity.
-	if pvcStatusCap.Cmp(*pvcSpecCap) >= 0 && pvcStatusCap.Cmp(pvCap) >= 0 {
-		return true
-	}
-	return false
+	return pvcStatusCap.Cmp(*pvcSpecCap) >= 0 && pvcStatusCap.Cmp(pvCap) >= 0
 }
 
 // Implementing VolumeHost interface
