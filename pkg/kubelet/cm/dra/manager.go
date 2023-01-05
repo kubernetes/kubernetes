@@ -19,6 +19,7 @@ package dra
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +40,8 @@ type ManagerImpl struct {
 	// KubeClient reference
 	kubeClient clientset.Interface
 }
+
+const draTimeout = 2 * time.Second
 
 // NewManagerImpl creates a new manager.
 func NewManagerImpl(kubeClient clientset.Interface) (*ManagerImpl, error) {
@@ -112,8 +115,11 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 				return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", driverName, err)
 			}
 
+			ctx, cancel := context.WithTimeout(context.Background(), draTimeout)
+			defer cancel()
+
 			response, err := client.NodePrepareResource(
-				context.Background(),
+				ctx,
 				resourceClaim.Namespace,
 				resourceClaim.UID,
 				resourceClaim.Name,
@@ -219,8 +225,11 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", claimInfo.driverName, err)
 		}
 
+		ctx, cancel := context.WithTimeout(context.Background(), draTimeout)
+		defer cancel()
+
 		response, err := client.NodeUnprepareResource(
-			context.Background(),
+			ctx,
 			claimInfo.namespace,
 			claimInfo.claimUID,
 			claimInfo.claimName,
