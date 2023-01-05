@@ -135,10 +135,6 @@ done < "${KUBE_TEMP}"/licenses.csv
 awk '{ printf "%-100s : %-20s : %s\n", $1, $2, $3 }' "${KUBE_TEMP}"/approved_licenses.dump
 
 
-# cleanup
-git remote remove licenses
-
-
 if [[ ${#packages_url_missing[@]} -gt 0 ]]; then
 	echo -e '\n[ERROR] The following go-packages in the project have unknown or unreachable license URL:'
 	awk '{ printf "%-100s :  %-20s : %s\n", $1, $2, $3 }' "${KUBE_TEMP}"/approved_licenses_with_missing_urls.dump
