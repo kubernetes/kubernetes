@@ -1983,7 +1983,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			cache := internalcache.New(time.Duration(0), ctx.Done())
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -1994,8 +1997,6 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				cache.AddNode(node)
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			cs := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			for _, pvc := range test.pvcs {
@@ -2054,10 +2055,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 }
 
 func TestFindFitAllError(t *testing.T) {
-	nodes := makeNodeList([]string{"3", "2", "1"})
-	scheduler := makeScheduler(nodes)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	nodes := makeNodeList([]string{"3", "2", "1"})
+	scheduler := makeScheduler(ctx, nodes)
 
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
@@ -2093,10 +2095,11 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
-	nodes := makeNodeList([]string{"3", "2", "1"})
-	scheduler := makeScheduler(nodes)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	nodes := makeNodeList([]string{"3", "2", "1"})
+	scheduler := makeScheduler(ctx, nodes)
 
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
@@ -2188,7 +2191,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := makeScheduler(nodes)
+			scheduler := makeScheduler(ctx, nodes)
 			if err := scheduler.Cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
@@ -2597,9 +2600,10 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		nodeNames = append(nodeNames, strconv.Itoa(i))
 	}
 	nodes := makeNodeList(nodeNames)
-	sched := makeScheduler(nodes)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	sched := makeScheduler(ctx, nodes)
+
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -2661,11 +2665,14 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := clientsetfake.NewSimpleClientset(test.pod)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			cache := internalcache.New(time.Duration(0), ctx.Done())
 			for _, n := range nodes {
 				cache.AddNode(n)
 			}
@@ -2681,8 +2688,6 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				registerFakeFilterFunc,
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			fwk, err := st.NewFramework(
 				registerPlugins, "", ctx.Done(),
 				frameworkruntime.WithClientSet(client),
@@ -2744,8 +2749,8 @@ func makeNodeList(nodeNames []string) []*v1.Node {
 }
 
 // makeScheduler makes a simple Scheduler for testing.
-func makeScheduler(nodes []*v1.Node) *Scheduler {
-	cache := internalcache.New(time.Duration(0), wait.NeverStop)
+func makeScheduler(ctx context.Context, nodes []*v1.Node) *Scheduler {
+	cache := internalcache.New(time.Duration(0), ctx.Done())
 	for _, n := range nodes {
 		cache.AddNode(n)
 	}
