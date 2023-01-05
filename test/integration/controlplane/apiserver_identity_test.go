@@ -196,8 +196,8 @@ func newTestLease(acquireTime time.Time, namespace string) *coordinationv1.Lease
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity:       pointer.StringPtr(testLeaseName),
-			LeaseDurationSeconds: pointer.Int32Ptr(3600),
+			HolderIdentity:       pointer.String(testLeaseName),
+			LeaseDurationSeconds: pointer.Int32(3600),
 			AcquireTime:          &metav1.MicroTime{Time: acquireTime},
 			RenewTime:            &metav1.MicroTime{Time: acquireTime},
 		},
