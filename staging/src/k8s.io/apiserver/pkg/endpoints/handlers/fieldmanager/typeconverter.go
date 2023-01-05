@@ -23,7 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
-	"k8s.io/kube-openapi/pkg/util/proto"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
@@ -70,10 +71,14 @@ type typeConverter struct {
 
 var _ TypeConverter = &typeConverter{}
 
-// NewTypeConverter builds a TypeConverter from a proto.Models. This
+// NewTypeConverter builds a TypeConverter from a spec.Swagger. This
 // will automatically find the proper version of the object, and the
 // corresponding schema information.
-func NewTypeConverter(models proto.Models, preserveUnknownFields bool) (TypeConverter, error) {
+func NewTypeConverter(openapiSpec *spec.Swagger, preserveUnknownFields bool) (TypeConverter, error) {
+	models, err := utilopenapi.ToProtoModels(openapiSpec)
+	if err != nil {
+		return nil, err
+	}
 	parser, err := managedfields.NewGVKParser(models, preserveUnknownFields)
 	if err != nil {
 		return nil, err

@@ -750,15 +750,6 @@ items:
     verbs:
     - list
   - apiGroups:
-    - ""
-    resourceNames:
-    - 'http:heapster:'
-    - 'https:heapster:'
-    resources:
-    - services/proxy
-    verbs:
-    - get
-  - apiGroups:
     - metrics.k8s.io
     resources:
     - pods

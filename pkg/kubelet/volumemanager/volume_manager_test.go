@@ -21,6 +21,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,6 +135,82 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 				t.Errorf("Expected %v to be in use but got %v", expectedInUse, actualInUse)
 			}
 		})
+	}
+}
+
+func TestWaitForAttachAndMountError(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "abc",
+			Namespace: "nsA",
+			UID:       "1234",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volumetest.FailMountDeviceVolumeName,
+							MountPath: "/vol1",
+						},
+						{
+							Name:      "vol2",
+							MountPath: "/vol2",
+						},
+						{
+							Name:      "vol3",
+							MountPath: "/vol3",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: volumetest.FailMountDeviceVolumeName,
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{},
+					},
+				},
+				{
+					Name: "vol2",
+					VolumeSource: v1.VolumeSource{
+						RBD: &v1.RBDVolumeSource{},
+					},
+				},
+				{
+					Name: "vol3",
+					VolumeSource: v1.VolumeSource{
+						AzureDisk: &v1.AzureDiskVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+
+	kubeClient := fake.NewSimpleClientset(pod)
+
+	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, nil)
+
+	stopCh := runVolumeManager(manager)
+	defer close(stopCh)
+
+	podManager.SetPods([]*v1.Pod{pod})
+
+	err = manager.WaitForAttachAndMount(pod)
+	if err == nil {
+		t.Errorf("Expected error, got none")
+	}
+	if !strings.Contains(err.Error(),
+		"unattached volumes=[vol2], failed to process volumes=[vol3]") {
+		t.Errorf("Unexpected error info: %v", err)
 	}
 }
 
@@ -282,14 +359,29 @@ func (p *fakePodStateProvider) ShouldPodContainersBeTerminating(uid kubetypes.UI
 }
 
 func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manager, kubeClient clientset.Interface, node *v1.Node) VolumeManager {
-	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	attachablePlug := &volumetest.FakeVolumePlugin{
+		PluginName: "fake",
+		Host:       nil,
+		CanSupportFn: func(spec *volume.Spec) bool {
+			return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD != nil) ||
+				(spec.Volume != nil && spec.Volume.RBD != nil)
+		},
+	}
+	unattachablePlug := &volumetest.FakeVolumePlugin{
+		PluginName:    "unattachable-fake-plugin",
+		Host:          nil,
+		NonAttachable: true,
+		CanSupportFn: func(spec *volume.Spec) bool {
+			return spec.Volume != nil && spec.Volume.ConfigMap != nil
+		},
+	}
 	fakeRecorder := &record.FakeRecorder{}
 	plugMgr := &volume.VolumePluginMgr{}
 	// TODO (#51147) inject mock prober
 	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, kubeClient, nil)
 	fakeVolumeHost.WithNode(node)
 
-	plugMgr.InitPlugins([]volume.VolumePlugin{plug}, nil /* prober */, fakeVolumeHost)
+	plugMgr.InitPlugins([]volume.VolumePlugin{attachablePlug, unattachablePlug}, nil /* prober */, fakeVolumeHost)
 	stateProvider := &fakePodStateProvider{}
 	fakePathHandler := volumetest.NewBlockVolumePathHandler()
 	vm := NewVolumeManager(

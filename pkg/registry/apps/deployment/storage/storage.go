@@ -92,9 +92,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apps.Deployment{} },
-		NewListFunc:              func() runtime.Object { return &apps.DeploymentList{} },
-		DefaultQualifiedResource: apps.Resource("deployments"),
+		NewFunc:                   func() runtime.Object { return &apps.Deployment{} },
+		NewListFunc:               func() runtime.Object { return &apps.DeploymentList{} },
+		DefaultQualifiedResource:  apps.Resource("deployments"),
+		SingularQualifiedResource: apps.Resource("deployment"),
 
 		CreateStrategy:      deployment.Strategy,
 		UpdateStrategy:      deployment.Strategy,

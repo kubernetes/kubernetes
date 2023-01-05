@@ -35,9 +35,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against RoleBinding objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &rbac.RoleBinding{} },
-		NewListFunc:              func() runtime.Object { return &rbac.RoleBindingList{} },
-		DefaultQualifiedResource: rbac.Resource("rolebindings"),
+		NewFunc:                   func() runtime.Object { return &rbac.RoleBinding{} },
+		NewListFunc:               func() runtime.Object { return &rbac.RoleBindingList{} },
+		DefaultQualifiedResource:  rbac.Resource("rolebindings"),
+		SingularQualifiedResource: rbac.Resource("rolebinding"),
 
 		CreateStrategy: rolebinding.Strategy,
 		UpdateStrategy: rolebinding.Strategy,

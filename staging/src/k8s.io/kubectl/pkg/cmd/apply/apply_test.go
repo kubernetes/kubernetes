@@ -147,6 +147,14 @@ func TestApplyFlagValidation(t *testing.T) {
 			},
 			expectedErr: "--force cannot be used with --prune",
 		},
+		{
+			args: [][]string{
+				{"server-side", "true"},
+				{"prune", "true"},
+				{"all", "true"},
+			},
+			expectedErr: "--prune is in alpha and doesn't currently work on objects created by server-side apply",
+		},
 	}
 
 	for _, test := range tests {

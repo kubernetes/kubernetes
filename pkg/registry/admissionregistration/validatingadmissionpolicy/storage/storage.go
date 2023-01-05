@@ -47,7 +47,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authori
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*admissionregistration.ValidatingAdmissionPolicy).Name, nil
 		},
-		DefaultQualifiedResource: groupResource,
+		DefaultQualifiedResource:  groupResource,
+		SingularQualifiedResource: admissionregistration.Resource("validatingadmissionpolicy"),
 
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,

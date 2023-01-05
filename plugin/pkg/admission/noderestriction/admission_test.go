@@ -297,8 +297,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace: api.NamespaceNodeLease,
 			},
 			Spec: coordination.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr("mynode"),
-				LeaseDurationSeconds: pointer.Int32Ptr(40),
+				HolderIdentity:       pointer.String("mynode"),
+				LeaseDurationSeconds: pointer.Int32(40),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
 			},
 		}
@@ -308,8 +308,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: coordination.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr("mynode"),
-				LeaseDurationSeconds: pointer.Int32Ptr(40),
+				HolderIdentity:       pointer.String("mynode"),
+				LeaseDurationSeconds: pointer.Int32(40),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
 			},
 		}
@@ -319,8 +319,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace: api.NamespaceNodeLease,
 			},
 			Spec: coordination.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr("mynode"),
-				LeaseDurationSeconds: pointer.Int32Ptr(40),
+				HolderIdentity:       pointer.String("mynode"),
+				LeaseDurationSeconds: pointer.Int32(40),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
 			},
 		}
