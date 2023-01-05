@@ -501,6 +501,8 @@ function codegen::openapi() {
             "${apimachinery_dirs[@]}"
         )
 
+    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+
     for prefix in "${targets[@]}"; do
         local report_file="${OUT_DIR}/${prefix}_violations.report"
         # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
