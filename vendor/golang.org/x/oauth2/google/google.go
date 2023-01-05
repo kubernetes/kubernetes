@@ -122,7 +122,6 @@ type credentialsFile struct {
 	TokenURLExternal               string                           `json:"token_url"`
 	TokenInfoURL                   string                           `json:"token_info_url"`
 	ServiceAccountImpersonationURL string                           `json:"service_account_impersonation_url"`
-	ServiceAccountImpersonation    serviceAccountImpersonationInfo  `json:"service_account_impersonation"`
 	Delegates                      []string                         `json:"delegates"`
 	CredentialSource               externalaccount.CredentialSource `json:"credential_source"`
 	QuotaProjectID                 string                           `json:"quota_project_id"`
@@ -130,10 +129,6 @@ type credentialsFile struct {
 
 	// Service account impersonation
 	SourceCredentials *credentialsFile `json:"source_credentials"`
-}
-
-type serviceAccountImpersonationInfo struct {
-	TokenLifetimeSeconds int `json:"token_lifetime_seconds"`
 }
 
 func (f *credentialsFile) jwtConfig(scopes []string, subject string) *jwt.Config {
@@ -144,7 +139,6 @@ func (f *credentialsFile) jwtConfig(scopes []string, subject string) *jwt.Config
 		Scopes:       scopes,
 		TokenURL:     f.TokenURL,
 		Subject:      subject, // This is the user email to impersonate
-		Audience:     f.Audience,
 	}
 	if cfg.TokenURL == "" {
 		cfg.TokenURL = JWTTokenURL
@@ -183,13 +177,12 @@ func (f *credentialsFile) tokenSource(ctx context.Context, params CredentialsPar
 			TokenURL:                       f.TokenURLExternal,
 			TokenInfoURL:                   f.TokenInfoURL,
 			ServiceAccountImpersonationURL: f.ServiceAccountImpersonationURL,
-			ServiceAccountImpersonationLifetimeSeconds: f.ServiceAccountImpersonation.TokenLifetimeSeconds,
-			ClientSecret:             f.ClientSecret,
-			ClientID:                 f.ClientID,
-			CredentialSource:         f.CredentialSource,
-			QuotaProjectID:           f.QuotaProjectID,
-			Scopes:                   params.Scopes,
-			WorkforcePoolUserProject: f.WorkforcePoolUserProject,
+			ClientSecret:                   f.ClientSecret,
+			ClientID:                       f.ClientID,
+			CredentialSource:               f.CredentialSource,
+			QuotaProjectID:                 f.QuotaProjectID,
+			Scopes:                         params.Scopes,
+			WorkforcePoolUserProject:       f.WorkforcePoolUserProject,
 		}
 		return cfg.TokenSource(ctx)
 	case impersonatedServiceAccount:
