@@ -17,12 +17,8 @@ limitations under the License.
 package fieldmanagertest
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,35 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
-
-var builtinConverter = func() fieldmanager.TypeConverter {
-	data, err := ioutil.ReadFile(filepath.Join(
-		strings.Repeat(".."+string(filepath.Separator), 8),
-		"api", "openapi-spec", "swagger.json"))
-	if err != nil {
-		panic(err)
-	}
-	spec := spec.Swagger{}
-	if err := json.Unmarshal(data, &spec); err != nil {
-		panic(err)
-	}
-	tc, err := fieldmanager.NewTypeConverter(&spec, false)
-	if err != nil {
-		panic(fmt.Errorf("Failed to build TypeConverter: %v", err))
-	}
-	return tc
-}()
-
-// NewBuiltinTypeConverter creates a TypeConverter with all the built-in
-// types defined, given the committed kubernetes swagger.json.
-func NewBuiltinTypeConverter() fieldmanager.TypeConverter {
-	return builtinConverter
-}
 
 type fakeObjectConvertor struct {
 	converter  merge.Converter
@@ -132,13 +103,12 @@ type TestFieldManager struct {
 
 // NewDefaultTestFieldManager returns a new TestFieldManager built for
 // the given gvk, on the main resource.
-func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, "", nil)
+func NewDefaultTestFieldManager(typeConverter fieldmanager.TypeConverter, gvk schema.GroupVersionKind) TestFieldManager {
+	return NewTestFieldManager(typeConverter, gvk, "", nil)
 }
 
 // NewTestFieldManager creates a new manager for the given GVK.
-func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainFieldManager func(fieldmanager.Manager) fieldmanager.Manager) TestFieldManager {
-	typeConverter := NewBuiltinTypeConverter()
+func NewTestFieldManager(typeConverter fieldmanager.TypeConverter, gvk schema.GroupVersionKind, subresource string, chainFieldManager func(fieldmanager.Manager) fieldmanager.Manager) TestFieldManager {
 	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
 	objectConverter := &fakeObjectConvertor{sameVersionConverter{}, apiVersion}
 	f, err := fieldmanager.NewStructuredMergeManager(
