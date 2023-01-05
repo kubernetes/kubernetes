@@ -1445,7 +1445,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			fts:  feature.Features{EnablePodDisruptionConditions: true},
 			pod:  st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
 			pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().
-				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByKubeScheduler).Obj()},
+				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj()},
 			nodes:    []string{"node1"},
 			expected: false,
 		},
@@ -1462,7 +1462,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			fts:  feature.Features{EnablePodDisruptionConditions: false},
 			pod:  st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
 			pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().
-				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByKubeScheduler).Obj()},
+				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj()},
 			nodes:    []string{"node1"},
 			expected: false,
 		},

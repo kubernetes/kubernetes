@@ -275,7 +275,7 @@ func podTerminatingByPreemption(p *v1.Pod, enablePodDisruptionConditions bool) b
 
 	for _, condition := range p.Status.Conditions {
 		if condition.Type == v1.DisruptionTarget {
-			return condition.Status == v1.ConditionTrue && condition.Reason == v1.PodReasonPreemptionByKubeScheduler
+			return condition.Status == v1.ConditionTrue && condition.Reason == v1.PodReasonPreemptionByScheduler
 		}
 	}
 	return false
