@@ -752,30 +752,39 @@ func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.Filter
 }
 
 // RunPostFilterPlugins runs the set of configured PostFilter plugins until the first
-// Success or Error is met, otherwise continues to execute all plugins.
+// Success, Error or UnschedulableAndUnresolvable is met; otherwise continues to execute all plugins.
 func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (_ *framework.PostFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(postFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	statuses := make(framework.PluginToStatus)
 	// `result` records the last meaningful(non-noop) PostFilterResult.
 	var result *framework.PostFilterResult
+	var reasons []string
+	var failedPlugin string
 	for _, pl := range f.postFilterPlugins {
 		r, s := f.runPostFilterPlugin(ctx, pl, state, pod, filteredNodeStatusMap)
 		if s.IsSuccess() {
 			return r, s
+		} else if s.Code() == framework.UnschedulableAndUnresolvable {
+			return r, s.WithFailedPlugin(pl.Name())
 		} else if !s.IsUnschedulable() {
-			// Any status other than Success or Unschedulable is Error.
-			return nil, framework.AsStatus(s.AsError())
+			// Any status other than Success, Unschedulable or UnschedulableAndUnresolvable is Error.
+			return nil, framework.AsStatus(s.AsError()).WithFailedPlugin(pl.Name())
 		} else if r != nil && r.Mode() != framework.ModeNoop {
 			result = r
 		}
-		statuses[pl.Name()] = s
+
+		reasons = append(reasons, s.Reasons()...)
+		// Record the first failed plugin unless we proved that
+		// the latter is more relevant.
+		if len(failedPlugin) == 0 {
+			failedPlugin = pl.Name()
+		}
 	}
 
-	return result, statuses.Merge()
+	return result, framework.NewStatus(framework.Unschedulable, reasons...).WithFailedPlugin(failedPlugin)
 }
 
 func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
