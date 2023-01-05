@@ -38,7 +38,6 @@ fi
 BASH_TARGETS=(
 	update-generated-protobuf
 	update-codegen
-	update-generated-proto-bindings
 	update-generated-api-compatibility-data
 	update-generated-docs
 	update-generated-swagger-docs

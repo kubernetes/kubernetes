@@ -1,4 +1,4 @@
-// To regenerate api.pb.go run hack/update-generated-proto-bindings.sh
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
 syntax = "proto3";
 
 package v1alpha1;

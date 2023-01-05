@@ -777,6 +777,12 @@ function codegen::subprojects() {
     done
 }
 
+function codegen::protobindings() {
+    # NOTE: All output from this script needs to be copied back to the calling
+    # source tree.  This is managed in kube::build::copy_output in build/common.sh.
+    # If the output set is changed update that function.
+    build/run.sh hack/update-generated-proto-bindings-dockerized.sh
+}
 
 #
 # main
