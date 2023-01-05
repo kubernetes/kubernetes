@@ -61,7 +61,7 @@ func makePort(proto *api.Protocol, port intstr.IntOrString, endPort int32) netwo
 		r.Port = &port
 	}
 	if endPort != 0 {
-		r.EndPort = utilpointer.Int32Ptr(endPort)
+		r.EndPort = utilpointer.Int32(endPort)
 	}
 	return r
 }
@@ -735,7 +735,7 @@ func TestValidateIngress(t *testing.T) {
 								Backend: networking.IngressBackend{
 									Service: serviceBackend,
 									Resource: &api.TypedLocalObjectReference{
-										APIGroup: utilpointer.StringPtr("example.com"),
+										APIGroup: utilpointer.String("example.com"),
 										Kind:     "foo",
 										Name:     "bar",
 									},
@@ -760,7 +760,7 @@ func TestValidateIngress(t *testing.T) {
 								Backend: networking.IngressBackend{
 									Service: serviceBackend,
 									Resource: &api.TypedLocalObjectReference{
-										APIGroup: utilpointer.StringPtr("example.com"),
+										APIGroup: utilpointer.String("example.com"),
 										Kind:     "foo",
 										Name:     "bar",
 									},
@@ -779,7 +779,7 @@ func TestValidateIngress(t *testing.T) {
 				ing.Spec.DefaultBackend = &networking.IngressBackend{
 					Service: serviceBackend,
 					Resource: &api.TypedLocalObjectReference{
-						APIGroup: utilpointer.StringPtr("example.com"),
+						APIGroup: utilpointer.String("example.com"),
 						Kind:     "foo",
 						Name:     "bar",
 					},
@@ -794,7 +794,7 @@ func TestValidateIngress(t *testing.T) {
 				ing.Spec.DefaultBackend = &networking.IngressBackend{
 					Service: serviceBackend,
 					Resource: &api.TypedLocalObjectReference{
-						APIGroup: utilpointer.StringPtr("example.com"),
+						APIGroup: utilpointer.String("example.com"),
 						Kind:     "foo",
 						Name:     "bar",
 					},
@@ -961,7 +961,7 @@ func TestValidateIngressCreate(t *testing.T) {
 		Service: serviceBackend,
 	}
 	resourceBackend := &api.TypedLocalObjectReference{
-		APIGroup: utilpointer.StringPtr("example.com"),
+		APIGroup: utilpointer.String("example.com"),
 		Kind:     "foo",
 		Name:     "bar",
 	}
@@ -983,7 +983,7 @@ func TestValidateIngressCreate(t *testing.T) {
 	}{
 		"class field set": {
 			tweakIngress: func(ingress *networking.Ingress) {
-				ingress.Spec.IngressClassName = utilpointer.StringPtr("bar")
+				ingress.Spec.IngressClassName = utilpointer.String("bar")
 			},
 			expectedErrs: field.ErrorList{},
 		},
@@ -995,7 +995,7 @@ func TestValidateIngressCreate(t *testing.T) {
 		},
 		"class field and annotation set": {
 			tweakIngress: func(ingress *networking.Ingress) {
-				ingress.Spec.IngressClassName = utilpointer.StringPtr("bar")
+				ingress.Spec.IngressClassName = utilpointer.String("bar")
 				ingress.Annotations = map[string]string{annotationIngressClass: "foo"}
 			},
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("annotations").Child(annotationIngressClass), "foo", "can not be set when the class field is also set")},
@@ -1138,7 +1138,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 		Service: serviceBackend,
 	}
 	resourceBackend := &api.TypedLocalObjectReference{
-		APIGroup: utilpointer.StringPtr("example.com"),
+		APIGroup: utilpointer.String("example.com"),
 		Kind:     "foo",
 		Name:     "bar",
 	}
@@ -1159,7 +1159,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 	}{
 		"class field set": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
-				newIngress.Spec.IngressClassName = utilpointer.StringPtr("bar")
+				newIngress.Spec.IngressClassName = utilpointer.String("bar")
 			},
 			expectedErrs: field.ErrorList{},
 		},
@@ -1171,7 +1171,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 		},
 		"class field and annotation set": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
-				newIngress.Spec.IngressClassName = utilpointer.StringPtr("bar")
+				newIngress.Spec.IngressClassName = utilpointer.String("bar")
 				newIngress.Annotations = map[string]string{annotationIngressClass: "foo"}
 			},
 			expectedErrs: field.ErrorList{},
@@ -1595,44 +1595,44 @@ func TestValidateIngressClass(t *testing.T) {
 		},
 		"valid name, valid controller, valid params": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(utilpointer.StringPtr("example.com"), "foo", "bar", utilpointer.StringPtr("Cluster"), nil)),
+				setParams(makeIngressClassParams(utilpointer.String("example.com"), "foo", "bar", utilpointer.String("Cluster"), nil)),
 			),
 			expectedErrs: field.ErrorList{},
 		},
 		"valid name, valid controller, invalid params (no kind)": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(utilpointer.StringPtr("example.com"), "", "bar", utilpointer.StringPtr("Cluster"), nil)),
+				setParams(makeIngressClassParams(utilpointer.String("example.com"), "", "bar", utilpointer.String("Cluster"), nil)),
 			),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.parameters.kind"), "kind is required")},
 		},
 		"valid name, valid controller, invalid params (no name)": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(utilpointer.StringPtr("example.com"), "foo", "", utilpointer.StringPtr("Cluster"), nil)),
+				setParams(makeIngressClassParams(utilpointer.String("example.com"), "foo", "", utilpointer.String("Cluster"), nil)),
 			),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.parameters.name"), "name is required")},
 		},
 		"valid name, valid controller, invalid params (bad kind)": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(nil, "foo/", "bar", utilpointer.StringPtr("Cluster"), nil)),
+				setParams(makeIngressClassParams(nil, "foo/", "bar", utilpointer.String("Cluster"), nil)),
 			),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec.parameters.kind"), "foo/", "may not contain '/'")},
 		},
 		"valid name, valid controller, invalid params (bad scope)": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("bad-scope"), nil)),
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.String("bad-scope"), nil)),
 			),
 			expectedErrs: field.ErrorList{field.NotSupported(field.NewPath("spec.parameters.scope"),
 				"bad-scope", []string{"Cluster", "Namespace"})},
 		},
 		"valid name, valid controller, valid Namespace scope": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Namespace"), utilpointer.StringPtr("foo-ns"))),
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.String("Namespace"), utilpointer.String("foo-ns"))),
 			),
 			expectedErrs: field.ErrorList{},
 		},
 		"valid name, valid controller, valid scope, invalid namespace": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Namespace"), utilpointer.StringPtr("foo_ns"))),
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.String("Namespace"), utilpointer.String("foo_ns"))),
 			),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec.parameters.namespace"), "foo_ns",
 				"a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-',"+
@@ -1641,27 +1641,27 @@ func TestValidateIngressClass(t *testing.T) {
 		},
 		"valid name, valid controller, valid Cluster scope": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Cluster"), nil)),
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.String("Cluster"), nil)),
 			),
 			expectedErrs: field.ErrorList{},
 		},
 		"namespace not set when scope is Namespace": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Namespace"), nil)),
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.String("Namespace"), nil)),
 			),
 			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.parameters.namespace"),
 				"`parameters.scope` is set to 'Namespace'")},
 		},
 		"namespace is forbidden when scope is Cluster": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Cluster"), utilpointer.StringPtr("foo-ns"))),
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.String("Cluster"), utilpointer.String("foo-ns"))),
 			),
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec.parameters.namespace"),
 				"`parameters.scope` is set to 'Cluster'")},
 		},
 		"empty namespace is forbidden when scope is Cluster": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.StringPtr("Cluster"), utilpointer.StringPtr(""))),
+				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.String("Cluster"), utilpointer.String(""))),
 			),
 			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec.parameters.namespace"),
 				"`parameters.scope` is set to 'Cluster'")},
@@ -1712,7 +1712,7 @@ func TestValidateIngressClassUpdate(t *testing.T) {
 			newIngressClass: makeValidIngressClass("test123", "foo.co/bar",
 				setResourceVersion("2"),
 				setParams(
-					makeIngressClassParams(utilpointer.StringPtr("v1"), "ConfigMap", "foo", utilpointer.StringPtr("Namespace"), utilpointer.StringPtr("bar")),
+					makeIngressClassParams(utilpointer.String("v1"), "ConfigMap", "foo", utilpointer.String("Namespace"), utilpointer.String("bar")),
 				),
 			),
 			oldIngressClass: makeValidIngressClass("test123", "foo.co/bar"),
