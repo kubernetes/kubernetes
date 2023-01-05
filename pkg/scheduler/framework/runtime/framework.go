@@ -599,8 +599,10 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 // *Status and its code is set to non-success if any of the plugins returns
-// anything but Success. If a non-success status is returned, then the scheduling
-// cycle is aborted.
+// anything but Success/Skip.
+// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
+// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
+// If a non-success status is returned, then the scheduling cycle is aborted.
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
@@ -608,8 +610,13 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 	}()
 	var result *framework.PreFilterResult
 	var pluginsWithNodes []string
+	skipPlugins := sets.New[string]()
 	for _, pl := range f.preFilterPlugins {
 		r, s := f.runPreFilterPlugin(ctx, pl, state, pod)
+		if s.IsSkip() {
+			skipPlugins.Insert(pl.Name())
+			continue
+		}
 		if !s.IsSuccess() {
 			s.SetFailedPlugin(pl.Name())
 			if s.IsUnschedulable() {
@@ -628,8 +635,8 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			}
 			return nil, framework.NewStatus(framework.Unschedulable, msg)
 		}
-
 	}
+	state.SkipFilterPlugins = skipPlugins
 	return result, nil
 }
 
@@ -654,7 +661,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 	nodeInfo *framework.NodeInfo,
 ) (status *framework.Status) {
 	for _, pl := range f.preFilterPlugins {
-		if pl.PreFilterExtensions() == nil {
+		if pl.PreFilterExtensions() == nil || state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
 		}
 		status = f.runPreFilterExtensionAddPod(ctx, pl, state, podToSchedule, podInfoToAdd, nodeInfo)
@@ -689,7 +696,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	nodeInfo *framework.NodeInfo,
 ) (status *framework.Status) {
 	for _, pl := range f.preFilterPlugins {
-		if pl.PreFilterExtensions() == nil {
+		if pl.PreFilterExtensions() == nil || state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
 		}
 		status = f.runPreFilterExtensionRemovePod(ctx, pl, state, podToSchedule, podInfoToRemove, nodeInfo)
@@ -726,6 +733,9 @@ func (f *frameworkImpl) RunFilterPlugins(
 	var status *framework.Status
 
 	for _, pl := range f.filterPlugins {
+		if state.SkipFilterPlugins.Has(pl.Name()) {
+			continue
+		}
 		status = f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
 		if !status.IsSuccess() {
 			if !status.IsUnschedulable() {
