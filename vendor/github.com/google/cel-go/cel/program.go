@@ -213,7 +213,10 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 		factory := func(state interpreter.EvalState, costTracker *interpreter.CostTracker) (Program, error) {
 			costTracker.Estimator = p.callCostEstimator
 			costTracker.Limit = p.costLimit
-			decs := decorators
+			// Limit capacity to guarantee a reallocation when calling 'append(decs, ...)' below. This
+			// prevents the underlying memory from being shared between factory function calls causing
+			// undesired mutations.
+			decs := decorators[:len(decorators):len(decorators)]
 			var observers []interpreter.EvalObserver
 
 			if p.evalOpts&(OptExhaustiveEval|OptTrackState) != 0 {
