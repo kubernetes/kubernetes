@@ -333,6 +333,8 @@ function codegen::conversions() {
         done
     fi
 
+    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+
     ./hack/run-in-gopath.sh "${gen_conversion_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
