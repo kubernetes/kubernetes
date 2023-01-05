@@ -7,7 +7,7 @@ go 1.19
 require (
 	github.com/emicklei/go-restful/v3 v3.9.0
 	github.com/gogo/protobuf v1.3.2
-	github.com/google/cel-go v0.12.5
+	github.com/google/cel-go v0.12.6
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.9
 	github.com/google/gofuzz v1.1.0
