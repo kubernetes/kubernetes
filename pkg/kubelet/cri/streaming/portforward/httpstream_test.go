@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -129,7 +130,7 @@ func TestGetStreamPair(t *testing.T) {
 	// start the monitor for this pair
 	monitorDone := make(chan struct{})
 	go func() {
-		h.monitorStreamPair(p, timeout)
+		h.monitorStreamPair(context.Background(), p, timeout)
 		close(monitorDone)
 	}()
 
@@ -191,7 +192,7 @@ func TestGetStreamPair(t *testing.T) {
 
 	monitorDone = make(chan struct{})
 	go func() {
-		h.monitorStreamPair(p, timeout)
+		h.monitorStreamPair(context.Background(), p, timeout)
 		close(monitorDone)
 	}()
 	// cause the timeout
@@ -199,6 +200,33 @@ func TestGetStreamPair(t *testing.T) {
 	// make sure monitorStreamPair completed
 	<-monitorDone
 	if h.hasStreamPair("2") {
+		t.Fatal("expected stream pair to be removed")
+	}
+	if !conn.removeStreamsCalled {
+		t.Fatalf("connection remove stream not called")
+	}
+
+	// removed via ctx
+	conn.removeStreamsCalled = false
+	p, created = h.getStreamPair("3")
+	if !created {
+		t.Fatal("expected created=true")
+	}
+	if p == nil {
+		t.Fatal("expected p not to be nil")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	monitorDone = make(chan struct{})
+	go func() {
+		h.monitorStreamPair(ctx, p, nil)
+		close(monitorDone)
+	}()
+	// cancel the context
+	cancel()
+	// make sure monitorStreamPair completed
+	<-monitorDone
+	if h.hasStreamPair("3") {
 		t.Fatal("expected stream pair to be removed")
 	}
 	if !conn.removeStreamsCalled {

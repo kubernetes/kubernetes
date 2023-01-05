@@ -142,7 +142,7 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 		uid:         uid,
 		forwarder:   portForwarder,
 	}
-	h.run(req.Context()) // TODO confirm this is correct
+	h.run(req.Context())
 
 	return nil
 }

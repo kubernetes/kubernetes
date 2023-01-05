@@ -63,7 +63,7 @@ func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 		uid:                   uid,
 		forwarder:             portForwarder,
 	}
-	h.run(req.Context()) // TODO confirm this is correct
+	h.run(req.Context())
 
 	return nil
 }
@@ -135,10 +135,14 @@ func (h *httpStreamHandler) getStreamPair(requestID string) (*httpStreamPair, bo
 }
 
 // monitorStreamPair waits for the pair to receive both its error and data
-// streams, or for the timeout to expire (whichever happens first), and then
+// streams, or for the timeout/ctx to expire (whichever happens first), and then
 // removes the pair.
-func (h *httpStreamHandler) monitorStreamPair(p *httpStreamPair, timeout <-chan time.Time) {
+func (h *httpStreamHandler) monitorStreamPair(ctx context.Context, p *httpStreamPair, timeout <-chan time.Time) {
 	select {
+	case <-ctx.Done():
+		err := fmt.Errorf("request %q canceled while waiting for streams", p.requestID)
+		utilruntime.HandleError(err)
+		p.printError(err.Error())
 	case <-timeout:
 		err := fmt.Errorf("request %q timed out waiting for streams", p.requestID)
 		utilruntime.HandleError(err)
@@ -215,6 +219,9 @@ func (h *httpStreamHandler) run(ctx context.Context) {
 Loop:
 	for {
 		select {
+		case <-ctx.Done():
+			klog.V(5).InfoS("Connection context closed")
+			break Loop
 		case <-h.conn.CloseChan():
 			klog.V(5).InfoS("Connection upgraded connection closed")
 			break Loop
@@ -225,7 +232,11 @@ Loop:
 
 			p, created := h.getStreamPair(requestID)
 			if created {
-				go h.monitorStreamPair(p, time.After(h.streamCreationTimeout))
+				go func() {
+					timer := time.NewTimer(h.streamCreationTimeout)
+					defer timer.Stop()
+					h.monitorStreamPair(ctx, p, timer.C)
+				}()
 			}
 			if complete, err := p.add(stream); err != nil {
 				msg := fmt.Sprintf("error processing stream for request %s: %v", requestID, err)
