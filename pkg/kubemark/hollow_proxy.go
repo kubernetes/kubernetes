@@ -85,9 +85,14 @@ func NewHollowProxyOrDie(
 			klog.InfoS("can't determine this node's IP, assuming 127.0.0.1")
 			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 		}
+		family := v1.IPv4Protocol
+		if iptInterface.IsIPv6() {
+			family = v1.IPv6Protocol
+		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
 		//var err error
 		proxier, err = iptables.NewProxier(
+			family,
 			iptInterface,
 			sysctl,
 			execer,
