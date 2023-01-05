@@ -6,6 +6,7 @@ on:
     tags:
     # Push events on datadog tags
     - "*-dd*"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -44,9 +45,9 @@ jobs:
         do
           sha256sum "$TARGET_FILE" > "${TARGET_FILE}.sha256sum"
         done
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v4
       with:
-        name: k8s_output
+        name: k8s_output_${{ matrix.platform }}
         path: _output/release-tars
   release:
     runs-on: ubuntu-latest
@@ -106,7 +107,7 @@ jobs:
     steps:
     - uses: actions/download-artifact@v2
       with:
-        name: k8s_output
+        name: k8s_output_${{ matrix.platform }}
         path: _output/release-tars
     - name: Display structure of downloaded files
       run: ls -R
