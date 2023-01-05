@@ -40,13 +40,14 @@ type pruner struct {
 	resources         []prune.Resource
 }
 
-func newPruner(dc dynamic.Interface, m meta.RESTMapper, r []prune.Resource) *pruner {
+func newPruner(dc dynamic.Interface, m meta.RESTMapper, r []prune.Resource, selector string) *pruner {
 	return &pruner{
 		visitedUids:       sets.NewString(),
 		visitedNamespaces: sets.NewString(),
 		dynamicClient:     dc,
 		mapper:            m,
 		resources:         r,
+		labelSelector:     selector,
 	}
 }
 
