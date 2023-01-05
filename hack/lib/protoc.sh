@@ -72,7 +72,7 @@ function kube::protoc::format() {
 
   # Run gofmt to clean up the generated code.
   kube::golang::verify_go_version
-  gofmt -l -s -w "${package}/api.pb.go"
+  gofmt -s -w "${package}/api.pb.go"
 }
 
 # Compares the contents of $1 and $2

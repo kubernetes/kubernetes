@@ -1,4 +1,4 @@
-// To regenerate api.pb.go run hack/update-generated-device-plugin.sh
+// To regenerate api.pb.go run hack/update-generated-proto-bindings.sh
 syntax = "proto3";
 
 package deviceplugin;

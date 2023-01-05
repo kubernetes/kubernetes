@@ -39,8 +39,7 @@ BASH_TARGETS=(
 	update-generated-protobuf
 	update-codegen
 	update-generated-runtime
-	update-generated-device-plugin
-	update-generated-dynamic-resource-allocation
+	update-generated-proto-bindings
 	update-generated-api-compatibility-data
 	update-generated-docs
 	update-generated-swagger-docs

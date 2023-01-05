@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2018 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,11 +19,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-KUBE_KMS_V1BETA1="${KUBE_ROOT}/staging/src/k8s.io/kms/apis/v1beta1/"
-KUBE_KMS_V2ALPHA1="${KUBE_ROOT}/staging/src/k8s.io/kms/apis/v2alpha1/"
-KUBE_KMS_V2="${KUBE_ROOT}/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1/"
 
-source "${KUBE_ROOT}/hack/lib/protoc.sh"
-kube::protoc::generate_proto "${KUBE_KMS_V1BETA1}"
-kube::protoc::generate_proto "${KUBE_KMS_V2ALPHA1}"
-kube::protoc::generate_proto "${KUBE_KMS_V2}"
+# NOTE: All output from this script needs to be copied back to the calling
+# source tree.  This is managed in kube::build::copy_output in build/common.sh.
+# If the output set is changed update that function.
+
+"${KUBE_ROOT}/build/run.sh" hack/update-generated-proto-bindings-dockerized.sh
