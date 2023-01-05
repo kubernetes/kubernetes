@@ -139,43 +139,6 @@ func assertStatusCode(t *testing.T, code Code, value int) {
 	}
 }
 
-func TestPluginToStatusMerge(t *testing.T) {
-	tests := []struct {
-		name      string
-		statusMap PluginToStatus
-		wantCode  Code
-	}{
-		{
-			name:      "merge Error and Unschedulable statuses",
-			statusMap: PluginToStatus{"p1": NewStatus(Error), "p2": NewStatus(Unschedulable)},
-			wantCode:  Error,
-		},
-		{
-			name:      "merge Success and Unschedulable statuses",
-			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(Unschedulable)},
-			wantCode:  Unschedulable,
-		},
-		{
-			name:      "merge Success, UnschedulableAndUnresolvable and Unschedulable statuses",
-			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(UnschedulableAndUnresolvable), "p3": NewStatus(Unschedulable)},
-			wantCode:  UnschedulableAndUnresolvable,
-		},
-		{
-			name:     "merge nil status",
-			wantCode: Success,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			gotStatus := test.statusMap.Merge()
-			if test.wantCode != gotStatus.Code() {
-				t.Errorf("wantCode %v, gotCode %v", test.wantCode, gotStatus.Code())
-			}
-		})
-	}
-}
-
 func TestPreFilterResultMerge(t *testing.T) {
 	tests := map[string]struct {
 		receiver *PreFilterResult
