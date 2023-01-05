@@ -276,6 +276,8 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 	case *errors.StatusError:
 		if errors.IsAlreadyExists(err) {
 			klog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+		} else if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+			klog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		} else {
 			klog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		}
