@@ -72,18 +72,20 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 
 	tcases := []struct {
-		name          string
-		newK8sVersion string
-		dryRun        bool
-		flags         applyPlanFlags
-		expectedErr   string
+		name               string
+		newK8sVersion      string
+		dryRun             bool
+		flags              applyPlanFlags
+		expectedErr        string
+		expectedErrNonRoot string
 	}{
 		{
 			name: "Fail pre-flight check",
 			flags: applyPlanFlags{
 				kubeConfigPath: fullPath,
 			},
-			expectedErr: "ERROR CoreDNSUnsupportedPlugins",
+			expectedErr:        "ERROR CoreDNSUnsupportedPlugins",
+			expectedErrNonRoot: "user is not running as", // user is not running as (root || administrator)
 		},
 		{
 			name: "Bogus preflight check specify all with individual check",
@@ -109,8 +111,13 @@ func TestEnforceRequirements(t *testing.T) {
 				t.Error("Expected error, but got success")
 			}
 
-			if err != nil && !strings.Contains(err.Error(), tt.expectedErr) {
-				t.Fatalf("enforceRequirements returned unexpected error, expected: %s, got %v", tt.expectedErr, err)
+			expErr := tt.expectedErr
+			// pre-flight check expects the user to be root, so the root and non-root should hit different errors
+			if os.Getuid() != 0 && len(tt.expectedErrNonRoot) != 0 {
+				expErr = tt.expectedErrNonRoot
+			}
+			if err != nil && !strings.Contains(err.Error(), expErr) {
+				t.Fatalf("enforceRequirements returned unexpected error, expected: %s, got %v", expErr, err)
 			}
 
 		})
