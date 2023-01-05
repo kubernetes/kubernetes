@@ -168,7 +168,7 @@ func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[st
 			continue
 		}
 		if endpoint.GetZoneHints().Len() == 0 {
-			klog.InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint")
+			klog.InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint", "endpoint", endpoint)
 			return false
 		}
 
