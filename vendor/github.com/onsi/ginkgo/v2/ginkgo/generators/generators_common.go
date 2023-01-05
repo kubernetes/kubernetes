@@ -13,6 +13,7 @@ import (
 type GeneratorsConfig struct {
 	Agouti, NoDot, Internal bool
 	CustomTemplate          string
+	CustomTemplateData      string
 }
 
 func getPackageAndFormattedName() (string, string, string) {

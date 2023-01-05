@@ -151,6 +151,13 @@ func (suite *Suite) PushNode(node Node) error {
 		}
 	}
 
+	if node.MarkedContinueOnFailure {
+		firstOrderedNode := suite.tree.AncestorNodeChain().FirstNodeMarkedOrdered()
+		if !firstOrderedNode.IsZero() {
+			return types.GinkgoErrors.InvalidContinueOnFailureDecoration(node.CodeLocation)
+		}
+	}
+
 	if node.NodeType == types.NodeTypeContainer {
 		// During PhaseBuildTopLevel we only track the top level containers without entering them
 		// We only enter the top level container nodes during PhaseBuildTree
