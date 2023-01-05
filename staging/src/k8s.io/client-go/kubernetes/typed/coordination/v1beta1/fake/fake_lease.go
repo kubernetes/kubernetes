@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/coordination/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	coordinationv1beta1 "k8s.io/client-go/applyconfigurations/coordination/v1beta1"
@@ -39,9 +38,9 @@ type FakeLeases struct {
 	ns   string
 }
 
-var leasesResource = schema.GroupVersionResource{Group: "coordination.k8s.io", Version: "v1beta1", Resource: "leases"}
+var leasesResource = v1beta1.SchemeGroupVersion.WithResource("leases")
 
-var leasesKind = schema.GroupVersionKind{Group: "coordination.k8s.io", Version: "v1beta1", Kind: "Lease"}
+var leasesKind = v1beta1.SchemeGroupVersion.WithKind("Lease")
 
 // Get takes name of the lease, and returns the corresponding lease object, and an error if there is any.
 func (c *FakeLeases) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Lease, err error) {

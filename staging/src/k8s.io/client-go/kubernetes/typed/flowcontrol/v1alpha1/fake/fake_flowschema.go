@@ -26,7 +26,6 @@ import (
 	v1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	flowcontrolv1alpha1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1alpha1"
@@ -38,9 +37,9 @@ type FakeFlowSchemas struct {
 	Fake *FakeFlowcontrolV1alpha1
 }
 
-var flowschemasResource = schema.GroupVersionResource{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1", Resource: "flowschemas"}
+var flowschemasResource = v1alpha1.SchemeGroupVersion.WithResource("flowschemas")
 
-var flowschemasKind = schema.GroupVersionKind{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1", Kind: "FlowSchema"}
+var flowschemasKind = v1alpha1.SchemeGroupVersion.WithKind("FlowSchema")
 
 // Get takes name of the flowSchema, and returns the corresponding flowSchema object, and an error if there is any.
 func (c *FakeFlowSchemas) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.FlowSchema, err error) {

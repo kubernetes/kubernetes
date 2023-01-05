@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeTestTypes struct {
 	Fake *FakeSecondExample
 }
 
-var testtypesResource = schema.GroupVersionResource{Group: "example.test.apiserver.code-generator.k8s.io", Version: "", Resource: "testtypes"}
+var testtypesResource = example2.SchemeGroupVersion.WithResource("testtypes")
 
-var testtypesKind = schema.GroupVersionKind{Group: "example.test.apiserver.code-generator.k8s.io", Version: "", Kind: "TestType"}
+var testtypesKind = example2.SchemeGroupVersion.WithKind("TestType")
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
 func (c *FakeTestTypes) Get(ctx context.Context, name string, options v1.GetOptions) (result *example2.TestType, err error) {
