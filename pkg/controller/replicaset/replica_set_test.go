@@ -50,6 +50,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	. "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -64,6 +65,7 @@ func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh ch
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	ret := NewReplicaSetController(
+		klog.FromContext(context.TODO()),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		client,
@@ -391,6 +393,7 @@ func TestGetReplicaSetsWithSameController(t *testing.T) {
 	pendingDeletionRS.ObjectMeta.OwnerReferences[0].UID = "789"
 	now := metav1.Now()
 	pendingDeletionRS.DeletionTimestamp = &now
+	_, ctx := ktesting.NewTestContext(t)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -424,7 +427,7 @@ func TestGetReplicaSetsWithSameController(t *testing.T) {
 		for _, r := range c.rss {
 			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(r)
 		}
-		actualRSs := manager.getReplicaSetsWithSameController(c.rs)
+		actualRSs := manager.getReplicaSetsWithSameController(klog.FromContext(ctx), c.rs)
 		var actualRSNames, expectedRSNames []string
 		for _, r := range actualRSs {
 			actualRSNames = append(actualRSNames, r.Name)
@@ -444,6 +447,7 @@ func BenchmarkGetReplicaSetsWithSameController(b *testing.B) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	controller, informers := testNewReplicaSetControllerFromClient(clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}), stopCh, BurstReplicas)
+	_, ctx := ktesting.NewTestContext(b)
 
 	targetRS := newReplicaSet(1, map[string]string{"foo": "bar"})
 	targetRS.Name = "rs1"
@@ -463,7 +467,7 @@ func BenchmarkGetReplicaSetsWithSameController(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		gotRSs := controller.getReplicaSetsWithSameController(targetRS)
+		gotRSs := controller.getReplicaSetsWithSameController(klog.FromContext(ctx), targetRS)
 		if len(gotRSs) != 2 {
 			b.Errorf("Incorrect ReplicaSets number, expected 2, got: %d", len(gotRSs))
 		}
@@ -553,6 +557,7 @@ func TestRelatedPodsLookup(t *testing.T) {
 	pod2 := newPod("pod2", someRS, v1.PodRunning, nil, true)
 	pod3 := newPod("pod3", relatedRS, v1.PodRunning, nil, true)
 	pod4 := newPod("pod4", unrelatedRS, v1.PodRunning, nil, true)
+	_, ctx := ktesting.NewTestContext(t)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -594,7 +599,7 @@ func TestRelatedPodsLookup(t *testing.T) {
 			informers.Core().V1().Pods().Informer().GetIndexer().Add(pod)
 			manager.addPod(pod)
 		}
-		actualPods, err := manager.getIndirectlyRelatedPods(c.rs)
+		actualPods, err := manager.getIndirectlyRelatedPods(klog.FromContext(ctx), c.rs)
 		if err != nil {
 			t.Errorf("Unexpected error from getIndirectlyRelatedPods: %v", err)
 		}
@@ -617,7 +622,9 @@ func TestWatchControllers(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	logger, _ := ktesting.NewTestContext(t)
 	manager := NewReplicaSetController(
+		logger,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		client,
@@ -878,7 +885,8 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	fakeRSClient := fakeClient.AppsV1().ReplicaSets("default")
 	numReplicas := int32(10)
 	newStatus := apps.ReplicaSetStatus{Replicas: numReplicas}
-	updateReplicaSetStatus(fakeRSClient, rs, newStatus)
+	_, ctx := ktesting.NewTestContext(t)
+	updateReplicaSetStatus(klog.FromContext(ctx), fakeRSClient, rs, newStatus)
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
 		if a.GetResource().Resource != "replicasets" {
@@ -1174,7 +1182,9 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	defer close(stopCh)
 
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	logger, _ := ktesting.NewTestContext(t)
 	manager := NewReplicaSetController(
+		logger,
 		f.Apps().V1().ReplicaSets(),
 		f.Core().V1().Pods(),
 		client,
@@ -1196,7 +1206,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		klog.V(8).Infof("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
+		logger.V(8).Info("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
 	if err != nil {
@@ -1240,7 +1250,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		klog.V(8).Infof("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
+		logger.V(8).Info("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
 	if err != nil {
@@ -1282,7 +1292,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		klog.V(8).Infof("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
+		logger.V(8).Info("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
 	if err != nil {
