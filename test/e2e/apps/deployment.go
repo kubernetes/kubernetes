@@ -184,6 +184,7 @@ var _ = SIGDescribe("Deployment", func() {
 	*/
 	framework.ConformanceIt("should run the lifecycle of a Deployment", func(ctx context.Context) {
 		one := int64(1)
+		two := int64(2)
 		deploymentResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 		testNamespaceName := f.Namespace.Name
 		testDeploymentName := "test-deployment"
@@ -259,7 +260,7 @@ var _ = SIGDescribe("Deployment", func() {
 				"replicas": testDeploymentMinimumReplicas,
 				"template": map[string]interface{}{
 					"spec": map[string]interface{}{
-						"TerminationGracePeriodSeconds": &one,
+						"terminationGracePeriodSeconds": &two,
 						"containers": [1]map[string]interface{}{{
 							"name":  testDeploymentName,
 							"image": testDeploymentPatchImage,
@@ -301,7 +302,8 @@ var _ = SIGDescribe("Deployment", func() {
 					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas &&
 					deployment.Status.UpdatedReplicas == testDeploymentMinimumReplicas &&
 					deployment.Status.UnavailableReplicas == 0 &&
-					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage
+					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage &&
+					*deployment.Spec.Template.Spec.TerminationGracePeriodSeconds == two
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
 				}
