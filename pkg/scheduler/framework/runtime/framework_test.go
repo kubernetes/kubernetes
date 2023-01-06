@@ -1402,9 +1402,11 @@ func TestPreFilterPlugins(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
-		f.RunPreFilterPlugins(ctx, nil, nil)
-		f.RunPreFilterExtensionAddPod(ctx, nil, nil, nil, nil)
-		f.RunPreFilterExtensionRemovePod(ctx, nil, nil, nil, nil)
+		state := framework.NewCycleState()
+
+		f.RunPreFilterPlugins(ctx, state, nil)
+		f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, nil)
+		f.RunPreFilterExtensionRemovePod(ctx, state, nil, nil, nil)
 
 		if preFilter1.PreFilterCalled != 1 {
 			t.Errorf("preFilter1 called %v, expected: 1", preFilter1.PreFilterCalled)
@@ -1421,39 +1423,309 @@ func TestPreFilterPlugins(t *testing.T) {
 	})
 }
 
-func TestRunPreFilterPluginsStatus(t *testing.T) {
-	preFilter := &TestPlugin{
-		name: preFilterPluginName,
-		inj:  injectedResult{PreFilterStatus: int(framework.Error)},
+func TestRunPreFilterPlugins(t *testing.T) {
+	tests := []struct {
+		name                string
+		plugins             []*TestPlugin
+		wantPreFilterResult *framework.PreFilterResult
+		wantSkippedPlugins  sets.Set[string]
+		wantStatusCode      framework.Code
+	}{
+		{
+			name: "all PreFilter returned success",
+			plugins: []*TestPlugin{
+				{
+					name: "success1",
+				},
+				{
+					name: "success2",
+				},
+			},
+			wantPreFilterResult: nil,
+			wantStatusCode:      framework.Success,
+		},
+		{
+			name: "one PreFilter plugin returned success, but another PreFilter plugin returned non-success",
+			plugins: []*TestPlugin{
+				{
+					name: "success",
+				},
+				{
+					name: "error",
+					inj:  injectedResult{PreFilterStatus: int(framework.Error)},
+				},
+			},
+			wantPreFilterResult: nil,
+			wantStatusCode:      framework.Error,
+		},
+		{
+			name: "one PreFilter plugin returned skip, but another PreFilter plugin returned non-success",
+			plugins: []*TestPlugin{
+				{
+					name: "skip",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+				{
+					name: "error",
+					inj:  injectedResult{PreFilterStatus: int(framework.Error)},
+				},
+			},
+			wantPreFilterResult: nil,
+			wantStatusCode:      framework.Error,
+		},
+		{
+			name: "all PreFilter plugins returned skip",
+			plugins: []*TestPlugin{
+				{
+					name: "skip1",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+				{
+					name: "skip2",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+				{
+					name: "skip3",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+			},
+			wantPreFilterResult: nil,
+			wantSkippedPlugins:  sets.New("skip1", "skip2", "skip3"),
+			wantStatusCode:      framework.Success,
+		},
+		{
+			name: "some PreFilter plugins returned skip",
+			plugins: []*TestPlugin{
+				{
+					name: "skip1",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+				{
+					name: "success1",
+				},
+				{
+					name: "skip2",
+					inj:  injectedResult{PreFilterStatus: int(framework.Skip)},
+				},
+				{
+					name: "success2",
+				},
+			},
+			wantPreFilterResult: nil,
+			wantSkippedPlugins:  sets.New("skip1", "skip2"),
+			wantStatusCode:      framework.Success,
+		},
 	}
-	r := make(Registry)
-	r.Register(preFilterPluginName,
-		func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return preFilter, nil
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := make(Registry)
+			enabled := make([]config.Plugin, len(tt.plugins))
+			for i, p := range tt.plugins {
+				p := p
+				enabled[i].Name = p.name
+				r.Register(p.name, func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return p, nil
+				})
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			f, err := newFrameworkWithQueueSortAndBind(
+				r,
+				config.KubeSchedulerProfile{Plugins: &config.Plugins{PreFilter: config.PluginSet{Enabled: enabled}}},
+				ctx.Done(),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+
+			state := framework.NewCycleState()
+			result, status := f.RunPreFilterPlugins(ctx, state, nil)
+			if d := cmp.Diff(result, tt.wantPreFilterResult); d != "" {
+				t.Errorf("wrong status. got: %v, want: %v, diff: %s", result, tt.wantPreFilterResult, d)
+			}
+			if status.Code() != tt.wantStatusCode {
+				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
+			}
+			skipped := state.SkipFilterPlugins
+			if d := cmp.Diff(skipped, tt.wantSkippedPlugins); d != "" {
+				t.Errorf("wrong skip filter plugins. got: %v, want: %v, diff: %s", skipped, tt.wantSkippedPlugins, d)
+			}
 		})
-
-	plugins := &config.Plugins{PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: preFilterPluginName}}}}
-
-	profile := config.KubeSchedulerProfile{Plugins: plugins}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	f, err := newFrameworkWithQueueSortAndBind(r, profile, ctx.Done())
-	if err != nil {
-		t.Fatalf("Failed to create framework for testing: %v", err)
 	}
-	_, status := f.RunPreFilterPlugins(ctx, nil, nil)
-	wantStatus := framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", preFilter.Name(), errInjectedStatus)).WithFailedPlugin(preFilter.Name())
-	if !reflect.DeepEqual(status, wantStatus) {
-		t.Errorf("wrong status. got: %v, want:%v", status, wantStatus)
+}
+
+func TestRunPreFilterExtensionRemovePod(t *testing.T) {
+	tests := []struct {
+		name               string
+		plugins            []*TestPlugin
+		skippedPluginNames sets.Set[string]
+		wantStatusCode     framework.Code
+	}{
+		{
+			name: "no plugins are skipped and all RemovePod() returned success",
+			plugins: []*TestPlugin{
+				{
+					name: "success1",
+				},
+				{
+					name: "success2",
+				},
+			},
+			wantStatusCode: framework.Success,
+		},
+		{
+			name: "one RemovePod() returned error",
+			plugins: []*TestPlugin{
+				{
+					name: "success1",
+				},
+				{
+					name: "error1",
+					inj:  injectedResult{PreFilterRemovePodStatus: int(framework.Error)},
+				},
+			},
+			wantStatusCode: framework.Error,
+		},
+		{
+			name: "one RemovePod() is skipped",
+			plugins: []*TestPlugin{
+				{
+					name: "success1",
+				},
+				{
+					name: "skipped",
+					// To confirm it's skipped, return error so that this test case will fail when it isn't skipped.
+					inj: injectedResult{PreFilterRemovePodStatus: int(framework.Error)},
+				},
+			},
+			skippedPluginNames: sets.New("skipped"),
+			wantStatusCode:     framework.Success,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := make(Registry)
+			enabled := make([]config.Plugin, len(tt.plugins))
+			for i, p := range tt.plugins {
+				p := p
+				enabled[i].Name = p.name
+				r.Register(p.name, func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return p, nil
+				})
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			f, err := newFrameworkWithQueueSortAndBind(
+				r,
+				config.KubeSchedulerProfile{Plugins: &config.Plugins{PreFilter: config.PluginSet{Enabled: enabled}}},
+				ctx.Done(),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+
+			state := framework.NewCycleState()
+			state.SkipFilterPlugins = tt.skippedPluginNames
+			status := f.RunPreFilterExtensionRemovePod(ctx, state, nil, nil, nil)
+			if status.Code() != tt.wantStatusCode {
+				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
+			}
+		})
+	}
+}
+
+func TestRunPreFilterExtensionAddPod(t *testing.T) {
+	tests := []struct {
+		name               string
+		plugins            []*TestPlugin
+		skippedPluginNames sets.Set[string]
+		wantStatusCode     framework.Code
+	}{
+		{
+			name: "no plugins are skipped and all AddPod() returned success",
+			plugins: []*TestPlugin{
+				{
+					name: "success1",
+				},
+				{
+					name: "success2",
+				},
+			},
+			wantStatusCode: framework.Success,
+		},
+		{
+			name: "one AddPod() returned error",
+			plugins: []*TestPlugin{
+				{
+					name: "success1",
+				},
+				{
+					name: "error1",
+					inj:  injectedResult{PreFilterAddPodStatus: int(framework.Error)},
+				},
+			},
+			wantStatusCode: framework.Error,
+		},
+		{
+			name: "one AddPod() is skipped",
+			plugins: []*TestPlugin{
+				{
+					name: "success1",
+				},
+				{
+					name: "skipped",
+					// To confirm it's skipped, return error so that this test case will fail when it isn't skipped.
+					inj: injectedResult{PreFilterAddPodStatus: int(framework.Error)},
+				},
+			},
+			skippedPluginNames: sets.New("skipped"),
+			wantStatusCode:     framework.Success,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := make(Registry)
+			enabled := make([]config.Plugin, len(tt.plugins))
+			for i, p := range tt.plugins {
+				p := p
+				enabled[i].Name = p.name
+				r.Register(p.name, func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return p, nil
+				})
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			f, err := newFrameworkWithQueueSortAndBind(
+				r,
+				config.KubeSchedulerProfile{Plugins: &config.Plugins{PreFilter: config.PluginSet{Enabled: enabled}}},
+				ctx.Done(),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+
+			state := framework.NewCycleState()
+			state.SkipFilterPlugins = tt.skippedPluginNames
+			status := f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, nil)
+			if status.Code() != tt.wantStatusCode {
+				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
+			}
+		})
 	}
 }
 
 func TestFilterPlugins(t *testing.T) {
 	tests := []struct {
-		name       string
-		plugins    []*TestPlugin
-		wantStatus *framework.Status
+		name           string
+		plugins        []*TestPlugin
+		skippedPlugins sets.Set[string]
+		wantStatus     *framework.Status
 	}{
 		{
 			name: "SuccessFilter",
@@ -1554,6 +1826,22 @@ func TestFilterPlugins(t *testing.T) {
 			wantStatus: nil,
 		},
 		{
+			name: "SuccessAndSkipFilters",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(framework.Success)},
+				},
+
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(framework.Error)}, // To make sure this plugins isn't called, set error as an injected result.
+				},
+			},
+			wantStatus:     nil,
+			skippedPlugins: sets.New("TestPlugin2"),
+		},
+		{
 			name: "ErrorAndSuccessFilters",
 			plugins: []*TestPlugin{
 				{
@@ -1624,7 +1912,9 @@ func TestFilterPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
-			gotStatus := f.RunFilterPlugins(ctx, nil, pod, nil)
+			state := framework.NewCycleState()
+			state.SkipFilterPlugins = tt.skippedPlugins
+			gotStatus := f.RunFilterPlugins(ctx, state, pod, nil)
 			if diff := cmp.Diff(gotStatus, tt.wantStatus, cmpOpts...); diff != "" {
 				t.Errorf("Unexpected status: (-got, +want):\n%s", diff)
 			}
@@ -1896,7 +2186,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 			tt.nodeInfo.SetNode(tt.node)
-			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, nil, tt.pod, tt.nodeInfo)
+			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, framework.NewCycleState(), tt.pod, tt.nodeInfo)
 			if diff := cmp.Diff(gotStatus, tt.wantStatus, cmpOpts...); diff != "" {
 				t.Errorf("Unexpected status: (-got, +want):\n%s", diff)
 			}

@@ -91,7 +91,9 @@ const (
 	UnschedulableAndUnresolvable
 	// Wait is used when a Permit plugin finds a pod scheduling should wait.
 	Wait
-	// Skip is used when a Bind plugin chooses to skip binding.
+	// Skip is used in the following scenarios:
+	// - when a Bind plugin chooses to skip binding.
+	// - when a PreFilter plugin returns Skip so that coupled Filter plugin/PreFilterExtensions() will be skipped.
 	Skip
 )
 
@@ -348,6 +350,8 @@ type PreFilterPlugin interface {
 	// plugins must return success or the pod will be rejected. PreFilter could optionally
 	// return a PreFilterResult to influence which nodes to evaluate downstream. This is useful
 	// for cases where it is possible to determine the subset of nodes to process in O(1) time.
+	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
+	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
 	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally

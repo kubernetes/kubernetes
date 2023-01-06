@@ -1980,6 +1980,42 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test prefilter plugin returning skip",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter1",
+					st.NewFakePreFilterPlugin("FakeFilter1", nil, nil),
+				),
+				st.RegisterFilterPlugin(
+					"FakeFilter1",
+					st.NewFakeFilterPlugin(map[string]framework.Code{
+						"node1": framework.Unschedulable,
+					}),
+				),
+				st.RegisterPluginAsExtensions("FakeFilter2", func(configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
+					return st.FakePreFilterAndFilterPlugin{
+						FakePreFilterPlugin: &st.FakePreFilterPlugin{
+							Result: nil,
+							Status: framework.NewStatus(framework.Skip),
+						},
+						FakeFilterPlugin: &st.FakeFilterPlugin{
+							// This Filter plugin shouldn't be executed in the Filter extension point due to skip.
+							// To confirm that, return the status code Error to all Nodes.
+							FailedNodeReturnCodeMap: map[string]framework.Code{
+								"node1": framework.Error, "node2": framework.Error, "node3": framework.Error,
+							},
+						},
+					}, nil
+				}, "PreFilter", "Filter"),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes:              []string{"node1", "node2", "node3"},
+			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			wantNodes:          sets.NewString("node2", "node3"),
+			wantEvaluatedNodes: pointer.Int32(3),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

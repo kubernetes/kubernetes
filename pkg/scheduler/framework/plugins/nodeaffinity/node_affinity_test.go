@@ -45,10 +45,6 @@ func TestNodeAffinity(t *testing.T) {
 		disablePreFilter    bool
 	}{
 		{
-			name: "no selector",
-			pod:  &v1.Pod{},
-		},
-		{
 			name: "missing labels",
 			pod: st.MakePod().NodeSelector(map[string]string{
 				"foo": "bar",
@@ -285,6 +281,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 		},
 		{
 			name: "Pod with Affinity but nil NodeSelector will schedule onto a node",
@@ -300,6 +297,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 		},
 		{
 			name: "Pod with multiple matchExpressions ANDed that matches the existing node",

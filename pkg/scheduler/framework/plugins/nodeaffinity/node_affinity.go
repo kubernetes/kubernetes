@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -89,13 +89,19 @@ func (pl *NodeAffinity) EventsToRegister() []framework.ClusterEvent {
 
 // PreFilter builds and writes cycle state used by Filter.
 func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	affinity := pod.Spec.Affinity
+	noNodeAffinity := (affinity == nil ||
+		affinity.NodeAffinity == nil ||
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil)
+	if noNodeAffinity && pl.addedNodeSelector == nil && pod.Spec.NodeSelector == nil {
+		// NodeAffinity Filter has nothing to do with the Pod.
+		return nil, framework.NewStatus(framework.Skip)
+	}
+
 	state := &preFilterState{requiredNodeSelectorAndAffinity: nodeaffinity.GetRequiredNodeAffinity(pod)}
 	cycleState.Write(preFilterStateKey, state)
-	affinity := pod.Spec.Affinity
-	if affinity == nil ||
-		affinity.NodeAffinity == nil ||
-		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil ||
-		len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
+
+	if noNodeAffinity || len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
 		return nil, nil
 	}
 

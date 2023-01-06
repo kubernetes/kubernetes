@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -65,6 +65,16 @@ func (pl *TrueFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, p
 // NewTrueFilterPlugin initializes a TrueFilterPlugin and returns it.
 func NewTrueFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &TrueFilterPlugin{}, nil
+}
+
+type FakePreFilterAndFilterPlugin struct {
+	*FakePreFilterPlugin
+	*FakeFilterPlugin
+}
+
+// Name returns name of the plugin.
+func (pl FakePreFilterAndFilterPlugin) Name() string {
+	return "FakePreFilterAndFilterPlugin"
 }
 
 // FakeFilterPlugin is a test filter plugin to record how many times its Filter() function have
