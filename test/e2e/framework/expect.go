@@ -17,11 +17,210 @@ limitations under the License.
 package framework
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
+	"github.com/onsi/gomega/types"
 )
+
+// Gomega returns an interface that can be used like gomega to express
+// assertions. The difference is that failed assertions are returned as an
+// error:
+//
+//	if err := Gomega().Expect(pod.Status.Phase).To(gomega.BeEqual(v1.Running)); err != nil {
+//	    return fmt.Errorf("test pod not running: %w", err)
+//	}
+//
+// This error can get wrapped to provide additional context for the
+// failure. The test then should use ExpectNoError to turn a non-nil error into
+// a failure.
+//
+// When using this approach, there is no need for call offsets and extra
+// descriptions for the Expect call because the call stack will be dumped when
+// ExpectNoError is called and the additional description(s) can be added by
+// wrapping the error.
+//
+// Asynchronous assertions use the framework's Poll interval and PodStart timeout
+// by default.
+func Gomega() GomegaInstance {
+	return gomegaInstance{}
+}
+
+type GomegaInstance interface {
+	Expect(actual interface{}) Assertion
+	Eventually(ctx context.Context, args ...interface{}) AsyncAssertion
+	Consistently(ctx context.Context, args ...interface{}) AsyncAssertion
+}
+
+type Assertion interface {
+	Should(matcher types.GomegaMatcher) error
+	ShouldNot(matcher types.GomegaMatcher) error
+	To(matcher types.GomegaMatcher) error
+	ToNot(matcher types.GomegaMatcher) error
+	NotTo(matcher types.GomegaMatcher) error
+}
+
+type AsyncAssertion interface {
+	Should(matcher types.GomegaMatcher) error
+	ShouldNot(matcher types.GomegaMatcher) error
+
+	WithTimeout(interval time.Duration) AsyncAssertion
+	WithPolling(interval time.Duration) AsyncAssertion
+}
+
+type gomegaInstance struct{}
+
+var _ GomegaInstance = gomegaInstance{}
+
+func (g gomegaInstance) Expect(actual interface{}) Assertion {
+	return assertion{actual: actual}
+}
+
+func (g gomegaInstance) Eventually(ctx context.Context, args ...interface{}) AsyncAssertion {
+	return newAsyncAssertion(ctx, args, false)
+}
+
+func (g gomegaInstance) Consistently(ctx context.Context, args ...interface{}) AsyncAssertion {
+	return newAsyncAssertion(ctx, args, true)
+}
+
+func newG() (*FailureError, gomega.Gomega) {
+	var failure FailureError
+	g := gomega.NewGomega(func(msg string, callerSkip ...int) {
+		failure = FailureError(msg)
+	})
+
+	return &failure, g
+}
+
+type assertion struct {
+	actual interface{}
+}
+
+func (a assertion) Should(matcher types.GomegaMatcher) error {
+	err, g := newG()
+	if !g.Expect(a.actual).Should(matcher) {
+		return *err
+	}
+	return nil
+}
+
+func (a assertion) ShouldNot(matcher types.GomegaMatcher) error {
+	err, g := newG()
+	if !g.Expect(a.actual).ShouldNot(matcher) {
+		return *err
+	}
+	return nil
+}
+
+func (a assertion) To(matcher types.GomegaMatcher) error {
+	err, g := newG()
+	if !g.Expect(a.actual).To(matcher) {
+		return *err
+	}
+	return nil
+}
+
+func (a assertion) ToNot(matcher types.GomegaMatcher) error {
+	err, g := newG()
+	if !g.Expect(a.actual).ToNot(matcher) {
+		return *err
+	}
+	return nil
+}
+
+func (a assertion) NotTo(matcher types.GomegaMatcher) error {
+	err, g := newG()
+	if !g.Expect(a.actual).NotTo(matcher) {
+		return *err
+	}
+	return nil
+}
+
+type asyncAssertion struct {
+	ctx          context.Context
+	args         []interface{}
+	timeout      time.Duration
+	interval     time.Duration
+	consistently bool
+}
+
+func newAsyncAssertion(ctx context.Context, args []interface{}, consistently bool) asyncAssertion {
+	return asyncAssertion{
+		ctx:  ctx,
+		args: args,
+		// PodStart is used as default because waiting for a pod is the
+		// most common operation.
+		timeout:  TestContext.timeouts.PodStart,
+		interval: TestContext.timeouts.Poll,
+	}
+}
+
+func (a asyncAssertion) newAsync() (*FailureError, gomega.AsyncAssertion) {
+	err, g := newG()
+	var assertion gomega.AsyncAssertion
+	if a.consistently {
+		assertion = g.Consistently(a.ctx, a.args...)
+	} else {
+		assertion = g.Eventually(a.ctx, a.args...)
+	}
+	assertion = assertion.WithTimeout(a.timeout).WithPolling(a.interval)
+	return err, assertion
+}
+
+func (a asyncAssertion) Should(matcher types.GomegaMatcher) error {
+	err, assertion := a.newAsync()
+	if !assertion.Should(matcher) {
+		return *err
+	}
+	return nil
+}
+
+func (a asyncAssertion) ShouldNot(matcher types.GomegaMatcher) error {
+	err, assertion := a.newAsync()
+	if !assertion.ShouldNot(matcher) {
+		return *err
+	}
+	return nil
+}
+
+func (a asyncAssertion) WithTimeout(timeout time.Duration) AsyncAssertion {
+	a.timeout = timeout
+	return a
+}
+
+func (a asyncAssertion) WithPolling(interval time.Duration) AsyncAssertion {
+	a.interval = interval
+	return a
+}
+
+// FailureError is an error where the error string is meant to be passed to
+// ginkgo.Fail directly, i.e. adding some prefix like "unexpected error" is not
+// necessary. It is also not necessary to dump the error struct.
+type FailureError string
+
+func (f FailureError) Error() string {
+	return string(f)
+}
+
+func (f FailureError) Is(target error) bool {
+	return target == ErrFailure
+}
+
+// ErrFailure is an empty error that can be wrapped to indicate that an error
+// is a FailureError. It can also be used to test for a FailureError:.
+//
+//	return fmt.Errorf("some problem%w", ErrFailure)
+//	...
+//	err := someOperation()
+//	if errors.Is(err, ErrFailure) {
+//	    ...
+//	}
+var ErrFailure error = FailureError("")
 
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
 func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
@@ -72,7 +271,12 @@ func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	//   failures at the same code line might not be matched in
 	//   https://go.k8s.io/triage because the error details are too
 	//   different.
-	Logf("Unexpected error: %s\n%s", prefix, format.Object(err, 1))
+	//
+	// Some errors include all relevant information in the Error
+	// string. For those we can skip the redundant log message.
+	if !errors.Is(err, ErrFailure) {
+		Logf("Unexpected error: %s\n%s", prefix, format.Object(err, 1))
+	}
 	Fail(prefix+err.Error(), 1+offset)
 }
 
