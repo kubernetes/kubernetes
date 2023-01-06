@@ -286,13 +286,14 @@ aliases:
     - soltysh
     - smarterclayton
   sig-apps-reviewers:
+    - alculquicondor
+    - atiratree
     - janetkuo
     - kow3ns
+    - krmayankk
     - mortent
     - smarterclayton
     - soltysh
-    - krmayankk
-    - alculquicondor
   # sig-apps-emeritus:
   # - tnozicka
 
