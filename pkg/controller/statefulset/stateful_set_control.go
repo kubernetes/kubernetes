@@ -453,15 +453,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				set.Namespace,
 				set.Name,
 				replicas[i].Name)
-			if err := ssc.podControl.createPersistentVolumeClaims(set, replicas[i]); err != nil {
+			if err := ssc.podControl.createMissingPersistentVolumeClaims(set, replicas[i]); err != nil {
 				return &status, err
-			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-				// Set PVC policy as much as is possible at this point.
-				if err := ssc.podControl.UpdatePodClaimForRetentionPolicy(set, replicas[i]); err != nil {
-					ssc.podControl.recordPodEvent("update", set, replicas[i], err)
-					return &status, err
-				}
 			}
 		}
 		// If we find a Pod that is currently terminating, we must wait until graceful deletion
