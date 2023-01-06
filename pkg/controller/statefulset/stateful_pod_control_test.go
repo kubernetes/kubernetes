@@ -536,6 +536,11 @@ func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 		fakeClient := &fake.Clientset{}
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
+		fakeClient.AddReactor("update", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+			update := action.(core.UpdateAction)
+			indexer.Update(update.GetObject())
+			return true, update.GetObject(), nil
+		})
 		set := newStatefulSet(3)
 		set.GetObjectMeta().SetUID("set-123")
 		pod := newStatefulSetPod(set, 0)

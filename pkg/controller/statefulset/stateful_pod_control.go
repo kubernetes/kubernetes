@@ -241,6 +241,7 @@ func (spc *StatefulPodControl) UpdatePodClaimForRetentionPolicy(set *apps.Statef
 			return fmt.Errorf("Could not retrieve claim %s not found for %s when checking PVC deletion policy: %w", claimName, pod.Name, err)
 		default:
 			if !claimOwnerMatchesSetAndPod(claim, set, pod) {
+				claim = claim.DeepCopy() // Make a copy so we don't mutate the shared cache.
 				needsUpdate := updateClaimOwnerRefForSetAndPod(claim, set, pod)
 				if needsUpdate {
 					err := spc.objectMgr.UpdateClaim(claim)
