@@ -120,7 +120,7 @@ func (d *Definitions) ParseSchemaV3(s *openapi_v3.Schema, path *Path) (Schema, e
 	switch s.GetType() {
 	case object:
 		for _, extension := range s.GetSpecificationExtension() {
-			if extension.Name == "x-kuberentes-group-version-kind" {
+			if extension.Name == "x-kubernetes-group-version-kind" {
 				// Objects with x-kubernetes-group-version-kind are always top
 				// level types.
 				return d.parseV3Kind(s, path)
@@ -285,7 +285,7 @@ func parseV3Interface(def *yaml.Node) (interface{}, error) {
 
 func (d *Definitions) parseV3BaseSchema(s *openapi_v3.Schema, path *Path) (*BaseSchema, error) {
 	if s == nil {
-		return nil, fmt.Errorf("cannot initializae BaseSchema from nil")
+		return nil, fmt.Errorf("cannot initialize BaseSchema from nil")
 	}
 
 	def, err := parseV3Interface(s.GetDefault().ToRawInfo())

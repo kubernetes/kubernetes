@@ -21,7 +21,6 @@ import (
 	"crypto/sha512"
 	"encoding/json"
 	"fmt"
-	"mime"
 	"net/http"
 	"net/url"
 	"path"
@@ -41,13 +40,6 @@ import (
 )
 
 const (
-	jsonExt = ".json"
-
-	mimeJson = "application/json"
-	// TODO(mehdy): change @68f4ded to a version tag when gnostic add version tags.
-	mimePb   = "application/com.github.googleapis.gnostic.OpenAPIv3@68f4ded+protobuf"
-	mimePbGz = "application/x-gzip"
-
 	subTypeProtobuf = "com.github.proto-openapi.spec.v3@v1.0+protobuf"
 	subTypeJSON     = "json"
 )
@@ -82,12 +74,6 @@ type OpenAPIV3Group struct {
 	pbCache   handler.HandlerCache
 	jsonCache handler.HandlerCache
 	etagCache handler.HandlerCache
-}
-
-func init() {
-	mime.AddExtensionType(".json", mimeJson)
-	mime.AddExtensionType(".pb-v1", mimePb)
-	mime.AddExtensionType(".gz", mimePbGz)
 }
 
 func computeETag(data []byte) string {
@@ -191,6 +177,8 @@ func ToV3ProtoBinary(json []byte) ([]byte, error) {
 
 func (o *OpenAPIService) HandleDiscovery(w http.ResponseWriter, r *http.Request) {
 	data, _ := o.getGroupBytes()
+	w.Header().Set("Etag", strconv.Quote(computeETag(data)))
+	w.Header().Set("Content-Type", "application/json")
 	http.ServeContent(w, r, "/openapi/v3", time.Now(), bytes.NewReader(data))
 }
 

@@ -184,7 +184,7 @@ func MinimumUint(path, in string, data, min uint64, exclusive bool) *errors.Vali
 // MultipleOf validates if the provided number is a multiple of the factor
 func MultipleOf(path, in string, data, factor float64) *errors.Validation {
 	// multipleOf factor must be positive
-	if factor < 0 {
+	if factor <= 0 {
 		return errors.MultipleOfMustBePositive(path, in, factor)
 	}
 	var mult float64
@@ -202,7 +202,7 @@ func MultipleOf(path, in string, data, factor float64) *errors.Validation {
 // MultipleOfInt validates if the provided integer is a multiple of the factor
 func MultipleOfInt(path, in string, data int64, factor int64) *errors.Validation {
 	// multipleOf factor must be positive
-	if factor < 0 {
+	if factor <= 0 {
 		return errors.MultipleOfMustBePositive(path, in, factor)
 	}
 	mult := data / factor
@@ -214,6 +214,10 @@ func MultipleOfInt(path, in string, data int64, factor int64) *errors.Validation
 
 // MultipleOfUint validates if the provided unsigned integer is a multiple of the factor
 func MultipleOfUint(path, in string, data, factor uint64) *errors.Validation {
+	// multipleOf factor must be positive
+	if factor == 0 {
+		return errors.MultipleOfMustBePositive(path, in, factor)
+	}
 	mult := data / factor
 	if mult*factor != data {
 		return errors.NotMultipleOf(path, in, factor, data)
