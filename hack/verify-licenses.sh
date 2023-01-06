@@ -128,7 +128,7 @@ do
 			echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/approved_licenses.dump
 		fi
 	else
-		echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"notapproved_licenses.dump
+		echo "${GO_PACKAGE}  ${LICENSE_NAME}  ${LICENSE_URL}" >> "${KUBE_TEMP}"/notapproved_licenses.dump
 		packages_flagged+=("${GO_PACKAGE}")
 	fi
 done < "${KUBE_TEMP}"/licenses.csv
