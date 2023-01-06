@@ -108,7 +108,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		framework.ExpectNoError(e2epv.WaitOnPVandPVC(ctx, c, f.Timeouts, ns, pv, pvc))
 
 		ginkgo.By("Creating the Client Pod")
-		clientPod, err = e2epod.CreateClientPod(ctx, c, ns, pvc)
+		clientPod, err = e2epod.CreateClientPod(ctx, c, ns, pvc, false)
 		framework.ExpectNoError(err)
 		node = clientPod.Spec.NodeName
 		ginkgo.DeferCleanup(func() {
