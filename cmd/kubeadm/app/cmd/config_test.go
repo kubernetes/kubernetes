@@ -34,7 +34,6 @@ import (
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
-	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -388,7 +387,7 @@ func TestMigrate(t *testing.T) {
 		# This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
 		apiVersion: %s
 		kind: InitConfiguration
-	`, kubeadmapiv1old.SchemeGroupVersion.String())))
+	`, kubeadmapiv1.SchemeGroupVersion.String())))
 	configFile, cleanup := tempConfig(t, cfg)
 	defer cleanup()
 

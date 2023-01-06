@@ -496,12 +496,6 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 func ValidateDNS(dns *kubeadm.DNS, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
-	const kubeDNSType = "kube-dns"
-	if dns.Type == kubeDNSType {
-		allErrs = append(allErrs, field.Invalid(fldPath, dns.Type, fmt.Sprintf("DNS type %q is no longer supported", kubeDNSType)))
-	}
-
 	if len(dns.ImageRepository) > 0 {
 		allErrs = append(allErrs, ValidateImageRepository(dns.ImageRepository, fldPath.Child("imageRepository"))...)
 	}
