@@ -361,7 +361,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 				victimPodApply.Status.WithConditions(corev1apply.PodCondition().
 					WithType(v1.DisruptionTarget).
 					WithStatus(v1.ConditionTrue).
-					WithReason("PreemptionByKubeScheduler").
+					WithReason(v1.PodReasonPreemptionByScheduler).
 					WithMessage(fmt.Sprintf("Kube-scheduler: preempting to accommodate a higher priority pod: %s", klog.KObj(pod))).
 					WithLastTransitionTime(metav1.Now()),
 				)
