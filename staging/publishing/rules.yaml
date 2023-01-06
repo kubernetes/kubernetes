@@ -353,6 +353,9 @@ rules:
     source:
       branch: master
       dir: staging/src/k8s.io/kms
+    dependencies:
+    - repository: apimachinery
+      branch: master
   - name: release-1.26
     go: 1.19.4
     source:
