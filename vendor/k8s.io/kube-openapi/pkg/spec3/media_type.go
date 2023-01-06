@@ -56,7 +56,7 @@ func (m *MediaType) UnmarshalJSON(data []byte) error {
 // MediaTypeProps a struct that allows you to specify content format, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#mediaTypeObject
 type MediaTypeProps struct {
 	// Schema holds the schema defining the type used for the media type
-	Schema    *spec.Schema `json:"schema,omitempty"`
+	Schema *spec.Schema `json:"schema,omitempty"`
 	// Example of the media type
 	Example interface{} `json:"example,omitempty"`
 	// Examples of the media type. Each example object should match the media type and specific schema if present

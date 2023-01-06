@@ -406,7 +406,7 @@
           },
           "protocol": {
             "default": "",
-            "description": "Protocol is the protocol of the ingress port. The supported values are: \"TCP\", \"UDP\", \"SCTP\"\n\n",
+            "description": "Protocol is the protocol of the ingress port. The supported values are: \"TCP\", \"UDP\", \"SCTP\"",
             "type": "string"
           }
         },

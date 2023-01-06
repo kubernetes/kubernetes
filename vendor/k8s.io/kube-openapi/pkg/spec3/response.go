@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // Responses holds the list of possible responses as they are returned from executing this operation
@@ -148,7 +148,6 @@ type ResponseProps struct {
 	// Links is a map of operations links that can be followed from the response
 	Links map[string]*Link `json:"links,omitempty"`
 }
-
 
 // Link represents a possible design-time link for a response, more at https://swagger.io/specification/#link-object
 type Link struct {

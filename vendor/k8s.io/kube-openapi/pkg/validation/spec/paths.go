@@ -114,7 +114,9 @@ func (p *Paths) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Deco
 				p.Paths[k] = pi
 			default:
 				_, err := dec.ReadValue() // skip value
-				return err
+				if err != nil {
+					return err
+				}
 			}
 		}
 	default:

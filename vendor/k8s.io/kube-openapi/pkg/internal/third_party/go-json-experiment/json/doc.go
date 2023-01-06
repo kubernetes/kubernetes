@@ -8,8 +8,7 @@
 // primitive data types such as booleans, strings, and numbers,
 // in addition to structured data types such as objects and arrays.
 //
-//
-// Terminology
+// # Terminology
 //
 // This package uses the terms "encode" and "decode" for syntactic functionality
 // that is concerned with processing JSON based on its grammar, and
@@ -32,8 +31,7 @@
 //
 // See RFC 8259 for more information.
 //
-//
-// Specifications
+// # Specifications
 //
 // Relevant specifications include RFC 4627, RFC 7159, RFC 7493, RFC 8259,
 // and RFC 8785. Each RFC is generally a stricter subset of another RFC.
@@ -60,8 +58,7 @@
 // In particular, it makes specific choices about behavior that RFC 8259
 // leaves as undefined in order to ensure greater interoperability.
 //
-//
-// JSON Representation of Go structs
+// # JSON Representation of Go structs
 //
 // A Go struct is naturally represented as a JSON object,
 // where each Go struct field corresponds with a JSON object member.
