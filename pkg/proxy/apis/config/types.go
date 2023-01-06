@@ -218,48 +218,6 @@ const (
 	LocalModeInterfaceNamePrefix LocalMode = "InterfaceNamePrefix"
 )
 
-// IPVSSchedulerMethod is the algorithm for allocating TCP connections and
-// UDP datagrams to real servers. Scheduling algorithms are implemented as kernel modules.
-// Ten are shipped with the Linux Virtual Server.
-type IPVSSchedulerMethod string
-
-const (
-	// RoundRobin distributes jobs equally amongst the available real servers.
-	RoundRobin IPVSSchedulerMethod = "rr"
-	// WeightedRoundRobin assigns jobs to real servers proportionally to their real servers' weight.
-	// Servers with higher weights receive new jobs first and get more jobs than servers with lower weights.
-	// Servers with equal weights get an equal distribution of new jobs.
-	WeightedRoundRobin IPVSSchedulerMethod = "wrr"
-	// LeastConnection assigns more jobs to real servers with fewer active jobs.
-	LeastConnection IPVSSchedulerMethod = "lc"
-	// WeightedLeastConnection assigns more jobs to servers with fewer jobs and
-	// relative to the real servers' weight(Ci/Wi).
-	WeightedLeastConnection IPVSSchedulerMethod = "wlc"
-	// LocalityBasedLeastConnection assigns jobs destined for the same IP address to the same server if
-	// the server is not overloaded and available; otherwise assigns jobs to servers with fewer jobs,
-	// and keep it for future assignment.
-	LocalityBasedLeastConnection IPVSSchedulerMethod = "lblc"
-	// LocalityBasedLeastConnectionWithReplication with Replication assigns jobs destined for the same IP address to the
-	// least-connection node in the server set for the IP address. If all the node in the server set are overloaded,
-	// it picks up a node with fewer jobs in the cluster and adds it to the sever set for the target.
-	// If the server set has not been modified for the specified time, the most loaded node is removed from the server set,
-	// in order to avoid high degree of replication.
-	LocalityBasedLeastConnectionWithReplication IPVSSchedulerMethod = "lblcr"
-	// SourceHashing assigns jobs to servers through looking up a statically assigned hash table
-	// by their source IP addresses.
-	SourceHashing IPVSSchedulerMethod = "sh"
-	// DestinationHashing assigns jobs to servers through looking up a statically assigned hash table
-	// by their destination IP addresses.
-	DestinationHashing IPVSSchedulerMethod = "dh"
-	// ShortestExpectedDelay assigns an incoming job to the server with the shortest expected delay.
-	// The expected delay that the job will experience is (Ci + 1) / Ui if sent to the ith server, in which
-	// Ci is the number of jobs on the ith server and Ui is the fixed service rate (weight) of the ith server.
-	ShortestExpectedDelay IPVSSchedulerMethod = "sed"
-	// NeverQueue assigns an incoming job to an idle server if there is, instead of waiting for a fast one;
-	// if all the servers are busy, it adopts the ShortestExpectedDelay policy to assign the job.
-	NeverQueue IPVSSchedulerMethod = "nq"
-)
-
 func (m *ProxyMode) Set(s string) error {
 	*m = ProxyMode(s)
 	return nil
