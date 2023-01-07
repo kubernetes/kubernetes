@@ -31,6 +31,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	kmsapi "k8s.io/kms/apis/v2alpha1"
 )
 
@@ -61,6 +62,21 @@ func TestGRPCService(t *testing.T) {
 	t.Cleanup(server.Shutdown)
 
 	client := newClient(t, address)
+
+	// make sure the gRPC server is up before running tests
+	if err := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (bool, error) {
+		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+
+		_, err := client.Status(ctx, &kmsapi.StatusRequest{})
+		if err != nil {
+			t.Logf("failed to get kms status: %v", err)
+		}
+
+		return err == nil, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("should be able to encrypt and decrypt through unix domain sockets", func(t *testing.T) {
 		t.Parallel()
