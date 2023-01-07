@@ -92,9 +92,7 @@ func TestVolumeBinding(t *testing.T) {
 			nodes: []*v1.Node{
 				makeNode("node-a").Node,
 			},
-			wantStateAfterPreFilter: &stateData{
-				skip: true,
-			},
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 			wantFilterStatus: []*framework.Status{
 				nil,
 			},
