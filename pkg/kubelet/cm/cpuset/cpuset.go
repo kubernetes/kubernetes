@@ -14,75 +14,48 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package cpuset represents a collection of CPUs in a 'set' data structure.
+//
+// It can be used to represent core IDs, hyper thread siblings, CPU nodes, or processor IDs.
+//
+// The only special thing about this package is that
+// methods are provided to convert back and forth from Linux 'list' syntax.
+// See http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS for details.
+//
+// Future work can migrate this to use a 'set' library, and relax the dubious 'immutable' property.
 package cpuset
 
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
-
-	"k8s.io/klog/v2"
 )
-
-// Builder is a mutable builder for CPUSet. Functions that mutate instances
-// of this type are not thread-safe.
-type Builder struct {
-	result CPUSet
-	done   bool
-}
-
-// NewBuilder returns a mutable CPUSet builder.
-func NewBuilder() *Builder {
-	return &Builder{
-		result: CPUSet{
-			elems: map[int]struct{}{},
-		},
-	}
-}
-
-// Add adds the supplied elements to the result. Calling Add after calling
-// Result has no effect.
-func (b *Builder) Add(elems ...int) {
-	if b.done {
-		return
-	}
-	for _, elem := range elems {
-		b.result.elems[elem] = struct{}{}
-	}
-}
-
-// Result returns the result CPUSet containing all elements that were
-// previously added to this builder. Subsequent calls to Add have no effect.
-func (b *Builder) Result() CPUSet {
-	b.done = true
-	return b.result
-}
 
 // CPUSet is a thread-safe, immutable set-like data structure for CPU IDs.
 type CPUSet struct {
 	elems map[int]struct{}
 }
 
-// NewCPUSet returns a new CPUSet containing the supplied elements.
-func NewCPUSet(cpus ...int) CPUSet {
-	b := NewBuilder()
-	for _, c := range cpus {
-		b.Add(c)
+// New returns a new CPUSet containing the supplied elements.
+func New(cpus ...int) CPUSet {
+	s := CPUSet{
+		elems: map[int]struct{}{},
 	}
-	return b.Result()
+	for _, c := range cpus {
+		s.add(c)
+	}
+	return s
 }
 
-// NewCPUSetInt64 returns a new CPUSet containing the supplied elements, as slice of int64.
-func NewCPUSetInt64(cpus ...int64) CPUSet {
-	b := NewBuilder()
-	for _, c := range cpus {
-		b.Add(int(c))
+// add adds the supplied elements to the CPUSet.
+// It is intended for internal use only, since it mutates the CPUSet.
+func (s CPUSet) add(elems ...int) {
+	for _, elem := range elems {
+		s.elems[elem] = struct{}{}
 	}
-	return b.Result()
 }
 
 // Size returns the number of elements in this set.
@@ -107,29 +80,16 @@ func (s CPUSet) Equals(s2 CPUSet) bool {
 	return reflect.DeepEqual(s.elems, s2.elems)
 }
 
-// Filter returns a new CPU set that contains all of the elements from this
+// filter returns a new CPU set that contains all of the elements from this
 // set that match the supplied predicate, without mutating the source set.
-func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
-	b := NewBuilder()
+func (s CPUSet) filter(predicate func(int) bool) CPUSet {
+	r := New()
 	for cpu := range s.elems {
 		if predicate(cpu) {
-			b.Add(cpu)
+			r.add(cpu)
 		}
 	}
-	return b.Result()
-}
-
-// FilterNot returns a new CPU set that contains all of the elements from this
-// set that do not match the supplied predicate, without mutating the source
-// set.
-func (s CPUSet) FilterNot(predicate func(int) bool) CPUSet {
-	b := NewBuilder()
-	for cpu := range s.elems {
-		if !predicate(cpu) {
-			b.Add(cpu)
-		}
-	}
-	return b.Result()
+	return r
 }
 
 // IsSubsetOf returns true if the supplied set contains all the elements
@@ -145,87 +105,49 @@ func (s CPUSet) IsSubsetOf(s2 CPUSet) bool {
 }
 
 // Union returns a new CPU set that contains all of the elements from this
-// set and all of the elements from the supplied set, without mutating
-// either source set.
-func (s CPUSet) Union(s2 CPUSet) CPUSet {
-	b := NewBuilder()
-	for cpu := range s.elems {
-		b.Add(cpu)
-	}
-	for cpu := range s2.elems {
-		b.Add(cpu)
-	}
-	return b.Result()
-}
-
-// UnionAll returns a new CPU set that contains all of the elements from this
 // set and all of the elements from the supplied sets, without mutating
 // either source set.
-func (s CPUSet) UnionAll(s2 []CPUSet) CPUSet {
-	b := NewBuilder()
+func (s CPUSet) Union(s2 ...CPUSet) CPUSet {
+	r := New()
 	for cpu := range s.elems {
-		b.Add(cpu)
+		r.add(cpu)
 	}
 	for _, cs := range s2 {
 		for cpu := range cs.elems {
-			b.Add(cpu)
+			r.add(cpu)
 		}
 	}
-	return b.Result()
+	return r
 }
 
 // Intersection returns a new CPU set that contains all of the elements
 // that are present in both this set and the supplied set, without mutating
 // either source set.
 func (s CPUSet) Intersection(s2 CPUSet) CPUSet {
-	return s.Filter(func(cpu int) bool { return s2.Contains(cpu) })
+	return s.filter(func(cpu int) bool { return s2.Contains(cpu) })
 }
 
 // Difference returns a new CPU set that contains all of the elements that
 // are present in this set and not the supplied set, without mutating either
 // source set.
 func (s CPUSet) Difference(s2 CPUSet) CPUSet {
-	return s.FilterNot(func(cpu int) bool { return s2.Contains(cpu) })
+	return s.filter(func(cpu int) bool { return !s2.Contains(cpu) })
 }
 
-// ToSlice returns a slice of integers that contains all elements from
-// this set.
-func (s CPUSet) ToSlice() []int {
-	result := make([]int, 0, len(s.elems))
-	for cpu := range s.elems {
-		result = append(result, cpu)
-	}
+// List returns a slice of integers that contains all elements from
+// this set. The list is sorted.
+func (s CPUSet) List() []int {
+	result := s.UnsortedList()
 	sort.Ints(result)
 	return result
 }
 
-// ToSliceNoSort returns a slice of integers that contains all elements from
+// UnsortedList returns a slice of integers that contains all elements from
 // this set.
-func (s CPUSet) ToSliceNoSort() []int {
+func (s CPUSet) UnsortedList() []int {
 	result := make([]int, 0, len(s.elems))
 	for cpu := range s.elems {
 		result = append(result, cpu)
-	}
-	return result
-}
-
-// ToSliceInt64 returns an ordered slice of int64 that contains all elements from
-// this set
-func (s CPUSet) ToSliceInt64() []int64 {
-	result := make([]int64, 0, len(s.elems))
-	for cpu := range s.elems {
-		result = append(result, int64(cpu))
-	}
-	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
-	return result
-}
-
-// ToSliceNoSortInt64 returns a slice of int64 that contains all elements from
-// this set.
-func (s CPUSet) ToSliceNoSortInt64() []int64 {
-	result := make([]int64, 0, len(s.elems))
-	for cpu := range s.elems {
-		result = append(result, int64(cpu))
 	}
 	return result
 }
@@ -239,7 +161,7 @@ func (s CPUSet) String() string {
 		return ""
 	}
 
-	elems := s.ToSlice()
+	elems := s.List()
 
 	type rng struct {
 		start int
@@ -273,28 +195,16 @@ func (s CPUSet) String() string {
 	return strings.TrimRight(result.String(), ",")
 }
 
-// MustParse CPUSet constructs a new CPU set from a Linux CPU list formatted
-// string. Unlike Parse, it does not return an error but rather panics if the
-// input cannot be used to construct a CPU set.
-func MustParse(s string) CPUSet {
-	res, err := Parse(s)
-	if err != nil {
-		klog.ErrorS(err, "Failed to parse input as CPUSet", "input", s)
-		os.Exit(1)
-	}
-	return res
-}
-
 // Parse CPUSet constructs a new CPU set from a Linux CPU list formatted string.
 //
 // See: http://man7.org/linux/man-pages/man7/cpuset.7.html#FORMATS
 func Parse(s string) (CPUSet, error) {
-	b := NewBuilder()
-
 	// Handle empty string.
 	if s == "" {
-		return b.Result(), nil
+		return New(), nil
 	}
+
+	result := New()
 
 	// Split CPU list string:
 	// "0-5,34,46-48" => ["0-5", "34", "46-48"]
@@ -306,39 +216,39 @@ func Parse(s string) (CPUSet, error) {
 			// Handle ranges that consist of only one element like "34".
 			elem, err := strconv.Atoi(boundaries[0])
 			if err != nil {
-				return NewCPUSet(), err
+				return New(), err
 			}
-			b.Add(elem)
+			result.add(elem)
 		} else if len(boundaries) == 2 {
 			// Handle multi-element ranges like "0-5".
 			start, err := strconv.Atoi(boundaries[0])
 			if err != nil {
-				return NewCPUSet(), err
+				return New(), err
 			}
 			end, err := strconv.Atoi(boundaries[1])
 			if err != nil {
-				return NewCPUSet(), err
+				return New(), err
 			}
 			if start > end {
-				return NewCPUSet(), fmt.Errorf("invalid range %q (%d >= %d)", r, start, end)
+				return New(), fmt.Errorf("invalid range %q (%d >= %d)", r, start, end)
 			}
 			// start == end is acceptable (1-1 -> 1)
 
 			// Add all elements to the result.
 			// e.g. "0-5", "46-48" => [0, 1, 2, 3, 4, 5, 46, 47, 48].
 			for e := start; e <= end; e++ {
-				b.Add(e)
+				result.add(e)
 			}
 		}
 	}
-	return b.Result(), nil
+	return result, nil
 }
 
 // Clone returns a copy of this CPU set.
 func (s CPUSet) Clone() CPUSet {
-	b := NewBuilder()
+	r := New()
 	for elem := range s.elems {
-		b.Add(elem)
+		r.add(elem)
 	}
-	return b.Result()
+	return r
 }

@@ -522,7 +522,11 @@ func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpo
 	resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
 	framework.ExpectNoErrorWithOffset(1, err)
 	devs := resp.GetDevices()
-	allocatableCPUs := cpuset.NewCPUSetInt64(resp.GetCpuIds()...)
+	var cpus []int
+	for _, cpuid := range resp.GetCpuIds() {
+		cpus = append(cpus, int(cpuid))
+	}
+	allocatableCPUs := cpuset.New(cpus...)
 
 	if onlineCPUs.Size() == 0 {
 		ginkgo.By("expecting no CPUs reported")
@@ -557,7 +561,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 	f := framework.NewDefaultFramework("podresources-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	reservedSystemCPUs := cpuset.MustParse("1")
+	reservedSystemCPUs := cpuset.New(1)
 
 	ginkgo.Context("with SRIOV devices in the system", func() {
 		ginkgo.BeforeEach(func() {

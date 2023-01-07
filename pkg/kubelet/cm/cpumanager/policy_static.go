@@ -217,7 +217,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 			tmpCPUSets = append(tmpCPUSets, cset)
 		}
 	}
-	totalKnownCPUs = totalKnownCPUs.UnionAll(tmpCPUSets)
+	totalKnownCPUs = totalKnownCPUs.Union(tmpCPUSets...)
 	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
 			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
@@ -245,7 +245,7 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	}
 	// If no cpuset exists for cpusToReuse by this pod yet, create one.
 	if _, ok := p.cpusToReuse[string(pod.UID)]; !ok {
-		p.cpusToReuse[string(pod.UID)] = cpuset.NewCPUSet()
+		p.cpusToReuse[string(pod.UID)] = cpuset.New()
 	}
 	// Check if the container is an init container.
 	// If so, add its cpuset to the cpuset of reusable CPUs for any new allocations.
@@ -316,7 +316,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
 func getAssignedCPUsOfSiblings(s state.State, podUID string, containerName string) cpuset.CPUSet {
 	assignments := s.GetCPUAssignments()
-	cset := cpuset.NewCPUSet()
+	cset := cpuset.New()
 	for name, cpus := range assignments[podUID] {
 		if containerName == name {
 			continue
@@ -344,7 +344,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	allocatableCPUs := p.GetAvailableCPUs(s).Union(reusableCPUs)
 
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
-	result := cpuset.NewCPUSet()
+	result := cpuset.New()
 	if numaAffinity != nil {
 		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
 
@@ -355,7 +355,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 
 		alignedCPUs, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
 		if err != nil {
-			return cpuset.NewCPUSet(), err
+			return cpuset.New(), err
 		}
 
 		result = result.Union(alignedCPUs)
@@ -364,7 +364,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
 	remainingCPUs, err := p.takeByTopology(allocatableCPUs.Difference(result), numCPUs-result.Size())
 	if err != nil {
-		return cpuset.NewCPUSet(), err
+		return cpuset.New(), err
 	}
 	result = result.Union(remainingCPUs)
 
@@ -486,7 +486,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 		return nil
 	}
 
-	assignedCPUs := cpuset.NewCPUSet()
+	assignedCPUs := cpuset.New()
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		requestedByContainer := p.guaranteedCPUs(pod, &container)
 		// Short circuit to regenerate the same hints if there are already
@@ -544,7 +544,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 
 	// Iterate through all combinations of numa nodes bitmask and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().ToSlice(), func(mask bitmask.BitMask) {
+	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().List(), func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
 		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
@@ -554,7 +554,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 		// Then check to see if we have enough CPUs available on the current
 		// numa node bitmask to satisfy the CPU request.
 		numMatching := 0
-		for _, c := range reusableCPUs.ToSlice() {
+		for _, c := range reusableCPUs.List() {
 			// Disregard this mask if its NUMANode isn't part of it.
 			if !mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
 				return
@@ -564,7 +564,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 
 		// Finally, check to see if enough available CPUs remain on the current
 		// NUMA node combination to satisfy the CPU request.
-		for _, c := range availableCPUs.ToSlice() {
+		for _, c := range availableCPUs.List() {
 			if mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
 				numMatching++
 			}
@@ -616,14 +616,14 @@ func (p *staticPolicy) isHintSocketAligned(hint topologymanager.TopologyHint, mi
 
 // getAlignedCPUs return set of aligned CPUs based on numa affinity mask and configured policy options.
 func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableCPUs cpuset.CPUSet) cpuset.CPUSet {
-	alignedCPUs := cpuset.NewCPUSet()
+	alignedCPUs := cpuset.New()
 	numaBits := numaAffinity.GetBits()
 
 	// If align-by-socket policy option is enabled, NUMA based hint is expanded to
 	// socket aligned hint. It will ensure that first socket aligned available CPUs are
 	// allocated before we try to find CPUs across socket to satisfy allocation request.
 	if p.options.AlignBySocket {
-		socketBits := p.topology.CPUDetails.SocketsInNUMANodes(numaBits...).ToSliceNoSort()
+		socketBits := p.topology.CPUDetails.SocketsInNUMANodes(numaBits...).UnsortedList()
 		for _, socketID := range socketBits {
 			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInSockets(socketID)))
 		}
