@@ -618,7 +618,7 @@ type RollingUpdateDaemonSet struct {
 	// update. Value can be an absolute number (ex: 5) or a percentage of total
 	// number of DaemonSet pods at the start of the update (ex: 10%). Absolute
 	// number is calculated from percentage by rounding up.
-	// This cannot be 0 if MaxSurge is 0
+	// This cannot be 0 if MaxSurge is 0.
 	// Default value is 1.
 	// Example: when this is set to 30%, at most 30% of the total number of nodes
 	// that should be running the daemon pod (i.e. status.desiredNumberScheduled)
@@ -632,7 +632,7 @@ type RollingUpdateDaemonSet struct {
 	MaxUnavailable intstr.IntOrString
 
 	// The maximum number of nodes with an existing available DaemonSet pod that
-	// can have an updated DaemonSet pod during during an update.
+	// can have an updated DaemonSet pod during an update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// This can not be 0 if MaxUnavailable is 0.
 	// Absolute number is calculated from percentage by rounding up to a minimum of 1.
