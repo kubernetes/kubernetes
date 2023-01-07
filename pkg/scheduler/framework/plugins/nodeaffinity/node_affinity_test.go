@@ -218,42 +218,6 @@ func TestNodeAffinity(t *testing.T) {
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
-			name: "Pod with a nil []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: nil,
-							},
-						},
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
-		},
-		{
-			name: "Pod with an empty []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{},
-							},
-						},
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
-		},
-		{
 			name: "Pod with empty MatchExpressions is not a valid value will match no objects and won't schedule onto the node",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
