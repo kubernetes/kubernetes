@@ -4,7 +4,16 @@ Welcome to Kubernetes! We use GitHub for tracking bugs and feature requests.
 This isn't the right place to get support for using Kubernetes, but the following
 resources are available below, thanks for understanding.
 
-### Stack Overflow
+### Real-time Chat: For Beginners
+
+* [Slack](https://kubernetes.slack.com) ([registration](https://slack.k8s.io)):
+The `#kubernetes-users` and `#kubernetes-novice` channels are usual places where
+people offer support. If you are completely new to k8s. Join this community. 
+You will surely get help from memebers and regular contributors there.
+**WE WELCOME NEW CONTRIBUTOR**
+
+
+### Stack Overflow: For Errors
 
 The Kubernetes Community is active on Stack Overflow, you can post your questions there:
 
@@ -18,12 +27,7 @@ The Kubernetes Community is active on Stack Overflow, you can post your question
 * [User Documentation](https://kubernetes.io/docs/)
 * [Troubleshooting Guide](https://kubernetes.io/docs/tasks/debug/)
 
-### Real-time Chat
 
-* [Slack](https://kubernetes.slack.com) ([registration](https://slack.k8s.io)):
-The `#kubernetes-users` and `#kubernetes-novice` channels are usual places where
-people offer support.
-
-### Forum
+### Forum: For Technical Question
 
 * [Kubernetes Official Forum](https://discuss.kubernetes.io)
