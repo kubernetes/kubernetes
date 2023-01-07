@@ -98,6 +98,9 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 	if !status.IsSuccess() {
 		return nil, status
 	}
+	if len(podPVTopologies) == 0 {
+		return nil, framework.NewStatus(framework.Skip)
+	}
 	cs.Write(preFilterStateKey, &stateData{podPVTopologies: podPVTopologies})
 	return nil, nil
 }
@@ -186,11 +189,6 @@ func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
 func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	// If a pod doesn't have any volume attached to it, the predicate will always be true.
-	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
-	if len(pod.Spec.Volumes) == 0 {
-		return nil
-	}
 	var podPVTopologies []pvTopology
 	state, err := getStateData(cs)
 	if err != nil {
