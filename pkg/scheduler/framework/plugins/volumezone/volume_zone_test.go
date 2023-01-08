@@ -230,16 +230,13 @@ func TestSingleZone(t *testing.T) {
 				pvcLister,
 				nil,
 			}
-
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
-				t.Errorf("status does not match (-want,+got):\n%s", diff)
+				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
-			if preFilterStatus.IsSuccess() {
-				filterStatus := p.Filter(ctx, state, test.Pod, node)
-				if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
-					t.Errorf("status does not match (-want,+got):\n%s", diff)
-				}
+			filterStatus := p.Filter(ctx, state, test.Pod, node)
+			if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
+				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -366,13 +363,11 @@ func TestMultiZone(t *testing.T) {
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
-				t.Errorf("status does not match (-want,+got):\n%s", diff)
+				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
-			if preFilterStatus.IsSuccess() {
-				filterStatus := p.Filter(context.Background(), state, test.Pod, node)
-				if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
-					t.Errorf("status does not match (-want,+got):\n%s", diff)
-				}
+			filterStatus := p.Filter(ctx, state, test.Pod, node)
+			if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
+				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -450,6 +445,8 @@ func TestWithBinding(t *testing.T) {
 			Node: testNode,
 			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
 				"PersistentVolumeClaim had no pv name and storageClass name"),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+				"PersistentVolumeClaim had no pv name and storageClass name"),
 		},
 		{
 			name: "unbound volume no storage class",
@@ -457,12 +454,15 @@ func TestWithBinding(t *testing.T) {
 			Node: testNode,
 			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
 				"unable to find storage class: Class_0"),
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+				"unable to find storage class: Class_0"),
 		},
 		{
 			name:                "unbound volume immediate binding mode",
 			Pod:                 createPodWithVolume("pod_1", "vol_1", "PVC_ImmediateSC"),
 			Node:                testNode,
 			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
+			wantFilterStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
 		},
 		{
 			name:                "unbound volume wait binding mode",
@@ -487,13 +487,11 @@ func TestWithBinding(t *testing.T) {
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
-				t.Errorf("status does not match (-want,+got):\n%s", diff)
+				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
-			if preFilterStatus.IsSuccess() {
-				filterStatus := p.Filter(ctx, state, test.Pod, node)
-				if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
-					t.Errorf("status does not match (-want,+got):\n%s", diff)
-				}
+			filterStatus := p.Filter(ctx, state, test.Pod, node)
+			if diff := cmp.Diff(filterStatus, test.wantFilterStatus); diff != "" {
+				t.Errorf("Filter: status does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}
