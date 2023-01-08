@@ -165,6 +165,7 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
 		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
 	} else if !hasPVC {
+		state.Write(stateKey, &stateData{})
 		return nil, framework.NewStatus(framework.Skip)
 	}
 	podVolumeClaims, err := pl.Binder.GetPodVolumeClaims(pod)
