@@ -246,7 +246,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 				Namespace: "namespace",
 			},
 			Spec: v1.ReplicationControllerSpec{
-				Replicas:        utilpointer.Int32Ptr(1),
+				Replicas:        utilpointer.Int32(1),
 				MinReadySeconds: 32,
 				Selector:        map[string]string{"foo": "bar", "bar": "foo"},
 				Template: &v1.PodTemplateSpec{

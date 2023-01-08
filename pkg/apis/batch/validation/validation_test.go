@@ -170,7 +170,7 @@ func TestValidateJob(t *testing.T) {
 				},
 				Spec: batch.JobSpec{
 					Selector:       validManualSelector,
-					ManualSelector: pointer.BoolPtr(true),
+					ManualSelector: pointer.Bool(true),
 					Template:       validPodTemplateSpecForManual,
 				},
 			},
@@ -213,8 +213,8 @@ func TestValidateJob(t *testing.T) {
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    pointer.Int32Ptr(2),
-					Parallelism:    pointer.Int32Ptr(100000),
+					Completions:    pointer.Int32(2),
+					Parallelism:    pointer.Int32(100000),
 				},
 			},
 		},
@@ -698,7 +698,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: pointer.BoolPtr(true),
+				ManualSelector: pointer.Bool(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"y": "z"},
@@ -719,7 +719,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: pointer.BoolPtr(true),
+				ManualSelector: pointer.Bool(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"controller-uid": "4d5e6f"},
@@ -740,7 +740,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: pointer.BoolPtr(true),
+				ManualSelector: pointer.Bool(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validManualSelector.MatchLabels,
@@ -761,7 +761,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: pointer.BoolPtr(true),
+				ManualSelector: pointer.Bool(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validManualSelector.MatchLabels,
@@ -808,8 +808,8 @@ func TestValidateJob(t *testing.T) {
 				Selector:       validGeneratedSelector,
 				Template:       validPodTemplateSpecForGenerated,
 				CompletionMode: completionModePtr(batch.IndexedCompletion),
-				Completions:    pointer.Int32Ptr(2),
-				Parallelism:    pointer.Int32Ptr(100001),
+				Completions:    pointer.Int32(2),
+				Parallelism:    pointer.Int32(100001),
 			},
 		},
 		"metadata.annotations[batch.kubernetes.io/job-tracking]: cannot add this annotation": {
@@ -909,16 +909,16 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:                validGeneratedSelector,
 					Template:                validPodTemplateSpecForGenerated,
-					Parallelism:             pointer.Int32Ptr(5),
-					ActiveDeadlineSeconds:   pointer.Int64Ptr(2),
-					TTLSecondsAfterFinished: pointer.Int32Ptr(1),
+					Parallelism:             pointer.Int32(5),
+					ActiveDeadlineSeconds:   pointer.Int64(2),
+					TTLSecondsAfterFinished: pointer.Int32(1),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Parallelism = pointer.Int32Ptr(2)
-				job.Spec.ActiveDeadlineSeconds = pointer.Int64Ptr(3)
-				job.Spec.TTLSecondsAfterFinished = pointer.Int32Ptr(2)
-				job.Spec.ManualSelector = pointer.BoolPtr(true)
+				job.Spec.Parallelism = pointer.Int32(2)
+				job.Spec.ActiveDeadlineSeconds = pointer.Int64(3)
+				job.Spec.TTLSecondsAfterFinished = pointer.Int32(2)
+				job.Spec.ManualSelector = pointer.Bool(true)
 			},
 		},
 		"immutable completion": {
@@ -930,7 +930,7 @@ func TestValidateJobUpdate(t *testing.T) {
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(1)
+				job.Spec.Completions = pointer.Int32(1)
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -1070,7 +1070,7 @@ func TestValidateJobUpdate(t *testing.T) {
 					Selector:       validGeneratedSelector,
 					Template:       validPodTemplateSpecForGenerated,
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    pointer.Int32Ptr(2),
+					Completions:    pointer.Int32(2),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -1831,7 +1831,7 @@ func TestValidateCronJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						ManualSelector: pointer.BoolPtr(true),
+						ManualSelector: pointer.Bool(true),
 						Template:       validPodTemplateSpec,
 					},
 				},
