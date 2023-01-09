@@ -198,8 +198,8 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 	defer rsc.queue.ShutDown()
 
 	controllerName := strings.ToLower(rsc.Kind)
-	klog.FromContext(ctx).Info("Starting %v controller", controllerName)
-	defer klog.FromContext(ctx).Info("Shutting down %v controller", controllerName)
+	klog.FromContext(ctx).Info("Starting controller", "name", controllerName)
+	defer klog.FromContext(ctx).Info("Shutting down controller", "name", controllerName)
 
 	if !cache.WaitForNamedCacheSync(rsc.Kind, ctx.Done(), rsc.podListerSynced, rsc.rsListerSynced) {
 		return
@@ -593,7 +593,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		// The skipped pods will be retried later. The next controller resync will
 		// retry the slow start process.
 		if skippedPods := diff - successfulCreations; skippedPods > 0 {
-			klog.FromContext(ctx).V(2).Info("Slow-start failure. Skipping creation of %d pods, decrementing expectations for %v %v/%v", skippedPods, rsc.Kind, rs.Namespace, rs.Name)
+			klog.FromContext(ctx).V(2).Info("Slow-start failure. Skipping creation of pods, decrementing expectations", "pods skipped", skippedPods, "kind", rsc.Kind, "namespace", rs.Namespace, "name", rs.Name)
 			for i := 0; i < skippedPods; i++ {
 				// Decrement the expected number of creates because the informer won't observe this pod
 				rsc.expectations.CreationObserved(rsKey)
@@ -631,7 +631,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 					podKey := controller.PodKey(targetPod)
 					rsc.expectations.DeletionObserved(rsKey, podKey)
 					if !apierrors.IsNotFound(err) {
-						klog.FromContext(ctx).V(2).Info("Failed to delete %v, decremented expectations for %v %s/%s", podKey, rsc.Kind, rs.Namespace, rs.Name)
+						klog.FromContext(ctx).V(2).Info("Failed to delete pod, decremented expectations", "pod", podKey, "kind", rsc.Kind, "namespace", rs.Namespace, "name", rs.Name)
 						errCh <- err
 					}
 				}
@@ -658,7 +658,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.FromContext(ctx).V(4).Info("Finished syncing %v %q (%v)", rsc.Kind, key, time.Since(startTime))
+		klog.FromContext(ctx).V(4).Info("Finished syncing", "kind", rsc.Kind, "key", key, "time taken", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -667,7 +667,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		klog.FromContext(ctx).V(4).Info("%v %v has been deleted", rsc.Kind, key)
+		klog.FromContext(ctx).V(4).Info("deleted", "kind", rsc.Kind, "key", key)
 		rsc.expectations.DeleteExpectations(key)
 		return nil
 	}
@@ -793,7 +793,7 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(logger klog.Logger, rs
 		}
 		for _, pod := range pods {
 			if otherRS, found := seen[pod.UID]; found {
-				logger.V(5).Info("Pod %s/%s is owned by both %v %s/%s and %v %s/%s", pod.Namespace, pod.Name, rsc.Kind, otherRS.Namespace, otherRS.Name, rsc.Kind, relatedRS.Namespace, relatedRS.Name)
+				logger.V(5).Info("Pod is owned by both", "pod namespace", pod.Namespace, "pod name", pod.Name, "kind", rsc.Kind, "namespace", otherRS.Namespace, "name", otherRS.Name, "kind", rsc.Kind, "namespace", relatedRS.Namespace, "name", relatedRS.Name)
 				continue
 			}
 			seen[pod.UID] = relatedRS
