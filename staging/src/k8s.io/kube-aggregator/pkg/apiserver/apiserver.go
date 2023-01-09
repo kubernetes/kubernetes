@@ -342,10 +342,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 				if apierrors.IsNotFound(err) {
 					return false, nil
 				}
-				if err != nil {
-					return false, err
-				}
-				return true, nil
+				return err == nil, err
 			}, hookContext.StopCh); err != nil {
 				return fmt.Errorf("failed to wait for apiserver-identity lease %s to be created: %v",
 					s.GenericAPIServer.APIServerID, err)

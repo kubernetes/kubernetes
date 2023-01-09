@@ -236,10 +236,8 @@ func (c *NamingConditionController) sync(key string) error {
 	if apierrors.IsNotFound(err) {
 		// CRD was deleted and has freed its names.
 		// Reconsider all other CRDs in the same group.
-		if err := c.requeueAllOtherGroupCRDs(key); err != nil {
-			return err
-		}
-		return nil
+		err := c.requeueAllOtherGroupCRDs(key)
+		return err
 	}
 	if err != nil {
 		return err

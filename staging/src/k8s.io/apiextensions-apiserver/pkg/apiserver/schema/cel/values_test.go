@@ -555,11 +555,8 @@ func TestMapper(t *testing.T) {
 			},
 			schema: &objectSchema,
 			propertySchema: func(key string) (*schema.Structural, bool) {
-				if s, ok := objectSchema.Properties[key]; ok {
-					return &s, true
-				}
-				return nil, false
-			},
+				return objectSchema.Properties[key]
+},
 			size: 2,
 			notContains: []ref.Val{
 				UnstructuredToVal("field3", &stringSchema),

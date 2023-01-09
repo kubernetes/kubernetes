@@ -65,10 +65,7 @@ func waitListAllNodes(c clientset.Interface) (*v1.NodeList, error) {
 	var err error
 	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
 		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return err == nil, err
 	}) != nil {
 		return nodes, err
 	}

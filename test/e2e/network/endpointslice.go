@@ -119,10 +119,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		// Expect Endpoints resource to be created.
 		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 			_, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			return true, nil
+			return err == nil, nil
 		}); err != nil {
 			framework.Failf("No Endpoints found for Service %s/%s: %s", svc.Namespace, svc.Name, err)
 		}
@@ -185,10 +182,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			if err != nil {
 				return false, err
 			}
-			if len(endpointSliceList.Items) == 0 {
-				return true, nil
-			}
-			return false, nil
+			return len(endpointSliceList.Items) == 0, nil
 		}); err != nil {
 			framework.Failf("EndpointSlice resource not deleted after Service %s/%s was deleted: %s", svc.Namespace, svc.Name, err)
 		}

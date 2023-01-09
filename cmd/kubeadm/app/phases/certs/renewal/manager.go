@@ -245,11 +245,7 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 
 	// writes the new certificate to disk
 	err = handler.readwriter.Write(newCert, newKey)
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return err == nil, err
 }
 
 // CreateRenewCSR generates CSR request for certificate renewal.

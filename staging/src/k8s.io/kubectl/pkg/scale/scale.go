@@ -90,10 +90,7 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 		if errors.IsConflict(err) {
 			return false, nil
 		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return err == nil, err
 	}
 }
 

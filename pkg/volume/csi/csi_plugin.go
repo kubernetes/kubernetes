@@ -753,10 +753,7 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 		}
 		return false, err
 	}
-	if csiDriver.Spec.AttachRequired != nil && *csiDriver.Spec.AttachRequired == false {
-		return true, nil
-	}
-	return false, nil
+	return csiDriver.Spec.AttachRequired != nil && *csiDriver.Spec.AttachRequired == false, nil
 }
 
 func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {

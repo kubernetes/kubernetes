@@ -171,10 +171,8 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 				}
 
 				filePath := filepath.Join(base, fileName)
-				if err := makeLink(filePath, targeLinkPath); err != nil {
-					return err
-				}
-				return nil
+				err := makeLink(filePath, targeLinkPath)
+				return err
 			},
 			false,
 			false,

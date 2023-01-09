@@ -192,10 +192,7 @@ func TestInitialSync(t *testing.T) {
 	err := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
 		svcHandler.lock.Lock()
 		defer svcHandler.lock.Unlock()
-		if reflect.DeepEqual(svcHandler.state, expectedSvcState) {
-			return true, nil
-		}
-		return false, nil
+		return reflect.DeepEqual(svcHandler.state, expectedSvcState), nil
 	})
 	if err != nil {
 		t.Fatal("Timed out waiting for the completion of handler `OnServiceAdd`")
@@ -204,10 +201,7 @@ func TestInitialSync(t *testing.T) {
 	err = wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
 		epsHandler.lock.Lock()
 		defer epsHandler.lock.Unlock()
-		if reflect.DeepEqual(epsHandler.state, expectedEpsState) {
-			return true, nil
-		}
-		return false, nil
+		return reflect.DeepEqual(epsHandler.state, expectedEpsState), nil
 	})
 	if err != nil {
 		t.Fatal("Timed out waiting for the completion of handler `OnEndpointsAdd`")

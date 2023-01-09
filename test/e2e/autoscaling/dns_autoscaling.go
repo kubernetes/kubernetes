@@ -365,10 +365,7 @@ func waitForDNSConfigMapCreated(ctx context.Context, c clientset.Interface, time
 	framework.Logf("Waiting up to %v for DNS autoscaling ConfigMap got re-created", timeout)
 	condition := func() (bool, error) {
 		configMap, err = fetchDNSScalingConfigMap(ctx, c)
-		if err != nil {
-			return false, nil
-		}
-		return true, nil
+		return err == nil, nil
 	}
 
 	if err = wait.Poll(time.Second, timeout, condition); err != nil {

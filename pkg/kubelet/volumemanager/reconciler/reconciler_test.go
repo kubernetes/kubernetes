@@ -1979,10 +1979,7 @@ func waitForVolumeToExistInASW(t *testing.T, volumeName v1.UniqueVolumeName, asw
 	err := retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
-			if asw.VolumeExists(volumeName) {
-				return true, nil
-			}
-			return false, nil
+			return asw.VolumeExists(volumeName), nil
 		},
 	)
 	if err != nil {
@@ -2348,10 +2345,7 @@ func TestSyncStates(t *testing.T) {
 			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
 				return retryWithExponentialBackOff(reconcilerSyncWaitDuration, func() (bool, error) {
 					err := volumetesting.VerifyTearDownCallCount(1, fakePlugin)
-					if err != nil {
-						return false, nil
-					}
-					return true, nil
+					return err == nil, nil
 				})
 			},
 		},

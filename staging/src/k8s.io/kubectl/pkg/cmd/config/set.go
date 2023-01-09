@@ -168,13 +168,8 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 			currMapValue = reflect.New(mapValueType.Elem()).Elem().Addr()
 			actualCurrValue.SetMapIndex(mapKey, currMapValue)
 		}
-
 		err := modifyConfig(currMapValue, steps, propertyValue, unset, setRawBytes)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return err
 
 	case reflect.String:
 		if steps.moreStepsRemaining() {

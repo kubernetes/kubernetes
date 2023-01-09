@@ -515,10 +515,7 @@ func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb st
 		switch httpVerb {
 		case "HEAD":
 			framework.Logf("http.Client request:%s | StatusCode:%d", httpVerb, resp.StatusCode)
-			if resp.StatusCode != 200 {
-				return false, nil
-			}
-			return true, nil
+			return resp.StatusCode == 200, nil
 		default:
 			var jr *jsonResponse
 			err = json.Unmarshal([]byte(response), &jr)
@@ -535,11 +532,7 @@ func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb st
 			if msg != jr.Body {
 				return false, nil
 			}
-
-			if httpVerb != jr.Method {
-				return false, nil
-			}
-			return true, nil
+			return httpVerb == jr.Method, nil
 		}
 	}
 }

@@ -416,11 +416,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		return true, err
 	}
 	// If the directory has a different device as parent, then it is a mountpoint.
-	if stat.Sys().(*syscall.Stat_t).Dev != rootStat.Sys().(*syscall.Stat_t).Dev {
-		return false, nil
-	}
-
-	return true, nil
+	return stat.Sys().(*syscall.Stat_t).Dev == rootStat.Sys().(*syscall.Stat_t).Dev, nil
 }
 
 // CanSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.

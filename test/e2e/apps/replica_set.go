@@ -380,10 +380,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 		if err != nil && apierrors.IsConflict(err) {
 			return false, nil
 		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return err == nil, err
 	})
 	framework.ExpectNoError(err)
 

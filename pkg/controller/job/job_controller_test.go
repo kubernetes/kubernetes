@@ -1899,10 +1899,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 				if err != nil {
 					return false, nil
 				}
-				if len(j.Status.Conditions) == 1 && j.Status.Conditions[0].Reason == "DeadlineExceeded" {
-					return true, nil
-				}
-				return false, nil
+				return len(j.Status.Conditions) == 1 && j.Status.Conditions[0].Reason == "DeadlineExceeded", nil
 			})
 			if err != nil {
 				t.Errorf("Job failed to enforce activeDeadlineSeconds configuration. Expected condition with Reason 'DeadlineExceeded' was not found in %v", j.Status)

@@ -221,12 +221,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				for _, slice := range esList.Items {
 					numEndpoints += len(slice.Endpoints)
 				}
-
-				if numEndpoints > 0 {
-					return true, nil
-				}
-
-				return false, nil
+				return numEndpoints > 0, nil
 			})
 			if err != nil {
 				t.Errorf("Error waiting for endpoint slices: %v", err)

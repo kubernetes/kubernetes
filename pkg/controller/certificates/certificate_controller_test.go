@@ -48,10 +48,7 @@ func TestCertificateController(t *testing.T) {
 			Message: "test message",
 		})
 		_, err := client.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}
 
 	controller := NewCertificateController(

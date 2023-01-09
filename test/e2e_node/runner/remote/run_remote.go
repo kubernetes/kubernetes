@@ -800,10 +800,8 @@ func rebootInstance(instance *compute.Instance) error {
 	// wait until the instance will response again to SSH
 	klog.Info("Wait for instance to be available via SSH")
 	if waitErr := wait.PollImmediate(30*time.Second, 5*time.Minute, func() (bool, error) {
-		if _, err := remote.SSH(instance.Name, "sh", "-c", "date"); err != nil {
-			return false, nil
-		}
-		return true, nil
+		_, err := remote.SSH(instance.Name, "sh", "-c", "date")
+		return err == nil, nil
 	}); waitErr != nil {
 		return fmt.Errorf("the instance %s does not response to SSH: %v", instance.Name, waitErr)
 	}

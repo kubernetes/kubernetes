@@ -587,11 +587,8 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 		if err != nil {
 			return err
 		}
-
-		if err = printer.PrintObj(info.Object, o.Out); err != nil {
-			return err
-		}
-		return nil
+		err = printer.PrintObj(info.Object, o.Out)
+		return err
 	}
 
 	// Get the modified configuration of the object. Embed the result
@@ -634,10 +631,8 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 		if err != nil {
 			return err
 		}
-		if err = printer.PrintObj(info.Object, o.Out); err != nil {
-			return err
-		}
-		return nil
+		err = printer.PrintObj(info.Object, o.Out)
+		return err
 	}
 
 	if err := o.MarkObjectVisited(info); err != nil {
@@ -669,10 +664,8 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 			if err != nil {
 				return err
 			}
-			if err = printer.PrintObj(info.Object, o.Out); err != nil {
-				return err
-			}
-			return nil
+			err = printer.PrintObj(info.Object, o.Out)
+			return err
 		}
 	}
 

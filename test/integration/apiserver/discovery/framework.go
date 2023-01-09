@@ -414,12 +414,7 @@ func WaitForResultWithCondition(ctx context.Context, client testClient, conditio
 			if err != nil {
 				return false, err
 			}
-
-			if condition(groupList) {
-				return true, nil
-			}
-
-			return false, nil
+			return condition(groupList), nil
 		})
 }
 
@@ -436,12 +431,7 @@ func WaitForV1GroupsWithCondition(ctx context.Context, client testClient, condit
 			if err != nil {
 				return false, err
 			}
-
-			if condition(groupList) {
-				return true, nil
-			}
-
-			return false, nil
+			return condition(groupList), nil
 		})
 }
 

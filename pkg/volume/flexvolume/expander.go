@@ -64,8 +64,5 @@ func (plugin *flexVolumePlugin) NodeExpand(rsOpt volume.NodeResizeOptions) (bool
 	if isCmdNotSupportedErr(err) {
 		return newExpanderDefaults(plugin).NodeExpand(rsOpt)
 	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return err == nil, err
 }

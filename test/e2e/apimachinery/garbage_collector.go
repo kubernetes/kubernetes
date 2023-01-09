@@ -331,10 +331,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			// rc.Spec.Replicas. We want to see if the garbage collector and the
 			// rc manager work properly if the rc is deleted before it reaches
 			// stasis.
-			if len(pods.Items) > 0 {
-				return true, nil
-			}
-			return false, nil
+			return len(pods.Items) > 0, nil
 
 		}); err != nil {
 			framework.Failf("failed to wait for the rc to create some pods: %v", err)
@@ -385,10 +382,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err != nil {
 				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
-			if rc.Status.Replicas == *rc.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
+			return rc.Status.Replicas == *rc.Spec.Replicas, nil
 
 		}); err != nil {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
@@ -412,10 +406,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err != nil {
 				return false, fmt.Errorf("failed to list rcs: %v", err)
 			}
-			if len(rcs.Items) != 0 {
-				return false, nil
-			}
-			return true, nil
+			return len(rcs.Items) == 0, nil
 		}); err != nil {
 			framework.Failf("%v", err)
 		}
@@ -454,10 +445,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err != nil {
 				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
-			if rc.Status.Replicas == *rc.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
+			return rc.Status.Replicas == *rc.Spec.Replicas, nil
 		}); err != nil {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
@@ -665,10 +653,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err != nil {
 				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
-			if rc.Status.Replicas == *rc.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
+			return rc.Status.Replicas == *rc.Spec.Replicas, nil
 		}); err != nil {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
@@ -760,10 +745,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err != nil {
 				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
-			if rc1.Status.Replicas == *rc1.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
+			return rc1.Status.Replicas == *rc1.Spec.Replicas, nil
 		}); err != nil {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
@@ -891,10 +873,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err2 != nil {
 				return false, fmt.Errorf("failed to list pods: %v", err)
 			}
-			if len(pods.Items) == 0 {
-				return true, nil
-			}
-			return false, nil
+			return len(pods.Items) == 0, nil
 		}); err != nil {
 			data, _ := json.Marshal(pods.Items)
 			framework.Logf("pods are %s", string(data))

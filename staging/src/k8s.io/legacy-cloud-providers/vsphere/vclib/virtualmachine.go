@@ -42,10 +42,7 @@ func (vm *VirtualMachine) IsDiskAttached(ctx context.Context, diskPath string) (
 	if err != nil {
 		return false, err
 	}
-	if device != nil {
-		return true, nil
-	}
-	return false, nil
+	return device != nil, nil
 }
 
 // DeleteVM deletes the VM.
@@ -224,11 +221,7 @@ func (vm *VirtualMachine) IsActive(ctx context.Context) (bool, error) {
 		klog.Errorf("Failed to get VM Managed object with property summary. err: +%v", err)
 		return false, err
 	}
-	if vmMoList[0].Summary.Runtime.PowerState == ActivePowerState {
-		return true, nil
-	}
-
-	return false, nil
+	return vmMoList[0].Summary.Runtime.PowerState == ActivePowerState, nil
 }
 
 // Exists checks if VM exists and is not terminated

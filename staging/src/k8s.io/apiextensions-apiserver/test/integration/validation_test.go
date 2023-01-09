@@ -784,10 +784,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 						return false, nil
 					}
 				}
-				if err != nil {
-					return false, err
-				}
-				return true, nil
+				return err == nil, err
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -1554,10 +1551,7 @@ properties:
 					return false, err
 				}
 				cond = findCRDCondition(obj, apiextensionsv1.NonStructuralSchema)
-				if cond != nil {
-					return true, nil
-				}
-				return false, nil
+				return cond != nil, nil
 			})
 			if err != nil {
 				t.Fatalf("unexpected error waiting for violations in NonStructuralSchema condition: %v", err)

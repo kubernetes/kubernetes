@@ -80,10 +80,7 @@ func TestIsNextRetry(t *testing.T) {
 			response:   nil,
 			err:        fakeError,
 			retryableErrFunc: func(_ *http.Request, err error) bool {
-				if err == fakeError {
-					return true
-				}
-				return false
+				return err == fakeError
 			},
 			retryExpected: []bool{true},
 			retryAfterExpected: []*RetryAfter{
@@ -162,10 +159,7 @@ func TestIsNextRetry(t *testing.T) {
 			response:   retryAfterResponse(),
 			err:        fakeError,
 			retryableErrFunc: func(_ *http.Request, err error) bool {
-				if err == fakeError {
-					return true
-				}
-				return false
+				return err == fakeError
 			},
 			retryExpected: []bool{true},
 			retryAfterExpected: []*RetryAfter{

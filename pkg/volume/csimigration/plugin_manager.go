@@ -162,8 +162,5 @@ func TranslateInTreeSpecToCSI(spec *volume.Spec, podNamespace string, translator
 func CheckMigrationFeatureFlags(f featuregate.FeatureGate, pluginMigration,
 	pluginUnregister featuregate.Feature) (migrationComplete bool, err error) {
 	// This is for in-tree plugin that get migration finished
-	if f.Enabled(pluginMigration) && f.Enabled(pluginUnregister) {
-		return true, nil
-	}
-	return false, nil
+	return f.Enabled(pluginMigration) && f.Enabled(pluginUnregister), nil
 }

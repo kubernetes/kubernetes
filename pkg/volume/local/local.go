@@ -411,10 +411,7 @@ func (plugin *localVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOptio
 	switch fileType {
 	case hostutil.FileTypeBlockDev:
 		_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), localDevicePath, resizeOptions.DeviceMountPath)
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return err == nil, err
 	case hostutil.FileTypeDirectory:
 		// if the given local volume path is of already filesystem directory, return directly because
 		// we do not want to prevent mount operation from succeeding.

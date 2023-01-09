@@ -415,10 +415,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 			if err != nil {
 				return true, err
 			}
-			if len(failedPodUpdated.Finalizers) == 0 {
-				return true, nil
-			}
-			return false, nil
+			return len(failedPodUpdated.Finalizers) == 0, nil
 		})
 		if err != nil {
 			t.Logf("Failed awaiting for the finalizer removal for pod %v", klog.KObj(jobPods[failedIndex]))

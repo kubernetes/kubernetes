@@ -388,10 +388,7 @@ func podMatchesSelector(pod *corev1.Pod, selector corev1.ScopedResourceSelectorR
 	if len(pod.Spec.PriorityClassName) != 0 {
 		m = map[string]string{string(corev1.ResourceQuotaScopePriorityClass): pod.Spec.PriorityClassName}
 	}
-	if labelSelector.Matches(labels.Set(m)) {
-		return true, nil
-	}
-	return false, nil
+	return labelSelector.Matches(labels.Set(m)), nil
 }
 
 func crossNamespacePodAffinityTerm(term *corev1.PodAffinityTerm) bool {

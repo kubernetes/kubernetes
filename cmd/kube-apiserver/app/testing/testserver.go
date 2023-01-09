@@ -289,10 +289,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		result := req.Do(context.TODO())
 		status := 0
 		result.StatusCode(&status)
-		if status == 200 {
-			return true, nil
-		}
-		return false, nil
+		return status == 200, nil
 	})
 	if err != nil {
 		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)

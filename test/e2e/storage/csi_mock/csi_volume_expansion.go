@@ -429,10 +429,7 @@ func waitForAllocatedResource(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup,
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %v", pvc.Name, err)
 		}
 		actualAllocatedSize := updatedPVC.Status.AllocatedResources.Storage()
-		if actualAllocatedSize != nil && actualAllocatedSize.Equal(expectedQuantity) {
-			return true, nil
-		}
-		return false, nil
+		return actualAllocatedSize != nil && actualAllocatedSize.Equal(expectedQuantity), nil
 
 	})
 	if waitErr != nil {

@@ -697,10 +697,7 @@ func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentNa
 			return false, err
 		}
 		// Pods may be created by overlapping deployments right after this deployment is deleted, ignore them
-		if len(pods.Items) == 0 {
-			return true, nil
-		}
-		return false, nil
+		return len(pods.Items) == 0, nil
 	}); err != nil {
 		framework.Failf("Err : %s\n. Failed to remove deployment %s pods : %+v", err, deploymentName, pods)
 	}

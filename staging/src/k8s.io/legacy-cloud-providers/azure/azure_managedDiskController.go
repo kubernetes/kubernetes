@@ -197,10 +197,7 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 		if err != nil {
 			return false, err
 		}
-		if strings.ToLower(provisionState) == "succeeded" {
-			return true, nil
-		}
-		return false, nil
+		return strings.ToLower(provisionState) == "succeeded", nil
 	})
 
 	if err != nil {

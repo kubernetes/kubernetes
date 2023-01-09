@@ -393,11 +393,8 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 			return err
 		}
 		currConfig.CurrentContext = newCurrentContext
-		if err := WriteToFile(*currConfig, file); err != nil {
-			return err
-		}
-
-		return nil
+		err := WriteToFile(*currConfig, file)
+		return err
 	}
 
 	if len(newCurrentContext) > 0 {
@@ -407,12 +404,8 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 			return err
 		}
 		config.CurrentContext = newCurrentContext
-
-		if err := WriteToFile(*config, destinationFile); err != nil {
-			return err
-		}
-
-		return nil
+		err := WriteToFile(*config, destinationFile)
+		return err
 	}
 
 	// we're supposed to be clearing the current context.  We need to find the first spot in the chain that is setting it and clear it
@@ -425,11 +418,8 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 
 			if len(currConfig.CurrentContext) > 0 {
 				currConfig.CurrentContext = newCurrentContext
-				if err := WriteToFile(*currConfig, file); err != nil {
-					return err
-				}
-
-				return nil
+				err := WriteToFile(*currConfig, file)
+				return err
 			}
 		}
 	}
@@ -451,11 +441,8 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 			return err
 		}
 		currConfig.Preferences = newPrefs
-		if err := WriteToFile(*currConfig, file); err != nil {
-			return err
-		}
-
-		return nil
+		err := WriteToFile(*currConfig, file)
+		return err
 	}
 
 	for _, file := range configAccess.GetLoadingPrecedence() {
@@ -466,11 +453,8 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 
 		if !reflect.DeepEqual(currConfig.Preferences, newPrefs) {
 			currConfig.Preferences = newPrefs
-			if err := WriteToFile(*currConfig, file); err != nil {
-				return err
-			}
-
-			return nil
+			err := WriteToFile(*currConfig, file)
+			return err
 		}
 	}
 

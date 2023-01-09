@@ -204,10 +204,7 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 				rogueDir := filepath.Join(path, "roguedir")
 				nosgidPerm := info.Mode() &^ os.ModeSetgid
 				err = os.Mkdir(rogueDir, nosgidPerm)
-				if err != nil {
-					return err
-				}
-				return nil
+				return err
 			},
 			assertFunc: func(path string) error {
 				rogueDir := filepath.Join(path, "roguedir")
@@ -235,10 +232,7 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 				// create a subdirectory with invalid permissions
 				rogueDir := filepath.Join(path, "roguedir")
 				err = os.Mkdir(rogueDir, rwMask)
-				if err != nil {
-					return err
-				}
-				return nil
+				return err
 			},
 			assertFunc: func(path string) error {
 				rogueDir := filepath.Join(path, "roguedir")
@@ -262,10 +256,7 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 				// create a subdirectory with invalid permissions
 				rogueDir := filepath.Join(path, "roguedir")
 				err = os.Mkdir(rogueDir, rwMask)
-				if err != nil {
-					return err
-				}
-				return nil
+				return err
 			},
 			assertFunc: func(path string) error {
 				rogueDir := filepath.Join(path, "roguedir")
@@ -404,11 +395,7 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 
 				symname := filepath.Join(path, "file_link.txt")
 				err = os.Symlink(filename, symname)
-				if err != nil {
-					return err
-				}
-
-				return nil
+				return err
 			},
 			assertFunc: func(path string) error {
 				symname := filepath.Join(path, "file_link.txt")

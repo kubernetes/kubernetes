@@ -165,10 +165,7 @@ func (ebs *EBSUtil) waitForAvailable(volumeID string) error {
 			return false, err
 		}
 		volumeState := aws.StringValue(info.State)
-		if volumeState != ec2.VolumeStateAvailable {
-			return false, nil
-		}
-		return true, nil
+		return volumeState == ec2.VolumeStateAvailable, nil
 	})
 	return err
 }

@@ -733,11 +733,8 @@ func (runner *runner) HasRandomFully() bool {
 // Present tests if iptable is supported on current kernel by checking the existence
 // of default table and chain
 func (runner *runner) Present() bool {
-	if _, err := runner.ChainExists(TableNAT, ChainPostrouting); err != nil {
-		return false
-	}
-
-	return true
+	_, err := runner.ChainExists(TableNAT, ChainPostrouting)
+	return err == nil
 }
 
 var iptablesNotFoundStrings = []string{

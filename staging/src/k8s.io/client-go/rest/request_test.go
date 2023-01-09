@@ -1276,10 +1276,7 @@ func TestRequestStream(t *testing.T) {
 			attemptsExpected: 1,
 			Err:              true,
 			ErrFn: func(err error) bool {
-				if err.Error() == "a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]" {
-					return true
-				}
-				return false
+				return err.Error() == "a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]"
 			},
 		},
 		{

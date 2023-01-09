@@ -160,10 +160,7 @@ func (r *volumeReactor) waitTest(test controllerTest) error {
 		// Return 'true' if the reactor reached the expected state
 		err1 := r.CheckClaims(test.expectedClaims)
 		err2 := r.CheckVolumes(test.expectedVolumes)
-		if err1 == nil && err2 == nil {
-			return true, nil
-		}
-		return false, nil
+		return err1 == nil && err2 == nil, nil
 	})
 	return err
 }

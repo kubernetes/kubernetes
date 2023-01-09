@@ -445,10 +445,7 @@ func runTopologyManagerNegativeTest(ctx context.Context, f *framework.Framework,
 
 	pod = e2epod.NewPodClient(f).Create(ctx, pod)
 	err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
-		if pod.Status.Phase != v1.PodPending {
-			return true, nil
-		}
-		return false, nil
+		return pod.Status.Phase != v1.PodPending, nil
 	})
 	framework.ExpectNoError(err)
 	pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})

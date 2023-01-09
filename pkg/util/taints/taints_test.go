@@ -216,20 +216,14 @@ func TestTaintSetFilter(t *testing.T) {
 		{
 			name: "Filter out nothing",
 			fn: func(t *v1.Taint) bool {
-				if t.Key == v1.TaintNodeUnschedulable {
-					return true
-				}
-				return false
+				return t.Key == v1.TaintNodeUnschedulable
 			},
 			expectedTaints: []v1.Taint{},
 		},
 		{
 			name: "Filter out a subset",
 			fn: func(t *v1.Taint) bool {
-				if t.Effect == v1.TaintEffectNoExecute {
-					return true
-				}
-				return false
+				return t.Effect == v1.TaintEffectNoExecute
 			},
 			expectedTaints: []v1.Taint{testTaint1},
 		},

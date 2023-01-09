@@ -126,10 +126,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 // WaitForTerminatedContainer waits till a given container be terminated for a given pod.
 func WaitForTerminatedContainer(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string) error {
 	return e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
-		if len(testutils.TerminatedContainers(pod)[containerName]) > 0 {
-			return true, nil
-		}
-		return false, nil
+		return len(testutils.TerminatedContainers(pod)[containerName]) > 0, nil
 	})
 }
 

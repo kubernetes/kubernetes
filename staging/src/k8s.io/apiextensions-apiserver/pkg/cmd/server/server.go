@@ -38,10 +38,8 @@ func NewServerCommand(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Comm
 			if err := o.Validate(); err != nil {
 				return err
 			}
-			if err := Run(o, stopCh); err != nil {
-				return err
-			}
-			return nil
+			err := Run(o, stopCh)
+			return err
 		},
 	}
 

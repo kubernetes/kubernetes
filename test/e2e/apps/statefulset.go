@@ -225,10 +225,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			gomega.Expect(e2epod.WaitForPodCondition(ctx, c, pod.Namespace, pod.Name, "released", statefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
 					controllerRef := metav1.GetControllerOf(pod)
-					if controllerRef != nil {
-						return false, nil
-					}
-					return true, nil
+					return controllerRef == nil, nil
 				},
 			)).To(gomega.Succeed(), "wait for pod %q to be released", pod.Name)
 

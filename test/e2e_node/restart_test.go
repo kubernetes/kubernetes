@@ -115,10 +115,8 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 						}
 						// Make sure the container runtime is running, pid got from pid file may not be running.
 						pid = runtimePids[0]
-						if _, err := exec.Command("sudo", "ps", "-p", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
-							return err
-						}
-						return nil
+						_, err := exec.Command("sudo", "ps", "-p", fmt.Sprintf("%d", pid)).CombinedOutput()
+						return err
 					}, 1*time.Minute, 2*time.Second).Should(gomega.BeNil())
 					if stdout, err := exec.Command("sudo", "kill", "-SIGKILL", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
 						framework.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))

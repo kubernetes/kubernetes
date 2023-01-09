@@ -1337,10 +1337,8 @@ func waitForProvisionAnn(client clientset.Interface, pvc *v1.PersistentVolumeCla
 		if err != nil {
 			return false, err
 		}
-		if err := validateProvisionAnn(claim, annShouldExist); err == nil {
-			return true, nil
-		}
-		return false, nil
+		err := validateProvisionAnn(claim, annShouldExist)
+		return err == nil, nil
 	})
 }
 
@@ -1361,11 +1359,7 @@ func waitForPVPhase(client clientset.Interface, pvName string, phase v1.Persiste
 		if err != nil {
 			return false, err
 		}
-
-		if pv.Status.Phase == phase {
-			return true, nil
-		}
-		return false, nil
+		return pv.Status.Phase == phase, nil
 	})
 }
 
@@ -1375,10 +1369,7 @@ func waitForPVCBound(client clientset.Interface, pvc *v1.PersistentVolumeClaim) 
 		if err != nil {
 			return false, err
 		}
-		if claim.Status.Phase == v1.ClaimBound {
-			return true, nil
-		}
-		return false, nil
+		return claim.Status.Phase == v1.ClaimBound, nil
 	})
 }
 

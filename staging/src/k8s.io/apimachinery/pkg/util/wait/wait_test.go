@@ -834,10 +834,7 @@ func TestExponentialBackoffWithContext(t *testing.T) {
 			steps:     5,
 			ctxGetter: defaultCtx,
 			callback: func(attempts int) (bool, error) {
-				if attempts == 3 {
-					return true, nil
-				}
-				return false, nil
+				return attempts == 3, nil
 			},
 			attemptsExpected: 3,
 			errExpected:      nil,

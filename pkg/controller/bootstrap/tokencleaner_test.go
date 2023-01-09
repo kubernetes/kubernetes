@@ -130,10 +130,7 @@ func TestCleanerExpiredAt(t *testing.T) {
 	}
 
 	var conditionFunc = func() (bool, error) {
-		if cleaner.queue.Len() == 1 {
-			return true, nil
-		}
-		return false, nil
+		return cleaner.queue.Len() == 1, nil
 	}
 
 	err = wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, conditionFunc)

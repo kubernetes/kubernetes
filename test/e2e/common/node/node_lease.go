@@ -58,10 +58,7 @@ var _ = SIGDescribe("NodeLease", func() {
 			ginkgo.By("check that lease for this Kubelet exists in the kube-node-lease namespace")
 			gomega.Eventually(ctx, func() error {
 				lease, err = leaseClient.Get(ctx, nodeName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				return nil
+				return err
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 			// check basic expectations for the lease
 			gomega.Expect(expectLease(lease, nodeName)).To(gomega.BeNil())
@@ -95,10 +92,7 @@ var _ = SIGDescribe("NodeLease", func() {
 			)
 			gomega.Eventually(ctx, func() error {
 				leaseList, err = leaseClient.List(ctx, metav1.ListOptions{})
-				if err != nil {
-					return err
-				}
-				return nil
+				return err
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 			// All the leases should have OwnerReferences set to their corresponding
 			// Node object.
@@ -120,10 +114,7 @@ var _ = SIGDescribe("NodeLease", func() {
 			var lease *coordinationv1.Lease
 			gomega.Eventually(ctx, func() error {
 				lease, err = f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease).Get(ctx, nodeName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				return nil
+				return err
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 			// check basic expectations for the lease
 			gomega.Expect(expectLease(lease, nodeName)).To(gomega.BeNil())

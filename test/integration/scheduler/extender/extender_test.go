@@ -242,17 +242,11 @@ func (e *Extender) Bind(binding *extenderv1.ExtenderBindingArgs) error {
 }
 
 func machine1_2_3Predicate(pod *v1.Pod, node *v1.Node) (bool, error) {
-	if node.Name == "machine1" || node.Name == "machine2" || node.Name == "machine3" {
-		return true, nil
-	}
-	return false, nil
+	return node.Name == "machine1" || node.Name == "machine2" || node.Name == "machine3", nil
 }
 
 func machine2_3_5Predicate(pod *v1.Pod, node *v1.Node) (bool, error) {
-	if node.Name == "machine2" || node.Name == "machine3" || node.Name == "machine5" {
-		return true, nil
-	}
-	return false, nil
+	return node.Name == "machine2" || node.Name == "machine3" || node.Name == "machine5", nil
 }
 
 func machine2Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPriorityList, error) {

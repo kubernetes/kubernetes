@@ -69,11 +69,8 @@ func UnstructuredToVal(unstructured interface{}, schema *structuralschema.Struct
 				value:  m,
 				schema: schema,
 				propSchema: func(key string) (*structuralschema.Structural, bool) {
-					if schema, ok := schema.Properties[key]; ok {
-						return &schema, true
-					}
-					return nil, false
-				},
+					return schema.Properties[key]
+},
 			}
 		}
 		if schema.AdditionalProperties != nil && schema.AdditionalProperties.Structural != nil {

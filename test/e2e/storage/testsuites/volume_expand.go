@@ -362,10 +362,7 @@ func WaitForControllerVolumeResize(ctx context.Context, pvc *v1.PersistentVolume
 		pvSize := pv.Spec.Capacity[v1.ResourceStorage]
 
 		// If pv size is greater or equal to requested size that means controller resize is finished.
-		if pvSize.Cmp(pvcSize) >= 0 {
-			return true, nil
-		}
-		return false, nil
+		return pvSize.Cmp(pvcSize) >= 0, nil
 	})
 	if waitErr != nil {
 		return fmt.Errorf("error while waiting for controller resize to finish: %v", waitErr)
@@ -390,10 +387,7 @@ func WaitForPendingFSResizeCondition(ctx context.Context, pvc *v1.PersistentVolu
 			return true, nil
 		}
 		conditionType := inProgressConditions[0].Type
-		if conditionType == v1.PersistentVolumeClaimFileSystemResizePending {
-			return true, nil
-		}
-		return false, nil
+		return conditionType == v1.PersistentVolumeClaimFileSystemResizePending, nil
 	})
 	if waitErr != nil {
 		return nil, fmt.Errorf("error waiting for pvc %q to have filesystem resize status: %v", pvc.Name, waitErr)
@@ -416,10 +410,7 @@ func WaitForFSResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clien
 		pvcStatusSize := updatedPVC.Status.Capacity[v1.ResourceStorage]
 
 		//If pvc's status field size is greater than or equal to pvc's size then done
-		if pvcStatusSize.Cmp(pvcSize) >= 0 {
-			return true, nil
-		}
-		return false, nil
+		return pvcStatusSize.Cmp(pvcSize) >= 0, nil
 	})
 	if waitErr != nil {
 		return nil, fmt.Errorf("error waiting for pvc %q filesystem resize to finish: %v", pvc.Name, waitErr)

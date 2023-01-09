@@ -361,10 +361,7 @@ func waitForWardleRunning(ctx context.Context, t *testing.T, wardleToKASKubeConf
 		healthStatus := 0
 		result := wardleClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&healthStatus)
 		lastHealthContent, lastHealthErr = result.Raw()
-		if healthStatus != http.StatusOK {
-			return false, nil
-		}
-		return true, nil
+		return healthStatus == http.StatusOK, nil
 	})
 	if err != nil {
 		t.Log(string(lastHealthContent))

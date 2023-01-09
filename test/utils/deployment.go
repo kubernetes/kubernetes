@@ -337,10 +337,7 @@ func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName 
 			return false, err
 		}
 		// Rollback not set or is kicked off
-		if deployment.Annotations[apps.DeprecatedRollbackTo] == "" {
-			return true, nil
-		}
-		return false, nil
+		return deployment.Annotations[apps.DeprecatedRollbackTo] == "", nil
 	})
 	if err != nil {
 		return fmt.Errorf("error waiting for deployment %s rollbackTo to be cleared: %v", deploymentName, err)

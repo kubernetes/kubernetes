@@ -129,11 +129,7 @@ func hasGVKExtension(extensions []*openapi_v2.NamedAny, gvk schema.GroupVersionK
 		if err != nil {
 			continue
 		}
-
-		if value["group"] == gvk.Group && value["kind"] == gvk.Kind && value["version"] == gvk.Version {
-			return true
-		}
-		return false
+		return value["group"] == gvk.Group && value["kind"] == gvk.Kind && value["version"] == gvk.Version
 	}
 	return false
 }

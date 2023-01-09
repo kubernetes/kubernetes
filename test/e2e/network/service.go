@@ -204,10 +204,7 @@ func checkAffinity(ctx context.Context, cs clientset.Interface, execPod *v1.Pod,
 		if !shouldHold && !affinityHolds {
 			return true, nil
 		}
-		if shouldHold && affinityHolds {
-			return true, nil
-		}
-		return false, nil
+		return shouldHold && affinityHolds, nil
 	}); pollErr != nil {
 		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
 		if pollErr != wait.ErrWaitTimeout {
@@ -637,10 +634,7 @@ func TestHTTPHealthCheckNodePort(host string, port int, request string, timeout 
 			!success && !expectSucceed {
 			count++
 		}
-		if count >= threshold {
-			return true, nil
-		}
-		return false, nil
+		return count >= threshold, nil
 	}
 
 	if err := wait.PollImmediate(time.Second, timeout, condition); err != nil {
@@ -2130,10 +2124,7 @@ var _ = common.SIGDescribe("Services", func() {
 		cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
 			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
-			if err != nil {
-				return true, nil
-			}
-			return false, nil
+			return err != nil, nil
 		}); pollErr != nil {
 			framework.ExpectNoError(pollErr, "service still serves traffic")
 		}
@@ -2808,10 +2799,7 @@ var _ = common.SIGDescribe("Services", func() {
 			}
 
 			expectedOut := "200"
-			if out != expectedOut {
-				return false, nil
-			}
-			return true, nil
+			return out == expectedOut, nil
 		})
 		framework.ExpectNoError(err)
 
@@ -2829,10 +2817,7 @@ var _ = common.SIGDescribe("Services", func() {
 			}
 
 			expectedOut := "503"
-			if out != expectedOut {
-				return false, nil
-			}
-			return true, nil
+			return out == expectedOut, nil
 		})
 		framework.ExpectNoError(err)
 

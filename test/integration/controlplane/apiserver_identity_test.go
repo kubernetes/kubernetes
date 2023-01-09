@@ -170,10 +170,7 @@ func testLeaseNotGarbageCollected(t *testing.T, client kubernetes.Interface, lea
 		}
 		if err := wait.PollImmediate(500*time.Millisecond, 5*time.Second, func() (bool, error) {
 			_, err := client.CoordinationV1().Leases(ns).Get(context.TODO(), lease.Name, metav1.GetOptions{})
-			if err != nil && apierrors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
+			return err != nil && apierrors.IsNotFound(err), nil
 		}); err == nil {
 			t.Fatalf("Unexpected valid lease getting garbage collected")
 		}

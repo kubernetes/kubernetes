@@ -97,10 +97,7 @@ func (t *dnsTestCommon) checkDNSRecordFrom(name string, predicate func([]string)
 		timeout,
 		func() (bool, error) {
 			actual = t.runDig(name, target)
-			if predicate(actual) {
-				return true, nil
-			}
-			return false, nil
+			return predicate(actual), nil
 		})
 
 	if err != nil {

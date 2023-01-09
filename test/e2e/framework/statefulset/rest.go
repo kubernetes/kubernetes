@@ -153,10 +153,7 @@ func Scale(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, c
 	var statefulPodList *v1.PodList
 	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
 		statefulPodList = GetPodList(ctx, c, ss)
-		if int32(len(statefulPodList.Items)) == count {
-			return true, nil
-		}
-		return false, nil
+		return int32(len(statefulPodList.Items)) == count, nil
 	})
 	if pollErr != nil {
 		unhealthy := []string{}

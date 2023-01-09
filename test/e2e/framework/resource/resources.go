@@ -200,10 +200,7 @@ func waitForPodsInactive(ctx context.Context, ps *testutils.PodStore, interval, 
 	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
 		pods := ps.List()
 		activePods = e2epod.FilterActivePods(pods)
-		if len(activePods) != 0 {
-			return false, nil
-		}
-		return true, nil
+		return len(activePods) == 0, nil
 	})
 
 	if err == wait.ErrWaitTimeout {

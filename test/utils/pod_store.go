@@ -57,10 +57,7 @@ func NewPodStore(c clientset.Interface, namespace string, label labels.Selector,
 	reflector := cache.NewReflector(lw, &v1.Pod{}, store, 0)
 	go reflector.Run(stopCh)
 	if err := wait.PollImmediate(50*time.Millisecond, 2*time.Minute, func() (bool, error) {
-		if len(reflector.LastSyncResourceVersion()) != 0 {
-			return true, nil
-		}
-		return false, nil
+		return len(reflector.LastSyncResourceVersion()) != 0, nil
 	}); err != nil {
 		close(stopCh)
 		return nil, err

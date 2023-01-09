@@ -179,10 +179,7 @@ func waitListSchedulableNodes(ctx context.Context, c clientset.Interface) (*v1.N
 		nodes, err = c.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return err == nil, err
 	}) != nil {
 		return nodes, err
 	}

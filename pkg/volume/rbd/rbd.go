@@ -217,10 +217,7 @@ func (plugin *rbdPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (boo
 		return true, nil
 	}
 	_, err = volutil.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return err == nil, err
 }
 
 var _ volume.NodeExpandableVolumePlugin = &rbdPlugin{}

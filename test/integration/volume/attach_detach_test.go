@@ -368,10 +368,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int) {
 	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
-		if len(objects) == podNum {
-			return true, nil
-		}
-		return false, nil
+		return len(objects) == podNum, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -381,10 +378,7 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 func waitForPodsInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld) {
 	if err := wait.Poll(time.Millisecond*500, wait.ForeverTestTimeout, func() (bool, error) {
 		pods := dswp.GetPodToAdd()
-		if len(pods) > 0 {
-			return true, nil
-		}
-		return false, nil
+		return len(pods) > 0, nil
 	}); err != nil {
 		t.Fatalf("Pod not added to desired state of world : %v", err)
 	}
@@ -394,10 +388,7 @@ func waitForPodsInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld) {
 func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, checkTimeout time.Duration, failMessage string, podCount int) {
 	if err := wait.Poll(time.Millisecond*500, checkTimeout, func() (bool, error) {
 		pods := dswp.GetPodToAdd()
-		if len(pods) == podCount {
-			return true, nil
-		}
-		return false, nil
+		return len(pods) == podCount, nil
 	}); err != nil {
 		t.Fatalf("%s but got error %v", failMessage, err)
 	}

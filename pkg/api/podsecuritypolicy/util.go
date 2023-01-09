@@ -34,11 +34,6 @@ func allowedProcMountTypesInUse(oldPSPSpec *policy.PodSecurityPolicySpec) bool {
 	if oldPSPSpec == nil {
 		return false
 	}
-
-	if oldPSPSpec.AllowedProcMountTypes != nil {
-		return true
-	}
-
-	return false
+	return oldPSPSpec.AllowedProcMountTypes != nil
 
 }

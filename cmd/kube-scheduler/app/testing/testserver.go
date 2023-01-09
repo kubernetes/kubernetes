@@ -139,10 +139,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
 		status := 0
 		result.StatusCode(&status)
-		if status == 200 {
-			return true, nil
-		}
-		return false, nil
+		return status == 200, nil
 	})
 	if err != nil {
 		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)

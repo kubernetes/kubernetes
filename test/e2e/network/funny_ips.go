@@ -124,10 +124,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 				return false, nil
 			}
 			trimmed := strings.TrimSpace(stdout)
-			if trimmed != "" {
-				return true, nil
-			}
-			return false, nil
+			return trimmed != "", nil
 		})
 		// Service is working on the expected IP.
 		if err == nil {
@@ -143,10 +140,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 				return false, nil
 			}
 			trimmed := strings.TrimSpace(stdout)
-			if trimmed != "" {
-				return true, nil
-			}
-			return false, nil
+			return trimmed != "", nil
 		})
 		// Ouch, Service has worked on IP interpreted as octal.
 		if err == nil {

@@ -620,11 +620,7 @@ var _ = common.SIGDescribe("Networking", func() {
 				e2essh.LogResult(result)
 				return false, err
 			}
-
-			if strings.Contains(result.Stdout, "\n:KUBE-IPTABLES-HINT") {
-				return true, nil
-			}
-			return false, nil
+			return strings.Contains(result.Stdout, "\n:KUBE-IPTABLES-HINT"), nil
 		})
 		if err != nil {
 			e2essh.LogResult(result)

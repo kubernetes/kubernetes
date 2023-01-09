@@ -2642,12 +2642,7 @@ func waitForVolumeUnmount(
 			// Verify volumes detached
 			podVolumes = volumeManager.GetMountedVolumesForPod(
 				util.GetUniquePodName(pod))
-
-			if len(podVolumes) != 0 {
-				return false, nil
-			}
-
-			return true, nil
+			return len(podVolumes) == 0, nil
 		},
 	)
 

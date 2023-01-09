@@ -1666,10 +1666,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 				framework.Logf("Invalid client IP address format: %q", host)
 				return false, nil
 			}
-			if subnetPrefix.Contains(ip) {
-				return true, nil
-			}
-			return false, nil
+			return subnetPrefix.Contains(ip), nil
 		})
 		if pollErr != nil {
 			framework.Failf("Source IP WAS preserved even after ESIPP turned off. Got %v, expected a ten-dot cluster ip.", clientIP)
@@ -1706,10 +1703,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 				framework.Logf("Invalid client IP address format: %q", host)
 				return false, nil
 			}
-			if !subnetPrefix.Contains(ip) {
-				return true, nil
-			}
-			return false, nil
+			return !subnetPrefix.Contains(ip), nil
 		})
 		if pollErr != nil {
 			framework.Failf("Source IP (%v) is not the client IP even after ESIPP turned on, expected a public IP.", clientIP)

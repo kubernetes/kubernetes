@@ -231,20 +231,12 @@ func BenchmarkDelayingQueue_AddAfter(b *testing.B) {
 
 func waitForAdded(q DelayingInterface, depth int) error {
 	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-		if q.Len() == depth {
-			return true, nil
-		}
-
-		return false, nil
+		return q.Len() == depth, nil
 	})
 }
 
 func waitForWaitingQueueToFill(q DelayingInterface) error {
 	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-		if len(q.(*delayingType).waitingForAddCh) == 0 {
-			return true, nil
-		}
-
-		return false, nil
+		return len(q.(*delayingType).waitingForAddCh) == 0, nil
 	})
 }

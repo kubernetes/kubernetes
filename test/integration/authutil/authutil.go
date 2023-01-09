@@ -54,10 +54,7 @@ func WaitForNamedAuthorizationUpdate(t *testing.T, ctx context.Context, c author
 		if err != nil {
 			return false, err
 		}
-		if response.Status.Allowed != allowed {
-			return false, nil
-		}
-		return true, nil
+		return response.Status.Allowed == allowed, nil
 	}); err != nil {
 		t.Fatal(err)
 	}

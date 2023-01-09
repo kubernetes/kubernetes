@@ -1116,10 +1116,7 @@ func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if strings.Contains(strBody, "\"maxNodeCount\": "+strconv.Itoa(expectedMaxNodeCountInTargetPool)) {
-		return true, nil
-	}
-	return false, nil
+	return strings.Contains(strBody, "\"maxNodeCount\": "+strconv.Itoa(expectedMaxNodeCountInTargetPool)), nil
 }
 
 func getClusterLocation() string {

@@ -205,11 +205,7 @@ func (o *RolloutStatusOptions) Run() error {
 					}
 
 					shouldWatch := o.Watch
-					if !shouldWatch {
-						return true, nil
-					}
-
-					return false, nil
+					return !shouldWatch, nil
 
 				case watch.Deleted:
 					// We need to abort to avoid cases of recreation and not to silently watch the wrong (new) object

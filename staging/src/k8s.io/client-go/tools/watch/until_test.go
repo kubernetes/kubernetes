@@ -250,10 +250,7 @@ func TestUntilWithSync(t *testing.T) {
 				if err != nil {
 					return true, err
 				}
-				if exists {
-					return true, nil
-				}
-				return false, nil
+				return exists, nil
 			},
 			conditionFunc: func(e watch.Event) (bool, error) {
 				return true, errors.New("should never reach this")

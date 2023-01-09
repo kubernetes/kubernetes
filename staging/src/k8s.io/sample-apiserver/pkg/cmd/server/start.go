@@ -84,10 +84,8 @@ func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan st
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunWardleServer(stopCh); err != nil {
-				return err
-			}
-			return nil
+			err := o.RunWardleServer(stopCh)
+			return err
 		},
 	}
 

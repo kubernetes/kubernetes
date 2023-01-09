@@ -329,10 +329,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				// that means the controller is working.
 				err = wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
 					err = cs.CoreV1().Pods(ns).EvictV1(ctx, e)
-					if err != nil {
-						return false, nil
-					}
-					return true, nil
+					return err == nil, nil
 				})
 				framework.ExpectNoError(err)
 			}
@@ -457,10 +454,8 @@ func updatePDBOrDie(ctx context.Context, cs kubernetes.Interface, ns string, nam
 			return err
 		}
 		old = f(old)
-		if updated, err = api(ctx, old, metav1.UpdateOptions{}); err != nil {
-			return err
-		}
-		return nil
+		updated, err = api(ctx, old, metav1.UpdateOptions{})
+		return err
 	})
 
 	framework.ExpectNoError(err, "Waiting for the PDB update to be processed in namespace %s", ns)
@@ -518,10 +513,7 @@ func waitForPDBCollectionToBeDeleted(ctx context.Context, cs kubernetes.Interfac
 		if err != nil {
 			return false, err
 		}
-		if len(pdbList.Items) != 0 {
-			return false, nil
-		}
-		return true, nil
+		return len(pdbList.Items) == 0, nil
 	})
 	framework.ExpectNoError(err, "Waiting for the PDB collection to be deleted in namespace %s", ns)
 }
@@ -674,10 +666,7 @@ func waitForPdbToObserveHealthyPods(ctx context.Context, cs kubernetes.Interface
 		if err != nil {
 			return false, err
 		}
-		if pdb.Status.CurrentHealthy != healthyCount {
-			return false, nil
-		}
-		return true, nil
+		return pdb.Status.CurrentHealthy == healthyCount, nil
 	})
 	framework.ExpectNoError(err, "Waiting for the pdb in namespace %s to observed %d healthy pods", ns, healthyCount)
 }

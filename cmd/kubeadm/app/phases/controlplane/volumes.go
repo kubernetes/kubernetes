@@ -223,8 +223,6 @@ func getEtcdCertVolumes(etcdCfg *kubeadmapi.ExternalEtcd, k8sCertificatesDir str
 // On some systems were we host-mount /etc/ssl/certs, it is also required to mount /etc/pki. This is needed
 // due to symlinks pointing from files in /etc/ssl/certs into /etc/pki/
 func isExtraVolumeMountNeeded(caCertsExtraVolumePath string) bool {
-	if _, err := os.Stat(caCertsExtraVolumePath); err == nil {
-		return true
-	}
-	return false
+	_, err := os.Stat(caCertsExtraVolumePath)
+	return err == nil
 }

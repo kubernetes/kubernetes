@@ -518,10 +518,7 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 		if condition == nil {
 			return false, nil
 		}
-		if condition.Status == apiextensionsv1.ConditionTrue {
-			return true, nil
-		}
-		return false, nil
+		return condition.Status == apiextensionsv1.ConditionTrue, nil
 	})
 	if err != nil {
 		t.Fatal(err)

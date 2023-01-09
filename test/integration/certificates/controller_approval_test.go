@@ -157,10 +157,7 @@ func waitForCertificateRequestApproved(client clientset.Interface, name string) 
 		if err != nil {
 			return false, err
 		}
-		if certificates.IsCertificateRequestApproved(csr) {
-			return true, nil
-		}
-		return false, nil
+		return certificates.IsCertificateRequestApproved(csr), nil
 	}); err != nil {
 		return err
 	}

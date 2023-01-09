@@ -438,10 +438,7 @@ func getServiceAccount(c clientset.Interface, ns string, name string, shouldWait
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return err == nil, err
 	})
 	return user, err
 }

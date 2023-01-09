@@ -399,10 +399,7 @@ func TestOnEndpointSliceUpdate(t *testing.T) {
 	assert.Equal(t, 0, esController.queue.Len())
 	esController.onEndpointSliceUpdate(epSlice1, epSlice2)
 	err := wait.PollImmediate(100*time.Millisecond, 3*time.Second, func() (bool, error) {
-		if esController.queue.Len() > 0 {
-			return true, nil
-		}
-		return false, nil
+		return esController.queue.Len() > 0, nil
 	})
 	if err != nil {
 		t.Fatalf("unexpected error waiting for add to queue")

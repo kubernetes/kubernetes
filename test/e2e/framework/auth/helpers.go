@@ -70,10 +70,7 @@ func WaitForNamedAuthorizationUpdate(ctx context.Context, c v1authorization.Subj
 		if err != nil {
 			return false, err
 		}
-		if response.Status.Allowed != allowed {
-			return false, nil
-		}
-		return true, nil
+		return response.Status.Allowed == allowed, nil
 	})
 	return err
 }

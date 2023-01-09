@@ -285,10 +285,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				if err != nil {
 					return false, err
 				}
-				if len(eventList.Items) > 0 {
-					return true, nil
-				}
-				return false, nil
+				return len(eventList.Items) > 0, nil
 			}))
 
 			ginkgo.By("Checking events about the pod")

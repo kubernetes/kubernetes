@@ -107,10 +107,7 @@ func (r *ResourceCollector) Start() {
 	wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
 		var err error
 		r.client, err = cadvisorclient.NewClient(fmt.Sprintf("http://localhost:%d/", cadvisorPort))
-		if err == nil {
-			return true, nil
-		}
-		return false, err
+		return err == nil, err
 	})
 
 	gomega.Expect(r.client).NotTo(gomega.BeNil(), "cadvisor client not ready")

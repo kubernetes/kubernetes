@@ -764,10 +764,7 @@ func IsUUIDSupportedNode(node *v1.Node) (bool, error) {
 		klog.Errorf("Failed to determine whether node %+v is old with error %v", node, err)
 		return false, err
 	}
-	if nodeVersion.LessThan(newVersion) {
-		return true, nil
-	}
-	return false, nil
+	return nodeVersion.LessThan(newVersion), nil
 }
 
 func isGuestHardwareVersionDeprecated(vmHardwareversion string) (bool, error) {

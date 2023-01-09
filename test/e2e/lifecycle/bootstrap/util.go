@@ -140,10 +140,7 @@ func WaitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID strin
 
 	return wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
 		_, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, nil
+		return apierrors.IsNotFound(err), nil
 	})
 }
 

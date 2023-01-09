@@ -58,9 +58,6 @@ func FakeNodeInformer(fakeNodeHandler *testutil.FakeNodeHandler) coreinformers.N
 
 func WaitForUpdatedNodeWithTimeout(nodeHandler *testutil.FakeNodeHandler, number int, timeout time.Duration) error {
 	return wait.Poll(NodePollInterval, timeout, func() (bool, error) {
-		if len(nodeHandler.GetUpdatedNodesCopy()) >= number {
-			return true, nil
-		}
-		return false, nil
+		return len(nodeHandler.GetUpdatedNodesCopy()) >= number, nil
 	})
 }

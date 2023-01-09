@@ -455,10 +455,7 @@ func WaitForPodTerminatedInNamespace(ctx context.Context, c clientset.Interface,
 // WaitForPodTerminatingInNamespaceTimeout returns if the pod is terminating, or an error if it is not after the timeout.
 func WaitForPodTerminatingInNamespaceTimeout(ctx context.Context, c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(ctx, c, namespace, podName, "is terminating", timeout, func(pod *v1.Pod) (bool, error) {
-		if pod.DeletionTimestamp != nil {
-			return true, nil
-		}
-		return false, nil
+		return pod.DeletionTimestamp != nil, nil
 	})
 }
 
@@ -753,10 +750,7 @@ func WaitForPodContainerToFail(ctx context.Context, c clientset.Interface, names
 				return false, nil
 			}
 			containerStatus := pod.Status.ContainerStatuses[containerIndex]
-			if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == reason {
-				return true, nil
-			}
-			return false, nil
+			return containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == reason, nil
 		case v1.PodFailed, v1.PodRunning, v1.PodSucceeded:
 			return false, fmt.Errorf("pod was expected to be pending, but it is in the state: %s", pod.Status.Phase)
 		}

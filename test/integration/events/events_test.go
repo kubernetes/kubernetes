@@ -86,11 +86,7 @@ func TestEventCompatibility(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-
-		if len(events.Items) != 2 {
-			return false, nil
-		}
-		return true, nil
+		return len(events.Items) == 2, nil
 	})
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)

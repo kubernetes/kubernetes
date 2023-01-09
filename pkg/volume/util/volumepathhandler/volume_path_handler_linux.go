@@ -203,10 +203,7 @@ func compareBindMountAndSymlinks(global, pod string) (bool, error) {
 	klog.V(5).Infof("CompareBindMountAndSymlinks: devNumGlobal %s, devNumPod %s", devNumGlobal, devNumPod)
 
 	// Check if the major/minor number are the same
-	if devNumGlobal == devNumPod {
-		return true, nil
-	}
-	return false, nil
+	return devNumGlobal == devNumPod, nil
 }
 
 // getDeviceMajorMinor returns major/minor number for the path with below format:

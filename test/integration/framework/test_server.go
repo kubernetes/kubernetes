@@ -211,11 +211,8 @@ func StartTestServer(t testing.TB, setup TestServerSetup) (client.Interface, *re
 		if _, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
 			return false, nil
 		}
-		if _, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), "kube-system", metav1.GetOptions{}); err != nil {
-			return false, nil
-		}
-
-		return true, nil
+		_, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), "kube-system", metav1.GetOptions{})
+		return err == nil, nil
 	})
 	if err != nil {
 		t.Fatal(err)

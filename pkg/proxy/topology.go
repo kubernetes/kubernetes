@@ -57,11 +57,7 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 		// effort attempt to avoid dropping connections.
 		if len(clusterEndpoints) == 0 && utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) {
 			clusterEndpoints = filterEndpoints(endpoints, func(ep Endpoint) bool {
-				if ep.IsServing() && ep.IsTerminating() {
-					return true
-				}
-
-				return false
+				return ep.IsServing() && ep.IsTerminating()
 			})
 		}
 

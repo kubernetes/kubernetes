@@ -798,10 +798,7 @@ func GetReliableMountRefs(mounter mount.Interface, mountPath string) ([]string, 
 			lastErr = err
 			return false, nil
 		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return err == nil, err
 	})
 	if err == wait.ErrWaitTimeout {
 		return nil, lastErr

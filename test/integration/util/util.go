@@ -176,10 +176,7 @@ func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.Condit
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
-		if pod.DeletionTimestamp != nil {
-			return true, nil
-		}
-		return false, nil
+		return pod.DeletionTimestamp != nil, nil
 	}
 }
 
@@ -748,10 +745,7 @@ func PodIsGettingEvicted(c clientset.Interface, podNamespace, podName string) wa
 		if err != nil {
 			return false, err
 		}
-		if pod.DeletionTimestamp != nil {
-			return true, nil
-		}
-		return false, nil
+		return pod.DeletionTimestamp != nil, nil
 	}
 }
 

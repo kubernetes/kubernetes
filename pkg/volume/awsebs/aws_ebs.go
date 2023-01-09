@@ -307,10 +307,7 @@ func (plugin *awsElasticBlockStorePlugin) NodeExpand(resizeOptions volume.NodeRe
 		return true, nil
 	}
 	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return err == nil, err
 }
 
 var _ volume.NodeExpandableVolumePlugin = &awsElasticBlockStorePlugin{}

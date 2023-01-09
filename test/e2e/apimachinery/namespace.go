@@ -129,10 +129,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *framewor
 	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
 			_, err = f.ClientSet.CoreV1().Namespaces().Get(ctx, namespace.Name, metav1.GetOptions{})
-			if err != nil && apierrors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
+			return err != nil && apierrors.IsNotFound(err), nil
 		}))
 
 	ginkgo.By("Recreating the namespace")
@@ -186,10 +183,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(ctx context.Context, f *fram
 	framework.ExpectNoError(wait.Poll(1*time.Second, time.Duration(maxWaitSeconds)*time.Second,
 		func() (bool, error) {
 			_, err = f.ClientSet.CoreV1().Namespaces().Get(ctx, namespace.Name, metav1.GetOptions{})
-			if err != nil && apierrors.IsNotFound(err) {
-				return true, nil
-			}
-			return false, nil
+			return err != nil && apierrors.IsNotFound(err), nil
 		}))
 
 	ginkgo.By("Recreating the namespace")

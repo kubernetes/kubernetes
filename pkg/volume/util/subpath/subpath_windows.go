@@ -75,10 +75,7 @@ func isLinkPath(path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if strings.TrimSpace(string(output)) != "" {
-		return true, nil
-	}
-	return false, nil
+	return strings.TrimSpace(string(output)) != "", nil
 }
 
 // evalSymlink returns the path name after the evaluation of any symbolic links.

@@ -73,10 +73,8 @@ func grabIptablesLocks(lockfilePath14x, lockfilePath16x string) (iptablesLocker,
 	}
 
 	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
-		if err := grabIptablesFileLock(l.lock16); err != nil {
-			return false, nil
-		}
-		return true, nil
+		err := grabIptablesFileLock(l.lock16)
+		return err == nil, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to acquire new iptables lock: %v", err)
 	}
@@ -84,10 +82,7 @@ func grabIptablesLocks(lockfilePath14x, lockfilePath16x string) (iptablesLocker,
 	// Roughly duplicate iptables 1.4.x xtables_lock() function.
 	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
 		l.lock14, err = net.ListenUnix("unix", &net.UnixAddr{Name: lockfilePath14x, Net: "unix"})
-		if err != nil {
-			return false, nil
-		}
-		return true, nil
+		return err == nil, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to acquire old iptables lock: %v", err)
 	}

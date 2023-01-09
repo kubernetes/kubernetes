@@ -33,9 +33,6 @@ func BasicLongRunningRequestCheck(longRunningVerbs, longRunningSubresources sets
 		if requestInfo.IsResourceRequest && longRunningSubresources.Has(requestInfo.Subresource) {
 			return true
 		}
-		if !requestInfo.IsResourceRequest && strings.HasPrefix(requestInfo.Path, "/debug/pprof/") {
-			return true
-		}
-		return false
+		return !requestInfo.IsResourceRequest && strings.HasPrefix(requestInfo.Path, "/debug/pprof/")
 	}
 }

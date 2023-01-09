@@ -683,10 +683,7 @@ func TestBootstrapping(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
-		if event.Type != watch.Added {
-			return false, nil
-		}
-		return true, nil
+		return event.Type == watch.Added, nil
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

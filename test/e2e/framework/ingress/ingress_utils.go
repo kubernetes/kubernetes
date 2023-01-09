@@ -792,10 +792,7 @@ func (j *TestJig) WaitForIngress(ctx context.Context, waitForNodePort bool) {
 func (j *TestJig) WaitForIngressToStable(ctx context.Context) {
 	if err := wait.PollWithContext(ctx, 10*time.Second, e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, j.Client), func(ctx context.Context) (bool, error) {
 		_, err := j.GetDistinctResponseFromIngress(ctx)
-		if err != nil {
-			return false, nil
-		}
-		return true, nil
+		return err == nil, nil
 	}); err != nil {
 		framework.Failf("error in waiting for ingress to stabilize: %v", err)
 	}
@@ -893,10 +890,7 @@ func getPortURL(ctx context.Context, client clientset.Interface, ns, name string
 		nodes, err = client.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return err == nil, err
 	}) != nil {
 		return "", err
 	}

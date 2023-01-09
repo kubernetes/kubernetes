@@ -364,10 +364,8 @@ func (g *Cloud) ensureExternalLoadBalancerDeleted(clusterName, clusterID string,
 				return err
 			}
 			klog.Infof("ensureExternalLoadBalancerDeleted(%s): Deleting target pool.", lbRefStr)
-			if err := g.DeleteExternalTargetPoolAndChecks(service, loadBalancerName, g.region, clusterID, hcNames...); err != nil {
-				return err
-			}
-			return nil
+			err := g.DeleteExternalTargetPoolAndChecks(service, loadBalancerName, g.region, clusterID, hcNames...)
+			return err
 		},
 	)
 	if errs != nil {

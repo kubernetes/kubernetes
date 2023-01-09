@@ -282,11 +282,7 @@ func Test_NestedPendingOperations_Negative_SecondThirdOpWithDifferentNames(t *te
 				EmptyUniquePodName,
 				EmptyNodeName,
 				volumetypes.GeneratedOperations{OperationFunc: operation2, OperationName: op1Name})
-
-			if exponentialbackoff.IsExponentialBackoff(err) {
-				return true, nil
-			}
-			return false, nil
+			return exponentialbackoff.IsExponentialBackoff(err), nil
 		},
 	)
 

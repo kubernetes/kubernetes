@@ -170,10 +170,8 @@ func configureHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int) 
 // isHugePageAvailable returns true if hugepages of the specified size is available on the host
 func isHugePageAvailable(hugepagesSize int) bool {
 	path := fmt.Sprintf("%s-%dkB/%s", hugepagesDirPrefix, hugepagesSize, hugepagesCapacityFile)
-	if _, err := os.Stat(path); err != nil {
-		return false
-	}
-	return true
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func getHugepagesTestPod(f *framework.Framework, limits v1.ResourceList, mounts []v1.VolumeMount, volumes []v1.Volume) *v1.Pod {
@@ -270,10 +268,8 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 
 				ginkgo.By(fmt.Sprintf("Configuring the host to reserve %d of pre-allocated hugepages of size %d", count, size))
 				gomega.Eventually(ctx, func() error {
-					if err := configureHugePages(size, count, nil); err != nil {
-						return err
-					}
-					return nil
+					err := configureHugePages(size, count, nil)
+					return err
 				}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
 			}
 		}

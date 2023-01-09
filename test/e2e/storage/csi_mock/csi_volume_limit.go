@@ -135,10 +135,7 @@ func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Inte
 			return false, err
 		}
 		attachLimit = getVolumeLimitFromCSINode(csiNode, driverName)
-		if attachLimit > 0 {
-			return true, nil
-		}
-		return false, nil
+		return attachLimit > 0, nil
 	})
 	if waitErr != nil {
 		return 0, fmt.Errorf("error waiting for non-zero volume limit of driver %s on node %s: %v", driverName, nodeName, waitErr)

@@ -63,10 +63,7 @@ func waitForRegistration(
 	err := retryWithExponentialBackOff(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
-			if dsw.PluginExists(socketPath) {
-				return true, nil
-			}
-			return false, nil
+			return dsw.PluginExists(socketPath), nil
 		},
 	)
 	if err != nil {
@@ -81,10 +78,7 @@ func waitForUnregistration(
 	err := retryWithExponentialBackOff(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
-			if !dsw.PluginExists(socketPath) {
-				return true, nil
-			}
-			return false, nil
+			return !dsw.PluginExists(socketPath), nil
 		},
 	)
 

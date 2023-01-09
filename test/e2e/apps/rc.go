@@ -254,10 +254,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 				if err != nil {
 					return false, err
 				}
-				if rc.Status.Replicas != testRcInitialReplicaCount {
-					return false, nil
-				}
-				return true, nil
+				return rc.Status.Replicas == testRcInitialReplicaCount, nil
 			})
 			framework.ExpectNoError(err, "Failed to find updated ready replica count")
 			framework.ExpectEqual(eventFound, true, "Failed to find updated ready replica count")
@@ -670,10 +667,7 @@ func testRCReleaseControlledNotMatching(ctx context.Context, f *framework.Framew
 		if err != nil && apierrors.IsConflict(err) {
 			return false, nil
 		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
+		return err == nil, err
 	})
 	framework.ExpectNoError(err)
 

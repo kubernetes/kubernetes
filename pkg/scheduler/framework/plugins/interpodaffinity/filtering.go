@@ -354,10 +354,7 @@ func satisfyPodAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) boo
 		// in the cluster matches the namespace and selector of this pod, the pod matches
 		// its own terms, and the node has all the requested topologies, then we allow the pod
 		// to pass the affinity check.
-		if len(state.affinityCounts) == 0 && podMatchesAllAffinityTerms(state.podInfo.RequiredAffinityTerms, state.podInfo.Pod) {
-			return true
-		}
-		return false
+		return len(state.affinityCounts) == 0 && podMatchesAllAffinityTerms(state.podInfo.RequiredAffinityTerms, state.podInfo.Pod)
 	}
 	return true
 }

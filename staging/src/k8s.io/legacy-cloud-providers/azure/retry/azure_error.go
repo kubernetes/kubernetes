@@ -206,11 +206,7 @@ func shouldRetryHTTPRequest(resp *http.Response, err error) bool {
 		}
 
 		// should retry on <200, error>.
-		if isSuccessHTTPResponse(resp) && err != nil {
-			return true
-		}
-
-		return false
+		return isSuccessHTTPResponse(resp) && err != nil
 	}
 
 	// should retry when error is not nil and no http.Response.

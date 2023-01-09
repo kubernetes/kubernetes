@@ -214,10 +214,7 @@ func isvCenterNotSupported(vCenterVersion string, vCenterAPIVersion string) (boo
 	if err != nil {
 		return false, fmt.Errorf("failed to parse minimum vCenter version: %s. err: %+v", MinvCenterVersion, err)
 	}
-	if vcversion.isLessThan(minvcversion) && vcapiversion.isLessThan(minvcversion) {
-		return true, nil
-	}
-	return false, nil
+	return vcversion.isLessThan(minvcversion) && vcapiversion.isLessThan(minvcversion), nil
 }
 
 // vcVersion represents a VC version

@@ -694,10 +694,7 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	}
 	// sort by name of the conversion function
 	sort.Slice(pairs, func(i, j int) bool {
-		if g.manualConversions[pairs[i]].Name.Name < g.manualConversions[pairs[j]].Name.Name {
-			return true
-		}
-		return false
+		return g.manualConversions[pairs[i]].Name.Name < g.manualConversions[pairs[j]].Name.Name
 	})
 	for _, pair := range pairs {
 		args := argsFromType(pair.inType, pair.outType).With("Scope", types.Ref(conversionPackagePath, "Scope")).With("fn", g.manualConversions[pair])

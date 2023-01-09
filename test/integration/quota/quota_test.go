@@ -381,10 +381,8 @@ plugins:
 	// attempt to create a new pod once the quota is propagated
 	err = wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
 		// retry until we succeed (to allow time for all changes to propagate)
-		if _, err := clientset.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err == nil {
-			return true, nil
-		}
-		return false, nil
+		_, err := clientset.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+		return err == nil, nil
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
