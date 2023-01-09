@@ -287,7 +287,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 			ginkgo.By("Scheduling a sample device plugin pod")
-			data, err := e2etestfiles.Read(SampleDevicePluginDS2YAML)
+			data, err := e2etestfiles.Read(SampleDevicePluginControlRegistrationDSYAML)
 			if err != nil {
 				framework.Fail(err.Error())
 			}
