@@ -242,7 +242,7 @@ func (e *TokensController) syncServiceAccount() {
 		retry = true
 	case sa == nil:
 		// service account no longer exists, so delete related tokens
-		logger.V(4).Info("syncServiceAccount(%s/%s), service account deleted, removing tokens", saInfo.namespace, saInfo.name)
+		logger.V(4).Info("service account deleted, removing tokens", "namespace", saInfo.namespace, "service account", saInfo.name)
 		sa = &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: saInfo.namespace, Name: saInfo.name, UID: saInfo.uid}}
 		retry, err = e.deleteTokens(sa)
 		if err != nil {
@@ -295,7 +295,7 @@ func (e *TokensController) syncSecret() {
 			retry = true
 		case sa == nil:
 			// Delete token
-			logger.V(4).Info("syncSecret(%s/%s), service account does not exist, deleting token", secretInfo.namespace, secretInfo.name)
+			logger.V(4).Info("service account does not exist, deleting token", "namespace", secretInfo.namespace, "key", secretInfo.name)
 			if retriable, err := e.deleteToken(secretInfo.namespace, secretInfo.name, secretInfo.uid); err != nil {
 				logger.Error(err, "error deleting serviceaccount token", "namespace", secretInfo.namespace, "key", secretInfo.name, "service account", secretInfo.saName)
 				retry = retriable
@@ -375,7 +375,7 @@ func (e *TokensController) generateTokenIfNeeded(logger klog.Logger, serviceAcco
 	if liveSecret.ResourceVersion != cachedSecret.ResourceVersion {
 		// our view of the secret is not up to date
 		// we'll get notified of an update event later and get to try again
-		logger.V(2).Info("secret %s/%s is not up to date, skipping token population", liveSecret.Namespace, liveSecret.Name)
+		logger.V(2).Info("secret is not up to date, skipping token population", "namespace", liveSecret.Namespace, "key", liveSecret.Name)
 		return false, nil
 	}
 
