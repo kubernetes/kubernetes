@@ -170,6 +170,7 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		PodValidationOptions:    pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
 		AllowTrackingAnnotation: true,
 		AllowElasticIndexedJobs: utilfeature.DefaultFeatureGate.Enabled(features.ElasticIndexedJob),
+		RequirePrefixedLabels:   true,
 	}
 	if oldJob != nil {
 		opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldJob.Spec.Selector)
@@ -184,6 +185,12 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		suspended := oldJob.Spec.Suspend != nil && *oldJob.Spec.Suspend
 		notStarted := oldJob.Status.StartTime == nil
 		opts.AllowMutableSchedulingDirectives = suspended && notStarted
+
+		// Validation should not fail jobs if they don't have the new labels.
+		// This can be removed once we have high confidence that both labels exist (1.30 at least)
+		_, hadJobName := oldJob.Spec.Template.Labels[batch.JobNameLabel]
+		_, hadControllerUid := oldJob.Spec.Template.Labels[batch.ControllerUidLabel]
+		opts.RequirePrefixedLabels = hadJobName && hadControllerUid
 	}
 	return opts
 }
@@ -209,21 +216,28 @@ func generateSelector(obj *batch.Job) {
 	// The job-name label is unique except in cases that are expected to be
 	// quite uncommon, and is more user friendly than uid.  So, we add it as
 	// a label.
-	_, found := obj.Spec.Template.Labels["job-name"]
-	if found {
-		// User asked us to automatically generate a selector, but set manual labels.
-		// If there is a conflict, we will reject in validation.
-	} else {
-		obj.Spec.Template.Labels["job-name"] = string(obj.ObjectMeta.Name)
+	jobNameLabels := []string{batch.LegacyJobNameLabel, batch.JobNameLabel}
+	for _, value := range jobNameLabels {
+		_, found := obj.Spec.Template.Labels[value]
+		if found {
+			// User asked us to automatically generate a selector, but set manual labels.
+			// If there is a conflict, we will reject in validation.
+		} else {
+			obj.Spec.Template.Labels[value] = string(obj.ObjectMeta.Name)
+		}
 	}
+
 	// The controller-uid label makes the pods that belong to this job
 	// only match this job.
-	_, found = obj.Spec.Template.Labels["controller-uid"]
-	if found {
-		// User asked us to automatically generate a selector, but set manual labels.
-		// If there is a conflict, we will reject in validation.
-	} else {
-		obj.Spec.Template.Labels["controller-uid"] = string(obj.ObjectMeta.UID)
+	controllerUidLabels := []string{batch.LegacyControllerUidLabel, batch.ControllerUidLabel}
+	for _, value := range controllerUidLabels {
+		_, found := obj.Spec.Template.Labels[value]
+		if found {
+			// User asked us to automatically generate a selector, but set manual labels.
+			// If there is a conflict, we will reject in validation.
+		} else {
+			obj.Spec.Template.Labels[value] = string(obj.ObjectMeta.UID)
+		}
 	}
 	// Select the controller-uid label.  This is sufficient for uniqueness.
 	if obj.Spec.Selector == nil {
@@ -232,8 +246,9 @@ func generateSelector(obj *batch.Job) {
 	if obj.Spec.Selector.MatchLabels == nil {
 		obj.Spec.Selector.MatchLabels = make(map[string]string)
 	}
-	if _, found := obj.Spec.Selector.MatchLabels["controller-uid"]; !found {
-		obj.Spec.Selector.MatchLabels["controller-uid"] = string(obj.ObjectMeta.UID)
+
+	if _, found := obj.Spec.Selector.MatchLabels[batch.ControllerUidLabel]; !found {
+		obj.Spec.Selector.MatchLabels[batch.ControllerUidLabel] = string(obj.ObjectMeta.UID)
 	}
 	// If the user specified matchLabel controller-uid=$WRONGUID, then it should fail
 	// in validation, either because the selector does not match the pod template
