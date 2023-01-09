@@ -2088,6 +2088,7 @@ k8s.io/klog/v2/test
 ## explicit; go 1.19
 k8s.io/kms/apis/v1beta1
 k8s.io/kms/apis/v2alpha1
+k8s.io/kms/service
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 ## explicit; go 1.19
 k8s.io/kube-aggregator/pkg/apis/apiregistration

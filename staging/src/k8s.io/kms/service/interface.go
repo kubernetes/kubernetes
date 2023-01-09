@@ -18,10 +18,6 @@ package service
 
 import "context"
 
-/*
-Copied from: k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2
-*/
-
 // Service allows encrypting and decrypting data using an external Key Management Service.
 type Service interface {
 	// Decrypt a given bytearray to obtain the original data as bytes.

@@ -49,6 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kmsservice "k8s.io/kms/service"
 )
 
 const (
@@ -80,7 +81,7 @@ type kmsPluginProbe struct {
 type kmsv2PluginProbe struct {
 	name         string
 	ttl          time.Duration
-	service      envelopekmsv2.Service
+	service      kmsservice.Service
 	lastResponse *kmsPluginHealthzResponse
 	l            *sync.Mutex
 }
@@ -275,7 +276,7 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 }
 
 // isKMSv2ProviderHealthy checks if the KMSv2-Plugin is healthy.
-func isKMSv2ProviderHealthy(name string, response *envelopekmsv2.StatusResponse) error {
+func isKMSv2ProviderHealthy(name string, response *kmsservice.StatusResponse) error {
 	var errs []error
 	if response.Healthz != "ok" {
 		errs = append(errs, fmt.Errorf("got unexpected healthz status: %s", response.Healthz))
