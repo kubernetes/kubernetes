@@ -135,15 +135,11 @@ func (h *httpStreamHandler) getStreamPair(requestID string) (*httpStreamPair, bo
 }
 
 // monitorStreamPair waits for the pair to receive both its error and data
-// streams, or for the timeout/ctx to expire (whichever happens first), and then
+// streams, or for the ctx to expire (whichever happens first), and then
 // removes the pair.
-func (h *httpStreamHandler) monitorStreamPair(ctx context.Context, p *httpStreamPair, timeout <-chan time.Time) {
+func (h *httpStreamHandler) monitorStreamPair(ctx context.Context, p *httpStreamPair) {
 	select {
 	case <-ctx.Done():
-		err := fmt.Errorf("request %q canceled while waiting for streams", p.requestID)
-		utilruntime.HandleError(err)
-		p.printError(err.Error())
-	case <-timeout:
 		err := fmt.Errorf("request %q timed out waiting for streams", p.requestID)
 		utilruntime.HandleError(err)
 		p.printError(err.Error())
@@ -233,9 +229,9 @@ Loop:
 			p, created := h.getStreamPair(requestID)
 			if created {
 				go func() {
-					timer := time.NewTimer(h.streamCreationTimeout)
-					defer timer.Stop()
-					h.monitorStreamPair(ctx, p, timer.C)
+					streamCreationCtx, cancel := context.WithTimeout(ctx, h.streamCreationTimeout)
+					defer cancel()
+					h.monitorStreamPair(streamCreationCtx, p)
 				}()
 			}
 			if complete, err := p.add(stream); err != nil {

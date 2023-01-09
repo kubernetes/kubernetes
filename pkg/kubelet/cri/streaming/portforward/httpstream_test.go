@@ -104,8 +104,6 @@ func (*fakeConn) SetIdleTimeout(timeout time.Duration)                        {}
 func (f *fakeConn) RemoveStreams(streams ...httpstream.Stream)                { f.removeStreamsCalled = true }
 
 func TestGetStreamPair(t *testing.T) {
-	timeout := make(chan time.Time)
-
 	conn := &fakeConn{}
 	h := &httpStreamHandler{
 		streamPairs: make(map[string]*httpStreamPair),
@@ -130,7 +128,7 @@ func TestGetStreamPair(t *testing.T) {
 	// start the monitor for this pair
 	monitorDone := make(chan struct{})
 	go func() {
-		h.monitorStreamPair(context.Background(), p, timeout)
+		h.monitorStreamPair(context.Background(), p)
 		close(monitorDone)
 	}()
 
@@ -190,43 +188,17 @@ func TestGetStreamPair(t *testing.T) {
 		t.Fatal("expected p not to be nil")
 	}
 
-	monitorDone = make(chan struct{})
-	go func() {
-		h.monitorStreamPair(context.Background(), p, timeout)
-		close(monitorDone)
-	}()
-	// cause the timeout
-	close(timeout)
-	// make sure monitorStreamPair completed
-	<-monitorDone
-	if h.hasStreamPair("2") {
-		t.Fatal("expected stream pair to be removed")
-	}
-	if !conn.removeStreamsCalled {
-		t.Fatalf("connection remove stream not called")
-	}
-
-	// removed via ctx
-	conn.removeStreamsCalled = false
-	p, created = h.getStreamPair("3")
-	if !created {
-		t.Fatal("expected created=true")
-	}
-	if p == nil {
-		t.Fatal("expected p not to be nil")
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	monitorDone = make(chan struct{})
 	go func() {
-		h.monitorStreamPair(ctx, p, nil)
+		h.monitorStreamPair(ctx, p)
 		close(monitorDone)
 	}()
-	// cancel the context
+	// cause the timeout
 	cancel()
 	// make sure monitorStreamPair completed
 	<-monitorDone
-	if h.hasStreamPair("3") {
+	if h.hasStreamPair("2") {
 		t.Fatal("expected stream pair to be removed")
 	}
 	if !conn.removeStreamsCalled {
