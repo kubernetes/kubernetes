@@ -151,18 +151,18 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				accessModes := []v1.PersistentVolumeAccessMode{t.volumeMode}
 				_, claim, pod := m.createPodWithSELinux(ctx, accessModes, t.mountOptions, t.firstPodSELinuxOpts)
 				err := e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "failed to start the initial pod")
+				framework.ExpectNoError(err, "starting the initial pod")
 
 				// Assert
 				ginkgo.By("Checking the initial pod mount options")
-				framework.ExpectEqual(nodeStageMountOpts, t.expectedFirstMountOptions, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.MountFlags to equal %q; got: %q", t.expectedFirstMountOptions, nodeStageMountOpts)
-				framework.ExpectEqual(nodePublishMountOpts, t.expectedFirstMountOptions, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.MountFlags to equal %q; got: %q", t.expectedFirstMountOptions, nodeStageMountOpts)
+				framework.ExpectEqual(nodeStageMountOpts, t.expectedFirstMountOptions, "NodeStage MountFlags for the initial pod")
+				framework.ExpectEqual(nodePublishMountOpts, t.expectedFirstMountOptions, "NodePublish MountFlags for the initial pod")
 
 				ginkgo.By("Checking the CSI driver calls for the initial pod")
-				gomega.Expect(unstageCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeUnstage was unexpectedly called for the initial pod")
-				gomega.Expect(unpublishCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeUnpublish was unexpectedly called for the initial pod")
-				gomega.Expect(stageCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeStage was not called for the initial pod")
-				gomega.Expect(publishCalls.Load()).To(gomega.BeNumerically(">", 0), "NodePublish was not called for the initial pod")
+				gomega.Expect(unstageCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeUnstage call count for the initial pod")
+				gomega.Expect(unpublishCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeUnpublish call count for the initial pod")
+				gomega.Expect(stageCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeStage for the initial pod")
+				gomega.Expect(publishCalls.Load()).To(gomega.BeNumerically(">", 0), "NodePublish for the initial pod")
 
 				if !t.startSecondPod {
 					return
@@ -173,10 +173,10 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 
 				// Skip scheduler, it would block scheduling the second pod with ReadWriteOncePod PV.
 				pod, err = m.cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err, fmt.Sprintf("get the initial pod"))
+				framework.ExpectNoError(err, fmt.Sprintf("getting the initial pod"))
 				nodeSelection := e2epod.NodeSelection{Name: pod.Spec.NodeName}
 				pod2, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, t.secondPodSELinuxOpts)
-				framework.ExpectNoError(err, "Failed to create second pod with SELinux context %s: %v", t.secondPodSELinuxOpts, err)
+				framework.ExpectNoError(err, "creating second pod with SELinux context %s", t.secondPodSELinuxOpts)
 				m.pods = append(m.pods, pod2)
 
 				// Delete the initial pod only after kubelet processes the second pod and adds its volumes to
@@ -198,7 +198,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 					msg = "volume uses the ReadWriteOncePod access mode and is already in use by another pod"
 				}
 				err = e2eevents.WaitTimeoutForEvent(ctx, m.cs, pod2.Namespace, eventSelector, msg, f.Timeouts.PodStart)
-				framework.ExpectNoError(err, "faile to wait for event in the second test pod:", msg)
+				framework.ExpectNoError(err, "waiting for event %q in the second test pod", msg)
 
 				// count fresh CSI driver calls between the first and the second pod
 				nodeStageMountOpts = nil
@@ -211,29 +211,29 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 				// Act 2nd part of the test
 				ginkgo.By("Deleting the initial pod")
 				err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
-				framework.ExpectNoError(err, "failed to delete the initial pod")
+				framework.ExpectNoError(err, "deleting the initial pod")
 
 				// Assert 2nd part of the test
 				ginkgo.By("Waiting for the second pod to start")
 				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod2.Name, pod2.Namespace)
-				framework.ExpectNoError(err, "failed to start the second pod")
+				framework.ExpectNoError(err, "starting the second pod")
 
 				ginkgo.By("Checking CSI driver calls for the second pod")
 				if t.expectedUnstage {
 					// Volume should be fully unstaged between the first and the second pod
-					gomega.Expect(unstageCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeUnstage was not called for the second pod")
-					gomega.Expect(stageCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeStage was not called for the second pod")
+					gomega.Expect(unstageCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeUnstage calls after the first pod is deleted")
+					gomega.Expect(stageCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeStage calls for the second pod")
 					// The second pod got the right mount option
-					framework.ExpectEqual(nodeStageMountOpts, t.expectedSecondMountOptions, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume.MountFlags to equal %q; got: %q", t.expectedSecondMountOptions, nodeStageMountOpts)
+					framework.ExpectEqual(nodeStageMountOpts, t.expectedSecondMountOptions, "NodeStage MountFlags for the second pod")
 				} else {
 					// Volume should not be fully unstaged between the first and the second pod
-					gomega.Expect(unstageCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeUnstage was unexpectedly called for the second pod")
-					gomega.Expect(stageCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeStage was unexpectedly called for the second pod")
+					gomega.Expect(unstageCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeUnstage calls after the first pod is deleted")
+					gomega.Expect(stageCalls.Load()).To(gomega.BeNumerically("==", 0), "NodeStage calls for the second pod")
 				}
 				// In both cases, Unublish and Publish is called, with the right mount opts
-				gomega.Expect(unpublishCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeUnpublish was not called for the second pod")
-				gomega.Expect(publishCalls.Load()).To(gomega.BeNumerically(">", 0), "NodePublish was not called for the second pod")
-				framework.ExpectEqual(nodePublishMountOpts, t.expectedSecondMountOptions, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.MountFlags to equal %q; got: %q", t.expectedSecondMountOptions, nodeStageMountOpts)
+				gomega.Expect(unpublishCalls.Load()).To(gomega.BeNumerically(">", 0), "NodeUnpublish calls after the first pod is deleted")
+				gomega.Expect(publishCalls.Load()).To(gomega.BeNumerically(">", 0), "NodePublish calls for the second pod")
+				framework.ExpectEqual(nodePublishMountOpts, t.expectedSecondMountOptions, "NodePublish MountFlags for the second pod")
 			})
 		}
 	})
