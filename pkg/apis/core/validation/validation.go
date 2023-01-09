@@ -5978,7 +5978,7 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, podCl
 // validateResourceClaimNames checks that the names in
 // ResourceRequirements.Claims have a corresponding entry in
 // PodSpec.ResourceClaims.
-func validateResourceClaimNames(claims []core.ResourceClaim, podClaimNames sets.String, fldPath *field.Path) field.ErrorList {
+func validateResourceClaimNames(claims []core.ResourceAttachment, podClaimNames sets.String, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	names := sets.String{}
 	for i, claim := range claims {

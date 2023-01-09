@@ -487,7 +487,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.ReplicationControllerList":                                                    schema_k8sio_api_core_v1_ReplicationControllerList(ref),
 		"k8s.io/api/core/v1.ReplicationControllerSpec":                                                    schema_k8sio_api_core_v1_ReplicationControllerSpec(ref),
 		"k8s.io/api/core/v1.ReplicationControllerStatus":                                                  schema_k8sio_api_core_v1_ReplicationControllerStatus(ref),
-		"k8s.io/api/core/v1.ResourceClaim":                                                                schema_k8sio_api_core_v1_ResourceClaim(ref),
+		"k8s.io/api/core/v1.ResourceAttachment":                                                           schema_k8sio_api_core_v1_ResourceAttachment(ref),
 		"k8s.io/api/core/v1.ResourceFieldSelector":                                                        schema_k8sio_api_core_v1_ResourceFieldSelector(ref),
 		"k8s.io/api/core/v1.ResourceQuota":                                                                schema_k8sio_api_core_v1_ResourceQuota(ref),
 		"k8s.io/api/core/v1.ResourceQuotaList":                                                            schema_k8sio_api_core_v1_ResourceQuotaList(ref),
@@ -24797,11 +24797,11 @@ func schema_k8sio_api_core_v1_ReplicationControllerStatus(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_core_v1_ResourceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ResourceAttachment(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+				Description: "ResourceAttachment references one entry in PodSpec.ResourceClaims.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -25112,7 +25112,7 @@ func schema_k8sio_api_core_v1_ResourceRequirements(ref common.ReferenceCallback)
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/core/v1.ResourceClaim"),
+										Ref:     ref("k8s.io/api/core/v1.ResourceAttachment"),
 									},
 								},
 							},
@@ -25122,7 +25122,7 @@ func schema_k8sio_api_core_v1_ResourceRequirements(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.ResourceClaim", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/core/v1.ResourceAttachment", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 

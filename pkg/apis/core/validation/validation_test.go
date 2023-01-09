@@ -21764,7 +21764,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 
 	successCases := map[string]core.PodSpec{
 		"resource claim reference": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21777,7 +21777,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"resource claim template": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21790,7 +21790,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"multiple claims": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "another-claim"}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}, {Name: "another-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21805,8 +21805,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"init container": {
-			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			InitContainers: []core.Container{{Name: "ctr-init", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}},
+			InitContainers: []core.Container{{Name: "ctr-init", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}},
 			RestartPolicy:  core.RestartPolicyAlways,
 			DNSPolicy:      core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21875,7 +21875,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"resource claim source empty": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21886,7 +21886,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"resource claim reference and template": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21900,7 +21900,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"claim not found": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "no-such-claim"}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "no-such-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21911,7 +21911,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"claim name empty": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: ""}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: ""}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21922,7 +21922,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"pod claim name duplicates": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "my-claim"}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}, {Name: "my-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21933,12 +21933,12 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"no claims defined": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 		},
 		"duplicate pod claim name": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
@@ -21953,8 +21953,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		"ephemeral container don't support resource requirements": {
-			Containers:          []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			EphemeralContainers: []core.EphemeralContainer{{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ctr-ephemeral", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}, TargetContainerName: "ctr"}},
+			Containers:          []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}},
+			EphemeralContainers: []core.EphemeralContainer{{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ctr-ephemeral", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceAttachment{{Name: "my-claim"}}}}, TargetContainerName: "ctr"}},
 			RestartPolicy:       core.RestartPolicyAlways,
 			DNSPolicy:           core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{

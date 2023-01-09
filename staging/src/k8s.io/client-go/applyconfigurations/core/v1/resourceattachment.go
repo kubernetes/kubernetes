@@ -18,22 +18,22 @@ limitations under the License.
 
 package v1
 
-// ResourceClaimApplyConfiguration represents an declarative configuration of the ResourceClaim type for use
+// ResourceAttachmentApplyConfiguration represents an declarative configuration of the ResourceAttachment type for use
 // with apply.
-type ResourceClaimApplyConfiguration struct {
+type ResourceAttachmentApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// ResourceClaimApplyConfiguration constructs an declarative configuration of the ResourceClaim type for use with
+// ResourceAttachmentApplyConfiguration constructs an declarative configuration of the ResourceAttachment type for use with
 // apply.
-func ResourceClaim() *ResourceClaimApplyConfiguration {
-	return &ResourceClaimApplyConfiguration{}
+func ResourceAttachment() *ResourceAttachmentApplyConfiguration {
+	return &ResourceAttachmentApplyConfiguration{}
 }
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *ResourceClaimApplyConfiguration) WithName(value string) *ResourceClaimApplyConfiguration {
+func (b *ResourceAttachmentApplyConfiguration) WithName(value string) *ResourceAttachmentApplyConfiguration {
 	b.Name = &value
 	return b
 }

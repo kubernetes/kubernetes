@@ -4408,8 +4408,8 @@ message ReplicationControllerStatus {
   repeated ReplicationControllerCondition conditions = 6;
 }
 
-// ResourceClaim references one entry in PodSpec.ResourceClaims.
-message ResourceClaim {
+// ResourceAttachment references one entry in PodSpec.ResourceClaims.
+message ResourceAttachment {
   // Name must match the name of one entry in pod.spec.resourceClaims of
   // the Pod where this field is used. It makes that resource available
   // inside a container.
@@ -4518,7 +4518,7 @@ message ResourceRequirements {
   // +listMapKey=name
   // +featureGate=DynamicResourceAllocation
   // +optional
-  repeated ResourceClaim claims = 3;
+  repeated ResourceAttachment claims = 3;
 }
 
 // SELinuxOptions are the labels to be applied to the container

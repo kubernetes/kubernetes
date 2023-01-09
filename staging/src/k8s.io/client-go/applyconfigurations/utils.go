@@ -803,8 +803,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ReplicationControllerSpecApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ReplicationControllerStatus"):
 		return &applyconfigurationscorev1.ReplicationControllerStatusApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("ResourceClaim"):
-		return &applyconfigurationscorev1.ResourceClaimApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceAttachment"):
+		return &applyconfigurationscorev1.ResourceAttachmentApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceFieldSelector"):
 		return &applyconfigurationscorev1.ResourceFieldSelectorApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceQuota"):

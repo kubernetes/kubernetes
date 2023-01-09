@@ -636,7 +636,7 @@ func (b *builder) podInline(allocationMode resourcev1alpha1.AllocationMode) (*v1
 	pod := b.pod()
 	pod.Spec.Containers[0].Name = "with-resource"
 	podClaimName := "my-inline-claim"
-	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: podClaimName}}
+	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceAttachment{{Name: podClaimName}}
 	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 		{
 			Name: podClaimName,
@@ -687,7 +687,7 @@ func (b *builder) podExternal() *v1.Pod {
 			},
 		},
 	}
-	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: podClaimName}}
+	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceAttachment{{Name: podClaimName}}
 	return pod
 }
 

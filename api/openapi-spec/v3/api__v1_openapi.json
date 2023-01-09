@@ -6036,8 +6036,8 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.core.v1.ResourceClaim": {
-        "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+      "io.k8s.api.core.v1.ResourceAttachment": {
+        "description": "ResourceAttachment references one entry in PodSpec.ResourceClaims.",
         "properties": {
           "name": {
             "default": "",
@@ -6243,7 +6243,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceClaim"
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceAttachment"
                 }
               ],
               "default": {}

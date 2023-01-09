@@ -6471,7 +6471,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
-- name: io.k8s.api.core.v1.ResourceClaim
+- name: io.k8s.api.core.v1.ResourceAttachment
   map:
     fields:
     - name: name
@@ -6551,7 +6551,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         list:
           elementType:
-            namedType: io.k8s.api.core.v1.ResourceClaim
+            namedType: io.k8s.api.core.v1.ResourceAttachment
           elementRelationship: associative
           keys:
           - name

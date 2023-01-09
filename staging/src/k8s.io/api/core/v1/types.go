@@ -2325,11 +2325,11 @@ type ResourceRequirements struct {
 	// +listMapKey=name
 	// +featureGate=DynamicResourceAllocation
 	// +optional
-	Claims []ResourceClaim `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
+	Claims []ResourceAttachment `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
 }
 
-// ResourceClaim references one entry in PodSpec.ResourceClaims.
-type ResourceClaim struct {
+// ResourceAttachment references one entry in PodSpec.ResourceClaims.
+type ResourceAttachment struct {
 	// Name must match the name of one entry in pod.spec.resourceClaims of
 	// the Pod where this field is used. It makes that resource available
 	// inside a container.

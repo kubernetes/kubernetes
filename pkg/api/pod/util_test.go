@@ -792,14 +792,14 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			Containers: []api.Container{
 				{
 					Resources: api.ResourceRequirements{
-						Claims: []api.ResourceClaim{{Name: "my-claim"}},
+						Claims: []api.ResourceAttachment{{Name: "my-claim"}},
 					},
 				},
 			},
 			InitContainers: []api.Container{
 				{
 					Resources: api.ResourceRequirements{
-						Claims: []api.ResourceClaim{{Name: "my-claim"}},
+						Claims: []api.ResourceAttachment{{Name: "my-claim"}},
 					},
 				},
 			},
@@ -807,7 +807,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 				{
 					EphemeralContainerCommon: api.EphemeralContainerCommon{
 						Resources: api.ResourceRequirements{
-							Claims: []api.ResourceClaim{{Name: "my-claim"}},
+							Claims: []api.ResourceAttachment{{Name: "my-claim"}},
 						},
 					},
 				},
