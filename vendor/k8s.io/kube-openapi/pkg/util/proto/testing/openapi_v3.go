@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -47,7 +46,7 @@ func (f *FakeV3) OpenAPIV3Schema(groupVersion string) (*openapi_v3.Document, err
 	if err != nil {
 		return nil, err
 	}
-	spec, err := ioutil.ReadFile(filepath.Join(f.Path, groupVersion+".json"))
+	spec, err := os.ReadFile(filepath.Join(f.Path, groupVersion+".json"))
 	if err != nil {
 		return nil, err
 	}

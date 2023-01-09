@@ -12,13 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !go1.8
-// +build !go1.8
-
 package swag
 
-import "net/url"
+import "mime/multipart"
 
-func pathUnescape(path string) (string, error) {
-	return url.QueryUnescape(path)
+// File represents an uploaded file.
+type File struct {
+	Data   multipart.File
+	Header *multipart.FileHeader
+}
+
+// Read bytes from the file
+func (f *File) Read(p []byte) (n int, err error) {
+	return f.Data.Read(p)
+}
+
+// Close the file
+func (f *File) Close() error {
+	return f.Data.Close()
 }

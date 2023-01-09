@@ -43,7 +43,6 @@
   "status": {
     "unwantedReferences": {
       "github.com/PuerkitoBio/urlesc": [
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v4",
         "sigs.k8s.io/kustomize/kyaml"
