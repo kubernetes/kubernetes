@@ -216,13 +216,6 @@ aliases:
     - cblecker
     - spiffxp
     - dims
-  sig-testing-approvers:
-    - bentheelder
-    - cblecker
-    - spiffxp
-    # emeritus
-    # - ixdy
-    # - krzyzacy
   sig-node-approvers:
     - Random-Liu
     - dchen1107
