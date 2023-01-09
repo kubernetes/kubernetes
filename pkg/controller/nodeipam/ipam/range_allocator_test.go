@@ -18,6 +18,9 @@ package ipam
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/labels"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"net"
 	"testing"
 	"time"
@@ -26,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
+	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	netutils "k8s.io/utils/net"
@@ -662,6 +666,96 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 			}
 		}
 	}
+	for _, tc := range testCases {
+		testFunc(tc)
+	}
+}
+
+type countingNodeLister struct {
+	parent   *countingNodeInformer
+	delegate listers.NodeLister
+}
+
+type countingNodeInformer struct {
+	getNodeCallCount int
+	delegate         coreinformers.NodeInformer
+}
+
+func (l *countingNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
+	return l.delegate.List(selector)
+}
+
+func (l *countingNodeLister) Get(name string) (*v1.Node, error) {
+	l.parent.getNodeCallCount++
+	return l.delegate.Get(name)
+}
+
+func (i *countingNodeInformer) Informer() cache.SharedIndexInformer {
+	return i.delegate.Informer()
+}
+
+func (i *countingNodeInformer) Lister() listers.NodeLister {
+	return &countingNodeLister{
+		parent:   i,
+		delegate: i.delegate.Lister(),
+	}
+}
+
+func TestAbortRetryOnMissingNode(t *testing.T) {
+	testCases := []testCase{
+		{
+			description: "When the node is missing, retry should eventually be aborted",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing:  []*v1.Node{},
+				Clientset: fake.NewSimpleClientset(),
+			},
+		},
+	}
+
+	testFunc := func(tc testCase) {
+
+		// Initialize the range allocator.
+		fakeNodeInformer := &countingNodeInformer{
+			getNodeCallCount: 0,
+			delegate:         test.FakeNodeInformer(tc.fakeNodeHandler),
+		}
+		allocator, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nil)
+		if err != nil {
+			t.Logf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
+		}
+		rangeAllocator, ok := allocator.(*rangeAllocator)
+		if !ok {
+			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
+			return
+		}
+		rangeAllocator.nodesSynced = test.AlwaysReady
+		rangeAllocator.recorder = testutil.NewFakeRecorder()
+		go allocator.Run(wait.NeverStop)
+
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node0",
+			},
+		}
+		if err := allocator.AllocateOrOccupyCIDR(node); err != nil {
+			t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
+		}
+
+		// Wait for node processing to be cancelled
+		lastCount := 0
+		for {
+			time.Sleep(10 * time.Second)
+			if fakeNodeInformer.getNodeCallCount > 20 {
+				t.Fatalf("%v: node processed too often", tc.description)
+			}
+			if fakeNodeInformer.getNodeCallCount-lastCount == 0 {
+				// Node processing has stopped
+				break
+			}
+			lastCount = fakeNodeInformer.getNodeCallCount
+		}
+	}
+
 	for _, tc := range testCases {
 		testFunc(tc)
 	}
