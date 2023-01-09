@@ -17,8 +17,10 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,13 +34,11 @@ func TestGetValidatingWebhookConfig(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	stop := make(chan struct{})
 	defer close(stop)
+
+	manager := NewValidatingWebhookConfigurationManager(informerFactory)
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
 
-	manager := NewValidatingWebhookConfigurationManager(informerFactory)
-	if validatingConfig, ok := manager.(*validatingWebhookConfigurationManager); ok {
-		validatingConfig.updateConfiguration()
-	}
 	// no configurations
 	if configurations := manager.Webhooks(); len(configurations) != 0 {
 		t.Errorf("expected empty webhooks, but got %v", configurations)
@@ -49,13 +49,24 @@ func TestGetValidatingWebhookConfig(t *testing.T) {
 		Webhooks:   []v1.ValidatingWebhook{{Name: "webhook1.1"}},
 	}
 
-	validatingInformer := informerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations()
-	validatingInformer.Informer().GetIndexer().Add(webhookConfiguration)
-	if validatingConfig, ok := manager.(*validatingWebhookConfigurationManager); ok {
-		validatingConfig.updateConfiguration()
-	}
-	// configuration populated
+	client.
+		AdmissionregistrationV1().
+		ValidatingWebhookConfigurations().
+		Create(context.TODO(), webhookConfiguration, metav1.CreateOptions{})
+
+	// Wait up to 10s for the notification to be delivered.
+	// (on my system this takes < 2ms)
+	startTime := time.Now()
 	configurations := manager.Webhooks()
+	for len(configurations) == 0 {
+		if time.Since(startTime) > 10*time.Second {
+			break
+		}
+		time.Sleep(time.Millisecond)
+		configurations = manager.Webhooks()
+	}
+
+	// verify presence
 	if len(configurations) == 0 {
 		t.Errorf("expected non empty webhooks")
 	}
