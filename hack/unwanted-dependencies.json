@@ -48,9 +48,6 @@
         "sigs.k8s.io/kustomize/kustomize/v4",
         "sigs.k8s.io/kustomize/kyaml"
       ],
-      "github.com/form3tech-oss/jwt-go": [
-        "go.etcd.io/etcd/server/v3"
-      ],
       "github.com/getsentry/raven-go": [
         "github.com/cockroachdb/datadriven"
       ],
