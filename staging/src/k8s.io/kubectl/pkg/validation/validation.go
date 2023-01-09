@@ -27,28 +27,28 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 )
 
-// SchemaValidation validates the object against an OpenAPI schema.
-type SchemaValidation struct {
+// schemaValidation validates the object against an OpenAPI schema.
+type schemaValidation struct {
 	resources openapi.Resources
 }
 
-// NewSchemaValidation creates a new SchemaValidation that can be used
+// NewSchemaValidation creates a new Schema that can be used
 // to validate objects.
-func NewSchemaValidation(resources openapi.Resources) *SchemaValidation {
-	return &SchemaValidation{
+func NewSchemaValidation(resources openapi.Resources) Schema {
+	return &schemaValidation{
 		resources: resources,
 	}
 }
 
 // ValidateBytes will validates the object against using the Resources
 // object.
-func (v *SchemaValidation) ValidateBytes(data []byte) error {
-	obj, err := Parse(data)
+func (v *schemaValidation) ValidateBytes(data []byte) error {
+	obj, err := parse(data)
 	if err != nil {
 		return err
 	}
 
-	gvk, errs := GetObjectKind(obj)
+	gvk, errs := getObjectKind(obj)
 	if errs != nil {
 		return utilerrors.NewAggregate(errs)
 	}
@@ -60,7 +60,7 @@ func (v *SchemaValidation) ValidateBytes(data []byte) error {
 	return utilerrors.NewAggregate(v.validateResource(obj, gvk))
 }
 
-func (v *SchemaValidation) validateList(object interface{}) []error {
+func (v *schemaValidation) validateList(object interface{}) []error {
 	fields, ok := object.(map[string]interface{})
 	if !ok || fields == nil {
 		return []error{errors.New("invalid object to validate")}
@@ -71,7 +71,7 @@ func (v *SchemaValidation) validateList(object interface{}) []error {
 		return []error{errors.New("invalid object to validate")}
 	}
 	for _, item := range fields["items"].([]interface{}) {
-		if gvk, errs := GetObjectKind(item); errs != nil {
+		if gvk, errs := getObjectKind(item); errs != nil {
 			allErrors = append(allErrors, errs...)
 		} else {
 			allErrors = append(allErrors, v.validateResource(item, gvk)...)
@@ -80,7 +80,7 @@ func (v *SchemaValidation) validateList(object interface{}) []error {
 	return allErrors
 }
 
-func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVersionKind) []error {
+func (v *schemaValidation) validateResource(obj interface{}, gvk schema.GroupVersionKind) []error {
 	resource := v.resources.LookupResource(gvk)
 	if resource == nil {
 		// resource is not present, let's just skip validation.
@@ -90,7 +90,7 @@ func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVer
 	return validation.ValidateModel(obj, resource, gvk.Kind)
 }
 
-func Parse(data []byte) (interface{}, error) {
+func parse(data []byte) (interface{}, error) {
 	var obj interface{}
 	out, err := yaml.ToJSON(data)
 	if err != nil {
@@ -102,7 +102,7 @@ func Parse(data []byte) (interface{}, error) {
 	return obj, nil
 }
 
-func GetObjectKind(object interface{}) (schema.GroupVersionKind, []error) {
+func getObjectKind(object interface{}) (schema.GroupVersionKind, []error) {
 	var listErrors []error
 	fields, ok := object.(map[string]interface{})
 	if !ok || fields == nil {
