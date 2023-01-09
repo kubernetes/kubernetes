@@ -1869,6 +1869,9 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 				start := metav1.NewTime(fakeClock.Now())
 				job.Status.StartTime = &start
 			}
+			job.Annotations = map[string]string{
+				batch.JobTrackingFinalizer: "",
+			}
 
 			_, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
 			if err != nil {
@@ -1878,6 +1881,10 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 			if err := sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job); err != nil {
 				t.Fatalf("Failed to insert job in index: %v", err)
 			}
+			// This is needed because the fake clientset doesn't report created pods
+			// to the informer, leading to unsatisfied expectations in syncJob that prevent the controller from setting the final condition.
+			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
+			setPodsStatuses(podIndexer, job, 0, 1, 0, 0, 0)
 
 			var j *batch.Job
 			err = wait.PollImmediate(200*time.Microsecond, 3*time.Second, func() (done bool, err error) {
