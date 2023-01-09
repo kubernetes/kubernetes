@@ -39,7 +39,6 @@ import (
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
-	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
 type rangeAllocator struct {
@@ -150,13 +149,6 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 			// state is correct.
 			// Restart of NC fixes the issue.
 			if len(newNode.Spec.PodCIDRs) == 0 {
-				return ra.AllocateOrOccupyCIDR(newNode)
-			}
-			// Even if PodCIDR is assigned, but NetworkUnavailable condition is
-			// set to true, we need to process the node to set the condition.
-			networkUnavailableTaint := &v1.Taint{Key: v1.TaintNodeNetworkUnavailable, Effect: v1.TaintEffectNoSchedule}
-			_, cond := nodeutil.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
-			if cond == nil || cond.Status != v1.ConditionFalse || utiltaints.TaintExists(newNode.Spec.Taints, networkUnavailableTaint) {
 				return ra.AllocateOrOccupyCIDR(newNode)
 			}
 			return nil
