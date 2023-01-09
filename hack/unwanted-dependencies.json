@@ -2,6 +2,9 @@
   "spec": {
     "unwantedModules": {
       "cloud.google.com/go/firestore": "db/datastore clients should not be required",
+      "github.com/PuerkitoBio/urlesc": "unmaintained, archive mode",
+      "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
+      "github.com/getsentry/raven-go": "unmaintained, archive mode",
       "github.com/go-bindata/go-bindata": "refer to #99829",
       "github.com/go-kit/kit": "lots of transitive dependencies, see https://github.com/prometheus/common/issues/255",
       "github.com/go-openapi/analysis": "use k8s.io/kube-openapi/pkg/validation/spec",
@@ -10,6 +13,7 @@
       "github.com/go-openapi/validate": "use k8s.io/kube-openapi/pkg/validation/validate instead",
       "github.com/gogo/protobuf": "unmaintained",
       "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
+      "github.com/google/shlex": "unmaintained, archive mode",
       "github.com/gorilla/handlers": "unmaintained, archive mode",
       "github.com/gorilla/mux": "unmaintained, archive mode",
       "github.com/gorilla/rpc": "unmaintained, archive mode",
@@ -26,6 +30,7 @@
       "github.com/mindprince/gonvml": "depends on nvml.h that does not appear to permit modification, redistribution",
       "github.com/mndrix/tap-go": "unmaintained",
       "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
+      "github.com/pkg/errors": "unmaintained, archive mode",
       "github.com/spf13/viper": "refer to #102598",
       "github.com/xeipuuv/gojsonschema": "unmaintained",
       "go.mongodb.org/mongo-driver": "",
@@ -37,6 +42,18 @@
   },
   "status": {
     "unwantedReferences": {
+      "github.com/PuerkitoBio/urlesc": [
+        "k8s.io/kube-openapi",
+        "sigs.k8s.io/kustomize/api",
+        "sigs.k8s.io/kustomize/kustomize/v4",
+        "sigs.k8s.io/kustomize/kyaml"
+      ],
+      "github.com/form3tech-oss/jwt-go": [
+        "go.etcd.io/etcd/server/v3"
+      ],
+      "github.com/getsentry/raven-go": [
+        "github.com/cockroachdb/datadriven"
+      ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
       ],
@@ -56,6 +73,10 @@
         "go.etcd.io/etcd/raft/v3",
         "go.etcd.io/etcd/server/v3"
       ],
+      "github.com/google/shlex": [
+        "sigs.k8s.io/kustomize/api",
+        "sigs.k8s.io/kustomize/kustomize/v4"
+      ],
       "github.com/gorilla/websocket": [
         "github.com/moby/spdystream",
         "github.com/tmc/grpc-websocket-proxy"
@@ -69,6 +90,29 @@
       ],
       "github.com/mindprince/gonvml": [
         "github.com/google/cadvisor"
+      ],
+      "github.com/pkg/errors": [
+        "github.com/Microsoft/go-winio",
+        "github.com/Microsoft/hcsshim",
+        "github.com/aws/aws-sdk-go",
+        "github.com/cockroachdb/datadriven",
+        "github.com/containerd/cgroups",
+        "github.com/containerd/continuity",
+        "github.com/containerd/fifo",
+        "github.com/containerd/go-runc",
+        "github.com/containerd/typeurl",
+        "github.com/go-logr/zapr",
+        "github.com/google/cadvisor",
+        "github.com/grpc-ecosystem/go-grpc-middleware",
+        "github.com/moby/ipvs",
+        "github.com/moby/term",
+        "go.etcd.io/etcd/raft/v3",
+        "go.uber.org/zap",
+        "gotest.tools/v3",
+        "k8s.io/system-validators",
+        "sigs.k8s.io/kustomize/api",
+        "sigs.k8s.io/kustomize/kustomize/v4",
+        "sigs.k8s.io/kustomize/kyaml"
       ]
     }
   }
