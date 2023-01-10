@@ -102,6 +102,7 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 
 			ginkgo.By("Stopping the kubelet non gracefully for pod" + pod.Name)
 			utils.KubeletCommand(ctx, utils.KStop, c, pod)
+			ginkgo.DeferCleanup(utils.KubeletCommand, utils.KStart, c, pod)
 
 			ginkgo.By("Adding out of service taint on node " + oldNodeName)
 			// taint this node as out-of-service node
@@ -110,6 +111,7 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 				Effect: v1.TaintEffectNoExecute,
 			}
 			e2enode.AddOrUpdateTaintOnNode(ctx, c, oldNodeName, taint)
+			ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, c, oldNodeName, taint)
 
 			ginkgo.By(fmt.Sprintf("Checking if the pod %s got rescheduled to a new node", pod.Name))
 			labelSelectorStr := labels.SelectorFromSet(podLabels).String()
