@@ -244,7 +244,7 @@ func modifyContainer(cs []corev1.Container, containerName string, m func(*corev1
 	}
 }
 
-// modifyContainer performs m against a container from cs which has the name of containerName.
+// modifyEphemeralContainer performs m against a container from cs which has the name of containerName.
 func modifyEphemeralContainer(cs []corev1.EphemeralContainer, containerName string, m func(*corev1.EphemeralContainer)) {
 	for i, c := range cs {
 		if c.Name != containerName {
