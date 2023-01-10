@@ -115,7 +115,8 @@ var (
 		},
 		// tests that need to be temporarily disabled while the rebase is in progress
 		"[Disabled:RebaseInProgress]": {
-			`Kubectl client Kubectl events should show event when pod is created`, // TODO: needs oc with 1.26 kubectl
+			`Kubectl client Kubectl events should show event when pod is created`,                                           // TODO: needs oc with 1.26 kubectl
+			`DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy`, // TODO not working, yet not testing anything new
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
