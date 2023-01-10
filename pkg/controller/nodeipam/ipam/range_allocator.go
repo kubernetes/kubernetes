@@ -191,18 +191,18 @@ func (r *rangeAllocator) worker(stopChan <-chan struct{}) {
 				return
 			}
 			if err := r.updateCIDRsAllocation(workItem); err == nil {
-				klog.V(3).Infof("Updated CIDR for %q", workItem)
+				klog.V(3).Infof("Updated CIDR for %q", workItem.nodeName)
 			} else {
-				klog.Errorf("Error updating CIDR for %q: %v", workItem, err)
+				klog.Errorf("Error updating CIDR for %q: %v", workItem.nodeName, err)
 				if canRetry, timeout := r.retryParams(workItem.nodeName); canRetry {
-					klog.V(2).Infof("Retrying update for %q after %v", workItem, timeout)
+					klog.V(2).Infof("Retrying update for %q after %v", workItem.nodeName, timeout)
 					time.AfterFunc(timeout, func() {
 						// Requeue the failed node for update again.
 						r.nodeCIDRUpdateChannel <- workItem
 					})
 					continue
 				}
-				klog.Errorf("Exceeded retry count for %q, dropping from queue", workItem)
+				klog.Errorf("Exceeded retry count for %q, dropping from queue", workItem.nodeName)
 			}
 			r.removeNodeFromProcessing(workItem.nodeName)
 		case <-stopChan:
