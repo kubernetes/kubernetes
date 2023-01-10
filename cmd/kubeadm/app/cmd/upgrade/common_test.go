@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
@@ -113,7 +114,10 @@ func TestEnforceRequirements(t *testing.T) {
 
 			expErr := tt.expectedErr
 			// pre-flight check expects the user to be root, so the root and non-root should hit different errors
-			if os.Getuid() != 0 && len(tt.expectedErrNonRoot) != 0 {
+			isPrivileged := preflight.IsPrivilegedUserCheck{}
+			// this will return an array of errors if we're not running as a privileged user.
+			_, errors := isPrivileged.Check()
+			if len(errors) != 0 && len(tt.expectedErrNonRoot) != 0 {
 				expErr = tt.expectedErrNonRoot
 			}
 			if err != nil && !strings.Contains(err.Error(), expErr) {
