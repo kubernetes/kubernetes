@@ -68,14 +68,6 @@ func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runt
 	}
 }
 
-func isPodCopy(pod *corev1.Pod, target runtime.Object) bool {
-	if asserted, ok := target.(*corev1.Pod); !ok {
-		return false
-	} else {
-		return pod != asserted
-	}
-}
-
 type debugStyle int
 
 const (
@@ -87,8 +79,10 @@ const (
 func getDebugStyle(pod *corev1.Pod, target runtime.Object) debugStyle {
 	switch target.(type) {
 	case *corev1.Pod:
-		if isPodCopy(pod, target) {
-			return stylePodCopy
+		if asserted, ok := target.(*corev1.Pod); ok {
+			if pod != asserted { // comparing addresses
+				return stylePodCopy
+			}
 		}
 		return styleEphemeral
 	case *corev1.Node:
