@@ -45,7 +45,7 @@ run_kubectl_help_tests() {
   kube::test::if_has_string "$(LANG=ko_KR.UTF-8 kubectl uncordon --help)" "Mark node as schedulable."
   kube::test::if_has_string "$(LANG=pt_BR.UTF-8 kubectl uncordon --help)" "Remove a restrição de execução de workloads no node."
   kube::test::if_has_string "$(LANG=zh_CN.UTF-8 kubectl uncordon --help)" "标记节点为可调度。"
-  kube::test::if_has_string "$(LANG=zh_TW.UTF-8 kubectl uncordon --help)" "Mark node as schedulable."
+  kube::test::if_has_string "$(LANG=zh_TW.UTF-8 kubectl uncordon --help)" "標記節點爲可調度。"
 
   set +o nounset
   set +o errexit
