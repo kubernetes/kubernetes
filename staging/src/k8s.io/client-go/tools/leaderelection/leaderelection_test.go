@@ -80,6 +80,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 		name           string
 		observedRecord rl.LeaderElectionRecord
 		observedTime   time.Time
+		retryAfter     time.Duration
 		reactors       []Reactor
 
 		expectSuccess    bool
@@ -121,6 +122,33 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					},
 				},
 			},
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
+		},
+		{
+			name: "acquire from led object with the lease duration seconds",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", LeaseDurationSeconds: 3}), nil
+					},
+				},
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing", LeaseDurationSeconds: 3}), nil
+					},
+				},
+				{
+					verb: "update",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			retryAfter:       3 * time.Second,
 			expectSuccess:    true,
 			transitionLeader: true,
 			outHolder:        "baz",
@@ -283,7 +311,14 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				clock:             clock.RealClock{},
 			}
 			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
-				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+				if test.retryAfter != 0 {
+					time.Sleep(test.retryAfter)
+					if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
+						t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+					}
+				} else {
+					t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+				}
 			}
 
 			le.observedRecord.AcquireTime = metav1.Time{}
