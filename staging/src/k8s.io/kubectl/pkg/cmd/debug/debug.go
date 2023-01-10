@@ -631,8 +631,6 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 		if len(override) > 0 {
 			copied.Spec.Containers[i].Image = override
 		}
-		copied.Spec.Containers[i].LivenessProbe = nil
-		copied.Spec.Containers[i].ReadinessProbe = nil
 	}
 
 	name, containerByName := o.Container, containerNameToRef(copied)

@@ -106,6 +106,7 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
 			c.SecurityContext = addCap(c.SecurityContext, "SYS_PTRACE")
 		})
+		removeProbes(pod.Spec.Containers)
 
 	case styleEphemeral:
 		// For ephemeral container: sets SYS_PTRACE in ephemeral container
@@ -148,6 +149,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 			c.SecurityContext = nil
 			c.SecurityContext = addCap(c.SecurityContext, "SYS_PTRACE")
 		})
+		removeProbes(pod.Spec.Containers)
 
 	case styleEphemeral:
 		for i := range pod.Spec.EphemeralContainers {
@@ -187,6 +189,7 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
 			c.SecurityContext = sc
 		})
+		removeProbes(pod.Spec.Containers)
 
 	case styleEphemeral:
 		modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
@@ -233,6 +236,14 @@ func addCap(s *corev1.SecurityContext, c corev1.Capability) *corev1.SecurityCont
 
 	ss.Capabilities.Add = append(ss.Capabilities.Add, c)
 	return ss
+}
+
+// removeProbes remove liveness and readiness probes from the supplied list of containers
+func removeProbes(cs []corev1.Container) {
+	for i := range cs {
+		cs[i].LivenessProbe = nil
+		cs[i].ReadinessProbe = nil
+	}
 }
 
 // modifyContainer performs m against a container from cs which has the name of containerName.
