@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -36,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
@@ -45,11 +43,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
-	"k8s.io/kube-openapi/pkg/util/proto"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util/openapi"
-	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 )
 
 var (
@@ -87,11 +82,9 @@ func testComponentStatusData() *corev1.ComponentStatusList {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
 	t.Skip("This test is completely broken.  The first thing it does is add the object to the scheme!")
-	var openapiSchemaPath = filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
-	tf.OpenAPISchemaFunc = openapitesting.CreateOpenAPISchemaFunc(openapiSchemaPath)
 
 	obj := &cmdtesting.ExternalType{
 		Kind:       "Type",
@@ -159,67 +152,6 @@ func TestGetSchemaObject(t *testing.T) {
 	if !strings.Contains(buf.String(), "foo") {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
-}
-
-func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
-	pods, _, _ := cmdtesting.TestData()
-
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-
-	// override the openAPISchema function to return custom output
-	// for Pod type.
-	tf.OpenAPISchemaFunc = testOpenAPISchemaData
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
-	}
-
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.Flags().Set(useOpenAPIPrintColumnFlagLabel, "true")
-	cmd.Run(cmd, []string{"pods", "foo"})
-
-	expected := `NAME   RSRC
-foo    10
-`
-	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected\n%v\ngot\n%v", e, a)
-	}
-}
-
-type FakeResources struct {
-	resources map[schema.GroupVersionKind]proto.Schema
-}
-
-func (f FakeResources) LookupResource(s schema.GroupVersionKind) proto.Schema {
-	return f.resources[s]
-}
-
-func (f FakeResources) GetConsumes(gvk schema.GroupVersionKind, operation string) []string {
-	return nil
-}
-
-var _ openapi.Resources = &FakeResources{}
-
-func testOpenAPISchemaData() (openapi.Resources, error) {
-	return &FakeResources{
-		resources: map[schema.GroupVersionKind]proto.Schema{
-			{
-				Version: "v1",
-				Kind:    "Pod",
-			}: &proto.Primitive{
-				BaseSchema: proto.BaseSchema{
-					Extensions: map[string]interface{}{
-						"x-kubernetes-print-columns": "custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion",
-					},
-				},
-			},
-		},
-	}, nil
 }
 
 func TestGetObjects(t *testing.T) {
