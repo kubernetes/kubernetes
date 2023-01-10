@@ -126,7 +126,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 
 			ginkgo.By("waiting 2 minutes for the watch in the podGC to catch up, remove any pods scheduled on " +
 				"the now non-existent node and the RC to recreate it")
-			time.Sleep(framework.NewTimeoutContext().PodStartShort)
+			time.Sleep(f.Timeouts.PodStartShort)
 
 			ginkgo.By("verifying whether the pods from the removed node are recreated")
 			err = e2epod.VerifyPods(ctx, c, ns, name, true, originalNodeCount)
