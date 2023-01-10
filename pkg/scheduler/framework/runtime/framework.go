@@ -730,14 +730,11 @@ func (f *frameworkImpl) RunFilterPlugins(
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
 ) *framework.Status {
-	var status *framework.Status
-
 	for _, pl := range f.filterPlugins {
 		if state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
 		}
-		status = f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
-		if !status.IsSuccess() {
+		if status := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo); !status.IsSuccess() {
 			if !status.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
 				// Success or Unschedulable.
@@ -748,7 +745,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 		}
 	}
 
-	return status
+	return nil
 }
 
 func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.FilterPlugin, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
