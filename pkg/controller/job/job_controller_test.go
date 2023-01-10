@@ -1697,6 +1697,10 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 	manager, sharedInformerFactory := newControllerFromClientWithClock(clientset, controller.NoResyncPeriodFunc, fakeClock)
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
+	manager.expectations = FakeJobExpectations{
+		controller.NewControllerExpectations(), true, func() {
+		},
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	sharedInformerFactory.Start(ctx.Done())
@@ -1737,10 +1741,6 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 			if err := sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job); err != nil {
 				t.Fatalf("Failed to insert job in index: %v", err)
 			}
-			// This is needed because the fake clientset doesn't report created pods
-			// to the informer, leading to unsatisfied expectations in syncJob that prevent the controller from setting the final condition.
-			podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
-			setPodsStatuses(podIndexer, job, 0, 1, 0, 0, 0)
 
 			var j *batch.Job
 			err = wait.PollImmediate(200*time.Microsecond, 3*time.Second, func() (done bool, err error) {
@@ -1753,25 +1753,22 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 			if err != nil {
 				t.Errorf("Job failed to ensure that start time was set: %v", err)
 			}
-			for _, c := range j.Status.Conditions {
-				if c.Reason == "DeadlineExceeded" {
-					t.Errorf("Job contains DeadlineExceeded condition earlier than expected")
-					break
-				}
-			}
 			// Make sure the start time is in the informer cache.
 			if err := sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(j); err != nil {
 				t.Fatalf("Failed to update job in cache: %v", err)
 			}
-			manager.clock.Sleep(time.Second)
-			err = wait.Poll(200*time.Millisecond, 3*time.Second, func() (done bool, err error) {
+			err = wait.Poll(100*time.Millisecond, 3*time.Second, func() (done bool, err error) {
 				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
 				if err != nil {
 					return false, nil
 				}
-				if len(j.Status.Conditions) == 1 && j.Status.Conditions[0].Reason == "DeadlineExceeded" {
+				if getCondition(j, batch.JobFailed, v1.ConditionTrue, "DeadlineExceeded") {
+					if manager.clock.Since(j.Status.StartTime.Time) < time.Duration(*j.Spec.ActiveDeadlineSeconds)*time.Second {
+						return true, errors.New("Job contains DeadlineExceeded condition earlier than expected")
+					}
 					return true, nil
 				}
+				manager.clock.Sleep(100 * time.Millisecond)
 				return false, nil
 			})
 			if err != nil {
