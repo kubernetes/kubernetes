@@ -16,3 +16,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace github.com/google/cadvisor => github.com/bobbypage/cadvisor v0.37.1-0.20230110215912-29ef6917a3d0

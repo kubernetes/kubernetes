@@ -20,7 +20,7 @@ require (
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent v1.1.0
 	github.com/mitchellh/go-wordwrap v1.0.0
-	github.com/moby/term v0.0.0-20220808134915-39b0c02b01ae
+	github.com/moby/term v0.0.0-20221205130635-1aeaba878587
 	github.com/onsi/ginkgo/v2 v2.7.0
 	github.com/onsi/gomega v1.24.2
 	github.com/pkg/errors v0.9.1
