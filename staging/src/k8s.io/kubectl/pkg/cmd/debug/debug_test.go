@@ -1598,7 +1598,8 @@ func TestCompleteAndValidate(t *testing.T) {
 				t.Fatalf("CompleteAndValidate got error: '%v', wantError: %v", gotError, tc.wantError)
 			}
 
-			if diff := cmp.Diff(tc.wantOpts, opts, cmpFilter, cmpopts.IgnoreUnexported(DebugOptions{})); diff != "" {
+			if diff := cmp.Diff(tc.wantOpts, opts, cmpFilter, cmpopts.IgnoreFields(DebugOptions{},
+				"attachChanged", "shareProcessedChanged", "podClient", "WarningPrinter", "applier")); diff != "" {
 				t.Error("CompleteAndValidate unexpected diff in generated object: (-want +got):\n", diff)
 			}
 		})
