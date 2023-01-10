@@ -144,7 +144,7 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //	             |                                            |
 //	             |                       |-------------------------------------------------|
 //	             |                       |                                                 |
-//	             |             close(stopHttpServerCh)                         HandlerChainWaitGroup.Wait()
+//	             |             close(stopHttpServerCh)                         NonLongRunningRequestWaitGroup.Wait()
 //	             |                       |                                                 |
 //	             |            server.Shutdown(timeout=60s)                                 |
 //	             |                       |                                                 |
@@ -357,7 +357,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 //     |                                            |
 //     |                               (NotAcceptingNewRequest)
 //     |                                            |
-//     |                              HandlerChainWaitGroup.Wait()
+//     |                              NonLongRunningRequestWaitGroup.Wait()
 //     |                                            |
 //     |                                (InFlightRequestsDrained)
 //     |                                            |

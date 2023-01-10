@@ -217,8 +217,10 @@ type GenericAPIServer struct {
 	// delegationTarget is the next delegate in the chain. This is never nil.
 	delegationTarget DelegationTarget
 
-	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
-	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
+	// NonLongRunningRequestWaitGroup allows you to wait for all chain
+	// handlers associated with non long-running requests
+	// to complete while the server is shuting down.
+	NonLongRunningRequestWaitGroup *utilwaitgroup.SafeWaitGroup
 
 	// ShutdownDelayDuration allows to block shutdown for some time, e.g. until endpoints pointing to this API server
 	// have converged on all node. During this time, the API server keeps serving, /healthz will return 200,
@@ -452,7 +454,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // |           |                        |              |                 |
 // |           |                        ---------------|                 |
 // |           |                                       |                 |
-// |           |                         (HandlerChainWaitGroup::Wait)   |
+// |           |                (NonLongRunningRequestWaitGroup::Wait)   |
 // |           |                                       |                 |
 // |           |                    InFlightRequestsDrained (drainedCh)  |
 // |           |                                       |                 |
@@ -582,7 +584,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		<-notAcceptingNewRequestCh.Signaled()
 
 		// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
-		// once HandlerChainWaitGroup.Wait is invoked, the apiserver is
+		// once NonLongRunningRequestWaitGroup.Wait is invoked, the apiserver is
 		// expected to reject any incoming request with a {503, Retry-After}
 		// response via the WithWaitGroup filter. On the contrary, we observe
 		// that incoming request(s) get a 'connection refused' error, this is
@@ -594,7 +596,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		// 'Server.Shutdown' will be invoked only after in-flight requests
 		// have been drained.
 		// TODO: can we consolidate these two modes of graceful termination?
-		s.HandlerChainWaitGroup.Wait()
+		s.NonLongRunningRequestWaitGroup.Wait()
 	}()
 
 	klog.V(1).Info("[graceful-termination] waiting for shutdown to be initiated")
