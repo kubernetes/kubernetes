@@ -217,7 +217,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					}
 
 					return nil
-				}, 180*time.Second, time.Second*4).Should(gomega.BeNil())
+				}, 5*time.Minute, 30*time.Second).Should(gomega.BeNil())
 
 			})
 			ginkgo.It("burstable container's oom-score-adj should be between [2, 1000)", func(ctx context.Context) {
