@@ -97,14 +97,14 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 		// For copy of pod: sets SYS_PTRACE in debugging container, sets shareProcessNamespace
 		pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
 		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
-			c.SecurityContext = addCap(c.SecurityContext, "SYS_PTRACE")
+			c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
 		})
 		removeProbes(pod.Spec.Containers)
 
 	case styleEphemeral:
 		// For ephemeral container: sets SYS_PTRACE in ephemeral container
 		modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
-			c.SecurityContext = addCap(c.SecurityContext, "SYS_PTRACE")
+			c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
 		})
 
 	case styleNode:
@@ -140,7 +140,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 		setHostNamespace(pod, false)
 		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
 			c.SecurityContext = nil
-			c.SecurityContext = addCap(c.SecurityContext, "SYS_PTRACE")
+			c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
 		})
 		removeProbes(pod.Spec.Containers)
 
@@ -206,7 +206,7 @@ func setHostNamespace(pod *corev1.Pod, enabled bool) {
 	pod.Spec.HostIPC = enabled
 }
 
-func addCap(s *corev1.SecurityContext, c corev1.Capability) *corev1.SecurityContext {
+func addCapability(s *corev1.SecurityContext, c corev1.Capability) *corev1.SecurityContext {
 	if s == nil {
 		return &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
@@ -215,16 +215,15 @@ func addCap(s *corev1.SecurityContext, c corev1.Capability) *corev1.SecurityCont
 		}
 	}
 
-	ss := s.DeepCopy()
-	if ss.Capabilities == nil {
-		ss.Capabilities = &corev1.Capabilities{
+	if s.Capabilities == nil {
+		s.Capabilities = &corev1.Capabilities{
 			Add: []corev1.Capability{c},
 		}
-		return ss
+		return s
 	}
 
-	ss.Capabilities.Add = append(ss.Capabilities.Add, c)
-	return ss
+	s.Capabilities.Add = append(s.Capabilities.Add, c)
+	return s
 }
 
 // removeProbes remove liveness and readiness probes from the supplied list of containers
