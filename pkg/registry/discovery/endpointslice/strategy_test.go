@@ -978,3 +978,39 @@ func Test_getDeprecatedTopologyNodeNames(t *testing.T) {
 		})
 	}
 }
+
+func TestWarningsOnEndpointSliceAddressType(t *testing.T) {
+	tests := []struct {
+		name        string
+		addressType discovery.AddressType
+		wantWarning bool
+	}{
+		{
+			name:        "AddressType = FQDN",
+			addressType: discovery.AddressTypeFQDN,
+			wantWarning: true,
+		},
+		{
+			name:        "AddressType = IPV4",
+			addressType: discovery.AddressTypeIPv4,
+			wantWarning: false,
+		},
+		{
+			name:        "AddressType = IPV6",
+			addressType: discovery.AddressTypeIPv6,
+			wantWarning: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "discovery.k8s.io", APIVersion: "v1", Resource: "endpointslices"})
+			edp := discovery.EndpointSlice{AddressType: tc.addressType}
+			got := Strategy.WarningsOnCreate(ctx, &edp)
+			if tc.wantWarning && len(got) == 0 {
+				t.Fatal("Failed warning was not returned")
+			} else if !tc.wantWarning && len(got) != 0 {
+				t.Fatalf("Failed warning  was returned (%v)", got)
+			}
+		})
+	}
+}
