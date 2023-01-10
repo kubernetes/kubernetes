@@ -54,6 +54,7 @@ var MetricsGrabbingDisabledError = errors.New("metrics grabbing disabled")
 // Collection is metrics collection of components
 type Collection struct {
 	APIServerMetrics          APIServerMetrics
+	APIServerMetricsSLIs      APIServerMetrics
 	ControllerManagerMetrics  ControllerManagerMetrics
 	SnapshotControllerMetrics SnapshotControllerMetrics
 	KubeletMetrics            map[string]KubeletMetrics
@@ -323,6 +324,15 @@ func (g *Grabber) GrabFromAPIServer(ctx context.Context) (APIServerMetrics, erro
 	return parseAPIServerMetrics(output)
 }
 
+// GrabMetricsSLIsFromAPIServer returns metrics from API server
+func (g *Grabber) GrabMetricsSLIsFromAPIServer(ctx context.Context) (APIServerMetrics, error) {
+	output, err := g.getMetricsSLIsFromAPIServer(ctx)
+	if err != nil {
+		return APIServerMetrics{}, err
+	}
+	return parseAPIServerMetrics(output)
+}
+
 // Grab returns metrics from corresponding component
 func (g *Grabber) Grab(ctx context.Context) (Collection, error) {
 	result := Collection{}
@@ -381,6 +391,14 @@ func (g *Grabber) Grab(ctx context.Context) (Collection, error) {
 				}
 				result.KubeletMetrics[node.Name] = metrics
 			}
+		}
+	}
+	if g.grabFromAPIServer {
+		metrics, err := g.GrabMetricsSLIsFromAPIServer(ctx)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			result.APIServerMetricsSLIs = metrics
 		}
 	}
 	if len(errs) > 0 {
