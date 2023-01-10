@@ -245,6 +245,11 @@ func (c *delegatingCRConverter) ConvertToVersion(in runtime.Object, target runti
 		return converted, nil
 	}
 
+	// Deep copy the list before we invoke the converter to ensure that if the converter does mutate the
+	// list (which it shouldn't, but you never know), it doesn't have any impact.
+	convertedList := list.DeepCopy()
+	convertedList.SetAPIVersion(desiredAPIVersion)
+
 	convertedObjects, err := c.converter.Convert(list, toGVK.GroupVersion())
 	if err != nil {
 		return nil, fmt.Errorf("conversion for %v failed: %w", in.GetObjectKind().GroupVersionKind(), err)
@@ -253,10 +258,8 @@ func (c *delegatingCRConverter) ConvertToVersion(in runtime.Object, target runti
 		return nil, fmt.Errorf("conversion for %v returned %d objects, expected %d", in.GetObjectKind().GroupVersionKind(), len(convertedObjects.Items), len(objectsToConvert))
 	}
 
-	// start a deepcopy of the input and fill in the converted objects from the response at the right spots.
+	// Fill in the converted objects from the response at the right spots.
 	// The response list might be sparse because objects had the right version already.
-	convertedList := list.DeepCopy()
-	convertedList.SetAPIVersion(desiredAPIVersion)
 	convertedIndex := 0
 	for i := range convertedList.Items {
 		original := &convertedList.Items[i]
