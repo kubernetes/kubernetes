@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
@@ -618,5 +619,30 @@ func makeFakeCommandAction(stdout string, err error) testexec.FakeCommandAction 
 	}
 	return func(cmd string, args ...string) utilexec.Cmd {
 		return testexec.InitFakeCmd(&c, cmd, args...)
+	}
+}
+
+func TestNotMountedBehaviorOfUnmount(t *testing.T) {
+	target, err := ioutil.TempDir("", "kubelet-umount")
+	if err != nil {
+		t.Errorf("Cannot create temp dir: %v", err)
+	}
+
+	defer os.RemoveAll(target)
+
+	m := Mounter{withSafeNotMountedBehavior: true}
+	if err = m.Unmount(target); err != nil {
+		t.Errorf(`Expect complete Unmount(), but it dose not: %v`, err)
+	}
+
+	if err = tryUnmount(target, m.withSafeNotMountedBehavior, time.Minute); err != nil {
+		t.Errorf(`Expect complete tryUnmount(), but it does not: %v`, err)
+	}
+
+	// forceUmount exec "umount -f", so skip this case if user is not root.
+	if os.Getuid() == 0 {
+		if err = forceUmount(target, m.withSafeNotMountedBehavior); err != nil {
+			t.Errorf(`Expect complete forceUnmount(), but it does not: %v`, err)
+		}
 	}
 }
