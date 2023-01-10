@@ -145,14 +145,10 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 		removeProbes(pod.Spec.Containers)
 
 	case styleEphemeral:
-		for i := range pod.Spec.EphemeralContainers {
-			container := &pod.Spec.EphemeralContainers[i]
-			if container.Name != containerName {
-				continue
-			}
-			// For ephemeral container: empty securityContext
-			container.SecurityContext = nil
-		}
+		// For ephemeral container: empty securityContext
+		modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
+			c.SecurityContext = nil
+		})
 
 	case styleNode:
 		// empty securityContext; uses isolated namespaces
