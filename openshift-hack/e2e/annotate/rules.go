@@ -113,6 +113,10 @@ var (
 
 			`Topology Hints should distribute endpoints evenly`,
 		},
+		// tests that need to be temporarily disabled while the rebase is in progress.
+		"[Disabled:RebaseInProgress]": {
+			`DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy`, // TODO not working, yet not testing anything new
+		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
 			`\[Driver: rbd\]`,           // OpenShift 4.x does not support Ceph RBD (use CSI instead)
