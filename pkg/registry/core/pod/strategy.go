@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -89,7 +88,6 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	podutil.DropDisabledPodFields(pod, nil)
 
-	applySeccompVersionSkew(pod)
 	applyWaitingForSchedulingGatesCondition(pod)
 }
 
@@ -673,87 +671,4 @@ func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
 		Reason:  api.PodReasonSchedulingGated,
 		Message: "Scheduling is blocked due to non-empty scheduling gates",
 	})
-}
-
-// applySeccompVersionSkew implements the version skew behavior described in:
-// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/135-seccomp#version-skew-strategy
-// Note that we dropped copying the field to annotation synchronization in
-// v1.25 with the functional removal of the annotations.
-func applySeccompVersionSkew(pod *api.Pod) {
-	// get possible annotation and field
-	annotation, hasAnnotation := pod.Annotations[v1.SeccompPodAnnotationKey]
-	hasField := false
-
-	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
-		hasField = true
-	}
-
-	// sync field and annotation
-	if hasAnnotation && !hasField {
-		newField := seccompFieldForAnnotation(annotation)
-
-		if newField != nil {
-			if pod.Spec.SecurityContext == nil {
-				pod.Spec.SecurityContext = &api.PodSecurityContext{}
-			}
-			pod.Spec.SecurityContext.SeccompProfile = newField
-		}
-	}
-
-	// Handle the containers of the pod
-	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(),
-		func(ctr *api.Container, _ podutil.ContainerType) bool {
-			// get possible annotation and field
-			key := api.SeccompContainerAnnotationKeyPrefix + ctr.Name
-			annotation, hasAnnotation := pod.Annotations[key]
-
-			hasField := false
-			if ctr.SecurityContext != nil && ctr.SecurityContext.SeccompProfile != nil {
-				hasField = true
-			}
-
-			// sync field and annotation
-			if hasAnnotation && !hasField {
-				newField := seccompFieldForAnnotation(annotation)
-
-				if newField != nil {
-					if ctr.SecurityContext == nil {
-						ctr.SecurityContext = &api.SecurityContext{}
-					}
-					ctr.SecurityContext.SeccompProfile = newField
-				}
-			}
-
-			return true
-		})
-}
-
-// seccompFieldForAnnotation takes a pod annotation and returns the converted
-// seccomp profile field.
-func seccompFieldForAnnotation(annotation string) *api.SeccompProfile {
-	// If only seccomp annotations are specified, copy the values into the
-	// corresponding fields. This ensures that existing applications continue
-	// to enforce seccomp, and prevents the kubelet from needing to resolve
-	// annotations & fields.
-	if annotation == v1.SeccompProfileNameUnconfined {
-		return &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined}
-	}
-
-	if annotation == api.SeccompProfileRuntimeDefault || annotation == api.DeprecatedSeccompProfileDockerDefault {
-		return &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}
-	}
-
-	if strings.HasPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix) {
-		localhostProfile := strings.TrimPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix)
-		if localhostProfile != "" {
-			return &api.SeccompProfile{
-				Type:             api.SeccompProfileTypeLocalhost,
-				LocalhostProfile: &localhostProfile,
-			}
-		}
-	}
-
-	// we can only reach this code path if the localhostProfile name has a zero
-	// length or if the annotation has an unrecognized value
-	return nil
 }

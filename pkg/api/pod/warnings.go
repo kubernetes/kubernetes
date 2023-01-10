@@ -210,7 +210,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 	// use of pod seccomp annotation without accompanying field
 	if podSpec.SecurityContext == nil || podSpec.SecurityContext.SeccompProfile == nil {
 		if _, exists := meta.Annotations[api.SeccompPodAnnotationKey]; exists {
-			warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.19, non-functional in a future release; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompPodAnnotationKey)))
+			warnings = append(warnings, fmt.Sprintf(`%s: non-functional in v1.27+; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompPodAnnotationKey)))
 		}
 	}
 
@@ -218,7 +218,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		// use of container seccomp annotation without accompanying field
 		if c.SecurityContext == nil || c.SecurityContext.SeccompProfile == nil {
 			if _, exists := meta.Annotations[api.SeccompContainerAnnotationKeyPrefix+c.Name]; exists {
-				warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.19, non-functional in a future release; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompContainerAnnotationKeyPrefix+c.Name)))
+				warnings = append(warnings, fmt.Sprintf(`%s: non-functional in v1.27+; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompContainerAnnotationKeyPrefix+c.Name)))
 			}
 		}
 
