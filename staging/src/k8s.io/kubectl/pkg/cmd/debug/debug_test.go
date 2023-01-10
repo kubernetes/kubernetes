@@ -34,14 +34,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
-func mustNewProfileApplier(profile string) ProfileApplier {
-	applier, err := NewProfileApplier(profile)
-	if err != nil {
-		panic(fmt.Errorf("failed to create profile applier: %s: %v", profile, err))
-	}
-	return applier
-}
-
 func TestGenerateDebugContainer(t *testing.T) {
 	// Slightly less randomness for testing.
 	defer func(old func(int) string) { nameSuffixFunc = old }(nameSuffixFunc)
@@ -63,7 +55,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 				Container:  "debugger",
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileLegacy),
+				Profile:    ProfileLegacy,
 			},
 			expected: &corev1.EphemeralContainer{
 				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
@@ -81,7 +73,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 				Image:           "busybox",
 				PullPolicy:      corev1.PullIfNotPresent,
 				TargetContainer: "myapp",
-				applier:         mustNewProfileApplier(ProfileLegacy),
+				Profile:         ProfileLegacy,
 			},
 			expected: &corev1.EphemeralContainer{
 				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
@@ -100,7 +92,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 				Container:  "debugger",
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileLegacy),
+				Profile:    ProfileLegacy,
 			},
 			expected: &corev1.EphemeralContainer{
 				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
@@ -120,7 +112,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 				Args:       []string{"echo", "one", "two", "three"},
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileLegacy),
+				Profile:    ProfileLegacy,
 			},
 			expected: &corev1.EphemeralContainer{
 				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
@@ -137,7 +129,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 			opts: &DebugOptions{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileLegacy),
+				Profile:    ProfileLegacy,
 			},
 			expected: &corev1.EphemeralContainer{
 				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
@@ -153,7 +145,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 			opts: &DebugOptions{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileLegacy),
+				Profile:    ProfileLegacy,
 			},
 			pod: &corev1.Pod{
 				Spec: corev1.PodSpec{
@@ -178,7 +170,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 			opts: &DebugOptions{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileLegacy),
+				Profile:    ProfileLegacy,
 			},
 			pod: &corev1.Pod{
 				Spec: corev1.PodSpec{
@@ -211,7 +203,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 			opts: &DebugOptions{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileLegacy),
+				Profile:    ProfileLegacy,
 			},
 			pod: &corev1.Pod{
 				Spec: corev1.PodSpec{
@@ -248,7 +240,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 			opts: &DebugOptions{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileGeneral),
+				Profile:    ProfileGeneral,
 			},
 			expected: &corev1.EphemeralContainer{
 				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
@@ -269,7 +261,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 			opts: &DebugOptions{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileBaseline),
+				Profile:    ProfileBaseline,
 			},
 			expected: &corev1.EphemeralContainer{
 				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
@@ -285,7 +277,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 			opts: &DebugOptions{
 				Image:      "busybox",
 				PullPolicy: corev1.PullIfNotPresent,
-				applier:    mustNewProfileApplier(ProfileRestricted),
+				Profile:    ProfileRestricted,
 			},
 			expected: &corev1.EphemeralContainer{
 				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
@@ -306,6 +298,12 @@ func TestGenerateDebugContainer(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
 			suffixCounter = 0
+
+			applier, err := NewProfileApplier(tc.opts.Profile)
+			if err != nil {
+				t.Fatalf("failed to create profile applier: %s: %v", tc.opts.Profile, err)
+			}
+			tc.opts.applier = applier
 
 			if tc.pod == nil {
 				tc.pod = &corev1.Pod{}
