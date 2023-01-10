@@ -50,3 +50,11 @@ func (g *Grabber) getMetricsFromAPIServer(ctx context.Context) (string, error) {
 	}
 	return string(rawOutput), nil
 }
+
+func (g *Grabber) getMetricsSLIsFromAPIServer(ctx context.Context) (string, error) {
+	rawOutput, err := g.client.CoreV1().RESTClient().Get().RequestURI("/metrics/slis").Do(ctx).Raw()
+	if err != nil {
+		return "", err
+	}
+	return string(rawOutput), nil
+}
