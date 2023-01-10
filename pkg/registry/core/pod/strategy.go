@@ -114,7 +114,7 @@ func (podStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 	newPod := obj.(*api.Pod)
 	var warnings []string
 	if msgs := utilvalidation.IsDNS1123Label(newPod.Name); len(msgs) != 0 {
-		warnings = append(warnings, fmt.Sprintf("metadata.name: this is used in Pod names and hostnames, which can result in surprising behavior; a DNS label is recommended: %v", msgs))
+		warnings = append(warnings, fmt.Sprintf("metadata.name: this is used in the Pod's hostname, which can result in surprising behavior; a DNS label is recommended: %v", msgs))
 	}
 	warnings = append(warnings, podutil.GetWarningsForPod(ctx, newPod, nil)...)
 	return warnings
