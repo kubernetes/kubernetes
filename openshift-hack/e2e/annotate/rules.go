@@ -115,8 +115,10 @@ var (
 		},
 		// tests that need to be temporarily disabled while the rebase is in progress.
 		"[Disabled:RebaseInProgress]": {
-			`\[sig-network\] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod`,      // TODO(network): simple test in k8s 1.27, needs investigation
-			`\[sig-cli\] Kubectl client Kubectl prune with applyset should apply and prune objects`,                         // TODO(workloads): alpha feature in k8s 1.27. It's failing with `error: unknown flag: --applyset`. Needs investigation
+			// https://issues.redhat.com/browse/OCPBUGS-12870
+			`DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy`,
+			`\[sig-network\] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod`, // TODO(network): simple test in k8s 1.27, needs investigation
+			`\[sig-cli\] Kubectl client Kubectl prune with applyset should apply and prune objects`,                    // TODO(workloads): alpha feature in k8s 1.27. It's failing with `error: unknown flag: --applyset`. Needs investigation
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
