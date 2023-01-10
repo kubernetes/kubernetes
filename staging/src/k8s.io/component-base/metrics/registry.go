@@ -157,6 +157,10 @@ type KubeRegistry interface {
 	Reset()
 	// RegisterMetaMetrics registers metrics about the number of registered metrics.
 	RegisterMetaMetrics()
+	// Registerer exposes the underlying prometheus registerer
+	Registerer() prometheus.Registerer
+	// Gatherer exposes the underlying prometheus gatherer
+	Gatherer() prometheus.Gatherer
 }
 
 // kubeRegistry is a wrapper around a prometheus registry-type object. Upon initialization
@@ -186,6 +190,16 @@ func (kr *kubeRegistry) Register(c Registerable) error {
 
 	kr.trackHiddenCollector(c)
 	return nil
+}
+
+// Registerer exposes the underlying prometheus.Registerer
+func (kr *kubeRegistry) Registerer() prometheus.Registerer {
+	return kr.PromRegistry
+}
+
+// Gatherer exposes the underlying prometheus.Gatherer
+func (kr *kubeRegistry) Gatherer() prometheus.Gatherer {
+	return kr.PromRegistry
 }
 
 // MustRegister works like Register but registers any number of

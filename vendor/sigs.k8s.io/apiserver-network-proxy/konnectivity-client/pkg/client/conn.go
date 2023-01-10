@@ -23,6 +23,9 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+
+	"sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics"
+	commonmetrics "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics"
 	"sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client"
 )
 
@@ -62,8 +65,11 @@ func (c *conn) Write(data []byte) (n int, err error) {
 
 	klog.V(5).InfoS("[tracing] send req", "type", req.Type)
 
+	const segment = commonmetrics.SegmentFromClient
+	metrics.Metrics.ObservePacket(segment, req.Type)
 	err = c.stream.Send(req)
 	if err != nil {
+		metrics.Metrics.ObserveStreamError(segment, err, req.Type)
 		return 0, err
 	}
 	return len(data), err
@@ -147,7 +153,10 @@ func (c *conn) Close() error {
 
 	klog.V(5).InfoS("[tracing] send req", "type", req.Type)
 
+	const segment = commonmetrics.SegmentFromClient
+	metrics.Metrics.ObservePacket(segment, req.Type)
 	if err := c.stream.Send(req); err != nil {
+		metrics.Metrics.ObserveStreamError(segment, err, req.Type)
 		return err
 	}
 
