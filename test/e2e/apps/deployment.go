@@ -325,7 +325,9 @@ var _ = SIGDescribe("Deployment", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundDeployment, true, "unable to find the Deployment in list", deploymentsList)
+		if !foundDeployment {
+			framework.Failf("unable to find the Deployment in the following list %v", deploymentsList)
+		}
 
 		ginkgo.By("updating the Deployment")
 		testDeploymentUpdate := testDeployment
@@ -681,7 +683,9 @@ func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentNa
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
 	_, err = c.AppsV1().Deployments(ns).Get(ctx, deployment.Name, metav1.GetOptions{})
 	framework.ExpectError(err)
-	framework.ExpectEqual(apierrors.IsNotFound(err), true)
+	if !apierrors.IsNotFound(err) {
+		framework.Failf("Expected deployment %s to be deleted", deploymentName)
+	}
 	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	framework.ExpectNoError(err)
