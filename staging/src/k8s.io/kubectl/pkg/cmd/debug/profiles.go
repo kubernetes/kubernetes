@@ -77,7 +77,19 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 			// For ephemeral container: sets SYS_PTRACE in ephemeral container
 			for i, c := range pod.Spec.EphemeralContainers {
 				if c.Name == containerName {
-					pod.Spec.EphemeralContainers[i].SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
+					pod.Spec.EphemeralContainers[i].SecurityContext = &corev1.SecurityContext{
+						Capabilities: &corev1.Capabilities{
+							Add: []corev1.Capability{"SYS_PTRACE"},
+						},
+					}
+					if c.SecurityContext == nil {
+					} else if c.SecurityContext.Capabilities == nil {
+						pod.Spec.EphemeralContainers[i].SecurityContext.Capabilities = &corev1.Capabilities{
+							Add: []corev1.Capability{"SYS_PTRACE"},
+						}
+					} else {
+						pod.Spec.EphemeralContainers[i].SecurityContext.Capabilities.Add = append(c.SecurityContext.Capabilities.Add, "SYS_PTRACE")
+					}
 				}
 			}
 		} else {
@@ -85,7 +97,19 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
 			for i, c := range pod.Spec.Containers {
 				if c.Name == containerName {
-					pod.Spec.Containers[i].SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
+					pod.Spec.Containers[i].SecurityContext = &corev1.SecurityContext{
+						Capabilities: &corev1.Capabilities{
+							Add: []corev1.Capability{"SYS_PTRACE"},
+						},
+					}
+					if c.SecurityContext == nil {
+					} else if c.SecurityContext.Capabilities == nil {
+						pod.Spec.Containers[i].SecurityContext.Capabilities = &corev1.Capabilities{
+							Add: []corev1.Capability{"SYS_PTRACE"},
+						}
+					} else {
+						pod.Spec.Containers[i].SecurityContext.Capabilities.Add = append(c.SecurityContext.Capabilities.Add, "SYS_PTRACE")
+					}
 				}
 				pod.Spec.Containers[i].LivenessProbe = nil
 				pod.Spec.Containers[i].ReadinessProbe = nil
@@ -200,24 +224,4 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	pod.Spec.HostIPC = false
 
 	return nil
-}
-
-func addCapability(s *corev1.SecurityContext, c corev1.Capability) *corev1.SecurityContext {
-	if s == nil {
-		return &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{c},
-			},
-		}
-	}
-
-	if s.Capabilities == nil {
-		s.Capabilities = &corev1.Capabilities{
-			Add: []corev1.Capability{c},
-		}
-		return s
-	}
-
-	s.Capabilities.Add = append(s.Capabilities.Add, c)
-	return s
 }
