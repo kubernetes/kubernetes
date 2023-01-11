@@ -121,6 +121,7 @@ type DebugOptions struct {
 	TargetContainer string
 	TTY             bool
 	Profile         string
+	Applier         ProfileApplier
 
 	attachChanged         bool
 	shareProcessedChanged bool
@@ -129,8 +130,6 @@ type DebugOptions struct {
 
 	genericclioptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
-
-	applier ProfileApplier
 }
 
 // NewDebugOptions returns a DebugOptions initialized with default values.
@@ -226,9 +225,13 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if o.WarningPrinter == nil {
 		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
 	}
-	o.applier, err = NewProfileApplier(o.Profile)
-	if err != nil {
-		return err
+
+	if o.Applier == nil {
+		applier, err := NewProfileApplier(o.Profile)
+		if err != nil {
+			return err
+		}
+		o.Applier = applier
 	}
 
 	return nil
@@ -536,7 +539,7 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) (*corev1.Pod, *co
 
 	copied := pod.DeepCopy()
 	copied.Spec.EphemeralContainers = append(copied.Spec.EphemeralContainers, *ec)
-	if err := o.applier.Apply(copied, name, copied); err != nil {
+	if err := o.Applier.Apply(copied, name, copied); err != nil {
 		return nil, nil, err
 	}
 
@@ -595,7 +598,7 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 		p.Spec.Containers[0].Command = o.Args
 	}
 
-	if err := o.applier.Apply(p, cn, node); err != nil {
+	if err := o.Applier.Apply(p, cn, node); err != nil {
 		return nil, err
 	}
 
@@ -681,7 +684,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 
 	appendDebugContainer()
 
-	err := o.applier.Apply(copied, c.Name, pod)
+	err := o.Applier.Apply(copied, c.Name, pod)
 	if err != nil {
 		return nil, "", err
 	}
