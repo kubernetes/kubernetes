@@ -20,11 +20,9 @@ limitations under the License.
 package awsebs
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -102,47 +100,6 @@ func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool 
 
 func (plugin *awsElasticBlockStorePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
-}
-
-func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, error) {
-	volumeLimits := map[string]int64{
-		util.EBSVolumeLimitKey: util.DefaultMaxEBSVolumes,
-	}
-	cloud := plugin.host.GetCloudProvider()
-
-	// if we can't fetch cloudprovider we return an error
-	// hoping external CCM or admin can set it. Returning
-	// default values from here will mean, no one can
-	// override them.
-	if cloud == nil {
-		return nil, fmt.Errorf("no cloudprovider present")
-	}
-
-	if cloud.ProviderName() != aws.ProviderName {
-		return nil, fmt.Errorf("expected aws cloud, found %s", cloud.ProviderName())
-	}
-
-	instances, ok := cloud.Instances()
-	if !ok {
-		klog.V(3).Infof("Failed to get instances from cloud provider")
-		return volumeLimits, nil
-	}
-
-	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
-	if err != nil {
-		klog.Errorf("Failed to get instance type from AWS cloud provider")
-		return volumeLimits, nil
-	}
-
-	if ok, _ := regexp.MatchString(util.EBSNitroLimitRegex, instanceType); ok {
-		volumeLimits[util.EBSVolumeLimitKey] = util.DefaultMaxEBSNitroVolumeLimit
-	}
-
-	return volumeLimits, nil
-}
-
-func (plugin *awsElasticBlockStorePlugin) VolumeLimitKey(spec *volume.Spec) string {
-	return util.EBSVolumeLimitKey
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -315,7 +272,6 @@ func (plugin *awsElasticBlockStorePlugin) NodeExpand(resizeOptions volume.NodeRe
 
 var _ volume.NodeExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
 var _ volume.ExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
-var _ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
 
 // Abstract interface to PD operations.
 type ebsManager interface {
