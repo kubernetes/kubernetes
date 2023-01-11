@@ -104,21 +104,29 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 
 	// perform the main update function and get the status
 	currentStatus, err = ssc.updateStatefulSet(ctx, set, currentRevision, updateRevision, collisionCount, pods)
-	if err != nil {
-		return currentRevision, updateRevision, currentStatus, err
+	if err != nil && currentStatus == nil {
+		return currentRevision, updateRevision, nil, err
 	}
-	// update the set's status
-	err = ssc.updateStatefulSetStatus(ctx, set, currentStatus)
-	if err != nil {
-		return currentRevision, updateRevision, currentStatus, err
+
+	// make sure to update the latest status even if there is an error with non-nil currentStatus
+	statusErr := ssc.updateStatefulSetStatus(ctx, set, currentStatus)
+	if statusErr == nil {
+		klog.V(4).InfoS("Updated status", "statefulSet", klog.KObj(set),
+			"replicas", currentStatus.Replicas,
+			"readyReplicas", currentStatus.ReadyReplicas,
+			"currentReplicas", currentStatus.CurrentReplicas,
+			"updatedReplicas", currentStatus.UpdatedReplicas)
 	}
-	klog.V(4).Infof("StatefulSet %s/%s pod status replicas=%d ready=%d current=%d updated=%d",
-		set.Namespace,
-		set.Name,
-		currentStatus.Replicas,
-		currentStatus.ReadyReplicas,
-		currentStatus.CurrentReplicas,
-		currentStatus.UpdatedReplicas)
+
+	switch {
+	case err != nil && statusErr != nil:
+		klog.ErrorS(statusErr, "Could not update status", "statefulSet", klog.KObj(set))
+		return currentRevision, updateRevision, currentStatus, err
+	case err != nil:
+		return currentRevision, updateRevision, currentStatus, err
+	case statusErr != nil:
+		return currentRevision, updateRevision, currentStatus, statusErr
+	}
 
 	klog.V(4).Infof("StatefulSet %s/%s revisions current=%s update=%s",
 		set.Namespace,

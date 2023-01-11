@@ -29,12 +29,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	typedappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	//svc "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
@@ -308,4 +310,27 @@ func scaleSTS(t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet, repl
 		t.Fatalf("failed to update .Spec.Replicas to %d for sts %s: %v", replicas, sts.Name, err)
 	}
 	waitSTSStable(t, c, sts)
+}
+
+var _ admission.ValidationInterface = &fakePodFailAdmission{}
+
+type fakePodFailAdmission struct {
+	limitedPodNumber int
+	succeedPodsCount int
+}
+
+func (f *fakePodFailAdmission) Handles(operation admission.Operation) bool {
+	return operation == admission.Create
+}
+
+func (f *fakePodFailAdmission) Validate(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	if attr.GetKind().GroupKind() != api.Kind("Pod") {
+		return nil
+	}
+
+	if f.succeedPodsCount >= f.limitedPodNumber {
+		return fmt.Errorf("fakePodFailAdmission error")
+	}
+	f.succeedPodsCount++
+	return nil
 }
