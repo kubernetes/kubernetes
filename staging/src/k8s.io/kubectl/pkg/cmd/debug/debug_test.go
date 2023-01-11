@@ -1637,7 +1637,7 @@ func TestCompleteAndValidate(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name: "Applier can be overriden",
+			name: "Applier can be overridden",
 			args: "--image=busybox mypod1 mypod2",
 			debugOptionModifyFunc: func(o *DebugOptions) {
 				o.Applier = ProfileApplierFunc(func(_ *corev1.Pod, _ string, _ runtime.Object) error {
