@@ -366,7 +366,7 @@ func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts 
 		correlatableOldItems := makeMapList(sts, oldObj)
 		for i := range obj {
 			var err field.ErrorList
-			err, remainingBudget = s.Items.Validate(ctx, fldPath.Index(i), sts.Items, obj[i], correlatableOldItems.get(obj[i]), remainingBudget)
+			err, remainingBudget = s.Items.Validate(ctx, fldPath.Index(i), sts.Items, obj[i], correlatableOldItems.Get(obj[i]), remainingBudget)
 			errs = append(errs, err...)
 			if remainingBudget < 0 {
 				return errs, remainingBudget

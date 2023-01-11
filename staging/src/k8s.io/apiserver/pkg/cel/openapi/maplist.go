@@ -23,12 +23,12 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-// mapList provides a "lookup by key" operation for lists (arrays) with x-kubernetes-list-type=map.
-type mapList interface {
-	// get returns the first element having given key, for all
-	// x-kubernetes-list-map-keys, to the provided object. If the provided object isn't itself a valid mapList element,
+// MapList provides a "lookup by key" operation for lists (arrays) with x-kubernetes-list-type=map.
+type MapList interface {
+	// Get returns the first element having given key, for all
+	// x-kubernetes-list-map-keys, to the provided object. If the provided object isn't itself a valid MapList element,
 	// get returns nil.
-	get(interface{}) interface{}
+	Get(interface{}) interface{}
 }
 
 type keyStrategy interface {
@@ -91,10 +91,10 @@ func (ks *multiKeyStrategy) CompositeKeyFor(obj map[string]interface{}) (interfa
 	return delimited.String(), true
 }
 
-// emptyMapList is a mapList containing no elements.
+// emptyMapList is a MapList containing no elements.
 type emptyMapList struct{}
 
-func (emptyMapList) get(interface{}) interface{} {
+func (emptyMapList) Get(interface{}) interface{} {
 	return nil
 }
 
@@ -107,7 +107,7 @@ type mapListImpl struct {
 	unkeyedItems []interface{}
 }
 
-func (a *mapListImpl) get(obj interface{}) interface{} {
+func (a *mapListImpl) Get(obj interface{}) interface{} {
 	mobj, ok := obj.(map[string]interface{})
 	if !ok {
 		return nil
@@ -162,10 +162,10 @@ func makeKeyStrategy(sts *spec.Schema) keyStrategy {
 	}
 }
 
-// makeMapList returns a queryable interface over the provided x-kubernetes-list-type=map
+// MakeMapList returns a queryable interface over the provided x-kubernetes-list-type=map
 // keyedItems. If the provided schema is _not_ an array with x-kubernetes-list-type=map, returns an
 // empty mapList.
-func makeMapList(sts *spec.Schema, items []interface{}) (rv mapList) {
+func MakeMapList(sts *spec.Schema, items []interface{}) (rv MapList) {
 	if !sts.Type.Contains("array") || getXListType(sts) != "map" || len(getXListMapKeys(sts)) == 0 {
 		return emptyMapList{}
 	}

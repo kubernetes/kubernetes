@@ -296,11 +296,11 @@ func TestMapList(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mapList := makeMapList(tc.sts, tc.items)
+			mapList := MakeMapList(tc.sts, tc.items)
 			for _, warmUp := range tc.warmUpQueries {
-				mapList.get(warmUp)
+				mapList.Get(warmUp)
 			}
-			actual := mapList.get(tc.query)
+			actual := mapList.Get(tc.query)
 			if !reflect.DeepEqual(tc.expected, actual) {
 				t.Errorf("got: %v, expected %v", actual, tc.expected)
 			}
