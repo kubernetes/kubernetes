@@ -62,7 +62,7 @@ type reconciler struct {
 // reconcile takes an Endpoints resource and ensures that corresponding
 // EndpointSlices exist. It creates, updates, or deletes EndpointSlices to
 // ensure the desired set of addresses are represented by EndpointSlices.
-func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*discovery.EndpointSlice) error {
+func (r *reconciler) reconcile(logger klog.Logger, endpoints *corev1.Endpoints, existingSlices []*discovery.EndpointSlice) error {
 	// Calculate desired state.
 	d := newDesiredCalc()
 
@@ -88,7 +88,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 				totalAddressesAdded++
 			} else {
 				numInvalidAddresses++
-				klog.Warningf("Address in %s/%s Endpoints is not a valid IP, it will not be mirrored to an EndpointSlice: %s", endpoints.Namespace, endpoints.Name, address.IP)
+				logger.Info("Address in Endpoints is not a valid IP, it will not be mirrored to an EndpointSlice", "endpoints", klog.KObj(endpoints), "IP", address.IP)
 			}
 		}
 
@@ -103,7 +103,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 				totalAddressesAdded++
 			} else {
 				numInvalidAddresses++
-				klog.Warningf("Address in %s/%s Endpoints is not a valid IP, it will not be mirrored to an EndpointSlice: %s", endpoints.Namespace, endpoints.Name, address.IP)
+				logger.Info("Address in Endpoints is not a valid IP, it will not be mirrored to an EndpointSlice", "endpoints", klog.KObj(endpoints), "IP", address.IP)
 			}
 		}
 
@@ -124,7 +124,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 	// Record a separate event if we skipped mirroring due to the number of
 	// addresses exceeding MaxEndpointsPerSubset.
 	if addressesSkipped > numInvalidAddresses {
-		klog.Warningf("%d addresses in %s/%s Endpoints were skipped due to exceeding MaxEndpointsPerSubset", addressesSkipped, endpoints.Namespace, endpoints.Name)
+		logger.Info("Addresses in Endpoints were skipped due to exceeding MaxEndpointsPerSubset", "skippedAddresses", addressesSkipped, "endpoints", klog.KObj(endpoints))
 		r.eventRecorder.Eventf(endpoints, corev1.EventTypeWarning, TooManyAddressesToMirror,
 			"A max of %d addresses can be mirrored to EndpointSlices per Endpoints subset. %d addresses were skipped", r.maxEndpointsPerSubset, addressesSkipped)
 	}
