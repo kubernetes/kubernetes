@@ -691,7 +691,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			b.Cleanup(func() {
-				_ = nodePreparer.CleanupNodes(ctx)
+				_ = nodePreparer.CleanupNodes(context.Background())
 			})
 			nextNodeIndex += concreteOp.Count
 
