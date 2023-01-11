@@ -44,6 +44,8 @@ const (
 	// DefaultImageRepository defines default image registry
 	// (previously this defaulted to k8s.gcr.io)
 	DefaultImageRepository = "registry.k8s.io"
+	// OldDefaultImageRepository defines the old default image registry. This is used for migration purposes.
+	OldDefaultImageRepository = "k8s.gcr.io"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
 	// DefaultClusterName defines the default cluster name

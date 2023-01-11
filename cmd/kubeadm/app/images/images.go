@@ -48,8 +48,9 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.DNS.ImageRepository != "" {
 		dnsImageRepository = cfg.DNS.ImageRepository
 	}
-	// Handle the renaming of the official image from "registry.k8s.io/coredns" to "registry.k8s.io/coredns/coredns
-	if dnsImageRepository == kubeadmapiv1beta3.DefaultImageRepository {
+	// Handle the renaming of the official image from "registry.k8s.io/coredns" to "registry.k8s.io/coredns/coredns"
+	// (and "k8s.gcr.io/coredns" to "k8s.gcr.io/coredns/coredns" for deprecated configurations)
+	if dnsImageRepository == kubeadmapiv1beta3.DefaultImageRepository || dnsImageRepository == kubeadmapiv1beta3.OldDefaultImageRepository {
 		dnsImageRepository = fmt.Sprintf("%s/coredns", dnsImageRepository)
 	}
 	// DNS uses an imageTag that corresponds to the DNS version matching the Kubernetes version

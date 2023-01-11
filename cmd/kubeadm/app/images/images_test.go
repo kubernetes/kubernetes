@@ -255,6 +255,13 @@ func TestGetDNSImage(t *testing.T) {
 			},
 		},
 		{
+			expected: kubeadmapiv1beta3.OldDefaultImageRepository + "/coredns/coredns:v1.10.0",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: kubeadmapiv1beta3.OldDefaultImageRepository,
+				DNS:             kubeadmapi.DNS{},
+			},
+		},
+		{
 			expected: "foo.io/coredns/coredns:v1.10.0",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository: "foo.io",
