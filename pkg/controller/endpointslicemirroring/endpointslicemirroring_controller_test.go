@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -242,7 +243,8 @@ func TestSyncEndpoints(t *testing.T) {
 				}
 			}
 
-			err := esController.syncEndpoints(fmt.Sprintf("%s/%s", namespace, endpointsName))
+			logger, _ := ktesting.NewTestContext(t)
+			err := esController.syncEndpoints(logger, fmt.Sprintf("%s/%s", namespace, endpointsName))
 			if err != nil {
 				t.Fatalf("Unexpected error from syncEndpoints: %v", err)
 			}
