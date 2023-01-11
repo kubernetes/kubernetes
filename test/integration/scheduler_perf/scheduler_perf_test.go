@@ -691,7 +691,9 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			b.Cleanup(func() {
-				_ = nodePreparer.CleanupNodes(context.Background())
+				if err := nodePreparer.CleanupNodes(context.Background()); err != nil {
+					b.Fatalf("failed to clean up nodes, error: %v", err)
+				}
 			})
 			nextNodeIndex += concreteOp.Count
 
