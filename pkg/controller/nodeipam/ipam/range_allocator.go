@@ -334,6 +334,10 @@ func (r *rangeAllocator) updateCIDRsAllocation(data nodeReservedCIDRs) error {
 	cidrsString := ipnetToStringList(data.allocatedCIDRs)
 	node, err = r.nodeLister.Get(data.nodeName)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil // node no longer available, skip processing
+		}
+
 		klog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDRs: %v", data.nodeName, err)
 		return err
 	}
