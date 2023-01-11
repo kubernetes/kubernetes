@@ -210,3 +210,14 @@ func addOCTransport(trans http.RoundTripper, settings *internal.DialSettings) ht
 		Propagation: &propagation.HTTPFormat{},
 	}
 }
+
+// clonedTransport returns the given RoundTripper as a cloned *http.Transport.
+// It returns nil if the RoundTripper can't be cloned or coerced to
+// *http.Transport.
+func clonedTransport(rt http.RoundTripper) *http.Transport {
+	t, ok := rt.(*http.Transport)
+	if !ok {
+		return nil
+	}
+	return t.Clone()
+}

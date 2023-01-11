@@ -219,25 +219,25 @@ func (x *QuotaFailure) GetViolations() []*QuotaFailure_Violation {
 // Example of an error when contacting the "pubsub.googleapis.com" API when it
 // is not enabled:
 //
-//     { "reason": "API_DISABLED"
-//       "domain": "googleapis.com"
-//       "metadata": {
-//         "resource": "projects/123",
-//         "service": "pubsub.googleapis.com"
-//       }
-//     }
+//	{ "reason": "API_DISABLED"
+//	  "domain": "googleapis.com"
+//	  "metadata": {
+//	    "resource": "projects/123",
+//	    "service": "pubsub.googleapis.com"
+//	  }
+//	}
 //
 // This response indicates that the pubsub.googleapis.com API is not enabled.
 //
 // Example of an error that is returned when attempting to create a Spanner
 // instance in a region that is out of stock:
 //
-//     { "reason": "STOCKOUT"
-//       "domain": "spanner.googleapis.com",
-//       "metadata": {
-//         "availableRegions": "us-central1,us-east2"
-//       }
-//     }
+//	{ "reason": "STOCKOUT"
+//	  "domain": "spanner.googleapis.com",
+//	  "metadata": {
+//	    "availableRegions": "us-central1,us-east2"
+//	  }
+//	}
 type ErrorInfo struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

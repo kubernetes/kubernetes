@@ -157,45 +157,45 @@ func (ResourceDescriptor_Style) EnumDescriptor() ([]byte, []int) {
 //
 // Example:
 //
-//     message Topic {
-//       // Indicates this message defines a resource schema.
-//       // Declares the resource type in the format of {service}/{kind}.
-//       // For Kubernetes resources, the format is {api group}/{kind}.
-//       option (google.api.resource) = {
-//         type: "pubsub.googleapis.com/Topic"
-//         pattern: "projects/{project}/topics/{topic}"
-//       };
-//     }
+//	message Topic {
+//	  // Indicates this message defines a resource schema.
+//	  // Declares the resource type in the format of {service}/{kind}.
+//	  // For Kubernetes resources, the format is {api group}/{kind}.
+//	  option (google.api.resource) = {
+//	    type: "pubsub.googleapis.com/Topic"
+//	    pattern: "projects/{project}/topics/{topic}"
+//	  };
+//	}
 //
 // The ResourceDescriptor Yaml config will look like:
 //
-//     resources:
-//     - type: "pubsub.googleapis.com/Topic"
-//       pattern: "projects/{project}/topics/{topic}"
+//	resources:
+//	- type: "pubsub.googleapis.com/Topic"
+//	  pattern: "projects/{project}/topics/{topic}"
 //
 // Sometimes, resources have multiple patterns, typically because they can
 // live under multiple parents.
 //
 // Example:
 //
-//     message LogEntry {
-//       option (google.api.resource) = {
-//         type: "logging.googleapis.com/LogEntry"
-//         pattern: "projects/{project}/logs/{log}"
-//         pattern: "folders/{folder}/logs/{log}"
-//         pattern: "organizations/{organization}/logs/{log}"
-//         pattern: "billingAccounts/{billing_account}/logs/{log}"
-//       };
-//     }
+//	message LogEntry {
+//	  option (google.api.resource) = {
+//	    type: "logging.googleapis.com/LogEntry"
+//	    pattern: "projects/{project}/logs/{log}"
+//	    pattern: "folders/{folder}/logs/{log}"
+//	    pattern: "organizations/{organization}/logs/{log}"
+//	    pattern: "billingAccounts/{billing_account}/logs/{log}"
+//	  };
+//	}
 //
 // The ResourceDescriptor Yaml config will look like:
 //
-//     resources:
-//     - type: 'logging.googleapis.com/LogEntry'
-//       pattern: "projects/{project}/logs/{log}"
-//       pattern: "folders/{folder}/logs/{log}"
-//       pattern: "organizations/{organization}/logs/{log}"
-//       pattern: "billingAccounts/{billing_account}/logs/{log}"
+//	resources:
+//	- type: 'logging.googleapis.com/LogEntry'
+//	  pattern: "projects/{project}/logs/{log}"
+//	  pattern: "folders/{folder}/logs/{log}"
+//	  pattern: "organizations/{organization}/logs/{log}"
+//	  pattern: "billingAccounts/{billing_account}/logs/{log}"
 type ResourceDescriptor struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
