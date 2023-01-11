@@ -61,7 +61,9 @@ func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runt
 			})
 		}
 
-		setHostNamespace(pod, true)
+		pod.Spec.HostNetwork = true
+		pod.Spec.HostPID = true
+		pod.Spec.HostIPC = true
 		return nil
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileLegacy, target)
@@ -100,7 +102,9 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 			})
 		})
 		pod.Spec.SecurityContext = nil
-		setHostNamespace(pod, true)
+		pod.Spec.HostNetwork = true
+		pod.Spec.HostPID = true
+		pod.Spec.HostIPC = true
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileGeneral, target)
 	}
@@ -120,7 +124,9 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 			// For copy of pod: empty securityContext; sets shareProcessNamespace
 			pod.Spec.SecurityContext = nil
 			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
-			setHostNamespace(pod, false)
+			pod.Spec.HostNetwork = false
+			pod.Spec.HostPID = false
+			pod.Spec.HostIPC = false
 			modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
 				c.SecurityContext = nil
 				c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
@@ -130,7 +136,9 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	case *corev1.Node:
 		// empty securityContext; uses isolated namespaces
 		pod.Spec.SecurityContext = nil
-		setHostNamespace(pod, false)
+		pod.Spec.HostNetwork = false
+		pod.Spec.HostPID = false
+		pod.Spec.HostIPC = false
 
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileBaseline, target)
@@ -171,15 +179,11 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 
 	// common settings, empty securityContext and uses isolated namespaces
 	pod.Spec.SecurityContext = nil
-	setHostNamespace(pod, false)
+	pod.Spec.HostNetwork = false
+	pod.Spec.HostPID = false
+	pod.Spec.HostIPC = false
 
 	return nil
-}
-
-func setHostNamespace(pod *corev1.Pod, enabled bool) {
-	pod.Spec.HostNetwork = enabled
-	pod.Spec.HostPID = enabled
-	pod.Spec.HostIPC = enabled
 }
 
 func addCapability(s *corev1.SecurityContext, c corev1.Capability) *corev1.SecurityContext {
