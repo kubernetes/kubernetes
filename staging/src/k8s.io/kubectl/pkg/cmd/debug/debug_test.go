@@ -30,7 +30,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
@@ -300,15 +299,15 @@ func TestGenerateDebugContainer(t *testing.T) {
 			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
 			suffixCounter = 0
 
+			if tc.pod == nil {
+				tc.pod = &corev1.Pod{}
+			}
+
 			applier, err := NewProfileApplier(tc.opts.Profile)
 			if err != nil {
 				t.Fatalf("failed to create profile applier: %s: %v", tc.opts.Profile, err)
 			}
 			tc.opts.Applier = applier
-
-			if tc.pod == nil {
-				tc.pod = &corev1.Pod{}
-			}
 
 			_, debugContainer, err := tc.opts.generateDebugContainer(tc.pod)
 			if err != nil {
@@ -1311,11 +1310,9 @@ func TestCompleteAndValidate(t *testing.T) {
 	}, cmp.Ignore())
 
 	tests := []struct {
-		name, args            string
-		debugOptionModifyFunc func(*DebugOptions)
-		wantOpts              *DebugOptions
-		wantError             bool
-		assert                func(*testing.T, *DebugOptions)
+		name, args string
+		wantOpts   *DebugOptions
+		wantError  bool
 	}{
 		{
 			name:      "No targets",
@@ -1636,40 +1633,12 @@ func TestCompleteAndValidate(t *testing.T) {
 			args:      "node/mynode --target --image=busybox",
 			wantError: true,
 		},
-		{
-			name: "Applier can be overridden",
-			args: "--image=busybox mypod1 mypod2",
-			debugOptionModifyFunc: func(o *DebugOptions) {
-				o.Applier = ProfileApplierFunc(func(_ *corev1.Pod, _ string, _ runtime.Object) error {
-					return fmt.Errorf("sentinel-error")
-				})
-			},
-			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Image:          "busybox",
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod1", "mypod2"},
-			},
-			assert: func(t *testing.T, o *DebugOptions) {
-				err := o.Applier.Apply(nil, "", nil)
-				if err == nil || err.Error() != "sentinel-error" {
-					t.Fatalf("Custom DebugOptions.Applier was not retained")
-				}
-			},
-		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			opts := NewDebugOptions(ioStreams)
 			var gotError error
-
-			if tc.debugOptionModifyFunc != nil {
-				tc.debugOptionModifyFunc(opts)
-			}
-
 			cmd := &cobra.Command{
 				Run: func(cmd *cobra.Command, args []string) {
 					gotError = opts.Complete(tf, cmd, args)
@@ -1698,10 +1667,6 @@ func TestCompleteAndValidate(t *testing.T) {
 			if diff := cmp.Diff(tc.wantOpts, opts, cmpFilter, cmpopts.IgnoreFields(DebugOptions{},
 				"attachChanged", "shareProcessedChanged", "podClient", "WarningPrinter", "Applier")); diff != "" {
 				t.Error("CompleteAndValidate unexpected diff in generated object: (-want +got):\n", diff)
-			}
-
-			if tc.assert != nil {
-				tc.assert(t, opts)
 			}
 		})
 	}

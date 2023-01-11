@@ -36,15 +36,6 @@ const (
 	ProfileRestricted = "restricted"
 )
 
-// ProfileApplierFunc is an adapter to allow the use of ordinary functions
-// as ProfileApplier. If f is a function with the appropriate signature,
-// ProfileApplierFunc(f) is an ProfileApplier that calls f.
-type ProfileApplierFunc func(pod *corev1.Pod, containerName string, target runtime.Object) error
-
-func (p ProfileApplierFunc) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	return p(pod, containerName, target)
-}
-
 type ProfileApplier interface {
 	// Apply applies the profile to the given container in the pod.
 	Apply(pod *corev1.Pod, containerName string, target runtime.Object) error
