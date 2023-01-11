@@ -92,5 +92,17 @@ if [[ ${ret} -gt 0 ]]; then
   exit ${ret}
 fi
 
+# Ensure we can tidy every repo using only its recorded versions
+for repo in $(kube::util::list_staging_repos); do
+  pushd "${_kubetmp}/staging/src/k8s.io/${repo}" >/dev/null 2>&1
+    echo "Tidying k8s.io/${repo}..."
+    GODEBUG=gocacheverify=1 go mod tidy
+  popd >/dev/null 2>&1
+done
+pushd "${_kubetmp}" >/dev/null 2>&1
+  echo "Tidying k8s.io/kubernetes..."
+  GODEBUG=gocacheverify=1 go mod tidy
+popd >/dev/null 2>&1
+
 echo "Vendor Verified."
 # ex: ts=2 sw=2 et filetype=sh
