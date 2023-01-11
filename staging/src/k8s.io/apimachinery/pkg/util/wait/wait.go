@@ -588,13 +588,7 @@ func poll(ctx context.Context, immediate bool, wait WaitWithContextFunc, conditi
 		}
 	}
 
-	select {
-	case <-ctx.Done():
-		// returning ctx.Err() will break backward compatibility
-		return ErrWaitTimeout
-	default:
-		return WaitForWithContext(ctx, wait, condition)
-	}
+	return WaitForWithContext(ctx, wait, condition)
 }
 
 // WaitFunc creates a channel that receives an item every time a test
@@ -653,6 +647,14 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 // "uniform pseudo-random", the `fn` might still run one or multiple times,
 // though eventually `WaitForWithContext` will return.
 func WaitForWithContext(ctx context.Context, wait WaitWithContextFunc, fn ConditionWithContextFunc) error {
+	// if the context is already canceled, fail fast
+	select {
+	case <-ctx.Done():
+		// returning ctx.Err() will break backward compatibility
+		return ErrWaitTimeout
+	default:
+	}
+
 	waitCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c := wait(waitCtx)
