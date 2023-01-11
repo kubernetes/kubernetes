@@ -139,7 +139,6 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 			for i, c := range pod.Spec.Containers {
 				if c.Name == containerName {
 					pod.Spec.Containers[i].SecurityContext = nil
-					pod.Spec.Containers[i].SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
 				}
 				pod.Spec.Containers[i].LivenessProbe = nil
 				pod.Spec.Containers[i].ReadinessProbe = nil

@@ -246,11 +246,6 @@ func TestBaselineProfile(t *testing.T) {
 						{
 							Name:  "dbg",
 							Image: "dbgimage",
-							SecurityContext: &corev1.SecurityContext{
-								Capabilities: &corev1.Capabilities{
-									Add: []corev1.Capability{"SYS_PTRACE"},
-								},
-							},
 						},
 					},
 				},
