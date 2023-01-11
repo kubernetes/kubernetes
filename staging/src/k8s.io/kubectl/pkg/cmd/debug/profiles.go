@@ -68,46 +68,23 @@ func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runt
 	}
 }
 
-type debugStyle int
-
-const (
-	styleEphemeral debugStyle = iota
-	stylePodCopy
-	styleNode
-)
-
-func getDebugStyle(pod *corev1.Pod, target runtime.Object) debugStyle {
-	switch target.(type) {
-	case *corev1.Pod:
-		if asserted, ok := target.(*corev1.Pod); ok {
-			if pod != asserted { // comparing addresses
-				return stylePodCopy
-			}
-		}
-		return styleEphemeral
-	case *corev1.Node:
-		return styleNode
-	}
-	return debugStyle(-1) // unknown
-}
-
 func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	switch getDebugStyle(pod, target) {
-	case stylePodCopy:
-		// For copy of pod: sets SYS_PTRACE in debugging container, sets shareProcessNamespace
-		pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
-		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
-			c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
-		})
-		removeProbes(pod.Spec.Containers)
-
-	case styleEphemeral:
-		// For ephemeral container: sets SYS_PTRACE in ephemeral container
-		modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
-			c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
-		})
-
-	case styleNode:
+	switch t := target.(type) {
+	case *corev1.Pod:
+		if t == pod {
+			// For ephemeral container: sets SYS_PTRACE in ephemeral container
+			modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
+				c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
+			})
+		} else {
+			// For copy of pod: sets SYS_PTRACE in debugging container, sets shareProcessNamespace
+			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
+			modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
+				c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
+			})
+			removeProbes(pod.Spec.Containers)
+		}
+	case *corev1.Node:
 		// empty securityContext; uses host namespaces, mounts root partition
 		const volumeName = "host-root"
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
@@ -132,25 +109,25 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 }
 
 func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	switch getDebugStyle(pod, target) {
-	case stylePodCopy:
-		// For copy of pod: empty securityContext; sets shareProcessNamespace
-		pod.Spec.SecurityContext = nil
-		pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
-		setHostNamespace(pod, false)
-		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
-			c.SecurityContext = nil
-			c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
-		})
-		removeProbes(pod.Spec.Containers)
-
-	case styleEphemeral:
-		// For ephemeral container: empty securityContext
-		modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
-			c.SecurityContext = nil
-		})
-
-	case styleNode:
+	switch t := target.(type) {
+	case *corev1.Pod:
+		if t == pod {
+			// For ephemeral container: empty securityContext
+			modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
+				c.SecurityContext = nil
+			})
+		} else {
+			// For copy of pod: empty securityContext; sets shareProcessNamespace
+			pod.Spec.SecurityContext = nil
+			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
+			setHostNamespace(pod, false)
+			modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
+				c.SecurityContext = nil
+				c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
+			})
+			removeProbes(pod.Spec.Containers)
+		}
+	case *corev1.Node:
 		// empty securityContext; uses isolated namespaces
 		pod.Spec.SecurityContext = nil
 		setHostNamespace(pod, false)
@@ -171,24 +148,23 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 		},
 	}
 
-	switch getDebugStyle(pod, target) {
-	case stylePodCopy:
-		// For copy of pod: empty securityContext; sets shareProcessNamespace
-		pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
-		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
-			c.SecurityContext = sc
-		})
-		removeProbes(pod.Spec.Containers)
-
-	case styleEphemeral:
-		modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
-			c.SecurityContext = sc
-		})
-
-	case styleNode:
+	switch t := target.(type) {
+	case *corev1.Pod:
+		if t == pod {
+			modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
+				c.SecurityContext = sc
+			})
+		} else {
+			// For copy of pod: empty securityContext; sets shareProcessNamespace
+			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
+			modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
+				c.SecurityContext = sc
+			})
+			removeProbes(pod.Spec.Containers)
+		}
+	case *corev1.Node:
 		// no additional settings required other than the common
 		// settings applied below
-
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileRestricted, target)
 	}
