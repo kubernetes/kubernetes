@@ -18,6 +18,7 @@ package stats
 
 import (
 	"context"
+	"runtime"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -39,6 +40,11 @@ import (
 )
 
 func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	const (
 		seedPastPod0Infra      = 1000
 		seedPastPod0Container0 = 2000

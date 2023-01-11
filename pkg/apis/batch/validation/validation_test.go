@@ -1618,23 +1618,6 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.timeZone: Invalid value: \"Continent/Zone \": unknown time zone Continent/Zone ": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mycronjob",
-				Namespace: metav1.NamespaceDefault,
-				UID:       types.UID("1a2b3c"),
-			},
-			Spec: batch.CronJobSpec{
-				Schedule:          "0 * * * *",
-				TimeZone:          &timeZoneBadSuffix,
-				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{
-					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
-					},
-				},
-			},
-		},
 		"spec.timeZone: Invalid value: \"Continent/InvalidZone\": unknown time zone  Continent/InvalidZone": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
@@ -1898,6 +1881,28 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+	}
+
+	// NOTE: The following test doesn't fail on Windows.
+	// When opening a file on Windows, syscall.Open is called, which will trim the whitespace suffix.
+	if runtime.GOOS != "windows" {
+		errorCases["spec.timeZone: Invalid value: \"Continent/Zone \": unknown time zone Continent/Zone "] = batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "0 * * * *",
+				TimeZone:          &timeZoneBadSuffix,
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		}
 	}
 
 	for k, v := range errorCases {

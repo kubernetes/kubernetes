@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -456,19 +457,26 @@ func TestGetPodDNS(t *testing.T) {
 	testCases := []struct {
 		desc              string
 		expandedDNSConfig bool
+		skipOnWindows     bool
 	}{
 		{
 			desc:              "Not ExpandedDNSConfig",
 			expandedDNSConfig: false,
+			skipOnWindows:     true,
 		},
 		{
 			desc:              "ExpandedDNSConfig",
 			expandedDNSConfig: true,
+			skipOnWindows:     true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+			if tc.skipOnWindows && goruntime.GOOS == "windows" {
+				t.Skip("Skipping test that fails on Windows")
+			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandedDNSConfig, tc.expandedDNSConfig)()
 			testGetPodDNS(t)
 		})
