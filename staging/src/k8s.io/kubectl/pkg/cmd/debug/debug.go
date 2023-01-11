@@ -130,7 +130,7 @@ type DebugOptions struct {
 	podClient corev1client.CoreV1Interface
 
 	genericclioptions.IOStreams
-	warningPrinter *printers.WarningPrinter
+	WarningPrinter *printers.WarningPrinter
 
 	applier ProfileApplier
 }
@@ -224,8 +224,10 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.attachChanged = cmd.Flags().Changed("attach")
 	o.shareProcessedChanged = cmd.Flags().Changed("share-processes")
 
-	// Warning printer
-	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	// Set default WarningPrinter
+	if o.WarningPrinter == nil {
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	}
 	o.applier, err = NewProfileApplier(o.Profile)
 	if err != nil {
 		return err
@@ -307,9 +309,9 @@ func (o *DebugOptions) Validate() error {
 		return fmt.Errorf("-i/--stdin is required for containers with -t/--tty=true")
 	}
 
-	// warningPrinter
-	if o.warningPrinter == nil {
-		return fmt.Errorf("warningPrinter can not be used without initialization")
+	// WarningPrinter
+	if o.WarningPrinter == nil {
+		return fmt.Errorf("WarningPrinter can not be used without initialization")
 	}
 
 	return nil
@@ -764,7 +766,7 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 				return true, nil
 			}
 			if !o.Quiet && s.State.Waiting != nil && s.State.Waiting.Message != "" {
-				o.warningPrinter.Print(fmt.Sprintf("container %s: %s", containerName, s.State.Waiting.Message))
+				o.WarningPrinter.Print(fmt.Sprintf("container %s: %s", containerName, s.State.Waiting.Message))
 			}
 			return false, nil
 		})
