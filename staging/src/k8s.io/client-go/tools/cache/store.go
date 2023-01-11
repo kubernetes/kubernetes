@@ -275,6 +275,7 @@ func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
 	}
 }
 
+// NewIndexerWithStore returns an Indexer if external thread safe store is supplied.
 func NewIndexerWithStore(keyFunc KeyFunc, cacheStorage ThreadSafeStore) Indexer {
 	return &cache{
 		cacheStorage: cacheStorage,
