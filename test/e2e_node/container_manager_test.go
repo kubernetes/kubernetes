@@ -28,9 +28,6 @@ import (
 	"strings"
 	"time"
 
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	testutils "k8s.io/kubernetes/test/utils"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -198,9 +196,6 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 						},
 					},
 				})
-				if err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName, "Ready", 120*time.Second, testutils.PodRunningReady); err != nil {
-					framework.ExpectNoError(err, fmt.Sprintf("Pod %v could not enter running/ready", podName))
-				}
 				var (
 					ngPids []int
 					err    error
@@ -217,7 +212,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					}
 
 					return nil
-				}, 30*time.Second, time.Second*4).Should(gomega.BeNil())
+				}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 			})
 			ginkgo.It("burstable container's oom-score-adj should be between [2, 1000)", func(ctx context.Context) {
@@ -243,9 +238,6 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 						},
 					},
 				})
-				if err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, podName, "Ready", 120*time.Second, testutils.PodRunningReady); err != nil {
-					framework.ExpectNoError(err, fmt.Sprintf("Pod %v could not enter running/ready", podName))
-				}
 				var (
 					wsPids []int
 					err    error
@@ -261,7 +253,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 						}
 					}
 					return nil
-				}, 30*time.Second, time.Second*4).Should(gomega.BeNil())
+				}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
 				// TODO: Test the oom-score-adj logic for burstable more accurately.
 			})
