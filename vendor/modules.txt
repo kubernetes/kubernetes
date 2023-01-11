@@ -1013,7 +1013,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.4.0
+# golang.org/x/net v0.5.0
 ## explicit; go 1.17
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -1030,8 +1030,8 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
-## explicit; go 1.11
+# golang.org/x/oauth2 v0.4.0
+## explicit; go 1.17
 golang.org/x/oauth2
 golang.org/x/oauth2/authhandler
 golang.org/x/oauth2/google
@@ -1042,7 +1042,7 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.1.0
 ## explicit
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.3.0
+# golang.org/x/sys v0.4.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -1053,10 +1053,10 @@ golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/term v0.3.0
+# golang.org/x/term v0.4.0
 ## explicit; go 1.17
 golang.org/x/term
-# golang.org/x/text v0.5.0
+# golang.org/x/text v0.6.0
 ## explicit; go 1.17
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
