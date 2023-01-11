@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
@@ -95,7 +96,7 @@ func (f *fakeObjectCreater) New(gvk schema.GroupVersionKind) (runtime.Object, er
 // to specify either a sub-resource, or a set of modified Manager to
 // test them specifically.
 type TestFieldManager struct {
-	fieldManager *fieldmanager.FieldManager
+	fieldManager *internal.FieldManager
 	apiVersion   string
 	emptyObj     runtime.Object
 	liveObj      runtime.Object
@@ -108,10 +109,10 @@ func NewDefaultTestFieldManager(typeConverter fieldmanager.TypeConverter, gvk sc
 }
 
 // NewTestFieldManager creates a new manager for the given GVK.
-func NewTestFieldManager(typeConverter fieldmanager.TypeConverter, gvk schema.GroupVersionKind, subresource string, chainFieldManager func(fieldmanager.Manager) fieldmanager.Manager) TestFieldManager {
+func NewTestFieldManager(typeConverter fieldmanager.TypeConverter, gvk schema.GroupVersionKind, subresource string, chainFieldManager func(internal.Manager) internal.Manager) TestFieldManager {
 	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
 	objectConverter := &fakeObjectConvertor{sameVersionConverter{}, apiVersion}
-	f, err := fieldmanager.NewStructuredMergeManager(
+	f, err := internal.NewStructuredMergeManager(
 		typeConverter,
 		objectConverter,
 		&fakeObjectDefaulter{},
@@ -125,14 +126,18 @@ func NewTestFieldManager(typeConverter fieldmanager.TypeConverter, gvk schema.Gr
 	live := &unstructured.Unstructured{}
 	live.SetKind(gvk.Kind)
 	live.SetAPIVersion(gvk.GroupVersion().String())
-	f = fieldmanager.NewLastAppliedUpdater(
-		fieldmanager.NewLastAppliedManager(
-			fieldmanager.NewProbabilisticSkipNonAppliedManager(
-				fieldmanager.NewBuildManagerInfoManager(
-					fieldmanager.NewManagedFieldsUpdater(
-						fieldmanager.NewStripMetaManager(f),
+	// This is different from `internal.NewDefaultFieldManager` because:
+	// 1. We don't want to create a `internal.FieldManager`
+	// 2. We don't want to use the CapManager that is tested separately with
+	// a smaller than the default cap.
+	f = internal.NewLastAppliedUpdater(
+		internal.NewLastAppliedManager(
+			internal.NewProbabilisticSkipNonAppliedManager(
+				internal.NewBuildManagerInfoManager(
+					internal.NewManagedFieldsUpdater(
+						internal.NewStripMetaManager(f),
 					), gvk.GroupVersion(), subresource,
-				), NewFakeObjectCreater(), gvk, fieldmanager.DefaultTrackOnCreateProbability,
+				), NewFakeObjectCreater(), gvk, internal.DefaultTrackOnCreateProbability,
 			), typeConverter, objectConverter, gvk.GroupVersion(),
 		),
 	)
@@ -140,7 +145,7 @@ func NewTestFieldManager(typeConverter fieldmanager.TypeConverter, gvk schema.Gr
 		f = chainFieldManager(f)
 	}
 	return TestFieldManager{
-		fieldManager: fieldmanager.NewFieldManager(f, subresource),
+		fieldManager: internal.NewFieldManager(f, subresource),
 		apiVersion:   gvk.GroupVersion().String(),
 		emptyObj:     live,
 		liveObj:      live.DeepCopyObject(),

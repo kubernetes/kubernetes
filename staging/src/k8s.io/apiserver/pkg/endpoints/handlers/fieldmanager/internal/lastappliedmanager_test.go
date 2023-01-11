@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package internal_test
 
 import (
 	"fmt"
@@ -24,7 +24,9 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -978,4 +980,28 @@ func testConflicts(t *testing.T, f fieldmanagertest.TestFieldManager, tests []te
 			}
 		})
 	}
+}
+
+func yamlToJSON(y []byte) (string, error) {
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal(y, &obj.Object); err != nil {
+		return "", fmt.Errorf("error decoding YAML: %v", err)
+	}
+	serialization, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
+	if err != nil {
+		return "", fmt.Errorf("error encoding object: %v", err)
+	}
+	json, err := yamlutil.ToJSON(serialization)
+	if err != nil {
+		return "", fmt.Errorf("error converting to json: %v", err)
+	}
+	return string(json), nil
+}
+
+func setLastAppliedFromEncoded(obj runtime.Object, lastApplied []byte) error {
+	lastAppliedJSON, err := yamlToJSON(lastApplied)
+	if err != nil {
+		return err
+	}
+	return internal.SetLastApplied(obj, lastAppliedJSON)
 }

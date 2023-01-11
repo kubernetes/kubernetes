@@ -679,7 +679,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		openAPIModels = nil
 	}
 
-	var typeConverter fieldmanager.TypeConverter = fieldmanager.DeducedTypeConverter{}
+	var typeConverter fieldmanager.TypeConverter = fieldmanager.NewDeducedTypeConverter()
 	if openAPIModels != nil {
 		typeConverter, err = fieldmanager.NewTypeConverter(openAPIModels, crd.Spec.PreserveUnknownFields)
 		if err != nil {

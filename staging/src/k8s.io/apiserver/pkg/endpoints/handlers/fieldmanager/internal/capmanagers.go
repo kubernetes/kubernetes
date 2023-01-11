@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package internal
 
 import (
 	"fmt"
@@ -22,7 +22,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -100,7 +99,7 @@ func (f *capManagersManager) capUpdateManagers(managed Managed) (newManaged Mana
 
 		// Create a new manager identifier for the versioned bucket entry.
 		// The version for this manager comes from the version of the update being merged into the bucket.
-		bucket, err := internal.BuildManagerIdentifier(&metav1.ManagedFieldsEntry{
+		bucket, err := BuildManagerIdentifier(&metav1.ManagedFieldsEntry{
 			Manager:    f.oldUpdatesManagerName,
 			Operation:  metav1.ManagedFieldsOperationUpdate,
 			APIVersion: version,

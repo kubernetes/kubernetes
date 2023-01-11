@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager
+package internal
 
 import (
 	"fmt"
@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 )
 
 type lastAppliedUpdater struct {
@@ -62,7 +61,7 @@ func (f *lastAppliedUpdater) Apply(liveObj, newObj runtime.Object, managed Manag
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to build last-applied annotation: %v", err)
 		}
-		err = internal.SetLastApplied(liveObj, lastAppliedValue)
+		err = SetLastApplied(liveObj, lastAppliedValue)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to set last-applied annotation: %v", err)
 		}
