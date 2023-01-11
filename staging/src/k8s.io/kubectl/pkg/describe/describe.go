@@ -209,7 +209,6 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                          &PriorityClassDescriber{c},
 		{Group: discoveryv1beta1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                     &EndpointSliceDescriber{c},
-		{Group: policyv1beta1.GroupName, Kind: "PodSecurityPolicy"}:               &PodSecurityPolicyDescriber{c},
 		{Group: autoscalingv2beta2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
@@ -4890,84 +4889,6 @@ func describePriorityClass(pc *schedulingv1.PriorityClass, events *corev1.EventL
 	})
 }
 
-// PodSecurityPolicyDescriber generates information about a PodSecuritypolicyv1beta1.
-type PodSecurityPolicyDescriber struct {
-	clientset.Interface
-}
-
-func (d *PodSecurityPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	psp, err := d.PolicyV1beta1().PodSecurityPolicies().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	return describePodSecurityPolicy(psp)
-}
-
-func describePodSecurityPolicy(psp *policyv1beta1.PodSecurityPolicy) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", psp.Name)
-
-		w.Write(LEVEL_0, "\nSettings:\n")
-
-		w.Write(LEVEL_1, "Allow Privileged:\t%t\n", psp.Spec.Privileged)
-		if psp.Spec.AllowPrivilegeEscalation != nil {
-			w.Write(LEVEL_1, "Allow Privilege Escalation:\t%t\n", *psp.Spec.AllowPrivilegeEscalation)
-		} else {
-			w.Write(LEVEL_1, "Allow Privilege Escalation:\t<unset>\n")
-		}
-		w.Write(LEVEL_1, "Default Add Capabilities:\t%v\n", capsToString(psp.Spec.DefaultAddCapabilities))
-		w.Write(LEVEL_1, "Required Drop Capabilities:\t%s\n", capsToString(psp.Spec.RequiredDropCapabilities))
-		w.Write(LEVEL_1, "Allowed Capabilities:\t%s\n", capsToString(psp.Spec.AllowedCapabilities))
-		w.Write(LEVEL_1, "Allowed Volume Types:\t%s\n", fsTypeToString(psp.Spec.Volumes))
-
-		if len(psp.Spec.AllowedFlexVolumes) > 0 {
-			w.Write(LEVEL_1, "Allowed FlexVolume Types:\t%s\n", flexVolumesToString(psp.Spec.AllowedFlexVolumes))
-		}
-
-		if len(psp.Spec.AllowedCSIDrivers) > 0 {
-			w.Write(LEVEL_1, "Allowed CSI Drivers:\t%s\n", csiDriversToString(psp.Spec.AllowedCSIDrivers))
-		}
-
-		if len(psp.Spec.AllowedUnsafeSysctls) > 0 {
-			w.Write(LEVEL_1, "Allowed Unsafe Sysctls:\t%s\n", sysctlsToString(psp.Spec.AllowedUnsafeSysctls))
-		}
-		if len(psp.Spec.ForbiddenSysctls) > 0 {
-			w.Write(LEVEL_1, "Forbidden Sysctls:\t%s\n", sysctlsToString(psp.Spec.ForbiddenSysctls))
-		}
-		w.Write(LEVEL_1, "Allow Host Network:\t%t\n", psp.Spec.HostNetwork)
-		w.Write(LEVEL_1, "Allow Host Ports:\t%s\n", hostPortRangeToString(psp.Spec.HostPorts))
-		w.Write(LEVEL_1, "Allow Host PID:\t%t\n", psp.Spec.HostPID)
-		w.Write(LEVEL_1, "Allow Host IPC:\t%t\n", psp.Spec.HostIPC)
-		w.Write(LEVEL_1, "Read Only Root Filesystem:\t%v\n", psp.Spec.ReadOnlyRootFilesystem)
-
-		w.Write(LEVEL_1, "SELinux Context Strategy: %s\t\n", string(psp.Spec.SELinux.Rule))
-		var user, role, seLinuxType, level string
-		if psp.Spec.SELinux.SELinuxOptions != nil {
-			user = psp.Spec.SELinux.SELinuxOptions.User
-			role = psp.Spec.SELinux.SELinuxOptions.Role
-			seLinuxType = psp.Spec.SELinux.SELinuxOptions.Type
-			level = psp.Spec.SELinux.SELinuxOptions.Level
-		}
-		w.Write(LEVEL_2, "User:\t%s\n", stringOrNone(user))
-		w.Write(LEVEL_2, "Role:\t%s\n", stringOrNone(role))
-		w.Write(LEVEL_2, "Type:\t%s\n", stringOrNone(seLinuxType))
-		w.Write(LEVEL_2, "Level:\t%s\n", stringOrNone(level))
-
-		w.Write(LEVEL_1, "Run As User Strategy: %s\t\n", string(psp.Spec.RunAsUser.Rule))
-		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.RunAsUser.Ranges))
-
-		w.Write(LEVEL_1, "FSGroup Strategy: %s\t\n", string(psp.Spec.FSGroup.Rule))
-		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.FSGroup.Ranges))
-
-		w.Write(LEVEL_1, "Supplemental Groups Strategy: %s\t\n", string(psp.Spec.SupplementalGroups.Rule))
-		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.SupplementalGroups.Ranges))
-
-		return nil
-	})
-}
-
 func stringOrNone(s string) string {
 	return stringOrDefaultValue(s, "<none>")
 }
@@ -4977,70 +4898,6 @@ func stringOrDefaultValue(s, defaultValue string) string {
 		return s
 	}
 	return defaultValue
-}
-
-func fsTypeToString(volumes []policyv1beta1.FSType) string {
-	strVolumes := []string{}
-	for _, v := range volumes {
-		strVolumes = append(strVolumes, string(v))
-	}
-	return stringOrNone(strings.Join(strVolumes, ","))
-}
-
-func flexVolumesToString(flexVolumes []policyv1beta1.AllowedFlexVolume) string {
-	volumes := []string{}
-	for _, flexVolume := range flexVolumes {
-		volumes = append(volumes, "driver="+flexVolume.Driver)
-	}
-	return stringOrDefaultValue(strings.Join(volumes, ","), "<all>")
-}
-
-func csiDriversToString(csiDrivers []policyv1beta1.AllowedCSIDriver) string {
-	drivers := []string{}
-	for _, csiDriver := range csiDrivers {
-		drivers = append(drivers, "driver="+csiDriver.Name)
-	}
-	return stringOrDefaultValue(strings.Join(drivers, ","), "<all>")
-}
-
-func sysctlsToString(sysctls []string) string {
-	return stringOrNone(strings.Join(sysctls, ","))
-}
-
-func hostPortRangeToString(ranges []policyv1beta1.HostPortRange) string {
-	formattedString := ""
-	if ranges != nil {
-		strRanges := []string{}
-		for _, r := range ranges {
-			strRanges = append(strRanges, fmt.Sprintf("%d-%d", r.Min, r.Max))
-		}
-		formattedString = strings.Join(strRanges, ",")
-	}
-	return stringOrNone(formattedString)
-}
-
-func idRangeToString(ranges []policyv1beta1.IDRange) string {
-	formattedString := ""
-	if ranges != nil {
-		strRanges := []string{}
-		for _, r := range ranges {
-			strRanges = append(strRanges, fmt.Sprintf("%d-%d", r.Min, r.Max))
-		}
-		formattedString = strings.Join(strRanges, ",")
-	}
-	return stringOrNone(formattedString)
-}
-
-func capsToString(caps []corev1.Capability) string {
-	formattedString := ""
-	if caps != nil {
-		strCaps := []string{}
-		for _, c := range caps {
-			strCaps = append(strCaps, string(c))
-		}
-		formattedString = strings.Join(strCaps, ",")
-	}
-	return stringOrNone(formattedString)
 }
 
 func policyTypesToString(pts []networkingv1.PolicyType) string {

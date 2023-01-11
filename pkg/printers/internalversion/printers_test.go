@@ -6098,12 +6098,6 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			},
 		},
 		{
-			name: "PodSecurityPolicy",
-			printer: func() ([]metav1.TableRow, error) {
-				return printPodSecurityPolicy(&policy.PodSecurityPolicy{}, printers.GenerateOptions{})
-			},
-		},
-		{
 			name: "NetworkPolicy",
 			printer: func() ([]metav1.TableRow, error) {
 				return printNetworkPolicy(&networking.NetworkPolicy{}, printers.GenerateOptions{})

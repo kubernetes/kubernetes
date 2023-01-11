@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // GroupName is the group name use in this package
@@ -60,8 +59,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&networking.IngressList{},
 		&apps.ReplicaSet{},
 		&apps.ReplicaSetList{},
-		&policy.PodSecurityPolicy{},
-		&policy.PodSecurityPolicyList{},
 		&autoscaling.Scale{},
 		&networking.NetworkPolicy{},
 		&networking.NetworkPolicyList{},
