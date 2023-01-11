@@ -46,7 +46,7 @@ type testArgs struct {
 // created with the client-side apply last-applied annotation
 // will not give conflicts
 func TestApplyUsingLastAppliedAnnotation(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	tests := []testArgs{
 		{
@@ -566,7 +566,7 @@ spec:
 }
 
 func TestServiceApply(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Service"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Service"))
 
 	tests := []testArgs{
 		{
@@ -677,7 +677,7 @@ spec:
 }
 
 func TestReplicationControllerApply(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ReplicationController"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "ReplicationController"))
 
 	tests := []testArgs{
 		{
@@ -740,7 +740,7 @@ spec:
 }
 
 func TestPodApply(t *testing.T) {
-	f := fieldmanagertest.NewDefaultTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	tests := []testArgs{
 		{

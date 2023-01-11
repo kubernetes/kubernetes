@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/fieldmanagertest"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	internaltesting "k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal/testing"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -48,7 +49,7 @@ func (*fakeManager) Apply(_, _ runtime.Object, _ internal.Managed, _ string, _ b
 }
 
 func TestCapManagersManagerMergesEntries(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"),
+	f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"),
 		"",
 		func(m internal.Manager) internal.Manager {
 			return internal.NewCapManagersManager(m, 3)
@@ -114,7 +115,7 @@ func TestCapManagersManagerMergesEntries(t *testing.T) {
 }
 
 func TestCapUpdateManagers(t *testing.T) {
-	f := fieldmanagertest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"),
+	f := internaltesting.NewTestFieldManagerImpl(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"),
 		"",
 		func(m internal.Manager) internal.Manager {
 			return internal.NewCapManagersManager(m, 3)
