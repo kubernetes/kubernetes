@@ -252,11 +252,11 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 		features.ValidatingAdmissionPolicy: {
 			Default: true, PreRelease: featuregate.Alpha}})
 	if err != nil {
-		t.Fatalf("Unable to add featureGate with Release as Alpha")
+		t.Fatalf("Unable to add feature gate: %v", err)
 	}
 	err = featureGate.SetFromMap(map[string]bool{string(features.ValidatingAdmissionPolicy): true})
 	if err != nil {
-		t.Fatalf("Unable to Set key ValidateAdmissionPolicy to the Alpha featureGate")
+		t.Fatalf("Unable to store flag gate: %v", err)
 	}
 
 	plug, err := NewPlugin()
