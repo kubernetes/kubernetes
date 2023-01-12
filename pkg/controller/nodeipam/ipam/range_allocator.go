@@ -59,6 +59,9 @@ type rangeAllocator struct {
 	// Keep a set of nodes that are currently being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
 	nodesInProcessing sets.String
+
+	//postWork is a hook for test which will be called in worker after allocating CIDR
+	postWork func()
 }
 
 // NewCIDRRangeAllocator returns a CIDRAllocator to allocate CIDRs for node (one from each of clusterCIDRs)
@@ -194,6 +197,11 @@ func (r *rangeAllocator) worker(stopChan <-chan struct{}) {
 				// Requeue the failed node for update again.
 				r.nodeCIDRUpdateChannel <- workItem
 			}
+
+			if r.postWork != nil {
+				r.postWork()
+			}
+
 		case <-stopChan:
 			return
 		}

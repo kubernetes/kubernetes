@@ -19,6 +19,7 @@ package ipam
 import (
 	"context"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -837,5 +838,113 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 
 	for _, tc := range testCases {
 		testFunc(tc)
+	}
+}
+
+type allocateTestCase struct {
+	description     string
+	fakeNodeHandler *testutil.FakeNodeHandler
+	allocatorParams CIDRAllocatorParams
+	addedNode       *v1.Node
+}
+
+func TestAllocatedOrOccupyCIDRForNonexistentNode(t *testing.T) {
+	testcases := []allocateTestCase{
+		{
+			description: "common case",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			addedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+			},
+			allocatorParams: CIDRAllocatorParams{
+				ClusterCIDRs: func() []*net.IPNet {
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/28")
+					return []*net.IPNet{clusterCIDR}
+				}(),
+				ServiceCIDR:          nil,
+				SecondaryServiceCIDR: nil,
+				NodeCIDRMaskSizes:    []int{30},
+			},
+		},
+		{
+			description: "simulate the case that add node and then delete it immediately",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			addedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+			},
+			allocatorParams: CIDRAllocatorParams{
+				ClusterCIDRs: func() []*net.IPNet {
+					_, clusterCIDR, _ := netutils.ParseCIDRSloppy("127.123.234.0/28")
+					return []*net.IPNet{clusterCIDR}
+				}(),
+				ServiceCIDR:          nil,
+				SecondaryServiceCIDR: nil,
+				NodeCIDRMaskSizes:    []int{30},
+			},
+		},
+	}
+
+	testFunc := func(tc allocateTestCase) {
+		allocator, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		if err != nil {
+			t.Logf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
+			return
+		}
+		rangeAllocator, ok := allocator.(*rangeAllocator)
+		if !ok {
+			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
+			return
+		}
+
+		stopCh := make(chan struct{})
+		countCallPostWork := uint64(0)
+		limitCallPostWork := uint64(100)
+		rangeAllocator.postWork = func() {
+			if len(rangeAllocator.nodeCIDRUpdateChannel) == 0 {
+				close(stopCh)
+				return
+			}
+
+			// avoid running for long
+			if atomic.AddUint64(&countCallPostWork, 1) == limitCallPostWork {
+				t.Errorf("times of calling postWork exceed limit %d", limitCallPostWork)
+				close(stopCh)
+				return
+			}
+		}
+
+		err = rangeAllocator.AllocateOrOccupyCIDR(tc.addedNode)
+		if err != nil {
+			t.Logf("%v: failed to allocate with error %v", tc.description, err)
+			return
+		}
+
+		rangeAllocator.worker(stopCh)
+	}
+
+	for _, testcase := range testcases {
+		testFunc(testcase)
 	}
 }
