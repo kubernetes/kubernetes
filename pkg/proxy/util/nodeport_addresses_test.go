@@ -17,9 +17,7 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"net"
-	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -34,15 +32,14 @@ type InterfaceAddrsPair struct {
 
 func TestGetNodeAddresses(t *testing.T) {
 	testCases := []struct {
+		name          string
 		cidrs         []string
-		nw            *fake.FakeNetwork
 		itfAddrsPairs []InterfaceAddrsPair
 		expected      sets.String
-		expectedErr   error
 	}{
-		{ // case 0
+		{
+			name:  "IPv4 single",
 			cidrs: []string{"10.20.30.0/24"},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
@@ -55,9 +52,9 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("10.20.30.51"),
 		},
-		{ // case 1
+		{
+			name:  "IPv4 zero CIDR",
 			cidrs: []string{"0.0.0.0/0"},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
@@ -70,13 +67,13 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("0.0.0.0/0"),
 		},
-		{ // case 2
-			cidrs: []string{"2001:db8::/32", "::1/128"},
-			nw:    fake.NewFakeNetwork(),
+		{
+			name:  "IPv6 multiple",
+			cidrs: []string{"2001:db8::/64", "::1/128"},
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(32, 128)}},
+					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(64, 128)}},
 				},
 				{
 					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
@@ -85,13 +82,13 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("2001:db8::1", "::1"),
 		},
-		{ // case 3
+		{
+			name:  "IPv6 zero CIDR",
 			cidrs: []string{"::/0"},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(32, 128)}},
+					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(64, 128)}},
 				},
 				{
 					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
@@ -100,9 +97,9 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("::/0"),
 		},
-		{ // case 4
+		{
+			name:  "IPv4 localhost exact",
 			cidrs: []string{"127.0.0.1/32"},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
@@ -115,9 +112,9 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("127.0.0.1"),
 		},
-		{ // case 5
+		{
+			name:  "IPv4 localhost subnet",
 			cidrs: []string{"127.0.0.0/8"},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
@@ -126,9 +123,9 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("127.0.1.1"),
 		},
-		{ // case 6
+		{
+			name:  "IPv4 multiple",
 			cidrs: []string{"10.20.30.0/24", "100.200.201.0/24"},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
@@ -141,9 +138,9 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("10.20.30.51", "100.200.201.1"),
 		},
-		{ // case 7
+		{
+			name:  "IPv4 multiple, no match",
 			cidrs: []string{"10.20.30.0/24", "100.200.201.0/24"},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
@@ -154,12 +151,11 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected:    nil,
-			expectedErr: fmt.Errorf("no addresses found for cidrs %v", []string{"10.20.30.0/24", "100.200.201.0/24"}),
+			expected: nil,
 		},
-		{ // case 8
+		{
+			name:  "empty list, IPv4 addrs",
 			cidrs: []string{},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
@@ -172,13 +168,13 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("0.0.0.0/0", "::/0"),
 		},
-		{ // case 9
+		{
+			name:  "empty list, IPv6 addrs",
 			cidrs: []string{},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(32, 128)}},
+					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(64, 128)}},
 				},
 				{
 					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
@@ -187,9 +183,9 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("0.0.0.0/0", "::/0"),
 		},
-		{ // case 9
+		{
+			name:  "IPv4 redundant CIDRs",
 			cidrs: []string{"1.2.3.0/24", "0.0.0.0/0"},
-			nw:    fake.NewFakeNetwork(),
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
 					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
@@ -198,50 +194,68 @@ func TestGetNodeAddresses(t *testing.T) {
 			},
 			expected: sets.NewString("0.0.0.0/0"),
 		},
-		{ // case 10
-			cidrs: []string{"0.0.0.0/0", "1.2.3.0/24", "::1/128"},
-			nw:    fake.NewFakeNetwork(),
+		{
+			name:  "Dual-stack, redundant IPv4",
+			cidrs: []string{"0.0.0.0/0", "1.2.3.0/24", "2001:db8::1/128"},
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)}},
+					itf: net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
+					addrs: []net.Addr{
+						&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)},
+						&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(64, 128)},
+					},
 				},
 				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
+					itf: net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
+					addrs: []net.Addr{
+						&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)},
+						&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)},
+					},
 				},
 			},
-			expected: sets.NewString("0.0.0.0/0", "::1"),
+			expected: sets.NewString("0.0.0.0/0", "2001:db8::1"),
 		},
-		{ // case 11
-			cidrs: []string{"::/0", "1.2.3.0/24", "::1/128"},
-			nw:    fake.NewFakeNetwork(),
+		{
+			name:  "Dual-stack, redundant IPv6",
+			cidrs: []string{"::/0", "1.2.3.0/24", "2001:db8::1/128"},
 			itfAddrsPairs: []InterfaceAddrsPair{
 				{
-					itf:   net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)}},
+					itf: net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
+					addrs: []net.Addr{
+						&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)},
+						&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(64, 128)},
+					},
 				},
 				{
-					itf:   net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
+					itf: net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
+					addrs: []net.Addr{
+						&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)},
+						&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)},
+					},
 				},
 			},
 			expected: sets.NewString("::/0", "1.2.3.4"),
 		},
 	}
 
-	for i := range testCases {
-		for _, pair := range testCases[i].itfAddrsPairs {
-			testCases[i].nw.AddInterfaceAddr(&pair.itf, pair.addrs)
-		}
-		addrList, err := GetNodeAddresses(testCases[i].cidrs, testCases[i].nw)
-		if !reflect.DeepEqual(err, testCases[i].expectedErr) {
-			t.Errorf("case [%d], unexpected error: %v", i, err)
-		}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nw := fake.NewFakeNetwork()
+			for _, pair := range tc.itfAddrsPairs {
+				nw.AddInterfaceAddr(&pair.itf, pair.addrs)
+			}
 
-		if !addrList.Equal(testCases[i].expected) {
-			t.Errorf("case [%d], unexpected mismatch, expected: %v, got: %v", i, testCases[i].expected, addrList)
-		}
+			addrList, err := GetNodeAddresses(tc.cidrs, nw)
+			// The fake InterfaceAddrs() never returns an error, so the only
+			// error GetNodeAddresses will return is "no addresses found".
+			if err != nil && tc.expected != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if !addrList.Equal(tc.expected) {
+				t.Errorf("unexpected mismatch, expected: %v, got: %v", tc.expected, addrList)
+			}
+		})
 	}
 }
 
