@@ -87,9 +87,6 @@
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v4"
       ],
-      "github.com/mindprince/gonvml": [
-        "github.com/google/cadvisor"
-      ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/go-winio",
         "github.com/Microsoft/hcsshim",
@@ -104,7 +101,6 @@
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/moby/ipvs",
-        "github.com/moby/term",
         "go.etcd.io/etcd/raft/v3",
         "go.uber.org/zap",
         "gotest.tools/v3",
