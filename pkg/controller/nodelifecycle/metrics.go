@@ -30,6 +30,9 @@ const (
 	zoneNoUnhealthyNodesKey = "unhealthy_nodes_in_zone"
 	evictionsNumberKey      = "evictions_number"
 	evictionsTotalKey       = "evictions_total"
+
+	updateNodeHealthKey     = "update_node_health_duration_seconds"
+	updateAllNodesHealthKey = "update_all_nodes_health_duration_seconds"
 )
 
 var (
@@ -79,6 +82,25 @@ var (
 		},
 		[]string{"zone"},
 	)
+
+	updateNodeHealthDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      nodeControllerSubsystem,
+			Name:           updateNodeHealthKey,
+			Help:           "Duration in seconds for NodeController to update the health of a single node.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 4, 8), // 1ms -> ~15s
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	updateAllNodesHealthDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      nodeControllerSubsystem,
+			Name:           updateAllNodesHealthKey,
+			Help:           "Duration in seconds for NodeController to update the health of all nodes.",
+			Buckets:        metrics.ExponentialBuckets(0.01, 4, 8), // 10ms -> ~3m
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -91,5 +113,7 @@ func Register() {
 		legacyregistry.MustRegister(unhealthyNodes)
 		legacyregistry.MustRegister(evictionsNumber)
 		legacyregistry.MustRegister(evictionsTotal)
+		legacyregistry.MustRegister(updateNodeHealthDuration)
+		legacyregistry.MustRegister(updateAllNodesHealthDuration)
 	})
 }
