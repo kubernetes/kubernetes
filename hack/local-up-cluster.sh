@@ -957,9 +957,17 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   else
     echo "Local Kubernetes cluster is running."
   fi
+
+  echo
+  echo "Configurations:"
+  for f in $(ls ${TMP_DIR}); do
+    echo "  ${TMP_DIR}/${f}"
+  done
+
   cat <<EOF
 
 Logs:
+  ${ETCD_LOGFILE:-}
   ${APISERVER_LOG:-}
   ${CTLRMGR_LOG:-}
   ${CLOUD_CTLRMGR_LOG:-}
