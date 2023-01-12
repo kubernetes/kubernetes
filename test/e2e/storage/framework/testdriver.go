@@ -141,7 +141,7 @@ func GetDriverTimeouts(driver TestDriver) *framework.TimeoutContext {
 	if d, ok := driver.(CustomTimeoutsTestDriver); ok {
 		return d.GetTimeouts()
 	}
-	return framework.NewTimeoutContextWithDefaults()
+	return framework.NewTimeoutContext()
 }
 
 // Capability represents a feature that a volume plugin supports

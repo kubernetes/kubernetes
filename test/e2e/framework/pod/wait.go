@@ -53,9 +53,6 @@ const (
 	// podStartTimeout is how long to wait for the pod to be started.
 	podStartTimeout = 5 * time.Minute
 
-	// poll is how often to poll pods, nodes and claims.
-	poll = 2 * time.Second
-
 	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
 	singleCallTimeout = 5 * time.Minute
@@ -195,7 +192,7 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 	notReady := int32(0)
 	var lastAPIError error
 
-	if wait.PollImmediateWithContext(ctx, poll, timeout, func(ctx context.Context) (bool, error) {
+	if wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (bool, error) {
 		// We get the new list of pods, replication controllers, and
 		// replica sets in every iteration because more pods come
 		// online during startup and we want to ensure they are also
@@ -287,7 +284,7 @@ func WaitForPodCondition(ctx context.Context, c clientset.Interface, ns, podName
 		lastPod      *v1.Pod
 		start        = time.Now()
 	)
-	err := wait.PollImmediateWithContext(ctx, poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (bool, error) {
 		pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 		lastPodError = err
 		if err != nil {
@@ -333,7 +330,7 @@ func WaitForAllPodsCondition(ctx context.Context, c clientset.Interface, ns stri
 	framework.Logf("Waiting up to %v for at least %d pods in namespace %s to be %s", timeout, minPods, ns, conditionDesc)
 	var pods *v1.PodList
 	matched := 0
-	err := wait.PollImmediateWithContext(ctx, poll, timeout, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (done bool, err error) {
 		pods, err = c.CoreV1().Pods(ns).List(ctx, opts)
 		if err != nil {
 			return handleWaitingAPIError(err, true, "listing pods")
@@ -366,7 +363,7 @@ func WaitForAllPodsCondition(ctx context.Context, c clientset.Interface, ns stri
 // WaitForPodsRunning waits for a given `timeout` to evaluate if a certain amount of pods in given `ns` are running.
 func WaitForPodsRunning(c clientset.Interface, ns string, num int, timeout time.Duration) error {
 	matched := 0
-	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+	err := wait.PollImmediate(framework.PollInterval(), timeout, func() (done bool, err error) {
 		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return handleWaitingAPIError(err, true, "listing pods")
@@ -389,7 +386,7 @@ func WaitForPodsRunning(c clientset.Interface, ns string, num int, timeout time.
 // WaitForPodsSchedulingGated waits for a given `timeout` to evaluate if a certain amount of pods in given `ns` stay in scheduling gated state.
 func WaitForPodsSchedulingGated(c clientset.Interface, ns string, num int, timeout time.Duration) error {
 	matched := 0
-	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+	err := wait.PollImmediate(framework.PollInterval(), timeout, func() (done bool, err error) {
 		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return handleWaitingAPIError(err, true, "listing pods")
@@ -415,7 +412,7 @@ func WaitForPodsSchedulingGated(c clientset.Interface, ns string, num int, timeo
 // match the given `schedulingGates`stay in scheduling gated state.
 func WaitForPodsWithSchedulingGates(c clientset.Interface, ns string, num int, timeout time.Duration, schedulingGates []v1.PodSchedulingGate) error {
 	matched := 0
-	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+	err := wait.PollImmediate(framework.PollInterval(), timeout, func() (done bool, err error) {
 		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return handleWaitingAPIError(err, true, "listing pods")
@@ -608,7 +605,7 @@ func WaitForPodSuccessInNamespaceSlow(ctx context.Context, c clientset.Interface
 // than "not found" then that error is returned and the wait stops.
 func WaitForPodNotFoundInNamespace(ctx context.Context, c clientset.Interface, podName, ns string, timeout time.Duration) error {
 	var lastPod *v1.Pod
-	err := wait.PollImmediateWithContext(ctx, poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (bool, error) {
 		pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil // done
@@ -670,7 +667,7 @@ func WaitForPodToDisappear(ctx context.Context, c clientset.Interface, ns, podNa
 func PodsResponding(ctx context.Context, c clientset.Interface, ns, name string, wantName bool, pods *v1.PodList) error {
 	ginkgo.By("trying to dial each unique pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	err := wait.PollImmediateWithContext(ctx, poll, podRespondingTimeout, NewProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
+	err := wait.PollImmediateWithContext(ctx, framework.PollInterval(), podRespondingTimeout, NewProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
 	return maybeTimeoutError(err, "waiting for pods to be responsive")
 }
 
@@ -679,7 +676,7 @@ func PodsResponding(ctx context.Context, c clientset.Interface, ns, name string,
 // It returns the matching Pods or a timeout error.
 func WaitForNumberOfPods(ctx context.Context, c clientset.Interface, ns string, num int, timeout time.Duration) (pods *v1.PodList, err error) {
 	actualNum := 0
-	err = wait.PollImmediateWithContext(ctx, poll, timeout, func(ctx context.Context) (bool, error) {
+	err = wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (bool, error) {
 		pods, err = c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return handleWaitingAPIError(err, false, "listing pods")
@@ -722,7 +719,7 @@ func WaitForPodsWithLabelRunningReady(ctx context.Context, c clientset.Interface
 func WaitForNRestartablePods(ctx context.Context, ps *testutils.PodStore, expect int, timeout time.Duration) ([]string, error) {
 	var pods []*v1.Pod
 	var errLast error
-	found := wait.PollWithContext(ctx, poll, timeout, func(ctx context.Context) (bool, error) {
+	found := wait.PollWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (bool, error) {
 		allPods := ps.List()
 		pods = FilterNonRestartablePods(allPods)
 		if len(pods) != expect {

@@ -311,7 +311,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(ctx context.Context, 
 }
 
 func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
-	timeouts := framework.NewTimeoutContextWithDefaults()
+	timeouts := framework.NewTimeoutContext()
 	if d.Timeouts == nil {
 		return timeouts
 	}
