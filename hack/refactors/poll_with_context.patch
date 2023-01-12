@@ -1,0 +1,251 @@
+# This patch modifies client code as described in https://github.com/kubernetes/kubernetes/pull/107826
+# using github.com/uber-go/gopatch (head). It performs the most laborious changes
+#
+# Replace an unnecessarily cast to wait.ConditionFunc around some Poll calls
+@@
+var interval, timeout, condition expression
+var a, b identifier
+@@
++import "context"
+
+-wait.Poll(interval, timeout, wait.ConditionFunc(func() (a bool, b error) {...}))
++wait.PollUntilContextTimeout(context.Background(), interval, timeout, false, func(ctx context.Context) (a bool, b error) {...})
+
+# Replace wait.Poll with wait.PollUntilContextTimeout when the function can be altered
+@@
+var interval, timeout, condition expression
+@@
++import "context"
+
+-wait.Poll(interval, timeout, func() (bool, error) {...})
++wait.PollUntilContextTimeout(context.Background(), interval, timeout, false, func(ctx context.Context) (bool, error) {...})
+
+# Replace wait.Poll with wait.PollUntilContextTimeout when the function has named returns
+@@
+var interval, timeout, condition expression
+var a, b identifier
+@@
++import "context"
+
+-wait.Poll(interval, timeout, func() (a bool, b error) {...})
++wait.PollUntilContextTimeout(context.Background(), interval, timeout, false, func(ctx context.Context) (a bool, b error) {...})
+
+# Replace wait.Poll with wait.PollUntilContextTimeout
+@@
+var interval, timeout, condition expression
+@@
++import "context"
+
+-wait.Poll(interval, timeout, condition)
++wait.PollUntilContextTimeout(context.Background(), interval, timeout, false, condition)
+
+# Replace wait.PollImmediate with wait.PollUntilContextTimeout
+@@
+var interval, timeout, condition expression
+var a, b identifier
+@@
++import "context"
+
+-wait.PollImmediate(interval, timeout, func() (a bool, b error) {...})
++wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (a bool, b error) {...})
+
+# Replace wait.PollImmediate with wait.PollUntilContextTimeout
+@@
+var interval, timeout, condition expression
+@@
++import "context"
+
+-wait.PollImmediate(interval, timeout, func() (bool, error) {...})
++wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, func(ctx context.Context) (bool, error) {...})
+
+# Replace wait.PollImmediate with wait.PollUntilContextTimeout
+@@
+var interval, timeout, condition expression
+@@
++import "context"
+
+-wait.PollImmediate(interval, timeout, condition)
++wait.PollUntilContextTimeout(context.Background(), interval, timeout, true, condition)
+
+# Replace wait.PollImmediateUntilContext with wait.PollUntilContextTimeout
+@@
+var ctx, interval, timeout, condition expression
+@@
++import "context"
+
+-wait.PollImmediateUntilContext(ctx, interval, timeout, condition)
++wait.PollUntilContextTimeout(ctx, interval, timeout, true, condition)
+
+# Replace wait.PollUntilContext with wait.PollUntilContextTimeout
+@@
+var ctx, interval, timeout, condition expression
+@@
+-wait.PollUntilContext(ctx, interval, timeout, condition)
++wait.PollUntilContextTimeout(ctx, interval, timeout, false, condition)
+
+# Replace wait.PollUntil with wait.PollUntilContextTimeout with a closure
+@@
+var interval expression
+var a expression
+@@
++import "context"
+
+-wait.PollUntil(interval, func() (bool, error) {...}, a)
++wait.PollUntilContextCancel(context.Background(), interval, false, func(ctx context.Context) (bool, error) {...})
+
+# Replace wait.PollUntil with wait.PollUntilContextTimeout with a closure
+@@
+var interval expression
+var a, b, c expression
+@@
++import "context"
+
+-wait.PollUntil(interval, func() (b bool, c error) {...}, a)
++wait.PollUntilContextCancel(context.Background(), interval, false, func(ctx context.Context) (b bool, c error) {...})
+
+# Replace wait.PollUntil with wait.PollUntilContextTimeout with a named function
+@@
+var interval, condition expression
+var a expression
+@@
++import "context"
+
+-wait.PollUntil(interval, condition, a)
++wait.PollUntilContextCancel(a, interval, false, condition)
+
+# Replace wait.PollImmediateUntil with wait.PollUntilContextTimeout with a closure
+@@
+var interval expression
+var a expression
+@@
++import "context"
+
+-wait.PollImmediateUntil(interval, func() (bool, error) {...}, a)
++wait.PollUntilContextCancel(a, interval, true, func(ctx context.Context) (bool, error) {...})
+
+# Replace wait.PollImmediateUntil with wait.PollUntilContextTimeout with a closure
+@@
+var interval expression
+var a, b, c expression
+@@
++import "context"
+
+-wait.PollImmediateUntil(interval, func() (b bool, c error) {...}, a)
++wait.PollUntilContextCancel(a, interval, true, func(ctx context.Context) (b bool, c error) {...})
+
+# Replace wait.PollImmediateUntil with wait.PollUntilContextTimeout with a named function
+@@
+var interval, condition expression
+var a expression
+@@
++import "context"
+
+-wait.PollImmediateUntil(interval, condition, a)
++wait.PollUntilContextCancel(a, interval, true, condition)
+
+# Replace wait.PollImmediateWithContext with wait.PollUntilContextTimeout
+@@
+var ctx, interval, timeout, condition expression
+@@
+-wait.PollImmediateWithContext(ctx, interval, timeout, condition)
++wait.PollUntilContextTimeout(ctx, interval, timeout, true, condition)
+
+# Replace wait.PollImmediateUntilWithContext with wait.PollUntilContextCancel
+@@
+var ctx, interval, condition expression
+@@
+-wait.PollImmediateUntilWithContext(ctx, interval, condition)
++wait.PollUntilContextCancel(ctx, interval, true, condition)
+
+# Replace wait.PollUntilWithContext with wait.PollUntilContextCancel
+@@
+var ctx, interval, condition expression
+@@
+-wait.PollUntilWithContext(ctx, interval, condition)
++wait.PollUntilContextCancel(ctx, interval, false, condition)
+
+# Replace wait.PollImmediateUntilWithContext with wait.PollUntilContextCancel
+@@
+var ctx, interval, condition expression
+@@
+-wait.PollImmediateUntilWithContext(ctx, interval, condition)
++wait.PollUntilContextCancel(ctx, interval, true, condition)
+
+# Replace wait.PollInfinite with wait.PollUntilContextCancel
+@@
+var interval expression
+@@
++import "context"
+
+-wait.PollInfinite(interval, func() (bool, error) {...})
++wait.PollUntilContextCancel(context.Background(), interval, false, func(ctx context.Context) (bool, error) {...})
+
+# Replace wait.PollImmediateInfinite with wait.PollUntilContextCancel
+@@
+var interval expression
+@@
++import "context"
+
+-wait.PollImmediateInfinite(interval, func() (bool, error) {...})
++wait.PollUntilContextCancel(context.Background(), interval, true, func(ctx context.Context) (bool, error) {...})
+
+# Replace older channel constructs for context cancel with the context
+@@
+var interval, immediate, condition expression
+@@
++import "context"
+
+-wait.PollUntilContextCancel(ctx.Done(), interval, immediate, condition)
++wait.PollUntilContextCancel(ctx, interval, immediate, condition)
+
+# Replace comparisons to wait.ErrWaitTimeout with wait.Interrupted
+@@
+var err expression
+@@
+-err == wait.ErrWaitTimeout
++wait.Interrupted(err)
+
+# Replace comparisons to wait.ErrWaitTimeout with wait.Interrupted
+@@
+var err expression
+@@
+-err != wait.ErrWaitTimeout
++!wait.Interrupted(err)
+
+# Propagate wrapped ErrWaitTimeout returns instead of reduplicating them
+@@
+var err expression
+@@
+-if wait.Interrupted(err) { return ..., wait.ErrWaitTimeout }
++if wait.Interrupted(err) { return ..., err }
+
+# Replace wait.ErrWaitTimeout with wait.ErrorInterrupted(errors.New("TODO"))
+@@
+var err expression
+@@
++ import "errors"
+-wait.ErrWaitTimeout
++wait.ErrorInterrupted(errors.New("TODO"))
+
+# Replace comparisons to a constant interrupted error (after patching)
+@@
+var err expression
+@@
+-err != wait.ErrorInterrupted(errors.New("TODO"))
++!wait.Interrupted(err)
+
+# Replace simple stop channels with cancellation
+@@
+var interval, immediate, condition expression
+@@
+-err := wait.PollUntilContextCancel(stopCh, interval, immediate, condition)
++ctx, cancel := wait.ContextForChannel(stopCh)
++defer cancel()
++err := wait.PollUntilContextCancel(ctx, interval, immediate, condition)
+
+# Replace simple contexts with cancellation
+@@
+var ctx, interval, immediate, condition expression
+@@
+-err := wait.PollUntilContextCancel(ctx.Done(), interval, immediate, condition)
++err := wait.PollUntilContextCancel(ctx, interval, immediate, condition)
