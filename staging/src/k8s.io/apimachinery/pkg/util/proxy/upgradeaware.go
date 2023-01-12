@@ -19,6 +19,7 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -383,6 +384,13 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	}
 	defer requestHijackedConn.Close()
 
+	// Occurs immediately after a successful Hijack call to bypass cases where the parsed
+	// backend status is not necessarily the same status we decide to write in the response to
+	// the client.
+	for _, recorder := range statusRecordersFrom(req.Context()) {
+		recorder.RecordStatus(backendHTTPResponse.StatusCode)
+	}
+
 	if backendHTTPResponse.StatusCode != http.StatusSwitchingProtocols {
 		// If the backend did not upgrade the request, echo the response from the backend to the client and return, closing the connection.
 		klog.V(6).Infof("Proxy upgrade error, status code %d", backendHTTPResponse.StatusCode)
@@ -554,4 +562,26 @@ func removeCORSHeaders(resp *http.Response) {
 	resp.Header.Del("Access-Control-Allow-Headers")
 	resp.Header.Del("Access-Control-Allow-Methods")
 	resp.Header.Del("Access-Control-Allow-Origin")
+}
+
+// StatusRecorder receives an HTTP response status code.
+type StatusRecorder interface {
+	RecordStatus(status int)
+}
+
+type contextKey int
+
+const statusRecordersKey contextKey = iota
+
+func statusRecordersFrom(ctx context.Context) []StatusRecorder {
+	recorders, _ := ctx.Value(statusRecordersKey).([]StatusRecorder)
+	return recorders
+}
+
+// WithStatusRecorder returns a copy of the given Context that holds a reference to the given
+// StatusRecorder. An UpgradeAwareHandler will send backend response statuses to any StatusRecorder
+// found in a request context in cases where it hijacks the ResponseWriter and copies the backend
+// response verbatim.
+func WithStatusRecorder(ctx context.Context, recorder StatusRecorder) context.Context {
+	return context.WithValue(ctx, statusRecordersKey, append(statusRecordersFrom(ctx), recorder))
 }

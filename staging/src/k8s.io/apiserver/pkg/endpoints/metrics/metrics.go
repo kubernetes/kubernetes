@@ -28,6 +28,7 @@ import (
 	restful "github.com/emicklei/go-restful/v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/proxy"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -564,7 +565,7 @@ func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, com
 		}
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: response.ResponseWriter}
-
+		req.Request = req.Request.WithContext(proxy.WithStatusRecorder(req.Request.Context(), delegate))
 		rw := responsewriter.WrapForHTTP1Or2(delegate)
 		response.ResponseWriter = rw
 
@@ -583,6 +584,7 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 		}
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: w}
+		req = req.WithContext(proxy.WithStatusRecorder(req.Context(), delegate))
 		w = responsewriter.WrapForHTTP1Or2(delegate)
 
 		handler(w, req)
@@ -752,6 +754,10 @@ func (r *ResponseWriterDelegator) Status() int {
 
 func (r *ResponseWriterDelegator) ContentLength() int {
 	return int(r.written)
+}
+
+func (r *ResponseWriterDelegator) RecordStatus(code int) {
+	r.status = code
 }
 
 // Small optimization over Itoa

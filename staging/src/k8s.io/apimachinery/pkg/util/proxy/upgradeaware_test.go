@@ -1210,6 +1210,60 @@ func TestProxyRedirectsforRootPath(t *testing.T) {
 	}
 }
 
+type fakeStatusRecorder int
+
+func (recorder *fakeStatusRecorder) RecordStatus(code int) {
+	*recorder = fakeStatusRecorder(code)
+}
+
+// TestBackendStatusRecorder tests that the status of a backend response is provided to a
+// StatusRecorder attached to the request context in cases where the proxy hijacks the
+// http.ResponseWriter and sends the backend response verbatim.
+func TestBackendStatusRecorder(t *testing.T) {
+	for _, code := range []int{101, 400, 500} {
+		t.Run(fmt.Sprintf("code=%d", code), func(t *testing.T) {
+			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(code)
+			}))
+			defer backend.Close()
+
+			u, err := url.Parse(backend.URL)
+			if err != nil {
+				t.Fatalf("unexpected error parsing backend server url: %v", err)
+			}
+
+			var recorder fakeStatusRecorder
+			frontend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				h := NewUpgradeAwareHandler(u, nil, false, true, &fakeResponder{t: t, w: w})
+				h.ServeHTTP(w, r.WithContext(WithStatusRecorder(r.Context(), &recorder)))
+			}))
+			defer frontend.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // five seconds ought to be enough for anybody
+			defer cancel()
+
+			req, err := http.NewRequestWithContext(WithStatusRecorder(ctx, &recorder), http.MethodGet, frontend.URL, nil)
+			if err != nil {
+				t.Fatalf("unexpected error constructing request: %v", err)
+			}
+			req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+
+			res, err := frontend.Client().Do(req)
+			if err != nil {
+				t.Fatalf("unexpected error performing request: %v", err)
+			}
+
+			if res.StatusCode != code {
+				t.Errorf("expected response with status %d, got %d", code, res.StatusCode)
+			}
+
+			if res.StatusCode != int(recorder) {
+				t.Errorf("recorded backend status %d did not match response status %d", int(recorder), res.StatusCode)
+			}
+		})
+	}
+}
+
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
 //
 //	go run generate_cert.go  --rsa-bits 1024 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
