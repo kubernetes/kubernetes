@@ -2062,4 +2062,4 @@ rules:
   library: true
 recursive-delete-patterns:
 - '*/.gitattributes'
-default-go-version: 1.19.4
+default-go-version: 1.19.5
