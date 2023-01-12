@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2alpha1
+package v2
 
 import (
 	"context"
@@ -36,7 +36,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	kmsapi "k8s.io/kms/apis/v2alpha1"
+	kmsapi "k8s.io/kms/apis/v2"
 )
 
 const (
@@ -44,7 +44,7 @@ const (
 	unixProtocol = "unix"
 
 	// Current version for the protocol interface definition.
-	kmsapiVersion = "v2alpha1"
+	kmsapiVersion = "v2beta1"
 )
 
 // Base64Plugin gRPC sever for a mock KMS provider.

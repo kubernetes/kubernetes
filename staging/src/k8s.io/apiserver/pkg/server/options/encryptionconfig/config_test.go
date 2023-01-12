@@ -108,7 +108,7 @@ func (t *testKMSv2EnvelopeService) Status(ctx context.Context) (*kmsservice.Stat
 	if t.err != nil {
 		return nil, t.err
 	}
-	return &kmsservice.StatusResponse{Healthz: "ok", KeyID: t.keyID, Version: "v2alpha1"}, nil
+	return &kmsservice.StatusResponse{Healthz: "ok", KeyID: t.keyID, Version: "v2beta1"}, nil
 }
 
 // The factory method to create mock envelope service.
@@ -1565,7 +1565,7 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "unhealthy",
 			},
-			expectedErr: "got unexpected healthz status: unhealthy, expected KMSv2 API version v2alpha1, got , got invalid KMSv2 KeyID ",
+			expectedErr: "got unexpected healthz status: unhealthy, expected KMSv2 API version v2beta1, got , got invalid KMSv2 KeyID ",
 			wantMetrics: `
 			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
 			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
@@ -1573,11 +1573,11 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			`,
 		},
 		{
-			desc: "version is not v2alpha1",
+			desc: "version is not v2beta1",
 			statusResponse: &kmsservice.StatusResponse{
 				Version: "v1beta1",
 			},
-			expectedErr: "got unexpected healthz status: , expected KMSv2 API version v2alpha1, got v1beta1, got invalid KMSv2 KeyID ",
+			expectedErr: "got unexpected healthz status: , expected KMSv2 API version v2beta1, got v1beta1, got invalid KMSv2 KeyID ",
 			wantMetrics: `
 			# HELP apiserver_envelope_encryption_invalid_key_id_from_status_total [ALPHA] Number of times an invalid keyID is returned by the Status RPC call split by error.
 			# TYPE apiserver_envelope_encryption_invalid_key_id_from_status_total counter
@@ -1588,7 +1588,7 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			desc: "missing keyID",
 			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "ok",
-				Version: "v2alpha1",
+				Version: "v2beta1",
 			},
 			expectedErr: "got invalid KMSv2 KeyID ",
 			wantMetrics: `
@@ -1601,7 +1601,7 @@ func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 			desc: "invalid long keyID",
 			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "ok",
-				Version: "v2alpha1",
+				Version: "v2beta1",
 				KeyID:   sampleInvalidKeyID,
 			},
 			expectedErr: "got invalid KMSv2 KeyID ",
