@@ -1382,7 +1382,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			candidates, _, _ := pe.DryRunPreemption(ctx, tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := pe.SelectCandidate(candidates)
 			if s == nil || len(s.Name()) == 0 {
-				return
+				t.Fatalf("empty candidate is returned from SelectCandidate unexpectedly")
 			}
 			found := false
 			for _, nodeName := range tt.expected {
