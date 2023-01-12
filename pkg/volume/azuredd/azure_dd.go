@@ -20,9 +20,7 @@ limitations under the License.
 package azuredd
 
 import (
-	"context"
 	"fmt"
-	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
@@ -85,13 +83,11 @@ var _ volume.PersistentVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.DeletableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.ProvisionableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.AttachableVolumePlugin = &azureDataDiskPlugin{}
-var _ volume.VolumePluginWithAttachLimits = &azureDataDiskPlugin{}
 var _ volume.ExpandableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.DeviceMountableVolumePlugin = &azureDataDiskPlugin{}
 
 const (
 	azureDataDiskPluginName = "kubernetes.io/azure-disk"
-	defaultAzureVolumeLimit = 16
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -136,55 +132,6 @@ func (plugin *azureDataDiskPlugin) SupportsBulkVolumeVerification() bool {
 
 func (plugin *azureDataDiskPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
-}
-
-func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
-	volumeLimits := map[string]int64{
-		util.AzureVolumeLimitKey: defaultAzureVolumeLimit,
-	}
-
-	az, err := getCloud(plugin.host)
-	if err != nil {
-		// if we can't fetch cloudprovider we return an error
-		// hoping external CCM or admin can set it. Returning
-		// default values from here will mean, no one can
-		// override them.
-		return nil, fmt.Errorf("failed to get azure cloud in GetVolumeLimits, plugin.host: %s", plugin.host.GetHostName())
-	}
-
-	instances, ok := az.Instances()
-	if !ok {
-		klog.Warningf("Failed to get instances from cloud provider")
-		return volumeLimits, nil
-	}
-
-	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
-	if err != nil {
-		klog.Errorf("Failed to get instance type from Azure cloud provider, nodeName: %s", plugin.host.GetNodeName())
-		return volumeLimits, nil
-	}
-
-	volumeLimits = map[string]int64{
-		util.AzureVolumeLimitKey: getMaxDataDiskCount(instanceType),
-	}
-
-	return volumeLimits, nil
-}
-
-func getMaxDataDiskCount(instanceType string) int64 {
-	vmsize := strings.ToUpper(instanceType)
-	maxDataDiskCount, exists := maxDataDiskCountMap[vmsize]
-	if exists {
-		klog.V(12).Infof("got a matching size in getMaxDataDiskCount, VM Size: %s, MaxDataDiskCount: %d", vmsize, maxDataDiskCount)
-		return maxDataDiskCount
-	}
-
-	klog.V(12).Infof("not found a matching size in getMaxDataDiskCount, VM Size: %s, use default volume limit: %d", vmsize, defaultAzureVolumeLimit)
-	return defaultAzureVolumeLimit
-}
-
-func (plugin *azureDataDiskPlugin) VolumeLimitKey(spec *volume.Spec) string {
-	return util.AzureVolumeLimitKey
 }
 
 func (plugin *azureDataDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {

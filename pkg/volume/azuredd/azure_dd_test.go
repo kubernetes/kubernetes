@@ -23,8 +23,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -58,35 +56,6 @@ func TestCanSupport(t *testing.T) {
 
 // fakeAzureProvider type was removed because all functions were not used
 // Testing mounting will require path calculation which depends on the cloud provider, which is faked in the above test.
-
-func TestGetMaxDataDiskCount(t *testing.T) {
-	tests := []struct {
-		instanceType string
-		expectResult int64
-	}{
-		{
-			instanceType: "standard_d2_v2",
-			expectResult: 8,
-		},
-		{
-			instanceType: "Standard_DS14_V2",
-			expectResult: 64,
-		},
-		{
-			instanceType: "NOT_EXISTING",
-			expectResult: defaultAzureVolumeLimit,
-		},
-		{
-			instanceType: "",
-			expectResult: defaultAzureVolumeLimit,
-		},
-	}
-
-	for _, test := range tests {
-		result := getMaxDataDiskCount(test.instanceType)
-		assert.Equal(t, test.expectResult, result)
-	}
-}
 
 func TestUnsupportedVolumeHost(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("azure_dd")
