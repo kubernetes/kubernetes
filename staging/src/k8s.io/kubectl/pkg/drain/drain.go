@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -64,6 +65,9 @@ type Helper struct {
 	Selector            string
 	PodSelector         string
 	ChunkSize           int64
+
+	// IgnorePreemption makes drain delete pods all at once
+	IgnorePreemption bool
 
 	// DisableEviction forces drain to use delete rather than evict
 	DisableEviction bool
@@ -243,6 +247,13 @@ func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {
 		return d.Client.CoreV1().Pods(namespace).Get(d.getContext(), name, metav1.GetOptions{})
 	}
 
+	var groups [][]corev1.Pod
+	if d.IgnorePreemption {
+		groups = append(groups, pods)
+	} else {
+		groups = d.GroupPods(pods, true)
+	}
+
 	if !d.DisableEviction {
 		evictionGroupVersion, err := CheckEvictionSupport(d.Client)
 		if err != nil {
@@ -250,11 +261,23 @@ func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {
 		}
 
 		if !evictionGroupVersion.Empty() {
-			return d.evictPods(pods, evictionGroupVersion, getPodFn)
+			for _, group := range groups {
+				err = d.evictPods(group, evictionGroupVersion, getPodFn)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
 		}
 	}
 
-	return d.deletePods(pods, getPodFn)
+	for _, group := range groups {
+		err := d.deletePods(group, getPodFn)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupVersion, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
@@ -274,9 +297,13 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 			for {
 				switch d.DryRunStrategy {
 				case cmdutil.DryRunServer:
-					fmt.Fprintf(d.Out, "evicting pod %s/%s (server dry run)\n", pod.Namespace, pod.Name)
+					fmt.Fprintf(d.Out, "evicting pod %s/%s with priority %d (server dry run)\n", pod.Namespace, pod.Name, *pod.Spec.Priority)
 				default:
-					fmt.Fprintf(d.Out, "evicting pod %s/%s\n", pod.Namespace, pod.Name)
+					var priority int32
+					if pod.Spec.Priority != nil {
+						priority = *pod.Spec.Priority
+					}
+					fmt.Fprintf(d.Out, "evicting pod %s/%s with priority %d\n", pod.Namespace, pod.Name, priority)
 				}
 				select {
 				case <-ctx.Done():
@@ -438,4 +465,50 @@ func (d *Helper) getContext() context.Context {
 		return d.Ctx
 	}
 	return context.Background()
+}
+
+// GroupPods groups a single slice of corev1.Pod by their .Spec.Priority values
+func (d *Helper) GroupPods(pods []corev1.Pod, byPhase bool) (groups [][]corev1.Pod) {
+	var priority int32
+	var currentGroup []corev1.Pod
+
+	byPriority := map[int32][]corev1.Pod{}
+	var discoveredPriorities []int32
+	for _, pod := range pods {
+		if byPhase && pod.Status.Phase == corev1.PodPending {
+			currentGroup = append(currentGroup, pod)
+			continue
+		}
+		if pod.Spec.Priority != nil {
+			priority = *pod.Spec.Priority
+		}
+		if _, ok := byPriority[priority]; !ok {
+			byPriority[priority] = make([]corev1.Pod, 0)
+			discoveredPriorities = append(discoveredPriorities, priority)
+		}
+		byPriority[priority] = append(byPriority[priority], pod)
+	}
+
+	sort.Slice(discoveredPriorities, func(i, j int) bool {
+		return discoveredPriorities[i] < discoveredPriorities[j]
+	})
+
+	for _, priority = range discoveredPriorities {
+		currentGroup = append(currentGroup, byPriority[priority]...)
+
+		for _, pod := range byPriority[priority] {
+			// commit currentGroup if any of the Pods in group are preempting
+			// note: nil defaults to PreemptLowerPriority see kubernetes/pkg/apis/scheduling/v1/defaults.go
+			if pod.Spec.PreemptionPolicy == nil || *pod.Spec.PreemptionPolicy == corev1.PreemptLowerPriority {
+				groups = append(groups, currentGroup)
+				currentGroup = nil
+				break
+			}
+		}
+	}
+	// commit remaining currentGroup
+	if len(currentGroup) > 0 {
+		groups = append(groups, currentGroup)
+	}
+	return groups
 }

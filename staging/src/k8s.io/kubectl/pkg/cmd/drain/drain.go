@@ -192,6 +192,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		},
 	}
 	cmd.Flags().BoolVar(&o.drainer.Force, "force", o.drainer.Force, "Continue even if there are pods that do not declare a controller.")
+	cmd.Flags().BoolVar(&o.drainer.IgnorePreemption, "ignore-preemption", o.drainer.IgnorePreemption, "Drain Pods all at once with no regard to preemption policy.")
 	cmd.Flags().BoolVar(&o.drainer.IgnoreAllDaemonSets, "ignore-daemonsets", o.drainer.IgnoreAllDaemonSets, "Ignore DaemonSet-managed pods.")
 	cmd.Flags().BoolVar(&o.drainer.DeleteEmptyDirData, "delete-local-data", o.drainer.DeleteEmptyDirData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().MarkDeprecated("delete-local-data", "This option is deprecated and will be deleted. Use --delete-emptydir-data.")
@@ -342,8 +343,10 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 		o.WarningPrinter.Print(warnings)
 	}
 	if o.drainer.DryRunStrategy == cmdutil.DryRunClient {
-		for _, pod := range list.Pods() {
-			fmt.Fprintf(o.Out, "evicting pod %s/%s (dry run)\n", pod.Namespace, pod.Name)
+		for _, pods := range o.drainer.GroupPods(list.Pods(), true) {
+			for _, pod := range pods {
+				fmt.Fprintf(o.Out, "evicting pod %s/%s with priority %d (dry run)\n", pod.Namespace, pod.Name, *pod.Spec.Priority)
+			}
 		}
 		return nil
 	}
