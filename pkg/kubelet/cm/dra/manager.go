@@ -28,7 +28,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
-	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -113,11 +112,8 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 				return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", driverName, err)
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), util.PluginTimeout)
-			defer cancel()
-
 			response, err := client.NodePrepareResource(
-				ctx,
+				context.Background(),
 				resourceClaim.Namespace,
 				resourceClaim.UID,
 				resourceClaim.Name,
@@ -223,11 +219,8 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", claimInfo.driverName, err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), util.PluginTimeout)
-		defer cancel()
-
 		response, err := client.NodeUnprepareResource(
-			ctx,
+			context.Background(),
 			claimInfo.namespace,
 			claimInfo.claimUID,
 			claimInfo.claimName,
