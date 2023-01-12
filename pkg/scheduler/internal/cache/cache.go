@@ -512,7 +512,7 @@ func (cache *cacheImpl) AddPod(logger klog.Logger, pod *v1.Pod) error {
 		// When assuming, we've already added the Pod to cache,
 		// Just update here to make sure the Pod's status is up-to-date.
 		if err = cache.updatePod(logger, currState.pod, pod); err != nil {
-			klog.ErrorS(err, "Error occurred while updating pod")
+			logger.Error(err, "Error occurred while updating pod")
 		}
 		if currState.pod.Spec.NodeName != pod.Spec.NodeName {
 			// The pod was added to a different node than it was assumed to.
@@ -552,8 +552,8 @@ func (cache *cacheImpl) UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) er
 	}
 
 	if currState.pod.Spec.NodeName != newPod.Spec.NodeName {
-		klog.ErrorS(nil, "Pod updated on a different node than previously added to", "podKey", key, "pod", klog.KObj(oldPod))
-		klog.ErrorS(nil, "scheduler cache is corrupted and can badly affect scheduling decisions")
+		logger.Error(nil, "Pod updated on a different node than previously added to", "podKey", key, "pod", klog.KObj(oldPod))
+		logger.Error(nil, "scheduler cache is corrupted and can badly affect scheduling decisions")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return cache.updatePod(logger, oldPod, newPod)

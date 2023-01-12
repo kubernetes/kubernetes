@@ -138,7 +138,7 @@ func (sched *Scheduler) schedulingCycle(
 
 		fitError, ok := err.(*framework.FitError)
 		if !ok {
-			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
+			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, framework.AsStatus(err)
 		}
 
@@ -285,7 +285,7 @@ func (sched *Scheduler) handleBindingCycleError(
 	// trigger un-reserve plugins to clean up state associated with the reserved Pod
 	fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 	if forgetErr := sched.Cache.ForgetPod(logger, assumedPod); forgetErr != nil {
-		klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+		logger.Error(forgetErr, "scheduler cache ForgetPod failed")
 	} else {
 		// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
 		// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
@@ -409,7 +409,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
 		msg := s.Message()
 		diagnosis.PreFilterMsg = msg
-		klog.V(5).InfoS("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
+		logger.V(5).Info("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
 		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
 		if s.FailedPlugin() != "" {
 			diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
@@ -673,8 +673,8 @@ func prioritizeNodes(
 	}
 
 	// Additional details logged at level 10 if enabled.
-	klogV := klog.V(10)
-	if klogV.Enabled() {
+	loggerVTen := logger.V(10)
+	if loggerVTen.Enabled() {
 		for _, nodeScore := range nodesScores {
 			for _, pluginScore := range nodeScore.Scores {
 				logger.V(10).Info("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", pluginScore.Name, "node", nodeScore.Name, "score", pluginScore.Score)
@@ -712,7 +712,7 @@ func prioritizeNodes(
 				for i := range *prioritizedList {
 					nodename := (*prioritizedList)[i].Host
 					score := (*prioritizedList)[i].Score
-					if klogV.Enabled() {
+					if loggerVTen.Enabled() {
 						logger.V(10).Info("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", nodename, "score", score)
 					}
 
@@ -744,7 +744,7 @@ func prioritizeNodes(
 		}
 	}
 
-	if klogV.Enabled() {
+	if loggerVTen.Enabled() {
 		for i := range nodesScores {
 			logger.V(10).Info("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", nodesScores[i].Name, "score", nodesScores[i].TotalScore)
 		}
@@ -830,7 +830,7 @@ func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error)
 
 func (sched *Scheduler) finishBinding(logger klog.Logger, fwk framework.Framework, assumed *v1.Pod, targetNode string, status *framework.Status) {
 	if finErr := sched.Cache.FinishBinding(logger, assumed); finErr != nil {
-		klog.ErrorS(finErr, "Scheduler cache FinishBinding failed")
+		logger.Error(finErr, "Scheduler cache FinishBinding failed")
 	}
 	if !status.IsSuccess() {
 		logger.V(1).Info("Failed to bind pod", "pod", klog.KObj(assumed))

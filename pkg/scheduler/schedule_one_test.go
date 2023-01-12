@@ -549,10 +549,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-
 			var gotError error
 			var gotPod *v1.Pod
 			var gotForgetPod *v1.Pod
@@ -584,7 +580,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
-			ctx, cancel = context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			fwk, err := st.NewFramework(registerPluginFuncs,
 				testSchedulerName,
@@ -607,6 +603,13 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 			sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 				return item.mockResult.result, item.mockResult.err
+			}
+			sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, _ *framework.NominatingInfo, _ time.Time) {
+				gotPod = p.Pod
+				gotError = status.AsError()
+
+				msg := truncateMessage(gotError.Error())
+				fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 			}
 			called := make(chan struct{})
 			stopFunc, err := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
@@ -2115,7 +2118,6 @@ func TestSchedulerSchedulePod(t *testing.T) {
 }
 
 func TestFindFitAllError(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -2156,7 +2158,6 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -2372,8 +2373,7 @@ func TestZeroRequest(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			client := clientsetfake.NewSimpleClientset()
@@ -2389,8 +2389,6 @@ func TestZeroRequest(t *testing.T) {
 				st.RegisterPreScorePlugin(selectorspread.Name, selectorspread.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			ctx, cancel = context.WithCancel(context.Background())
-			defer cancel()
 			fwk, err := st.NewFramework(
 				pluginRegistrations, "", ctx.Done(),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -2729,8 +2727,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 }
 
 func TestFairEvaluationForNodes(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	numAllNodes := 500
@@ -2739,8 +2736,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		nodeNames = append(nodeNames, strconv.Itoa(i))
 	}
 	nodes := makeNodeList(nodeNames)
-	ctx, cancel = context.WithCancel(context.Background())
-	defer cancel()
+
 	sched := makeScheduler(ctx, nodes)
 
 	fwk, err := st.NewFramework(

@@ -183,7 +183,7 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 	}
 	// Attempt to reduce down the number of nodes to consider in subsequent scheduling stages if pod has bound claims.
 	var result *framework.PreFilterResult
-	if eligibleNodes := pl.Binder.GetEligibleNodes(podVolumeClaims.boundClaims); eligibleNodes != nil {
+	if eligibleNodes := pl.Binder.GetEligibleNodes(logger, podVolumeClaims.boundClaims); eligibleNodes != nil {
 		result = &framework.PreFilterResult{
 			NodeNames: eligibleNodes,
 		}

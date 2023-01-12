@@ -157,7 +157,7 @@ type SchedulerVolumeBinder interface {
 	//
 	// If eligibleNodes is 'nil', then it indicates that such eligible node reduction cannot be made
 	// and all nodes should be considered.
-	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String)
+	GetEligibleNodes(logger klog.Logger, boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String)
 
 	// FindPodVolumes checks if all of a Pod's PVCs can be satisfied by the
 	// node and returns pod's volumes information.
@@ -387,7 +387,7 @@ func (b *volumeBinder) FindPodVolumes(logger klog.Logger, pod *v1.Pod, podVolume
 //
 // Returning 'nil' for eligibleNodes indicates that such eligible node reduction cannot be made and all nodes
 // should be considered.
-func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
+func (b *volumeBinder) GetEligibleNodes(logger klog.Logger, boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
 	if len(boundClaims) == 0 {
 		return
 	}
@@ -420,12 +420,12 @@ func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim)
 	}
 
 	if len(errs) > 0 {
-		klog.V(4).InfoS("GetEligibleNodes: one or more error occurred finding eligible nodes", "error", errs)
+		logger.V(4).Info("GetEligibleNodes: one or more error occurred finding eligible nodes", "error", errs)
 		return nil
 	}
 
 	if eligibleNodes != nil {
-		klog.V(4).InfoS("GetEligibleNodes: reduced down eligible nodes", "nodes", eligibleNodes)
+		logger.V(4).Info("GetEligibleNodes: reduced down eligible nodes", "nodes", eligibleNodes)
 	}
 	return
 }
@@ -591,7 +591,7 @@ func (b *volumeBinder) bindAPIUpdate(logger klog.Logger, pod *v1.Pod, bindings [
 		logger.V(5).Info("Updating claims objects to trigger volume provisioning", "pod", klog.KObj(pod), "PVC", klog.KObj(claim))
 		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
 		if err != nil {
-			klog.V(4).InfoS("Updating PersistentVolumeClaim: binding to volume failed", "PVC", klog.KObj(claim), "err", err)
+			logger.V(4).Info("Updating PersistentVolumeClaim: binding to volume failed", "PVC", klog.KObj(claim), "err", err)
 			return err
 		}
 

@@ -107,6 +107,7 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 }
 
 func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology, *framework.Status) {
+	logger := klog.FromContext(ctx)
 	podPVTopologies := make([]pvTopology, 0)
 
 	for i := range pod.Spec.Volumes {
@@ -154,7 +155,7 @@ func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology
 			if value, ok := pv.ObjectMeta.Labels[key]; ok {
 				volumeVSet, err := volumehelpers.LabelZonesToSet(value)
 				if err != nil {
-					klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
+					logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
 					continue
 				}
 				podPVTopologies = append(podPVTopologies, pvTopology{

@@ -530,7 +530,7 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 			m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
 				WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
-			got, _ := q.addToActiveQ(q.newQueuedPodInfo(tt.pod))
+			got, _ := q.addToActiveQ(logger, q.newQueuedPodInfo(tt.pod))
 			if got != tt.wantSuccess {
 				t.Errorf("Unexpected result: want %v, but got %v", tt.wantSuccess, got)
 			}
@@ -551,6 +551,7 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 }
 
 func TestPriorityQueue_flushBackoffQCompleted(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name                       string
 		plugin                     framework.PreEnqueuePlugin
@@ -582,7 +583,7 @@ func TestPriorityQueue_flushBackoffQCompleted(t *testing.T) {
 			pInfo := newQueuedPodInfoForLookup(tt.pod)
 			pInfo.Gated = true
 			for _, op := range tt.operations {
-				op(q, pInfo)
+				op(logger, q, pInfo)
 			}
 			if tt.wantPreEnqueuePluginCalled != tt.plugin.(*preEnqueuePlugin).called {
 				t.Errorf("Unexpected number of calling preEnqueue: want %v, but got %v", tt.wantPreEnqueuePluginCalled, tt.plugin.(*preEnqueuePlugin).called)

@@ -2441,7 +2441,8 @@ func TestGetEligibleNodes(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType) {
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		// Setup
@@ -2452,7 +2453,7 @@ func TestGetEligibleNodes(t *testing.T) {
 		testEnv.initClaims(scenario.pvcs, scenario.pvcs)
 
 		// Execute
-		eligibleNodes := testEnv.binder.GetEligibleNodes(scenario.pvcs)
+		eligibleNodes := testEnv.binder.GetEligibleNodes(logger, scenario.pvcs)
 
 		// Validate
 		if reflect.DeepEqual(scenario.eligibleNodes, eligibleNodes) {

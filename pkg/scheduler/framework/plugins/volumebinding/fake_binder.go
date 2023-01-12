@@ -54,7 +54,7 @@ func (b *FakeVolumeBinder) GetPodVolumeClaims(_ klog.Logger, pod *v1.Pod) (podVo
 }
 
 // GetEligibleNodes implements SchedulerVolumeBinder.GetEligibleNodes.
-func (b *FakeVolumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
+func (b *FakeVolumeBinder) GetEligibleNodes(logger klog.Logger, boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
 	return nil
 }
 
