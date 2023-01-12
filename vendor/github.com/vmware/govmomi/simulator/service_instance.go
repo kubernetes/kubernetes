@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/simulator/vpx"
+
+	"github.com/vmware/govmomi/simulator/internal"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -33,8 +33,11 @@ type ServiceInstance struct {
 	mo.ServiceInstance
 }
 
-func NewServiceInstance(content types.ServiceContent, folder mo.Folder) *ServiceInstance {
+func NewServiceInstance(ctx *Context, content types.ServiceContent, folder mo.Folder) *ServiceInstance {
+	// TODO: This function ignores the passed in Map and operates on the
+	// global Map.
 	Map = NewRegistry()
+	ctx.Map = Map
 
 	s := &ServiceInstance{}
 
@@ -46,52 +49,23 @@ func NewServiceInstance(content types.ServiceContent, folder mo.Folder) *Service
 	f := &Folder{Folder: folder}
 	Map.Put(f)
 
-	var setting []types.BaseOptionValue
-
 	if content.About.ApiType == "HostAgent" {
-		CreateDefaultESX(f)
+		CreateDefaultESX(ctx, f)
 	} else {
 		content.About.InstanceUuid = uuid.New().String()
-		setting = vpx.Setting
 	}
 
-	objects := []object.Reference{
-		NewSessionManager(*s.Content.SessionManager),
-		NewAuthorizationManager(*s.Content.AuthorizationManager),
-		NewPerformanceManager(*s.Content.PerfManager),
-		NewPropertyCollector(s.Content.PropertyCollector),
-		NewFileManager(*s.Content.FileManager),
-		NewVirtualDiskManager(*s.Content.VirtualDiskManager),
-		NewLicenseManager(*s.Content.LicenseManager),
-		NewSearchIndex(*s.Content.SearchIndex),
-		NewViewManager(*s.Content.ViewManager),
-		NewEventManager(*s.Content.EventManager),
-		NewTaskManager(*s.Content.TaskManager),
-		NewUserDirectory(*s.Content.UserDirectory),
-		NewOptionManager(s.Content.Setting, setting),
-		NewStorageResourceManager(*s.Content.StorageResourceManager),
-	}
+	refs := mo.References(content)
 
-	switch content.VStorageObjectManager.Type {
-	case "HostVStorageObjectManager":
-		// TODO: NewHostVStorageObjectManager(*content.VStorageObjectManager)
-	case "VcenterVStorageObjectManager":
-		objects = append(objects, NewVcenterVStorageObjectManager(*content.VStorageObjectManager))
-	}
-
-	if s.Content.CustomFieldsManager != nil {
-		objects = append(objects, NewCustomFieldsManager(*s.Content.CustomFieldsManager))
-	}
-
-	if s.Content.IpPoolManager != nil {
-		objects = append(objects, NewIpPoolManager(*s.Content.IpPoolManager))
-	}
-
-	if s.Content.AccountManager != nil {
-		objects = append(objects, NewHostLocalAccountManager(*s.Content.AccountManager))
-	}
-
-	for _, o := range objects {
+	for i := range refs {
+		if Map.Get(refs[i]) != nil {
+			continue
+		}
+		content := types.ObjectContent{Obj: refs[i]}
+		o, err := loadObject(content)
+		if err != nil {
+			panic(err)
+		}
 		Map.Put(o)
 	}
 
@@ -110,6 +84,16 @@ func (*ServiceInstance) CurrentTime(*types.CurrentTime) soap.HasFault {
 	return &methods.CurrentTimeBody{
 		Res: &types.CurrentTimeResponse{
 			Returnval: time.Now(),
+		},
+	}
+}
+
+func (s *ServiceInstance) RetrieveInternalContent(*internal.RetrieveInternalContent) soap.HasFault {
+	return &internal.RetrieveInternalContentBody{
+		Res: &internal.RetrieveInternalContentResponse{
+			Returnval: internal.InternalServiceInstanceContent{
+				NfcService: types.ManagedObjectReference{Type: "NfcService", Value: "NfcService"},
+			},
 		},
 	}
 }
