@@ -88,6 +88,7 @@ type EventedPLEG struct {
 func NewEventedPLEG(runtime kubecontainer.Runtime, runtimeService internalapi.RuntimeService, eventChannel chan *PodLifecycleEvent,
 	cache kubecontainer.Cache, genericPleg PodLifecycleEventGenerator, eventedPlegMaxStreamRetries int,
 	relistDuration *RelistDuration, clock clock.Clock) PodLifecycleEventGenerator {
+	fmt.Println("-------------> Runtime", runtime.Type())
 	return &EventedPLEG{
 		runtime:                     runtime,
 		runtimeService:              runtimeService,
