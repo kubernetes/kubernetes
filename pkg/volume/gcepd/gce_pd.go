@@ -20,7 +20,6 @@ limitations under the License.
 package gcepd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,7 +37,6 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -55,21 +53,9 @@ var _ volume.PersistentVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.DeletableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.ProvisionableVolumePlugin = &gcePersistentDiskPlugin{}
 var _ volume.ExpandableVolumePlugin = &gcePersistentDiskPlugin{}
-var _ volume.VolumePluginWithAttachLimits = &gcePersistentDiskPlugin{}
 
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
-)
-
-// The constants are used to map from the machine type (number of CPUs) to the limit of
-// persistent disks that can be attached to an instance. Please refer to gcloud doc
-// https://cloud.google.com/compute/docs/machine-types
-// These constants are all the documented attach limit minus one because the
-// node boot disk is considered an attachable disk so effective attach limit is
-// one less.
-const (
-	volumeLimitSmall = 15
-	volumeLimitBig   = 127
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -120,50 +106,6 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 		v1.ReadWriteOnce,
 		v1.ReadOnlyMany,
 	}
-}
-
-func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
-	volumeLimits := map[string]int64{
-		util.GCEVolumeLimitKey: volumeLimitSmall,
-	}
-	cloud := plugin.host.GetCloudProvider()
-
-	// if we can't fetch cloudprovider we return an error
-	// hoping external CCM or admin can set it. Returning
-	// default values from here will mean, no one can
-	// override them.
-	if cloud == nil {
-		return nil, fmt.Errorf("no cloudprovider present")
-	}
-
-	if cloud.ProviderName() != gcecloud.ProviderName {
-		return nil, fmt.Errorf("expected gce cloud got %s", cloud.ProviderName())
-	}
-
-	instances, ok := cloud.Instances()
-	if !ok {
-		klog.Warning("Failed to get instances from cloud provider")
-		return volumeLimits, nil
-	}
-
-	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
-	if err != nil {
-		klog.Errorf("Failed to get instance type from GCE cloud provider")
-		return volumeLimits, nil
-	}
-	smallMachineTypes := []string{"f1-micro", "g1-small", "e2-micro", "e2-small", "e2-medium"}
-	for _, small := range smallMachineTypes {
-		if instanceType == small {
-			volumeLimits[util.GCEVolumeLimitKey] = volumeLimitSmall
-			return volumeLimits, nil
-		}
-	}
-	volumeLimits[util.GCEVolumeLimitKey] = volumeLimitBig
-	return volumeLimits, nil
-}
-
-func (plugin *gcePersistentDiskPlugin) VolumeLimitKey(spec *volume.Spec) string {
-	return util.GCEVolumeLimitKey
 }
 
 func (plugin *gcePersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
