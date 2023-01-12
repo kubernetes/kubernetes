@@ -20,6 +20,8 @@ import (
 	"strings"
 
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/simulator/esx"
+	"github.com/vmware/govmomi/simulator/vpx"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -37,6 +39,16 @@ func NewOptionManager(ref *types.ManagedObjectReference, setting []types.BaseOpt
 	}
 	s.Setting = setting
 	return s
+}
+
+func (m *OptionManager) init(r *Registry) {
+	if len(m.Setting) == 0 {
+		if r.IsVPX() {
+			m.Setting = vpx.Setting
+		} else {
+			m.Setting = esx.Setting
+		}
+	}
 }
 
 func (m *OptionManager) QueryOptions(req *types.QueryOptions) soap.HasFault {

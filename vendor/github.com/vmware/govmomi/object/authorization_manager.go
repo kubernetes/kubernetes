@@ -172,3 +172,50 @@ func (m AuthorizationManager) UpdateRole(ctx context.Context, id int32, name str
 	_, err := methods.UpdateAuthorizationRole(ctx, m.Client(), &req)
 	return err
 }
+
+func (m AuthorizationManager) HasUserPrivilegeOnEntities(ctx context.Context, entities []types.ManagedObjectReference, userName string, privID []string) ([]types.EntityPrivilege, error) {
+	req := types.HasUserPrivilegeOnEntities{
+		This:     m.Reference(),
+		Entities: entities,
+		UserName: userName,
+		PrivId:   privID,
+	}
+
+	res, err := methods.HasUserPrivilegeOnEntities(ctx, m.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Returnval, nil
+}
+
+func (m AuthorizationManager) HasPrivilegeOnEntity(ctx context.Context, entity types.ManagedObjectReference, sessionID string, privID []string) ([]bool, error) {
+	req := types.HasPrivilegeOnEntity{
+		This:      m.Reference(),
+		Entity:    entity,
+		SessionId: sessionID,
+		PrivId:    privID,
+	}
+
+	res, err := methods.HasPrivilegeOnEntity(ctx, m.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Returnval, nil
+}
+
+func (m AuthorizationManager) FetchUserPrivilegeOnEntities(ctx context.Context, entities []types.ManagedObjectReference, userName string) ([]types.UserPrivilegeResult, error) {
+	req := types.FetchUserPrivilegeOnEntities{
+		This:     m.Reference(),
+		Entities: entities,
+		UserName: userName,
+	}
+
+	res, err := methods.FetchUserPrivilegeOnEntities(ctx, m.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Returnval, nil
+}
