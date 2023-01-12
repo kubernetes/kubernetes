@@ -110,7 +110,7 @@ func (v *reconcileWithSchemaWalker) finishDescent(v2 *reconcileWithSchemaWalker)
 }
 
 // ReconcileFieldSetWithSchema reconciles the a field set with any changes to the
-//// object's schema since the field set was written. Returns the reconciled field set, or nil of
+// object's schema since the field set was written. Returns the reconciled field set, or nil of
 // no changes were made to the field set.
 //
 // Supports:
