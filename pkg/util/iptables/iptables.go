@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
-	utilwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	utiltrace "k8s.io/utils/trace"
@@ -569,7 +569,7 @@ const (
 // Monitor is part of Interface
 func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
 	for {
-		_ = utilwait.PollImmediateUntil(interval, func() (bool, error) {
+		_ = wait.PollImmediateUntil(interval, func() (bool, error) {
 			for _, table := range tables {
 				if _, err := runner.EnsureChain(table, canary); err != nil {
 					klog.ErrorS(err, "Could not set up iptables canary", "table", table, "chain", canary)
@@ -580,7 +580,7 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 		}, stopCh)
 
 		// Poll until stopCh is closed or iptables is flushed
-		err := utilwait.PollUntil(interval, func() (bool, error) {
+		err := wait.PollUntil(interval, func() (bool, error) {
 			if exists, err := runner.ChainExists(tables[0], canary); exists {
 				return false, nil
 			} else if isResourceError(err) {
@@ -590,7 +590,7 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 			klog.V(2).InfoS("IPTables canary deleted", "table", tables[0], "chain", canary)
 			// Wait for the other canaries to be deleted too before returning
 			// so we don't start reloading too soon.
-			err := utilwait.PollImmediate(iptablesFlushPollTime, iptablesFlushTimeout, func() (bool, error) {
+			err := wait.PollImmediate(iptablesFlushPollTime, iptablesFlushTimeout, func() (bool, error) {
 				for i := 1; i < len(tables); i++ {
 					if exists, err := runner.ChainExists(tables[i], canary); exists || isResourceError(err) {
 						return false, nil

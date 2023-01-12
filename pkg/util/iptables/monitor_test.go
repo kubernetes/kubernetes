@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/exec"
 )
 
@@ -284,7 +284,7 @@ func TestIPTablesMonitor(t *testing.T) {
 }
 
 func waitForChains(mfe *monitorFakeExec, canary Chain, tables []Table) error {
-	return utilwait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
+	return wait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
 		mfe.Lock()
 		defer mfe.Unlock()
 
@@ -307,7 +307,7 @@ func ensureNoChains(mfe *monitorFakeExec) bool {
 
 func waitForReloads(reloads *uint32, expected uint32) error {
 	if atomic.LoadUint32(reloads) < expected {
-		utilwait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
+		wait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
 			return atomic.LoadUint32(reloads) >= expected, nil
 		})
 	}
@@ -319,7 +319,7 @@ func waitForReloads(reloads *uint32, expected uint32) error {
 }
 
 func waitForNoReload(reloads *uint32, expected uint32) error {
-	utilwait.PollImmediate(50*time.Millisecond, 250*time.Millisecond, func() (bool, error) {
+	wait.PollImmediate(50*time.Millisecond, 250*time.Millisecond, func() (bool, error) {
 		return atomic.LoadUint32(reloads) > expected, nil
 	})
 
@@ -331,7 +331,7 @@ func waitForNoReload(reloads *uint32, expected uint32) error {
 }
 
 func waitForBlocked(mfe *monitorFakeExec) error {
-	return utilwait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
+	return wait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
 		blocked := mfe.getWasBlocked()
 		return blocked, nil
 	})

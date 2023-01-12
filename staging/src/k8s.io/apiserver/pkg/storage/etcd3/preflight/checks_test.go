@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	utilwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 func TestParseServerURIGood(t *testing.T) {
@@ -100,7 +100,7 @@ func TestCheckEtcdServers(t *testing.T) {
 }
 
 func TestPollCheckServer(t *testing.T) {
-	err := utilwait.PollImmediate(1*time.Microsecond,
+	err := wait.PollImmediate(1*time.Microsecond,
 		2*time.Microsecond,
 		EtcdConnection{ServerList: []string{""}}.CheckEtcdServers)
 	if err == nil {

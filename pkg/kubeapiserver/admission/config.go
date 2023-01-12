@@ -25,7 +25,7 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 
-	utilwait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -74,7 +74,7 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 
 	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {
 		discoveryRESTMapper.Reset()
-		go utilwait.Until(discoveryRESTMapper.Reset, 30*time.Second, context.StopCh)
+		go wait.Until(discoveryRESTMapper.Reset, 30*time.Second, context.StopCh)
 		return nil
 	}
 
