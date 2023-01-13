@@ -75,29 +75,22 @@ func (c *Common) SetInventoryPath(p string) {
 	c.InventoryPath = p
 }
 
-// ObjectName returns the base name of the InventoryPath field if set,
-// otherwise fetches the mo.ManagedEntity.Name field via the property collector.
+// ObjectName fetches the mo.ManagedEntity.Name field via the property collector.
 func (c Common) ObjectName(ctx context.Context) (string, error) {
-	var o mo.ManagedEntity
+	var content []types.ObjectContent
 
-	err := c.Properties(ctx, c.Reference(), []string{"name"}, &o)
+	err := c.Properties(ctx, c.Reference(), []string{"name"}, &content)
 	if err != nil {
 		return "", err
 	}
 
-	if o.Name != "" {
-		return o.Name, nil
+	for i := range content {
+		for _, prop := range content[i].PropSet {
+			return prop.Val.(string), nil
+		}
 	}
 
-	// Network has its own "name" field...
-	var n mo.Network
-
-	err = c.Properties(ctx, c.Reference(), []string{"name"}, &n)
-	if err != nil {
-		return "", err
-	}
-
-	return n.Name, nil
+	return "", nil
 }
 
 // Properties is a wrapper for property.DefaultCollector().RetrieveOne()
@@ -141,4 +134,15 @@ func (c Common) SetCustomValue(ctx context.Context, key string, value string) er
 
 	_, err := methods.SetCustomValue(ctx, c.c, &req)
 	return err
+}
+
+func ReferenceFromString(s string) *types.ManagedObjectReference {
+	var ref types.ManagedObjectReference
+	if !ref.FromString(s) {
+		return nil
+	}
+	if mo.IsManagedObjectType(ref.Type) {
+		return &ref
+	}
+	return nil
 }

@@ -297,10 +297,8 @@ func (f *DatastoreFile) TailFunc(lines int, include func(line int, message strin
 
 			nread = bsize + remain
 			eof = true
-		} else {
-			if pos, err = f.Seek(offset, io.SeekEnd); err != nil {
-				return err
-			}
+		} else if pos, err = f.Seek(offset, io.SeekEnd); err != nil {
+			return err
 		}
 
 		if _, err = io.CopyN(buf, f, nread); err != nil {

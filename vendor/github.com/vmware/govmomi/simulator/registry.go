@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017-2018 VMware, Inc. All Rights Reserved.
+Copyright (c) 2017-2021 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,14 +19,17 @@ package simulator
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 
+	"github.com/vmware/govmomi/simulator/internal"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -42,9 +45,16 @@ var refValueMap = map[string]string{
 	"VirtualMachineSnapshot":         "snapshot",
 	"VmwareDistributedVirtualSwitch": "dvs",
 	"DistributedVirtualSwitch":       "dvs",
+	"ClusterComputeResource":         "domain-c",
+	"Folder":                         "group",
+	"StoragePod":                     "group-p",
 }
 
 // Map is the default Registry instance.
+//
+// TODO/WIP: To support the eventual removal of this unsyncronized global
+// variable, the Map should be accessed through any Context.Map that is passed
+// in to functions that may need it.
 var Map = NewRegistry()
 
 // RegisterObject interface supports callbacks when objects are created, updated and deleted from the Registry
@@ -52,7 +62,7 @@ type RegisterObject interface {
 	mo.Reference
 	PutObject(mo.Reference)
 	UpdateObject(mo.Reference, []types.PropertyChange)
-	RemoveObject(types.ManagedObjectReference)
+	RemoveObject(*Context, types.ManagedObjectReference)
 }
 
 // Registry manages a map of mo.Reference objects
@@ -61,10 +71,11 @@ type Registry struct {
 	m        sync.Mutex
 	objects  map[types.ManagedObjectReference]mo.Reference
 	handlers map[types.ManagedObjectReference]RegisterObject
-	locks    map[types.ManagedObjectReference]sync.Locker
+	locks    map[types.ManagedObjectReference]*internal.ObjectLock
 
 	Namespace string
 	Path      string
+	Handler   func(*Context, *Method) (mo.Reference, types.BaseMethodFault)
 
 	tagManager tagManager
 }
@@ -82,7 +93,7 @@ func NewRegistry() *Registry {
 	r := &Registry{
 		objects:  make(map[types.ManagedObjectReference]mo.Reference),
 		handlers: make(map[types.ManagedObjectReference]RegisterObject),
-		locks:    make(map[types.ManagedObjectReference]sync.Locker),
+		locks:    make(map[types.ManagedObjectReference]*internal.ObjectLock),
 
 		Namespace: vim25.Namespace,
 		Path:      vim25.Path,
@@ -107,11 +118,16 @@ func typeName(item mo.Reference) string {
 
 // valuePrefix returns the value name prefix of a given object
 func valuePrefix(typeName string) string {
-	if v, ok := refValueMap[typeName]; ok {
-		return v
+	v, ok := refValueMap[typeName]
+	if ok {
+		if strings.Contains(v, "-") {
+			return v
+		}
+	} else {
+		v = strings.ToLower(typeName)
 	}
 
-	return strings.ToLower(typeName)
+	return v + "-"
 }
 
 // newReference returns a new MOR, where Type defaults to type of the given item
@@ -125,7 +141,7 @@ func (r *Registry) newReference(item mo.Reference) types.ManagedObjectReference 
 
 	if ref.Value == "" {
 		n := atomic.AddInt64(&r.counter, 1)
-		ref.Value = fmt.Sprintf("%s-%d", valuePrefix(ref.Type), n)
+		ref.Value = fmt.Sprintf("%s%d", valuePrefix(ref.Type), n)
 	}
 
 	return ref
@@ -140,6 +156,13 @@ func (r *Registry) setReference(item mo.Reference, ref types.ManagedObjectRefere
 func (r *Registry) AddHandler(h RegisterObject) {
 	r.m.Lock()
 	r.handlers[h.Reference()] = h
+	r.m.Unlock()
+}
+
+// RemoveHandler removes a RegisterObject handler from the Registry.
+func (r *Registry) RemoveHandler(h RegisterObject) {
+	r.m.Lock()
+	delete(r.handlers, h.Reference())
 	r.m.Unlock()
 }
 
@@ -205,6 +228,22 @@ func (r *Registry) All(kind string) []mo.Entity {
 	return entities
 }
 
+// AllReference returns all mo.Reference objects of type specified by kind.
+// If kind is empty - all objects will be returned.
+func (r *Registry) AllReference(kind string) []mo.Reference {
+	r.m.Lock()
+	defer r.m.Unlock()
+
+	var objs []mo.Reference
+	for ref, val := range r.objects {
+		if kind == "" || ref.Type == kind {
+			objs = append(objs, val)
+		}
+	}
+
+	return objs
+}
+
 // applyHandlers calls the given func for each r.handlers
 func (r *Registry) applyHandlers(f func(o RegisterObject)) {
 	r.m.Lock()
@@ -219,15 +258,18 @@ func (r *Registry) applyHandlers(f func(o RegisterObject)) {
 	}
 }
 
-// Put adds a new object to Registry, generating a ManagedObjectReference if not already set.
-func (r *Registry) Put(item mo.Reference) mo.Reference {
-	r.m.Lock()
-
+func (r *Registry) reference(item mo.Reference) types.ManagedObjectReference {
 	ref := item.Reference()
 	if ref.Type == "" || ref.Value == "" {
 		ref = r.newReference(item)
 		r.setReference(item, ref)
 	}
+	return ref
+}
+
+// Put adds a new object to Registry, generating a ManagedObjectReference if not already set.
+func (r *Registry) Put(item mo.Reference) mo.Reference {
+	r.m.Lock()
 
 	if me, ok := item.(mo.Entity); ok {
 		me.Entity().ConfigStatus = types.ManagedEntityStatusGreen
@@ -235,7 +277,7 @@ func (r *Registry) Put(item mo.Reference) mo.Reference {
 		me.Entity().EffectiveRole = []int32{-1} // Admin
 	}
 
-	r.objects[ref] = item
+	r.objects[r.reference(item)] = item
 
 	r.m.Unlock()
 
@@ -247,9 +289,9 @@ func (r *Registry) Put(item mo.Reference) mo.Reference {
 }
 
 // Remove removes an object from the Registry.
-func (r *Registry) Remove(item types.ManagedObjectReference) {
+func (r *Registry) Remove(ctx *Context, item types.ManagedObjectReference) {
 	r.applyHandlers(func(o RegisterObject) {
-		o.RemoveObject(item)
+		o.RemoveObject(ctx, item)
 	})
 
 	r.m.Lock()
@@ -283,15 +325,24 @@ func (r *Registry) Update(obj mo.Reference, changes []types.PropertyChange) {
 	})
 }
 
+func (r *Registry) AtomicUpdate(ctx *Context, obj mo.Reference, changes []types.PropertyChange) {
+	r.WithLock(ctx, obj, func() {
+		r.Update(obj, changes)
+	})
+}
+
 // getEntityParent traverses up the inventory and returns the first object of type kind.
 // If no object of type kind is found, the method will panic when it reaches the
 // inventory root Folder where the Parent field is nil.
 func (r *Registry) getEntityParent(item mo.Entity, kind string) mo.Entity {
+	var ok bool
 	for {
 		parent := item.Entity().Parent
 
-		item = r.Get(*parent).(mo.Entity)
-
+		item, ok = r.Get(*parent).(mo.Entity)
+		if !ok {
+			return nil
+		}
 		if item.Reference().Type == kind {
 			return item
 		}
@@ -300,11 +351,15 @@ func (r *Registry) getEntityParent(item mo.Entity, kind string) mo.Entity {
 
 // getEntityDatacenter returns the Datacenter containing the given item
 func (r *Registry) getEntityDatacenter(item mo.Entity) *Datacenter {
-	return r.getEntityParent(item, "Datacenter").(*Datacenter)
+	dc, ok := r.getEntityParent(item, "Datacenter").(*Datacenter)
+	if ok {
+		return dc
+	}
+	return nil
 }
 
-func (r *Registry) getEntityFolder(item mo.Entity, kind string) *Folder {
-	dc := Map.getEntityDatacenter(item)
+func (r *Registry) getEntityFolder(item mo.Entity, kind string) *mo.Folder {
+	dc := r.getEntityDatacenter(item)
 
 	var ref types.ManagedObjectReference
 
@@ -313,12 +368,12 @@ func (r *Registry) getEntityFolder(item mo.Entity, kind string) *Folder {
 		ref = dc.DatastoreFolder
 	}
 
-	folder := r.Get(ref).(*Folder)
+	folder, _ := asFolderMO(r.Get(ref))
 
 	// If Model was created with Folder option, use that Folder; else use top-level folder
 	for _, child := range folder.ChildEntity {
 		if child.Type == "Folder" {
-			folder = Map.Get(child).(*Folder)
+			folder, _ = asFolderMO(r.Get(child))
 			break
 		}
 	}
@@ -344,6 +399,31 @@ func (r *Registry) getEntityComputeResource(item mo.Entity) mo.Entity {
 	}
 }
 
+func entityName(e mo.Entity) string {
+	name := e.Entity().Name
+	if name != "" {
+		return name
+	}
+
+	obj := getManagedObject(e).Addr().Interface()
+
+	// The types below have their own 'Name' field, so ManagedEntity.Name (me.Name) is empty.
+	// See also mo.Ancestors
+	switch x := obj.(type) {
+	case *mo.Network:
+		return x.Name
+	case *mo.DistributedVirtualSwitch:
+		return x.Name
+	case *mo.DistributedVirtualPortgroup:
+		return x.Name
+	case *mo.OpaqueNetwork:
+		return x.Name
+	}
+
+	log.Panicf("%T object %s does not have a Name", obj, e.Reference())
+	return name
+}
+
 // FindByName returns the first mo.Entity of the given refs whose Name field is equal to the given name.
 // If there is no match, nil is returned.
 // This method is useful for cases where objects are required to have a unique name, such as Datastore with
@@ -351,7 +431,7 @@ func (r *Registry) getEntityComputeResource(item mo.Entity) mo.Entity {
 func (r *Registry) FindByName(name string, refs []types.ManagedObjectReference) mo.Entity {
 	for _, ref := range refs {
 		if e, ok := r.Get(ref).(mo.Entity); ok {
-			if name == e.Entity().Name {
+			if name == entityName(e) {
 				return e
 			}
 		}
@@ -374,15 +454,15 @@ func FindReference(refs []types.ManagedObjectReference, match ...types.ManagedOb
 }
 
 // AppendReference appends the given refs to field.
-func (r *Registry) AppendReference(obj mo.Reference, field *[]types.ManagedObjectReference, ref ...types.ManagedObjectReference) {
-	r.WithLock(obj, func() {
+func (r *Registry) AppendReference(ctx *Context, obj mo.Reference, field *[]types.ManagedObjectReference, ref ...types.ManagedObjectReference) {
+	r.WithLock(ctx, obj, func() {
 		*field = append(*field, ref...)
 	})
 }
 
 // AddReference appends ref to field if not already in the given field.
-func (r *Registry) AddReference(obj mo.Reference, field *[]types.ManagedObjectReference, ref types.ManagedObjectReference) {
-	r.WithLock(obj, func() {
+func (r *Registry) AddReference(ctx *Context, obj mo.Reference, field *[]types.ManagedObjectReference, ref types.ManagedObjectReference) {
+	r.WithLock(ctx, obj, func() {
 		if FindReference(*field, ref) == nil {
 			*field = append(*field, ref)
 		}
@@ -400,14 +480,14 @@ func RemoveReference(field *[]types.ManagedObjectReference, ref types.ManagedObj
 }
 
 // RemoveReference removes ref from the given field.
-func (r *Registry) RemoveReference(obj mo.Reference, field *[]types.ManagedObjectReference, ref types.ManagedObjectReference) {
-	r.WithLock(obj, func() {
+func (r *Registry) RemoveReference(ctx *Context, obj mo.Reference, field *[]types.ManagedObjectReference, ref types.ManagedObjectReference) {
+	r.WithLock(ctx, obj, func() {
 		RemoveReference(field, ref)
 	})
 }
 
-func (r *Registry) removeString(obj mo.Reference, field *[]string, val string) {
-	r.WithLock(obj, func() {
+func (r *Registry) removeString(ctx *Context, obj mo.Reference, field *[]string, val string) {
+	r.WithLock(ctx, obj, func() {
 		for i, name := range *field {
 			if name == val {
 				*field = append((*field)[:i], (*field)[i+1:]...)
@@ -446,9 +526,20 @@ func (r *Registry) FileManager() *FileManager {
 	return r.Get(r.content().FileManager.Reference()).(*FileManager)
 }
 
+type VirtualDiskManagerInterface interface {
+	mo.Reference
+	MO() mo.VirtualDiskManager
+	CreateVirtualDiskTask(*Context, *types.CreateVirtualDisk_Task) soap.HasFault
+	DeleteVirtualDiskTask(*Context, *types.DeleteVirtualDisk_Task) soap.HasFault
+	MoveVirtualDiskTask(*Context, *types.MoveVirtualDisk_Task) soap.HasFault
+	CopyVirtualDiskTask(*Context, *types.CopyVirtualDisk_Task) soap.HasFault
+	QueryVirtualDiskUuid(*Context, *types.QueryVirtualDiskUuid) soap.HasFault
+	SetVirtualDiskUuid(*Context, *types.SetVirtualDiskUuid) soap.HasFault
+}
+
 // VirtualDiskManager returns the VirtualDiskManager singleton
-func (r *Registry) VirtualDiskManager() *VirtualDiskManager {
-	return r.Get(r.content().VirtualDiskManager.Reference()).(*VirtualDiskManager)
+func (r *Registry) VirtualDiskManager() VirtualDiskManagerInterface {
+	return r.Get(r.content().VirtualDiskManager.Reference()).(VirtualDiskManagerInterface)
 }
 
 // ViewManager returns the ViewManager singleton
@@ -476,6 +567,11 @@ func (r *Registry) CustomFieldsManager() *CustomFieldsManager {
 	return r.Get(r.content().CustomFieldsManager.Reference()).(*CustomFieldsManager)
 }
 
+// TenantManager returns TenantManager singleton
+func (r *Registry) TenantManager() *TenantManager {
+	return r.Get(r.content().TenantManager.Reference()).(*TenantManager)
+}
+
 func (r *Registry) MarshalJSON() ([]byte, error) {
 	r.m.Lock()
 	defer r.m.Unlock()
@@ -491,7 +587,7 @@ func (r *Registry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(vars)
 }
 
-func (r *Registry) locker(obj mo.Reference) sync.Locker {
+func (r *Registry) locker(obj mo.Reference) *internal.ObjectLock {
 	var ref types.ManagedObjectReference
 
 	switch x := obj.(type) {
@@ -502,17 +598,27 @@ func (r *Registry) locker(obj mo.Reference) sync.Locker {
 		ref = *x
 		obj = r.Get(ref) // to check for sync.Locker
 	default:
-		ref = obj.Reference()
+		// Use of obj.Reference() may cause a read race, prefer the mo 'Self' field to avoid this
+		self := reflect.ValueOf(obj).Elem().FieldByName("Self")
+		if self.IsValid() {
+			ref = self.Interface().(types.ManagedObjectReference)
+		} else {
+			ref = obj.Reference()
+		}
 	}
 
 	if mu, ok := obj.(sync.Locker); ok {
-		return mu
+		// Objects that opt out of default locking are responsible for
+		// implementing their own lock sharing, if needed. Returning
+		// nil as heldBy means that WithLock will call Lock/Unlock
+		// every time.
+		return internal.NewObjectLock(mu)
 	}
 
 	r.m.Lock()
 	mu, ok := r.locks[ref]
 	if !ok {
-		mu = new(sync.Mutex)
+		mu = internal.NewObjectLock(new(sync.Mutex))
 		r.locks[ref] = mu
 	}
 	r.m.Unlock()
@@ -523,13 +629,29 @@ func (r *Registry) locker(obj mo.Reference) sync.Locker {
 var enableLocker = os.Getenv("VCSIM_LOCKER") != "false"
 
 // WithLock holds a lock for the given object while then given function is run.
-func (r *Registry) WithLock(obj mo.Reference, f func()) {
-	if enableLocker {
-		mu := r.locker(obj)
-		mu.Lock()
-		defer mu.Unlock()
-	}
+func (r *Registry) WithLock(onBehalfOf *Context, obj mo.Reference, f func()) {
+	unlock := r.AcquireLock(onBehalfOf, obj)
 	f()
+	unlock()
+}
+
+// AcquireLock acquires the lock for onBehalfOf then returns. The lock MUST be
+// released by calling the returned function. WithLock should be preferred
+// wherever possible.
+func (r *Registry) AcquireLock(onBehalfOf *Context, obj mo.Reference) func() {
+	if onBehalfOf == nil {
+		panic(fmt.Sprintf("Attempt to lock %v with nil onBehalfOf", obj))
+	}
+
+	if !enableLocker {
+		return func() {}
+	}
+
+	l := r.locker(obj)
+	l.Acquire(onBehalfOf)
+	return func() {
+		l.Release(onBehalfOf)
+	}
 }
 
 // nopLocker can be embedded to opt-out of auto-locking (see Registry.WithLock)

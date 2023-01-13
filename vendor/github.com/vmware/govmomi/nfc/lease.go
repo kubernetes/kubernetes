@@ -18,16 +18,15 @@ package nfc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"path"
 
 	"github.com/vmware/govmomi/property"
+	"github.com/vmware/govmomi/task"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
-	"github.com/vmware/govmomi/vim25/progress"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 )
@@ -195,7 +194,7 @@ func (l *Lease) Wait(ctx context.Context, items []types.OvfFileItem) (*LeaseInfo
 	}
 
 	if lease.Error != nil {
-		return nil, errors.New(lease.Error.LocalizedMessage)
+		return nil, &task.Error{LocalizedMethodFault: lease.Error}
 	}
 
 	return nil, fmt.Errorf("unexpected nfc lease state: %s", lease.State)
@@ -208,8 +207,6 @@ func (l *Lease) StartUpdater(ctx context.Context, info *LeaseInfo) *LeaseUpdater
 func (l *Lease) Upload(ctx context.Context, item FileItem, f io.Reader, opts soap.Upload) error {
 	if opts.Progress == nil {
 		opts.Progress = item
-	} else {
-		opts.Progress = progress.Tee(item, opts.Progress)
 	}
 
 	// Non-disk files (such as .iso) use the PUT method.
@@ -230,8 +227,6 @@ func (l *Lease) Upload(ctx context.Context, item FileItem, f io.Reader, opts soa
 func (l *Lease) DownloadFile(ctx context.Context, file string, item FileItem, opts soap.Download) error {
 	if opts.Progress == nil {
 		opts.Progress = item
-	} else {
-		opts.Progress = progress.Tee(item, opts.Progress)
 	}
 
 	return l.c.DownloadFile(ctx, file, item.URL, &opts)

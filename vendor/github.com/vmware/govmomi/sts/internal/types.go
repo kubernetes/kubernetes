@@ -473,12 +473,12 @@ func (a *AttributeStatement) C14N() string {
 
 type AttributeValue struct {
 	XMLName xml.Name
-	Type    string `xml:"type,attr"`
+	Type    string `xml:"type,attr,typeattr"`
 	Value   string `xml:",innerxml"`
 }
 
 func (a *AttributeValue) C14N() string {
-	return fmt.Sprintf(`<saml2:AttributeValue xmlns:xsi="%s" xsi:type="xs:string">%s</saml2:AttributeValue>`, XSI, a.Value)
+	return fmt.Sprintf(`<saml2:AttributeValue xmlns:xsi="%s" xsi:type="%s">%s</saml2:AttributeValue>`, XSI, a.Type, a.Value)
 }
 
 type Attribute struct {
@@ -682,7 +682,7 @@ func Marshal(val interface{}) string {
 // Note that the namespace is required when encoding, but the namespace prefix must not be
 // present when decoding as Go's decoding does not handle namespace prefix.
 func mkns(ns string, obj interface{}, name ...*xml.Name) string {
-	ns = ns + ":"
+	ns += ":"
 	for i := range name {
 		name[i].Space = ""
 		if !strings.HasPrefix(name[i].Local, ns) {

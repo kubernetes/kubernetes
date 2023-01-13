@@ -36,6 +36,10 @@ func NewDistributedVirtualPortgroup(c *vim25.Client, ref types.ManagedObjectRefe
 	}
 }
 
+func (p DistributedVirtualPortgroup) GetInventoryPath() string {
+	return p.InventoryPath
+}
+
 // EthernetCardBackingInfo returns the VirtualDeviceBackingInfo for this DistributedVirtualPortgroup
 func (p DistributedVirtualPortgroup) EthernetCardBackingInfo(ctx context.Context) (types.BaseVirtualDeviceBackingInfo, error) {
 	var dvp mo.DistributedVirtualPortgroup
@@ -46,9 +50,15 @@ func (p DistributedVirtualPortgroup) EthernetCardBackingInfo(ctx context.Context
 		return nil, err
 	}
 
+	// From the docs at https://code.vmware.com/apis/196/vsphere/doc/vim.dvs.DistributedVirtualPortgroup.ConfigInfo.html:
 	// "This property should always be set unless the user's setting does not have System.Read privilege on the object referred to by this property."
+	// Note that "the object" refers to the Switch, not the PortGroup.
 	if dvp.Config.DistributedVirtualSwitch == nil {
-		return nil, fmt.Errorf("no System.Read privilege on: %s.%s", p.Reference(), prop)
+		name := p.InventoryPath
+		if name == "" {
+			name = p.Reference().String()
+		}
+		return nil, fmt.Errorf("failed to create EthernetCardBackingInfo for %s: System.Read privilege required for %s", name, prop)
 	}
 
 	if err := p.Properties(ctx, *dvp.Config.DistributedVirtualSwitch, []string{"uuid"}, &dvs); err != nil {
