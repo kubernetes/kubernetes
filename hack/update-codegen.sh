@@ -130,7 +130,7 @@ function codegen::prerelease() {
     fi
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
-        grep -l -Z --color=never '+k8s:prerelease-lifecycle-gen=true' "${ALL_K8S_TAG_FILES[@]}" \
+        grep -l --null --color=never '+k8s:prerelease-lifecycle-gen=true' "${ALL_K8S_TAG_FILES[@]}" \
             | xargs -0 -n1 dirname \
             | LC_ALL=C sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -189,7 +189,7 @@ function codegen::deepcopy() {
     fi
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
-        grep -l -Z --color=never '+k8s:deepcopy-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+        grep -l --null --color=never '+k8s:deepcopy-gen=' "${ALL_K8S_TAG_FILES[@]}" \
             | xargs -0 -n1 dirname \
             | LC_ALL=C sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -255,7 +255,7 @@ function codegen::defaults() {
     fi
     local tag_dirs=()
     kube::util::read-array tag_dirs < <( \
-        grep -l -Z --color=never '+k8s:defaulter-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+        grep -l --null --color=never '+k8s:defaulter-gen=' "${ALL_K8S_TAG_FILES[@]}" \
             | xargs -0 -n1 dirname \
             | LC_ALL=C sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -326,7 +326,7 @@ function codegen::conversions() {
     fi
     local tag_dirs=()
     kube::util::read-array tag_dirs < <(\
-        grep -l -Z --color=never '^// *+k8s:conversion-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+        grep -l --null --color=never '^// *+k8s:conversion-gen=' "${ALL_K8S_TAG_FILES[@]}" \
             | xargs -0 -n1 dirname \
             | LC_ALL=C sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -536,7 +536,7 @@ function codegen::openapi() {
 
         local tag_dirs=()
         kube::util::read-array tag_dirs < <(
-            grep -l -Z --color=never '+k8s:openapi-gen=' $(indirect_array "${prefix}_tag_files") \
+            grep -l --null --color=never '+k8s:openapi-gen=' $(indirect_array "${prefix}_tag_files") \
                 | xargs -0 -n1 dirname \
                 | LC_ALL=C sort -u)
 
