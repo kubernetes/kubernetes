@@ -22,10 +22,12 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/utils/pointer"
 )
 
 func TestCustomMetrics(t *testing.T) {
@@ -96,4 +98,45 @@ func TestCustomMetrics(t *testing.T) {
 			Time:  metav1.NewTime(timestamp2),
 			Value: 2.1,
 		})
+}
+
+func TestMergeProcessStats(t *testing.T) {
+	for _, tc := range []struct {
+		desc     string
+		first    *statsapi.ProcessStats
+		second   *statsapi.ProcessStats
+		expected *statsapi.ProcessStats
+	}{
+		{
+			desc:     "both nil",
+			first:    nil,
+			second:   nil,
+			expected: nil,
+		},
+		{
+			desc:     "first non-nil, second not",
+			first:    &statsapi.ProcessStats{ProcessCount: pointer.Uint64(100)},
+			second:   nil,
+			expected: &statsapi.ProcessStats{ProcessCount: pointer.Uint64(100)},
+		},
+		{
+			desc:     "first nil, second non-nil",
+			first:    nil,
+			second:   &statsapi.ProcessStats{ProcessCount: pointer.Uint64(100)},
+			expected: &statsapi.ProcessStats{ProcessCount: pointer.Uint64(100)},
+		},
+		{
+			desc:     "both non nill",
+			first:    &statsapi.ProcessStats{ProcessCount: pointer.Uint64(100)},
+			second:   &statsapi.ProcessStats{ProcessCount: pointer.Uint64(100)},
+			expected: &statsapi.ProcessStats{ProcessCount: pointer.Uint64(200)},
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := mergeProcessStats(tc.first, tc.second)
+			if diff := cmp.Diff(tc.expected, got); diff != "" {
+				t.Fatalf("Unexpected diff on process stats (-want,+got):\n%s", diff)
+			}
+		})
+	}
 }
