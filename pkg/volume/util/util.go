@@ -617,9 +617,9 @@ func GetLocalPersistentVolumeNodeNames(pv *v1.PersistentVolume) []string {
 // GetPodVolumeNames returns names of volumes that are used in a pod,
 // either as filesystem mount or raw block device, together with list
 // of all SELinux contexts of all containers that use the volumes.
-func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String, seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
-	mounts = sets.NewString()
-	devices = sets.NewString()
+func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[string], seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
+	mounts = sets.New[string]()
+	devices = sets.New[string]()
 	seLinuxContainerContexts = make(map[string][]*v1.SELinuxOptions)
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {

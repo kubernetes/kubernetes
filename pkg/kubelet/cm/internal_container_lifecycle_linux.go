@@ -20,6 +20,7 @@ limitations under the License.
 package cm
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
 	"strconv"
 	"strings"
 
@@ -39,7 +40,7 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, contain
 		numaNodes := i.memoryManager.GetMemoryNUMANodes(pod, container)
 		if numaNodes.Len() > 0 {
 			var affinity []string
-			for _, numaNode := range numaNodes.List() {
+			for _, numaNode := range sets.List(numaNodes) {
 				affinity = append(affinity, strconv.Itoa(numaNode))
 			}
 			containerConfig.Linux.Resources.CpusetMems = strings.Join(affinity, ",")

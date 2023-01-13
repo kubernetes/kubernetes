@@ -361,7 +361,7 @@ func (g *GenericPLEG) Relist() {
 }
 
 func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Container {
-	cidSet := sets.NewString()
+	cidSet := sets.New[string]()
 	var containers []*kubecontainer.Container
 	fillCidSet := func(cs []*kubecontainer.Container) {
 		for _, c := range cs {

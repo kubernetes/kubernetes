@@ -83,7 +83,7 @@ type Manager interface {
 	GetPodTopologyHints(*v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// GetMemoryNUMANodes provides NUMA nodes that are used to allocate the container memory
-	GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Int
+	GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Set[int]
 
 	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 	GetAllocatableMemory() []state.Block
@@ -213,9 +213,9 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 }
 
 // GetMemoryNUMANodes provides NUMA nodes that used to allocate the container memory
-func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Int {
+func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Set[int] {
 	// Get NUMA node affinity of blocks assigned to the container during Allocate()
-	numaNodes := sets.NewInt()
+	numaNodes := sets.New[int]()
 	for _, block := range m.state.GetMemoryBlocks(string(pod.UID), container.Name) {
 		for _, nodeID := range block.NUMAAffinity {
 			// avoid nodes duplication when hugepages and memory blocks pinned to the same NUMA node

@@ -180,7 +180,7 @@ func (n *networkCounter) mergeCollectedData(packetsReceivedPerSecondData,
 	packetsReceivedErrorsData,
 	packetsOutboundDiscardedData,
 	packetsOutboundErrorsData map[string]uint64) {
-	adapters := sets.NewString()
+	adapters := sets.New[string]()
 
 	// merge the collected data and list of adapters.
 	adapters.Insert(n.mergePacketsReceivedPerSecondData(packetsReceivedPerSecondData)...)

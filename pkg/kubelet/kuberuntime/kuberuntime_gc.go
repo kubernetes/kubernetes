@@ -285,7 +285,7 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 	}
 
 	// collect all the PodSandboxId of container
-	sandboxIDs := sets.NewString()
+	sandboxIDs := sets.New[string]()
 	for _, container := range containers {
 		sandboxIDs.Insert(container.PodSandboxId)
 	}

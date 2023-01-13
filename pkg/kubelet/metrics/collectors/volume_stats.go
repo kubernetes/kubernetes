@@ -107,7 +107,7 @@ func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Me
 		lv = append([]string{pvcRef.Namespace, pvcRef.Name}, lv...)
 		ch <- metrics.NewLazyConstMetric(desc, metrics.GaugeValue, v, lv...)
 	}
-	allPVCs := sets.String{}
+	allPVCs := sets.Set[string]{}
 	for _, podStat := range podStats {
 		if podStat.VolumeStats == nil {
 			continue

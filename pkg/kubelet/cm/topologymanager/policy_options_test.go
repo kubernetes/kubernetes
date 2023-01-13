@@ -82,7 +82,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 		},
 	}
 
-	betaOptions = sets.NewString(fancyBetaOption)
+	betaOptions = sets.New[string](fancyBetaOption)
 
 	for _, tcase := range testCases {
 		t.Run(tcase.description, func(t *testing.T) {

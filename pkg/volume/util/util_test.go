@@ -622,8 +622,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 	tests := []struct {
 		name                    string
 		pod                     *v1.Pod
-		expectedMounts          sets.String
-		expectedDevices         sets.String
+		expectedMounts          sets.Set[string]
+		expectedDevices         sets.Set[string]
 		expectedSELinuxContexts map[string][]*v1.SELinuxOptions
 	}{
 		{
@@ -631,8 +631,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{},
 			},
-			expectedMounts:  sets.NewString(),
-			expectedDevices: sets.NewString(),
+			expectedMounts:  sets.New[string](),
+			expectedDevices: sets.New[string](),
 		},
 		{
 			name: "pod with volumes",
@@ -675,8 +675,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts:  sets.NewString("vol1", "vol2"),
-			expectedDevices: sets.NewString("vol3", "vol4"),
+			expectedMounts:  sets.New("vol1", "vol2"),
+			expectedDevices: sets.New("vol3", "vol4"),
 		},
 		{
 			name: "pod with init containers",
@@ -719,8 +719,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts:  sets.NewString("vol1", "vol2"),
-			expectedDevices: sets.NewString("vol3", "vol4"),
+			expectedMounts:  sets.New("vol1", "vol2"),
+			expectedDevices: sets.New("vol3", "vol4"),
 		},
 		{
 			name: "pod with multiple containers",
@@ -778,8 +778,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts:  sets.NewString("vol1", "vol3"),
-			expectedDevices: sets.NewString("vol2", "vol4"),
+			expectedMounts:  sets.New("vol1", "vol3"),
+			expectedDevices: sets.New("vol2", "vol4"),
 		},
 		{
 			name: "pod with ephemeral containers",
@@ -820,8 +820,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts:  sets.NewString("vol1", "vol2"),
-			expectedDevices: sets.NewString(),
+			expectedMounts:  sets.New("vol1", "vol2"),
+			expectedDevices: sets.New[string](),
 		},
 		{
 			name: "pod with SELinuxOptions",
@@ -893,7 +893,7 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts: sets.NewString("vol1", "vol2", "vol3"),
+			expectedMounts: sets.New[string]("vol1", "vol2", "vol3"),
 			expectedSELinuxContexts: map[string][]*v1.SELinuxOptions{
 				"vol1": {
 					{
@@ -929,10 +929,10 @@ func TestGetPodVolumeNames(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mounts, devices, contexts := GetPodVolumeNames(test.pod)
 			if !mounts.Equal(test.expectedMounts) {
-				t.Errorf("Expected mounts: %q, got %q", mounts.List(), test.expectedMounts.List())
+				t.Errorf("Expected mounts: %q, got %q", sets.List(mounts), sets.List(test.expectedMounts))
 			}
 			if !devices.Equal(test.expectedDevices) {
-				t.Errorf("Expected devices: %q, got %q", devices.List(), test.expectedDevices.List())
+				t.Errorf("Expected devices: %q, got %q", sets.List(devices), sets.List(test.expectedDevices))
 			}
 			if len(contexts) == 0 {
 				contexts = nil

@@ -37,16 +37,16 @@ func newTestBasicWorkQueue() (*basicWorkQueue, *testingclock.FakeClock) {
 }
 
 func compareResults(t *testing.T, expected, actual []types.UID) {
-	expectedSet := sets.NewString()
+	expectedSet := sets.New[string]()
 	for _, u := range expected {
 		expectedSet.Insert(string(u))
 	}
-	actualSet := sets.NewString()
+	actualSet := sets.New[string]()
 	for _, u := range actual {
 		actualSet.Insert(string(u))
 	}
 	if !expectedSet.Equal(actualSet) {
-		t.Errorf("Expected %#v, got %#v", expectedSet.List(), actualSet.List())
+		t.Errorf("Expected %#v, got %#v", sets.List(expectedSet), sets.List(actualSet))
 	}
 }
 

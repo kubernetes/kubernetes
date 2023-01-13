@@ -211,8 +211,8 @@ func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 	return im.imageCache.get(), nil
 }
 
-func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.Time) (sets.String, error) {
-	imagesInUse := sets.NewString()
+func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.Time) (sets.Set[string], error) {
+	imagesInUse := sets.New[string]()
 
 	// Always consider the container runtime pod sandbox image in use
 	imageRef, err := im.runtime.GetImageRef(ctx, container.ImageSpec{Image: im.sandboxImage})
@@ -239,7 +239,7 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 
 	// Add new images and record those being used.
 	now := time.Now()
-	currentImages := sets.NewString()
+	currentImages := sets.New[string]()
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
 	for _, image := range images {
@@ -423,7 +423,7 @@ func (ev byLastUsedAndDetected) Less(i, j int) bool {
 	return ev[i].lastUsed.Before(ev[j].lastUsed)
 }
 
-func isImageUsed(imageID string, imagesInUse sets.String) bool {
+func isImageUsed(imageID string, imagesInUse sets.Set[string]) bool {
 	// Check the image ID.
 	if _, ok := imagesInUse[imageID]; ok {
 		return true
