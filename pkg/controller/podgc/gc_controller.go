@@ -329,53 +329,24 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(pod.Namespace, pod.Name))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 
-		// Extact the pod status as PodGC may or may not own the pod phase, if
-		// it owns the phase then we need to send the field back if the condition
-		// is added.
-		podApply, err := corev1apply.ExtractPodStatus(pod, fieldManager)
-		if err != nil {
-			return nil
-		}
-
-		// Set the status in case PodGC does not own any status fields yet
-		if podApply.Status == nil {
-			podApply.WithStatus(corev1apply.PodStatus())
-		}
-
-		updated := false
-		if condition != nil {
-			updatePodCondition(podApply.Status, condition)
-			updated = true
-		}
 		// Mark the pod as failed - this is especially important in case the pod
 		// is orphaned, in which case the pod would remain in the Running phase
 		// forever as there is no kubelet running to change the phase.
 		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
+			podApply := corev1apply.Pod(pod.Name, pod.Namespace).WithStatus(corev1apply.PodStatus())
+			// we don't need to extract the pod apply configuration and can send
+			// only phase and the DisruptionTarget condition as PodGC would not
+			// own other fields. If the DisruptionTarget condition is owned by
+			// PodGC it means that it is in the Failed phase, so sending the
+			// condition will not be re-attempted.
 			podApply.Status.WithPhase(v1.PodFailed)
-			updated = true
-		}
-		if updated {
+			if condition != nil {
+				podApply.Status.WithConditions(condition)
+			}
 			if _, err := gcc.kubeClient.CoreV1().Pods(pod.Namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 				return err
 			}
 		}
 	}
 	return gcc.kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
-}
-
-func updatePodCondition(podStatusApply *corev1apply.PodStatusApplyConfiguration, condition *corev1apply.PodConditionApplyConfiguration) {
-	if conditionIndex, _ := findPodConditionApplyByType(podStatusApply.Conditions, *condition.Type); conditionIndex < 0 {
-		podStatusApply.WithConditions(condition)
-	} else {
-		podStatusApply.Conditions[conditionIndex] = *condition
-	}
-}
-
-func findPodConditionApplyByType(conditionApplyList []corev1apply.PodConditionApplyConfiguration, cType v1.PodConditionType) (int, *corev1apply.PodConditionApplyConfiguration) {
-	for index, conditionApply := range conditionApplyList {
-		if *conditionApply.Type == cType {
-			return index, &conditionApply
-		}
-	}
-	return -1, nil
 }
