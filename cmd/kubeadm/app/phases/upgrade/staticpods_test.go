@@ -251,12 +251,16 @@ func (c fakeTLSEtcdClient) ListMembers() ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-func (c fakeTLSEtcdClient) AddMemberAsLeanerAndPromote(name string, peerAddrs string) ([]etcdutil.Member, error) {
+func (c fakeTLSEtcdClient) AddMemberAsLearner(name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
 func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
+}
+
+func (c fakeTLSEtcdClient) MemberPromote(learnerID uint64) error {
+	return nil
 }
 
 func (c fakeTLSEtcdClient) GetMemberID(peerURL string) (uint64, error) {
@@ -290,12 +294,16 @@ func (c fakePodManifestEtcdClient) ListMembers() ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-func (c fakePodManifestEtcdClient) AddMemberAsLeanerAndPromote(name string, peerAddrs string) ([]etcdutil.Member, error) {
+func (c fakePodManifestEtcdClient) AddMemberAsLearner(name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
 func (c fakePodManifestEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
+}
+
+func (c fakePodManifestEtcdClient) MemberPromote(learnerID uint64) error {
+	return nil
 }
 
 func (c fakePodManifestEtcdClient) GetMemberID(peerURL string) (uint64, error) {
