@@ -312,8 +312,10 @@ func (jm *Controller) updatePod(old, cur interface{}) {
 		return
 	}
 
-	// the only time we want the backoff to kick-in, is when the pod failed
-	immediate := curPod.Status.Phase != v1.PodFailed
+	// the only time we want the backoff to kick-in, is when the pod failed for the first time.
+	// we don't want to re-calculate backoff for an update event when the tracking finalizer
+	// for a failed pod is removed.
+	immediate := !(curPod.Status.Phase == v1.PodFailed && oldPod.Status.Phase != v1.PodFailed)
 
 	// Don't check if oldPod has the finalizer, as during ownership transfer
 	// finalizers might be re-added and removed again in behalf of the new owner.
@@ -504,7 +506,9 @@ func (jm *Controller) enqueueControllerDelayed(obj interface{}, immediate bool, 
 
 	backoff := delay
 	if !immediate {
-		backoff = getBackoff(jm.queue, key)
+		if calculatedBackoff := getBackoff(jm.queue, key); calculatedBackoff > 0 {
+			backoff = calculatedBackoff
+		}
 	}
 
 	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
@@ -859,6 +863,12 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	job.Status.Ready = ready
 	err = jm.trackJobStatusAndRemoveFinalizers(ctx, &job, pods, prevSucceededIndexes, *uncounted, expectedRmFinalizers, finishedCondition, needsStatusUpdate)
 	if err != nil {
+		if apierrors.IsConflict(err) {
+			// we probably have a stale informer cache
+			// so don't return an error to avoid backoff
+			jm.enqueueController(&job, false)
+			return false, nil
+		}
 		return false, fmt.Errorf("tracking status: %w", err)
 	}
 	jobFinished := IsJobFinished(&job)
@@ -866,7 +876,9 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		// returning an error will re-enqueue Job after the backoff period
 		return forget, fmt.Errorf("failed pod(s) detected for job key %q", key)
 	}
-	forget = true
+	if suspendCondChanged {
+		forget = true
+	}
 	return forget, manageJobErr
 }
 
