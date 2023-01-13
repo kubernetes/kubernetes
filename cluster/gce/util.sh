@@ -48,13 +48,20 @@ fi
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
     DEFAULT_GCI_PROJECT=google-containers
-    if [[ "${GCI_VERSION}" == "cos"* ]]; then
+    if [[ "${GCI_VERSION}" == "cos"* ]] || [[ "${MASTER_IMAGE_FAMILY}" == "cos"* ]]; then
         DEFAULT_GCI_PROJECT=cos-cloud
     fi
     export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
-    # If the master image is not set, we use the latest GCI image.
-    # Otherwise, we respect whatever is set by the user.
-    export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
+
+    # If the master image is not set, we use the latest image based on image
+    # family.
+    kube_master_image="${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}"
+    if [[ -z "${kube_master_image}" ]]; then
+      kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY}" --format 'value(name)')
+    fi
+
+    echo "Using image: ${kube_master_image} from project: ${MASTER_IMAGE_PROJECT} as master image" >&2
+    export MASTER_IMAGE="${kube_master_image}"
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
@@ -69,14 +76,23 @@ fi
 function set-linux-node-image() {
   if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
     DEFAULT_GCI_PROJECT=google-containers
-    if [[ "${GCI_VERSION}" == "cos"* ]]; then
+    if [[ "${GCI_VERSION}" == "cos"* ]] || [[ "${NODE_IMAGE_FAMILY}" == "cos"* ]]; then
       DEFAULT_GCI_PROJECT=cos-cloud
     fi
 
-    # If the node image is not set, we use the latest GCI image.
+    # If the node image is not set, we use the latest image based on image
+    # family.
     # Otherwise, we respect whatever is set by the user.
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
     NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${DEFAULT_GCI_PROJECT}}
+    local kube_node_image
+
+    kube_node_image="${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}"
+    if [[ -z "${kube_node_image}" ]]; then
+      kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY}" --format 'value(name)')
+    fi
+
+    echo "Using image: ${kube_node_image} from project: ${NODE_IMAGE_PROJECT} as node image" >&2
+    export NODE_IMAGE="${kube_node_image}"
   fi
 }
 
