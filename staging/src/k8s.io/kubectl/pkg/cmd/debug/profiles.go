@@ -76,43 +76,29 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 		if t == pod {
 			// For ephemeral container: sets SYS_PTRACE in ephemeral container
 			for i, c := range pod.Spec.EphemeralContainers {
-				if c.Name == containerName {
-					pod.Spec.EphemeralContainers[i].SecurityContext = &corev1.SecurityContext{
-						Capabilities: &corev1.Capabilities{
-							Add: []corev1.Capability{"SYS_PTRACE"},
-						},
-					}
-					if c.SecurityContext == nil {
-					} else if c.SecurityContext.Capabilities == nil {
-						pod.Spec.EphemeralContainers[i].SecurityContext.Capabilities = &corev1.Capabilities{
-							Add: []corev1.Capability{"SYS_PTRACE"},
-						}
-					} else {
-						pod.Spec.EphemeralContainers[i].SecurityContext.Capabilities.Add = append(c.SecurityContext.Capabilities.Add, "SYS_PTRACE")
-					}
+				if c.Name != containerName {
+					continue
+				}
+				pod.Spec.EphemeralContainers[i].SecurityContext = &corev1.SecurityContext{
+					Capabilities: &corev1.Capabilities{
+						Add: []corev1.Capability{"SYS_PTRACE"},
+					},
 				}
 			}
 		} else {
 			// For copy of pod: sets SYS_PTRACE in debugging container, sets shareProcessNamespace
-			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
+			pod.Spec.ShareProcessNamespace = pointer.Bool(true)
 			for i, c := range pod.Spec.Containers {
-				if c.Name == containerName {
-					pod.Spec.Containers[i].SecurityContext = &corev1.SecurityContext{
-						Capabilities: &corev1.Capabilities{
-							Add: []corev1.Capability{"SYS_PTRACE"},
-						},
-					}
-					if c.SecurityContext == nil {
-					} else if c.SecurityContext.Capabilities == nil {
-						pod.Spec.Containers[i].SecurityContext.Capabilities = &corev1.Capabilities{
-							Add: []corev1.Capability{"SYS_PTRACE"},
-						}
-					} else {
-						pod.Spec.Containers[i].SecurityContext.Capabilities.Add = append(c.SecurityContext.Capabilities.Add, "SYS_PTRACE")
-					}
-				}
 				pod.Spec.Containers[i].LivenessProbe = nil
 				pod.Spec.Containers[i].ReadinessProbe = nil
+				if c.Name != containerName {
+					continue
+				}
+				pod.Spec.Containers[i].SecurityContext = &corev1.SecurityContext{
+					Capabilities: &corev1.Capabilities{
+						Add: []corev1.Capability{"SYS_PTRACE"},
+					},
+				}
 			}
 		}
 	case *corev1.Node:
@@ -125,12 +111,13 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 			},
 		})
 		for i, c := range pod.Spec.Containers {
-			if c.Name == containerName {
-				pod.Spec.Containers[i].VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
-					MountPath: "/host",
-					Name:      volumeName,
-				})
+			if c.Name != containerName {
+				continue
 			}
+			pod.Spec.Containers[i].VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
+				MountPath: "/host",
+				Name:      volumeName,
+			})
 		}
 		pod.Spec.SecurityContext = nil
 		pod.Spec.HostNetwork = true
@@ -149,31 +136,30 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 		if t == pod {
 			// For ephemeral container: empty securityContext
 			for i, c := range pod.Spec.EphemeralContainers {
-				if c.Name == containerName {
-					pod.Spec.EphemeralContainers[i].SecurityContext = nil
+				if c.Name != containerName {
+					continue
 				}
+				pod.Spec.EphemeralContainers[i].SecurityContext = nil
 			}
 		} else {
 			// For copy of pod: empty securityContext; sets shareProcessNamespace
 			pod.Spec.SecurityContext = nil
-			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
+			pod.Spec.ShareProcessNamespace = pointer.Bool(true)
 			pod.Spec.HostNetwork = false
 			pod.Spec.HostPID = false
 			pod.Spec.HostIPC = false
 			for i, c := range pod.Spec.Containers {
-				if c.Name == containerName {
-					pod.Spec.Containers[i].SecurityContext = nil
-				}
 				pod.Spec.Containers[i].LivenessProbe = nil
 				pod.Spec.Containers[i].ReadinessProbe = nil
+				if c.Name == containerName {
+					continue
+				}
+				pod.Spec.Containers[i].SecurityContext = nil
 			}
 		}
 	case *corev1.Node:
 		// empty securityContext; uses isolated namespaces
 		pod.Spec.SecurityContext = nil
-		pod.Spec.HostNetwork = false
-		pod.Spec.HostPID = false
-		pod.Spec.HostIPC = false
 
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileBaseline, target)
@@ -185,7 +171,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
 	// drops privilege and run as non-root
 	sc := &corev1.SecurityContext{
-		RunAsNonRoot: pointer.BoolPtr(true),
+		RunAsNonRoot: pointer.Bool(true),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
@@ -195,24 +181,25 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	case *corev1.Pod:
 		if t == pod {
 			for i, c := range pod.Spec.EphemeralContainers {
-				if c.Name == containerName {
-					pod.Spec.EphemeralContainers[i].SecurityContext = sc
+				if c.Name != containerName {
+					continue
 				}
+				pod.Spec.EphemeralContainers[i].SecurityContext = sc
 			}
 		} else {
 			// For copy of pod: empty securityContext; sets shareProcessNamespace
-			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
+			pod.Spec.ShareProcessNamespace = pointer.Bool(true)
 			for i, c := range pod.Spec.Containers {
-				if c.Name == containerName {
-					pod.Spec.Containers[i].SecurityContext = sc
-				}
 				pod.Spec.Containers[i].LivenessProbe = nil
 				pod.Spec.Containers[i].ReadinessProbe = nil
+				if c.Name != containerName {
+					continue
+				}
+				pod.Spec.Containers[i].SecurityContext = sc
 			}
 		}
 	case *corev1.Node:
-		// no additional settings required other than the common
-		// settings applied below
+		return nil
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileRestricted, target)
 	}

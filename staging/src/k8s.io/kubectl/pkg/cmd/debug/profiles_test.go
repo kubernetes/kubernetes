@@ -111,7 +111,7 @@ func TestGeneralProfile(t *testing.T) {
 							},
 						},
 					},
-					ShareProcessNamespace: pointer.BoolPtr(true),
+					ShareProcessNamespace: pointer.Bool(true),
 				},
 			},
 		},
@@ -240,7 +240,7 @@ func TestBaselineProfile(t *testing.T) {
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
-					ShareProcessNamespace: pointer.BoolPtr(true),
+					ShareProcessNamespace: pointer.Bool(true),
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
 						{
@@ -333,7 +333,7 @@ func TestRestrictedProfile(t *testing.T) {
 						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 							Name: "dbg", Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.BoolPtr(true),
+								RunAsNonRoot: pointer.Bool(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
@@ -365,14 +365,14 @@ func TestRestrictedProfile(t *testing.T) {
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
-					ShareProcessNamespace: pointer.BoolPtr(true),
+					ShareProcessNamespace: pointer.Bool(true),
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
 						{
 							Name:  "dbg",
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.BoolPtr(true),
+								RunAsNonRoot: pointer.Bool(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},

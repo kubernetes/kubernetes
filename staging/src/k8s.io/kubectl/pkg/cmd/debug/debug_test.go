@@ -286,7 +286,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 					SecurityContext: &corev1.SecurityContext{
-						RunAsNonRoot: pointer.BoolPtr(true),
+						RunAsNonRoot: pointer.Bool(true),
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
@@ -881,7 +881,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 						},
 					},
-					ShareProcessNamespace: pointer.BoolPtr(true),
+					ShareProcessNamespace: pointer.Bool(true),
 				},
 			},
 		},

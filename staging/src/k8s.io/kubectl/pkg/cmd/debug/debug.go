@@ -619,7 +619,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	copied.Spec.EphemeralContainers = nil
 	// change ShareProcessNamespace configuration only when commanded explicitly
 	if o.shareProcessedChanged {
-		copied.Spec.ShareProcessNamespace = pointer.BoolPtr(o.ShareProcesses)
+		copied.Spec.ShareProcessNamespace = pointer.Bool(o.ShareProcesses)
 	}
 	if !o.SameNode {
 		copied.Spec.NodeName = ""
