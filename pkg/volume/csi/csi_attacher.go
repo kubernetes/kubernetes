@@ -495,10 +495,10 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 		resetDuration = time.Minute
 		backoffFactor = 1.05
 		jitter        = 0.1
+		steps         = 7
 		clock         = &clock.RealClock{}
 	)
-	backoffMgr := wait.NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration, backoffFactor, jitter, clock)
-
+	backoff := wait.Backoff{Duration: initBackoff, Cap: maxBackoff, Factor: backoffFactor, Jitter: jitter, Steps: steps}.StepWithReset(clock, resetDuration)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -509,8 +509,11 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 		klog.V(4).Info(log("Could not find CSI driver name in spec for volume [%v]", volumeHandle))
 	}
 
+	// TODO: this should use a context-aware wait.Poll/Until/Jitter method once they are unified in
+	// https://github.com/kubernetes/kubernetes/issue/107826 or a successor
+	t := clock.NewTimer(backoff())
+	defer t.Stop()
 	for {
-		t := backoffMgr.Backoff()
 		select {
 		case <-t.C():
 			successful, err := verifyStatus()
@@ -520,8 +523,8 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 			if successful {
 				return nil
 			}
+			t.Reset(backoff())
 		case <-ctx.Done():
-			t.Stop()
 			klog.Error(log("%s timeout after %v [volume=%v; attachment.ID=%v]", operation, timeout, volumeHandle, attachID))
 			return fmt.Errorf("timed out waiting for external-attacher of %v CSI driver to %v volume %v", csiDriverName, strings.ToLower(operation), volumeHandle)
 		}

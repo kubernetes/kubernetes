@@ -19,7 +19,6 @@ package wait
 import (
 	"context"
 	"errors"
-	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -132,15 +131,31 @@ func NonSlidingUntilWithContext(ctx context.Context, f func(context.Context), pe
 // Close stopCh to stop. f may not be invoked if stop channel is already
 // closed. Pass NeverStop to if you don't want it stop.
 func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
-	BackoffUntil(f, NewJitteredBackoffManager(period, jitterFactor, &clock.RealClock{}), sliding, stopCh)
+	b := Backoff{Duration: period, Jitter: jitterFactor}
+	BackoffUntil(f, RealTimer, b.Step, sliding, stopCh)
 }
+
+var (
+	// RealClock can be passed to methods that need a clock.
+	RealClock = clock.RealClock{}
+	// RealTimer can be passed to methods that need a TimerFunc.
+	RealTimer = RealClock.NewTimer
+)
+
+// TimerFunc allows the caller to inject a timer for testing. Most callers should use RealTimer.
+type TimerFunc func(time.Duration) clock.Timer
 
 // BackoffUntil loops until stop channel is closed, run f every duration given by BackoffManager.
 //
 // If sliding is true, the period is computed after f runs. If it is false then
 // period includes the runtime for f.
-func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan struct{}) {
+func BackoffUntil(f func(), timerFn TimerFunc, delayFn DelayFunc, sliding bool, stopCh <-chan struct{}) {
 	var t clock.Timer
+	defer func() {
+		if t != nil {
+			t.Stop()
+		}
+	}()
 	for {
 		select {
 		case <-stopCh:
@@ -148,8 +163,9 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 		default:
 		}
 
+		var interval time.Duration
 		if !sliding {
-			t = backoff.Backoff()
+			interval = delayFn()
 		}
 
 		func() {
@@ -158,7 +174,12 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 		}()
 
 		if sliding {
-			t = backoff.Backoff()
+			interval = delayFn()
+		}
+		if t == nil {
+			t = timerFn(interval)
+		} else {
+			t.Reset(interval)
 		}
 
 		// NOTE: b/c there is no priority selection in golang
@@ -168,9 +189,6 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 		// of every loop to prevent extra executions of f().
 		select {
 		case <-stopCh:
-			if !t.Stop() {
-				<-t.C()
-			}
 			return
 		case <-t.C():
 		}
@@ -223,6 +241,25 @@ func (cf ConditionFunc) WithContext() ConditionWithContextFunc {
 	}
 }
 
+// ContextForChannel derives a child context from a parent channel.
+//
+// The derived context's Done channel is closed when the returned cancel function
+// is called or when the parent channel is closed, whichever happens first.
+//
+// Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
+func ContextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		select {
+		case <-parentCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
+}
+
 // runConditionWithCrashProtection runs a ConditionFunc with crash protection
 func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
 	return runConditionWithCrashProtectionWithContext(context.TODO(), condition.WithContext())
@@ -234,6 +271,9 @@ func runConditionWithCrashProtectionWithContext(ctx context.Context, condition C
 	defer runtime.HandleCrash()
 	return condition(ctx)
 }
+
+// DelayFunc returns the next time interval to wait.
+type DelayFunc func() time.Duration
 
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
@@ -261,17 +301,18 @@ type Backoff struct {
 	Cap time.Duration
 }
 
-// Step (1) returns an amount of time to sleep determined by the
-// original Duration and Jitter and (2) mutates the provided Backoff
-// to update its Steps and Duration.
+// Step returns an amount of time to sleep determined by the
+// original Duration and Jitter. The backoff is mutated to update its
+// Steps and Duration.
 func (b *Backoff) Step() time.Duration {
 	if b.Steps < 1 {
 		if b.Jitter > 0 {
 			return Jitter(b.Duration, b.Jitter)
 		}
 		return b.Duration
+	} else {
+		b.Steps--
 	}
-	b.Steps--
 
 	duration := b.Duration
 
@@ -290,122 +331,46 @@ func (b *Backoff) Step() time.Duration {
 	return duration
 }
 
-// ContextForChannel derives a child context from a parent channel.
-//
-// The derived context's Done channel is closed when the returned cancel function
-// is called or when the parent channel is closed, whichever happens first.
-//
-// Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
-func ContextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
+// StepWithReset returns a DelayFunc that will return the appropriate next interval to
+// wait. Every resetInterval the backoff parameters are reset to their initial state.
+// This method is safe to invoke from multiple goroutines.
+func (b Backoff) StepWithReset(c clock.Clock, resetInterval time.Duration) DelayFunc {
+	return (&backoffManager{
+		backoff:        b,
+		initialBackoff: b,
+		resetInterval:  resetInterval,
 
-	go func() {
-		select {
-		case <-parentCh:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-	return ctx, cancel
+		clock:     c,
+		lastStart: c.Now(),
+		timer:     nil,
+	}).Step
 }
 
-// BackoffManager manages backoff with a particular scheme based on its underlying implementation. It provides
-// an interface to return a timer for backoff, and caller shall backoff until Timer.C() drains. If the second Backoff()
-// is called before the timer from the first Backoff() call finishes, the first timer will NOT be drained and result in
-// undetermined behavior.
-// The BackoffManager is supposed to be called in a single-threaded environment.
-type BackoffManager interface {
-	Backoff() clock.Timer
+type backoffManager struct {
+	backoff        Backoff
+	initialBackoff Backoff
+	resetInterval  time.Duration
+
+	clock clock.Clock
+
+	lock      sync.Mutex
+	lastStart time.Time
+	timer     clock.Timer
 }
 
-type exponentialBackoffManagerImpl struct {
-	backoff              *Backoff
-	backoffTimer         clock.Timer
-	lastBackoffStart     time.Time
-	initialBackoff       time.Duration
-	backoffResetDuration time.Duration
-	clock                clock.Clock
-}
+// Step returns the expected next duration to wait.
+func (b *backoffManager) Step() time.Duration {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
-// NewExponentialBackoffManager returns a manager for managing exponential backoff. Each backoff is jittered and
-// backoff will not exceed the given max. If the backoff is not called within resetDuration, the backoff is reset.
-// This backoff manager is used to reduce load during upstream unhealthiness.
-func NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration time.Duration, backoffFactor, jitter float64, c clock.Clock) BackoffManager {
-	return &exponentialBackoffManagerImpl{
-		backoff: &Backoff{
-			Duration: initBackoff,
-			Factor:   backoffFactor,
-			Jitter:   jitter,
-
-			// the current impl of wait.Backoff returns Backoff.Duration once steps are used up, which is not
-			// what we ideally need here, we set it to max int and assume we will never use up the steps
-			Steps: math.MaxInt32,
-			Cap:   maxBackoff,
-		},
-		backoffTimer:         nil,
-		initialBackoff:       initBackoff,
-		lastBackoffStart:     c.Now(),
-		backoffResetDuration: resetDuration,
-		clock:                c,
+	switch {
+	case b.resetInterval == 0:
+		b.backoff = b.initialBackoff
+	case b.clock.Now().Sub(b.lastStart) > b.resetInterval:
+		b.backoff = b.initialBackoff
+		b.lastStart = b.clock.Now()
 	}
-}
-
-func (b *exponentialBackoffManagerImpl) getNextBackoff() time.Duration {
-	if b.clock.Now().Sub(b.lastBackoffStart) > b.backoffResetDuration {
-		b.backoff.Steps = math.MaxInt32
-		b.backoff.Duration = b.initialBackoff
-	}
-	b.lastBackoffStart = b.clock.Now()
 	return b.backoff.Step()
-}
-
-// Backoff implements BackoffManager.Backoff, it returns a timer so caller can block on the timer for exponential backoff.
-// The returned timer must be drained before calling Backoff() the second time
-func (b *exponentialBackoffManagerImpl) Backoff() clock.Timer {
-	if b.backoffTimer == nil {
-		b.backoffTimer = b.clock.NewTimer(b.getNextBackoff())
-	} else {
-		b.backoffTimer.Reset(b.getNextBackoff())
-	}
-	return b.backoffTimer
-}
-
-type jitteredBackoffManagerImpl struct {
-	clock        clock.Clock
-	duration     time.Duration
-	jitter       float64
-	backoffTimer clock.Timer
-}
-
-// NewJitteredBackoffManager returns a BackoffManager that backoffs with given duration plus given jitter. If the jitter
-// is negative, backoff will not be jittered.
-func NewJitteredBackoffManager(duration time.Duration, jitter float64, c clock.Clock) BackoffManager {
-	return &jitteredBackoffManagerImpl{
-		clock:        c,
-		duration:     duration,
-		jitter:       jitter,
-		backoffTimer: nil,
-	}
-}
-
-func (j *jitteredBackoffManagerImpl) getNextBackoff() time.Duration {
-	jitteredPeriod := j.duration
-	if j.jitter > 0.0 {
-		jitteredPeriod = Jitter(j.duration, j.jitter)
-	}
-	return jitteredPeriod
-}
-
-// Backoff implements BackoffManager.Backoff, it returns a timer so caller can block on the timer for jittered backoff.
-// The returned timer must be drained before calling Backoff() the second time
-func (j *jitteredBackoffManagerImpl) Backoff() clock.Timer {
-	backoff := j.getNextBackoff()
-	if j.backoffTimer == nil {
-		j.backoffTimer = j.clock.NewTimer(backoff)
-	} else {
-		j.backoffTimer.Reset(backoff)
-	}
-	return j.backoffTimer
 }
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
