@@ -161,6 +161,10 @@ type Config struct {
 	// handlers associated with non long-running requests
 	// to complete while the server is shuting down.
 	NonLongRunningRequestWaitGroup *utilwaitgroup.SafeWaitGroup
+	// WatchRequestWaitGroup allows us to wait for all chain
+	// handlers associated with active watch requests to
+	// complete while the server is shuting down.
+	WatchRequestWaitGroup *utilwaitgroup.RateLimitedSafeWaitGroup
 	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
@@ -371,6 +375,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		Serializer:                     codecs,
 		BuildHandlerChainFunc:          DefaultBuildHandlerChain,
 		NonLongRunningRequestWaitGroup: new(utilwaitgroup.SafeWaitGroup),
+		WatchRequestWaitGroup:          &utilwaitgroup.RateLimitedSafeWaitGroup{},
 		LegacyAPIGroupPrefixes:         sets.NewString(DefaultLegacyAPIPrefix),
 		DisabledPostStartHooks:         sets.NewString(),
 		PostStartHooks:                 map[string]PostStartHookConfigEntry{},
@@ -670,6 +675,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		delegationTarget:               delegationTarget,
 		EquivalentResourceRegistry:     c.EquivalentResourceRegistry,
 		NonLongRunningRequestWaitGroup: c.NonLongRunningRequestWaitGroup,
+		WatchRequestWaitGroup:          c.WatchRequestWaitGroup,
 		Handler:                        apiServerHandler,
 		UnprotectedDebugSocket:         debugSocket,
 
@@ -907,6 +913,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator,
 		c.LongRunningFunc, c.Serializer, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.NonLongRunningRequestWaitGroup)
+	handler = genericfilters.WithWatchTerminationDuringShutdown(handler, c.lifecycleSignals, c.WatchRequestWaitGroup)
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
 	}
