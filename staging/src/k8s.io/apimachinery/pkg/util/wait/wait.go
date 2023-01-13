@@ -371,116 +371,162 @@ func delay(steps int, duration, cap time.Duration, factor, jitter float64) (_ ti
 
 }
 
-// BackoffManager manages backoff with a particular scheme based on its underlying implementation. It provides
-// an interface to return a timer for backoff, and caller shall backoff until Timer.C() drains. If the second Backoff()
-// is called before the timer from the first Backoff() call finishes, the first timer will NOT be drained and result in
-// undetermined behavior.
-// The BackoffManager is supposed to be called in a single-threaded environment.
-type BackoffManager interface {
-	Backoff() clock.Timer
-	DelayFunc() DelayFunc
+// DelayWithReset returns a DelayFunc that will return the appropriate next interval to
+// wait. Every resetInterval the backoff parameters are reset to their initial state.
+// This method is safe to invoke from multiple goroutines, but all calls will advance
+// the backoff state when Factor is set. If Factor is zero, this method is the same as
+// invoking b.DelayFunc() since Steps has no impact without Factor. If resetInterval is
+// zero no backoff will be performed as the same calling DelayFunc with a zero factor
+// and steps.
+func (b Backoff) DelayWithReset(c clock.Clock, resetInterval time.Duration) DelayFunc {
+	if b.Factor <= 0 {
+		return b.delayFunc()
+	}
+	if resetInterval <= 0 {
+		b.Steps = 0
+		b.Factor = 0
+		return b.delayFunc()
+	}
+	return (&backoffManager{
+		backoff:        b,
+		initialBackoff: b,
+		resetInterval:  resetInterval,
+
+		clock:     c,
+		lastStart: c.Now(),
+		timer:     nil,
+	}).Step
 }
 
-type exponentialBackoffManagerImpl struct {
-	backoff              *Backoff
-	backoffTimer         clock.Timer
-	lastBackoffStart     time.Time
-	initialBackoff       time.Duration
-	backoffResetDuration time.Duration
-	clock                clock.Clock
+// BackoffManager manages backoff with a particular scheme based on its underlying implementation.
+type BackoffManager interface {
+	// Backoff returns a shared clock.Timer that is Reset on every invocation. This method is not
+	// safe for use from multiple threads. It returns a timer for backoff, and caller shall backoff
+	// until Timer.C() drains. If the second Backoff() is called before the timer from the first
+	// Backoff() call finishes, the first timer will NOT be drained and result in undetermined
+	// behavior.
+	Backoff() clock.Timer
+	// Timer returns a new Timer for use in a loop function in this package. Each timer retrieves its
+	// next interval from the manager, and so all Timers from this manager will participate in shared
+	// backoff.
+	Timer() Timer
+}
+
+type backoffManager struct {
+	backoff        Backoff
+	initialBackoff Backoff
+	resetInterval  time.Duration
+
+	clock clock.Clock
+
+	lock      sync.Mutex
+	lastStart time.Time
+	timer     clock.Timer
+}
+
+// Step returns the expected next duration to wait.
+func (b *backoffManager) Step() time.Duration {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	switch {
+	case b.resetInterval == 0:
+		b.backoff = b.initialBackoff
+	case b.clock.Now().Sub(b.lastStart) > b.resetInterval:
+		b.backoff = b.initialBackoff
+		b.lastStart = b.clock.Now()
+	}
+	return b.backoff.Step()
+}
+
+// Backoff implements BackoffManager.Backoff, it returns a timer so caller can block on the timer
+// for exponential backoff. The returned timer must be drained before calling Backoff() the second
+// time.
+func (b *backoffManager) Backoff() clock.Timer {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	if b.timer == nil {
+		b.timer = b.clock.NewTimer(b.Step())
+	} else {
+		b.timer.Reset(b.Step())
+	}
+	return b.timer
+}
+
+// Timer returns a new Timer instance that shares the clock and the reset behavior with all other
+// timers.
+func (b *backoffManager) Timer() Timer {
+	return DelayFunc(b.Step).Timer(b.clock)
 }
 
 // NewExponentialBackoffManager returns a manager for managing exponential backoff. Each backoff is jittered and
 // backoff will not exceed the given max. If the backoff is not called within resetDuration, the backoff is reset.
 // This backoff manager is used to reduce load during upstream unhealthiness.
+//
+// Deprecated: Will be removed when the legacy Poll methods are removed. Callers should construct a
+// Backoff struct, use DelayWithReset() to get a DelayFunc that periodically resets itself, and then
+// invoke Timer() when calling wait.BackoffUntil.
+//
+// Instead of:
+//
+//	bm := wait.NewExponentialBackoffManager(init, max, reset, factor, jitter, clock)
+//	...
+//	wait.BackoffUntil(..., bm.Backoff, ...)
+//
+// Use:
+//
+//	delayFn := wait.Backoff{
+//	  Duration: init,
+//	  Cap:      max,
+//	  Steps:    int(math.Ceil(float64(max) / float64(init))), // now a required argument
+//	  Factor:   factor,
+//	  Jitter:   jitter,
+//	}.DelayWithReset(reset, clock)
+//	wait.BackoffUntil(..., delayFn.Timer(), ...)
 func NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration time.Duration, backoffFactor, jitter float64, c clock.Clock) BackoffManager {
-	return &exponentialBackoffManagerImpl{
-		backoff: &Backoff{
-			Duration: initBackoff,
-			Factor:   backoffFactor,
-			Jitter:   jitter,
-
-			// the current impl of wait.Backoff returns Backoff.Duration once steps are used up, which is not
-			// what we ideally need here, we set it to max int and assume we will never use up the steps
-			Steps: math.MaxInt32,
-			Cap:   maxBackoff,
-		},
-		backoffTimer:         nil,
-		initialBackoff:       initBackoff,
-		lastBackoffStart:     c.Now(),
-		backoffResetDuration: resetDuration,
-		clock:                c,
+	b := Backoff{
+		Duration: initBackoff,
+		Cap:      maxBackoff,
+		Factor:   backoffFactor,
+		Jitter:   jitter,
 	}
-}
-
-func (b *exponentialBackoffManagerImpl) getNextBackoff() time.Duration {
-	if b.clock.Now().Sub(b.lastBackoffStart) > b.backoffResetDuration {
-		b.backoff.Steps = math.MaxInt32
-		b.backoff.Duration = b.initialBackoff
+	// ensure a sufficient number of steps is provided
+	if maxBackoff > initBackoff {
+		b.Steps = int(math.Ceil(float64(maxBackoff)/float64(initBackoff))) + 1
 	}
-	b.lastBackoffStart = b.clock.Now()
-	return b.backoff.Step()
-}
-
-// Backoff implements BackoffManager.Backoff, it returns a timer so caller can block on the timer for exponential backoff.
-// The returned timer must be drained before calling Backoff() the second time
-func (b *exponentialBackoffManagerImpl) Backoff() clock.Timer {
-	if b.backoffTimer == nil {
-		b.backoffTimer = b.clock.NewTimer(b.getNextBackoff())
-	} else {
-		b.backoffTimer.Reset(b.getNextBackoff())
+	return &backoffManager{
+		backoff:        b,
+		initialBackoff: b,
+		resetInterval:  resetDuration,
+		clock:          c,
 	}
-	return b.backoffTimer
-}
-
-// DelayFunc returns a function that returns the next time interval and is
-// safe for concurrent use.
-func (b *exponentialBackoffManagerImpl) DelayFunc() DelayFunc {
-	return DelayFunc(b.getNextBackoff).Concurrent()
-}
-
-type jitteredBackoffManagerImpl struct {
-	clock        clock.Clock
-	duration     time.Duration
-	jitter       float64
-	backoffTimer clock.Timer
 }
 
 // NewJitteredBackoffManager returns a BackoffManager that backoffs with given duration plus given jitter. If the jitter
 // is negative, backoff will not be jittered.
+//
+// Deprecated: Will be removed when the legacy Poll methods are removed. Callers should construct a
+// Backoff struct and invoke Timer() when calling wait.BackoffUntil.
+//
+// Instead of:
+//
+//	bm := wait.NewJitteredBackoffManager(duration, jitter, clock)
+//	...
+//	wait.BackoffUntil(..., bm.Backoff, ...)
+//
+// Use:
+//
+//	wait.BackoffUntil(..., wait.Backoff{Duration: duration, Jitter: jitter}.Timer(), ...)
 func NewJitteredBackoffManager(duration time.Duration, jitter float64, c clock.Clock) BackoffManager {
-	return &jitteredBackoffManagerImpl{
-		clock:        c,
-		duration:     duration,
-		jitter:       jitter,
-		backoffTimer: nil,
+	b := Backoff{
+		Duration: duration,
+		Jitter:   jitter,
 	}
-}
-
-func (j *jitteredBackoffManagerImpl) getNextBackoff() time.Duration {
-	jitteredPeriod := j.duration
-	if j.jitter > 0.0 {
-		jitteredPeriod = Jitter(j.duration, j.jitter)
+	return &backoffManager{
+		backoff:        b,
+		initialBackoff: b,
+		clock:          c,
 	}
-	return jitteredPeriod
-}
-
-// Backoff implements BackoffManager.Backoff, it returns a timer so caller can block on the timer for jittered backoff.
-// The returned timer must be drained before calling Backoff() the second time
-func (j *jitteredBackoffManagerImpl) Backoff() clock.Timer {
-	backoff := j.getNextBackoff()
-	if j.backoffTimer == nil {
-		j.backoffTimer = j.clock.NewTimer(backoff)
-	} else {
-		j.backoffTimer.Reset(backoff)
-	}
-	return j.backoffTimer
-}
-
-// DelayFunc returns a function that returns the next time interval and is
-// safe for concurrent use.
-func (j *jitteredBackoffManagerImpl) DelayFunc() DelayFunc {
-	return DelayFunc(j.getNextBackoff).Concurrent()
 }
 
 // ExponentialBackoff repeats a condition check with exponential backoff.

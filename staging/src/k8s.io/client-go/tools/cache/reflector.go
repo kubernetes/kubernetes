@@ -67,10 +67,11 @@ type Reflector struct {
 	// listerWatcher is used to perform lists and watches.
 	listerWatcher ListerWatcher
 	// backoff manages backoff of ListWatch
-	backoffManager wait.BackoffManager
+	backoffManager wait.DelayFunc
 	// initConnBackoffManager manages backoff the initial connection with the Watch call of ListAndWatch.
-	initConnBackoffManager wait.BackoffManager
-	resyncPeriod           time.Duration
+	initConnBackoffManager wait.DelayFunc
+	// resyncPeriod is the interval that the reflector will keep between resync attempts
+	resyncPeriod time.Duration
 	// clock allows tests to manipulate time
 	clock clock.Clock
 	// paginatedResult defines whether pagination should be forced for list calls.
@@ -210,8 +211,8 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
 		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
-		backoffManager:         wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
-		initConnBackoffManager: wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
+		backoffManager:         wait.Backoff{Duration: 800 * time.Millisecond, Cap: 30 * time.Second, Factor: 2.0, Jitter: 1.0, Steps: 20}.DelayWithReset(reflectorClock, 2*time.Minute),
+		initConnBackoffManager: wait.Backoff{Duration: 800 * time.Millisecond, Cap: 30 * time.Second, Factor: 2.0, Jitter: 1.0, Steps: 20}.DelayWithReset(reflectorClock, 2*time.Minute),
 		clock:                  reflectorClock,
 		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
 		expectedType:           reflect.TypeOf(expectedType),
@@ -279,7 +280,7 @@ func (r *Reflector) Run(stopCh <-chan struct{}) {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			r.watchErrorHandler(r, err)
 		}
-	}, r.backoffManager.DelayFunc().Timer(r.clock), true, stopCh)
+	}, r.backoffManager.Timer(r.clock), true, stopCh)
 	klog.V(3).Infof("Stopping reflector %s (%s) from %s", r.typeDescription, r.resyncPeriod, r.name)
 }
 
@@ -385,7 +386,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			if err != nil {
 				if canRetry := isWatchErrorRetriable(err); canRetry {
 					klog.V(4).Infof("%s: watch of %v returned %v - backing off", r.name, r.typeDescription, err)
-					<-r.initConnBackoffManager.Backoff().C()
+					<-r.clock.After(r.initConnBackoffManager())
 					continue
 				}
 				return err
@@ -406,7 +407,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.typeDescription, err)
 				case apierrors.IsTooManyRequests(err):
 					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.typeDescription)
-					<-r.initConnBackoffManager.Backoff().C()
+					<-r.clock.After(r.initConnBackoffManager())
 					continue
 				case apierrors.IsInternalError(err) && retry.ShouldRetry():
 					klog.V(2).Infof("%s: retrying watch of %v internal error: %v", r.name, r.typeDescription, err)
