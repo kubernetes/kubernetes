@@ -68,9 +68,9 @@ type Reflector struct {
 	listerWatcher ListerWatcher
 
 	// backoff manages backoff of ListWatch
-	backoffManager wait.BackoffManager
+	backoffManager wait.DelayFunc
 	// initConnBackoffManager manages backoff the initial connection with the Watch call of ListAndWatch.
-	initConnBackoffManager wait.BackoffManager
+	initConnBackoffManager wait.DelayFunc
 	// MaxInternalErrorRetryDuration defines how long we should retry internal errors returned by watch.
 	MaxInternalErrorRetryDuration time.Duration
 
@@ -212,8 +212,8 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
 		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
-		backoffManager:         wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
-		initConnBackoffManager: wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
+		backoffManager:         wait.Backoff{Duration: 800 * time.Millisecond, Cap: 30 * time.Second, Factor: 2.0, Jitter: 1.0, Steps: 20}.DelayWithReset(reflectorClock, 2*time.Minute),
+		initConnBackoffManager: wait.Backoff{Duration: 800 * time.Millisecond, Cap: 30 * time.Second, Factor: 2.0, Jitter: 1.0, Steps: 20}.DelayWithReset(reflectorClock, 2*time.Minute),
 		clock:                  reflectorClock,
 		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
 		expectedType:           reflect.TypeOf(expectedType),
@@ -281,7 +281,7 @@ func (r *Reflector) Run(stopCh <-chan struct{}) {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			r.watchErrorHandler(r, err)
 		}
-	}, r.backoffManager, true, stopCh)
+	}, r.clock.NewTimer, r.backoffManager, true, stopCh)
 	klog.V(3).Infof("Stopping reflector %s (%s) from %s", r.typeDescription, r.resyncPeriod, r.name)
 }
 
@@ -378,7 +378,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			// If that's the case begin exponentially backing off and resend watch request.
 			// Do the same for "429" errors.
 			if utilnet.IsConnectionRefused(err) || apierrors.IsTooManyRequests(err) {
-				<-r.initConnBackoffManager.Backoff().C()
+				<-r.clock.After(r.initConnBackoffManager())
 				continue
 			}
 			return err
@@ -396,7 +396,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.typeDescription, err)
 				case apierrors.IsTooManyRequests(err):
 					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.typeDescription)
-					<-r.initConnBackoffManager.Backoff().C()
+					<-r.clock.After(r.initConnBackoffManager())
 					continue
 				case apierrors.IsInternalError(err) && retry.ShouldRetry():
 					klog.V(2).Infof("%s: retrying watch of %v internal error: %v", r.name, r.typeDescription, err)

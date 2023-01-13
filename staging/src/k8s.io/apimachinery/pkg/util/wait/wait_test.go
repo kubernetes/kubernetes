@@ -713,47 +713,65 @@ func TestContextForChannel(t *testing.T) {
 	}
 }
 
-func TestExponentialBackoffManagerGetNextBackoff(t *testing.T) {
+func TestBackoffDelayWithResetExponential(t *testing.T) {
 	fc := testingclock.NewFakeClock(time.Now())
-	backoff := NewExponentialBackoffManager(1, 10, 10, 2.0, 0.0, fc)
+	backoff := Backoff{Duration: 1, Cap: 10, Factor: 2.0, Jitter: 0.0, Steps: 10}.DelayWithReset(fc, 10)
 	durations := []time.Duration{1, 2, 4, 8, 10, 10, 10}
 	for i := 0; i < len(durations); i++ {
-		generatedBackoff := backoff.(*exponentialBackoffManagerImpl).getNextBackoff()
+		generatedBackoff := backoff()
 		if generatedBackoff != durations[i] {
 			t.Errorf("unexpected %d-th backoff: %d, expecting %d", i, generatedBackoff, durations[i])
 		}
 	}
 
 	fc.Step(11)
-	resetDuration := backoff.(*exponentialBackoffManagerImpl).getNextBackoff()
+	resetDuration := backoff()
 	if resetDuration != 1 {
 		t.Errorf("after reset, backoff should be 1, but got %d", resetDuration)
 	}
 }
 
-func TestJitteredBackoffManagerGetNextBackoff(t *testing.T) {
+func TestBackoffDelayWithResetEmpty(t *testing.T) {
+	fc := testingclock.NewFakeClock(time.Now())
+	backoff := Backoff{Duration: 1, Cap: 10, Factor: 2.0, Jitter: 0.0, Steps: 10}.DelayWithReset(fc, 0)
+	durations := []time.Duration{1, 1, 1, 1, 1, 1, 1}
+	for i := 0; i < len(durations); i++ {
+		generatedBackoff := backoff()
+		if generatedBackoff != durations[i] {
+			t.Errorf("unexpected %d-th backoff: %d, expecting %d", i, generatedBackoff, durations[i])
+		}
+	}
+
+	fc.Step(11)
+	resetDuration := backoff()
+	if resetDuration != 1 {
+		t.Errorf("after reset, backoff should be 1, but got %d", resetDuration)
+	}
+}
+
+func TestBackoffDelayWithResetJitter(t *testing.T) {
 	// positive jitter
-	backoffMgr := NewJitteredBackoffManager(1, 1, testingclock.NewFakeClock(time.Now()))
+	backoff := Backoff{Duration: 1, Jitter: 1}.DelayWithReset(testingclock.NewFakeClock(time.Now()), 0)
 	for i := 0; i < 5; i++ {
-		backoff := backoffMgr.(*jitteredBackoffManagerImpl).getNextBackoff()
-		if backoff < 1 || backoff > 2 {
-			t.Errorf("backoff out of range: %d", backoff)
+		value := backoff()
+		if value < 1 || value > 2 {
+			t.Errorf("backoff out of range: %d", value)
 		}
 	}
 
 	// negative jitter, shall be a fixed backoff
-	backoffMgr = NewJitteredBackoffManager(1, -1, testingclock.NewFakeClock(time.Now()))
-	backoff := backoffMgr.(*jitteredBackoffManagerImpl).getNextBackoff()
-	if backoff != 1 {
-		t.Errorf("backoff should be 1, but got %d", backoff)
+	backoff = Backoff{Duration: 1, Jitter: -1}.DelayWithReset(testingclock.NewFakeClock(time.Now()), 0)
+	value := backoff()
+	if value != 1 {
+		t.Errorf("backoff should be 1, but got %d", value)
 	}
 }
 
-func TestJitterBackoffManagerWithRealClock(t *testing.T) {
-	backoffMgr := NewJitteredBackoffManager(1*time.Millisecond, 0, &clock.RealClock{})
+func TestBackoffDelayWithResetWithRealClockJitter(t *testing.T) {
+	backoff := Backoff{Duration: 1 * time.Millisecond, Jitter: 0}.DelayWithReset(&clock.RealClock{}, 0)
 	for i := 0; i < 5; i++ {
 		start := time.Now()
-		<-backoffMgr.Backoff().C()
+		<-RealTimer(backoff()).C()
 		passed := time.Since(start)
 		if passed < 1*time.Millisecond {
 			t.Errorf("backoff should be at least 1ms, but got %s", passed.String())
@@ -761,14 +779,14 @@ func TestJitterBackoffManagerWithRealClock(t *testing.T) {
 	}
 }
 
-func TestExponentialBackoffManagerWithRealClock(t *testing.T) {
+func TestBackoffDelayWithResetWithRealClockExponential(t *testing.T) {
 	// backoff at least 1ms, 2ms, 4ms, 8ms, 10ms, 10ms, 10ms
 	durationFactors := []time.Duration{1, 2, 4, 8, 10, 10, 10}
-	backoffMgr := NewExponentialBackoffManager(1*time.Millisecond, 10*time.Millisecond, 1*time.Hour, 2.0, 0.0, &clock.RealClock{})
+	backoff := Backoff{Duration: 1 * time.Millisecond, Cap: 10 * time.Millisecond, Factor: 2.0, Jitter: 0.0, Steps: 10}.DelayWithReset(&clock.RealClock{}, 1*time.Hour)
 
 	for i := range durationFactors {
 		start := time.Now()
-		<-backoffMgr.Backoff().C()
+		<-RealTimer(backoff()).C()
 		passed := time.Since(start)
 		if passed < durationFactors[i]*time.Millisecond {
 			t.Errorf("backoff should be at least %d ms, but got %s", durationFactors[i], passed.String())

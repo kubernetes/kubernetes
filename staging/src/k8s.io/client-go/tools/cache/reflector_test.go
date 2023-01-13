@@ -19,6 +19,7 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -375,7 +376,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 				stopCh := make(chan struct{})
 				connFails := test.numConnFails
 				fakeClock := testingclock.NewFakeClock(time.Unix(0, 0))
-				bm := wait.NewExponentialBackoffManager(time.Millisecond, maxBackoff, 100*time.Millisecond, 2.0, 1.0, fakeClock)
+				bm := wait.Backoff{Duration: time.Millisecond, Cap: maxBackoff, Factor: 2.0, Jitter: 1.0, Steps: math.MaxInt}.DelayWithReset(fakeClock, 100*time.Millisecond)
 				done := make(chan struct{})
 				defer close(done)
 				go func() {
@@ -439,9 +440,9 @@ type fakeBackoff struct {
 	calls int
 }
 
-func (f *fakeBackoff) Backoff() clock.Timer {
+func (f *fakeBackoff) Step() time.Duration {
 	f.calls++
-	return f.clock.NewTimer(time.Duration(0))
+	return 0
 }
 
 func TestBackoffOnTooManyRequests(t *testing.T) {
@@ -474,7 +475,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 		name:                   "test-reflector",
 		listerWatcher:          lw,
 		store:                  NewFIFO(MetaNamespaceKeyFunc),
-		initConnBackoffManager: bm,
+		initConnBackoffManager: bm.Step,
 		clock:                  clock,
 		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
 	}
@@ -543,7 +544,7 @@ func TestRetryInternalError(t *testing.T) {
 			name:                   "test-reflector",
 			listerWatcher:          lw,
 			store:                  NewFIFO(MetaNamespaceKeyFunc),
-			initConnBackoffManager: bm,
+			initConnBackoffManager: bm.Step,
 			clock:                  fakeClock,
 			watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
 		}
