@@ -141,16 +141,16 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.16, non-functional in v1.22+", fieldPath.Child("spec", "volumes").Index(i).Child("scaleIO")))
 		}
 		if v.Flocker != nil {
-			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, support removal is planned in v1.26", fieldPath.Child("spec", "volumes").Index(i).Child("flocker")))
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, non-functional in v1.25+", fieldPath.Child("spec", "volumes").Index(i).Child("flocker")))
 		}
 		if v.StorageOS != nil {
-			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, support removal is planned in v1.26", fieldPath.Child("spec", "volumes").Index(i).Child("storageOS")))
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, non-functional in v1.25+", fieldPath.Child("spec", "volumes").Index(i).Child("storageOS")))
 		}
 		if v.Quobyte != nil {
-			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, support removal is planned in v1.26", fieldPath.Child("spec", "volumes").Index(i).Child("quobyte")))
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, non-functional in v1.25+", fieldPath.Child("spec", "volumes").Index(i).Child("quobyte")))
 		}
 		if v.Glusterfs != nil {
-			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.25, this feature will be removed soon after in a subsequent release", fieldPath.Child("spec", "volumes").Index(i).Child("glusterfs")))
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.25, non-functional in v1.26+", fieldPath.Child("spec", "volumes").Index(i).Child("glusterfs")))
 		}
 		if v.Ephemeral != nil && v.Ephemeral.VolumeClaimTemplate != nil {
 			warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(fieldPath.Child("spec", "volumes").Index(i).Child("ephemeral").Child("volumeClaimTemplate").Child("spec"), v.Ephemeral.VolumeClaimTemplate.Spec)...)
