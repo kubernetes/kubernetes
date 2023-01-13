@@ -24,25 +24,12 @@ KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd -P)"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 
-# Each element of this array is a directory containing subdirectories which
-# eventually contain a file named "api.proto".
-APIS=(
-    "staging/src/k8s.io/cri-api/pkg/apis/runtime"
+if [ "$#" = 0 ]; then
+    echo "usage: $0 <api_dir>..."
+    exit 1
+fi
 
-    "staging/src/k8s.io/kubelet/pkg/apis/podresources"
-
-    "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
-
-    "staging/src/k8s.io/kms/apis"
-    "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
-
-    "staging/src/k8s.io/kubelet/pkg/apis/dra"
-
-    "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"
-    "pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis"
-)
-
-for api in "${APIS[@]}"; do
+for api; do
     # This can't use `git ls-files` because it runs in a container without the
     # .git dir synced.
     find "${api}" -type f -name "api.proto" \
