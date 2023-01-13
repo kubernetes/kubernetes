@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2018 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2022 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -909,6 +909,17 @@ func init() {
 	types.Add("pbm:PbmFaultInvalidLoginFault", reflect.TypeOf((*PbmFaultInvalidLoginFault)(nil)).Elem())
 }
 
+type PbmFaultNoPermissionEntityPrivileges struct {
+	types.DynamicData
+
+	ProfileId    *PbmProfileId `xml:"profileId,omitempty"`
+	PrivilegeIds []string      `xml:"privilegeIds,omitempty"`
+}
+
+func init() {
+	types.Add("pbm:PbmFaultNoPermissionEntityPrivileges", reflect.TypeOf((*PbmFaultNoPermissionEntityPrivileges)(nil)).Elem())
+}
+
 type PbmFaultNotFound struct {
 	PbmFault
 }
@@ -995,6 +1006,17 @@ func init() {
 
 type PbmFetchComplianceResultResponse struct {
 	Returnval []PbmComplianceResult `xml:"returnval,omitempty"`
+}
+
+type PbmFetchEntityHealthStatusSpec struct {
+	types.DynamicData
+
+	ObjectRef PbmServerObjectRef `xml:"objectRef"`
+	BackingId string             `xml:"backingId,omitempty"`
+}
+
+func init() {
+	types.Add("pbm:PbmFetchEntityHealthStatusSpec", reflect.TypeOf((*PbmFetchEntityHealthStatusSpec)(nil)).Elem())
 }
 
 type PbmFetchResourceType PbmFetchResourceTypeRequestType
@@ -1112,6 +1134,17 @@ type PbmLineOfServiceInfo struct {
 
 func init() {
 	types.Add("pbm:PbmLineOfServiceInfo", reflect.TypeOf((*PbmLineOfServiceInfo)(nil)).Elem())
+}
+
+type PbmLoggingConfiguration struct {
+	types.DynamicData
+
+	Component string `xml:"component"`
+	LogLevel  string `xml:"logLevel"`
+}
+
+func init() {
+	types.Add("pbm:PbmLoggingConfiguration", reflect.TypeOf((*PbmLoggingConfiguration)(nil)).Elem())
 }
 
 type PbmNonExistentHubs struct {
