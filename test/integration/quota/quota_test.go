@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -75,7 +76,8 @@ func TestQuota(t *testing.T) {
 	ns2 := framework.CreateNamespaceOrDie(clientset, "non-quotaed", t)
 	defer framework.DeleteNamespaceOrDie(clientset, ns2, t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
@@ -102,14 +104,14 @@ func TestQuota(t *testing.T) {
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	go resourceQuotaController.Run(ctx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
+	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
 
 	informers.Start(ctx.Done())
 	close(informersStarted)
@@ -304,7 +306,8 @@ plugins:
 	ns := framework.CreateNamespaceOrDie(clientset, "quota", t)
 	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
@@ -331,14 +334,14 @@ plugins:
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	go resourceQuotaController.Run(ctx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
+	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
 
 	informers.Start(ctx.Done())
 	close(informersStarted)
@@ -430,7 +433,8 @@ plugins:
 	ns := framework.CreateNamespaceOrDie(clientset, "quota", t)
 	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
@@ -457,14 +461,14 @@ plugins:
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(ctx, resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	go resourceQuotaController.Run(ctx, 2)
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
+	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
 
 	informers.Start(ctx.Done())
 	close(informersStarted)
