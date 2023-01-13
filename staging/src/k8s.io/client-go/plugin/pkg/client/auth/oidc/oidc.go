@@ -120,27 +120,48 @@ func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister
 	}
 
 	// Check cache for existing provider.
-	if provider, ok := cache.getClient(clusterAddress, issuer, clientID); ok {
-		return provider, nil
-	}
+	cachedProvider, _ := cache.getClient(clusterAddress, issuer, clientID)
 
 	if len(cfg[cfgExtraScopes]) > 0 {
 		klog.V(2).Infof("%s auth provider field deprecated, scopes will not get sent with a token refresh request",
 			cfgExtraScopes)
 	}
 
-	var certAuthData []byte
-	var err error
-	if cfg[cfgCertificateAuthorityData] != "" {
-		certAuthData, err = base64.StdEncoding.DecodeString(cfg[cfgCertificateAuthorityData])
+	provider := &oidcAuthProvider{}
+	if cachedProvider != nil {
+		provider = cachedProvider
+	}
+
+	provider.mu.Lock()
+	defer provider.mu.Unlock()
+	if provider.cfg == nil || // new provider
+		provider.cfg[cfgCertificateAuthorityData] != cfg[cfgCertificateAuthorityData] ||
+		provider.cfg[cfgCertificateAuthority] != cfg[cfgCertificateAuthority] {
+
+		httpClient, err := newOIDCHttpClient(cfg[cfgCertificateAuthorityData], cfg[cfgCertificateAuthority])
 		if err != nil {
 			return nil, err
 		}
+
+		provider.client = httpClient
+	}
+
+	provider.now = time.Now
+	provider.cfg = cfg
+	provider.persister = persister
+
+	return cache.setClient(clusterAddress, issuer, clientID, provider), nil
+}
+
+func newOIDCHttpClient(caB64PEM, caPath string) (*http.Client, error) {
+	certAuthData, err := base64.StdEncoding.DecodeString(caB64PEM)
+	if err != nil {
+		return nil, err
 	}
 
 	clientConfig := restclient.Config{
 		TLSClientConfig: restclient.TLSClientConfig{
-			CAFile: cfg[cfgCertificateAuthority],
+			CAFile: caPath,
 			CAData: certAuthData,
 		},
 	}
@@ -149,16 +170,7 @@ func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister
 	if err != nil {
 		return nil, err
 	}
-	hc := &http.Client{Transport: trans}
-
-	provider := &oidcAuthProvider{
-		client:    hc,
-		now:       time.Now,
-		cfg:       cfg,
-		persister: persister,
-	}
-
-	return cache.setClient(clusterAddress, issuer, clientID, provider), nil
+	return &http.Client{Transport: trans}, nil
 }
 
 type oidcAuthProvider struct {
