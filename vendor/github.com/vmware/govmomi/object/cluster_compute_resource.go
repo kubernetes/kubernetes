@@ -87,3 +87,17 @@ func (c ClusterComputeResource) MoveInto(ctx context.Context, hosts ...*HostSyst
 
 	return NewTask(c.c, res.Returnval), nil
 }
+
+func (c ClusterComputeResource) PlaceVm(ctx context.Context, spec types.PlacementSpec) (*types.PlacementResult, error) {
+	req := types.PlaceVm{
+		This:          c.Reference(),
+		PlacementSpec: spec,
+	}
+
+	res, err := methods.PlaceVm(ctx, c.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res.Returnval, nil
+}

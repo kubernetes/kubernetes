@@ -1,7 +1,5 @@
-//+build !windows
-
 /*
-Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,23 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package simulator
+package debug
 
-import "syscall"
+import (
+	"fmt"
+	"io"
+	"os"
+)
 
-func (ds *Datastore) stat() error {
-	info := ds.Info.GetDatastoreInfo()
-	var stat syscall.Statfs_t
+type LogWriterCloser struct {
+}
 
-	err := syscall.Statfs(info.Url, &stat)
-	if err != nil {
-		return err
-	}
+func NewLogWriterCloser() *LogWriterCloser {
+	return &LogWriterCloser{}
+}
 
-	info.FreeSpace = int64(stat.Bfree * uint64(stat.Bsize))
+func (lwc *LogWriterCloser) Write(p []byte) (n int, err error) {
+	fmt.Fprint(os.Stderr, string(Scrub(p)))
+	return len(p), nil
+}
 
-	ds.Summary.FreeSpace = info.FreeSpace
-	ds.Summary.Capacity = int64(stat.Blocks * uint64(stat.Bsize))
-
+func (lwc *LogWriterCloser) Close() error {
 	return nil
+}
+
+type LogProvider struct {
+}
+
+func (s *LogProvider) NewFile(p string) io.WriteCloser {
+	return NewLogWriterCloser()
+}
+
+func (s *LogProvider) Flush() {
 }

@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/simulator/internal"
+	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -50,13 +52,14 @@ func NewPropertyCollector(ref types.ManagedObjectReference) object.Reference {
 
 var errMissingField = errors.New("missing field")
 var errEmptyField = errors.New("empty field")
+var errInvalidField = errors.New("invalid field")
 
 func getObject(ctx *Context, ref types.ManagedObjectReference) (reflect.Value, bool) {
 	var obj mo.Reference
 	if ctx.Session == nil {
 		// Even without permissions to access an object or specific fields, RetrieveProperties
 		// returns an ObjectContent response as long as the object exists.  See retrieveResult.add()
-		obj = Map.Get(ref)
+		obj = ctx.Map.Get(ref)
 	} else {
 		obj = ctx.Session.Get(ref)
 	}
@@ -137,9 +140,7 @@ func wrapValue(rval reflect.Value, rtype reflect.Type) interface{} {
 		default:
 			kind := rtype.Elem().Name()
 			// Remove govmomi interface prefix name
-			if strings.HasPrefix(kind, "Base") {
-				kind = kind[4:]
-			}
+			kind = strings.TrimPrefix(kind, "Base")
 			akind, _ := defaultMapType("ArrayOf" + kind)
 			a := reflect.New(akind)
 			a.Elem().FieldByName(kind).Set(rval)
@@ -178,6 +179,11 @@ func fieldValue(rval reflect.Value, p string) (interface{}, error) {
 				continue
 			}
 			rval = rval.Elem()
+		}
+
+		if kind == reflect.Slice {
+			// field of array field cannot be specified
+			return nil, errInvalidField
 		}
 
 		x := ucFirst(name)
@@ -231,7 +237,7 @@ func isTrue(v *bool) bool {
 }
 
 func isFalse(v *bool) bool {
-	return v == nil || *v == false
+	return v == nil || !*v
 }
 
 func lcFirst(s string) string {
@@ -262,7 +268,7 @@ func (rr *retrieveResult) add(ctx *Context, name string, val types.AnyType, cont
 		Path: name,
 		Fault: types.LocalizedMethodFault{Fault: &types.NotAuthenticated{
 			NoPermission: types.NoPermission{
-				Object:      content.Obj,
+				Object:      &content.Obj,
 				PrivilegeId: "System.Read",
 			}},
 		},
@@ -316,6 +322,13 @@ func (rr *retrieveResult) collectFields(ctx *Context, rval reflect.Value, fields
 					Name: name,
 				}},
 			})
+		case errInvalidField:
+			content.MissingSet = append(content.MissingSet, types.MissingProperty{
+				Path: name,
+				Fault: types.LocalizedMethodFault{Fault: &types.InvalidProperty{
+					Name: name,
+				}},
+			})
 		}
 	}
 }
@@ -331,8 +344,8 @@ func (rr *retrieveResult) collect(ctx *Context, ref types.ManagedObjectReference
 
 	rval, ok := getObject(ctx, ref)
 	if !ok {
-		// Possible if a test uses Map.Remove instead of Destroy_Task
-		log.Printf("object %s no longer exists", ref)
+		// Possible if a test uses ctx.Map.Remove instead of Destroy_Task
+		tracef("object %s no longer exists", ref)
 		return
 	}
 
@@ -341,7 +354,7 @@ func (rr *retrieveResult) collect(ctx *Context, ref types.ManagedObjectReference
 
 	for _, spec := range rr.req.SpecSet {
 		for _, p := range spec.PropSet {
-			if p.Type != ref.Type {
+			if p.Type != ref.Type && p.Type != rtype.Name() {
 				// e.g. ManagedEntity, ComputeResource
 				field, ok := rtype.FieldByName(p.Type)
 
@@ -485,8 +498,8 @@ func (pc *PropertyCollector) DestroyPropertyCollector(ctx *Context, c *types.Des
 		filter.DestroyPropertyFilter(ctx, &types.DestroyPropertyFilter{This: ref})
 	}
 
-	ctx.Session.Remove(c.This)
-	ctx.Map.Remove(c.This)
+	ctx.Session.Remove(ctx, c.This)
+	ctx.Map.Remove(ctx, c.This)
 
 	body.Res = &types.DestroyPropertyCollectorResponse{}
 
@@ -579,7 +592,7 @@ func (pc *PropertyCollector) UpdateObject(o mo.Reference, changes []types.Proper
 	})
 }
 
-func (pc *PropertyCollector) RemoveObject(ref types.ManagedObjectReference) {
+func (pc *PropertyCollector) RemoveObject(_ *Context, ref types.ManagedObjectReference) {
 	pc.update(types.ObjectUpdate{
 		Obj:       ref,
 		Kind:      types.ObjectUpdateKindLeave,
@@ -667,13 +680,13 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 	}
 
 	if r.Version == "" {
+		ctx.Map.AddHandler(pc) // Listen for create, update, delete of managed objects
 		apply()                // Collect current state
 		set.Version = "-"      // Next request with Version set will wait via loop below
-		ctx.Map.AddHandler(pc) // Listen for create, update, delete of managed objects
 		return body
 	}
 
-	ticker := time.NewTicker(250 * time.Millisecond) // allow for updates to accumulate
+	ticker := time.NewTicker(20 * time.Millisecond) // allow for updates to accumulate
 	defer ticker.Stop()
 	// Start the wait loop, returning on one of:
 	// - Client calls CancelWaitForUpdates
@@ -685,11 +698,11 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 			body.Res.Returnval = nil
 			switch wait.Err() {
 			case context.Canceled:
-				log.Printf("%s: WaitForUpdates canceled", pc.Self)
+				tracef("%s: WaitForUpdates canceled", pc.Self)
 				body.Fault_ = Fault("", new(types.RequestCanceled)) // CancelWaitForUpdates was called
 				body.Res = nil
 			case context.DeadlineExceeded:
-				log.Printf("%s: WaitForUpdates MaxWaitSeconds exceeded", pc.Self)
+				tracef("%s: WaitForUpdates MaxWaitSeconds exceeded", pc.Self)
 			}
 
 			return body
@@ -699,14 +712,14 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 			pc.updates = nil // clear updates collected by the managed object CRUD listeners
 			pc.mu.Unlock()
 			if len(updates) == 0 {
-				if oneUpdate == true {
+				if oneUpdate {
 					body.Res.Returnval = nil
 					return body
 				}
 				continue
 			}
 
-			log.Printf("%s: applying %d updates to %d filters", pc.Self, len(updates), len(pc.Filter))
+			tracef("%s: applying %d updates to %d filters", pc.Self, len(updates), len(pc.Filter))
 
 			for _, f := range pc.Filter {
 				filter := ctx.Session.Get(f).(*PropertyFilter)
@@ -719,7 +732,7 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 							return body
 						}
 					case types.ObjectUpdateKindModify: // Update
-						log.Printf("%s has %d changes", update.Obj, len(update.ChangeSet))
+						tracef("%s has %d changes", update.Obj, len(update.ChangeSet))
 						if !apply() { // An update may apply to collector traversal specs
 							return body
 						}
@@ -747,7 +760,7 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 			if len(set.FilterSet) != 0 {
 				return body
 			}
-			if oneUpdate == true {
+			if oneUpdate {
 				body.Res.Returnval = nil
 				return body
 			}
@@ -772,5 +785,70 @@ func (pc *PropertyCollector) WaitForUpdates(ctx *Context, r *types.WaitForUpdate
 		}
 	}
 
+	return body
+}
+
+// Fetch is not documented in the vSphere SDK, but ovftool depends on it.
+// A Fetch request is converted to a RetrievePropertiesEx method call by vcsim.
+func (pc *PropertyCollector) Fetch(ctx *Context, req *internal.Fetch) soap.HasFault {
+	body := new(internal.FetchBody)
+
+	if req.This == vim25.ServiceInstance && req.Prop == "content" {
+		content := ctx.Map.content()
+		// ovftool uses API version for 6.0 and fails when these fields are non-nil; TODO
+		content.VStorageObjectManager = nil
+		content.HostProfileManager = nil
+		content.HostSpecManager = nil
+		content.CryptoManager = nil
+		content.HostProfileManager = nil
+		content.HealthUpdateManager = nil
+		content.FailoverClusterConfigurator = nil
+		content.FailoverClusterManager = nil
+		body.Res = &internal.FetchResponse{
+			Returnval: content,
+		}
+		return body
+	}
+
+	if ctx.Map.Get(req.This) == nil {
+		// The Fetch method supports use of super class types, this is a quick hack to support the cases used by ovftool
+		switch req.This.Type {
+		case "ManagedEntity":
+			for o := range ctx.Map.objects {
+				if o.Value == req.This.Value {
+					req.This.Type = o.Type
+					break
+				}
+			}
+		case "ComputeResource":
+			req.This.Type = "Cluster" + req.This.Type
+		}
+	}
+
+	res := pc.RetrievePropertiesEx(ctx, &types.RetrievePropertiesEx{
+		SpecSet: []types.PropertyFilterSpec{{
+			PropSet: []types.PropertySpec{{
+				Type:    req.This.Type,
+				PathSet: []string{req.Prop},
+			}},
+			ObjectSet: []types.ObjectSpec{{
+				Obj: req.This,
+			}},
+		}}})
+
+	if res.Fault() != nil {
+		return res
+	}
+
+	obj := res.(*methods.RetrievePropertiesExBody).Res.Returnval.Objects[0]
+	if len(obj.PropSet) == 0 {
+		fault := obj.MissingSet[0].Fault
+		body.Fault_ = Fault(fault.LocalizedMessage, fault.Fault)
+		return body
+	}
+
+	body.Res = &internal.FetchResponse{
+		Returnval: obj.PropSet[0].Val,
+	}
 	return body
 }

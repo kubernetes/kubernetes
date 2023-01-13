@@ -59,16 +59,11 @@ type IpPoolManager struct {
 	nextPoolId int32
 }
 
-func NewIpPoolManager(ref types.ManagedObjectReference) *IpPoolManager {
-	m := &IpPoolManager{}
-	m.Self = ref
-
+func (m *IpPoolManager) init(*Registry) {
 	m.pools = map[int32]*IpPool{
 		1: ipPool,
 	}
 	m.nextPoolId = 2
-
-	return m
 }
 
 func (m *IpPoolManager) CreateIpPool(req *types.CreateIpPool) soap.HasFault {
