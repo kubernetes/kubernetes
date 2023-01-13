@@ -1423,15 +1423,15 @@ func (proxier *Proxier) syncProxyRules() {
 	// nodeAddresses may contain dual-stack zero-CIDRs if proxier.nodePortAddresses is empty.
 	// Ensure nodeAddresses only contains the addresses for this proxier's IP family.
 	isIPv6 := proxier.iptables.IsIPv6()
-	for addr := range nodeAddresses {
+	for _, addr := range nodeAddresses {
 		if utilproxy.IsZeroCIDR(addr) && isIPv6 == netutils.IsIPv6CIDRString(addr) {
 			// if any of the addresses is zero cidr of this IP family, non-zero IPs can be excluded.
-			nodeAddresses = sets.NewString(addr)
+			nodeAddresses = []string{addr}
 			break
 		}
 	}
 
-	for address := range nodeAddresses {
+	for _, address := range nodeAddresses {
 		if utilproxy.IsZeroCIDR(address) {
 			destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
 			if isIPv6 {

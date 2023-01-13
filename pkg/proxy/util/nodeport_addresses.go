@@ -32,12 +32,12 @@ import (
 // If multiple cidrs is given, it will return the minimal IP sets, e.g. given input `[1.2.0.0/16, 0.0.0.0/0]`, it will
 // only return `0.0.0.0/0`.
 // NOTE: GetNodeAddresses only accepts CIDRs, if you want concrete IPs, e.g. 1.2.3.4, then the input should be 1.2.3.4/32.
-func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error) {
+func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) ([]string, error) {
 	uniqueAddressList := sets.NewString()
 	if len(cidrs) == 0 {
 		uniqueAddressList.Insert(IPv4ZeroCIDR)
 		uniqueAddressList.Insert(IPv6ZeroCIDR)
-		return uniqueAddressList, nil
+		return uniqueAddressList.List(), nil
 	}
 	// First round of iteration to pick out `0.0.0.0/0` or `::/0` for the sake of excluding non-zero IPs.
 	for _, cidr := range cidrs {
@@ -85,7 +85,7 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 		return nil, fmt.Errorf("no addresses found for cidrs %v", cidrs)
 	}
 
-	return uniqueAddressList, nil
+	return uniqueAddressList.List(), nil
 }
 
 // ContainsIPv4Loopback returns true if the input is empty or one of the CIDR contains an IPv4 loopback address.

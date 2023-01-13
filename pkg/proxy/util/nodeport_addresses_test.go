@@ -252,7 +252,7 @@ func TestGetNodeAddresses(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			if !addrList.Equal(tc.expected) {
+			if !sets.NewString(addrList...).Equal(tc.expected) {
 				t.Errorf("unexpected mismatch, expected: %v, got: %v", tc.expected, addrList)
 			}
 		})

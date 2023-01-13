@@ -1073,11 +1073,10 @@ func (proxier *Proxier) syncProxyRules() {
 	)
 
 	if hasNodePort {
-		nodeAddrSet, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+		nodeAddresses, err = utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 		if err != nil {
 			klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
 		} else {
-			nodeAddresses = nodeAddrSet.List()
 			for _, address := range nodeAddresses {
 				a := netutils.ParseIPSloppy(address)
 				if a.IsLoopback() {
