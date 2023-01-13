@@ -507,7 +507,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				IdentityLeaseRenewIntervalPeriod,
 				leaseName,
 				metav1.NamespaceSystem,
-				labelAPIServerHeartbeat)
+				// TODO: receive identity label value as a parameter when post start hook is moved to generic apiserver.
+				labelAPIServerHeartbeatFunc(KubeAPIServer))
 			go controller.Run(hookContext.StopCh)
 			return nil
 		})
@@ -555,21 +556,24 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	return m, nil
 }
 
-func labelAPIServerHeartbeat(lease *coordinationapiv1.Lease) error {
-	if lease.Labels == nil {
-		lease.Labels = map[string]string{}
-	}
-	// This label indicates that kube-apiserver owns this identity lease object
-	lease.Labels[IdentityLeaseComponentLabelKey] = KubeAPIServer
+func labelAPIServerHeartbeatFunc(identity string) lease.ProcessLeaseFunc {
+	return func(lease *coordinationapiv1.Lease) error {
+		if lease.Labels == nil {
+			lease.Labels = map[string]string{}
+		}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
-	}
+		// This label indiciates the identity of the lease object.
+		lease.Labels[IdentityLeaseComponentLabelKey] = identity
 
-	// convenience label to easily map a lease object to a specific apiserver
-	lease.Labels[apiv1.LabelHostname] = hostname
-	return nil
+		hostname, err := os.Hostname()
+		if err != nil {
+			return err
+		}
+
+		// convenience label to easily map a lease object to a specific apiserver
+		lease.Labels[apiv1.LabelHostname] = hostname
+		return nil
+	}
 }
 
 // InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.

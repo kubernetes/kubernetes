@@ -34,6 +34,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/cryptobyte"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -345,7 +346,23 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 			klog.Fatalf("error getting hostname for apiserver identity: %v", err)
 		}
 
-		hash := sha256.Sum256([]byte(hostname))
+		// Since the hash needs to be unique across each kube-apiserver and aggregated apiservers,
+		// the hash used for the identity should include both the hostname and the identity value.
+		// TODO: receive the identity value as a parameter once the apiserver identity lease controller
+		// post start hook is moved to generic apiserver.
+		b := cryptobyte.NewBuilder(nil)
+		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+			b.AddBytes([]byte(hostname))
+		})
+		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+			b.AddBytes([]byte("kube-apiserver"))
+		})
+		hashData, err := b.Bytes()
+		if err != nil {
+			klog.Fatalf("error building hash data for apiserver identity: %v", err)
+		}
+
+		hash := sha256.Sum256(hashData)
 		id = "apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 	}
 	lifecycleSignals := newLifecycleSignals()
