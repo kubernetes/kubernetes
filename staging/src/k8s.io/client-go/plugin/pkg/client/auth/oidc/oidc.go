@@ -111,12 +111,12 @@ func (c *clientCache) setClient(clusterAddress, issuer, clientID string, client 
 func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	issuer := cfg[cfgIssuerURL]
 	if issuer == "" {
-		return nil, fmt.Errorf("Must provide %s", cfgIssuerURL)
+		return nil, fmt.Errorf("must provide %s", cfgIssuerURL)
 	}
 
 	clientID := cfg[cfgClientID]
 	if clientID == "" {
-		return nil, fmt.Errorf("Must provide %s", cfgClientID)
+		return nil, fmt.Errorf("must provide %s", cfgClientID)
 	}
 
 	// Check cache for existing provider.
@@ -125,7 +125,7 @@ func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister
 	}
 
 	if len(cfg[cfgExtraScopes]) > 0 {
-		klog.V(2).Infof("%s auth provider field depricated, refresh request don't send scopes",
+		klog.V(2).Infof("%s auth provider field deprecated, scopes will not get sent with a token refresh request",
 			cfgExtraScopes)
 	}
 
