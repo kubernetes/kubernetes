@@ -1849,7 +1849,7 @@ func createGC(ctx context.Context, t *testing.T, restConfig *restclient.Config, 
 			restMapper.Reset()
 		}, syncPeriod, ctx.Done())
 		go gc.Run(ctx, 1)
-		go gc.Sync(clientSet.Discovery(), syncPeriod, ctx.Done())
+		go gc.Sync(ctx, clientSet.Discovery(), syncPeriod)
 	}
 	return startGC
 }

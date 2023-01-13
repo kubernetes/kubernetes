@@ -502,6 +502,8 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 		return nil, false, nil
 	}
 
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "garbagecollector"))
+
 	gcClientset := controllerContext.ClientBuilder.ClientOrDie("generic-garbage-collector")
 	discoveryClient := controllerContext.ClientBuilder.DiscoveryClientOrDie("generic-garbage-collector")
 
@@ -536,7 +538,7 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
-	go garbageCollector.Sync(discoveryClient, 30*time.Second, ctx.Done())
+	go garbageCollector.Sync(ctx, discoveryClient, 30*time.Second)
 
 	return garbageCollector, true, nil
 }
