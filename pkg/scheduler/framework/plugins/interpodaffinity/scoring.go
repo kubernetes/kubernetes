@@ -142,6 +142,15 @@ func (pl *InterPodAffinity) PreScore(
 	hasPreferredAffinityConstraints := affinity != nil && affinity.PodAffinity != nil && len(affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0
 	hasPreferredAntiAffinityConstraints := affinity != nil && affinity.PodAntiAffinity != nil && len(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0
 
+	// Optionally ignore calculating preferences of existing pods' affinity rules
+	// if the incoming pod has no inter-pod affinities.
+	if pl.args.IgnorePreferredTermsOfExistingPods && !hasPreferredAffinityConstraints && !hasPreferredAntiAffinityConstraints {
+		cycleState.Write(preScoreStateKey, &preScoreState{
+			topologyScore: make(map[string]map[string]int64),
+		})
+		return nil
+	}
+
 	// Unless the pod being scheduled has preferred affinity terms, we only
 	// need to process nodes hosting pods with affinity.
 	var allNodes []*framework.NodeInfo

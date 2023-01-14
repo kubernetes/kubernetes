@@ -53495,7 +53495,16 @@ func schema_k8sio_kube_scheduler_config_v1_InterPodAffinityArgs(ref common.Refer
 							Format:      "int32",
 						},
 					},
+					"ignorePreferredTermsOfExistingPods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IgnorePreferredTermsOfExistingPods configures the scheduler to ignore existing pods' preferred affinity rules when scoring candidate nodes, unless the incoming pod has inter-pod affinities.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"ignorePreferredTermsOfExistingPods"},
 			},
 		},
 	}
@@ -54599,7 +54608,16 @@ func schema_k8sio_kube_scheduler_config_v1beta2_InterPodAffinityArgs(ref common.
 							Format:      "int32",
 						},
 					},
+					"ignorePreferredTermsOfExistingPods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IgnorePreferredTermsOfExistingPods configures the scheduler to ignore existing pods' preferred affinity rules when scoring candidate nodes, unless the incoming pod has inter-pod affinities.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"ignorePreferredTermsOfExistingPods"},
 			},
 		},
 	}
@@ -55710,7 +55728,16 @@ func schema_k8sio_kube_scheduler_config_v1beta3_InterPodAffinityArgs(ref common.
 							Format:      "int32",
 						},
 					},
+					"ignorePreferredTermsOfExistingPods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IgnorePreferredTermsOfExistingPods configures the scheduler to ignore existing pods' preferred affinity rules when scoring candidate nodes, unless the incoming pod has inter-pod affinities.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"ignorePreferredTermsOfExistingPods"},
 			},
 		},
 	}
