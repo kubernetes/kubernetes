@@ -36,7 +36,6 @@ if ! ${ALL} ; then
 fi
 
 BASH_TARGETS=(
-	update-generated-protobuf
 	update-codegen
 	update-generated-api-compatibility-data
 	update-generated-docs
