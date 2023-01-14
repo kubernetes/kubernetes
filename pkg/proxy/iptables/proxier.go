@@ -237,7 +237,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddressStrings []string,
 ) (*Proxier, error) {
-	nodePortAddresses := utilproxy.NewNodePortAddresses(nodePortAddressStrings)
+	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	if localhostNodePorts && nodePortAddresses.ContainsIPv4Loopback() {
 		// Set the route_localnet sysctl we need for exposing NodePorts on loopback addresses
@@ -327,17 +327,16 @@ func NewDualStackProxier(
 	nodePortAddresses []string,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
-		nodeIP[0], recorder, healthzServer, ipFamilyMap[v1.IPv4Protocol])
+		nodeIP[0], recorder, healthzServer, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
-		nodeIP[1], recorder, healthzServer, ipFamilyMap[v1.IPv6Protocol])
+		nodeIP[1], recorder, healthzServer, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -1422,16 +1421,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if err != nil {
 		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 	}
-	// nodeAddresses may contain dual-stack zero-CIDRs if proxier.nodePortAddresses is empty.
-	// Ensure nodeAddresses only contains the addresses for this proxier's IP family.
 	isIPv6 := proxier.iptables.IsIPv6()
-	for _, addr := range nodeAddresses {
-		if utilproxy.IsZeroCIDR(addr) && isIPv6 == netutils.IsIPv6CIDRString(addr) {
-			// if any of the addresses is zero cidr of this IP family, non-zero IPs can be excluded.
-			nodeAddresses = []string{addr}
-			break
-		}
-	}
 
 	for _, address := range nodeAddresses {
 		if utilproxy.IsZeroCIDR(address) {
@@ -1456,12 +1446,6 @@ func (proxier *Proxier) syncProxyRules() {
 				destinations,
 				"-j", string(kubeNodePortsChain))
 			break
-		}
-
-		// Ignore IP addresses with incorrect version
-		if isIPv6 && !netutils.IsIPv6String(address) || !isIPv6 && netutils.IsIPv6String(address) {
-			klog.ErrorS(nil, "IP has incorrect IP version", "IP", address)
-			continue
 		}
 
 		// For ipv6, Regardless of the value of localhostNodePorts is true or false, we should disallow access

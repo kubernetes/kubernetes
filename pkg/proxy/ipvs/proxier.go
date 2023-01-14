@@ -457,7 +457,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		scheduler = defaultScheduler
 	}
 
-	nodePortAddresses := utilproxy.NewNodePortAddresses(nodePortAddressStrings)
+	nodePortAddresses := utilproxy.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses)
 
@@ -539,14 +539,12 @@ func NewDualStackProxier(
 
 	safeIpset := newSafeIpset(ipset)
 
-	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
-
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIP[0],
-		recorder, healthzServer, scheduler, ipFamilyMap[v1.IPv4Protocol], kernelHandler)
+		recorder, healthzServer, scheduler, nodePortAddresses, kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -555,7 +553,7 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIP[1],
-		nil, nil, scheduler, ipFamilyMap[v1.IPv6Protocol], kernelHandler)
+		nil, nil, scheduler, nodePortAddresses, kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -1095,17 +1093,6 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 	}
-
-	// filter node IPs by proxier ipfamily
-	idx := 0
-	for _, nodeIP := range nodeIPs {
-		if (proxier.ipFamily == v1.IPv6Protocol) == netutils.IsIPv6(nodeIP) {
-			nodeIPs[idx] = nodeIP
-			idx++
-		}
-	}
-	// reset slice to filtered entries
-	nodeIPs = nodeIPs[:idx]
 
 	// Build IPVS rules for each service.
 	for svcPortName, svcPort := range proxier.svcPortMap {
