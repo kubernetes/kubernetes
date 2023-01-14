@@ -100,13 +100,13 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 	if allocatorParams.ServiceCIDR != nil {
 		ra.filterOutServiceRange(allocatorParams.ServiceCIDR)
 	} else {
-		klog.V(0).Info("No Service CIDR provided. Skipping filtering out service addresses.")
+		klog.Info("No Service CIDR provided. Skipping filtering out service addresses.")
 	}
 
 	if allocatorParams.SecondaryServiceCIDR != nil {
 		ra.filterOutServiceRange(allocatorParams.SecondaryServiceCIDR)
 	} else {
-		klog.V(0).Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses.")
+		klog.Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses.")
 	}
 
 	if nodeList != nil {
@@ -164,7 +164,7 @@ func (r *rangeAllocator) Run(stopCh <-chan struct{}) {
 
 	// Start event processing pipeline.
 	r.broadcaster.StartStructuredLogging(0)
-	klog.V(0).Infof("Sending events to api server.")
+	klog.Infof("Sending events to api server.")
 	r.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: r.client.CoreV1().Events("")})
 	defer r.broadcaster.Shutdown()
 

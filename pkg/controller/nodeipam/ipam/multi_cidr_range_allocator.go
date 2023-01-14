@@ -175,13 +175,13 @@ func NewMultiCIDRRangeAllocator(
 	if allocatorParams.ServiceCIDR != nil {
 		ra.filterOutServiceRange(allocatorParams.ServiceCIDR)
 	} else {
-		klog.V(0).Info("No Service CIDR provided. Skipping filtering out service addresses.")
+		klog.Info("No Service CIDR provided. Skipping filtering out service addresses.")
 	}
 
 	if allocatorParams.SecondaryServiceCIDR != nil {
 		ra.filterOutServiceRange(allocatorParams.SecondaryServiceCIDR)
 	} else {
-		klog.V(0).Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses.")
+		klog.Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses.")
 	}
 
 	if nodeList != nil {
@@ -190,7 +190,7 @@ func NewMultiCIDRRangeAllocator(
 				klog.V(4).Infof("Node %v has no CIDR, ignoring", node.Name)
 				continue
 			}
-			klog.V(0).Infof("Node %v has CIDR %s, occupying it in CIDR map", node.Name, node.Spec.PodCIDRs)
+			klog.Infof("Node %v has CIDR %s, occupying it in CIDR map", node.Name, node.Spec.PodCIDRs)
 			if err := ra.occupyCIDRs(&node); err != nil {
 				// This will happen if:
 				// 1. We find garbage in the podCIDRs field. Retrying is useless.
@@ -240,7 +240,7 @@ func (r *multiCIDRRangeAllocator) Run(stopCh <-chan struct{}) {
 
 	// Start event processing pipeline.
 	r.broadcaster.StartStructuredLogging(0)
-	klog.V(0).Infof("Started sending events to API Server.")
+	klog.Infof("Started sending events to API Server.")
 	r.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: r.client.CoreV1().Events("")})
 	defer r.broadcaster.Shutdown()
 
