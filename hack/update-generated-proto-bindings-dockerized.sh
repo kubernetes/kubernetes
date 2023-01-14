@@ -27,6 +27,8 @@ source "${KUBE_ROOT}/hack/lib/protoc.sh"
 # Each element of this array is a directory containing subdirectories which
 # eventually contain a file named "api.proto".
 APIS=(
+    "staging/src/k8s.io/cri-api/pkg/apis/runtime"
+
     "staging/src/k8s.io/kubelet/pkg/apis/podresources"
 
     "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
