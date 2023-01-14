@@ -18,6 +18,7 @@ limitations under the License.
 syntax = "proto3";
 
 package v2alpha1;
+option go_package = "k8s.io/kms/apis/v2alpha1";
 
 // This service defines the public APIs for remote KMS provider.
 service KeyManagementService {
