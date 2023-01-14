@@ -27,15 +27,38 @@ import (
 // NodePortAddresses is used to handle the --nodeport-addresses flag
 type NodePortAddresses struct {
 	cidrStrings []string
+
+	cidrs                []*net.IPNet
+	containsIPv4Loopback bool
 }
+
+// RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
+var ipv4LoopbackStart = net.IPv4(127, 0, 0, 0)
 
 // NewNodePortAddresses takes the `--nodeport-addresses` value (which is assumed to
 // contain only valid CIDRs) and returns a NodePortAddresses object. If cidrStrings is
 // empty, this is treated as `["0.0.0.0/0", "::/0"]`.
 func NewNodePortAddresses(cidrStrings []string) *NodePortAddresses {
-	return &NodePortAddresses{
+	if len(cidrStrings) == 0 {
+		cidrStrings = []string{IPv4ZeroCIDR, IPv6ZeroCIDR}
+	}
+
+	npa := &NodePortAddresses{
 		cidrStrings: cidrStrings,
 	}
+
+	for _, str := range npa.cidrStrings {
+		_, cidr, _ := netutils.ParseCIDRSloppy(str)
+		npa.cidrs = append(npa.cidrs, cidr)
+
+		if netutils.IsIPv4CIDR(cidr) {
+			if cidr.IP.IsLoopback() || cidr.Contains(ipv4LoopbackStart) {
+				npa.containsIPv4Loopback = true
+			}
+		}
+	}
+
+	return npa
 }
 
 func (npa *NodePortAddresses) String() string {
@@ -49,11 +72,7 @@ func (npa *NodePortAddresses) String() string {
 // NetworkInterfacer is injected for test purpose.
 func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.String, error) {
 	uniqueAddressList := sets.NewString()
-	if len(npa.cidrStrings) == 0 {
-		uniqueAddressList.Insert(IPv4ZeroCIDR)
-		uniqueAddressList.Insert(IPv6ZeroCIDR)
-		return uniqueAddressList, nil
-	}
+
 	// First round of iteration to pick out `0.0.0.0/0` or `::/0` for the sake of excluding non-zero IPs.
 	for _, cidr := range npa.cidrStrings {
 		if IsZeroCIDR(cidr) {
@@ -67,12 +86,11 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Strin
 	}
 
 	// Second round of iteration to parse IPs based on cidr.
-	for _, cidr := range npa.cidrStrings {
-		if IsZeroCIDR(cidr) {
+	for _, cidr := range npa.cidrs {
+		if IsZeroCIDR(cidr.String()) {
 			continue
 		}
 
-		_, ipNet, _ := netutils.ParseCIDRSloppy(cidr)
 		for _, addr := range addrs {
 			var ip net.IP
 			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
@@ -85,7 +103,7 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Strin
 				continue
 			}
 
-			if ipNet.Contains(ip) {
+			if cidr.Contains(ip) {
 				if netutils.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
 					uniqueAddressList.Insert(ip.String())
 				}
@@ -105,27 +123,5 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Strin
 
 // ContainsIPv4Loopback returns true if npa's CIDRs contain an IPv4 loopback address.
 func (npa *NodePortAddresses) ContainsIPv4Loopback() bool {
-	if len(npa.cidrStrings) == 0 {
-		return true
-	}
-	// RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
-	ipv4LoopbackStart := netutils.ParseIPSloppy("127.0.0.0")
-	for _, cidr := range npa.cidrStrings {
-		ip, ipnet, err := netutils.ParseCIDRSloppy(cidr)
-		if err != nil {
-			continue
-		}
-
-		if netutils.IsIPv6CIDR(ipnet) {
-			continue
-		}
-
-		if ip.IsLoopback() {
-			return true
-		}
-		if ipnet.Contains(ipv4LoopbackStart) {
-			return true
-		}
-	}
-	return false
+	return npa.containsIPv4Loopback
 }
