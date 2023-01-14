@@ -83,6 +83,41 @@ fi
 # Code generation logic.
 #
 
+# protobuf generation
+#
+# Some of the later codegens depend on the results of this, so it needs to come
+# first in the case of regenerating everything.
+function codegen::protobuf() {
+    # NOTE: All output from this script needs to be copied back to the calling
+    # source tree.  This is managed in kube::build::copy_output in build/common.sh.
+    # If the output set is changed update that function.
+
+    local apis=()
+    kube::util::read-array apis < <(
+        git grep --untracked --null -l \
+            -e '// +k8s:protobuf-gen=package' \
+            -- \
+            cmd pkg staging \
+            | xargs -0 -n1 dirname \
+            | sed 's|^|k8s.io/kubernetes/|;s|k8s.io/kubernetes/staging/src/||' \
+            | LC_ALL=C sort -u)
+
+    kube::log::status "Generating protobufs for ${#apis[@]} targets"
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: generating protobufs for:"
+        for dir in "${apis[@]}"; do
+            kube::log::status "DBG:     $dir"
+        done
+    fi
+
+    git_find -z \
+        ':(glob)**/generated.proto' \
+        ':(glob)**/generated.pb.go' \
+        | xargs -0 rm -f
+
+    build/run.sh hack/update-generated-protobuf-dockerized.sh "${apis[@]}"
+}
+
 # prerelease-lifecycle generation
 #
 # Any package that wants prerelease-lifecycle functions generated must include a

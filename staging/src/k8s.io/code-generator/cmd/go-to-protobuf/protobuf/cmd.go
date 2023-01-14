@@ -273,11 +273,9 @@ func Run(g *Generator) {
 		// generate the gogoprotobuf protoc
 		cmd := exec.Command("protoc", append(args, path)...)
 		out, err := cmd.CombinedOutput()
-		if len(out) > 0 {
-			log.Print(string(out))
-		}
 		if err != nil {
 			log.Println(strings.Join(cmd.Args, " "))
+			log.Println(string(out))
 			log.Fatalf("Unable to generate protoc on %s: %v", p.PackageName, err)
 		}
 
@@ -397,9 +395,9 @@ func importOrder(deps map[string][]string) ([]string, error) {
 	if len(remainingNodes) > 0 {
 		return nil, fmt.Errorf("cycle: remaining nodes: %#v, remaining edges: %#v", remainingNodes, graph)
 	}
-	for _, n := range sorted {
-		fmt.Println("topological order", n)
-	}
+	//for _, n := range sorted {
+	//	fmt.Println("topological order", n)
+	//}
 	return sorted, nil
 }
 
