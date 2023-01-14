@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	netutils "k8s.io/utils/net"
 )
@@ -35,27 +36,45 @@ type NodePortAddresses struct {
 // RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
 var ipv4LoopbackStart = net.IPv4(127, 0, 0, 0)
 
-// NewNodePortAddresses takes the `--nodeport-addresses` value (which is assumed to
-// contain only valid CIDRs) and returns a NodePortAddresses object. If cidrStrings is
-// empty, this is treated as `["0.0.0.0/0", "::/0"]`.
-func NewNodePortAddresses(cidrStrings []string) *NodePortAddresses {
-	if len(cidrStrings) == 0 {
-		cidrStrings = []string{IPv4ZeroCIDR, IPv6ZeroCIDR}
+// NewNodePortAddresses takes an IP family and the `--nodeport-addresses` value (which is
+// assumed to contain only valid CIDRs, potentially of both IP families) and returns a
+// NodePortAddresses object for the given family. If there are no CIDRs of the given
+// family then the CIDR "0.0.0.0/0" or "::/0" will be added (even if there are CIDRs of
+// the other family).
+func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAddresses {
+	npa := &NodePortAddresses{}
+
+	// Filter CIDRs to correct family
+	for _, str := range cidrStrings {
+		if (family == v1.IPv4Protocol) == netutils.IsIPv4CIDRString(str) {
+			npa.cidrStrings = append(npa.cidrStrings, str)
+		}
+	}
+	if len(npa.cidrStrings) == 0 {
+		if family == v1.IPv4Protocol {
+			npa.cidrStrings = []string{IPv4ZeroCIDR}
+		} else {
+			npa.cidrStrings = []string{IPv6ZeroCIDR}
+		}
 	}
 
-	npa := &NodePortAddresses{
-		cidrStrings: cidrStrings,
-	}
-
+	// Now parse
 	for _, str := range npa.cidrStrings {
 		_, cidr, _ := netutils.ParseCIDRSloppy(str)
-		npa.cidrs = append(npa.cidrs, cidr)
 
 		if netutils.IsIPv4CIDR(cidr) {
 			if cidr.IP.IsLoopback() || cidr.Contains(ipv4LoopbackStart) {
 				npa.containsIPv4Loopback = true
 			}
 		}
+
+		if IsZeroCIDR(str) {
+			// Ignore everything else
+			npa.cidrs = []*net.IPNet{cidr}
+			break
+		}
+
+		npa.cidrs = append(npa.cidrs, cidr)
 	}
 
 	return npa
@@ -65,10 +84,10 @@ func (npa *NodePortAddresses) String() string {
 	return fmt.Sprintf("%v", npa.cidrStrings)
 }
 
-// GetNodeAddresses return all matched node IP addresses for npa's CIDRs.
-// If npa's CIDRs include "0.0.0.0/0" and/or "::/0", then those values will be returned
-// verbatim in the response and no actual IPs of that family will be returned.
-// If no matching IPs are found, GetNodeAddresses will return an error.
+// GetNodeAddresses returns all matched node IP addresses for npa's IP family. If npa's
+// CIDRs include "0.0.0.0/0" or "::/0", then that value will be returned verbatim in
+// the response and no actual IPs of that family will be returned. If no matching IPs are
+// found, GetNodeAddresses will return an error.
 // NetworkInterfacer is injected for test purpose.
 func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Set[string], error) {
 	uniqueAddressList := sets.New[string]()
@@ -77,6 +96,7 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Set[s
 	for _, cidr := range npa.cidrStrings {
 		if IsZeroCIDR(cidr) {
 			uniqueAddressList.Insert(cidr)
+			return uniqueAddressList, nil
 		}
 	}
 
@@ -85,12 +105,7 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Set[s
 		return nil, fmt.Errorf("error listing all interfaceAddrs from host, error: %v", err)
 	}
 
-	// Second round of iteration to parse IPs based on cidr.
 	for _, cidr := range npa.cidrs {
-		if IsZeroCIDR(cidr.String()) {
-			continue
-		}
-
 		for _, addr := range addrs {
 			var ip net.IP
 			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
@@ -104,12 +119,7 @@ func (npa *NodePortAddresses) GetNodeAddresses(nw NetworkInterfacer) (sets.Set[s
 			}
 
 			if cidr.Contains(ip) {
-				if netutils.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
-					uniqueAddressList.Insert(ip.String())
-				}
-				if !netutils.IsIPv6(ip) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
-					uniqueAddressList.Insert(ip.String())
-				}
+				uniqueAddressList.Insert(ip.String())
 			}
 		}
 	}

@@ -20,6 +20,7 @@ import (
 	"net"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fake "k8s.io/kubernetes/pkg/proxy/util/testing"
 	netutils "k8s.io/utils/net"
@@ -31,11 +32,15 @@ type InterfaceAddrsPair struct {
 }
 
 func TestGetNodeAddresses(t *testing.T) {
+	type expectation struct {
+		ips sets.Set[string]
+	}
+
 	testCases := []struct {
 		name          string
 		cidrs         []string
 		itfAddrsPairs []InterfaceAddrsPair
-		expected      sets.Set[string]
+		expected      map[v1.IPFamily]expectation
 	}{
 		{
 			name:  "IPv4 single",
@@ -50,7 +55,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("100.200.201.1"), Mask: net.CIDRMask(24, 32)}},
 				},
 			},
-			expected: sets.New[string]("10.20.30.51"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("10.20.30.51"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "IPv4 zero CIDR",
@@ -65,7 +77,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected: sets.New[string]("0.0.0.0/0"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("0.0.0.0/0"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "IPv6 multiple",
@@ -80,7 +99,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
 				},
 			},
-			expected: sets.New[string]("2001:db8::1", "::1"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("0.0.0.0/0"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("2001:db8::1", "::1"),
+				},
+			},
 		},
 		{
 			name:  "IPv6 zero CIDR",
@@ -95,7 +121,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
 				},
 			},
-			expected: sets.New[string]("::/0"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("0.0.0.0/0"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "IPv4 localhost exact",
@@ -110,7 +143,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected: sets.New[string]("127.0.0.1"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("127.0.0.1"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "IPv4 localhost subnet",
@@ -121,7 +161,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.1.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected: sets.New[string]("127.0.1.1"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("127.0.1.1"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "IPv4 multiple",
@@ -136,7 +183,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("100.200.201.1"), Mask: net.CIDRMask(24, 32)}},
 				},
 			},
-			expected: sets.New[string]("10.20.30.51", "100.200.201.1"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("10.20.30.51", "100.200.201.1"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "IPv4 multiple, no match",
@@ -151,7 +205,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected: nil,
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: nil,
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "empty list, IPv4 addrs",
@@ -166,7 +227,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)}},
 				},
 			},
-			expected: sets.New[string]("0.0.0.0/0", "::/0"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("0.0.0.0/0"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "empty list, IPv6 addrs",
@@ -181,7 +249,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)}},
 				},
 			},
-			expected: sets.New[string]("0.0.0.0/0", "::/0"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("0.0.0.0/0"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "IPv4 redundant CIDRs",
@@ -192,7 +267,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					addrs: []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)}},
 				},
 			},
-			expected: sets.New[string]("0.0.0.0/0"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("0.0.0.0/0"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 		{
 			name:  "Dual-stack, redundant IPv4",
@@ -213,7 +295,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					},
 				},
 			},
-			expected: sets.New[string]("0.0.0.0/0", "2001:db8::1"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("0.0.0.0/0"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("2001:db8::1"),
+				},
+			},
 		},
 		{
 			name:  "Dual-stack, redundant IPv6",
@@ -234,7 +323,14 @@ func TestGetNodeAddresses(t *testing.T) {
 					},
 				},
 			},
-			expected: sets.New[string]("::/0", "1.2.3.4"),
+			expected: map[v1.IPFamily]expectation{
+				v1.IPv4Protocol: {
+					ips: sets.New[string]("1.2.3.4"),
+				},
+				v1.IPv6Protocol: {
+					ips: sets.New[string]("::/0"),
+				},
+			},
 		},
 	}
 
@@ -245,16 +341,20 @@ func TestGetNodeAddresses(t *testing.T) {
 				nw.AddInterfaceAddr(&pair.itf, pair.addrs)
 			}
 
-			npa := NewNodePortAddresses(tc.cidrs)
-			addrList, err := npa.GetNodeAddresses(nw)
-			// The fake InterfaceAddrs() never returns an error, so the only
-			// error GetNodeAddresses will return is "no addresses found".
-			if err != nil && tc.expected != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			for _, family := range []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol} {
+				npa := NewNodePortAddresses(family, tc.cidrs)
 
-			if !addrList.Equal(tc.expected) {
-				t.Errorf("unexpected mismatch, expected: %v, got: %v", tc.expected, addrList)
+				addrList, err := npa.GetNodeAddresses(nw)
+				// The fake InterfaceAddrs() never returns an error, so
+				// the only error GetNodeAddresses will return is "no
+				// addresses found".
+				if err != nil && tc.expected[family].ips != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+
+				if !addrList.Equal(tc.expected[family].ips) {
+					t.Errorf("unexpected mismatch for %s, expected: %v, got: %v", family, tc.expected[family].ips, addrList)
+				}
 			}
 		})
 	}
@@ -308,9 +408,14 @@ func TestContainsIPv4Loopback(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			npa := NewNodePortAddresses(tt.cidrStrings)
+			npa := NewNodePortAddresses(v1.IPv4Protocol, tt.cidrStrings)
 			if got := npa.ContainsIPv4Loopback(); got != tt.want {
-				t.Errorf("ContainsIPv4Loopback() = %v, want %v", got, tt.want)
+				t.Errorf("IPv4 ContainsIPv4Loopback() = %v, want %v", got, tt.want)
+			}
+			// ContainsIPv4Loopback should always be false for family=IPv6
+			npa = NewNodePortAddresses(v1.IPv6Protocol, tt.cidrStrings)
+			if got := npa.ContainsIPv4Loopback(); got {
+				t.Errorf("IPv6 ContainsIPv4Loopback() = %v, want %v", got, false)
 			}
 		})
 	}
