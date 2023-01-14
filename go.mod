@@ -47,7 +47,7 @@ require (
 	github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
 	github.com/libopenstorage/openstorage v1.0.0
 	github.com/lithammer/dedent v1.1.0
-	github.com/moby/ipvs v1.0.1
+	github.com/moby/ipvs v1.1.0
 	github.com/mrunalp/fileutils v0.5.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/onsi/ginkgo/v2 v2.7.0
@@ -211,13 +211,13 @@ require (
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/seccomp/libseccomp-golang v0.9.2-0.20220502022130-f33da4d89646 // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
-	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
+	github.com/vishvananda/netns v0.0.2 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
