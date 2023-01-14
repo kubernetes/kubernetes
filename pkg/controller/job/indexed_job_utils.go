@@ -341,3 +341,13 @@ func completionModeStr(job *batch.Job) string {
 	}
 	return string(batch.NonIndexedCompletion)
 }
+
+// When spec.Completions is nil, spec.Parallelism is used
+// as a drop-in replacement for generating the range of
+// completion indices.
+func getCompletions(job *batch.Job) int {
+	if job.Spec.Completions == nil {
+		return int(*job.Spec.Parallelism)
+	}
+	return int(*job.Spec.Completions)
+}

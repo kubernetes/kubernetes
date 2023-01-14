@@ -373,7 +373,7 @@ func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
 func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath, opts.PodValidationOptions)...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath.Child("completions"))...)
+	allErrs = append(allErrs, validateIndexedJobCompletionsMutatedWithParallelism(spec, oldSpec, fldPath)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector"))...)
 	allErrs = append(allErrs, validatePodTemplateUpdate(spec, oldSpec, fldPath, opts)...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.CompletionMode, oldSpec.CompletionMode, fldPath.Child("completionMode"))...)
@@ -542,6 +542,18 @@ func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, o
 	}
 	if spec.Spec.ManualSelector != nil && *spec.Spec.ManualSelector {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("spec", "manualSelector"), spec.Spec.ManualSelector, []string{"nil", "false"}))
+	}
+	return allErrs
+}
+
+func validateIndexedJobCompletionsMutatedWithParallelism(spec, oldSpec batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.CompletionMode != nil && *spec.CompletionMode != batch.IndexedCompletion {
+		return allErrs
+	}
+	// spec.Completions can only be mutated in tandem with spec.Parallelism.
+	if oldSpec.Completions != spec.Completions && oldSpec.Parallelism == oldSpec.Parallelism {
+		allErrs = append(allErrs, field.Invalid(fldPath, spec.Completions, "spec.Completions can only be modified in tandem with spec.Parallelism"))
 	}
 	return allErrs
 }

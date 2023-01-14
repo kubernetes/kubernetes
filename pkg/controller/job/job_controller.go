@@ -1003,7 +1003,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 				// The completion index is enough to avoid recounting succeeded pods.
 				// No need to track UIDs.
 				ix := getCompletionIndex(pod.Annotations)
-				if ix != unknownCompletionIndex && ix < int(*job.Spec.Completions) && !succeededIndexes.has(ix) {
+				if ix != unknownCompletionIndex && ix < getCompletions(job) && !succeededIndexes.has(ix) {
 					newSucceededIndexes = append(newSucceededIndexes, ix)
 					needsFlush = true
 				}
@@ -1013,7 +1013,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			}
 		} else if pod.Status.Phase == v1.PodFailed || considerTerminated {
 			ix := getCompletionIndex(pod.Annotations)
-			if !uncounted.failed.Has(string(pod.UID)) && (!isIndexed || (ix != unknownCompletionIndex && ix < int(*job.Spec.Completions))) {
+			if !uncounted.failed.Has(string(pod.UID)) && (!isIndexed || (ix != unknownCompletionIndex && ix < getCompletions(job))) {
 				if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
 					_, countFailed, action := matchPodFailurePolicy(job.Spec.PodFailurePolicy, pod)
 					if action != nil {
@@ -1218,7 +1218,7 @@ func (jm *Controller) enactJobFinished(job *batch.Job, finishedCond *batch.JobCo
 func (jm *Controller) recordJobFinished(job *batch.Job, finishedCond *batch.JobCondition) bool {
 	completionMode := getCompletionMode(job)
 	if finishedCond.Type == batch.JobComplete {
-		if job.Spec.Completions != nil && job.Status.Succeeded > *job.Spec.Completions {
+		if job.Spec.Completions != nil && int(job.Status.Succeeded) > getCompletions(job) {
 			jm.recorder.Event(job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
 		}
 		jm.recorder.Event(job, v1.EventTypeNormal, "Completed", "Job completed")
@@ -1373,7 +1373,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 	} else {
 		// Job specifies a specific number of completions.  Therefore, number
 		// active should not ever exceed number of remaining completions.
-		wantActive = *job.Spec.Completions - succeeded
+		wantActive = int32(getCompletions(job)) - succeeded
 		if wantActive > parallelism {
 			wantActive = parallelism
 		}
@@ -1416,7 +1416,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 
 		var indexesToAdd []int
 		if isIndexedJob(job) {
-			indexesToAdd = firstPendingIndexes(activePods, succeededIndexes, int(diff), int(*job.Spec.Completions))
+			indexesToAdd = firstPendingIndexes(activePods, succeededIndexes, int(diff), getCompletions(job))
 			diff = int32(len(indexesToAdd))
 		}
 		active += diff
@@ -1506,14 +1506,24 @@ func activePodsForRemoval(job *batch.Job, pods []*v1.Pod, rmAtLeast int) []*v1.P
 	if isIndexedJob(job) {
 		rm = make([]*v1.Pod, 0, rmAtLeast)
 		left = make([]*v1.Pod, 0, len(pods)-rmAtLeast)
-		rm, left = appendDuplicatedIndexPodsForRemoval(rm, left, pods, int(*job.Spec.Completions))
+		rm, left = appendDuplicatedIndexPodsForRemoval(rm, left, pods, getCompletions(job))
 	} else {
 		left = pods
 	}
 
 	if len(rm) < rmAtLeast {
-		sort.Sort(controller.ActivePods(left))
-		rm = append(rm, left[:rmAtLeast-len(rm)]...)
+		numToDelete := rmAtLeast - len(rm)
+
+		// If completions is nil, we sort pods by completion index and remove
+		// the higher indices first. Otherwise, we attempt to delete pods in
+		// the earlier stages of the pod lifecycle whenever possible.
+		if job.Spec.Completions == nil {
+			sort.Sort(byCompletionIndex(left))
+			rm = append(rm, left[len(left)-numToDelete:]...)
+		} else {
+			sort.Sort(controller.ActivePods(left))
+			rm = append(rm, left[:numToDelete]...)
+		}
 	}
 	return rm
 }
@@ -1563,7 +1573,7 @@ func countValidPodsWithFilter(job *batch.Job, pods []*v1.Pod, uncounted sets.Str
 		}
 		if isIndexedJob(job) {
 			idx := getCompletionIndex(p.Annotations)
-			if idx == unknownCompletionIndex || idx >= int(*job.Spec.Completions) {
+			if idx == unknownCompletionIndex || idx >= getCompletions(job) {
 				continue
 			}
 		}

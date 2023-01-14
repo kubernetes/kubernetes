@@ -237,6 +237,7 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedConditionStatus v1.ConditionStatus
 		expectedConditionReason string
 		expectedCreatedIndexes  sets.Int
+		expectedDeletedIndexes  sets.Int
 
 		// only applicable to tracking with finalizers
 		expectedPodPatches int
@@ -676,6 +677,25 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedFailed:        0,
 			expectedPodPatches:    5,
 		},
+		"indexed job with pod indexes higher than parallelism": {
+			parallelism:    2,
+			completions:    -1, // indicates completions should be set to nil
+			completionMode: batch.IndexedCompletion,
+			podsWithIndexes: []indexPhase{
+				{"0", v1.PodRunning},
+				{"3", v1.PodRunning},
+				{"1", v1.PodRunning},
+				{"2", v1.PodPending},
+				{"4", v1.PodPending},
+			},
+			jobKeyForget:           false,
+			expectedCreations:      0,
+			expectedSucceeded:      0,
+			expectedDeletions:      3,
+			expectedActive:         2,
+			expectedPodPatches:     3,
+			expectedDeletedIndexes: sets.NewInt(2, 3, 4),
+		},
 		"suspending a job with satisfied expectations": {
 			// Suspended Job should delete active pods when expectations are
 			// satisfied.
@@ -818,7 +838,7 @@ func TestControllerSyncJob(t *testing.T) {
 				t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", tc.expectedCreations, len(fakePodControl.Templates))
 			}
 			if tc.completionMode == batch.IndexedCompletion {
-				checkIndexedJobPods(t, &fakePodControl, tc.expectedCreatedIndexes, job.Name)
+				checkIndexedJobPods(t, &fakePodControl, tc.expectedCreatedIndexes, tc.expectedDeletedIndexes, job.Name)
 			} else {
 				for _, p := range fakePodControl.Templates {
 					// Fake pod control doesn't add generate name from the owner reference.
@@ -905,7 +925,7 @@ func TestControllerSyncJob(t *testing.T) {
 	}
 }
 
-func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantIndexes sets.Int, jobName string) {
+func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantIndexes, doNotWantIndexes sets.Int, jobName string) {
 	t.Helper()
 	gotIndexes := sets.NewInt()
 	for _, p := range control.Templates {
@@ -913,6 +933,8 @@ func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantI
 		ix := getCompletionIndex(p.Annotations)
 		if ix == -1 {
 			t.Errorf("Created pod %s didn't have completion index", p.Name)
+		} else if doNotWantIndexes.Has(ix) {
+			t.Errorf("Pod %s with completion index %d should have been deleted", p.Name, ix)
 		} else {
 			gotIndexes.Insert(ix)
 		}
