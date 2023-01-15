@@ -310,12 +310,14 @@ func (r *RuntimeSort) Less(i, j int) bool {
 
 	iValues, err = findJSONPathResults(parser, iObj)
 	if err != nil {
-		klog.Fatalf("Failed to get i values for %#v using %s (%#v)", iObj, r.field, err)
+		klog.Background().Error(err, "Failed to get i values for the object using the field", "object", iObj, "field", r.field)
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
 	jValues, err = findJSONPathResults(parser, jObj)
 	if err != nil {
-		klog.Fatalf("Failed to get j values for %#v using %s (%v)", jObj, r.field, err)
+		klog.Background().Error(err, "Failed to get i values for the object using the field", "object", iObj, "field", r.field)
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
 	if len(iValues) == 0 || len(iValues[0]) == 0 {
@@ -329,7 +331,8 @@ func (r *RuntimeSort) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		klog.Exitf("Field %s in %T is an unsortable type: %s, err: %v", r.field, iObj, iField.Kind().String(), err)
+		klog.Background().Error(err, "Field in the object is an unsortable type", "field", r.field, "object", iObj, "type", iField.Kind().String())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return less
 }
@@ -375,7 +378,8 @@ func (t *TableSorter) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		klog.Exitf("Field %s in %T is an unsortable type: %s, err: %v", t.field, t.parsedRows, iField.Kind().String(), err)
+		klog.Background().Error(err, "Field in the object is an unsortable type", "field", t.field, "object", t.parsedRows, "type", iField.Kind().String())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return less
 }

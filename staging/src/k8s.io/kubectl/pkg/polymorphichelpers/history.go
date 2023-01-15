@@ -111,7 +111,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
-			klog.Warningf("unable to get revision from replicaset %s for deployment %s in namespace %s: %v", rs.Name, name, namespace, err)
+			klog.Background().Info("unable to get revision from replicaset", "replicasetName", rs.Name, "deploymentName", name, "namespace", namespace, "err", err)
 			continue
 		}
 		historyInfo[v] = &rs.Spec.Template
@@ -169,7 +169,7 @@ func (h *DeploymentHistoryViewer) GetHistory(namespace, name string) (map[int64]
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
-			klog.Warningf("unable to get revision from replicaset %s for deployment %s in namespace %s: %v", rs.Name, name, namespace, err)
+			klog.Background().Info("unable to get revision from replicaset", "replicasetName", rs.Name, "deploymentName", name, "namespace", namespace, "err", err)
 			continue
 		}
 		result[v] = rs

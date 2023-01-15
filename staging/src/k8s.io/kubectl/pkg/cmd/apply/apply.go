@@ -487,7 +487,7 @@ func (o *ApplyOptions) SetObjects(infos []*resource.Info) {
 // Run executes the `apply` command.
 func (o *ApplyOptions) Run() error {
 	if o.PreProcessorFn != nil {
-		klog.V(4).Infof("Running apply pre-processor function")
+		klog.Background().V(4).Info("Running apply pre-processor function")
 		if err := o.PreProcessorFn(); err != nil {
 			return err
 		}
@@ -531,7 +531,7 @@ func (o *ApplyOptions) Run() error {
 	}
 
 	if o.PostProcessorFn != nil {
-		klog.V(4).Infof("Running apply post-processor function")
+		klog.Background().V(4).Info("Running apply post-processor function")
 		if err := o.PostProcessorFn(); err != nil {
 			return err
 		}
@@ -544,7 +544,7 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 	o.MarkNamespaceVisited(info)
 
 	if err := o.Recorder.Record(info.Object); err != nil {
-		klog.V(4).Infof("error recording current command: %v", err)
+		klog.Background().V(4).Info("error recording current command", "err", err)
 	}
 
 	if len(info.Name) == 0 {

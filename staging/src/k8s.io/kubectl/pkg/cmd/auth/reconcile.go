@@ -275,7 +275,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			return fmt.Errorf("only rbac.authorization.k8s.io/v1 is supported: not %T", t)
 
 		default:
-			klog.V(1).Infof("skipping %#v", info.Object.GetObjectKind())
+			klog.Background().V(1).Info("skipping", "object", info.Object.GetObjectKind())
 			// skip ignored resources
 		}
 

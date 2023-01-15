@@ -397,7 +397,7 @@ func (a *ApplySet) updateParent(mode ApplySetUpdateMode, dryRun cmdutil.DryRunSt
 	err = serverSideApplyRequest(a, data, dryRun, validation, false)
 	if err != nil && errors.IsConflict(err) {
 		// Try again with conflicts forced
-		klog.Warningf("WARNING: failed to update ApplySet: %s\nApplySet field manager %s should own these fields. Retrying with conflicts forced.", err.Error(), a.FieldManager())
+		klog.Background().Info("WARNING: failed to update ApplySet, as the ApplySet field manager should own these fields. Retrying with conflicts forced.", "err", err.Error(), "ApplySet field manager", a.FieldManager())
 		err = serverSideApplyRequest(a, data, dryRun, validation, true)
 	}
 	if err != nil {

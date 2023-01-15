@@ -346,7 +346,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 				return err
 			}
 			if err := o.Recorder.Record(info.Object); err != nil {
-				klog.V(4).Infof("error recording current command: %v", err)
+				klog.Background().V(4).Info("error recording current command", "err", err)
 			}
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
@@ -358,7 +358,7 @@ func (o AnnotateOptions) RunAnnotate() error {
 			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
 			createdPatch := err == nil
 			if err != nil {
-				klog.V(2).Infof("couldn't compute patch: %v", err)
+				klog.Background().V(2).Info("couldn't compute patch", "err", err)
 			}
 
 			client, err := o.unstructuredClientForMapping(mapping)

@@ -167,12 +167,12 @@ func (o *ProxyOptions) Complete(f cmdutil.Factory) error {
 			return err
 		}
 		if target.Path != "" && target.Path != "/" {
-			klog.Warning("Your kube context contains a server path " + target.Path + ", use --append-server-path to automatically append the path to each request")
+			klog.Background().Info("Your kube context contains a server path which uses --append-server-path to automatically append the path to each request", "path", target.Path)
 		}
 	}
 	if o.disableFilter {
 		if o.unixSocket == "" {
-			klog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
+			klog.Background().Info("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
 		}
 		o.filter = nil
 	} else {
@@ -195,9 +195,9 @@ func (o ProxyOptions) Validate() error {
 	if o.staticDir != "" {
 		fileInfo, err := os.Stat(o.staticDir)
 		if err != nil {
-			klog.Warning("Failed to stat static file directory "+o.staticDir+": ", err)
+			klog.Background().Info("Failed to stat static file directory", "directory", o.staticDir, "err", err)
 		} else if !fileInfo.IsDir() {
-			klog.Warning("Static file directory " + o.staticDir + " is not a directory")
+			klog.Background().Info("Static file directory is not a directory", "directory", o.staticDir)
 		}
 	}
 

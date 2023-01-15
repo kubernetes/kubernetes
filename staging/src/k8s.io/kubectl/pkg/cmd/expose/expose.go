@@ -329,7 +329,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		if err := o.Recorder.Record(overrideService); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
+			klog.Background().V(4).Info("error recording current command", "err", err)
 		}
 
 		if o.DryRunStrategy == cmdutil.DryRunClient {

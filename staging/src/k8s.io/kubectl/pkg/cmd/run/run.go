@@ -637,7 +637,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	if err := o.Recorder.Record(obj); err != nil {
-		klog.V(4).Infof("error recording current command: %v", err)
+		klog.Background().V(4).Info("error recording current command", "err", err)
 	}
 
 	actualObj := obj

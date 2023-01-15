@@ -80,7 +80,8 @@ func MakeRegexpArray(str string) ([]*regexp.Regexp, error) {
 func MakeRegexpArrayOrDie(str string) []*regexp.Regexp {
 	result, err := MakeRegexpArray(str)
 	if err != nil {
-		klog.Fatalf("Error compiling re: %v", err)
+		klog.Background().Error(err, "Error compiling re")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return result
 }
@@ -88,7 +89,7 @@ func MakeRegexpArrayOrDie(str string) []*regexp.Regexp {
 func matchesRegexp(str string, regexps []*regexp.Regexp) bool {
 	for _, re := range regexps {
 		if re.MatchString(str) {
-			klog.V(6).Infof("%v matched %s", str, re)
+			klog.Background().V(6).Info("str and re matched", "str", str, "re", re)
 			return true
 		}
 	}
@@ -128,11 +129,11 @@ func extractHost(header string) (host string) {
 func (f *FilterServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	host := extractHost(req.Host)
 	if f.accept(req.Method, req.URL.Path, host) {
-		klog.V(3).Infof("Filter accepting %v %v %v", req.Method, req.URL.Path, host)
+		klog.Background().V(3).Info("Filter accepting", "method", req.Method, "url", req.URL.Path, "host", host)
 		f.delegate.ServeHTTP(rw, req)
 		return
 	}
-	klog.V(3).Infof("Filter rejecting %v %v %v", req.Method, req.URL.Path, host)
+	klog.Background().V(3).Info("Filter rejecting", "method", req.Method, "url", req.URL.Path, "host", host)
 	http.Error(rw, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 }
 
@@ -144,7 +145,7 @@ type Server struct {
 type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
-	klog.Errorf("Error while proxying request: %v", err)
+	klog.Background().Error(err, "Error while proxying request")
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 

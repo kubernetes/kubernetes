@@ -272,7 +272,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 
 		if err := o.Recorder.Record(info.Object); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
+			klog.Background().V(4).Info("error recording current command", "err", err)
 		}
 
 		if o.DryRunStrategy != cmdutil.DryRunClient {

@@ -708,11 +708,7 @@ func (o *DiffOptions) Run() error {
 
 			force := i == maxRetries
 			if force {
-				klog.Warningf(
-					"Object (%v: %v) keeps changing, diffing without lock",
-					info.Object.GetObjectKind().GroupVersionKind(),
-					info.Name,
-				)
+				klog.Background().Info("Object keeps changing, diffing without lock", "infoObject", info.Object.GetObjectKind().GroupVersionKind(), "infoName", info.Name)
 			}
 			obj := InfoObject{
 				LocalObj:        local,
@@ -744,7 +740,7 @@ func (o *DiffOptions) Run() error {
 	if o.pruner != nil {
 		prunedObjs, err := o.pruner.pruneAll(o.tracker, o.CmdNamespace != "")
 		if err != nil {
-			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
+			klog.Background().Info("pruning failed and could not be evaluated err", "err", err)
 		}
 
 		// Print pruned objects into old file and thus, diff
@@ -752,7 +748,7 @@ func (o *DiffOptions) Run() error {
 		for _, p := range prunedObjs {
 			name, err := getObjectName(p)
 			if err != nil {
-				klog.Warningf("pruning failed and object name could not be retrieved: %v", err)
+				klog.Background().Info("pruning failed and object name could not be retrieved", "err", err)
 				continue
 			}
 			if err := differ.From.Print(name, p, printer); err != nil {

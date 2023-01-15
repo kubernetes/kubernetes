@@ -42,7 +42,7 @@ func (t *TablePrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 	}
 	// if we are unable to decode server response into a v1beta1.Table,
 	// fallback to client-side printing with whatever info the server returned.
-	klog.V(2).Infof("Unable to decode server response into a Table. Falling back to hardcoded types: %v", err)
+	klog.Background().V(2).Info("Unable to decode server response into a Table. Falling back to hardcoded types", "err", err)
 	return t.Delegate.PrintObj(obj, writer)
 }
 

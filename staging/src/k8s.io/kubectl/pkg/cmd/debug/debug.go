@@ -436,7 +436,8 @@ func (o *DebugOptions) visitPod(ctx context.Context, pod *corev1.Pod) (*corev1.P
 
 // debugByEphemeralContainer runs an EphemeralContainer in the target Pod for use as a debug container
 func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
-	klog.V(2).Infof("existing ephemeral containers: %v", pod.Spec.EphemeralContainers)
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("existing ephemeral containers", "containers", pod.Spec.EphemeralContainers)
 	podJS, err := json.Marshal(pod)
 	if err != nil {
 		return nil, "", fmt.Errorf("error creating JSON for pod: %v", err)
@@ -446,7 +447,7 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 	if err != nil {
 		return nil, "", err
 	}
-	klog.V(2).Infof("new ephemeral container: %#v", debugContainer)
+	logger.V(2).Info("new ephemeral container", "container", debugContainer)
 
 	debugJS, err := json.Marshal(debugPod)
 	if err != nil {
@@ -457,7 +458,7 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 	if err != nil {
 		return nil, "", fmt.Errorf("error creating patch to add debug container: %v", err)
 	}
-	klog.V(2).Infof("generated strategic merge patch for debug container: %s", patch)
+	logger.V(2).Info("generated strategic merge patch for debug container", "patch", patch)
 
 	pods := o.podClient.Pods(pod.Namespace)
 	result, err := pods.Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers")
@@ -472,7 +473,7 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 		// Kind the api server will respond with a not-registered error. When this happens we can optimistically try
 		// using the old API.
 		if runtime.IsNotRegisteredError(err) {
-			klog.V(1).Infof("Falling back to legacy API because server returned error: %v", err)
+			logger.V(1).Info("Falling back to legacy API because server returned error", "err", err)
 			return o.debugByEphemeralContainerLegacy(ctx, pod, debugContainer)
 		}
 
@@ -743,6 +744,7 @@ func containerNameToRef(pod *corev1.Pod) map[string]*corev1.Container {
 func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, containerName string) (*corev1.Pod, error) {
 	// TODO: expose the timeout
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, 0*time.Second)
+	logger := klog.FromContext(ctx)
 	defer cancel()
 
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", podName).String()
@@ -761,7 +763,7 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 	var result *corev1.Pod
 	err := intr.Run(func() error {
 		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, nil, func(ev watch.Event) (bool, error) {
-			klog.V(2).Infof("watch received event %q with object %T", ev.Type, ev.Object)
+			logger.V(2).Info("watch received event", "eventType", ev.Type, "eventObject", ev.Object)
 			switch ev.Type {
 			case watch.Deleted:
 				return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
@@ -776,7 +778,7 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 			if s == nil {
 				return false, nil
 			}
-			klog.V(2).Infof("debug container status is %v", s)
+			logger.V(2).Info("debug container status is", "status", s)
 			if s.State.Running != nil || s.State.Terminated != nil {
 				return true, nil
 			}
@@ -795,6 +797,7 @@ func (o *DebugOptions) waitForContainer(ctx context.Context, ns, podName, contai
 }
 
 func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, ns, podName, containerName string, opts *attach.AttachOptions) error {
+	logger := klog.FromContext(ctx)
 	pod, err := o.waitForContainer(ctx, ns, podName, containerName)
 	if err != nil {
 		return err
@@ -814,7 +817,7 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter gen
 		return fmt.Errorf("error getting container status of container name %q: %+v", containerName, err)
 	}
 	if status.State.Terminated != nil {
-		klog.V(1).Info("Ephemeral container terminated, falling back to logs")
+		logger.V(1).Info("Ephemeral container terminated, falling back to logs")
 		return logOpts(restClientGetter, pod, opts)
 	}
 

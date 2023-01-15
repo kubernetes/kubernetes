@@ -90,13 +90,13 @@ func DefaultBehaviorOnFatal() {
 }
 
 // fatal prints the message (if provided) and then exits. If V(99) or greater,
-// klog.Fatal is invoked for extended information. This is intended for maintainer
+// klog.ErrorDepth is invoked for extended information. This is intended for maintainer
 // debugging and out of a reasonable range for users.
 func fatal(msg string, code int) {
 	// nolint:logcheck // Not using the result of klog.V(99) inside the if
 	// branch is okay, we just use it to determine how to terminate.
-	if klog.V(99).Enabled() {
-		klog.FatalDepth(2, msg)
+	if klogV := klog.Background().V(99); klogV.Enabled() {
+		klog.Background().Error(nil, msg)
 	}
 	if len(msg) > 0 {
 		// add newline if needed
@@ -243,7 +243,7 @@ func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
 // commands.
 func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
-		klog.V(4).Infof(debugErr.DebugError())
+		klog.Background().V(4).Info(debugErr.DebugError())
 	}
 	status, isStatus := err.(apierrors.APIStatus)
 	switch {
@@ -261,7 +261,7 @@ func StandardErrorMessage(err error) (string, bool) {
 	}
 	switch t := err.(type) {
 	case *url.Error:
-		klog.V(4).Infof("Connection error: %s %s: %v", t.Op, t.URL, t.Err)
+		klog.Background().V(4).Info("Connection error", "option", t.Op, "url", t.URL, "err", t.Err)
 		switch {
 		case strings.Contains(t.Err.Error(), "connection refused"):
 			host := t.URL
@@ -348,7 +348,8 @@ func IsFilenameSliceEmpty(filenames []string, directory string) bool {
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	s, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Background().Error(err, "error accessing flag", "flag", flag, "command", cmd.Name())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return s
 }
@@ -357,7 +358,8 @@ func GetFlagString(cmd *cobra.Command, flag string) string {
 func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringSlice(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Background().Error(err, "error accessing flag", "flag", flag, "command", cmd.Name())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return s
 }
@@ -366,7 +368,8 @@ func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringArray(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Background().Error(err, "error accessing flag", "flag", flag, "command", cmd.Name())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return s
 }
@@ -374,7 +377,8 @@ func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	b, err := cmd.Flags().GetBool(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Background().Error(err, "error accessing flag", "flag", flag, "command", cmd.Name())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return b
 }
@@ -383,7 +387,8 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 func GetFlagInt(cmd *cobra.Command, flag string) int {
 	i, err := cmd.Flags().GetInt(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Background().Error(err, "error accessing flag", "flag", flag, "command", cmd.Name())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return i
 }
@@ -392,7 +397,8 @@ func GetFlagInt(cmd *cobra.Command, flag string) int {
 func GetFlagInt32(cmd *cobra.Command, flag string) int32 {
 	i, err := cmd.Flags().GetInt32(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Background().Error(err, "error accessing flag", "flag", flag, "command", cmd.Name())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return i
 }
@@ -401,7 +407,8 @@ func GetFlagInt32(cmd *cobra.Command, flag string) int32 {
 func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 	i, err := cmd.Flags().GetInt64(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Background().Error(err, "error accessing flag", "flag", flag, "command", cmd.Name())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return i
 }
@@ -409,7 +416,8 @@ func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	d, err := cmd.Flags().GetDuration(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Background().Error(err, "error accessing flag", "flag", flag, "command", cmd.Name())
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return d
 }
@@ -689,7 +697,7 @@ func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
 	if err != nil {
 		switch dryRunFlag {
 		case cmd.Flag("dry-run").NoOptDefVal:
-			klog.Warning(`--dry-run is deprecated and can be replaced with --dry-run=client.`)
+			klog.Background().Info("--dry-run is deprecated and can be replaced with --dry-run=client.")
 			return DryRunClient, nil
 		case "client":
 			return DryRunClient, nil
@@ -703,10 +711,10 @@ func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
 	}
 	// The flag was a boolean
 	if b {
-		klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "client")
+		klog.Background().Info("--dry-run= is deprecated (boolean value) and can be replaced with --dry-run=client.", "dryRunFlag", dryRunFlag)
 		return DryRunClient, nil
 	}
-	klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "none")
+	klog.Background().Info("--dry-run= is deprecated (boolean value) and can be replaced with --dry-run=none.", "dryRunFlag", dryRunFlag)
 	return DryRunNone, nil
 }
 

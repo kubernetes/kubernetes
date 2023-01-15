@@ -116,12 +116,12 @@ func loadSystemLanguage() string {
 	}
 
 	if langStr == "" {
-		klog.V(3).Infof("Couldn't find the LC_ALL, LC_MESSAGES or LANG environment variables, defaulting to en_US")
+		klog.Background().V(3).Info("Couldn't find the LC_ALL, LC_MESSAGES or LANG environment variables, defaulting to en_US")
 		return "default"
 	}
 	pieces := strings.Split(langStr, ".")
 	if len(pieces) != 2 {
-		klog.V(3).Infof("Unexpected system language (%s), defaulting to en_US", langStr)
+		klog.Background().V(3).Info("Unexpected system language, defaulting to en_US", "language", langStr)
 		return "default"
 	}
 	return pieces[0]
@@ -136,7 +136,7 @@ func findLanguage(root string, getLanguageFn func() string) string {
 			return langStr
 		}
 	}
-	klog.V(3).Infof("Couldn't find translations for %s, using default", langStr)
+	klog.Background().V(3).Info("Couldn't find translations, using default", "language", langStr)
 	return "default"
 }
 
@@ -154,7 +154,7 @@ func LoadTranslations(root string, getLanguageFn func() string) error {
 		fmt.Sprintf("%s/%s/LC_MESSAGES/k8s.mo", root, langStr),
 	}
 
-	klog.V(3).Infof("Setting language to %s", langStr)
+	klog.Background().V(3).Info("Setting language to", "language", langStr)
 	// TODO: list the directory and load all files.
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
@@ -190,7 +190,7 @@ func lazyLoadTranslations() {
 			return
 		}
 		if err := LoadTranslationsFunc(); err != nil {
-			klog.Warning("Failed to load translations")
+			klog.Background().Info("Failed to load translations")
 		}
 	})
 }

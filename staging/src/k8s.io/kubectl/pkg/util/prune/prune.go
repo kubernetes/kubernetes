@@ -68,7 +68,7 @@ func GetRESTMappings(mapper meta.RESTMapper, pruneResources []Resource, namespac
 		// TODO in kubectl v1.29, add back non-namespaced resource only if namespace is not specified
 		pruneResources = append(pruneResources, defaultNonNamespacedPruneResources...)
 		if namespaceSpecified {
-			klog.Warning("Deprecated: kubectl apply will no longer prune non-namespaced resources by default when used with the --namespace flag in a future release. To preserve the current behaviour, list the resources you want to target explicitly in the --prune-allowlist flag.")
+			klog.Background().Info("Deprecated: kubectl apply will no longer prune non-namespaced resources by default when used with the --namespace flag in a future release. To preserve the current behaviour, list the resources you want to target explicitly in the --prune-allowlist flag.")
 		}
 	}
 

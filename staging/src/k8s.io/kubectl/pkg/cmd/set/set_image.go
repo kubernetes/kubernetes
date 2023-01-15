@@ -253,7 +253,7 @@ func (o *SetImageOptions) Run() error {
 		}
 		// record this change (for rollout history)
 		if err := o.Recorder.Record(obj); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
+			klog.Background().V(4).Info("error recording current command", "err", err)
 		}
 
 		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)

@@ -214,7 +214,7 @@ func (o *AutoscaleOptions) Run() error {
 		hpa := o.createHorizontalPodAutoscaler(info.Name, mapping)
 
 		if err := o.Recorder.Record(hpa); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
+			klog.Background().V(4).Info("error recording current command", "err", err)
 		}
 
 		if o.dryRunStrategy == cmdutil.DryRunClient {

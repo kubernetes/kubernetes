@@ -293,7 +293,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		}
 
 		if err := o.Recorder.Record(info.Object); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
+			klog.Background().V(4).Info("error recording current command", "err", err)
 		}
 
 		if o.DryRunStrategy == cmdutil.DryRunClient {
@@ -404,7 +404,7 @@ func (o *ReplaceOptions) forceReplace() error {
 		}
 
 		if err := o.Recorder.Record(info.Object); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
+			klog.Background().V(4).Info("error recording current command", "err", err)
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).

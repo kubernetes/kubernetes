@@ -273,10 +273,10 @@ func (o *PatchOptions) RunPatch() error {
 
 			// if the recorder makes a change, compute and create another patch
 			if mergePatch, err := o.Recorder.MakeRecordMergePatch(patchedObj); err != nil {
-				klog.V(4).Infof("error recording current command: %v", err)
+				klog.Background().V(4).Info("error recording current command", "err", err)
 			} else if len(mergePatch) > 0 {
 				if recordedObj, err := helper.Patch(namespace, name, types.MergePatchType, mergePatch, nil); err != nil {
-					klog.V(4).Infof("error recording reason: %v", err)
+					klog.Background().V(4).Info("error recording reason", "err", err)
 				} else {
 					patchedObj = recordedObj
 				}

@@ -123,7 +123,7 @@ func (e Editor) Launch(path string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	klog.V(5).Infof("Opening file with editor %v", args)
+	klog.Background().V(5).Info("Opening file with editor", "args", args)
 	if err := (term.TTY{In: os.Stdin, TryDev: true}).Safe(cmd.Run); err != nil {
 		if err, ok := err.(*exec.Error); ok {
 			if err.Err == exec.ErrNotFound {

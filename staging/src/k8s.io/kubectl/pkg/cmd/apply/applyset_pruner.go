@@ -146,7 +146,7 @@ func (a *ApplySet) findObjectsToPrune(ctx context.Context, dynamicClient dynamic
 		LabelSelector: applysetLabelSelector,
 	}
 
-	klog.V(2).Infof("listing objects for pruning; namespace=%q, resource=%v", namespace, mapping.Resource)
+	klog.Background().V(2).Info("listing objects for pruning", "namespace", namespace, "resource", mapping.Resource)
 	objects, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).List(ctx, opt)
 	if err != nil {
 		return nil, err

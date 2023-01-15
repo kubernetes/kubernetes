@@ -245,7 +245,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (ResourceDescriber, bool) {
 	describers, err := describerMap(clientConfig)
 	if err != nil {
-		klog.V(1).Info(err)
+		klog.Background().V(1).Info("", "err", err)
 		return nil, false
 	}
 
@@ -391,7 +391,8 @@ func init() {
 		describeNamespace,
 	)
 	if err != nil {
-		klog.Fatalf("Cannot register describers: %v", err)
+		klog.Background().Error(err, "Cannot register describers")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	DefaultObjectDescriber = d
 }
@@ -747,7 +748,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := reference.GetReference(scheme.Scheme, pod); err != nil {
-			klog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
+			klog.Background().Error(err, "Unable to construct reference to", "pod", pod)
 		} else {
 			ref.Kind = ""
 			if _, isMirrorPod := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirrorPod {
@@ -3591,7 +3592,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := reference.GetReference(scheme.Scheme, node); err != nil {
-			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
+			klog.Background().Error(err, "Unable to construct reference to", "node", node)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
 			// there are two UIDs for host events:

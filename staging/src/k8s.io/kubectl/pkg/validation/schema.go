@@ -142,10 +142,10 @@ func (c *paramVerifyingSchema) ValidateBytes(data []byte) error {
 		case metav1.FieldValidationStrict:
 			return c.schema.ValidateBytes(data)
 		case metav1.FieldValidationWarn:
-			klog.Warningf("cannot perform warn validation if server-side field validation is unsupported, skipping validation")
+			klog.Background().Info("cannot perform warn validation if server-side field validation is unsupported, skipping validation")
 		default:
 			// can't be reached
-			klog.Warningf("unexpected field validation directive: %s, skipping validation", c.directive)
+			klog.Background().Info("unexpected field validation directive, skipping validation", "directive", c.directive)
 		}
 		return nil
 	}

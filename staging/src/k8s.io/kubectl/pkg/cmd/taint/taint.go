@@ -287,7 +287,7 @@ func (o TaintOptions) RunTaint() error {
 		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 		createdPatch := err == nil
 		if err != nil {
-			klog.V(2).Infof("couldn't compute patch: %v", err)
+			klog.Background().V(2).Info("couldn't compute patch", "err", err)
 		}
 
 		printer, err := o.ToPrinter(operation)

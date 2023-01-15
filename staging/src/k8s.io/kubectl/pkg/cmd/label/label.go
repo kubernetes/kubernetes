@@ -323,7 +323,7 @@ func (o *LabelOptions) RunLabel() error {
 				return err
 			}
 			if err := o.Recorder.Record(obj); err != nil {
-				klog.V(4).Infof("error recording current command: %v", err)
+				klog.Background().V(4).Info("error recording current command", "err", err)
 			}
 			newObj, err := json.Marshal(obj)
 			if err != nil {
@@ -333,7 +333,7 @@ func (o *LabelOptions) RunLabel() error {
 			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
 			createdPatch := err == nil
 			if err != nil {
-				klog.V(2).Infof("couldn't compute patch: %v", err)
+				klog.Background().V(2).Info("couldn't compute patch", "err", err)
 			}
 
 			mapping := info.ResourceMapping()

@@ -341,7 +341,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		responseMetadata, err := meta.Accessor(response)
 		if err != nil {
 			// we don't have UID, but we didn't fail the delete, next best thing is just skipping the UID
-			klog.V(1).Info(err)
+			klog.Background().V(1).Info("", "err", err)
 			return nil
 		}
 		uidMap[resourceLocation] = responseMetadata.GetUID()
@@ -388,7 +388,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
 		// if we're forbidden from waiting, we shouldn't fail.
 		// if the resource doesn't support a verb we need, we shouldn't fail.
-		klog.V(1).Info(err)
+		klog.Background().V(1).Info("", "err", err)
 		return nil
 	}
 	return err

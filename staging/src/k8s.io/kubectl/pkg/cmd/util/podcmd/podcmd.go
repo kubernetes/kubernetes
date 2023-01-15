@@ -73,10 +73,10 @@ func FindOrDefaultContainerByName(pod *v1.Pod, name string, quiet bool, warn io.
 	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/2227-kubectl-default-container
 	if name := pod.Annotations[DefaultContainerAnnotationName]; len(name) > 0 {
 		if container, _ = FindContainerByName(pod, name); container != nil {
-			klog.V(4).Infof("Defaulting container name from annotation %s", container.Name)
+			klog.Background().V(4).Info("Defaulting container name from annotation", "containerName", container.Name)
 			return container, nil
 		}
-		klog.V(4).Infof("Default container name from annotation %s was not found in the pod", name)
+		klog.Background().V(4).Info("Default container name from annotation was not found in the pod", "name", name)
 	}
 
 	// pick the first container as per existing behavior
@@ -85,7 +85,7 @@ func FindOrDefaultContainerByName(pod *v1.Pod, name string, quiet bool, warn io.
 		fmt.Fprintf(warn, "Defaulted container %q out of: %s\n", container.Name, AllContainerNames(pod))
 	}
 
-	klog.V(4).Infof("Defaulting container name to %s", container.Name)
+	klog.Background().V(4).Info("Defaulting container name to", "containerName", container.Name)
 	return &pod.Spec.Containers[0], nil
 }
 

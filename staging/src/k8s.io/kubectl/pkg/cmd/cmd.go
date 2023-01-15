@@ -500,11 +500,11 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 	// If the feature gate env var is set to "false", then do no add kubectl command headers.
 	if value, exists := os.LookupEnv(kubectlCmdHeaders); exists {
 		if value == "false" || value == "0" {
-			klog.V(5).Infoln("kubectl command headers turned off")
+			klog.Background().V(5).Info("kubectl command headers turned off")
 			return
 		}
 	}
-	klog.V(5).Infoln("kubectl command headers turned on")
+	klog.Background().V(5).Info("kubectl command headers turned on")
 	crt := &genericclioptions.CommandHeaderRoundTripper{}
 	existingPreRunE := cmds.PersistentPreRunE
 	// Add command parsing to the existing persistent pre-run function.

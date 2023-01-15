@@ -312,7 +312,7 @@ func (o *EditOptions) Run() error {
 			if len(results.file) > 0 {
 				os.Remove(results.file)
 			}
-			klog.V(4).Infof("User edited:\n%s", string(edited))
+			klog.Background().V(4).Info("User edited", "string", string(edited))
 
 			// Apply validation
 			schema, err := o.f.Validator(o.ValidationDirective)
@@ -681,18 +681,18 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			patchType = types.MergePatchType
 			patch, err = jsonpatch.CreateMergePatch(originalJS, editedJS)
 			if err != nil {
-				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				klog.Background().V(4).Info("Unable to calculate diff, no merge is possible", "err", err)
 				return err
 			}
 			var patchMap map[string]interface{}
 			err = json.Unmarshal(patch, &patchMap)
 			if err != nil {
-				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				klog.Background().V(4).Info("Unable to calculate diff, no merge is possible", "err", err)
 				return err
 			}
 			for _, precondition := range preconditions {
 				if !precondition(patchMap) {
-					klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+					klog.Background().V(4).Info("Unable to calculate diff, no merge is possible", "err", err)
 					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 				}
 			}
@@ -702,7 +702,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			patchType = types.StrategicMergePatchType
 			patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)
 			if err != nil {
-				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				klog.Background().V(4).Info("Unable to calculate diff, no merge is possible", "err", err)
 				if mergepatch.IsPreconditionFailed(err) {
 					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 				}
@@ -762,7 +762,7 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 			}
 		}
 		if err := o.Recorder.Record(info.Object); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
+			klog.Background().V(4).Info("error recording current command", "err", err)
 		}
 
 		return nil
