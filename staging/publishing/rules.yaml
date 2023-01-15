@@ -401,8 +401,6 @@ rules:
       branch: master
     - repository: kms
       branch: master
-    - repository: code-generator
-      branch: master
     source:
       branch: master
       dir: staging/src/k8s.io/kube-aggregator
@@ -491,8 +489,6 @@ rules:
     - repository: client-go
       branch: master
     - repository: apiserver
-      branch: master
-    - repository: code-generator
       branch: master
     - repository: kms
       branch: master
@@ -610,8 +606,6 @@ rules:
       branch: master
     - repository: client-go
       branch: master
-    - repository: code-generator
-      branch: master
     source:
       branch: master
       dir: staging/src/k8s.io/sample-controller
@@ -707,8 +701,6 @@ rules:
     - repository: client-go
       branch: master
     - repository: apiserver
-      branch: master
-    - repository: code-generator
       branch: master
     - repository: component-base
       branch: master
@@ -810,8 +802,6 @@ rules:
     - repository: api
       branch: master
     - repository: client-go
-      branch: master
-    - repository: code-generator
       branch: master
     source:
       branch: master
@@ -1833,8 +1823,6 @@ rules:
     - repository: cli-runtime
       branch: master
     - repository: client-go
-      branch: master
-    - repository: code-generator
       branch: master
     - repository: component-base
       branch: master
