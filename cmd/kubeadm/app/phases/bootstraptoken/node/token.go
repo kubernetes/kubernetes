@@ -21,7 +21,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
@@ -42,10 +41,7 @@ func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens 
 
 		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)
 		secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), secretName, metav1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		if secret != nil && failIfExists {
+		if secret != nil && err == nil && failIfExists {
 			return errors.Errorf("a token with id %q already exists", token.Token.ID)
 		}
 
