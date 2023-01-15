@@ -796,6 +796,14 @@ function codegen::protobindings() {
         "pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis"
     )
 
+    kube::log::status "Generating protobuf bindings for ${#apis[@]} targets"
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: generating protobuf bindings for:"
+        for dir in "${apis[@]}"; do
+            kube::log::status "DBG:     $dir"
+        done
+    fi
+
     for api in "${apis[@]}"; do
         git ls-files -z -cmo --exclude-standard ":(glob)${api}"/'**/api.pb.go' \
             | xargs -0 rm -f
