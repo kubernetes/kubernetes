@@ -100,7 +100,6 @@
         "github.com/go-logr/zapr",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
-        "github.com/moby/ipvs",
         "go.etcd.io/etcd/raft/v3",
         "go.uber.org/zap",
         "gotest.tools/v3",
