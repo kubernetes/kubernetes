@@ -449,6 +449,37 @@ func TestGetCacheBypass(t *testing.T) {
 	}
 }
 
+func TestWatchCacheBypass(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
+
+	// Inject error to underlying layer and check if cacher is not bypassed.
+	backingStorage.injectError(errDummy)
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "0",
+	})
+	if err != nil {
+		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
+	}
+
+	// With unset RV, check if cacher is bypassed.
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "",
+	})
+	if err != errDummy {
+		t.Errorf("Watch with unset RV should bypass cacher: %v", err)
+	}
+}
+
 func TestWatcherNotGoingBackInTime(t *testing.T) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
