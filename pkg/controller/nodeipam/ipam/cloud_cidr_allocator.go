@@ -128,7 +128,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 		DeleteFunc: controllerutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
 	})
 
-	klog.V(0).Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
+	klog.Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
 	return ca, nil
 }
 
@@ -137,7 +137,7 @@ func (ca *cloudCIDRAllocator) Run(stopCh <-chan struct{}) {
 
 	// Start event processing pipeline.
 	ca.broadcaster.StartStructuredLogging(0)
-	klog.V(0).Infof("Sending events to api server.")
+	klog.Infof("Sending events to api server.")
 	ca.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ca.client.CoreV1().Events("")})
 	defer ca.broadcaster.Shutdown()
 
