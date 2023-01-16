@@ -419,7 +419,7 @@ func (f *FakeRecorder) AnnotatedEventf(obj runtime.Object, annotations map[strin
 	f.Eventf(obj, eventtype, reason, messageFmt, args...)
 }
 
-// labelledEventf emits a fake formatted event to the fake recorder
+// LabelledEventf emits a fake formatted event to the fake recorder
 func (f *FakeRecorder) LabelledEventf(obj runtime.Object, labels map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
 	f.Eventf(obj, eventtype, reason, messageFmt, args...)
 }
