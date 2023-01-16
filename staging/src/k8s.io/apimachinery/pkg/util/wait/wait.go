@@ -132,49 +132,33 @@ func NonSlidingUntilWithContext(ctx context.Context, f func(context.Context), pe
 // Close stopCh to stop. f may not be invoked if stop channel is already
 // closed. Pass NeverStop to if you don't want it stop.
 func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
-	BackoffUntil(f, NewJitteredBackoffManager(period, jitterFactor, &clock.RealClock{}), sliding, stopCh)
+	BackoffUntil(f, Backoff{Duration: period, Jitter: jitterFactor}.Timer(), sliding, stopCh)
 }
 
-// BackoffUntil loops until stop channel is closed, run f every duration given by BackoffManager.
-//
-// If sliding is true, the period is computed after f runs. If it is false then
-// period includes the runtime for f.
-func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan struct{}) {
-	var t clock.Timer
-	for {
-		select {
-		case <-stopCh:
-			return
-		default:
-		}
+var (
+	// RealTimer can be passed to methods that need a clock.Timer.
+	RealTimer = clock.RealClock{}.NewTimer
+)
 
-		if !sliding {
-			t = backoff.Backoff()
-		}
+var (
+	// internalClock is used for test injection of clocks
+	internalClock = clock.RealClock{}
+	// internalNewTicker is used for injecting behavior into tests
+	// Deprecated: Will be removed when poller() is removed.
+	internalNewTicker func(time.Duration) *time.Ticker = time.NewTicker
+	// internalNewTimer is used for injecting behavior into tests
+	// Deprecated: Will be removed when poller() is removed.
+	internalNewTimer func(time.Duration) *time.Timer = time.NewTimer
+)
 
-		func() {
-			defer runtime.HandleCrash()
-			f()
-		}()
-
-		if sliding {
-			t = backoff.Backoff()
-		}
-
-		// NOTE: b/c there is no priority selection in golang
-		// it is possible for this to race, meaning we could
-		// trigger t.C and stopCh, and t.C select falls through.
-		// In order to mitigate we re-check stopCh at the beginning
-		// of every loop to prevent extra executions of f().
-		select {
-		case <-stopCh:
-			if !t.Stop() {
-				<-t.C()
-			}
-			return
-		case <-t.C():
-		}
-	}
+// BackoffUntil loops until stop channel is closed, run f every duration given by delayFn.
+// An appropriately delayFn is provided by the Backoff.Step method. If sliding is true, the
+// period is computed after f runs. If it is false then period includes the runtime for f.
+func BackoffUntil(f func(), timer Timer, sliding bool, stopCh <-chan struct{}) {
+	loopConditionUntilContext(ContextForChannel(stopCh), timer, true, sliding, func(_ context.Context) (bool, error) {
+		f()
+		return false, nil
+	})
 }
 
 // JitterUntilWithContext loops until context is done, running f every period.
@@ -187,7 +171,10 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 //
 // Cancel context to stop. f may not be invoked if context is already expired.
 func JitterUntilWithContext(ctx context.Context, f func(context.Context), period time.Duration, jitterFactor float64, sliding bool) {
-	JitterUntil(func() { f(ctx) }, period, jitterFactor, sliding, ctx.Done())
+	loopConditionUntilContext(ctx, Backoff{Duration: period, Jitter: jitterFactor}.Timer(), true, sliding, func(ctx context.Context) (bool, error) {
+		f(ctx)
+		return false, nil
+	})
 }
 
 // Jitter returns a time.Duration between duration and duration + maxFactor *
@@ -250,16 +237,39 @@ func (c channelContext) Err() error {
 func (c channelContext) Deadline() (time.Time, bool) { return time.Time{}, false }
 func (c channelContext) Value(key any) any           { return nil }
 
-// runConditionWithCrashProtection runs a ConditionFunc with crash protection
-func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
-	return runConditionWithCrashProtectionWithContext(context.TODO(), condition.WithContext())
-}
-
 // runConditionWithCrashProtectionWithContext runs a
 // ConditionWithContextFunc with crash protection.
+//
+// Deprecated: Will be removed when the legacy polling methods are removed.
 func runConditionWithCrashProtectionWithContext(ctx context.Context, condition ConditionWithContextFunc) (bool, error) {
 	defer runtime.HandleCrash()
 	return condition(ctx)
+}
+
+// DelayFunc returns the next time interval to wait.
+type DelayFunc func() time.Duration
+
+// Timer takes an arbitrary delay function and returns a timer that can handle arbitrary interval changes.
+// Use Backoff{...}.Timer() for simple delays and more efficient timers.
+func (fn DelayFunc) Timer(c clock.Clock) Timer {
+	return &variableTimer{fn: fn, new: c.NewTimer}
+}
+
+// Until takes an arbitrary delay function and runs until cancelled or the condition indicates exit. This
+// offers all of the functionality of the methods in this package.
+func (fn DelayFunc) Until(ctx context.Context, immediate, sliding bool, condition ConditionWithContextFunc) error {
+	return loopConditionUntilContext(ctx, &variableTimer{fn: fn, new: internalClock.NewTimer}, immediate, sliding, condition)
+}
+
+// Concurrent returns a version of this DelayFunc that is safe for use by multiple goroutines that
+// wish to share a single delay timer.
+func (fn DelayFunc) Concurrent() DelayFunc {
+	var lock sync.Mutex
+	return func() time.Duration {
+		lock.Lock()
+		defer lock.Unlock()
+		return fn()
+	}
 }
 
 // Backoff holds parameters applied to a Backoff function.
@@ -288,33 +298,77 @@ type Backoff struct {
 	Cap time.Duration
 }
 
-// Step (1) returns an amount of time to sleep determined by the
-// original Duration and Jitter and (2) mutates the provided Backoff
-// to update its Steps and Duration.
+// Step returns an amount of time to sleep determined by the original
+// Duration and Jitter. The backoff is mutated to update its Steps and
+// Duration. A nil Backoff always has a zero-duration step.
 func (b *Backoff) Step() time.Duration {
-	if b.Steps < 1 {
-		if b.Jitter > 0 {
-			return Jitter(b.Duration, b.Jitter)
-		}
-		return b.Duration
+	if b == nil {
+		return 0
 	}
-	b.Steps--
+	var nextDuration time.Duration
+	nextDuration, b.Duration, b.Steps = delay(b.Steps, b.Duration, b.Cap, b.Factor, b.Jitter)
+	return nextDuration
+}
 
+// delayFunc returns a function that will compute the next interval to
+// wait given the arguments in b. It does not mutate the original backoff
+// but the function is safe to use only from a single goroutine.
+func (b Backoff) delayFunc() DelayFunc {
+	steps := b.Steps
 	duration := b.Duration
+	cap := b.Cap
+	factor := b.Factor
+	jitter := b.Jitter
 
-	// calculate the next step
-	if b.Factor != 0 {
-		b.Duration = time.Duration(float64(b.Duration) * b.Factor)
-		if b.Cap > 0 && b.Duration > b.Cap {
-			b.Duration = b.Cap
-			b.Steps = 0
+	return func() time.Duration {
+		var nextDuration time.Duration
+		// jitter is applied per step and is not cumulative over multiple steps
+		nextDuration, duration, steps = delay(steps, duration, cap, factor, jitter)
+		return nextDuration
+	}
+}
+
+// Timer returns a timer implementation appropriate to this backoff's parameters
+// for use with wait functions.
+func (b Backoff) Timer() Timer {
+	if b.Steps > 1 || b.Jitter != 0 {
+		return &variableTimer{new: internalClock.NewTimer, fn: b.delayFunc()}
+	}
+	if b.Duration > 0 {
+		return &fixedTimer{new: internalClock.NewTicker, interval: b.Duration}
+	}
+	return newNoopTimer()
+}
+
+// delay implements the core delay algorithm used in this package.
+func delay(steps int, duration, cap time.Duration, factor, jitter float64) (_ time.Duration, next time.Duration, nextSteps int) {
+	// when steps is non-positive, do not alter the base duration
+	if steps < 1 {
+		if jitter > 0 {
+			return Jitter(duration, jitter), duration, 0
 		}
+		return duration, duration, 0
+	}
+	steps--
+
+	// calculate the next step's interval
+	if factor != 0 {
+		next = time.Duration(float64(duration) * factor)
+		if cap > 0 && next > cap {
+			next = cap
+			steps = 0
+		}
+	} else {
+		next = duration
 	}
 
-	if b.Jitter > 0 {
-		duration = Jitter(duration, b.Jitter)
+	// add jitter for this step
+	if jitter > 0 {
+		duration = Jitter(duration, jitter)
 	}
-	return duration
+
+	return duration, next, steps
+
 }
 
 // BackoffManager manages backoff with a particular scheme based on its underlying implementation. It provides
@@ -324,6 +378,7 @@ func (b *Backoff) Step() time.Duration {
 // The BackoffManager is supposed to be called in a single-threaded environment.
 type BackoffManager interface {
 	Backoff() clock.Timer
+	DelayFunc() DelayFunc
 }
 
 type exponentialBackoffManagerImpl struct {
@@ -378,6 +433,12 @@ func (b *exponentialBackoffManagerImpl) Backoff() clock.Timer {
 	return b.backoffTimer
 }
 
+// DelayFunc returns a function that returns the next time interval and is
+// safe for concurrent use.
+func (b *exponentialBackoffManagerImpl) DelayFunc() DelayFunc {
+	return DelayFunc(b.getNextBackoff).Concurrent()
+}
+
 type jitteredBackoffManagerImpl struct {
 	clock        clock.Clock
 	duration     time.Duration
@@ -416,6 +477,12 @@ func (j *jitteredBackoffManagerImpl) Backoff() clock.Timer {
 	return j.backoffTimer
 }
 
+// DelayFunc returns a function that returns the next time interval and is
+// safe for concurrent use.
+func (j *jitteredBackoffManagerImpl) DelayFunc() DelayFunc {
+	return DelayFunc(j.getNextBackoff).Concurrent()
+}
+
 // ExponentialBackoff repeats a condition check with exponential backoff.
 //
 // It repeatedly checks the condition and then sleeps, using `backoff.Step()`
@@ -427,45 +494,27 @@ func (j *jitteredBackoffManagerImpl) Backoff() clock.Timer {
 // In case (1) the returned error is what the condition function returned.
 // In all other cases, ErrWaitTimeout is returned.
 func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
-	for backoff.Steps > 0 {
-		if ok, err := runConditionWithCrashProtection(condition); err != nil || ok {
-			return err
-		}
-		if backoff.Steps == 1 {
-			break
-		}
-		time.Sleep(backoff.Step())
-	}
-	return ErrWaitTimeout
+	return ExponentialBackoffWithContext(context.Background(), backoff, condition.WithContext())
 }
 
 // ExponentialBackoffWithContext works with a request context and a Backoff. It ensures that the retry wait never
 // exceeds the deadline specified by the request context.
 func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, condition ConditionWithContextFunc) error {
-	for backoff.Steps > 0 {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+	steps := backoff.Steps
+	return loopConditionUntilContext(ctx, backoff.Timer(), true, true, func(ctx context.Context) (bool, error) {
+		if steps < 1 {
+			return true, ErrWaitTimeout
 		}
-
-		if ok, err := runConditionWithCrashProtectionWithContext(ctx, condition); err != nil || ok {
-			return err
+		ok, err := condition(ctx)
+		if err != nil || ok {
+			return ok, err
 		}
-
-		if backoff.Steps == 1 {
-			break
+		if steps == 1 {
+			return false, ErrWaitTimeout
 		}
-
-		waitBeforeRetry := backoff.Step()
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(waitBeforeRetry):
-		}
-	}
-
-	return ErrWaitTimeout
+		steps--
+		return false, nil
+	})
 }
 
 // Poll tries a condition func until it returns true, an error, or the timeout
@@ -709,7 +758,7 @@ func poller(interval, timeout time.Duration) waitWithContextFunc {
 		go func() {
 			defer close(ch)
 
-			tick := time.NewTicker(interval)
+			tick := internalNewTicker(interval)
 			defer tick.Stop()
 
 			var after <-chan time.Time
@@ -717,7 +766,7 @@ func poller(interval, timeout time.Duration) waitWithContextFunc {
 				// time.After is more convenient, but it
 				// potentially leaves timers around much longer
 				// than necessary if we exit early.
-				timer := time.NewTimer(timeout)
+				timer := internalNewTimer(timeout)
 				after = timer.C
 				defer timer.Stop()
 			}
@@ -741,4 +790,66 @@ func poller(interval, timeout time.Duration) waitWithContextFunc {
 
 		return ch
 	})
+}
+
+// loopConditionUntilContext executes the provided condition at intervals defined by
+// the provided timer until the provided context is cancelled, the condition returns
+// true, or the condition returns an error. If sliding is true, the period is computed
+// after condition runs. If it is false then period includes the runtime for condition.
+// If immediate is false the first delay happens before any call to condition. The
+// returned error is the error returned by the last condition or the context error if
+// the context was terminated.
+//
+// This is the common loop construct for all polling in the wait package.
+func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding bool, condition ConditionWithContextFunc) error {
+	defer t.Stop()
+
+	var timeCh <-chan time.Time
+	doneCh := ctx.Done()
+
+	// if we haven't requested immediate execution, delay once
+	if !immediate {
+		timeCh = t.C()
+		select {
+		case <-doneCh:
+			return ctx.Err()
+		case <-timeCh:
+		}
+	}
+
+	for {
+		// checking ctx.Err() is slightly faster than checking a select
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		if !sliding {
+			t.Next()
+		}
+		if ok, err := func() (bool, error) {
+			defer runtime.HandleCrash()
+			return condition(ctx)
+		}(); err != nil || ok {
+			return err
+		}
+		if sliding {
+			t.Next()
+		}
+
+		if timeCh == nil {
+			timeCh = t.C()
+		}
+
+		// NOTE: b/c there is no priority selection in golang
+		// it is possible for this to race, meaning we could
+		// trigger t.C and doneCh, and t.C select falls through.
+		// In order to mitigate we re-check doneCh at the beginning
+		// of every loop to guarantee at-most one extra execution
+		// of condition.
+		select {
+		case <-doneCh:
+			return ctx.Err()
+		case <-timeCh:
+		}
+	}
 }

@@ -163,7 +163,7 @@ func (m *LocalKEKService) run(ctx context.Context) {
 				m.isReady.Store(false)
 			}
 		}
-	}, wait.NewJitteredBackoffManager(m.pollInterval, 0, m.clock), true, ctx.Done())
+	}, wait.NewJitteredBackoffManager(m.pollInterval, 0, m.clock).Timer(), true, ctx.Done())
 }
 
 // getTransformerForEncryption returns the local KEK as localTransformer, the corresponding

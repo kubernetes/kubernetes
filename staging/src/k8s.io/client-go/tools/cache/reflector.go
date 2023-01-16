@@ -279,7 +279,7 @@ func (r *Reflector) Run(stopCh <-chan struct{}) {
 		if err := r.ListAndWatch(stopCh); err != nil {
 			r.watchErrorHandler(r, err)
 		}
-	}, r.backoffManager, true, stopCh)
+	}, r.backoffManager.DelayFunc().Timer(r.clock), true, stopCh)
 	klog.V(3).Infof("Stopping reflector %s (%s) from %s", r.typeDescription, r.resyncPeriod, r.name)
 }
 
