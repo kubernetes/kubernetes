@@ -24,11 +24,6 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-// NewErrorStreamingDisabled creates an error for disabled streaming method.
-func NewErrorStreamingDisabled(method string) error {
-	return grpcstatus.Errorf(codes.NotFound, "streaming method %s disabled", method)
-}
-
 // NewErrorTooManyInFlight creates an error for exceeding the maximum number of in-flight requests.
 func NewErrorTooManyInFlight() error {
 	return grpcstatus.Error(codes.ResourceExhausted, "maximum number of in-flight requests exceeded")
