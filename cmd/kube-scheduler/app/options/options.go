@@ -32,7 +32,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
@@ -43,6 +42,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -281,12 +281,12 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	// Prepare kube clients.
-	client, eventClient, err := createClients(c.KubeConfig)
+	client, _, err := createClients(c.KubeConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	c.EventBroadcaster = events.NewEventBroadcasterAdapter(eventClient)
+	c.EventBroadcaster = record.NewBroadcaster()
 
 	// Set up leader election if enabled.
 	var leaderElectionConfig *leaderelection.LeaderElectionConfig
@@ -296,7 +296,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 		if len(c.ComponentConfig.Profiles) != 0 {
 			schedulerName = c.ComponentConfig.Profiles[0].SchedulerName
 		}
-		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(schedulerName)
+		coreRecorder := c.EventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: schedulerName})
 		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, c.KubeConfig, coreRecorder)
 		if err != nil {
 			return nil, err

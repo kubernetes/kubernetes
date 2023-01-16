@@ -24,8 +24,8 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/record"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -46,8 +46,7 @@ type Config struct {
 	InformerFactory    informers.SharedInformerFactory
 	DynInformerFactory dynamicinformer.DynamicSharedInformerFactory
 
-	//nolint:staticcheck // SA1019 this deprecated field still needs to be used for now. It will be removed once the migration is done.
-	EventBroadcaster events.EventBroadcasterAdapter
+	EventBroadcaster record.EventBroadcaster
 
 	// LeaderElection is optional.
 	LeaderElection *leaderelection.LeaderElectionConfig
