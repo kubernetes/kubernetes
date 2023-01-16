@@ -17,7 +17,6 @@ limitations under the License.
 package statefulset
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -479,18 +478,6 @@ func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, current
 	pod := newStatefulSetPod(updateSet, ordinal)
 	setPodRevision(pod, updateRevision)
 	return pod
-}
-
-// Match check if the given StatefulSet's template matches the template stored in the given history.
-func Match(ss *apps.StatefulSet, history *apps.ControllerRevision) (bool, error) {
-	// Encoding the set for the patch may update its GVK metadata, which causes data races if this
-	// set is in an informer cache.
-	clone := ss.DeepCopy()
-	patch, err := getPatch(clone)
-	if err != nil {
-		return false, err
-	}
-	return bytes.Equal(patch, history.Data.Raw), nil
 }
 
 // getPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a
