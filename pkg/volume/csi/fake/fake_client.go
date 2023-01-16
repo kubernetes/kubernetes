@@ -43,11 +43,6 @@ type IdentityClient struct {
 	nextErr error
 }
 
-// NewIdentityClient returns a new IdentityClient
-func NewIdentityClient() *IdentityClient {
-	return &IdentityClient{}
-}
-
 // SetNextError injects expected error
 func (f *IdentityClient) SetNextError(err error) {
 	f.nextErr = err
@@ -439,11 +434,6 @@ func (f *NodeClient) NodeGetVolumeStats(ctx context.Context, req *csipb.NodeGetV
 type ControllerClient struct {
 	nextCapabilities []*csipb.ControllerServiceCapability
 	nextErr          error
-}
-
-// NewControllerClient returns a ControllerClient
-func NewControllerClient() *ControllerClient {
-	return &ControllerClient{}
 }
 
 // SetNextError injects next expected error

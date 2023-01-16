@@ -1521,24 +1521,6 @@ func VerifyZeroDetachCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 	return nil
 }
 
-// VerifySetUpDeviceCallCount ensures that at least one of the Mappers for this
-// plugin has the expectedSetUpDeviceCallCount number of calls. Otherwise it
-// returns an error.
-func VerifySetUpDeviceCallCount(
-	expectedSetUpDeviceCallCount int,
-	fakeVolumePlugin *FakeVolumePlugin) error {
-	for _, mapper := range fakeVolumePlugin.GetBlockVolumeMapper() {
-		actualCallCount := mapper.GetSetUpDeviceCallCount()
-		if actualCallCount >= expectedSetUpDeviceCallCount {
-			return nil
-		}
-	}
-
-	return fmt.Errorf(
-		"No Mapper have expected SetUpDeviceCallCount. Expected: <%v>.",
-		expectedSetUpDeviceCallCount)
-}
-
 // VerifyTearDownDeviceCallCount ensures that at least one of the Unmappers for this
 // plugin has the expectedTearDownDeviceCallCount number of calls. Otherwise it
 // returns an error.
