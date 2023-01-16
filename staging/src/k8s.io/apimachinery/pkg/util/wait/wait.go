@@ -439,6 +439,35 @@ func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 	return ErrWaitTimeout
 }
 
+// ExponentialBackoffWithContext works with a request context and a Backoff. It ensures that the retry wait never
+// exceeds the deadline specified by the request context.
+func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, condition ConditionWithContextFunc) error {
+	for backoff.Steps > 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if ok, err := runConditionWithCrashProtectionWithContext(ctx, condition); err != nil || ok {
+			return err
+		}
+
+		if backoff.Steps == 1 {
+			break
+		}
+
+		waitBeforeRetry := backoff.Step()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(waitBeforeRetry):
+		}
+	}
+
+	return ErrWaitTimeout
+}
+
 // Poll tries a condition func until it returns true, an error, or the timeout
 // is reached.
 //
@@ -712,33 +741,4 @@ func poller(interval, timeout time.Duration) waitWithContextFunc {
 
 		return ch
 	})
-}
-
-// ExponentialBackoffWithContext works with a request context and a Backoff. It ensures that the retry wait never
-// exceeds the deadline specified by the request context.
-func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, condition ConditionWithContextFunc) error {
-	for backoff.Steps > 0 {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		if ok, err := runConditionWithCrashProtectionWithContext(ctx, condition); err != nil || ok {
-			return err
-		}
-
-		if backoff.Steps == 1 {
-			break
-		}
-
-		waitBeforeRetry := backoff.Step()
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(waitBeforeRetry):
-		}
-	}
-
-	return ErrWaitTimeout
 }
