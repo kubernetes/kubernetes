@@ -280,9 +280,9 @@ func TestContainsIPv4Loopback(t *testing.T) {
 			want:        true,
 		},
 		{
-			name:        "all zeros ipv6", // interpret all zeros equal for IPv4 and IPv6 as Golang stdlib
+			name:        "all zeros ipv6",
 			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::/0"},
-			want:        true,
+			want:        false,
 		},
 		{
 			name:        "ipv4 loopback",
@@ -318,7 +318,7 @@ func TestContainsIPv4Loopback(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := ContainsIPv4Loopback(tt.cidrStrings); got != tt.want {
-				t.Errorf("ContainLoopback() = %v, want %v", got, tt.want)
+				t.Errorf("ContainsIPv4Loopback() = %v, want %v", got, tt.want)
 			}
 		})
 	}
