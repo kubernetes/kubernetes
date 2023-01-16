@@ -97,13 +97,18 @@ func testFinishedJob(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 	jobFinishTime := finishTime(job)
 	finishTimeUTC := jobFinishTime.UTC()
-	framework.ExpectNotEqual(jobFinishTime.IsZero(), true)
+
+	if !jobFinishTime.IsZero() {
+		framework.Failf("JobFinishTime not equals 0.")
+	}
 
 	deleteAtUTC := job.ObjectMeta.DeletionTimestamp.UTC()
 	framework.ExpectNotEqual(deleteAtUTC, nil)
 
 	expireAtUTC := finishTimeUTC.Add(time.Duration(ttl) * time.Second)
-	framework.ExpectEqual(deleteAtUTC.Before(expireAtUTC), false)
+	if deleteAtUTC.Before(expireAtUTC) {
+		framework.Failf("expireAtUTC as expected to be false.")
+	}
 }
 
 // finishTime returns finish time of the specified job.
