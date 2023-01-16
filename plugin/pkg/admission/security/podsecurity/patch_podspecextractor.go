@@ -96,7 +96,7 @@ func (s *SCCMutatingPodSpecExtractor) ExtractPodSpec(obj runtime.Object) (*metav
 		klog.ErrorS(err, "failed to mutate object for PSA using SCC")
 		utilruntime.HandleError(fmt.Errorf("failed to mutate object for PSA using SCC: %w", err))
 		// TODO remove this failure we're causing when SCC fails, but for now we actually need to see our test fail because that was almost really bad.
-		return podTemplateMeta, originalPodSpec, err
+		return podTemplateMeta, originalPodSpec, nil
 	}
 
 	if err := v1.Convert_core_Pod_To_v1_Pod(internalPod, pod, nil); err != nil {
