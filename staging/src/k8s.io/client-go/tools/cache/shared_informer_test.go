@@ -348,6 +348,18 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 	// Simulate a connection loss (or even just a too-old-watch)
 	source.ResetWatch()
 
+	// Wait long enough for the reflector to exit and the backoff function to start waiting
+	// on the fake clock, otherwise advancing the fake clock will have no effect.
+	// TODO: Make this deterministic by counting the number of waiters on FakeClock
+	time.Sleep(10 * time.Millisecond)
+
+	// Advance the clock to cause the backoff wait to expire.
+	clock.Step(1601 * time.Millisecond)
+
+	// Wait long enough for backoff to invoke ListWatch a second time and distribute events
+	// to listeners.
+	time.Sleep(10 * time.Millisecond)
+
 	for _, listener := range listeners {
 		if !listener.ok() {
 			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)

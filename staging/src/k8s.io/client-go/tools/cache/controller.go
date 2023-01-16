@@ -139,11 +139,11 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		ReflectorOptions{
 			ResyncPeriod:    c.config.FullResyncPeriod,
 			TypeDescription: c.config.ObjectDescription,
+			Clock:           c.clock,
 		},
 	)
 	r.ShouldResync = c.config.ShouldResync
 	r.WatchListPageSize = c.config.WatchListPageSize
-	r.clock = c.clock
 	if c.config.WatchErrorHandler != nil {
 		r.watchErrorHandler = c.config.WatchErrorHandler
 	}
