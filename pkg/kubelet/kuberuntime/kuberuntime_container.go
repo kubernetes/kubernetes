@@ -1006,7 +1006,7 @@ func setTerminationGracePeriod(pod *v1.Pod, containerSpec *v1.Container, contain
 func isProbeTerminationGracePeriodSecondsSet(pod *v1.Pod, containerSpec *v1.Container, probe *v1.Probe, containerName string, containerID kubecontainer.ContainerID, probeType string) bool {
 	if probe != nil && probe.TerminationGracePeriodSeconds != nil {
 		if *probe.TerminationGracePeriodSeconds > *pod.Spec.TerminationGracePeriodSeconds {
-			klog.V(4).InfoS("Using probe-level grace period that is greater than the pod-level grace period", "pod", klog.KObj(pod), "pod-uid", pod.UID, "containerName", containerName, "containerID", containerID.String(), "probe-type", probeType, "probe-grace-period", *probe.TerminationGracePeriodSeconds, "pod-grace-period", *pod.Spec.TerminationGracePeriodSeconds)
+			klog.V(4).InfoS("Using probe-level grace period that is greater than the pod-level grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", containerName, "containerID", containerID.String(), "probeType", probeType, "probeGracePeriod", *probe.TerminationGracePeriodSeconds, "podGracePeriod", *pod.Spec.TerminationGracePeriodSeconds)
 		}
 		return true
 	}

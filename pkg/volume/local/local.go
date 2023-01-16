@@ -418,7 +418,7 @@ func (plugin *localVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOptio
 	case hostutil.FileTypeDirectory:
 		// if the given local volume path is of already filesystem directory, return directly because
 		// we do not want to prevent mount operation from succeeding.
-		klog.InfoS("Expansion of directory based local volumes is NO-OP", "local-volume-path", localDevicePath)
+		klog.InfoS("Expansion of directory based local volumes is NO-OP", "localVolumePath", localDevicePath)
 		return true, nil
 	default:
 		return false, fmt.Errorf("only directory and block device are supported")
