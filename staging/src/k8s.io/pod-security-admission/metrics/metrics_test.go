@@ -71,15 +71,17 @@ func TestRecordEvaluation(t *testing.T) {
 							recorder.RecordEvaluation(decision, levelVersion(level, version), mode, &api.AttributesRecord{
 								Resource:  resource,
 								Operation: op,
+								Namespace: "some-namespace",
 							})
 
 							if level == api.LevelPrivileged {
 								expectedVersion = "latest"
 							}
+
 							expected := fmt.Sprintf(`
 							# HELP pod_security_evaluations_total [ALPHA] Number of policy evaluations that occurred, not counting ignored or exempt requests.
         	            	# TYPE pod_security_evaluations_total counter
-							pod_security_evaluations_total{decision="%s",mode="%s",policy_level="%s",policy_version="%s",request_operation="%s",resource="%s",subresource=""} 1
+							pod_security_evaluations_total{decision="%s",mode="%s",ocp_namespace="",policy_level="%s",policy_version="%s",request_operation="%s",resource="%s",subresource=""} 1
 							`, decision, mode, level, expectedVersion, strings.ToLower(string(op)), expectedResource)
 							expected = expectCachedMetrics("pod_security_evaluations_total", expected)
 
@@ -162,8 +164,8 @@ func levelVersion(level api.Level, version string) api.LevelVersion {
 // The cached metrics should always be present (value 0 if not counted).
 var expectedCachedMetrics = map[string][]string{
 	"pod_security_evaluations_total": {
-		`pod_security_evaluations_total{decision="allow",mode="enforce",policy_level="privileged",policy_version="latest",request_operation="create",resource="pod",subresource=""}`,
-		`pod_security_evaluations_total{decision="allow",mode="enforce",policy_level="privileged",policy_version="latest",request_operation="update",resource="pod",subresource=""}`,
+		`pod_security_evaluations_total{decision="allow",mode="enforce",ocp_namespace="",policy_level="privileged",policy_version="latest",request_operation="create",resource="pod",subresource=""}`,
+		`pod_security_evaluations_total{decision="allow",mode="enforce",ocp_namespace="",policy_level="privileged",policy_version="latest",request_operation="update",resource="pod",subresource=""}`,
 	},
 	"pod_security_exemptions_total": {
 		`pod_security_exemptions_total{request_operation="create",resource="controller",subresource=""}`,
