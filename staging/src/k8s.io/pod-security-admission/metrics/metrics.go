@@ -98,15 +98,28 @@ func (r *PrometheusRecorder) RecordEvaluation(decision Decision, policy api.Leve
 		}
 	}
 
-	r.evaluationsCounter.CachedInc(evaluationsLabels{
-		decision:    string(decision),
-		level:       string(policy.Level),
-		version:     version,
-		mode:        string(evalMode),
-		operation:   operationLabel(attrs.GetOperation()),
-		resource:    resourceLabel(attrs.GetResource()),
-		subresource: attrs.GetSubresource(),
-	})
+	// prevent cardinality explosion by only recording the platform namespaces
+	namespace := attrs.GetNamespace()
+	if !(namespace == "openshift" ||
+		strings.HasPrefix(namespace, "openshift-") ||
+		strings.HasPrefix(namespace, "kube-") ||
+		namespace == "default") {
+		// remove non-OpenShift platform namespace names to prevent cardinality explosion
+		namespace = ""
+	}
+
+	el := evaluationsLabels{
+		decision:     string(decision),
+		level:        string(policy.Level),
+		version:      version,
+		mode:         string(evalMode),
+		operation:    operationLabel(attrs.GetOperation()),
+		resource:     resourceLabel(attrs.GetResource()),
+		subresource:  attrs.GetSubresource(),
+		ocpNamespace: namespace,
+	}
+
+	r.evaluationsCounter.CachedInc(el)
 }
 
 func (r *PrometheusRecorder) RecordExemption(attrs api.Attributes) {
@@ -156,17 +169,18 @@ func operationLabel(op admissionv1.Operation) string {
 }
 
 type evaluationsLabels struct {
-	decision    string
-	level       string
-	version     string
-	mode        string
-	operation   string
-	resource    string
-	subresource string
+	decision     string
+	level        string
+	version      string
+	mode         string
+	operation    string
+	resource     string
+	subresource  string
+	ocpNamespace string
 }
 
 func (l *evaluationsLabels) labels() []string {
-	return []string{l.decision, l.level, l.version, l.mode, l.operation, l.resource, l.subresource}
+	return []string{l.decision, l.level, l.version, l.mode, l.operation, l.resource, l.subresource, l.ocpNamespace}
 }
 
 type exemptionsLabels struct {
@@ -194,7 +208,7 @@ func newEvaluationsCounter() *evaluationsCounter {
 				Help:           "Number of policy evaluations that occurred, not counting ignored or exempt requests.",
 				StabilityLevel: metrics.ALPHA,
 			},
-			[]string{"decision", "policy_level", "policy_version", "mode", "request_operation", "resource", "subresource"},
+			[]string{"decision", "policy_level", "policy_version", "mode", "request_operation", "resource", "subresource", "ocp_namespace"},
 		),
 		cache: make(map[evaluationsLabels]metrics.CounterMetric),
 	}
@@ -231,8 +245,8 @@ func (c *evaluationsCounter) Reset() {
 
 func (c *evaluationsCounter) populateCache() {
 	labelsToCache := []evaluationsLabels{
-		{decision: "allow", level: "privileged", version: "latest", mode: "enforce", operation: "create", resource: "pod", subresource: ""},
-		{decision: "allow", level: "privileged", version: "latest", mode: "enforce", operation: "update", resource: "pod", subresource: ""},
+		{decision: "allow", level: "privileged", version: "latest", mode: "enforce", operation: "create", resource: "pod", subresource: "", ocpNamespace: ""},
+		{decision: "allow", level: "privileged", version: "latest", mode: "enforce", operation: "update", resource: "pod", subresource: "", ocpNamespace: ""},
 	}
 	for _, l := range labelsToCache {
 		c.cache[l] = c.CounterVec.WithLabelValues(l.labels()...)
