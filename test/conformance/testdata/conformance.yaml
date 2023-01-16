@@ -1192,18 +1192,6 @@
     label as the label is removed.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
-- testname: Kubectl, logs
-  codename: '[sig-cli] Kubectl client Kubectl logs should be able to retrieve and
-    filter logs  [Conformance]'
-  description: When a Pod is running then it MUST generate logs. Starting a Pod should
-    have a expected log line. Also log command options MUST work as expected and described
-    below. 'kubectl logs -tail=1' should generate a output of one line, the last line
-    in the log. 'kubectl --limit-bytes=1' should generate a single byte output. 'kubectl
-    --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
-    'kubectl --since=1s' should output logs that are only 1 second older from now
-    'kubectl --since=24h' should output logs that are only 1 day older from now
-  release: v1.9
-  file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, patch to annotate
   codename: '[sig-cli] Kubectl client Kubectl patch should add annotations for pods
     in rc  [Conformance]'
@@ -1278,6 +1266,17 @@
     the replicaset to 2. Number of running instances of the Pod MUST be 2.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
+- testname: Kubectl, logs
+  codename: '[sig-cli] Kubectl logs logs should be able to retrieve and filter logs  [Conformance]'
+  description: When a Pod is running then it MUST generate logs. Starting a Pod should
+    have a expected log line. Also log command options MUST work as expected and described
+    below. 'kubectl logs -tail=1' should generate a output of one line, the last line
+    in the log. 'kubectl --limit-bytes=1' should generate a single byte output. 'kubectl
+    --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
+    'kubectl --since=1s' should output logs that are only 1 second older from now
+    'kubectl --since=24h' should output logs that are only 1 day older from now
+  release: v1.9
+  file: test/e2e/kubectl/logs.go
 - testname: New Event resource lifecycle, testing a list of events
   codename: '[sig-instrumentation] Events API should delete a collection of events
     [Conformance]'
