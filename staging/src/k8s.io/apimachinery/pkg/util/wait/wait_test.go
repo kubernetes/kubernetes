@@ -875,7 +875,7 @@ func TestExponentialBackoffWithContext(t *testing.T) {
 			}
 
 			attempts := 0
-			err := ExponentialBackoffWithContext(test.ctxGetter(), backoff, func() (bool, error) {
+			err := ExponentialBackoffWithContext(test.ctxGetter(), backoff, func(_ context.Context) (bool, error) {
 				attempts++
 				return test.callback(attempts)
 			})

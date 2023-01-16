@@ -729,7 +729,7 @@ func poller(interval, timeout time.Duration) WaitWithContextFunc {
 
 // ExponentialBackoffWithContext works with a request context and a Backoff. It ensures that the retry wait never
 // exceeds the deadline specified by the request context.
-func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, condition ConditionFunc) error {
+func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, condition ConditionWithContextFunc) error {
 	for backoff.Steps > 0 {
 		select {
 		case <-ctx.Done():
@@ -737,7 +737,7 @@ func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, conditi
 		default:
 		}
 
-		if ok, err := runConditionWithCrashProtection(condition); err != nil || ok {
+		if ok, err := runConditionWithCrashProtectionWithContext(ctx, condition); err != nil || ok {
 			return err
 		}
 

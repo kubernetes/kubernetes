@@ -673,7 +673,7 @@ func waitForDetachAndGrabMetrics(ctx context.Context, oldMetrics *storageControl
 		oldDetachCount = 0
 	}
 
-	verifyMetricFunc := func() (bool, error) {
+	verifyMetricFunc := func(ctx context.Context) (bool, error) {
 		updatedMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
 
 		if err != nil {
@@ -821,7 +821,7 @@ func waitForPVControllerSync(ctx context.Context, metricsGrabber *e2emetrics.Gra
 		Factor:   1.2,
 		Steps:    21,
 	}
-	verifyMetricFunc := func() (bool, error) {
+	verifyMetricFunc := func(ctx context.Context) (bool, error) {
 		updatedMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
 		if err != nil {
 			framework.Logf("Error fetching controller-manager metrics")
@@ -866,7 +866,7 @@ func waitForADControllerStatesMetrics(ctx context.Context, metricsGrabber *e2eme
 		Factor:   1.2,
 		Steps:    21,
 	}
-	verifyMetricFunc := func() (bool, error) {
+	verifyMetricFunc := func(ctx context.Context) (bool, error) {
 		updatedMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
 		if err != nil {
 			e2eskipper.Skipf("Could not get controller-manager metrics - skipping")

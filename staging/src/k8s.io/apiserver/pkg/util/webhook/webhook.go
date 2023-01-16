@@ -121,7 +121,7 @@ func WithExponentialBackoff(ctx context.Context, retryBackoff wait.Backoff, webh
 	// having a webhook error allows us to track the last actual webhook error for requests that
 	// are later cancelled or time out.
 	var webhookErr error
-	err := wait.ExponentialBackoffWithContext(ctx, retryBackoff, func() (bool, error) {
+	err := wait.ExponentialBackoffWithContext(ctx, retryBackoff, func(_ context.Context) (bool, error) {
 		webhookErr = webhookFn()
 		if shouldRetry(webhookErr) {
 			return false, nil
