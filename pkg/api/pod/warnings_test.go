@@ -185,7 +185,7 @@ func TestWarnings(t *testing.T) {
 					{Name: "s", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{}}},
 				}},
 			},
-			expected: []string{`spec.volumes[0].flocker: deprecated in v1.22, support removal is planned in v1.26`},
+			expected: []string{`spec.volumes[0].flocker: deprecated in v1.22, non-functional in v1.25+`},
 		},
 		{
 			name: "storageOS",
@@ -194,7 +194,7 @@ func TestWarnings(t *testing.T) {
 					{Name: "s", VolumeSource: api.VolumeSource{StorageOS: &api.StorageOSVolumeSource{}}},
 				}},
 			},
-			expected: []string{`spec.volumes[0].storageOS: deprecated in v1.22, support removal is planned in v1.26`},
+			expected: []string{`spec.volumes[0].storageOS: deprecated in v1.22, non-functional in v1.25+`},
 		},
 		{
 			name: "quobyte",
@@ -203,7 +203,7 @@ func TestWarnings(t *testing.T) {
 					{Name: "s", VolumeSource: api.VolumeSource{Quobyte: &api.QuobyteVolumeSource{}}},
 				}},
 			},
-			expected: []string{`spec.volumes[0].quobyte: deprecated in v1.22, support removal is planned in v1.26`},
+			expected: []string{`spec.volumes[0].quobyte: deprecated in v1.22, non-functional in v1.25+`},
 		},
 		{
 			name: "glusterfs",
@@ -212,7 +212,7 @@ func TestWarnings(t *testing.T) {
 					{Name: "s", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}},
 				}},
 			},
-			expected: []string{`spec.volumes[0].glusterfs: deprecated in v1.25, this feature will be removed soon after in a subsequent release`},
+			expected: []string{`spec.volumes[0].glusterfs: deprecated in v1.25, non-functional in v1.26+`},
 		},
 		{
 			name: "duplicate hostAlias",
@@ -432,8 +432,8 @@ func TestWarnings(t *testing.T) {
 			},
 			expected: []string{
 				`metadata.annotations[scheduler.alpha.kubernetes.io/critical-pod]: non-functional in v1.16+; use the "priorityClassName" field instead`,
-				`metadata.annotations[seccomp.security.alpha.kubernetes.io/pod]: deprecated since v1.19, non-functional in a future release; use the "seccompProfile" field instead`,
-				`metadata.annotations[container.seccomp.security.alpha.kubernetes.io/foo]: deprecated since v1.19, non-functional in a future release; use the "seccompProfile" field instead`,
+				`metadata.annotations[seccomp.security.alpha.kubernetes.io/pod]: non-functional in v1.27+; use the "seccompProfile" field instead`,
+				`metadata.annotations[container.seccomp.security.alpha.kubernetes.io/foo]: non-functional in v1.27+; use the "seccompProfile" field instead`,
 				`metadata.annotations[security.alpha.kubernetes.io/sysctls]: non-functional in v1.11+; use the "sysctls" field instead`,
 				`metadata.annotations[security.alpha.kubernetes.io/unsafe-sysctls]: non-functional in v1.11+; use the "sysctls" field instead`,
 			},

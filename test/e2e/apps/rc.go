@@ -168,6 +168,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 			if !eventFound {
 				framework.Failf("failed to find RC %v event", watch.Added)
 			}
+			if !eventFound {
+				framework.Failf("failed to find RC %v event", watch.Added)
+			}
 
 			ginkgo.By("waiting for available Replicas")
 			eventFound = false

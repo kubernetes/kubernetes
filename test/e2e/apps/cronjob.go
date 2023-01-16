@@ -423,7 +423,9 @@ var _ = SIGDescribe("CronJob", func() {
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(cjStatusJSON)+`}`),
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
-		gomega.Expect(patchedStatus.Status.LastScheduleTime).To(gomega.BeNumerically("==", &now1), "patched object should have the applied lastScheduleTime status")
+		if !patchedStatus.Status.LastScheduleTime.Equal(&now1) {
+			framework.Failf("patched object should have the applied lastScheduleTime %#v, got %#v instead", cjStatus.LastScheduleTime, patchedStatus.Status.LastScheduleTime)
+		}
 		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating /status")
@@ -440,8 +442,9 @@ var _ = SIGDescribe("CronJob", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-
-		gomega.Expect(updatedStatus.Status.LastScheduleTime).To(gomega.BeNumerically("==", &now2), fmt.Sprintf("updated object status expected to have updated lastScheduleTime %#v, got %#v", statusToUpdate.Status.LastScheduleTime, updatedStatus.Status.LastScheduleTime))
+		if !updatedStatus.Status.LastScheduleTime.Equal(&now2) {
+			framework.Failf("updated object status expected to have updated lastScheduleTime %#v, got %#v", statusToUpdate.Status.LastScheduleTime, updatedStatus.Status.LastScheduleTime)
+		}
 
 		ginkgo.By("get /status")
 		cjResource := schema.GroupVersionResource{Group: "batch", Version: cjVersion, Resource: "cronjobs"}

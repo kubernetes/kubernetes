@@ -43,6 +43,7 @@ limitations under the License.
 //
 //   - kubeadm v1.15.x and newer can be used to migrate from v1beta1 to v1beta2.
 //   - kubeadm v1.22.x and newer no longer support v1beta1 and older APIs, but can be used to migrate v1beta2 to v1beta3.
+//   - kubeadm v1.27.x and newer no longer support v1beta2 and older APIs.
 //
 // # Basics
 //

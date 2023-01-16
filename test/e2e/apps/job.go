@@ -357,7 +357,7 @@ var _ = SIGDescribe("Job", func() {
 			}
 		}
 		if !exists {
-			framework.Failf("Job was expected to be completed or failed")
+			framework.Failf("Expected suspended job to exist. It was not found.")
 		}
 	})
 
@@ -498,9 +498,8 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring job was deleted")
 		_, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectError(err, "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
-
 		if !apierrors.IsNotFound(err) {
-			framework.Failf("Job was not deleted.")
+			framework.Failf("failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
 		}
 	})
 
@@ -669,7 +668,7 @@ var _ = SIGDescribe("Job", func() {
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
 		if !patchedStatus.Status.StartTime.Equal(&now1) {
-			framework.Failf("Patched object should have the applied StartTime status")
+			framework.Failf("patched object should have the applied StartTime %#v, got %#v instead", jStatus.StartTime, patchedStatus.Status.StartTime)
 		}
 		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
 

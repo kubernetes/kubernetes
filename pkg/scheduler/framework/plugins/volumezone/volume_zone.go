@@ -98,6 +98,9 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 	if !status.IsSuccess() {
 		return nil, status
 	}
+	if len(podPVTopologies) == 0 {
+		return nil, framework.NewStatus(framework.Skip)
+	}
 	cs.Write(preFilterStateKey, &stateData{podPVTopologies: podPVTopologies})
 	return nil, nil
 }

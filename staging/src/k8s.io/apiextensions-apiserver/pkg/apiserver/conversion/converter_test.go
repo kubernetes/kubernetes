@@ -46,6 +46,7 @@ func TestConversion(t *testing.T) {
 			SourceObject: &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "example.com/v1",
+					"metadata":   map[string]interface{}{},
 					"other":      "data",
 					"kind":       "foo",
 				},
@@ -53,6 +54,7 @@ func TestConversion(t *testing.T) {
 			ExpectedObject: &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "example.com/v2",
+					"metadata":   map[string]interface{}{},
 					"other":      "data",
 					"kind":       "foo",
 				},
@@ -86,6 +88,7 @@ func TestConversion(t *testing.T) {
 					{
 						Object: map[string]interface{}{
 							"apiVersion": "example.com/v1",
+							"metadata":   map[string]interface{}{},
 							"kind":       "foo",
 							"other":      "data",
 						},
@@ -93,6 +96,7 @@ func TestConversion(t *testing.T) {
 					{
 						Object: map[string]interface{}{
 							"apiVersion": "example.com/v1",
+							"metadata":   map[string]interface{}{},
 							"kind":       "foo",
 							"other":      "data2",
 						},
@@ -108,6 +112,7 @@ func TestConversion(t *testing.T) {
 					{
 						Object: map[string]interface{}{
 							"apiVersion": "example.com/v2",
+							"metadata":   map[string]interface{}{},
 							"kind":       "foo",
 							"other":      "data",
 						},
@@ -115,6 +120,7 @@ func TestConversion(t *testing.T) {
 					{
 						Object: map[string]interface{}{
 							"apiVersion": "example.com/v2",
+							"metadata":   map[string]interface{}{},
 							"kind":       "foo",
 							"other":      "data2",
 						},
@@ -287,4 +293,80 @@ func TestGetObjectsToConvert(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConverterMutatesInput(t *testing.T) {
+	testCRD := apiextensionsv1.CustomResourceDefinition{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Conversion: &apiextensionsv1.CustomResourceConversion{
+				Strategy: apiextensionsv1.NoneConverter,
+			},
+			Group: "test.k8s.io",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:   "v1alpha1",
+					Served: true,
+				},
+				{
+					Name:   "v1alpha2",
+					Served: true,
+				},
+			},
+		},
+	}
+
+	safeConverter, _, err := NewDelegatingConverter(&testCRD, &inputMutatingConverter{})
+	if err != nil {
+		t.Fatalf("Cannot create converter: %v", err)
+	}
+
+	input := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"apiVersion": "test.k8s.io/v1alpha1",
+		},
+		Items: []unstructured.Unstructured{
+			{
+				Object: map[string]interface{}{
+					"apiVersion": "test.k8s.io/v1alpha1",
+					"metadata": map[string]interface{}{
+						"name": "item1",
+					},
+				},
+			},
+			{
+				Object: map[string]interface{}{
+					"apiVersion": "test.k8s.io/v1alpha1",
+					"metadata": map[string]interface{}{
+						"name": "item2",
+					},
+				},
+			},
+		},
+	}
+
+	toVersion, _ := schema.ParseGroupVersion("test.k8s.io/v1alpha2")
+	toVersions := schema.GroupVersions{toVersion}
+	converted, err := safeConverter.ConvertToVersion(input, toVersions)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	convertedList := converted.(*unstructured.UnstructuredList)
+	if e, a := 2, len(convertedList.Items); e != a {
+		t.Fatalf("length: expected %d, got %d", e, a)
+	}
+}
+
+type inputMutatingConverter struct{}
+
+func (i *inputMutatingConverter) Convert(in *unstructured.UnstructuredList, targetGVK schema.GroupVersion) (*unstructured.UnstructuredList, error) {
+	out := &unstructured.UnstructuredList{}
+	for _, obj := range in.Items {
+		u := obj.DeepCopy()
+		u.SetAPIVersion(targetGVK.String())
+		out.Items = append(out.Items, *u)
+	}
+
+	in.Items = nil
+
+	return out, nil
 }

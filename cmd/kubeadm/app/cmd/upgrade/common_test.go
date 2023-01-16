@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
@@ -72,18 +73,20 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 
 	tcases := []struct {
-		name          string
-		newK8sVersion string
-		dryRun        bool
-		flags         applyPlanFlags
-		expectedErr   string
+		name               string
+		newK8sVersion      string
+		dryRun             bool
+		flags              applyPlanFlags
+		expectedErr        string
+		expectedErrNonRoot string
 	}{
 		{
 			name: "Fail pre-flight check",
 			flags: applyPlanFlags{
 				kubeConfigPath: fullPath,
 			},
-			expectedErr: "ERROR CoreDNSUnsupportedPlugins",
+			expectedErr:        "ERROR CoreDNSUnsupportedPlugins",
+			expectedErrNonRoot: "user is not running as", // user is not running as (root || administrator)
 		},
 		{
 			name: "Bogus preflight check specify all with individual check",
@@ -109,8 +112,16 @@ func TestEnforceRequirements(t *testing.T) {
 				t.Error("Expected error, but got success")
 			}
 
-			if err != nil && !strings.Contains(err.Error(), tt.expectedErr) {
-				t.Fatalf("enforceRequirements returned unexpected error, expected: %s, got %v", tt.expectedErr, err)
+			expErr := tt.expectedErr
+			// pre-flight check expects the user to be root, so the root and non-root should hit different errors
+			isPrivileged := preflight.IsPrivilegedUserCheck{}
+			// this will return an array of errors if we're not running as a privileged user.
+			_, errors := isPrivileged.Check()
+			if len(errors) != 0 && len(tt.expectedErrNonRoot) != 0 {
+				expErr = tt.expectedErrNonRoot
+			}
+			if err != nil && !strings.Contains(err.Error(), expErr) {
+				t.Fatalf("enforceRequirements returned unexpected error, expected: %s, got %v", expErr, err)
 			}
 
 		})

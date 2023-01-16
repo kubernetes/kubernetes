@@ -26,7 +26,6 @@ import (
 	v1alpha1 "k8s.io/api/resource/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	resourcev1alpha1 "k8s.io/client-go/applyconfigurations/resource/v1alpha1"
@@ -39,9 +38,9 @@ type FakeResourceClaims struct {
 	ns   string
 }
 
-var resourceclaimsResource = schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1alpha1", Resource: "resourceclaims"}
+var resourceclaimsResource = v1alpha1.SchemeGroupVersion.WithResource("resourceclaims")
 
-var resourceclaimsKind = schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1alpha1", Kind: "ResourceClaim"}
+var resourceclaimsKind = v1alpha1.SchemeGroupVersion.WithKind("ResourceClaim")
 
 // Get takes name of the resourceClaim, and returns the corresponding resourceClaim object, and an error if there is any.
 func (c *FakeResourceClaims) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ResourceClaim, err error) {

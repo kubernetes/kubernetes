@@ -40,9 +40,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against DaemonSets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apps.DaemonSet{} },
-		NewListFunc:              func() runtime.Object { return &apps.DaemonSetList{} },
-		DefaultQualifiedResource: apps.Resource("daemonsets"),
+		NewFunc:                   func() runtime.Object { return &apps.DaemonSet{} },
+		NewListFunc:               func() runtime.Object { return &apps.DaemonSetList{} },
+		DefaultQualifiedResource:  apps.Resource("daemonsets"),
+		SingularQualifiedResource: apps.Resource("daemonset"),
 
 		CreateStrategy:      daemonset.Strategy,
 		UpdateStrategy:      daemonset.Strategy,

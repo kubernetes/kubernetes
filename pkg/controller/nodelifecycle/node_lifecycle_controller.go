@@ -332,6 +332,10 @@ type Controller struct {
 	//    value takes longer for user to see up-to-date node health.
 	nodeMonitorGracePeriod time.Duration
 
+	// Number of workers Controller uses to process node monitor health updates.
+	// Defaults to scheduler.UpdateWorkerSize.
+	nodeUpdateWorkerSize int
+
 	podEvictionTimeout          time.Duration
 	evictionLimiterQPS          float32
 	secondaryEvictionLimiterQPS float32
@@ -383,6 +387,7 @@ func NewNodeLifecycleController(
 		nodeMonitorPeriod:           nodeMonitorPeriod,
 		nodeStartupGracePeriod:      nodeStartupGracePeriod,
 		nodeMonitorGracePeriod:      nodeMonitorGracePeriod,
+		nodeUpdateWorkerSize:        scheduler.UpdateWorkerSize,
 		zonePodEvictor:              make(map[string]*scheduler.RateLimitedTimedQueue),
 		zoneNoExecuteTainter:        make(map[string]*scheduler.RateLimitedTimedQueue),
 		nodesToRetry:                sync.Map{},
@@ -794,6 +799,11 @@ func (nc *Controller) doEvictionPass(ctx context.Context) {
 // if not, post "NodeReady==ConditionUnknown".
 // This function will taint nodes who are not ready or not reachable for a long period of time.
 func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
+	start := nc.now()
+	defer func() {
+		updateAllNodesHealthDuration.Observe(time.Since(start.Time).Seconds())
+	}()
+
 	// We are listing nodes from local cache as we can tolerate some small delays
 	// comparing to state from etcd and there is eventual consistency anyway.
 	nodes, err := nc.nodeLister.List(labels.Everything())
@@ -824,13 +834,21 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		delete(nc.knownNodeSet, deleted[i].Name)
 	}
 
+	var zoneToNodeConditionsLock sync.Mutex
 	zoneToNodeConditions := map[string][]*v1.NodeCondition{}
-	for i := range nodes {
+	updateNodeFunc := func(piece int) {
+		start := nc.now()
+		defer func() {
+			updateNodeHealthDuration.Observe(time.Since(start.Time).Seconds())
+		}()
+
 		var gracePeriod time.Duration
 		var observedReadyCondition v1.NodeCondition
 		var currentReadyCondition *v1.NodeCondition
-		node := nodes[i].DeepCopy()
+		node := nodes[piece].DeepCopy()
+
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*scheduler.NodeHealthUpdateRetry, func() (bool, error) {
+			var err error
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeHealth(ctx, node)
 			if err == nil {
 				return true, nil
@@ -845,12 +863,14 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		}); err != nil {
 			klog.Errorf("Update health of Node '%v' from Controller error: %v. "+
 				"Skipping - no pods will be evicted.", node.Name, err)
-			continue
+			return
 		}
 
 		// Some nodes may be excluded from disruption checking
 		if !isNodeExcludedFromDisruptionChecks(node) {
+			zoneToNodeConditionsLock.Lock()
 			zoneToNodeConditions[nodetopology.GetZoneKey(node)] = append(zoneToNodeConditions[nodetopology.GetZoneKey(node)], currentReadyCondition)
+			zoneToNodeConditionsLock.Unlock()
 		}
 
 		if currentReadyCondition != nil {
@@ -863,7 +883,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 					// in the next iteration.
 					nc.nodesToRetry.Store(node.Name, struct{}{})
 				}
-				continue
+				return
 			}
 			if nc.runTaintManager {
 				nc.processTaintBaseEviction(ctx, node, &observedReadyCondition)
@@ -883,12 +903,20 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
 					utilruntime.HandleError(fmt.Errorf("unable to mark all pods NotReady on node %v: %v; queuing for retry", node.Name, err))
 					nc.nodesToRetry.Store(node.Name, struct{}{})
-					continue
+					return
 				}
 			}
 		}
 		nc.nodesToRetry.Delete(node.Name)
 	}
+
+	// Marking the pods not ready on a node requires looping over them and
+	// updating each pod's status one at a time. This is performed serially, and
+	// can take a while if we're processing each node serially as well. So we
+	// process them with bounded concurrency instead, since most of the time is
+	// spent waiting on io.
+	workqueue.ParallelizeUntil(ctx, nc.nodeUpdateWorkerSize, len(nodes), updateNodeFunc)
+
 	nc.handleDisruption(ctx, zoneToNodeConditions, nodes)
 
 	return nil

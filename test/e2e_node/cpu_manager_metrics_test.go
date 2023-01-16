@@ -79,7 +79,7 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 			newCfg := configureCPUManagerInKubelet(oldCfg,
 				&cpuManagerKubeletArguments{
 					policyName:              string(cpumanager.PolicyStatic),
-					reservedSystemCPUs:      cpuset.NewCPUSet(0),
+					reservedSystemCPUs:      cpuset.New(0),
 					enableCPUManagerOptions: true,
 					options:                 cpuPolicyOptions,
 				},

@@ -73,10 +73,11 @@ type REST struct {
 func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) (PodStorage, error) {
 
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Pod{} },
-		NewListFunc:              func() runtime.Object { return &api.PodList{} },
-		PredicateFunc:            registrypod.MatchPod,
-		DefaultQualifiedResource: api.Resource("pods"),
+		NewFunc:                   func() runtime.Object { return &api.Pod{} },
+		NewListFunc:               func() runtime.Object { return &api.PodList{} },
+		PredicateFunc:             registrypod.MatchPod,
+		DefaultQualifiedResource:  api.Resource("pods"),
+		SingularQualifiedResource: api.Resource("pod"),
 
 		CreateStrategy:      registrypod.Strategy,
 		UpdateStrategy:      registrypod.Strategy,
@@ -286,6 +287,10 @@ func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, crea
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a Binding object: %T", obj))
 	}
 	return r.bindingRest.Create(ctx, metadata.GetName(), obj, createValidation, options)
+}
+
+func (r *LegacyBindingREST) GetSingularName() string {
+	return "binding"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.

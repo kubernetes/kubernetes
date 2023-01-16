@@ -38,7 +38,7 @@ func (t taskProgress) Detail() string {
 
 func (t taskProgress) Error() error {
 	if t.info.Error != nil {
-		return Error{t.info.Error}
+		return Error{t.info.Error, t.info.Description}
 	}
 
 	return nil
@@ -68,7 +68,7 @@ func (t *taskCallback) fn(pc []types.PropertyChange) bool {
 		t.info = &ti
 	}
 
-	// t.info could be nil if pc can't satify the rules above
+	// t.info could be nil if pc can't satisfy the rules above
 	if t.info == nil {
 		return false
 	}
@@ -123,7 +123,18 @@ func Wait(ctx context.Context, ref types.ManagedObjectReference, pc *property.Co
 		defer close(cb.ch)
 	}
 
-	err := property.Wait(ctx, pc, ref, []string{"info"}, cb.fn)
+	filter := &property.WaitFilter{PropagateMissing: true}
+	filter.Add(ref, ref.Type, []string{"info"})
+
+	err := property.WaitForUpdates(ctx, pc, filter, func(updates []types.ObjectUpdate) bool {
+		for _, update := range updates {
+			if cb.fn(update.ChangeSet) {
+				return true
+			}
+		}
+
+		return false
+	})
 	if err != nil {
 		return nil, err
 	}

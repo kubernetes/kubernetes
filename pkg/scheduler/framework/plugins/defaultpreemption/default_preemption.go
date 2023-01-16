@@ -49,6 +49,7 @@ const Name = names.DefaultPreemption
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
 	fh        framework.Handle
+	fts       feature.Features
 	args      config.DefaultPreemptionArgs
 	podLister corelisters.PodLister
 	pdbLister policylisters.PodDisruptionBudgetLister
@@ -72,6 +73,7 @@ func New(dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 	}
 	pl := DefaultPreemption{
 		fh:        fh,
+		fts:       fts,
 		args:      *args,
 		podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister(),
 		pdbLister: getPDBLister(fh.SharedInformerFactory()),
@@ -250,7 +252,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNo
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			podPriority := corev1helpers.PodPriority(pod)
 			for _, p := range nodeInfo.Pods {
-				if p.Pod.DeletionTimestamp != nil && corev1helpers.PodPriority(p.Pod) < podPriority {
+				if corev1helpers.PodPriority(p.Pod) < podPriority && podTerminatingByPreemption(p.Pod, pl.fts.EnablePodDisruptionConditions) {
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
@@ -258,6 +260,25 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNo
 		}
 	}
 	return true, ""
+}
+
+// podTerminatingByPreemption returns the pod's terminating state if feature PodDisruptionConditions is not enabled.
+// Otherwise, it additionally checks if the termination state is caused by scheduler preemption.
+func podTerminatingByPreemption(p *v1.Pod, enablePodDisruptionConditions bool) bool {
+	if p.DeletionTimestamp == nil {
+		return false
+	}
+
+	if !enablePodDisruptionConditions {
+		return true
+	}
+
+	for _, condition := range p.Status.Conditions {
+		if condition.Type == v1.DisruptionTarget {
+			return condition.Status == v1.ConditionTrue && condition.Reason == v1.PodReasonPreemptionByScheduler
+		}
+	}
+	return false
 }
 
 // filterPodsWithPDBViolation groups the given "pods" into two groups of "violatingPods"

@@ -22,12 +22,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/openapi"
 )
 
 // PrintFlags composes common printer flag structs
@@ -74,35 +72,6 @@ func (f *PrintFlags) AllowedFormats() []string {
 	formats = append(formats, f.CustomColumnsFlags.AllowedFormats()...)
 	formats = append(formats, f.HumanReadableFlags.AllowedFormats()...)
 	return formats
-}
-
-// UseOpenAPIColumns modifies the output format, as well as the
-// "allowMissingKeys" option for template printers, to values
-// defined in the OpenAPI schema of a resource.
-func (f *PrintFlags) UseOpenAPIColumns(api openapi.Resources, mapping *meta.RESTMapping) error {
-	// Found openapi metadata for this resource
-	schema := api.LookupResource(mapping.GroupVersionKind)
-	if schema == nil {
-		// Schema not found, return empty columns
-		return nil
-	}
-
-	columns, found := openapi.GetPrintColumns(schema.GetExtensions())
-	if !found {
-		// Extension not found, return empty columns
-		return nil
-	}
-
-	parts := strings.SplitN(columns, "=", 2)
-	if len(parts) < 2 {
-		return nil
-	}
-
-	allowMissingKeys := true
-	f.OutputFormat = &parts[0]
-	f.TemplateFlags.TemplateArgument = &parts[1]
-	f.TemplateFlags.AllowMissingKeys = &allowMissingKeys
-	return nil
 }
 
 // ToPrinter attempts to find a composed set of PrintFlags suitable for

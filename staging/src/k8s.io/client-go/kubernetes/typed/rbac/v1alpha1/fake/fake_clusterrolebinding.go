@@ -26,7 +26,6 @@ import (
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
@@ -38,9 +37,9 @@ type FakeClusterRoleBindings struct {
 	Fake *FakeRbacV1alpha1
 }
 
-var clusterrolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "clusterrolebindings"}
+var clusterrolebindingsResource = v1alpha1.SchemeGroupVersion.WithResource("clusterrolebindings")
 
-var clusterrolebindingsKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}
+var clusterrolebindingsKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterRoleBinding")
 
 // Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
 func (c *FakeClusterRoleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterRoleBinding, err error) {

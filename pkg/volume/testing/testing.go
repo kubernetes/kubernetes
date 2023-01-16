@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -183,6 +184,7 @@ type FakeVolumePlugin struct {
 	SupportsRemount        bool
 	SupportsSELinux        bool
 	DisableNodeExpansion   bool
+	CanSupportFn           func(*volume.Spec) bool
 
 	// default to false which means it is attachable by default
 	NonAttachable bool
@@ -269,7 +271,10 @@ func (plugin *FakeVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error)
 }
 
 func (plugin *FakeVolumePlugin) CanSupport(spec *volume.Spec) bool {
-	// TODO: maybe pattern-match on spec.Name() to decide?
+	if plugin.CanSupportFn != nil {
+		return plugin.CanSupportFn(spec)
+	}
+
 	return true
 }
 
@@ -1265,6 +1270,11 @@ func (fv *FakeVolumePathHandler) GetLoopDevice(path string) (string, error) {
 // FindEmptyDirectoryUsageOnTmpfs finds the expected usage of an empty directory existing on
 // a tmpfs filesystem on this system.
 func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
+	// The command below does not exist on Windows. Additionally, empty folders have size 0 on Windows.
+	if goruntime.GOOS == "windows" {
+		used, err := resource.ParseQuantity("0")
+		return &used, err
+	}
 	tmpDir, err := utiltesting.MkTmpdir("metrics_du_test")
 	if err != nil {
 		return nil, err

@@ -183,6 +183,9 @@ type ReflectorOptions struct {
 	// ResyncPeriod is the Reflector's resync period. If unset/unspecified, the resync period defaults to 0
 	// (do not resync).
 	ResyncPeriod time.Duration
+
+	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
+	Clock clock.Clock
 }
 
 // NewReflectorWithOptions creates a new Reflector object which will keep the
@@ -196,7 +199,10 @@ type ReflectorOptions struct {
 // everything as well as incrementally processing the things that
 // change.
 func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store Store, options ReflectorOptions) *Reflector {
-	realClock := &clock.RealClock{}
+	reflectorClock := options.Clock
+	if reflectorClock == nil {
+		reflectorClock = clock.RealClock{}
+	}
 	r := &Reflector{
 		name:            options.Name,
 		resyncPeriod:    options.ResyncPeriod,
@@ -206,9 +212,9 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
 		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
-		backoffManager:         wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, realClock),
-		initConnBackoffManager: wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, realClock),
-		clock:                  realClock,
+		backoffManager:         wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
+		initConnBackoffManager: wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
+		clock:                  reflectorClock,
 		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
 		expectedType:           reflect.TypeOf(expectedType),
 	}

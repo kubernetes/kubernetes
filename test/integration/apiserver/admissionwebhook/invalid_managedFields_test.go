@@ -169,8 +169,9 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 // validate against both decoding and validation to make sure we use the hardest rule between the both to reset
 // with decoding being as strict as it gets, only using it should be enough in admission
 func validateManagedFieldsAndDecode(managedFields []metav1.ManagedFieldsEntry) error {
-	if _, err := fieldmanager.DecodeManagedFields(managedFields); err != nil {
+	if err := fieldmanager.ValidateManagedFields(managedFields); err != nil {
 		return err
+
 	}
 	validationErrs := v1validation.ValidateManagedFields(managedFields, field.NewPath("metadata").Child("managedFields"))
 	return validationErrs.ToAggregate()

@@ -94,6 +94,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 
 	storage := customresource.NewStorage(
 		groupResource,
+		groupResource,
 		kind,
 		schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItemList"},
 		customresource.NewStrategy(

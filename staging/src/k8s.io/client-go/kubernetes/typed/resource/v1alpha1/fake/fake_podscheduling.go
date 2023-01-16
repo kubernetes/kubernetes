@@ -26,7 +26,6 @@ import (
 	v1alpha1 "k8s.io/api/resource/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	resourcev1alpha1 "k8s.io/client-go/applyconfigurations/resource/v1alpha1"
@@ -39,9 +38,9 @@ type FakePodSchedulings struct {
 	ns   string
 }
 
-var podschedulingsResource = schema.GroupVersionResource{Group: "resource.k8s.io", Version: "v1alpha1", Resource: "podschedulings"}
+var podschedulingsResource = v1alpha1.SchemeGroupVersion.WithResource("podschedulings")
 
-var podschedulingsKind = schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1alpha1", Kind: "PodScheduling"}
+var podschedulingsKind = v1alpha1.SchemeGroupVersion.WithKind("PodScheduling")
 
 // Get takes name of the podScheduling, and returns the corresponding podScheduling object, and an error if there is any.
 func (c *FakePodSchedulings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PodScheduling, err error) {

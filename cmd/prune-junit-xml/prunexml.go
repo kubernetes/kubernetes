@@ -65,15 +65,17 @@ func pruneXML(suites *junitxml.JUnitTestSuites, maxBytes int) {
 			if testcase.SkipMessage != nil {
 				if len(testcase.SkipMessage.Message) > maxBytes {
 					fmt.Printf("clipping skip message in test case : %s\n", testcase.Name)
-					testcase.SkipMessage.Message = "[... clipped...]" +
-						testcase.SkipMessage.Message[len(testcase.SkipMessage.Message)-maxBytes:]
+					head := testcase.SkipMessage.Message[:maxBytes/2]
+					tail := testcase.SkipMessage.Message[len(testcase.SkipMessage.Message)-maxBytes/2:]
+					testcase.SkipMessage.Message = head + "[...clipped...]" + tail
 				}
 			}
 			if testcase.Failure != nil {
 				if len(testcase.Failure.Contents) > maxBytes {
 					fmt.Printf("clipping failure message in test case : %s\n", testcase.Name)
-					testcase.Failure.Contents = "[... clipped...]" +
-						testcase.Failure.Contents[len(testcase.Failure.Contents)-maxBytes:]
+					head := testcase.Failure.Contents[:maxBytes/2]
+					tail := testcase.Failure.Contents[len(testcase.Failure.Contents)-maxBytes/2:]
+					testcase.Failure.Contents = head + "[...clipped...]" + tail
 				}
 			}
 		}

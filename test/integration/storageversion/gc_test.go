@@ -95,7 +95,7 @@ func TestStorageVersionGarbageCollection(t *testing.T) {
 			t.Errorf("unexpected storage version entry id, expected %v, got: %v",
 				expectedID, sv.Status.StorageVersions[0].APIServerID)
 		}
-		assertCommonEncodingVersion(t, kubeclient, pointer.StringPtr(idToVersion(t, idA)))
+		assertCommonEncodingVersion(t, kubeclient, pointer.String(idToVersion(t, idA)))
 		if err := kubeclient.InternalV1alpha1().StorageVersions().Delete(
 			context.TODO(), svName, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("failed to cleanup valid storage version: %v", err)
@@ -108,7 +108,7 @@ func TestStorageVersionGarbageCollection(t *testing.T) {
 		assertCommonEncodingVersion(t, kubeclient, nil)
 		deleteTestAPIServerIdentityLease(t, kubeclient, idA)
 		assertStorageVersionEntries(t, kubeclient, 1, idB)
-		assertCommonEncodingVersion(t, kubeclient, pointer.StringPtr(idToVersion(t, idB)))
+		assertCommonEncodingVersion(t, kubeclient, pointer.String(idToVersion(t, idB)))
 	})
 
 	t.Run("deleting an id should delete a storage version object that it owns entirely", func(t *testing.T) {
@@ -135,7 +135,7 @@ func createTestStorageVersion(t *testing.T, client kubernetes.Interface, ids ...
 	// every id is unique and creates a different version. We know we have a common encoding
 	// version when there is only one id. Pick it
 	if len(ids) == 1 {
-		sv.Status.CommonEncodingVersion = pointer.StringPtr(sv.Status.StorageVersions[0].EncodingVersion)
+		sv.Status.CommonEncodingVersion = pointer.String(sv.Status.StorageVersions[0].EncodingVersion)
 	}
 
 	createdSV, err := client.InternalV1alpha1().StorageVersions().Create(context.TODO(), sv, metav1.CreateOptions{})
@@ -176,8 +176,8 @@ func createTestAPIServerIdentityLease(t *testing.T, client kubernetes.Interface,
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity:       pointer.StringPtr(name),
-			LeaseDurationSeconds: pointer.Int32Ptr(3600),
+			HolderIdentity:       pointer.String(name),
+			LeaseDurationSeconds: pointer.Int32(3600),
 			// create fresh leases
 			AcquireTime: &metav1.MicroTime{Time: time.Now()},
 			RenewTime:   &metav1.MicroTime{Time: time.Now()},

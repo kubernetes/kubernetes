@@ -98,7 +98,6 @@
 
 - name: SchedulingMigratedInTreePVs
   featureGates:
-    CSIMigration: true
     CSIMigrationAWS: true
   workloadTemplate:
   - opcode: createNodes
@@ -491,8 +490,6 @@
 
 - name: SchedulingRequiredPodAntiAffinityWithNSSelector
   defaultPodTemplatePath: config/pod-anti-affinity-ns-selector.yaml
-  featureGates:
-    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -526,8 +523,6 @@
 
 - name: SchedulingPreferredAntiAffinityWithNSSelector
   defaultPodTemplatePath: config/pod-preferred-anti-affinity-ns-selector.yaml
-  featureGates:
-    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -561,8 +556,6 @@
 
 - name: SchedulingRequiredPodAffinityWithNSSelector
   defaultPodTemplatePath: config/pod-affinity-ns-selector.yaml
-  featureGates:
-    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -597,8 +590,6 @@
 
 - name: SchedulingPreferredAffinityWithNSSelector
   defaultPodTemplatePath: config/pod-preferred-affinity-ns-selector.yaml
-  featureGates:
-    PodAffinityNamespaceSelector: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes

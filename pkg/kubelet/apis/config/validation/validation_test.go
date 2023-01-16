@@ -73,6 +73,7 @@ var (
 		Logging: logsapi.LoggingConfiguration{
 			Format: "text",
 		},
+		ContainerRuntimeEndpoint: "unix:///run/containerd/containerd.sock",
 	}
 )
 

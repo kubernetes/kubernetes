@@ -52,17 +52,13 @@ type orderedIntervals []interval
 // empty list if this Job is not tracked with finalizers. The new list includes
 // the indexes that succeeded since the last sync.
 func calculateSucceededIndexes(job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
-	var prevIntervals orderedIntervals
-	withFinalizers := hasJobTrackingAnnotation(job)
-	if withFinalizers {
-		prevIntervals = succeededIndexesFromJob(job)
-	}
+	prevIntervals := succeededIndexesFromJob(job)
 	newSucceeded := sets.NewInt()
 	for _, p := range pods {
 		ix := getCompletionIndex(p.Annotations)
 		// Succeeded Pod with valid index and, if tracking with finalizers,
 		// has a finalizer (meaning that it is not counted yet).
-		if p.Status.Phase == v1.PodSucceeded && ix != unknownCompletionIndex && ix < int(*job.Spec.Completions) && (!withFinalizers || hasJobTrackingFinalizer(p)) {
+		if p.Status.Phase == v1.PodSucceeded && ix != unknownCompletionIndex && ix < int(*job.Spec.Completions) && hasJobTrackingFinalizer(p) {
 			newSucceeded.Insert(ix)
 		}
 	}

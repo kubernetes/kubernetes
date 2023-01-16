@@ -249,13 +249,13 @@ func TestMultipleSchedulers(t *testing.T) {
 	// 5. create and start a scheduler with name "foo-scheduler"
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(fooScheduler),
+			SchedulerName: pointer.String(fooScheduler),
 			PluginConfig: []configv1.PluginConfig{
 				{
 					Name: "VolumeBinding",
 					Args: runtime.RawExtension{
 						Object: &configv1.VolumeBindingArgs{
-							BindTimeoutSeconds: pointer.Int64Ptr(30),
+							BindTimeoutSeconds: pointer.Int64(30),
 						},
 					},
 				},
@@ -279,8 +279,8 @@ func TestMultipleSchedulers(t *testing.T) {
 func TestMultipleSchedulingProfiles(t *testing.T) {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
-			{SchedulerName: pointer.StringPtr("default-scheduler")},
-			{SchedulerName: pointer.StringPtr("custom-scheduler")},
+			{SchedulerName: pointer.String("default-scheduler")},
+			{SchedulerName: pointer.String("custom-scheduler")},
 		},
 	})
 

@@ -32,9 +32,9 @@ const (
 
 	// KubeProxyLagTimeout is the maximum time a kube-proxy daemon on a node is allowed
 	// to not notice a Service update, such as type=NodePort.
-	// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
+	// TODO: This timeout should be O(10s), observed values are O(1m), 2m is very
 	// liberal. Fix tracked in #20567.
-	KubeProxyLagTimeout = 5 * time.Minute
+	KubeProxyLagTimeout = 2 * time.Minute
 
 	// KubeProxyEndpointLagTimeout is the maximum time a kube-proxy daemon on a node is allowed
 	// to not notice an Endpoint update.

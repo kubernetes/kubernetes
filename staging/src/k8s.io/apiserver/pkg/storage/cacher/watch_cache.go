@@ -463,6 +463,20 @@ func (w *watchCache) waitUntilFreshAndBlock(ctx context.Context, resourceVersion
 	return nil
 }
 
+type sortableStoreElements []interface{}
+
+func (s sortableStoreElements) Len() int {
+	return len(s)
+}
+
+func (s sortableStoreElements) Less(i, j int) bool {
+	return s[i].(*storeElement).Key < s[j].(*storeElement).Key
+}
+
+func (s sortableStoreElements) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) ([]interface{}, uint64, string, error) {
@@ -472,16 +486,21 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 		return nil, 0, "", err
 	}
 
-	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
-	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
-	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
-	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
-	for _, matchValue := range matchValues {
-		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
-			return result, w.resourceVersion, matchValue.IndexName, nil
+	result, rv, index, err := func() ([]interface{}, uint64, string, error) {
+		// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
+		// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
+		// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
+		// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
+		for _, matchValue := range matchValues {
+			if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
+				return result, w.resourceVersion, matchValue.IndexName, nil
+			}
 		}
-	}
-	return w.store.List(), w.resourceVersion, "", nil
+		return w.store.List(), w.resourceVersion, "", nil
+	}()
+
+	sort.Sort(sortableStoreElements(result))
+	return result, rv, index, err
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.

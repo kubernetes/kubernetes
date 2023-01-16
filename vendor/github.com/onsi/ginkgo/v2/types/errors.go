@@ -298,6 +298,15 @@ func (g ginkgoErrors) SetupNodeNotInOrderedContainer(cl CodeLocation, nodeType N
 	}
 }
 
+func (g ginkgoErrors) InvalidContinueOnFailureDecoration(cl CodeLocation) error {
+	return GinkgoError{
+		Heading:      "ContinueOnFailure not decorating an outermost Ordered Container",
+		Message:      "ContinueOnFailure can only decorate an Ordered container, and this Ordered container must be the outermost Ordered container.",
+		CodeLocation: cl,
+		DocLink:      "ordered-containers",
+	}
+}
+
 /* DeferCleanup errors */
 func (g ginkgoErrors) DeferCleanupInvalidFunction(cl CodeLocation) error {
 	return GinkgoError{

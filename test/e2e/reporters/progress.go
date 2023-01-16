@@ -33,11 +33,27 @@ import (
 // ProgressReporter is a ginkgo reporter which tracks the total number of tests to be run/passed/failed/skipped.
 // As new tests are completed it updates the values and prints them to stdout and optionally, sends the updates
 // to the configured URL.
-// TODO: Number of test specs is not available now, we can add it back when this is fixed in the Ginkgo V2.
-// pls see: https://github.com/kubernetes/kubernetes/issues/109744
+
+// One known limitation of the ProgressReporter it this reporter will not consolidate the reporter from each sub-process
+// if the tests are run in parallel.
+// As what's observed the reporter sent before test suite is started will be assembled correctly but each process will report
+// on its own after each test or suite are completed.
+// Here is a sample report that 5 testcases are executed totally, and run in parallel with 3 procs,
+// 3 of them are failed and other 2 passed.
+// {"msg":"","total":5,"completed":0,"skipped":0,"failed":0}
+// {"msg":"Test Suite starting","total":5,"completed":0,"skipped":0,"failed":0}
+// {"msg":"FAILED [sig-node] NoExecuteTaintManager Single Pod doesn't evict pod with tolerations from tainted nodes","total":0,"completed":0,"skipped":1332,"failed":1,"failures":["[sig-node] NoExecuteTaintManager..."]}
+// {"msg":"FAILED [sig-node] NoExecuteTaintManager Single Pod evicts pods from tainted nodes","total":5,"completed":0,"skipped":2524,"failed":1,"failures":["[sig-node] NoExecuteTaintManager Single Pod evicts pods from tainted nodes"]}
+// {"msg":"PASSED [sig-node] NoExecuteTaintManager Single Pod removing taint cancels eviction [Disruptive] [Conformance]","total":0,"completed":1,"skipped":1181,"failed":0}
+// {"msg":"Test Suite completed","total":0,"completed":1,"skipped":2592,"failed":0}
+// {"msg":"PASSED [sig-node] NoExecuteTaintManager Single Pod eventually evict pod with finite tolerations from tainted nodes","total":0,"completed":1,"skipped":1399,"failed":1,"failures":["[sig-node] NoExecuteTaintManager..."]}
+// {"msg":"Test Suite completed","total":0,"completed":1,"skipped":1399,"failed":1,"failures":["[sig-node] NoExecuteTaintManager Single Pod doesn't evict pod with tolerations from tainted nodes"]}
+// {"msg":"FAILED [sig-node] NoExecuteTaintManager Single Pod pods evicted from tainted nodes...","total":5,"completed":0,"skipped":3076,"failed":2,"failures":["[sig-node] NoExecuteTaintManager...","[sig-node] NoExecuteTaintManager..."]}
+// {"msg":"Test Suite completed","total":5,"completed":0,"skipped":3076,"failed":2,"failures":["[sig-node] NoExecuteTaintManager Single Pod evicts pods from tainted nodes","[sig-node] NoExecuteTaintManager..."]}
 type ProgressReporter struct {
 	LastMsg string `json:"msg"`
 
+	TestsTotal     int `json:"total"`
 	TestsCompleted int `json:"completed"`
 	TestsSkipped   int `json:"skipped"`
 	TestsFailed    int `json:"failed"`
@@ -106,6 +122,11 @@ func (reporter *ProgressReporter) serialize() []byte {
 
 func (reporter *ProgressReporter) SetStartMsg() {
 	reporter.LastMsg = "Test Suite starting"
+	reporter.SendUpdates()
+}
+
+func (reporter *ProgressReporter) SetTestsTotal(totalSpec int) {
+	reporter.TestsTotal = totalSpec
 	reporter.SendUpdates()
 }
 

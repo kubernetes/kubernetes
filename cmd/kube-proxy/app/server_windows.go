@@ -106,7 +106,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	proxyMode := proxyconfigapi.ProxyModeKernelspace
 	dualStackMode := getDualStackMode(config.Winkernel.NetworkName, winkernel.DualStackCompatTester{})
 	if dualStackMode {
-		klog.V(0).InfoS("Creating dualStackProxier for Windows kernel.")
+		klog.InfoS("Creating dualStackProxier for Windows kernel.")
 
 		proxier, err = winkernel.NewDualStackProxier(
 			config.IPTables.SyncPeriod.Duration,

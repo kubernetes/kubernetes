@@ -690,6 +690,33 @@ func TestGroupPriorty(t *testing.T) {
 	})
 }
 
+func TestSingularNames(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--runtime-config=api/all=true"}, framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+
+	kubeClientSet, err := kubernetes.NewForConfig(server.ClientConfig)
+	require.NoError(t, err)
+
+	_, resources, err := kubeClientSet.Discovery().ServerGroupsAndResources()
+	require.NoError(t, err)
+
+	for _, rr := range resources {
+		for _, r := range rr.APIResources {
+			if strings.Contains(r.Name, "/") {
+				continue
+			}
+			if r.SingularName == "" {
+				t.Errorf("missing singularName for resource %q in %q", r.Name, rr.GroupVersion)
+				continue
+			}
+			if r.SingularName != strings.ToLower(r.Kind) {
+				t.Errorf("expected singularName for resource %q in %q to be %q, got %q", r.Name, rr.GroupVersion, strings.ToLower(r.Kind), r.SingularName)
+				continue
+			}
+		}
+	}
+}
+
 func makeCRDSpec(group string, kind string, namespaced bool, versions []string, categories ...string) apiextensionsv1.CustomResourceDefinitionSpec {
 	scope := apiextensionsv1.NamespaceScoped
 	if !namespaced {

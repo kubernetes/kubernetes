@@ -28,7 +28,7 @@ const maxUtilization = 100
 
 // buildRequestedToCapacityRatioScorerFunction allows users to apply bin packing
 // on core resources like CPU, Memory as well as extended resources like accelerators.
-func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.FunctionShape, resourceToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap) int64 {
+func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.FunctionShape, resources []config.ResourceSpec) func([]int64, []int64) int64 {
 	rawScoringFunction := helper.BuildBrokenLinearFunction(scoringFunctionShape)
 	resourceScoringFunction := func(requested, capacity int64) int64 {
 		if capacity == 0 || requested > capacity {
@@ -37,11 +37,14 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.Fun
 
 		return rawScoringFunction(requested * maxUtilization / capacity)
 	}
-	return func(requested, allocable resourceToValueMap) int64 {
+	return func(requested, allocable []int64) int64 {
 		var nodeScore, weightSum int64
-		for resource := range requested {
-			weight := resourceToWeightMap[resource]
-			resourceScore := resourceScoringFunction(requested[resource], allocable[resource])
+		for i := range requested {
+			if allocable[i] == 0 {
+				continue
+			}
+			weight := resources[i].Weight
+			resourceScore := resourceScoringFunction(requested[i], allocable[i])
 			if resourceScore > 0 {
 				nodeScore += resourceScore * weight
 				weightSum += weight
@@ -54,7 +57,7 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.Fun
 	}
 }
 
-func requestedToCapacityRatioScorer(weightMap resourceToWeightMap, shape []config.UtilizationShapePoint) func(resourceToValueMap, resourceToValueMap) int64 {
+func requestedToCapacityRatioScorer(resources []config.ResourceSpec, shape []config.UtilizationShapePoint) func([]int64, []int64) int64 {
 	shapes := make([]helper.FunctionShapePoint, 0, len(shape))
 	for _, point := range shape {
 		shapes = append(shapes, helper.FunctionShapePoint{
@@ -66,5 +69,5 @@ func requestedToCapacityRatioScorer(weightMap resourceToWeightMap, shape []confi
 		})
 	}
 
-	return buildRequestedToCapacityRatioScorerFunction(shapes, weightMap)
+	return buildRequestedToCapacityRatioScorerFunction(shapes, resources)
 }

@@ -648,7 +648,7 @@ func (dc *DisruptionController) processNextStalePodDisruptionWorkItem(ctx contex
 	defer dc.stalePodDisruptionQueue.Done(key)
 	err := dc.syncStalePodDisruption(ctx, key.(string))
 	if err == nil {
-		dc.queue.Forget(key)
+		dc.stalePodDisruptionQueue.Forget(key)
 		return true
 	}
 	utilruntime.HandleError(fmt.Errorf("error syncing Pod %v to clear DisruptionTarget condition, requeueing: %v", key.(string), err))

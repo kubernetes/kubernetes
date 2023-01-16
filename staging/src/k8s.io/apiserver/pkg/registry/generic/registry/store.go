@@ -110,6 +110,9 @@ type Store struct {
 	// See qualifiedResourceFromContext for details.
 	DefaultQualifiedResource schema.GroupResource
 
+	// SingularQualifiedResource is the singular name of the resource.
+	SingularQualifiedResource schema.GroupResource
+
 	// KeyRootFunc returns the root etcd key for this resource; should not
 	// include trailing "/".  This is used for operations that work on the
 	// entire collection (listing and watching).
@@ -228,6 +231,8 @@ type Store struct {
 var _ rest.StandardStorage = &Store{}
 var _ rest.TableConvertor = &Store{}
 var _ GenericStore = &Store{}
+
+var _ rest.SingularNameProvider = &Store{}
 
 const (
 	OptimisticLockErrorMsg        = "the object has been modified; please apply your changes to the latest version and try again"
@@ -1320,6 +1325,12 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if e.DefaultQualifiedResource.Empty() {
 		return fmt.Errorf("store %#v must have a non-empty qualified resource", e)
 	}
+	if e.SingularQualifiedResource.Empty() {
+		return fmt.Errorf("store %#v must have a non-empty singular qualified resource", e)
+	}
+	if e.DefaultQualifiedResource.Group != e.SingularQualifiedResource.Group {
+		return fmt.Errorf("store for %#v, singular and plural qualified resource's group name's must match", e)
+	}
 	if e.NewFunc == nil {
 		return fmt.Errorf("store for %s must have NewFunc set", e.DefaultQualifiedResource.String())
 	}
@@ -1513,6 +1524,10 @@ func (e *Store) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 		return nil
 	}
 	return e.ResetFieldsStrategy.GetResetFields()
+}
+
+func (e *Store) GetSingularName() string {
+	return e.SingularQualifiedResource.Resource
 }
 
 // validateIndexers will check the prefix of indexers.

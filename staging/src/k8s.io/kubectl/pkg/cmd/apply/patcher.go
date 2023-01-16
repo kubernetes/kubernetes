@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kube-openapi/pkg/util/proto"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -123,12 +122,10 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 		// if openapischema is used, we'll try to get required patch type for this GVK from Open API.
 		// if it fails or could not find any patch type, fall back to baked-in patch type determination.
 		if patchType, err = p.getPatchTypeFromOpenAPI(p.Mapping.GroupVersionKind); err == nil && patchType == types.StrategicMergePatchType {
-			if s := p.findOpenAPIResource(p.Mapping.GroupVersionKind); s != nil {
-				patch, err = p.buildStrategicMergeFromOpenAPI(s, original, modified, current)
-				if err != nil {
-					// Warn user about problem and continue strategic merge patching using builtin types.
-					fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
-				}
+			patch, err = p.buildStrategicMergeFromOpenAPI(original, modified, current)
+			if err != nil {
+				// Warn user about problem and continue strategic merge patching using builtin types.
+				fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
 			}
 		}
 	}
@@ -187,21 +184,18 @@ func (p *Patcher) buildMergePatch(original, modified, current []byte) ([]byte, e
 
 // buildStrategicMergeFromOpenAPI builds patch from OpenAPI if it is enabled.
 // This is used for core types which is published in openapi.
-func (p *Patcher) buildStrategicMergeFromOpenAPI(schema proto.Schema, original, modified, current []byte) ([]byte, error) {
+func (p *Patcher) buildStrategicMergeFromOpenAPI(original, modified, current []byte) ([]byte, error) {
+	schema := p.OpenapiSchema.LookupResource(p.Mapping.GroupVersionKind)
+	if schema == nil {
+		// Missing schema returns nil patch; also no error.
+		return nil, nil
+	}
 	lookupPatchMeta := strategicpatch.PatchMetaFromOpenAPI{Schema: schema}
 	if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite); err != nil {
 		return nil, err
 	} else {
 		return openapiPatch, nil
 	}
-}
-
-// findOpenAPIResource finds schema of GVK in OpenAPI endpoint.
-func (p *Patcher) findOpenAPIResource(gvk schema.GroupVersionKind) proto.Schema {
-	if p.OpenapiSchema == nil {
-		return nil
-	}
-	return p.OpenapiSchema.LookupResource(gvk)
 }
 
 // getPatchTypeFromOpenAPI looks up patch types supported by given GroupVersionKind in Open API.

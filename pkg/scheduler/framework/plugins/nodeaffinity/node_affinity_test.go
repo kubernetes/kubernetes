@@ -45,10 +45,6 @@ func TestNodeAffinity(t *testing.T) {
 		disablePreFilter    bool
 	}{
 		{
-			name: "no selector",
-			pod:  &v1.Pod{},
-		},
-		{
 			name: "missing labels",
 			pod: st.MakePod().NodeSelector(map[string]string{
 				"foo": "bar",
@@ -222,42 +218,6 @@ func TestNodeAffinity(t *testing.T) {
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
-			name: "Pod with a nil []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: nil,
-							},
-						},
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
-		},
-		{
-			name: "Pod with an empty []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Affinity: &v1.Affinity{
-						NodeAffinity: &v1.NodeAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-								NodeSelectorTerms: []v1.NodeSelectorTerm{},
-							},
-						},
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
-		},
-		{
 			name: "Pod with empty MatchExpressions is not a valid value will match no objects and won't schedule onto the node",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -285,6 +245,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 		},
 		{
 			name: "Pod with Affinity but nil NodeSelector will schedule onto a node",
@@ -300,6 +261,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 		},
 		{
 			name: "Pod with multiple matchExpressions ANDed that matches the existing node",

@@ -107,7 +107,7 @@ func testFinishedJob(ctx context.Context, f *framework.Framework) {
 
 	expireAtUTC := finishTimeUTC.Add(time.Duration(ttl) * time.Second)
 	if deleteAtUTC.Before(expireAtUTC) {
-		framework.Failf("expireAtUTC as expected to be false.")
+		framework.Fail("Expected job's deletion time to be after expiration time.")
 	}
 }
 

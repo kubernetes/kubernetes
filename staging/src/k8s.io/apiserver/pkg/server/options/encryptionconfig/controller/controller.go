@@ -49,27 +49,22 @@ type DynamicKMSEncryptionConfigContent struct {
 
 	// dynamicTransformers updates the transformers when encryption config file changes.
 	dynamicTransformers *encryptionconfig.DynamicTransformers
-
-	// stopCh used here is a lifecycle signal of genericapiserver already drained while shutting down.
-	stopCh <-chan struct{}
 }
 
-// NewDynamicKMSEncryptionConfiguration returns controller that dynamically reacts to changes in encryption config file.
-func NewDynamicKMSEncryptionConfiguration(
+// NewDynamicEncryptionConfiguration returns controller that dynamically reacts to changes in encryption config file.
+func NewDynamicEncryptionConfiguration(
 	name, filePath string,
 	dynamicTransformers *encryptionconfig.DynamicTransformers,
 	configContentHash string,
-	stopCh <-chan struct{},
 ) *DynamicKMSEncryptionConfigContent {
 	encryptionConfig := &DynamicKMSEncryptionConfigContent{
 		name:                           name,
 		filePath:                       filePath,
 		lastLoadedEncryptionConfigHash: configContentHash,
 		dynamicTransformers:            dynamicTransformers,
-		stopCh:                         stopCh,
-		queue:                          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("%s-hot-reload", name)),
+		queue:                          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), name),
 	}
-	encryptionConfig.queue.Add(workqueueKey)
+	encryptionConfig.queue.Add(workqueueKey) // to avoid missing any file changes that occur in between the initial load and Run
 
 	return encryptionConfig
 }
@@ -83,21 +78,21 @@ func (d *DynamicKMSEncryptionConfigContent) Run(ctx context.Context) {
 	defer klog.InfoS("Shutting down controller", "name", d.name)
 
 	// start worker for processing content
-	go wait.Until(d.runWorker, time.Second, ctx.Done())
+	go wait.UntilWithContext(ctx, d.runWorker, time.Second)
 
 	// start the loop that watches the encryption config file until stopCh is closed.
-	go wait.Until(func() {
-		if err := d.watchEncryptionConfigFile(ctx.Done()); err != nil {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		if err := d.watchEncryptionConfigFile(ctx); err != nil {
 			// if there is an error while setting up or handling the watches, this will ensure that we will process the config file.
 			defer d.queue.Add(workqueueKey)
 			klog.ErrorS(err, "Failed to watch encryption config file, will retry later")
 		}
-	}, time.Second, ctx.Done())
+	}, time.Second)
 
 	<-ctx.Done()
 }
 
-func (d *DynamicKMSEncryptionConfigContent) watchEncryptionConfigFile(stopCh <-chan struct{}) error {
+func (d *DynamicKMSEncryptionConfigContent) watchEncryptionConfigFile(ctx context.Context) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("error creating fsnotify watcher: %w", err)
@@ -116,7 +111,7 @@ func (d *DynamicKMSEncryptionConfigContent) watchEncryptionConfigFile(stopCh <-c
 			}
 		case err := <-watcher.Errors:
 			return fmt.Errorf("received fsnotify error: %w", err)
-		case <-stopCh:
+		case <-ctx.Done():
 			return nil
 		}
 	}
@@ -142,13 +137,13 @@ func (d *DynamicKMSEncryptionConfigContent) handleWatchEvent(event fsnotify.Even
 }
 
 // runWorker to process file content
-func (d *DynamicKMSEncryptionConfigContent) runWorker() {
-	for d.processNextWorkItem() {
+func (d *DynamicKMSEncryptionConfigContent) runWorker(ctx context.Context) {
+	for d.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem processes file content when there is a message in the queue.
-func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem() bool {
+func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem(serverCtx context.Context) bool {
 	// key here is dummy item in the queue to trigger file content processing.
 	key, quit := d.queue.Get()
 	if quit {
@@ -163,11 +158,14 @@ func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem() bool {
 		configChanged           bool
 	)
 
-	// get context to close the new transformers.
-	ctx, closeTransformers := wait.ContextForChannel(d.stopCh)
+	// get context to close the new transformers (on error cases and on the next reload)
+	// serverCtx is attached to the API server's lifecycle so we will always close transformers on shut down
+	ctx, closeTransformers := context.WithCancel(serverCtx)
 
 	defer func() {
 		// TODO: increment success metric when updatedEffectiveConfig=true
+
+		// TODO can work queue metrics help here?
 
 		if !updatedEffectiveConfig {
 			// avoid leaking if we're not using the newly constructed transformers (due to an error or them not being changed)
@@ -222,7 +220,7 @@ func (d *DynamicKMSEncryptionConfigContent) processEncryptionConfig(ctx context.
 	err error,
 ) {
 	// this code path will only execute if reload=true. So passing true explicitly.
-	encryptionConfiguration, err = encryptionconfig.LoadEncryptionConfig(d.filePath, true, ctx.Done())
+	encryptionConfiguration, err = encryptionconfig.LoadEncryptionConfig(ctx, d.filePath, true)
 	if err != nil {
 		return nil, false, err
 	}
@@ -247,7 +245,12 @@ func (d *DynamicKMSEncryptionConfigContent) validateNewTransformersHealth(
 		kmsPluginCloseGracePeriod = 10 * time.Second
 	}
 
-	pollErr := wait.PollImmediate(100*time.Millisecond, kmsPluginCloseGracePeriod, func() (bool, error) {
+	// really make sure that the immediate check does not hang
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, kmsPluginCloseGracePeriod)
+	defer cancel()
+
+	pollErr := wait.PollImmediateWithContext(ctx, 100*time.Millisecond, kmsPluginCloseGracePeriod, func(ctx context.Context) (bool, error) {
 		// create a fake http get request to health check endpoint
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("/healthz/%s", kmsPluginHealthzCheck.Name()), nil)
 		if err != nil {

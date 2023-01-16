@@ -49,27 +49,27 @@ const (
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
 var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 	config.LeastAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
+		resources := args.ScoringStrategy.Resources
 		return &resourceAllocationScorer{
-			Name:                string(config.LeastAllocated),
-			scorer:              leastResourceScorer(resToWeightMap),
-			resourceToWeightMap: resToWeightMap,
+			Name:      string(config.LeastAllocated),
+			scorer:    leastResourceScorer(resources),
+			resources: resources,
 		}
 	},
 	config.MostAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
+		resources := args.ScoringStrategy.Resources
 		return &resourceAllocationScorer{
-			Name:                string(config.MostAllocated),
-			scorer:              mostResourceScorer(resToWeightMap),
-			resourceToWeightMap: resToWeightMap,
+			Name:      string(config.MostAllocated),
+			scorer:    mostResourceScorer(resources),
+			resources: resources,
 		}
 	},
 	config.RequestedToCapacityRatio: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resToWeightMap := resourcesToWeightMap(args.ScoringStrategy.Resources)
+		resources := args.ScoringStrategy.Resources
 		return &resourceAllocationScorer{
-			Name:                string(config.RequestedToCapacityRatio),
-			scorer:              requestedToCapacityRatioScorer(resToWeightMap, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
-			resourceToWeightMap: resToWeightMap,
+			Name:      string(config.RequestedToCapacityRatio),
+			scorer:    requestedToCapacityRatioScorer(resources, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
+			resources: resources,
 		}
 	},
 }

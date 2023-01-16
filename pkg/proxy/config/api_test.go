@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
@@ -81,71 +83,84 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 }
 
 func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
-	endpoints1v1 := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{
-				{IP: "1.2.3.4"},
+	tcp := v1.ProtocolTCP
+	endpoints1v1 := &discoveryv1.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Addresses: []string{
+				"1.2.3.4",
 			},
-			Ports: []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+		Ports: []discoveryv1.EndpointPort{{
+			Port:     utilpointer.Int32(8080),
+			Protocol: &tcp,
 		}},
 	}
-	endpoints1v2 := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{
-				{IP: "1.2.3.4"},
-				{IP: "4.3.2.1"},
+	endpoints1v2 := &discoveryv1.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Addresses: []string{
+				"1.2.3.4",
+				"4.3.2.1",
 			},
-			Ports: []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+		Ports: []discoveryv1.EndpointPort{{
+			Port:     utilpointer.Int32(8080),
+			Protocol: &tcp,
 		}},
 	}
-	endpoints2 := &v1.Endpoints{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "e2"},
-		Subsets: []v1.EndpointSubset{{
-			Addresses: []v1.EndpointAddress{
-				{IP: "5.6.7.8"},
+	endpoints2 := &discoveryv1.EndpointSlice{
+		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "e2"},
+		AddressType: discoveryv1.AddressTypeIPv4,
+		Endpoints: []discoveryv1.Endpoint{{
+			Addresses: []string{
+				"5.6.7.8",
 			},
-			Ports: []v1.EndpointPort{{Port: 80, Protocol: "TCP"}},
+		}},
+		Ports: []discoveryv1.EndpointPort{{
+			Port:     utilpointer.Int32(8080),
+			Protocol: &tcp,
 		}},
 	}
 
 	// Setup fake api client.
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
-	client.PrependWatchReactor("endpoints", ktesting.DefaultWatchReactor(fakeWatch, nil))
+	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	handler := NewEndpointsHandlerMock()
+	handler := NewEndpointSliceHandlerMock()
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	endpointsConfig := NewEndpointsConfig(sharedInformers.Core().V1().Endpoints(), time.Minute)
-	endpointsConfig.RegisterEventHandler(handler)
+	endpointsliceConfig := NewEndpointSliceConfig(sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	endpointsliceConfig.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
-	go endpointsConfig.Run(stopCh)
+	go endpointsliceConfig.Run(stopCh)
 
 	// Add the first endpoints
 	fakeWatch.Add(endpoints1v1)
-	handler.ValidateEndpoints(t, []*v1.Endpoints{endpoints1v1})
+	handler.ValidateEndpointSlices(t, []*discoveryv1.EndpointSlice{endpoints1v1})
 
 	// Add another endpoints
 	fakeWatch.Add(endpoints2)
-	handler.ValidateEndpoints(t, []*v1.Endpoints{endpoints1v1, endpoints2})
+	handler.ValidateEndpointSlices(t, []*discoveryv1.EndpointSlice{endpoints1v1, endpoints2})
 
 	// Modify endpoints1
 	fakeWatch.Modify(endpoints1v2)
-	handler.ValidateEndpoints(t, []*v1.Endpoints{endpoints1v2, endpoints2})
+	handler.ValidateEndpointSlices(t, []*discoveryv1.EndpointSlice{endpoints1v2, endpoints2})
 
 	// Delete endpoints1
 	fakeWatch.Delete(endpoints1v2)
-	handler.ValidateEndpoints(t, []*v1.Endpoints{endpoints2})
+	handler.ValidateEndpointSlices(t, []*discoveryv1.EndpointSlice{endpoints2})
 
 	// Delete endpoints2
 	fakeWatch.Delete(endpoints2)
-	handler.ValidateEndpoints(t, []*v1.Endpoints{})
+	handler.ValidateEndpointSlices(t, []*discoveryv1.EndpointSlice{})
 }
 
 func TestInitialSync(t *testing.T) {
@@ -157,10 +172,10 @@ func TestInitialSync(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}}},
 	}
-	eps1 := &v1.Endpoints{
+	eps1 := &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 	}
-	eps2 := &v1.Endpoints{
+	eps2 := &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 	}
 
@@ -168,7 +183,7 @@ func TestInitialSync(t *testing.T) {
 		{Name: svc1.Name, Namespace: svc1.Namespace}: svc1,
 		{Name: svc2.Name, Namespace: svc2.Namespace}: svc2,
 	}
-	expectedEpsState := map[types.NamespacedName]*v1.Endpoints{
+	expectedEpsState := map[types.NamespacedName]*discoveryv1.EndpointSlice{
 		{Name: eps1.Name, Namespace: eps1.Namespace}: eps1,
 		{Name: eps2.Name, Namespace: eps2.Namespace}: eps2,
 	}
@@ -181,8 +196,8 @@ func TestInitialSync(t *testing.T) {
 	svcHandler := NewServiceHandlerMock()
 	svcConfig.RegisterEventHandler(svcHandler)
 
-	epsConfig := NewEndpointsConfig(sharedInformers.Core().V1().Endpoints(), 0)
-	epsHandler := NewEndpointsHandlerMock()
+	epsConfig := NewEndpointSliceConfig(sharedInformers.Discovery().V1().EndpointSlices(), 0)
+	epsHandler := NewEndpointSliceHandlerMock()
 	epsConfig.RegisterEventHandler(epsHandler)
 
 	stopCh := make(chan struct{})
@@ -226,7 +241,7 @@ func TestInitialSync(t *testing.T) {
 	}
 
 	gotEps := <-epsHandler.updated
-	gotEpsState := make(map[types.NamespacedName]*v1.Endpoints, len(gotEps))
+	gotEpsState := make(map[types.NamespacedName]*discoveryv1.EndpointSlice, len(gotEps))
 	for _, eps := range gotEps {
 		gotEpsState[types.NamespacedName{Namespace: eps.Namespace, Name: eps.Name}] = eps
 	}

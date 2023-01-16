@@ -604,6 +604,9 @@ var ssEnumSupport = NewEnumSupport(map[uint]string{
 func (ss SpecState) String() string {
 	return ssEnumSupport.String(uint(ss))
 }
+func (ss SpecState) GomegaString() string {
+	return ssEnumSupport.String(uint(ss))
+}
 func (ss *SpecState) UnmarshalJSON(b []byte) error {
 	out, err := ssEnumSupport.UnmarshJSON(b)
 	*ss = SpecState(out)

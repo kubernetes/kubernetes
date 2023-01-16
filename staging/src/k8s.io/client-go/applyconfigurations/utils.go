@@ -937,12 +937,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationseventsv1beta1.EventSeriesApplyConfiguration{}
 
 		// Group=extensions, Version=v1beta1
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("AllowedCSIDriver"):
-		return &applyconfigurationsextensionsv1beta1.AllowedCSIDriverApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("AllowedFlexVolume"):
-		return &applyconfigurationsextensionsv1beta1.AllowedFlexVolumeApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("AllowedHostPath"):
-		return &applyconfigurationsextensionsv1beta1.AllowedHostPathApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSet"):
 		return &applyconfigurationsextensionsv1beta1.DaemonSetApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSetCondition"):
@@ -963,16 +957,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.DeploymentStatusApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DeploymentStrategy"):
 		return &applyconfigurationsextensionsv1beta1.DeploymentStrategyApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("FSGroupStrategyOptions"):
-		return &applyconfigurationsextensionsv1beta1.FSGroupStrategyOptionsApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("HostPortRange"):
-		return &applyconfigurationsextensionsv1beta1.HostPortRangeApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("HTTPIngressPath"):
 		return &applyconfigurationsextensionsv1beta1.HTTPIngressPathApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("HTTPIngressRuleValue"):
 		return &applyconfigurationsextensionsv1beta1.HTTPIngressRuleValueApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("IDRange"):
-		return &applyconfigurationsextensionsv1beta1.IDRangeApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("Ingress"):
 		return &applyconfigurationsextensionsv1beta1.IngressApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("IngressBackend"):
@@ -1009,10 +997,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.NetworkPolicySpecApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("NetworkPolicyStatus"):
 		return &applyconfigurationsextensionsv1beta1.NetworkPolicyStatusApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("PodSecurityPolicy"):
-		return &applyconfigurationsextensionsv1beta1.PodSecurityPolicyApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("PodSecurityPolicySpec"):
-		return &applyconfigurationsextensionsv1beta1.PodSecurityPolicySpecApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSet"):
 		return &applyconfigurationsextensionsv1beta1.ReplicaSetApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSetCondition"):
@@ -1027,18 +1011,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.RollingUpdateDaemonSetApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("RollingUpdateDeployment"):
 		return &applyconfigurationsextensionsv1beta1.RollingUpdateDeploymentApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("RunAsGroupStrategyOptions"):
-		return &applyconfigurationsextensionsv1beta1.RunAsGroupStrategyOptionsApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("RunAsUserStrategyOptions"):
-		return &applyconfigurationsextensionsv1beta1.RunAsUserStrategyOptionsApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("RuntimeClassStrategyOptions"):
-		return &applyconfigurationsextensionsv1beta1.RuntimeClassStrategyOptionsApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("Scale"):
 		return &applyconfigurationsextensionsv1beta1.ScaleApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("SELinuxStrategyOptions"):
-		return &applyconfigurationsextensionsv1beta1.SELinuxStrategyOptionsApplyConfiguration{}
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("SupplementalGroupsStrategyOptions"):
-		return &applyconfigurationsextensionsv1beta1.SupplementalGroupsStrategyOptionsApplyConfiguration{}
 
 		// Group=flowcontrol.apiserver.k8s.io, Version=v1alpha1
 	case flowcontrolv1alpha1.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):

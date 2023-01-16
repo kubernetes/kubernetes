@@ -1119,6 +1119,18 @@
     it MUST succeed and the field MUST equal the new value.
   release: v1.26
   file: test/e2e/auth/service_accounts.go
+- testname: SubjectReview, API Operations
+  codename: '[sig-auth] SubjectReview should support SubjectReview API operations
+    [Conformance]'
+  description: A ServiceAccount is created which MUST succeed. A clientset is created
+    to impersonate the ServiceAccount. A SubjectAccessReview is created for the ServiceAccount
+    which MUST succeed. The allowed status for the SubjectAccessReview MUST match
+    the expected allowed for the impersonated client call. A LocalSubjectAccessReviews
+    is created for the ServiceAccount which MUST succeed. The allowed status for the
+    LocalSubjectAccessReview MUST match the expected allowed for the impersonated
+    client call.
+  release: v1.27
+  file: test/e2e/auth/subjectreviews.go
 - testname: Kubectl, guestbook application
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
     a working application  [Conformance]'

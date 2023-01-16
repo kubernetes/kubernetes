@@ -147,17 +147,25 @@ func TestApplyFlagValidation(t *testing.T) {
 			},
 			expectedErr: "--force cannot be used with --prune",
 		},
+		{
+			args: [][]string{
+				{"server-side", "true"},
+				{"prune", "true"},
+				{"all", "true"},
+			},
+			expectedErr: "--prune is in alpha and doesn't currently work on objects created by server-side apply",
+		},
 	}
 
 	for _, test := range tests {
 		cmd := &cobra.Command{}
-		flags := NewApplyFlags(f, genericclioptions.NewTestIOStreamsDiscard())
+		flags := NewApplyFlags(genericclioptions.NewTestIOStreamsDiscard())
 		flags.AddFlags(cmd)
 		cmd.Flags().Set("filename", "unused")
 		for _, arg := range test.args {
 			cmd.Flags().Set(arg[0], arg[1])
 		}
-		o, err := flags.ToOptions(cmd, "kubectl", []string{})
+		o, err := flags.ToOptions(f, cmd, "kubectl", []string{})
 		if err != nil {
 			t.Fatalf("unexpected error creating apply options: %s", err)
 		}

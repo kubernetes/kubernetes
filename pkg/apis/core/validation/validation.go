@@ -4690,6 +4690,11 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"), opts)...)
 
+	// static pods don't support ephemeral containers #113935
+	if _, ok := oldPod.Annotations[core.MirrorPodAnnotationKey]; ok {
+		return field.ErrorList{field.Forbidden(field.NewPath(""), "static pods do not support ephemeral containers")}
+	}
+
 	// Part 2: Validate that the changes between oldPod.Spec.EphemeralContainers and
 	// newPod.Spec.EphemeralContainers are allowed.
 	//
@@ -5814,7 +5819,6 @@ func ValidateSecret(secret *core.Secret) field.ErrorList {
 		if _, exists := secret.Data[core.TLSPrivateKeyKey]; !exists {
 			allErrs = append(allErrs, field.Required(dataPath.Key(core.TLSPrivateKeyKey), ""))
 		}
-	// TODO: Verify that the key matches the cert.
 	default:
 		// no-op
 	}

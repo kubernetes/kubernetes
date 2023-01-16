@@ -60,7 +60,7 @@ func NewScaleHandler(parentEntries []metav1.ManagedFieldsEntry, groupVersion sch
 //  2. Replicas path of the main resource is transformed to the replicas path of
 //     the scale subresource
 func (h *ScaleHandler) ToSubresource() ([]metav1.ManagedFieldsEntry, error) {
-	managed, err := DecodeManagedFields(h.parentEntries)
+	managed, err := internal.DecodeManagedFields(h.parentEntries)
 	if err != nil {
 		return nil, err
 	}
@@ -92,13 +92,13 @@ func (h *ScaleHandler) ToSubresource() ([]metav1.ManagedFieldsEntry, error) {
 // ToParent merges `scaleEntries` with the entries of the main resource and
 // transforms them accordingly
 func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]metav1.ManagedFieldsEntry, error) {
-	decodedParentEntries, err := DecodeManagedFields(h.parentEntries)
+	decodedParentEntries, err := internal.DecodeManagedFields(h.parentEntries)
 	if err != nil {
 		return nil, err
 	}
 	parentFields := decodedParentEntries.Fields()
 
-	decodedScaleEntries, err := DecodeManagedFields(scaleEntries)
+	decodedScaleEntries, err := internal.DecodeManagedFields(scaleEntries)
 	if err != nil {
 		return nil, err
 	}

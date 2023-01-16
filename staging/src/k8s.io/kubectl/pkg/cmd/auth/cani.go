@@ -63,7 +63,7 @@ type CanIOptions struct {
 	List           bool
 
 	genericclioptions.IOStreams
-	warningPrinter *printers.WarningPrinter
+	WarningPrinter *printers.WarningPrinter
 }
 
 var (
@@ -145,7 +145,10 @@ func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 // Complete completes all the required options
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
-	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	// Set default WarningPrinter if not already set.
+	if o.WarningPrinter == nil {
+		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	}
 
 	if o.List {
 		if len(args) != 0 {
@@ -206,8 +209,8 @@ func (o *CanIOptions) Validate() error {
 		return nil
 	}
 
-	if o.warningPrinter == nil {
-		return fmt.Errorf("warningPrinter can not be used without initialization")
+	if o.WarningPrinter == nil {
+		return fmt.Errorf("WarningPrinter can not be used without initialization")
 	}
 
 	if o.NonResourceURL != "" {
@@ -218,18 +221,18 @@ func (o *CanIOptions) Validate() error {
 			return fmt.Errorf("NonResourceURL and ResourceName can not specified together")
 		}
 		if !isKnownNonResourceVerb(o.Verb) {
-			o.warningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
+			o.WarningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
 		}
 	} else if !o.Resource.Empty() && !o.AllNamespaces && o.DiscoveryClient != nil {
 		if namespaced, err := isNamespaced(o.Resource, o.DiscoveryClient); err == nil && !namespaced {
 			if len(o.Resource.Group) == 0 {
-				o.warningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped\n", o.Resource.Resource))
+				o.WarningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped\n", o.Resource.Resource))
 			} else {
-				o.warningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped in group '%s'\n", o.Resource.Resource, o.Resource.Group))
+				o.WarningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped in group '%s'\n", o.Resource.Resource, o.Resource.Group))
 			}
 		}
 		if !isKnownResourceVerb(o.Verb) {
-			o.warningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
+			o.WarningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
 		}
 	}
 
@@ -317,9 +320,9 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 		if err != nil {
 			if !nonStandardResourceNames.Has(groupResource.String()) {
 				if len(groupResource.Group) == 0 {
-					o.warningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s'\n", groupResource.Resource))
+					o.WarningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s'\n", groupResource.Resource))
 				} else {
-					o.warningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group))
+					o.WarningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group))
 				}
 			}
 			return schema.GroupVersionResource{Resource: resourceArg}
@@ -331,7 +334,7 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 
 func (o *CanIOptions) printStatus(status authorizationv1.SubjectRulesReviewStatus) error {
 	if status.Incomplete {
-		o.warningPrinter.Print(fmt.Sprintf("the list may be incomplete: %v", status.EvaluationError))
+		o.WarningPrinter.Print(fmt.Sprintf("the list may be incomplete: %v", status.EvaluationError))
 	}
 
 	breakdownRules := []rbacv1.PolicyRule{}
