@@ -365,7 +365,7 @@ func (o *Options) writeConfigFile() (err error) {
 		return err
 	}
 
-	klog.InfoS("Wrote configuration", "WriteConfigTo", o.WriteConfigTo)
+	klog.InfoS("Wrote configuration", "file", o.WriteConfigTo)
 
 	return nil
 }

@@ -34,7 +34,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -272,7 +272,7 @@ func (ttlc *Controller) patchNodeWithAnnotation(ctx context.Context, node *v1.No
 		klog.V(2).InfoS("Failed to change ttl annotation for node", "node", klog.KObj(node), "err", err)
 		return err
 	}
-	klog.V(2).InfoS("Changed ttl annotation", "node", klog.KObj(node), "new_ttl", time.Duration(value)*time.Second)
+	klog.V(2).InfoS("Changed ttl annotation", "node", klog.KObj(node), "TTL", time.Duration(value)*time.Second)
 	return nil
 }
 

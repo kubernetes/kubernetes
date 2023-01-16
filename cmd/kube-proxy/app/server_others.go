@@ -141,10 +141,10 @@ func newProxyServer(
 		if err != nil {
 			return nil, err
 		}
-		klog.InfoS("NodeInfo", "PodCIDR", nodeInfo.Spec.PodCIDR, "PodCIDRs", nodeInfo.Spec.PodCIDRs)
+		klog.InfoS("NodeInfo", "podCIDR", nodeInfo.Spec.PodCIDR, "podCIDRs", nodeInfo.Spec.PodCIDRs)
 	}
 
-	klog.V(2).InfoS("DetectLocalMode", "LocalMode", string(detectLocalMode))
+	klog.V(2).InfoS("DetectLocalMode", "localMode", string(detectLocalMode))
 
 	primaryFamily := v1.IPv4Protocol
 	primaryProtocol := utiliptables.ProtocolIPv4
@@ -422,7 +422,7 @@ func getDetectLocalMode(config *proxyconfigapi.KubeProxyConfiguration) (proxycon
 		if strings.TrimSpace(mode.String()) != "" {
 			return mode, fmt.Errorf("unknown detect-local-mode: %v", mode)
 		}
-		klog.V(4).InfoS("Defaulting detect-local-mode", "LocalModeClusterCIDR", string(proxyconfigapi.LocalModeClusterCIDR))
+		klog.V(4).InfoS("Defaulting detect-local-mode", "localModeClusterCIDR", string(proxyconfigapi.LocalModeClusterCIDR))
 		return proxyconfigapi.LocalModeClusterCIDR, nil
 	}
 }
@@ -452,7 +452,7 @@ func getLocalDetector(mode proxyconfigapi.LocalMode, config *proxyconfigapi.Kube
 		}
 		return proxyutiliptables.NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
 	}
-	klog.InfoS("Defaulting to no-op detect-local", "detect-local-mode", string(mode))
+	klog.InfoS("Defaulting to no-op detect-local", "detectLocalMode", string(mode))
 	return proxyutiliptables.NewNoOpLocalDetector(), nil
 }
 
@@ -516,9 +516,9 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 		}
 		return localDetectors, err
 	default:
-		klog.InfoS("Unknown detect-local-mode", "detect-local-mode", mode)
+		klog.InfoS("Unknown detect-local-mode", "detectLocalMode", mode)
 	}
-	klog.InfoS("Defaulting to no-op detect-local", "detect-local-mode", string(mode))
+	klog.InfoS("Defaulting to no-op detect-local", "detectLocalMode", string(mode))
 	return localDetectors, nil
 }
 
