@@ -231,14 +231,19 @@ func (cf ConditionFunc) WithContext() ConditionWithContextFunc {
 // Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
 func ContextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		select {
-		case <-parentCh:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+	select {
+	case <-parentCh:
+		// already closed, cancel now and no goroutine necessary
+		cancel()
+	default:
+		go func() {
+			select {
+			case <-parentCh:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+	}
 	return ctx, cancel
 }
 
