@@ -96,10 +96,6 @@ func ContainsIPv4Loopback(cidrStrings []string) bool {
 	// RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
 	ipv4LoopbackStart := netutils.ParseIPSloppy("127.0.0.0")
 	for _, cidr := range cidrStrings {
-		if IsZeroCIDR(cidr) {
-			return true
-		}
-
 		ip, ipnet, err := netutils.ParseCIDRSloppy(cidr)
 		if err != nil {
 			continue
