@@ -173,7 +173,7 @@ func (o *RolloutStatusOptions) Run() error {
 		return err
 	}
 
-	return r.Visit(func(info *resource.Info, err error) error {
+	return r.Visit(func(info *resource.Info, _ error) error {
 		mapping := info.ResourceMapping()
 		statusViewer, err := o.StatusViewerFn(mapping)
 		if err != nil {
