@@ -72,12 +72,6 @@ func Exec(execer exec.Interface, parameters ...string) error {
 	return nil
 }
 
-// Exists returns true if conntrack binary is installed.
-func Exists(execer exec.Interface) bool {
-	_, err := execer.LookPath("conntrack")
-	return err == nil
-}
-
 // ClearEntriesForPort uses the conntrack tool to delete the conntrack entries
 // for connections specified by the port.
 // When a packet arrives, it will not go through NAT table again, because it is not "the first" packet.
