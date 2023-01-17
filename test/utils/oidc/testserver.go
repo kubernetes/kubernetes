@@ -118,6 +118,7 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath string) *TestServer {
 		jwksURL, err := url.JoinPath(httpServer.URL + jwksWebPath)
 		require.NoError(t, err)
 		userInfoURL, err := url.JoinPath(httpServer.URL + authWebPath)
+		require.NoError(t, err)
 
 		err = json.NewEncoder(writer).Encode(struct {
 			Issuer      string `json:"issuer"`
