@@ -223,6 +223,25 @@ func (cf ConditionFunc) WithContext() ConditionWithContextFunc {
 	}
 }
 
+// ContextForChannel derives a child context from a parent channel.
+//
+// The derived context's Done channel is closed when the returned cancel function
+// is called or when the parent channel is closed, whichever happens first.
+//
+// Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
+func ContextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		select {
+		case <-parentCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
+}
+
 // runConditionWithCrashProtection runs a ConditionFunc with crash protection
 func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
 	return runConditionWithCrashProtectionWithContext(context.TODO(), condition.WithContext())
@@ -288,25 +307,6 @@ func (b *Backoff) Step() time.Duration {
 		duration = Jitter(duration, b.Jitter)
 	}
 	return duration
-}
-
-// ContextForChannel derives a child context from a parent channel.
-//
-// The derived context's Done channel is closed when the returned cancel function
-// is called or when the parent channel is closed, whichever happens first.
-//
-// Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
-func ContextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		select {
-		case <-parentCh:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-	return ctx, cancel
 }
 
 // BackoffManager manages backoff with a particular scheme based on its underlying implementation. It provides
