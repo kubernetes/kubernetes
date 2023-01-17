@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -208,6 +209,8 @@ func (m *manager) RemoveContainer(containerID string) error {
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	klog.InfoS("Topology Admit Handler")
+
+	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 	pod := attrs.Pod
 
 	return m.scope.Admit(pod)
