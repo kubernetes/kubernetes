@@ -144,7 +144,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 					enableSELinuxMount: &t.csiDriverSELinuxEnabled,
 					hooks:              createSELinuxMountPreHook(&nodeStageMountOpts, &nodePublishMountOpts, &stageCalls, &unstageCalls, &publishCalls, &unpublishCalls),
 				})
-				defer m.cleanup(ctx)
+				ginkgo.DeferCleanup(m.cleanup)
 
 				// Act
 				ginkgo.By("Starting the initial pod")
