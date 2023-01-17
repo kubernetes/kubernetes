@@ -18961,6 +18961,10 @@ func TestValidateSecurityContext(t *testing.T) {
 	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
 	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = utilpointer.Bool(false)
 
+	allWithoutEscalation := fullValidSC()
+	allWithoutEscalation.Capabilities.Add = []core.Capability{"ALL"}
+	allWithoutEscalation.AllowPrivilegeEscalation = utilpointer.BoolPtr(false)
+
 	errorCases := map[string]struct {
 		sc           *core.SecurityContext
 		errorType    field.ErrorType
@@ -18980,7 +18984,12 @@ func TestValidateSecurityContext(t *testing.T) {
 		"with CAP_SYS_ADMIN and allowPrivilegeEscalation false": {
 			sc:          capSysAdminWithoutEscalation,
 			errorType:   "FieldValueInvalid",
-			errorDetail: "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN",
+			errorDetail: "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` to CAP_SYS_ADMIN or ALL",
+		},
+		"with ALL and allowPrivilegeEscalation false": {
+			sc:          allWithoutEscalation,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` to CAP_SYS_ADMIN or ALL",
 		},
 		"with privileged and allowPrivilegeEscalation false": {
 			sc:           privWithoutEscalation,
