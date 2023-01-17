@@ -28,6 +28,7 @@ import (
 	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2alpha1"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
+	kmsservice "k8s.io/kms/service"
 )
 
 type testSocket struct {
@@ -120,7 +121,7 @@ func TestTimeouts(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			t.Parallel()
 			var (
-				service         Service
+				service         kmsservice.Service
 				err             error
 				data            = []byte("test data")
 				uid             = string(uuid.NewUUID())
@@ -293,7 +294,7 @@ func TestGRPCService(t *testing.T) {
 
 	keyID := "1"
 	// Call service to decrypt data.
-	result, err := service.Decrypt(ctx, uid, &DecryptRequest{Ciphertext: resp.Ciphertext, KeyID: keyID})
+	result, err := service.Decrypt(ctx, uid, &kmsservice.DecryptRequest{Ciphertext: resp.Ciphertext, KeyID: keyID})
 	if err != nil {
 		t.Fatalf("failed when execute decrypt, error: %v", err)
 	}
@@ -342,7 +343,7 @@ func TestGRPCServiceConcurrentAccess(t *testing.T) {
 
 			keyID := "1"
 			// Call service to decrypt data.
-			result, err := service.Decrypt(ctx, uid, &DecryptRequest{Ciphertext: resp.Ciphertext, KeyID: keyID})
+			result, err := service.Decrypt(ctx, uid, &kmsservice.DecryptRequest{Ciphertext: resp.Ciphertext, KeyID: keyID})
 			if err != nil {
 				t.Errorf("failed when execute decrypt, error: %v", err)
 			}
@@ -356,7 +357,7 @@ func TestGRPCServiceConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
-func destroyService(service Service) {
+func destroyService(service kmsservice.Service) {
 	if service != nil {
 		s := service.(*gRPCService)
 		s.connection.Close()
