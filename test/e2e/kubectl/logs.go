@@ -183,8 +183,9 @@ var _ = SIGDescribe("Kubectl logs", func() {
 
 			ginkgo.It("should log default container if not specified", func(ctx context.Context) {
 				ginkgo.By("Waiting for log generator to start.")
-				if !e2epod.CheckPodsRunningReadyOrSucceeded(ctx, c, ns, []string{podName}, framework.PodStartTimeout) {
-					framework.Failf("Pod %s was not ready", podName)
+				// we need to wait for pod completion, to check the generated number of lines
+				if err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, c, podName, ns, framework.PodStartTimeout); err != nil {
+					framework.Failf("Pod %s did not finish: %v", podName, err)
 				}
 
 				ginkgo.By("specified container log lines")
