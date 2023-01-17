@@ -230,6 +230,7 @@ func ListenAndServePodResources(endpoint string, providers podresources.PodResou
 		os.Exit(1)
 	}
 
+	klog.InfoS("Starting to serve the podresources API", "endpoint", endpoint)
 	if err := server.Serve(l); err != nil {
 		klog.ErrorS(err, "Failed to serve")
 		os.Exit(1)

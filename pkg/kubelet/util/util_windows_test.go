@@ -277,3 +277,48 @@ func TestNormalizePath(t *testing.T) {
 		assert.Equal(t, test.normalizedPath, NormalizePath(test.originalpath))
 	}
 }
+
+func TestLocalEndpoint(t *testing.T) {
+	tests := []struct {
+		path             string
+		file             string
+		expectError      bool
+		expectedFullPath string
+	}{
+		{
+			path:             "/var/lib/kubelet/pod-resources",
+			file:             "kube.sock", // this is not the default, but it's not relevant here
+			expectError:      false,
+			expectedFullPath: `npipe://\\.\pipe\kubelet-pod-resources`,
+		},
+	}
+	for _, test := range tests {
+		fullPath, err := LocalEndpoint(test.path, test.file)
+		if test.expectError {
+			assert.NotNil(t, err, "expected error")
+			continue
+		}
+		assert.Nil(t, err, "expected no error")
+		assert.Equal(t, test.expectedFullPath, fullPath)
+	}
+}
+
+func TestLocalEndpointRoundTrip(t *testing.T) {
+	npipeDialPointer := reflect.ValueOf(npipeDial).Pointer()
+	expectedDialerName := runtime.FuncForPC(npipeDialPointer).Name()
+	expectedAddress := "//./pipe/kubelet-pod-resources"
+
+	fullPath, err := LocalEndpoint(`pod-resources`, "kubelet")
+	require.NoErrorf(t, err, "Failed to create the local endpoint path")
+
+	address, dialer, err := GetAddressAndDialer(fullPath)
+	require.NoErrorf(t, err, "Failed to parse the endpoint path and get back address and dialer (path=%q)", fullPath)
+
+	dialerPointer := reflect.ValueOf(dialer).Pointer()
+	actualDialerName := runtime.FuncForPC(dialerPointer).Name()
+
+	assert.Equalf(t, npipeDialPointer, dialerPointer,
+		"Expected dialer %s, but get %s", expectedDialerName, actualDialerName)
+
+	assert.Equal(t, expectedAddress, address)
+}
