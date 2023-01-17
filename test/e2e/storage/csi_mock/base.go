@@ -829,28 +829,22 @@ func compareCSICalls(ctx context.Context, trackedCalls []string, expectedCallSeq
 func createSELinuxMountPreHook(nodeStageMountOpts, nodePublishMountOpts *[]string, stageCalls, unstageCalls, publishCalls, unpublishCalls *atomic.Int32) *drivers.Hooks {
 	return &drivers.Hooks{
 		Pre: func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
-			nodeStageRequest, ok := request.(*csipbv1.NodeStageVolumeRequest)
-			if ok {
+			switch req := request.(type) {
+			case *csipbv1.NodeStageVolumeRequest:
 				stageCalls.Add(1)
-				mountVolume := nodeStageRequest.GetVolumeCapability().GetMount()
+				mountVolume := req.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
 					*nodeStageMountOpts = mountVolume.MountFlags
 				}
-			}
-			nodePublishRequest, ok := request.(*csipbv1.NodePublishVolumeRequest)
-			if ok {
+			case *csipbv1.NodePublishVolumeRequest:
 				publishCalls.Add(1)
-				mountVolume := nodePublishRequest.GetVolumeCapability().GetMount()
+				mountVolume := req.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
 					*nodePublishMountOpts = mountVolume.MountFlags
 				}
-			}
-			_, ok = request.(*csipbv1.NodeUnstageVolumeRequest)
-			if ok {
+			case *csipbv1.NodeUnstageVolumeRequest:
 				unstageCalls.Add(1)
-			}
-			_, ok = request.(*csipbv1.NodeUnpublishVolumeRequest)
-			if ok {
+			case *csipbv1.NodeUnpublishVolumeRequest:
 				unpublishCalls.Add(1)
 			}
 			return nil, nil
