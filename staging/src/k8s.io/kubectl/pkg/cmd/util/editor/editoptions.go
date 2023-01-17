@@ -126,6 +126,8 @@ type editPrinterOptions struct {
 }
 
 func (e *editPrinterOptions) Complete(fromPrintFlags *genericclioptions.PrintFlags) error {
+	e.printFlags.JSONYamlPrintFlags = fromPrintFlags.JSONYamlPrintFlags
+
 	if e.printFlags == nil {
 		return fmt.Errorf("missing PrintFlags in editor printer options")
 	}
@@ -364,12 +366,17 @@ func (o *EditOptions) Run() error {
 			containsError = false
 			updatedVisitor := resource.InfoListVisitor(updatedInfos)
 
-			// we need to add back managedFields to both updated and original object
-			if err := o.restoreManagedFields(updatedInfos); err != nil {
-				return preservedFile(err, file, o.ErrOut)
-			}
-			if err := o.restoreManagedFields(infos); err != nil {
-				return preservedFile(err, file, o.ErrOut)
+			// add warning about editing managed fields if flag --show-managed-fields is set
+			// Otherwise, add back managedFields to both updated and original object
+			if o.PrintFlags.JSONYamlPrintFlags.ShowManagedFields {
+				fmt.Fprintln(o.ErrOut, "Editing managed fields does not use Server-Side Apply")
+			} else {
+				if err := o.restoreManagedFields(updatedInfos); err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
+				if err := o.restoreManagedFields(infos); err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
 			}
 
 			// need to make sure the original namespace wasn't changed while editing
@@ -475,31 +482,27 @@ func (o *EditOptions) extractManagedFields(obj runtime.Object) error {
 	o.managedFields = make(map[types.UID][]metav1.ManagedFieldsEntry)
 	if meta.IsListType(obj) {
 		err := meta.EachListItem(obj, func(obj runtime.Object) error {
-			uid, mf, err := clearManagedFields(obj)
+			metaObjs, err := meta.Accessor(obj)
 			if err != nil {
 				return err
 			}
-			o.managedFields[uid] = mf
+			if !o.PrintFlags.JSONYamlPrintFlags.ShowManagedFields {
+				metaObjs.SetManagedFields(nil)
+			}
+			o.managedFields[metaObjs.GetUID()] = metaObjs.GetManagedFields()
 			return nil
 		})
 		return err
 	}
-	uid, mf, err := clearManagedFields(obj)
+	metaObjs, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
-	o.managedFields[uid] = mf
-	return nil
-}
-
-func clearManagedFields(obj runtime.Object) (types.UID, []metav1.ManagedFieldsEntry, error) {
-	metaObjs, err := meta.Accessor(obj)
-	if err != nil {
-		return "", nil, err
+	if !o.PrintFlags.JSONYamlPrintFlags.ShowManagedFields {
+		metaObjs.SetManagedFields(nil)
 	}
-	mf := metaObjs.GetManagedFields()
-	metaObjs.SetManagedFields(nil)
-	return metaObjs.GetUID(), mf, nil
+	o.managedFields[metaObjs.GetUID()] = metaObjs.GetManagedFields()
+	return nil
 }
 
 func (o *EditOptions) restoreManagedFields(infos []*resource.Info) error {
