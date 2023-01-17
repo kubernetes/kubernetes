@@ -5,6 +5,8 @@
 // Package salsa provides low-level access to functions in the Salsa family.
 package salsa // import "golang.org/x/crypto/salsa20/salsa"
 
+import "math/bits"
+
 // Sigma is the Salsa20 constant for 256-bit keys.
 var Sigma = [16]byte{'e', 'x', 'p', 'a', 'n', 'd', ' ', '3', '2', '-', 'b', 'y', 't', 'e', ' ', 'k'}
 
@@ -31,76 +33,76 @@ func HSalsa20(out *[32]byte, in *[16]byte, k *[32]byte, c *[16]byte) {
 
 	for i := 0; i < 20; i += 2 {
 		u := x0 + x12
-		x4 ^= u<<7 | u>>(32-7)
+		x4 ^= bits.RotateLeft32(u, 7)
 		u = x4 + x0
-		x8 ^= u<<9 | u>>(32-9)
+		x8 ^= bits.RotateLeft32(u, 9)
 		u = x8 + x4
-		x12 ^= u<<13 | u>>(32-13)
+		x12 ^= bits.RotateLeft32(u, 13)
 		u = x12 + x8
-		x0 ^= u<<18 | u>>(32-18)
+		x0 ^= bits.RotateLeft32(u, 18)
 
 		u = x5 + x1
-		x9 ^= u<<7 | u>>(32-7)
+		x9 ^= bits.RotateLeft32(u, 7)
 		u = x9 + x5
-		x13 ^= u<<9 | u>>(32-9)
+		x13 ^= bits.RotateLeft32(u, 9)
 		u = x13 + x9
-		x1 ^= u<<13 | u>>(32-13)
+		x1 ^= bits.RotateLeft32(u, 13)
 		u = x1 + x13
-		x5 ^= u<<18 | u>>(32-18)
+		x5 ^= bits.RotateLeft32(u, 18)
 
 		u = x10 + x6
-		x14 ^= u<<7 | u>>(32-7)
+		x14 ^= bits.RotateLeft32(u, 7)
 		u = x14 + x10
-		x2 ^= u<<9 | u>>(32-9)
+		x2 ^= bits.RotateLeft32(u, 9)
 		u = x2 + x14
-		x6 ^= u<<13 | u>>(32-13)
+		x6 ^= bits.RotateLeft32(u, 13)
 		u = x6 + x2
-		x10 ^= u<<18 | u>>(32-18)
+		x10 ^= bits.RotateLeft32(u, 18)
 
 		u = x15 + x11
-		x3 ^= u<<7 | u>>(32-7)
+		x3 ^= bits.RotateLeft32(u, 7)
 		u = x3 + x15
-		x7 ^= u<<9 | u>>(32-9)
+		x7 ^= bits.RotateLeft32(u, 9)
 		u = x7 + x3
-		x11 ^= u<<13 | u>>(32-13)
+		x11 ^= bits.RotateLeft32(u, 13)
 		u = x11 + x7
-		x15 ^= u<<18 | u>>(32-18)
+		x15 ^= bits.RotateLeft32(u, 18)
 
 		u = x0 + x3
-		x1 ^= u<<7 | u>>(32-7)
+		x1 ^= bits.RotateLeft32(u, 7)
 		u = x1 + x0
-		x2 ^= u<<9 | u>>(32-9)
+		x2 ^= bits.RotateLeft32(u, 9)
 		u = x2 + x1
-		x3 ^= u<<13 | u>>(32-13)
+		x3 ^= bits.RotateLeft32(u, 13)
 		u = x3 + x2
-		x0 ^= u<<18 | u>>(32-18)
+		x0 ^= bits.RotateLeft32(u, 18)
 
 		u = x5 + x4
-		x6 ^= u<<7 | u>>(32-7)
+		x6 ^= bits.RotateLeft32(u, 7)
 		u = x6 + x5
-		x7 ^= u<<9 | u>>(32-9)
+		x7 ^= bits.RotateLeft32(u, 9)
 		u = x7 + x6
-		x4 ^= u<<13 | u>>(32-13)
+		x4 ^= bits.RotateLeft32(u, 13)
 		u = x4 + x7
-		x5 ^= u<<18 | u>>(32-18)
+		x5 ^= bits.RotateLeft32(u, 18)
 
 		u = x10 + x9
-		x11 ^= u<<7 | u>>(32-7)
+		x11 ^= bits.RotateLeft32(u, 7)
 		u = x11 + x10
-		x8 ^= u<<9 | u>>(32-9)
+		x8 ^= bits.RotateLeft32(u, 9)
 		u = x8 + x11
-		x9 ^= u<<13 | u>>(32-13)
+		x9 ^= bits.RotateLeft32(u, 13)
 		u = x9 + x8
-		x10 ^= u<<18 | u>>(32-18)
+		x10 ^= bits.RotateLeft32(u, 18)
 
 		u = x15 + x14
-		x12 ^= u<<7 | u>>(32-7)
+		x12 ^= bits.RotateLeft32(u, 7)
 		u = x12 + x15
-		x13 ^= u<<9 | u>>(32-9)
+		x13 ^= bits.RotateLeft32(u, 9)
 		u = x13 + x12
-		x14 ^= u<<13 | u>>(32-13)
+		x14 ^= bits.RotateLeft32(u, 13)
 		u = x14 + x13
-		x15 ^= u<<18 | u>>(32-18)
+		x15 ^= bits.RotateLeft32(u, 18)
 	}
 	out[0] = byte(x0)
 	out[1] = byte(x0 >> 8)

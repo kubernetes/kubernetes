@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 	"sync"
 
 	_ "crypto/sha1"
@@ -117,6 +118,20 @@ func algorithmsForKeyFormat(keyFormat string) []string {
 		return []string{keyFormat}
 	}
 }
+
+// supportedPubKeyAuthAlgos specifies the supported client public key
+// authentication algorithms. Note that this doesn't include certificate types
+// since those use the underlying algorithm. This list is sent to the client if
+// it supports the server-sig-algs extension. Order is irrelevant.
+var supportedPubKeyAuthAlgos = []string{
+	KeyAlgoED25519,
+	KeyAlgoSKED25519, KeyAlgoSKECDSA256,
+	KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521,
+	KeyAlgoRSASHA256, KeyAlgoRSASHA512, KeyAlgoRSA,
+	KeyAlgoDSA,
+}
+
+var supportedPubKeyAuthAlgosList = strings.Join(supportedPubKeyAuthAlgos, ",")
 
 // unexpectedMessageError results when the SSH message that we received didn't
 // match what we wanted.
