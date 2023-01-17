@@ -523,8 +523,7 @@ func Test_waitFor(t *testing.T) {
 		err := func() error {
 			done := make(chan struct{})
 			defer close(done)
-			ctx, cancel := ContextForChannel(done)
-			defer cancel()
+			ctx := ContextForChannel(done)
 			return waitForWithContext(ctx, ticker.WithContext(), c.F.WithContext())
 		}()
 		switch {
@@ -547,8 +546,7 @@ func Test_waitForWithEarlyClosing_waitFunc(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	ctx, cancel := ContextForChannel(stopCh)
-	defer cancel()
+	ctx := ContextForChannel(stopCh)
 	start := time.Now()
 	err := waitForWithContext(ctx, func(ctx context.Context) <-chan struct{} {
 		c := make(chan struct{})
@@ -575,8 +573,7 @@ func Test_waitForWithClosedChannel(t *testing.T) {
 	close(stopCh)
 	c := make(chan struct{})
 	defer close(c)
-	ctx, cancel := ContextForChannel(stopCh)
-	defer cancel()
+	ctx := ContextForChannel(stopCh)
 
 	start := time.Now()
 	err := waitForWithContext(ctx, func(_ context.Context) <-chan struct{} {
@@ -699,8 +696,7 @@ func TestContextForChannel(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ctx, cancel := ContextForChannel(parentCh)
-			defer cancel()
+			ctx := ContextForChannel(parentCh)
 			<-ctx.Done()
 		}()
 	}

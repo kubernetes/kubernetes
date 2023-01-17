@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -228,8 +229,8 @@ func (s *EtcdOptions) Complete(
 	}
 
 	if len(s.EncryptionProviderConfigFilepath) != 0 {
-		ctxTransformers, closeTransformers := wait.ContextForChannel(stopCh)
-		ctxServer, _ := wait.ContextForChannel(stopCh) // explicitly ignore cancel here because we do not own the server's lifecycle
+		ctxServer := wait.ContextForChannel(stopCh)
+		ctxTransformers, closeTransformers := context.WithCancel(ctxServer)
 
 		encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(ctxTransformers, s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload)
 		if err != nil {

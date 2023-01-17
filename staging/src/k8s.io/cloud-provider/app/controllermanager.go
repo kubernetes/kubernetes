@@ -199,7 +199,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		ctx, _ := wait.ContextForChannel(stopCh)
+		ctx := wait.ContextForChannel(stopCh)
 		run(ctx, controllerInitializers)
 		<-stopCh
 		return nil

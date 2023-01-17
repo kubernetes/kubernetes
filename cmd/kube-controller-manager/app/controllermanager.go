@@ -242,7 +242,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	// No leader election, run directly
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		ctx, _ := wait.ContextForChannel(stopCh)
+		ctx := wait.ContextForChannel(stopCh)
 		run(ctx, saTokenControllerInitFunc, NewControllerInitializers)
 		return nil
 	}
