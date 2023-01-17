@@ -238,7 +238,6 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedConditionReason string
 		expectedCreatedIndexes  sets.Int
 
-		// only applicable to tracking with finalizers
 		expectedPodPatches int
 
 		// features
@@ -3112,7 +3111,6 @@ func TestGetPodsForJob(t *testing.T) {
 		jobDeletedInCache bool
 		pods              []*v1.Pod
 		wantPods          []string
-		// only applicable to tracking with finalizers
 		wantPodsFinalizer []string
 	}{
 		"only matching": {
