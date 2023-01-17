@@ -20,30 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// HasPrivilegedRequest returns the value of SecurityContext.Privileged, taking into account
-// the possibility of nils
-func HasPrivilegedRequest(container *v1.Container) bool {
-	if container.SecurityContext == nil {
-		return false
-	}
-	if container.SecurityContext.Privileged == nil {
-		return false
-	}
-	return *container.SecurityContext.Privileged
-}
-
-// HasCapabilitiesRequest returns true if Adds or Drops are defined in the security context
-// capabilities, taking into account nils
-func HasCapabilitiesRequest(container *v1.Container) bool {
-	if container.SecurityContext == nil {
-		return false
-	}
-	if container.SecurityContext.Capabilities == nil {
-		return false
-	}
-	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
-}
-
 // HasWindowsHostProcessRequest returns true if container should run as HostProcess container,
 // taking into account nils
 func HasWindowsHostProcessRequest(pod *v1.Pod, container *v1.Container) bool {
