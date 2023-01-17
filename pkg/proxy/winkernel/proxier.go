@@ -127,6 +127,7 @@ type serviceInfo struct {
 	hns                    HostNetworkService
 	preserveDIP            bool
 	localTrafficDSR        bool
+	remoteIT               bool
 }
 
 type hnsNetworkInfo struct {
@@ -461,11 +462,13 @@ func (refCountMap endPointsReferenceCountMap) getRefCount(hnsID string) *uint16 
 func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service, bsvcPortInfo *proxy.BaseServicePortInfo) proxy.ServicePort {
 	info := &serviceInfo{BaseServicePortInfo: bsvcPortInfo}
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
+	remoteIT := service.Annotations["enable-remote-internal-traffic"] == "false"
 	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 	err := hcn.DSRSupported()
 	if err != nil {
 		preserveDIP = false
 		localTrafficDSR = false
+		remoteIT = false
 	}
 	// targetPort is zero if it is specified as a name in port.TargetPort.
 	// Its real value would be got later from endpoints.
@@ -478,6 +481,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	info.targetPort = targetPort
 	info.hns = proxier.hns
 	info.localTrafficDSR = localTrafficDSR
+	info.remoteIT = remoteIT
 
 	for _, eip := range service.Spec.ExternalIPs {
 		info.externalIPs = append(info.externalIPs, &externalIPInfo{ip: eip})
@@ -1367,7 +1371,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 			// Try loading existing policies, if already available
 			lbIngressEndpoints := hnsEndpoints
-			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
+			if svcInfo.preserveDIP || (svcInfo.localTrafficDSR && svcInfo.remoteIT) {
 				lbIngressEndpoints = hnsLocalEndpoints
 			}
 
