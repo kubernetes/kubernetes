@@ -59,6 +59,9 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
 	_ "k8s.io/kubernetes/test/utils/format"
 
+	gcemetadata "cloud.google.com/go/compute/metadata"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
@@ -100,6 +103,24 @@ func registerNodeFlags(flags *flag.FlagSet) {
 	flag.Var(cliflag.NewMapStringString(&framework.TestContext.RuntimeConfig), "runtime-config", "The runtime configuration used on node e2e tests.")
 	flags.BoolVar(&framework.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
 	flags.Var(cliflag.NewMapStringBool(&featureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
+
+	if framework.TestContext.Provider == "" && gcemetadata.OnGCE() {
+		gceZone, err := gcemetadata.Zone()
+		if err != nil {
+			klog.Exitf("Failed to get GCE zone: %v", err)
+		}
+
+		gceProject, err := gcemetadata.ProjectID()
+		if err != nil {
+			klog.Exitf("Failed to get GCE projectID: %v", err)
+		}
+
+		flag.StringVar(&framework.TestContext.CloudConfig.Zone, "gce-zone", gceZone, "GCE zone being used, if applicable")
+		flag.StringVar(&framework.TestContext.CloudConfig.Zone, "gce-project", gceProject, "GCE project being used, if applicable")
+
+		flag.StringVar(&framework.TestContext.Provider, "provider", "gce", "The name of the Kubernetes provider (gce, none, etc). Defaults to GCE if unset and running on GCE VM.")
+
+	}
 }
 
 func init() {
