@@ -861,10 +861,6 @@ function construct-windows-kubelet-flags {
   # Turn off kernel memory cgroup notification.
   flags+=" --kernel-memcg-notification=false"
 
-  # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
-  # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
-  flags+=" --feature-gates=KubeletPodResources=false"
-
   WINDOWS_CONTAINER_RUNTIME_ENDPOINT=${KUBE_WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
   flags+=" --container-runtime-endpoint=${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}"
 
