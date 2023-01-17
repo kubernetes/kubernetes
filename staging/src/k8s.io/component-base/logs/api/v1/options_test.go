@@ -19,6 +19,7 @@ package v1
 import (
 	"bytes"
 	"context"
+	"flag"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -98,6 +99,45 @@ func TestOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFlagSet(t *testing.T) {
+	t.Run("pflag", func(t *testing.T) {
+		newOptions := NewLoggingConfiguration()
+		var fs pflag.FlagSet
+		AddFlags(newOptions, &fs)
+		var buffer bytes.Buffer
+		fs.SetOutput(&buffer)
+		fs.PrintDefaults()
+		assert.Equal(t, `      --logging-format string          Sets the log format. Permitted formats: "text". (default "text")
+      --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
+  -v, --v Level                        number for the log level verbosity
+      --vmodule pattern=N,...          comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
+`, buffer.String())
+	})
+
+	t.Run("flag", func(t *testing.T) {
+		newOptions := NewLoggingConfiguration()
+		var pfs pflag.FlagSet
+		AddFlags(newOptions, &pfs)
+		var fs flag.FlagSet
+		pfs.VisitAll(func(f *pflag.Flag) {
+			fs.Var(f.Value, f.Name, f.Usage)
+		})
+		var buffer bytes.Buffer
+		fs.SetOutput(&buffer)
+		fs.PrintDefaults()
+		assert.Equal(t, `  -log-flush-frequency value
+    	Maximum number of seconds between log flushes (default 5s)
+  -logging-format value
+    	Sets the log format. Permitted formats: "text". (default text)
+  -v value
+    	number for the log level verbosity
+  -vmodule value
+    	comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
+`, buffer.String())
+	})
+
 }
 
 func TestContextualLogging(t *testing.T) {
