@@ -534,6 +534,7 @@ const (
 	// owner: @danwinship
 	// kep: http://kep.k8s.io/3453
 	// alpha: v1.26
+	// beta: v1.27
 	//
 	// Enables new performance-improving code in kube-proxy iptables mode
 	MinimizeIPTablesRestore featuregate.Feature = "MinimizeIPTablesRestore"
@@ -975,7 +976,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MinDomainsInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
-	MinimizeIPTablesRestore: {Default: false, PreRelease: featuregate.Alpha},
+	MinimizeIPTablesRestore: {Default: true, PreRelease: featuregate.Beta},
 
 	MixedProtocolLBService: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
