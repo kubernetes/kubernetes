@@ -232,27 +232,27 @@ func (mr *MockManagerMockRecorder) RemoveOrphanedStatuses(podUIDs interface{}) *
 }
 
 // SetContainerReadiness mocks base method.
-func (m *MockManager) SetContainerReadiness(podUID types.UID, containerID container.ContainerID, ready bool) {
+func (m *MockManager) SetContainerReadiness(pod *v1.Pod, containerID container.ContainerID, ready bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetContainerReadiness", podUID, containerID, ready)
+	m.ctrl.Call(m, "SetContainerReadiness", pod, containerID, ready)
 }
 
 // SetContainerReadiness indicates an expected call of SetContainerReadiness.
-func (mr *MockManagerMockRecorder) SetContainerReadiness(podUID, containerID, ready interface{}) *gomock.Call {
+func (mr *MockManagerMockRecorder) SetContainerReadiness(pod, containerID, ready interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetContainerReadiness", reflect.TypeOf((*MockManager)(nil).SetContainerReadiness), podUID, containerID, ready)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetContainerReadiness", reflect.TypeOf((*MockManager)(nil).SetContainerReadiness), pod, containerID, ready)
 }
 
 // SetContainerStartup mocks base method.
-func (m *MockManager) SetContainerStartup(podUID types.UID, containerID container.ContainerID, started bool) {
+func (m *MockManager) SetContainerStartup(pod *v1.Pod, containerID container.ContainerID, started bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetContainerStartup", podUID, containerID, started)
+	m.ctrl.Call(m, "SetContainerStartup", pod, containerID, started)
 }
 
 // SetContainerStartup indicates an expected call of SetContainerStartup.
-func (mr *MockManagerMockRecorder) SetContainerStartup(podUID, containerID, started interface{}) *gomock.Call {
+func (mr *MockManagerMockRecorder) SetContainerStartup(pod, containerID, started interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetContainerStartup", reflect.TypeOf((*MockManager)(nil).SetContainerStartup), podUID, containerID, started)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetContainerStartup", reflect.TypeOf((*MockManager)(nil).SetContainerStartup), pod, containerID, started)
 }
 
 // SetPodAllocation mocks base method.

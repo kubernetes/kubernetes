@@ -462,7 +462,7 @@ func TestLivenessProbeDisabledByStarted(t *testing.T) {
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
 	// setting started state
-	m.statusManager.SetContainerStartup(w.pod.UID, w.containerID, true)
+	m.statusManager.SetContainerStartup(w.pod, w.containerID, true)
 	// livenessProbe fails
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg = "Started, probe failure, result failure"
@@ -486,7 +486,7 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
 	// setting started state
-	m.statusManager.SetContainerStartup(w.pod.UID, w.containerID, true)
+	m.statusManager.SetContainerStartup(w.pod, w.containerID, true)
 	// startupProbe fails, but is disabled
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg = "Started, probe failure, result success"

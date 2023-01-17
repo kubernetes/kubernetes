@@ -975,13 +975,16 @@ func (kl *Kubelet) isAdmittedPodTerminal(pod *v1.Pod) bool {
 
 // removeOrphanedPodStatuses removes obsolete entries in podStatus where
 // the pod is no longer considered bound to this node.
-func (kl *Kubelet) removeOrphanedPodStatuses(pods []*v1.Pod, mirrorPods []*v1.Pod) {
+func (kl *Kubelet) removeOrphanedPodStatuses(pods []*v1.Pod, mirrorPods []*v1.Pod, possiblyRunningPods map[types.UID]sets.Empty) {
 	podUIDs := make(map[types.UID]bool)
 	for _, pod := range pods {
 		podUIDs[pod.UID] = true
 	}
 	for _, pod := range mirrorPods {
 		podUIDs[pod.UID] = true
+	}
+	for uid := range possiblyRunningPods {
+		podUIDs[uid] = true
 	}
 	kl.statusManager.RemoveOrphanedStatuses(podUIDs)
 }
@@ -1110,7 +1113,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 	// Remove orphaned pod statuses not in the total list of known config pods
 	klog.V(3).InfoS("Clean up orphaned pod statuses")
-	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
+	kl.removeOrphanedPodStatuses(allPods, mirrorPods, possiblyRunningPods)
 
 	// Remove orphaned pod user namespace allocations (if any).
 	klog.V(3).InfoS("Clean up orphaned pod user namespace allocations")

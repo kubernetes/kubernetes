@@ -168,7 +168,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 					switch result.Result.String() {
 					// The test will fail if any of the probes fails
 					case "Failure":
-						t.Errorf("Failure %s on contantinerID: %v Pod %v", probeType, result.ContainerID, result.PodUID)
+						t.Errorf("Failure %s on contantinerID: %v Pod %v", probeType, result.ContainerID, result.Pod.UID)
 					case "UNKNOWN": // startup probes
 						t.Logf("UNKNOWN state for %v", result)
 					default:
