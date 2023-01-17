@@ -18,7 +18,6 @@ package csi_mock
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 
 	"github.com/onsi/ginkgo/v2"
@@ -173,7 +172,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 
 				// Skip scheduler, it would block scheduling the second pod with ReadWriteOncePod PV.
 				pod, err = m.cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err, fmt.Sprintf("getting the initial pod"))
+				framework.ExpectNoError(err, "getting the initial pod")
 				nodeSelection := e2epod.NodeSelection{Name: pod.Spec.NodeName}
 				pod2, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, t.secondPodSELinuxOpts)
 				framework.ExpectNoError(err, "creating second pod with SELinux context %s", t.secondPodSELinuxOpts)
