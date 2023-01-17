@@ -621,7 +621,7 @@ const (
 	maxWatchChanSizeWithoutIndex = 100
 )
 
-func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) int {
+func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool, intervalSize int) int {
 	// To estimate the channel size we use a heuristic that a channel
 	// should roughly be able to keep one second of history.
 	// We don't have an exact data, but given we store updates from
@@ -642,6 +642,9 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
 		maxChanSize = maxWatchChanSizeWithIndexWithoutTrigger
 	case !indexExists:
 		maxChanSize = maxWatchChanSizeWithoutIndex
+	}
+	if chanSize < intervalSize {
+		chanSize = intervalSize
 	}
 	if chanSize > maxChanSize {
 		chanSize = maxChanSize

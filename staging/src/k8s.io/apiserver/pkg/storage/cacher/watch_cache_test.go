@@ -988,7 +988,8 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			store := newTestWatchCache(test.capacity, &cache.Indexers{})
-			got := store.suggestedWatchChannelSize(test.indexExists, test.triggerUsed)
+			// TODO(MadhavJivrajani): add proper tests
+			got := store.suggestedWatchChannelSize(test.indexExists, test.triggerUsed, -1)
 			if got != test.expected {
 				t.Errorf("unexpected channel size got: %v, expected: %v", got, test.expected)
 			}

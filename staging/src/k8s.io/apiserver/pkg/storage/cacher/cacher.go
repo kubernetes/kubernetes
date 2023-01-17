@@ -502,18 +502,26 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 	}
 
-	// It boils down to a tradeoff between:
-	// - having it as small as possible to reduce memory usage
-	// - having it large enough to ensure that watchers that need to process
-	//   a bunch of changes have enough buffer to avoid from blocking other
-	//   watchers on our watcher having a processing hiccup
-	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
-
 	// Determine watch timeout('0' means deadline is not set, ignore checking)
 	deadline, _ := ctx.Deadline()
 
 	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Label, pred.Field)
 
+	// We explicitly use thread unsafe version and do locking ourself to ensure that
+	// no new events will be processed in the meantime. The watchCache will be unlocked
+	// on return from this function.
+	// Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
+	// underlying watchCache is calling processEvent under its lock.
+	c.watchCache.RLock()
+	defer c.watchCache.RUnlock()
+	cacheInterval, err := c.watchCache.getAllEventsSinceLocked(watchRV)
+	intervalSize := cacheInterval.Size()
+	// It boils down to a tradeoff between:
+	// - having it as small as possible to reduce memory usage
+	// - having it large enough to ensure that watchers that need to process
+	//   a bunch of changes have enough buffer to avoid from blocking other
+	//   watchers on our watcher having a processing hiccup
+	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported, intervalSize)
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
@@ -529,14 +537,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		identifier,
 	)
 
-	// We explicitly use thread unsafe version and do locking ourself to ensure that
-	// no new events will be processed in the meantime. The watchCache will be unlocked
-	// on return from this function.
-	// Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
-	// underlying watchCache is calling processEvent under its lock.
-	c.watchCache.RLock()
-	defer c.watchCache.RUnlock()
-	cacheInterval, err := c.watchCache.getAllEventsSinceLocked(watchRV)
 	if err != nil {
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,

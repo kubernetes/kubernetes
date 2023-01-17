@@ -178,6 +178,10 @@ func (wci *watchCacheInterval) Next() (*watchCacheEvent, error) {
 	return nil, nil
 }
 
+func (wci *watchCacheInterval) Size() int {
+	return wci.buffer.endIndex - wci.buffer.startIndex + 1
+}
+
 func (wci *watchCacheInterval) fillBuffer() {
 	wci.buffer.startIndex = 0
 	wci.buffer.endIndex = 0
