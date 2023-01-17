@@ -30,9 +30,11 @@
 package gax
 
 import (
+	"errors"
 	"math/rand"
 	"time"
 
+	"google.golang.org/api/googleapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -119,6 +121,41 @@ func (r *boRetryer) Retry(err error) (time.Duration, bool) {
 	return 0, false
 }
 
+// OnHTTPCodes returns a Retryer that retries if and only if
+// the previous attempt returns a googleapi.Error whose status code is stored in
+// cc. Pause times between retries are specified by bo.
+//
+// bo is only used for its parameters; each Retryer has its own copy.
+func OnHTTPCodes(bo Backoff, cc ...int) Retryer {
+	codes := make(map[int]bool, len(cc))
+	for _, c := range cc {
+		codes[c] = true
+	}
+
+	return &httpRetryer{
+		backoff: bo,
+		codes:   codes,
+	}
+}
+
+type httpRetryer struct {
+	backoff Backoff
+	codes   map[int]bool
+}
+
+func (r *httpRetryer) Retry(err error) (time.Duration, bool) {
+	var gerr *googleapi.Error
+	if !errors.As(err, &gerr) {
+		return 0, false
+	}
+
+	if r.codes[gerr.Code] {
+		return r.backoff.Pause(), true
+	}
+
+	return 0, false
+}
+
 // Backoff implements exponential backoff. The wait time between retries is a
 // random value between 0 and the "retry period" - the time between retries. The
 // retry period starts at Initial and increases by the factor of Multiplier
@@ -173,6 +210,21 @@ func (o grpcOpt) Resolve(s *CallSettings) {
 	s.GRPC = o
 }
 
+type pathOpt struct {
+	p string
+}
+
+func (p pathOpt) Resolve(s *CallSettings) {
+	s.Path = p.p
+}
+
+// WithPath applies a Path override to the HTTP-based APICall.
+//
+// This is for internal use only.
+func WithPath(p string) CallOption {
+	return &pathOpt{p: p}
+}
+
 // WithGRPCOptions allows passing gRPC call options during client creation.
 func WithGRPCOptions(opt ...grpc.CallOption) CallOption {
 	return grpcOpt(append([]grpc.CallOption(nil), opt...))
@@ -186,4 +238,7 @@ type CallSettings struct {
 
 	// CallOptions to be forwarded to GRPC.
 	GRPC []grpc.CallOption
+
+	// Path is an HTTP override for an APICall.
+	Path string
 }

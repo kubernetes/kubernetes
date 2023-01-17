@@ -37,7 +37,7 @@ require (
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.4.0
 	golang.org/x/time v0.3.0
-	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
+	google.golang.org/genproto v0.0.0-20221202195650-67e5cbc046fd
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -57,7 +57,8 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.97.0 // indirect
+	cloud.google.com/go/compute v1.15.1 // indirect
+	cloud.google.com/go/compute/metadata v0.2.1 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

@@ -17,7 +17,7 @@ require (
 	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
-	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
+	google.golang.org/genproto v0.0.0-20221202195650-67e5cbc046fd // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d // indirect
 )

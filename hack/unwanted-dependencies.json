@@ -42,6 +42,9 @@
   },
   "status": {
     "unwantedReferences": {
+      "cloud.google.com/go/firestore": [
+        "google.golang.org/genproto"
+      ],
       "github.com/PuerkitoBio/urlesc": [
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v4",
