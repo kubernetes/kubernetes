@@ -2409,7 +2409,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		}
 	case update := <-kl.readinessManager.Updates():
 		ready := update.Result == proberesults.Success
-		kl.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
+		kl.statusManager.SetContainerReadiness(update.Pod, update.ContainerID, ready)
 
 		status := ""
 		if ready {
@@ -2418,7 +2418,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		handleProbeSync(kl, update, handler, "readiness", status)
 	case update := <-kl.startupManager.Updates():
 		started := update.Result == proberesults.Success
-		kl.statusManager.SetContainerStartup(update.PodUID, update.ContainerID, started)
+		kl.statusManager.SetContainerStartup(update.Pod, update.ContainerID, started)
 
 		status := "unhealthy"
 		if started {
@@ -2448,7 +2448,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 
 func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandler, probe, status string) {
 	// We should not use the pod from manager, because it is never updated after initialization.
-	pod, ok := kl.podManager.GetPodByUID(update.PodUID)
+	pod, ok := kl.podManager.GetPodByUID(update.Pod.UID)
 	if !ok {
 		// If the pod no longer exists, ignore the update.
 		klog.V(4).InfoS("SyncLoop (probe): ignore irrelevant update", "probe", probe, "status", status, "update", update)

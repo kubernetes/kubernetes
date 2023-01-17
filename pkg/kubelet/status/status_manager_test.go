@@ -332,6 +332,7 @@ func TestSyncPodChecksMismatchedUID(t *testing.T) {
 	pod.UID = "first"
 	syncer.podManager.AddPod(pod)
 	differentPod := getTestPod()
+	differentPod.Name = "second pod"
 	differentPod.UID = "second"
 	syncer.podManager.AddPod(differentPod)
 	syncer.kubeClient = fake.NewSimpleClientset(pod)
@@ -372,7 +373,7 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 	ret.UID = "other_pod"
 	err = nil
 	m.SetPodStatus(pod, getRandomPodStatus())
-	verifyActions(t, m, []core.Action{getAction()})
+	verifyActions(t, m, []core.Action{getAction(), patchAction()})
 
 	t.Logf("Pod not deleted (success case).")
 	ret = getTestPod()
@@ -1136,7 +1137,7 @@ func TestSetContainerReadiness(t *testing.T) {
 	m.podManager.AddPod(pod)
 
 	t.Log("Setting readiness before status should fail.")
-	m.SetContainerReadiness(pod.UID, cID1, true)
+	m.SetContainerReadiness(pod, cID1, true)
 	verifyUpdates(t, m, 0)
 	if status, ok := m.GetPodStatus(pod.UID); ok {
 		t.Errorf("Unexpected PodStatus: %+v", status)
@@ -1149,25 +1150,25 @@ func TestSetContainerReadiness(t *testing.T) {
 	verifyReadiness("initial", &status, false, false, false)
 
 	t.Log("Setting unchanged readiness should do nothing.")
-	m.SetContainerReadiness(pod.UID, cID1, false)
+	m.SetContainerReadiness(pod, cID1, false)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("unchanged", &status, false, false, false)
 
 	t.Log("Setting container readiness should generate update but not pod readiness.")
-	m.SetContainerReadiness(pod.UID, cID1, true)
+	m.SetContainerReadiness(pod, cID1, true)
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("c1 ready", &status, true, false, false)
 
 	t.Log("Setting both containers to ready should update pod readiness.")
-	m.SetContainerReadiness(pod.UID, cID2, true)
+	m.SetContainerReadiness(pod, cID2, true)
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("all ready", &status, true, true, true)
 
 	t.Log("Setting non-existent container readiness should fail.")
-	m.SetContainerReadiness(pod.UID, kubecontainer.ContainerID{Type: "test", ID: "foo"}, true)
+	m.SetContainerReadiness(pod, kubecontainer.ContainerID{Type: "test", ID: "foo"}, true)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("ignore non-existent", &status, true, true, true)
@@ -1220,7 +1221,7 @@ func TestSetContainerStartup(t *testing.T) {
 	m.podManager.AddPod(pod)
 
 	t.Log("Setting startup before status should fail.")
-	m.SetContainerStartup(pod.UID, cID1, true)
+	m.SetContainerStartup(pod, cID1, true)
 	verifyUpdates(t, m, 0)
 	if status, ok := m.GetPodStatus(pod.UID); ok {
 		t.Errorf("Unexpected PodStatus: %+v", status)
@@ -1233,25 +1234,25 @@ func TestSetContainerStartup(t *testing.T) {
 	verifyStartup("initial", &status, false, false, false)
 
 	t.Log("Setting unchanged startup should do nothing.")
-	m.SetContainerStartup(pod.UID, cID1, false)
+	m.SetContainerStartup(pod, cID1, false)
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
 	verifyStartup("unchanged", &status, false, false, false)
 
 	t.Log("Setting container startup should generate update but not pod startup.")
-	m.SetContainerStartup(pod.UID, cID1, true)
+	m.SetContainerStartup(pod, cID1, true)
 	verifyUpdates(t, m, 1) // Started = nil to false
 	status = expectPodStatus(t, m, pod)
 	verifyStartup("c1 ready", &status, true, false, false)
 
 	t.Log("Setting both containers to ready should update pod startup.")
-	m.SetContainerStartup(pod.UID, cID2, true)
+	m.SetContainerStartup(pod, cID2, true)
 	verifyUpdates(t, m, 1)
 	status = expectPodStatus(t, m, pod)
 	verifyStartup("all ready", &status, true, true, true)
 
 	t.Log("Setting non-existent container startup should fail.")
-	m.SetContainerStartup(pod.UID, kubecontainer.ContainerID{Type: "test", ID: "foo"}, true)
+	m.SetContainerStartup(pod, kubecontainer.ContainerID{Type: "test", ID: "foo"}, true)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
 	verifyStartup("ignore non-existent", &status, true, true, true)
