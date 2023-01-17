@@ -91,6 +91,10 @@ const (
 	CPUManagerPinningRequestsTotalKey = "cpu_manager_pinning_requests_total"
 	CPUManagerPinningErrorsTotalKey   = "cpu_manager_pinning_errors_total"
 
+	// Metrics to track the Topology manager behavior
+	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
+	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
+
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
@@ -549,6 +553,26 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// TopologyManagerAdmissionRequestsTotal tracks the number of times the pod spec will cause the topology manager to admit a pod
+	TopologyManagerAdmissionRequestsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           TopologyManagerAdmissionRequestsTotalKey,
+			Help:           "The number of admission requests where resources have to be aligned.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// TopologyManagerAdmissionErrorsTotal tracks the number of times the pod spec required the topology manager to admit a pod, but the admission failed
+	TopologyManagerAdmissionErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           TopologyManagerAdmissionErrorsTotalKey,
+			Help:           "The number of admission request failures where resources could not be aligned.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -600,6 +624,8 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(RunPodSandboxErrors)
 		legacyregistry.MustRegister(CPUManagerPinningRequestsTotal)
 		legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
+		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
+		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
