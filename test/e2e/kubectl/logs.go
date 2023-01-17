@@ -69,7 +69,6 @@ func testingPod(name, value, defaultContainerName string) v1.Pod {
 	}
 }
 
-// TODO promote to conformance test
 var _ = SIGDescribe("Kubectl logs", func() {
 	f := framework.NewDefaultFramework("kubectl-logs")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
