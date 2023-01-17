@@ -229,23 +229,6 @@ func MarkFSResizeFinished(
 	return updatedPVC, err
 }
 
-func MarkControllerExpansionFailed(pvc *v1.PersistentVolumeClaim, kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
-	expansionFailedOnController := v1.PersistentVolumeClaimControllerExpansionFailed
-	newPVC := pvc.DeepCopy()
-	newPVC.Status.ResizeStatus = &expansionFailedOnController
-	patchBytes, err := createPVCPatch(pvc, newPVC, false /* addResourceVersionCheck */)
-	if err != nil {
-		return pvc, fmt.Errorf("patchPVCStatus failed to patch PVC %q: %v", pvc.Name, err)
-	}
-
-	updatedClaim, updateErr := kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).
-		Patch(context.TODO(), pvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	if updateErr != nil {
-		return pvc, fmt.Errorf("patchPVCStatus failed to patch PVC %q: %v", pvc.Name, updateErr)
-	}
-	return updatedClaim, nil
-}
-
 // MarkNodeExpansionFailed marks a PVC for node expansion as failed. Kubelet should not retry expansion
 // of volumes which are in failed state.
 func MarkNodeExpansionFailed(pvc *v1.PersistentVolumeClaim, kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
