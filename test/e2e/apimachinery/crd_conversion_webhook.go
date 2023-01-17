@@ -349,25 +349,44 @@ func deployCustomResourceWebhookAndService(ctx context.Context, f *framework.Fra
 func verifyV1Object(crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v1"))
 	hostPort, exists := obj.Object["hostPort"]
-	framework.ExpectEqual(exists, true)
+	//framework.ExpectEqual(exists, true)
+
+	if (!exists) {
+		framework.Failf("host port does not exist", hostPort)
+	 }
 
 	gomega.Expect(hostPort).To(gomega.BeEquivalentTo("localhost:8080"))
 	_, hostExists := obj.Object["host"]
-	framework.ExpectEqual(hostExists, false)
+	//framework.ExpectEqual(hostExists, false)
+	if (hostExists) {
+		framework.Failf("the door exists", hostExists)
+	 }
 	_, portExists := obj.Object["port"]
-	framework.ExpectEqual(portExists, false)
+	//framework.ExpectEqual(portExists, false)
+	if (hostExists) {
+		framework.Failf("the door exists", hostExists)
+	 }
 }
 
 func verifyV2Object(crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v2"))
 	_, hostPortExists := obj.Object["hostPort"]
-	framework.ExpectEqual(hostPortExists, false)
+	//framework.ExpectEqual(hostPortExists, false)
+	if (hostPortExists) {
+		framework.Failf("host port exist", hostPortExists)
+	 }
 
 	host, hostExists := obj.Object["host"]
-	framework.ExpectEqual(hostExists, true)
+	//framework.ExpectEqual(hostExists, true)
+	if (!hostPortExists) {
+		framework.Failf("the host does not exist", host)
+	 }
 	gomega.Expect(host).To(gomega.BeEquivalentTo("localhost"))
 	port, portExists := obj.Object["port"]
-	framework.ExpectEqual(portExists, true)
+	//framework.ExpectEqual(portExists, true)
+	if (!hostPortExists) {
+		framework.Failf("the door does not exist", port)
+	 }
 	gomega.Expect(port).To(gomega.BeEquivalentTo("8080"))
 }
 
@@ -450,8 +469,15 @@ func testCRListConversion(ctx context.Context, f *framework.Framework, testCrd *
 	list, err := customResourceClients["v1"].List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
-	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
-		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1), true)
+	/*framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
+		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1), true)*/
+
+		
+	if (!list.Items[0].GetName() == name1 && !list.Items[1].GetName() == name2) ||
+	(!list.Items[0].GetName() == name2 && !list.Items[1].GetName() == name1) {
+		framework.Failf("item list failed", list.Items[0].GetName())
+	}
+		
 	verifyV1Object(crd, &list.Items[0])
 	verifyV1Object(crd, &list.Items[1])
 
@@ -459,8 +485,14 @@ func testCRListConversion(ctx context.Context, f *framework.Framework, testCrd *
 	list, err = customResourceClients["v2"].List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
-	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
-		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1), true)
+	/*framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
+		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1), true)*/
+
+	if (!list.Items[0].GetName() == name1 && !list.Items[1].GetName() == name2) ||
+	(!list.Items[0].GetName() == name2 && !list.Items[1].GetName() == name1) {
+		framework.Failf("item list failed",list.Items[0].GetName())
+	}
+
 	verifyV2Object(crd, &list.Items[0])
 	verifyV2Object(crd, &list.Items[1])
 }
