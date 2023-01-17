@@ -130,6 +130,7 @@ type serviceInfo struct {
 	localTrafficDSR        bool
 	winProxyOptimization   bool
 	internalTrafficLocal   bool
+	remoteIT               bool
 }
 
 type hnsNetworkInfo struct {
@@ -531,6 +532,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
 	// Annotation introduced to enable optimized loadbalancing
 	winProxyOptimization := !(strings.ToUpper(service.Annotations["winProxyOptimization"]) == "DISABLED")
+	remoteIT := service.Annotations["enable-remote-internal-traffic"] == "true"
 	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 	var internalTrafficLocal bool
 	if service.Spec.InternalTrafficPolicy != nil {
@@ -540,6 +542,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	if err != nil {
 		preserveDIP = false
 		localTrafficDSR = false
+		remoteIT = false
 	}
 	// targetPort is zero if it is specified as a name in port.TargetPort.
 	// Its real value would be got later from endpoints.
@@ -554,7 +557,8 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	info.localTrafficDSR = localTrafficDSR
 	info.winProxyOptimization = winProxyOptimization
 	info.internalTrafficLocal = internalTrafficLocal
-	klog.V(3).InfoS("Flags enabled for service", "service", service.Name, "localTrafficDSR", localTrafficDSR, "winProxyOptimization", winProxyOptimization, "internalTrafficLocal", internalTrafficLocal, "preserveDIP", preserveDIP)
+	info.remoteIT = remoteIT
+	klog.V(3).InfoS("Flags enabled for service", "service", service.Name, "localTrafficDSR", localTrafficDSR, "winProxyOptimization", winProxyOptimization, "internalTrafficLocal", internalTrafficLocal, "preserveDIP", preserveDIP, "remoteIT", remoteIT)
 
 	for _, eip := range service.Spec.ExternalIPs {
 		info.externalIPs = append(info.externalIPs, &externalIPInfo{ip: eip})
@@ -1572,7 +1576,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 			// Try loading existing policies, if already available
 			lbIngressEndpoints := hnsEndpoints
-			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
+			if svcInfo.preserveDIP || (svcInfo.localTrafficDSR && !svcInfo.remoteIT) {
 				lbIngressEndpoints = hnsLocalEndpoints
 			}
 
