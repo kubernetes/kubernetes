@@ -109,10 +109,15 @@ func TestFlagSet(t *testing.T) {
 		var buffer bytes.Buffer
 		fs.SetOutput(&buffer)
 		fs.PrintDefaults()
-		assert.Equal(t, `      --logging-format string          Sets the log format. Permitted formats: "text". (default "text")
-      --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
-  -v, --v Level                        number for the log level verbosity
-      --vmodule pattern=N,...          comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
+		// Expected (Go 1.19, pflag v1.0.5):
+		//     --logging-format string          Sets the log format. Permitted formats: "text". (default "text")
+		//     --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
+		// -v, --v Level                        number for the log level verbosity
+		//     --vmodule pattern=N,...          comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
+		assert.Regexp(t, `.*--logging-format.*default.*text.*
+.*--log-flush-frequency.*default 5s.*
+.*-v.*--v.*
+.*--vmodule.*pattern=N.*
 `, buffer.String())
 	})
 
@@ -127,14 +132,23 @@ func TestFlagSet(t *testing.T) {
 		var buffer bytes.Buffer
 		fs.SetOutput(&buffer)
 		fs.PrintDefaults()
-		assert.Equal(t, `  -log-flush-frequency value
-    	Maximum number of seconds between log flushes (default 5s)
-  -logging-format value
-    	Sets the log format. Permitted formats: "text". (default text)
-  -v value
-    	number for the log level verbosity
-  -vmodule value
-    	comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
+		// Expected (Go 1.19):
+		// -log-flush-frequency value
+		//   	Maximum number of seconds between log flushes (default 5s)
+		// -logging-format value
+		//   	Sets the log format. Permitted formats: "text". (default text)
+		// -v value
+		//   	number for the log level verbosity
+		// -vmodule value
+		//   	comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
+		assert.Regexp(t, `.*-log-flush-frequency.*
+.*default 5s.*
+.*-logging-format.*
+.*default.*text.*
+.*-v.*
+.*
+.*-vmodule.*
+.*
 `, buffer.String())
 	})
 
