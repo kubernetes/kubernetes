@@ -1040,7 +1040,7 @@ function install_cni {
   cni_plugin_sha=CNI_PLUGINS_${CNI_TARGETARCH^^}_SHA256SUM
   echo "Installing CNI plugin binaries ..." \
     && curl -sSL --retry 5 --output "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
-    && echo "${!cni_plugin_sha} "${TMP_DIR}"/cni.${CNI_TARGETARCH}.tgz" | tee "${TMP_DIR}"/cni.sha256 \
+    && echo "${!cni_plugin_sha} ${TMP_DIR}/cni.${CNI_TARGETARCH}.tgz" | tee "${TMP_DIR}"/cni.sha256 \
     && sha256sum --ignore-missing -c "${TMP_DIR}"/cni.sha256 \
     && rm -f "${TMP_DIR}"/cni.sha256 \
     && sudo mkdir -p /opt/cni/bin \
