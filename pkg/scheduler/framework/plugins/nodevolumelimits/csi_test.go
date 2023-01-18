@@ -305,6 +305,16 @@ func TestCSILimits(t *testing.T) {
 			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
+			newPod:           inTreeInlineVolPod,
+			existingPods:     []*v1.Pod{inTreeTwoVolPod},
+			filterName:       "csi",
+			maxVols:          2,
+			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
+			migrationEnabled: true,
+			limitSource:      "node",
+			test:             "nil csi node",
+		},
+		{
 			newPod:           pendingVolumePod,
 			existingPods:     []*v1.Pod{inTreeTwoVolPod},
 			filterName:       "csi",
@@ -540,8 +550,8 @@ func getFakeCSIPVLister(volumeName string, driverNames ...string) fakeframework.
 			}
 			pvLister = append(pvLister, pv)
 		}
-
 	}
+
 	return pvLister
 }
 
@@ -598,10 +608,11 @@ func getFakeCSIStorageClassLister(scName, provisionerName string) fakeframework.
 }
 
 func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakeframework.CSINodeLister {
+	csiNodeLister := fakeframework.CSINodeLister{}
 	if csiNode != nil {
-		return fakeframework.CSINodeLister(*csiNode)
+		csiNodeLister = append(csiNodeLister, *csiNode.DeepCopy())
 	}
-	return fakeframework.CSINodeLister{}
+	return csiNodeLister
 }
 
 func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
@@ -622,7 +633,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	initCSINode := func() {
 		csiNode = &storagev1.CSINode{
-			ObjectMeta: metav1.ObjectMeta{Name: "csi-node-for-max-pd-test-1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
 			Spec: storagev1.CSINodeSpec{
 				Drivers: []storagev1.CSINodeDriver{},
 			},
