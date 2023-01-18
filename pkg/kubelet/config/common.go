@@ -20,7 +20,11 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"regexp"
 	"strings"
+	"unsafe"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +34,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 
+	"k8s.io/klog/v2"
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
 	// to "v1"?
@@ -39,9 +44,6 @@ import (
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/hash"
-
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -55,17 +57,33 @@ func generatePodName(name string, nodeName types.NodeName) string {
 
 func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
-		hasher := md5.New()
-		hash.DeepHashObject(hasher, pod)
-		// DeepHashObject resets the hash, so we should write the pod source
-		// information AFTER it.
+		var byte_source []byte
+		var errReadSource error
+
 		if isFile {
-			fmt.Fprintf(hasher, "host:%s", nodeName)
-			fmt.Fprintf(hasher, "file:%s", source)
+			byte_source, errReadSource = ioutil.ReadFile(source)
 		} else {
-			fmt.Fprintf(hasher, "url:%s", source)
+			var resp *http.Response
+			resp, errReadSource = http.Get(source)
+			if errReadSource == nil {
+				byte_source, errReadSource = ioutil.ReadAll(resp.Body)
+			}
 		}
-		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
+
+		if errReadSource != nil {
+			return errReadSource
+		}
+
+		// Delete annotation
+		str := regexp.MustCompile("(?m)#.*$").ReplaceAllString(strings.TrimSpace(string(byte_source)), "${1}")
+
+		//Delete blank lines
+		str = regexp.MustCompile(`[\t\r\n]+`).ReplaceAllString(strings.TrimSpace(str), "\n")
+
+		byte_source = *(*[]byte)(unsafe.Pointer(&str))
+		md5sum := md5.Sum(byte_source)
+
+		pod.UID = types.UID(hex.EncodeToString(md5sum[:]))
 		klog.V(5).InfoS("Generated UID", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 	}
 
