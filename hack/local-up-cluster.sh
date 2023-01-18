@@ -512,7 +512,7 @@ function start_apiserver {
     fi
 
     if [[ -z "${EGRESS_SELECTOR_CONFIG_FILE:-}" ]]; then
-      cat <<EOF > ${TMP_DIR}/kube_egress_selector_configuration.yaml
+      cat <<EOF > "${TMP_DIR}"/kube_egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1beta1
 kind: EgressSelectorConfiguration
 egressSelections:
@@ -530,7 +530,7 @@ EOF
     fi
 
     if [[ -z "${AUDIT_POLICY_FILE}" ]]; then
-      cat <<EOF > ${TMP_DIR}/kube-audit-policy-file
+      cat <<EOF > "${TMP_DIR}"/kube-audit-policy-file
 # Log all requests at the Metadata level.
 apiVersion: audit.k8s.io/v1
 kind: Policy
@@ -735,7 +735,7 @@ function start_kubelet {
         generate_kubelet_certs
     fi
 
-    cat <<EOF > ${TMP_DIR}/kubelet.yaml
+    cat <<EOF > "${TMP_DIR}"/kubelet.yaml
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 address: "${KUBELET_HOST}"
@@ -756,7 +756,7 @@ resolvConf: "${KUBELET_RESOLV_CONF}"
 EOF
 
     if [[ "$FEATURE_GATES" == *KubeletTracing=true* ]]; then
-        cat <<EOF >> ${TMP_DIR}/kubelet.yaml
+        cat <<EOF >> "${TMP_DIR}"/kubelet.yaml
 tracing:
   endpoint: localhost:4317 # the default value
   samplingRatePerMillion: 1000000 # sample always
@@ -814,11 +814,11 @@ EOF
       if [[ -n ${FEATURE_GATES} ]]; then
         parse_feature_gates "${FEATURE_GATES}"
       fi
-    } >>${TMP_DIR}/kubelet.yaml
+    } >>"${TMP_DIR}"/kubelet.yaml
 
     # shellcheck disable=SC2024
     sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
-      --config=${TMP_DIR}/kubelet.yaml >"${KUBELET_LOG}" 2>&1 &
+      --config="${TMP_DIR}"/kubelet.yaml >"${KUBELET_LOG}" 2>&1 &
     KUBELET_PID=$!
 
     # Quick check that kubelet is running.
@@ -838,7 +838,7 @@ function start_kubeproxy {
       wait_node_ready
     fi
 
-    cat <<EOF > ${TMP_DIR}/kube-proxy.yaml
+    cat <<EOF > "${TMP_DIR}"/kube-proxy.yaml
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
 clientConnection:
@@ -855,7 +855,7 @@ conntrack:
 EOF
     if [[ -n ${FEATURE_GATES} ]]; then
       parse_feature_gates "${FEATURE_GATES}"
-    fi >>${TMP_DIR}/kube-proxy.yaml
+    fi >>"${TMP_DIR}"/kube-proxy.yaml
 
     if [[ "${REUSE_CERTS}" != true ]]; then
         generate_kubeproxy_certs
@@ -864,7 +864,7 @@ EOF
     # shellcheck disable=SC2024
     sudo "${GO_OUT}/kube-proxy" \
       --v="${LOG_LEVEL}" \
-      --config=${TMP_DIR}/kube-proxy.yaml \
+      --config="${TMP_DIR}"/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 }
@@ -872,7 +872,7 @@ EOF
 function start_kubescheduler {
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
 
-    cat <<EOF > ${TMP_DIR}/kube-scheduler.yaml
+    cat <<EOF > "${TMP_DIR}"/kube-scheduler.yaml
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -882,7 +882,7 @@ leaderElection:
 EOF
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
       --v="${LOG_LEVEL}" \
-      --config=${TMP_DIR}/kube-scheduler.yaml \
+      --config="${TMP_DIR}"/kube-scheduler.yaml \
       --feature-gates="${FEATURE_GATES}" \
       --authentication-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --authorization-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
@@ -960,8 +960,8 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
 
   echo
   echo "Configurations:"
-  for f in $(ls ${TMP_DIR}); do
-    echo "  ${TMP_DIR}/${f}"
+  for f in "${TMP_DIR}"/*; do
+    echo "  ${f}"
   done
 
   cat <<EOF
@@ -1039,13 +1039,13 @@ function parse_eviction {
 function install_cni {
   cni_plugin_sha=CNI_PLUGINS_${CNI_TARGETARCH^^}_SHA256SUM
   echo "Installing CNI plugin binaries ..." \
-    && curl -sSL --retry 5 --output ${TMP_DIR}/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
-    && echo "${!cni_plugin_sha} ${TMP_DIR}/cni.${CNI_TARGETARCH}.tgz" | tee ${TMP_DIR}/cni.sha256 \
-    && sha256sum --ignore-missing -c ${TMP_DIR}/cni.sha256 \
-    && rm -f ${TMP_DIR}/cni.sha256 \
+    && curl -sSL --retry 5 --output "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
+    && echo "${!cni_plugin_sha} "${TMP_DIR}"/cni.${CNI_TARGETARCH}.tgz" | tee "${TMP_DIR}"/cni.sha256 \
+    && sha256sum --ignore-missing -c "${TMP_DIR}"/cni.sha256 \
+    && rm -f "${TMP_DIR}"/cni.sha256 \
     && sudo mkdir -p /opt/cni/bin \
-    && sudo tar -C /opt/cni/bin -xzvf ${TMP_DIR}/cni."${CNI_TARGETARCH}".tgz \
-    && rm -rf ${TMP_DIR}/cni."${CNI_TARGETARCH}".tgz \
+    && sudo tar -C /opt/cni/bin -xzvf "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz \
+    && rm -rf "${TMP_DIR}"/cni."${CNI_TARGETARCH}".tgz \
     && sudo find /opt/cni/bin -type f -not \( \
          -iname host-local \
          -o -iname bridge \
