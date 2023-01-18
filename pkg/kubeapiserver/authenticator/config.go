@@ -18,6 +18,7 @@ package authenticator
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -277,8 +278,12 @@ func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAud
 		}
 		allPublicKeys = append(allPublicKeys, publicKeys...)
 	}
+	validator, err := serviceaccount.NewLegacyValidator(lookup, serviceAccountGetter, secretsWriter)
+	if err != nil {
+		return nil, fmt.Errorf("while creating legacy validator, err: %w", err)
+	}
 
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, allPublicKeys, apiAudiences, serviceaccount.NewLegacyValidator(lookup, serviceAccountGetter, secretsWriter))
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, allPublicKeys, apiAudiences, validator)
 	return tokenAuthenticator, nil
 }
 
