@@ -40,7 +40,7 @@ type EndpointSlice struct {
 	// supported:
 	// * IPv4: Represents an IPv4 Address.
 	// * IPv6: Represents an IPv6 Address.
-	// * FQDN: Represents a Fully Qualified Domain Name.
+	// * FQDN: Represents a Fully Qualified Domain Name. [DEPRECATED]
 	AddressType AddressType `json:"addressType" protobuf:"bytes,4,rep,name=addressType"`
 
 	// endpoints is a list of unique endpoints in this slice. Each slice may
