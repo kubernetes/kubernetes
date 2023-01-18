@@ -48,7 +48,7 @@ func newKubeApiserverLease(name, holderIdentity string) *coordinationv1.Lease {
 			Name:      name,
 			Namespace: metav1.NamespaceSystem,
 			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
+				"apiserver.kubernetes.io/identity": "kube-apiserver",
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{
