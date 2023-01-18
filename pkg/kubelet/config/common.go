@@ -61,7 +61,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 		var errReadSource error
 
 		if isFile {
-			byte_source, errReadSource = ioutil.ReadFile(source)
+			byte_source, errReadSource = os.ReadFile(source)
 		} else {
 			var resp *http.Response
 			resp, errReadSource = http.Get(source)
