@@ -485,17 +485,18 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	var tests = []struct {
-		name            string
-		fileContents    []byte
-		node            *v1.Node
-		staticPods      []testresources.FakeStaticPod
-		configMaps      []testresources.FakeConfigMap
-		newControlPlane bool
-		expectedError   bool
+		name                     string
+		fileContents             []byte
+		node                     *v1.Node
+		staticPods               []testresources.FakeStaticPod
+		configMaps               []testresources.FakeConfigMap
+		isLocalExistControlPlane bool
+		expectedError            bool
 	}{
 		{
-			name:          "invalid - No kubeadm-config ConfigMap",
-			expectedError: true,
+			name:                     "invalid - No kubeadm-config ConfigMap",
+			isLocalExistControlPlane: true,
+			expectedError:            true,
 		},
 		{
 			name: "invalid - No ClusterConfiguration in kubeadm-config ConfigMap",
@@ -505,7 +506,8 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					Data: map[string]string{},
 				},
 			},
-			expectedError: true,
+			isLocalExistControlPlane: true,
+			expectedError:            true,
 		},
 		{
 			name: "valid v1beta3 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information
@@ -550,6 +552,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					Taints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
 				},
 			},
+			isLocalExistControlPlane: true,
 		},
 		{
 			name: "valid v1beta3 - new control plane == true", // InitConfiguration composed with data from different places, without node specific information
@@ -582,7 +585,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 			},
-			newControlPlane: true,
+			isLocalExistControlPlane: false,
 		},
 	}
 

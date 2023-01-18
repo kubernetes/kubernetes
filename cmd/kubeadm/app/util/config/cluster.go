@@ -45,7 +45,7 @@ import (
 )
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
-func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, isLocalExistControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
 	if printer == nil {
 		printer = &output.TextPrinter{}
 	}
@@ -53,7 +53,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	printer.Printf("[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -o yaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 
 	// Fetch the actual config from cluster
-	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
+	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, isLocalExistControlPlane, skipComponentConfigs)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 }
 
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
-func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, isLocalExistControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
 	// Also, the config map really should be KubeadmConfigConfigMap...
 	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	if err != nil {
@@ -104,9 +104,9 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		}
 	}
 
-	// if this isn't a new controlplane instance (e.g. in case of kubeadm upgrades)
+	// if this is a controlplane instance (e.g. in case of kubeadm upgrades)
 	// get nodes specific information as well
-	if !newControlPlane {
+	if isLocalExistControlPlane {
 		// gets the nodeRegistration for the current from the node object
 		kubeconfigFile := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
 		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration); err != nil {
@@ -117,11 +117,11 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 			return nil, errors.Wrap(err, "failed to getAPIEndpoint")
 		}
 	} else {
-		// In the case where newControlPlane is true we don't go through getNodeRegistration() and initcfg.NodeRegistration.CRISocket is empty.
+		// In the case where isLocalExistControlPlane is false we don't go through getNodeRegistration() and initcfg.NodeRegistration.CRISocket is empty.
 		// This forces DetectCRISocket() to be called later on, and if there is more than one CRI installed on the system, it will error out,
 		// while asking for the user to provide an override for the CRI socket. Even if the user provides an override, the call to
 		// DetectCRISocket() can happen too early and thus ignore it (while still erroring out).
-		// However, if newControlPlane == true, initcfg.NodeRegistration is not used at all and it's overwritten later on.
+		// However, if isLocalExistControlPlane == true, initcfg.NodeRegistration is not used at all and it's overwritten later on.
 		// Thus it's necessary to supply some default value, that will avoid the call to DetectCRISocket() and as
 		// initcfg.NodeRegistration is discarded, setting whatever value here is harmless.
 		initcfg.NodeRegistration.CRISocket = constants.UnknownCRISocket

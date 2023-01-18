@@ -69,7 +69,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	// The usual case here is to not have a config file, but rather load the config from the cluster.
 	// This is probably 90% of the time. So we handle it first.
 	if cfgPath == "" {
-		cfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, false, skipComponentConfigs)
+		cfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, true, skipComponentConfigs)
 		return cfg, false, err
 	}
 
@@ -97,7 +97,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 
 	// If no kubeadm config types are present, we assume that there are manually upgraded component configs in the file.
 	// Hence, we load the kubeadm types from the cluster.
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, false, true)
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, true, true)
 	if err != nil {
 		return nil, false, err
 	}
