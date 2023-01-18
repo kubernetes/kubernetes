@@ -19,6 +19,8 @@ package framework
 import (
 	"errors"
 	"sync"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var (
@@ -48,6 +50,8 @@ type CycleState struct {
 	storage sync.Map
 	// if recordPluginMetrics is true, PluginExecutionDuration will be recorded for this cycle.
 	recordPluginMetrics bool
+	// SkipFilterPlugins are plugins that will be skipped in the Filter extension point.
+	SkipFilterPlugins sets.Set[string]
 }
 
 // NewCycleState initializes a new CycleState and returns its pointer.
@@ -83,6 +87,7 @@ func (c *CycleState) Clone() *CycleState {
 		return true
 	})
 	copy.recordPluginMetrics = c.recordPluginMetrics
+	copy.SkipFilterPlugins = c.SkipFilterPlugins
 
 	return copy
 }

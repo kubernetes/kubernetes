@@ -261,7 +261,9 @@ var _ = SIGDescribe("CronJob", func() {
 		ginkgo.By("Ensuring job was deleted")
 		_, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectError(err)
-		framework.ExpectEqual(apierrors.IsNotFound(err), true)
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("Failed to delete %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
+		}
 
 		ginkgo.By("Ensuring the job is not in the cronjob active list")
 		err = waitForJobNotActive(ctx, f.ClientSet, f.Namespace.Name, cronJob.Name, job.Name)
@@ -385,10 +387,14 @@ var _ = SIGDescribe("CronJob", func() {
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-cjWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
 				framework.ExpectEqual(evt.Type, watch.Modified)
 				watchedCronJob, isCronJob := evt.Object.(*batchv1.CronJob)
-				framework.ExpectEqual(isCronJob, true, fmt.Sprintf("expected CronJob, got %T", evt.Object))
+				if !isCronJob {
+					framework.Failf("expected CronJob, got %T", evt.Object)
+				}
 				if watchedCronJob.Annotations["patched"] == "true" {
 					framework.Logf("saw patched and updated annotations")
 					sawAnnotations = true
@@ -414,7 +420,9 @@ var _ = SIGDescribe("CronJob", func() {
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(cjStatusJSON)+`}`),
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedStatus.Status.LastScheduleTime.Equal(&now1), true, "patched object should have the applied lastScheduleTime status")
+		if !patchedStatus.Status.LastScheduleTime.Equal(&now1) {
+			framework.Failf("patched object should have the applied lastScheduleTime %#v, got %#v instead", cjStatus.LastScheduleTime, patchedStatus.Status.LastScheduleTime)
+		}
 		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating /status")
@@ -431,7 +439,9 @@ var _ = SIGDescribe("CronJob", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedStatus.Status.LastScheduleTime.Equal(&now2), true, fmt.Sprintf("updated object status expected to have updated lastScheduleTime %#v, got %#v", statusToUpdate.Status.LastScheduleTime, updatedStatus.Status.LastScheduleTime))
+		if !updatedStatus.Status.LastScheduleTime.Equal(&now2) {
+			framework.Failf("updated object status expected to have updated lastScheduleTime %#v, got %#v", statusToUpdate.Status.LastScheduleTime, updatedStatus.Status.LastScheduleTime)
+		}
 
 		ginkgo.By("get /status")
 		cjResource := schema.GroupVersionResource{Group: "batch", Version: cjVersion, Resource: "cronjobs"}
@@ -444,7 +454,9 @@ var _ = SIGDescribe("CronJob", func() {
 		// CronJob resource delete operations
 		expectFinalizer := func(cj *batchv1.CronJob, msg string) {
 			framework.ExpectNotEqual(cj.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, cronjob: %+v", msg, cj))
-			framework.ExpectEqual(len(cj.Finalizers) > 0, true, fmt.Sprintf("expected finalizers on cronjob, got none on step: %q, cronjob: %+v", msg, cj))
+			if len(cj.Finalizers) == 0 {
+				framework.Failf("expected finalizers on cronjob, got none on step: %q, cronjob: %+v", msg, cj)
+			}
 		}
 
 		ginkgo.By("deleting")
@@ -458,7 +470,9 @@ var _ = SIGDescribe("CronJob", func() {
 		if err == nil {
 			expectFinalizer(cj, "deleting cronjob")
 		} else {
-			framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %v", err))
+			if !apierrors.IsNotFound(err) {
+				framework.Failf("expected 404, got %v", err)
+			}
 		}
 
 		ginkgo.By("deleting a collection")
@@ -467,7 +481,10 @@ var _ = SIGDescribe("CronJob", func() {
 		cjs, err = cjClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		// Should have <= 2 items since some cronjobs might not have been deleted yet due to finalizers
-		framework.ExpectEqual(len(cjs.Items) <= 2, true, "filtered list should be <= 2")
+		if len(cjs.Items) > 2 {
+			framework.Logf("got unexpected filtered list: %v", cjs.Items)
+			framework.Fail("filtered list should be <= 2")
+		}
 		// Validate finalizers
 		for _, cj := range cjs.Items {
 			expectFinalizer(&cj, "deleting cronjob collection")

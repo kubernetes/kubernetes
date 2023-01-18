@@ -280,7 +280,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		currentNUMANodeIDs, err := cpuset.Parse(strings.Trim(output, "\n"))
 		framework.ExpectNoError(err)
 
-		framework.ExpectEqual(numaNodeIDs, currentNUMANodeIDs.ToSlice())
+		framework.ExpectEqual(numaNodeIDs, currentNUMANodeIDs.List())
 	}
 
 	waitingForHugepages := func(ctx context.Context, hugepagesCount int) {

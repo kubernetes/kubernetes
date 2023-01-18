@@ -57,7 +57,6 @@ type GetOptions struct {
 	PrintFlags             *PrintFlags
 	ToPrinter              func(*meta.RESTMapping, *bool, bool, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
-	PrintWithOpenAPICols   bool
 
 	CmdParent string
 
@@ -137,8 +136,7 @@ var (
 )
 
 const (
-	useOpenAPIPrintColumnFlagLabel = "use-openapi-print-columns"
-	useServerPrintColumns          = "server-print"
+	useServerPrintColumns = "server-print"
 )
 
 var supportedSubresources = []string{"status", "scale"}
@@ -184,7 +182,6 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	addOpenAPIPrintColumnFlags(cmd, o)
 	addServerPrintColumnFlags(cmd, o)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
@@ -241,11 +238,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		printFlags := o.PrintFlags.Copy()
 
 		if mapping != nil {
-			if !cmdSpecifiesOutputFmt(cmd) && o.PrintWithOpenAPICols {
-				if apiSchema, err := f.OpenAPISchema(); err == nil {
-					printFlags.UseOpenAPIColumns(apiSchema, mapping)
-				}
-			}
 			printFlags.SetKind(mapping.GroupVersionKind.GroupKind())
 		}
 		if withNamespace {
@@ -292,11 +284,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 			return cmdutil.UsageErrorf(cmd, usageString)
 		}
-	}
-
-	// openapi printing is mutually exclusive with server side printing
-	if o.PrintWithOpenAPICols && o.ServerPrint {
-		fmt.Fprintf(o.IOStreams.ErrOut, "warning: --%s requested, --%s will be ignored\n", useOpenAPIPrintColumnFlagLabel, useServerPrintColumns)
 	}
 
 	return nil
@@ -433,10 +420,6 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 }
 
 func (o *GetOptions) transformRequests(req *rest.Request) {
-	// We need full objects if printing with openapi columns
-	if o.PrintWithOpenAPICols {
-		return
-	}
 	if !o.ServerPrint || !o.IsHumanReadablePrinter {
 		return
 	}
@@ -578,13 +561,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			}
 
 			lastMapping = mapping
-		}
-
-		// ensure a versioned object is passed to the custom-columns printer
-		// if we are using OpenAPI columns to print
-		if o.PrintWithOpenAPICols {
-			printer.PrintObj(info.Object, w)
-			continue
 		}
 
 		printer.PrintObj(info.Object, w)
@@ -830,21 +806,12 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 }
 
-func addOpenAPIPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
-	cmd.Flags().BoolVar(&opt.PrintWithOpenAPICols, useOpenAPIPrintColumnFlagLabel, opt.PrintWithOpenAPICols, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
-	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "deprecated in favor of server-side printing")
-}
-
 func addServerPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
 	cmd.Flags().BoolVar(&opt.ServerPrint, useServerPrintColumns, opt.ServerPrint, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
 }
 
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
 	return printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource
-}
-
-func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
-	return cmdutil.GetFlagString(cmd, "output") != ""
 }
 
 func multipleGVKsRequested(infos []*resource.Info) bool {

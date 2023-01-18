@@ -276,7 +276,7 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 
 	// Override compiler used by controller for tests
 	controller = handler.evaluator.(*celAdmissionController)
-	controller.validatorCompiler = compiler
+	controller.policyController.ValidatorCompiler = compiler
 
 	t.Cleanup(func() {
 		testContextCancel()
@@ -369,8 +369,8 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 		return nil, err
 	}
 
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	c.policyController.mutex.RLock()
+	defer c.policyController.mutex.RUnlock()
 
 	switch obj.(type) {
 	case *unstructured.Unstructured:
@@ -380,7 +380,7 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 			Kind:       paramSourceGVK.Kind,
 		}
 		var paramInformer generic.Informer[*unstructured.Unstructured]
-		if paramInfo, ok := c.paramsCRDControllers[paramKind]; ok {
+		if paramInfo, ok := c.policyController.paramsCRDControllers[paramKind]; ok {
 			paramInformer = paramInfo.controller.Informer()
 		} else {
 			// Treat unknown CRD the same as not found
@@ -399,7 +399,7 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 		return item, nil
 	case *v1alpha1.ValidatingAdmissionPolicyBinding:
 		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
-		info, ok := c.bindingInfos[nn]
+		info, ok := c.policyController.bindingInfos[nn]
 		if !ok {
 			return nil, nil
 		}
@@ -407,7 +407,7 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 		return info.lastReconciledValue, nil
 	case *v1alpha1.ValidatingAdmissionPolicy:
 		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
-		info, ok := c.definitionInfo[nn]
+		info, ok := c.policyController.definitionInfo[nn]
 		if !ok {
 			return nil, nil
 		}
@@ -422,7 +422,15 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 // their gvk/name in the controller
 func waitForReconcile(ctx context.Context, controller *celAdmissionController, objects ...runtime.Object) error {
 	return wait.PollWithContext(ctx, 100*time.Millisecond, 1*time.Second, func(ctx context.Context) (done bool, err error) {
+		defer func() {
+			if done {
+				// force admission controller to refresh the information it
+				// uses for validation now that it is done in the background
+				controller.refreshPolicies()
+			}
+		}()
 		for _, obj := range objects {
+
 			objMeta, err := meta.Accessor(obj)
 			if err != nil {
 				return false, fmt.Errorf("error getting meta accessor for original %T object (%v): %w", obj, obj, err)
@@ -462,6 +470,14 @@ func waitForReconcile(ctx context.Context, controller *celAdmissionController, o
 // with the given GVKs and namespace/names
 func waitForReconcileDeletion(ctx context.Context, controller *celAdmissionController, objects ...runtime.Object) error {
 	return wait.PollWithContext(ctx, 200*time.Millisecond, 3*time.Hour, func(ctx context.Context) (done bool, err error) {
+		defer func() {
+			if done {
+				// force admission controller to refresh the information it
+				// uses for validation now that it is done in the background
+				controller.refreshPolicies()
+			}
+		}()
+
 		for _, obj := range objects {
 			currentValue, err := controller.getCurrentObject(obj)
 			if err != nil {
@@ -694,7 +710,6 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 			attributeRecord(
 				nil, nonMatchingParams,
 				admission.Create), &admission.RuntimeObjectInterfaces{}))
-	require.Zero(t, numCompiles)
 	require.Empty(t, passedParams)
 
 	// Validate a matching input.
@@ -791,9 +806,6 @@ func TestReconfigureBinding(t *testing.T) {
 	// Expect `Compile` only called once
 	require.Equal(t, 1, numCompiles, "expect `Compile` to be called only once")
 
-	// Show Evaluator was called
-	//require.Len(t, passedParams, 1, "expect evaluator is called due to proper configuration")
-
 	// Update the tracker to point at different params
 	require.NoError(t, tracker.Update(bindingsGVR, denyBinding2, ""))
 
@@ -808,8 +820,6 @@ func TestReconfigureBinding(t *testing.T) {
 	)
 
 	require.ErrorContains(t, err, `failed to configure binding: replicas-test2.example.com not found`)
-	require.Equal(t, 1, numCompiles, "expect compile is not called when there is configuration error")
-	//require.Len(t, passedParams, 1, "expect evaluator was not called when there is configuration error")
 
 	// Add the missing params
 	require.NoError(t, paramTracker.Add(fakeParams2))

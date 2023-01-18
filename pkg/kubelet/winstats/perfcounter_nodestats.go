@@ -157,7 +157,7 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 	}
 
 	return &cadvisorapi.MachineInfo{
-		NumCores:       processorCount(),
+		NumCores:       ProcessorCount(),
 		MemoryCapacity: p.nodeInfo.memoryPhysicalCapacityBytes,
 		MachineID:      hostname,
 		SystemUUID:     systemUUID,
@@ -173,7 +173,7 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 // more notes for this issue:
 // same issue in moby: https://github.com/moby/moby/issues/38935#issuecomment-744638345
 // solution in hcsshim: https://github.com/microsoft/hcsshim/blob/master/internal/processorinfo/processor_count.go
-func processorCount() int {
+func ProcessorCount() int {
 	if amount := getActiveProcessorCount(allProcessorGroups); amount != 0 {
 		return int(amount)
 	}

@@ -638,12 +638,12 @@ func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 		return true
 	}
 	for i := 0; i < len(pod.Spec.Containers); i++ {
-		if isSignificantContainerUpdate(&pod.Spec.Containers[i], &oldPod.Spec.Containers[i], pod.Annotations, oldPod.Annotations) {
+		if isSignificantContainerUpdate(&pod.Spec.Containers[i], &oldPod.Spec.Containers[i]) {
 			return true
 		}
 	}
 	for i := 0; i < len(pod.Spec.InitContainers); i++ {
-		if isSignificantContainerUpdate(&pod.Spec.InitContainers[i], &oldPod.Spec.InitContainers[i], pod.Annotations, oldPod.Annotations) {
+		if isSignificantContainerUpdate(&pod.Spec.InitContainers[i], &oldPod.Spec.InitContainers[i]) {
 			return true
 		}
 	}
@@ -658,7 +658,7 @@ func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 		if oldC == nil {
 			return true // EphemeralContainer added
 		}
-		if isSignificantContainerUpdate((*corev1.Container)(&c.EphemeralContainerCommon), oldC, pod.Annotations, oldPod.Annotations) {
+		if isSignificantContainerUpdate((*corev1.Container)(&c.EphemeralContainerCommon), oldC) {
 			return true
 		}
 	}
@@ -666,13 +666,8 @@ func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 }
 
 // isSignificantContainerUpdate determines whether a container update should trigger a policy evaluation.
-func isSignificantContainerUpdate(container, oldContainer *corev1.Container, annotations, oldAnnotations map[string]string) bool {
-	if container.Image != oldContainer.Image {
-		return true
-	}
-	// TODO(saschagrunert): Remove this logic in 1.27.
-	seccompKey := corev1.SeccompContainerAnnotationKeyPrefix + container.Name
-	return annotations[seccompKey] != oldAnnotations[seccompKey]
+func isSignificantContainerUpdate(container, oldContainer *corev1.Container) bool {
+	return container.Image != oldContainer.Image
 }
 
 func (a *Admission) exemptNamespace(namespace string) bool {

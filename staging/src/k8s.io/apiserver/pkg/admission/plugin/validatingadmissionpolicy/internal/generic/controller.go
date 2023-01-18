@@ -150,12 +150,13 @@ func (c *controller[T]) Run(ctx context.Context) error {
 			enqueue(obj, false)
 		},
 	})
-	c.notificationsDelivered.Store(registration.HasSynced)
 
 	// Error might be raised if informer was started and stopped already
 	if err != nil {
 		return err
 	}
+
+	c.notificationsDelivered.Store(registration.HasSynced)
 
 	// Make sure event handler is removed from informer in case return early from
 	// an error
@@ -185,8 +186,8 @@ func (c *controller[T]) Run(ctx context.Context) error {
 	for i := uint(0); i < c.options.Workers; i++ {
 		waitGroup.Add(1)
 		go func() {
+			defer waitGroup.Done()
 			wait.Until(c.runWorker, time.Second, ctx.Done())
-			waitGroup.Done()
 		}()
 	}
 

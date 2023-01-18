@@ -38,7 +38,6 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -366,20 +365,6 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(configMapColumnDefinitions, printConfigMap)
 	_ = h.TableHandler(configMapColumnDefinitions, printConfigMapList)
-
-	podSecurityPolicyColumnDefinitions := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Priv", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
-		{Name: "Caps", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["allowedCapabilities"]},
-		{Name: "SELinux", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["seLinux"]},
-		{Name: "RunAsUser", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["runAsUser"]},
-		{Name: "FsGroup", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["fsGroup"]},
-		{Name: "SupGroup", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["supplementalGroups"]},
-		{Name: "ReadOnlyRootFs", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["readOnlyRootFilesystem"]},
-		{Name: "Volumes", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["volumes"]},
-	}
-	_ = h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicy)
-	_ = h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicyList)
 
 	networkPolicyColumnDefinitioins := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -2318,39 +2303,6 @@ func printConfigMapList(list *api.ConfigMapList, options printers.GenerateOption
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printConfigMap(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printPodSecurityPolicy(obj *policy.PodSecurityPolicy, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	row := metav1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-
-	capabilities := make([]string, len(obj.Spec.AllowedCapabilities))
-	for i, c := range obj.Spec.AllowedCapabilities {
-		capabilities[i] = string(c)
-	}
-	volumes := make([]string, len(obj.Spec.Volumes))
-	for i, v := range obj.Spec.Volumes {
-		volumes[i] = string(v)
-	}
-	row.Cells = append(row.Cells, obj.Name, fmt.Sprintf("%v", obj.Spec.Privileged),
-		strings.Join(capabilities, ","), string(obj.Spec.SELinux.Rule),
-		string(obj.Spec.RunAsUser.Rule), string(obj.Spec.FSGroup.Rule),
-		string(obj.Spec.SupplementalGroups.Rule), obj.Spec.ReadOnlyRootFilesystem,
-		strings.Join(volumes, ","))
-	return []metav1.TableRow{row}, nil
-}
-
-func printPodSecurityPolicyList(list *policy.PodSecurityPolicyList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	rows := make([]metav1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printPodSecurityPolicy(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

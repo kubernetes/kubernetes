@@ -298,7 +298,9 @@ var _ = SIGDescribe("Job", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(exists, true)
+		if !exists {
+			framework.Failf("Expected suspended job to exist. It was not found.")
+		}
 
 		ginkgo.By("Updating the job with suspend=false")
 		job.Spec.Suspend = pointer.BoolPtr(false)
@@ -354,7 +356,9 @@ var _ = SIGDescribe("Job", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(exists, true)
+		if !exists {
+			framework.Failf("Expected suspended job to exist. It was not found.")
+		}
 	})
 
 	/*
@@ -494,7 +498,9 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring job was deleted")
 		_, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectError(err, "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
-		framework.ExpectEqual(apierrors.IsNotFound(err), true)
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
+		}
 	})
 
 	/*
@@ -661,7 +667,9 @@ var _ = SIGDescribe("Job", func() {
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(jStatusJSON)+`}`),
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedStatus.Status.StartTime.Equal(&now1), true, "patched object should have the applied StartTime status")
+		if !patchedStatus.Status.StartTime.Equal(&now1) {
+			framework.Failf("patched object should have the applied StartTime %#v, got %#v instead", jStatus.StartTime, patchedStatus.Status.StartTime)
+		}
 		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
 
 		ginkgo.By("updating /status")
@@ -678,7 +686,9 @@ var _ = SIGDescribe("Job", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedStatus.Status.StartTime.Equal(&now2), true, fmt.Sprintf("updated object status expected to have updated StartTime %#v, got %#v", statusToUpdate.Status.StartTime, updatedStatus.Status.StartTime))
+		if !updatedStatus.Status.StartTime.Equal(&now2) {
+			framework.Failf("updated object status expected to have updated StartTime %#v, got %#v", statusToUpdate.Status.StartTime, updatedStatus.Status.StartTime)
+		}
 
 		ginkgo.By("get /status")
 		jResource := schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}

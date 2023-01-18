@@ -34,7 +34,7 @@ import (
 )
 
 func convertToUnstructured(b *testing.B, obj runtime.Object) runtime.Object {
-	converter := fieldmanager.DeducedTypeConverter{}
+	converter := fieldmanager.NewDeducedTypeConverter()
 	typed, err := converter.ObjectToTyped(obj)
 	require.NoError(b, err)
 	res, err := converter.TypedToObject(typed)

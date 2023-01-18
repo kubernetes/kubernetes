@@ -70,7 +70,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// default Parameters to Cluster
 			if p.Spec.Parameters == nil || p.Spec.Parameters.Scope == nil {
 				p.Spec.Parameters = &networking.IngressClassParametersReference{
-					Scope: utilpointer.StringPtr(networking.IngressClassParametersReferenceScopeCluster),
+					Scope: utilpointer.String(networking.IngressClassParametersReferenceScopeCluster),
 				}
 			}
 		},

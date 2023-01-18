@@ -496,7 +496,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			rollbackPods[pod.Name] = true
 		}
 		for _, pod := range existingPods {
-			framework.ExpectEqual(rollbackPods[pod.Name], true, fmt.Sprintf("unexpected pod %s be restarted", pod.Name))
+			if !rollbackPods[pod.Name] {
+				framework.Failf("unexpected pod %s be restarted", pod.Name)
+			}
 		}
 	})
 

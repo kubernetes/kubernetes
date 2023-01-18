@@ -33,12 +33,13 @@ approvers:
   - msau42
   - neolit123
   - oomichi
+  - pohly
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
   - SataQiu
-  - sig-testing-approvers
   - smarterclayton
   - soltysh
+  - spiffxp
   - sttts
   - thockin
   - wojtek-t
@@ -46,7 +47,9 @@ emeritus_approvers:
   - eparis
   - foxish
   - gmarek
+  - ixdy
   - krousey
+  - krzyzacy
   - kow3ns
   - madhusudancs
   - marun

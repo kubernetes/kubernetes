@@ -602,7 +602,7 @@ func TestGracefulShutdown(t *testing.T) {
 	wg.Add(1)
 
 	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
-		handler := genericfilters.WithWaitGroup(apiHandler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+		handler := genericfilters.WithWaitGroup(apiHandler, c.LongRunningFunc, c.NonLongRunningRequestWaitGroup)
 		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 		return handler
 	}
@@ -666,7 +666,7 @@ func TestGracefulShutdown(t *testing.T) {
 	}
 
 	// wait for wait group handler finish
-	s.HandlerChainWaitGroup.Wait()
+	s.NonLongRunningRequestWaitGroup.Wait()
 	<-stoppedCh
 
 	// check server all handlers finished.

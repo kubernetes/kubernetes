@@ -32,9 +32,9 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
-	envelopekmsv2 "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kmsservice "k8s.io/kms/service"
 )
 
 const (
@@ -68,28 +68,28 @@ type testKMSv2EnvelopeService struct {
 	err error
 }
 
-func (t *testKMSv2EnvelopeService) Decrypt(ctx context.Context, uid string, req *envelopekmsv2.DecryptRequest) ([]byte, error) {
+func (t *testKMSv2EnvelopeService) Decrypt(ctx context.Context, uid string, req *kmsservice.DecryptRequest) ([]byte, error) {
 	if t.err != nil {
 		return nil, t.err
 	}
 	return base64.StdEncoding.DecodeString(string(req.Ciphertext))
 }
 
-func (t *testKMSv2EnvelopeService) Encrypt(ctx context.Context, uid string, data []byte) (*envelopekmsv2.EncryptResponse, error) {
+func (t *testKMSv2EnvelopeService) Encrypt(ctx context.Context, uid string, data []byte) (*kmsservice.EncryptResponse, error) {
 	if t.err != nil {
 		return nil, t.err
 	}
-	return &envelopekmsv2.EncryptResponse{
+	return &kmsservice.EncryptResponse{
 		Ciphertext: []byte(base64.StdEncoding.EncodeToString(data)),
 		KeyID:      "1",
 	}, nil
 }
 
-func (t *testKMSv2EnvelopeService) Status(ctx context.Context) (*envelopekmsv2.StatusResponse, error) {
+func (t *testKMSv2EnvelopeService) Status(ctx context.Context) (*kmsservice.StatusResponse, error) {
 	if t.err != nil {
 		return nil, t.err
 	}
-	return &envelopekmsv2.StatusResponse{Healthz: "ok", KeyID: "1", Version: "v2alpha1"}, nil
+	return &kmsservice.StatusResponse{Healthz: "ok", KeyID: "1", Version: "v2alpha1"}, nil
 }
 
 // The factory method to create mock envelope service.
@@ -103,12 +103,12 @@ func newMockErrorEnvelopeService(endpoint string, timeout time.Duration) (envelo
 }
 
 // The factory method to create mock envelope kmsv2 service.
-func newMockEnvelopeKMSv2Service(ctx context.Context, endpoint string, timeout time.Duration) (envelopekmsv2.Service, error) {
+func newMockEnvelopeKMSv2Service(ctx context.Context, endpoint string, timeout time.Duration) (kmsservice.Service, error) {
 	return &testKMSv2EnvelopeService{nil}, nil
 }
 
 // The factory method to create mock envelope kmsv2 service which always returns error.
-func newMockErrorEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (envelopekmsv2.Service, error) {
+func newMockErrorEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (kmsservice.Service, error) {
 	return &testKMSv2EnvelopeService{errors.New("test")}, nil
 }
 
@@ -177,37 +177,37 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	// Transforms data using one of them, and tries to untransform using the others.
 	// Repeats this for all possible combinations.
 	correctConfigWithIdentityFirst := "testdata/valid-configs/identity-first.yaml"
-	identityFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithIdentityFirst, false, ctx.Done())
+	identityFirstEncryptionConfiguration, err := LoadEncryptionConfig(ctx, correctConfigWithIdentityFirst, false)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithIdentityFirst)
 	}
 
 	correctConfigWithAesGcmFirst := "testdata/valid-configs/aes-gcm-first.yaml"
-	aesGcmFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithAesGcmFirst, false, ctx.Done())
+	aesGcmFirstEncryptionConfiguration, err := LoadEncryptionConfig(ctx, correctConfigWithAesGcmFirst, false)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesGcmFirst)
 	}
 
 	correctConfigWithAesCbcFirst := "testdata/valid-configs/aes-cbc-first.yaml"
-	aesCbcFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithAesCbcFirst, false, ctx.Done())
+	aesCbcFirstEncryptionConfiguration, err := LoadEncryptionConfig(ctx, correctConfigWithAesCbcFirst, false)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesCbcFirst)
 	}
 
 	correctConfigWithSecretboxFirst := "testdata/valid-configs/secret-box-first.yaml"
-	secretboxFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithSecretboxFirst, false, ctx.Done())
+	secretboxFirstEncryptionConfiguration, err := LoadEncryptionConfig(ctx, correctConfigWithSecretboxFirst, false)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithSecretboxFirst)
 	}
 
 	correctConfigWithKMSFirst := "testdata/valid-configs/kms-first.yaml"
-	kmsFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithKMSFirst, false, ctx.Done())
+	kmsFirstEncryptionConfiguration, err := LoadEncryptionConfig(ctx, correctConfigWithKMSFirst, false)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
 	}
 
 	correctConfigWithKMSv2First := "testdata/valid-configs/kmsv2-first.yaml"
-	kmsv2FirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithKMSv2First, false, ctx.Done())
+	kmsv2FirstEncryptionConfiguration, err := LoadEncryptionConfig(ctx, correctConfigWithKMSv2First, false)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSv2First)
 	}
@@ -460,7 +460,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 				}
 			}
 
-			_, _, kmsUsed, _ := getTransformerOverridesAndKMSPluginHealthzCheckers(&testCase.config, testContext(t).Done())
+			_, _, kmsUsed, _ := getTransformerOverridesAndKMSPluginHealthzCheckers(testContext(t), &testCase.config)
 			if kmsUsed == nil {
 				t.Fatal("kmsUsed should not be nil")
 			}
@@ -547,7 +547,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 				return
 			}
 
-			_, got, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(config, testContext(t).Done())
+			_, got, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(testContext(t), config)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -757,7 +757,7 @@ func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath strin
 	ctx := testContext(t)
 
 	t.Helper()
-	encryptionConfiguration, err := LoadEncryptionConfig(encryptionConfigPath, false, ctx.Done())
+	encryptionConfiguration, err := LoadEncryptionConfig(ctx, encryptionConfigPath, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -773,23 +773,23 @@ func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath strin
 func TestIsKMSv2ProviderHealthyError(t *testing.T) {
 	testCases := []struct {
 		desc           string
-		statusResponse *envelopekmsv2.StatusResponse
+		statusResponse *kmsservice.StatusResponse
 	}{
 		{
 			desc: "healthz status is not ok",
-			statusResponse: &envelopekmsv2.StatusResponse{
+			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "unhealthy",
 			},
 		},
 		{
 			desc: "version is not v2alpha1",
-			statusResponse: &envelopekmsv2.StatusResponse{
+			statusResponse: &kmsservice.StatusResponse{
 				Version: "v1beta1",
 			},
 		},
 		{
 			desc: "missing keyID",
-			statusResponse: &envelopekmsv2.StatusResponse{
+			statusResponse: &kmsservice.StatusResponse{
 				Healthz: "ok",
 				Version: "v2alpha1",
 			},

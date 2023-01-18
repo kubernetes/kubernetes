@@ -104,6 +104,10 @@ func (fake *fakeHTTPServer) Serve(listener net.Listener) error {
 	return nil // Cause the goroutine to return
 }
 
+func (fake *fakeHTTPServer) Close() error {
+	return nil
+}
+
 func mknsn(ns, name string) types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: ns,

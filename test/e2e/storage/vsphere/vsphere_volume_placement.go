@@ -59,7 +59,7 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		Bootstrap(f)
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, c, f.Timeouts.NodeSchedulable))
 		node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel = testSetupVolumePlacement(ctx, c, ns)
 		ginkgo.DeferCleanup(func() {
 			if len(node1KeyValueLabel) > 0 {

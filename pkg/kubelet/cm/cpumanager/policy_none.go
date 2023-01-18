@@ -72,5 +72,5 @@ func (p *nonePolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string]
 // CAN get exclusive access to core(s).
 // Hence, we return empty set here: no cpus are assignable according to above definition with this policy.
 func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }

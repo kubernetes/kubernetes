@@ -47,7 +47,6 @@ const (
 // framework.CycleState, in the later phases we don't need to call Write method
 // to update the value
 type stateData struct {
-	skip     bool // set true if pod does not have PVCs
 	allBound bool
 	// podVolumesByNode holds the pod's volume information found in the Filter
 	// phase for each node
@@ -166,8 +165,8 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
 		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
 	} else if !hasPVC {
-		state.Write(stateKey, &stateData{skip: true})
-		return nil, nil
+		state.Write(stateKey, &stateData{})
+		return nil, framework.NewStatus(framework.Skip)
 	}
 	podVolumeClaims, err := pl.Binder.GetPodVolumeClaims(pod)
 	if err != nil {
@@ -241,10 +240,6 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	state, err := getStateData(cs)
 	if err != nil {
 		return framework.AsStatus(err)
-	}
-
-	if state.skip {
-		return nil
 	}
 
 	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.podVolumeClaims, node)

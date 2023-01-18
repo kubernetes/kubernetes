@@ -96,10 +96,12 @@ type FilterPlugin struct {
 }
 
 type PostFilterPlugin struct {
+	name                string
 	fh                  framework.Handle
 	numPostFilterCalled int
 	failPostFilter      bool
 	rejectPostFilter    bool
+	breakPostFilter     bool
 }
 
 type ReservePlugin struct {
@@ -463,7 +465,7 @@ func (pp *PreFilterPlugin) reset() {
 
 // Name returns name of the plugin.
 func (pp *PostFilterPlugin) Name() string {
-	return postfilterPluginName
+	return pp.name
 }
 
 func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, _ framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
@@ -486,8 +488,12 @@ func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.Cyc
 		return nil, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 	if pp.rejectPostFilter {
-		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
+		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("injecting unschedulable for pod %v", pod.Name))
 	}
+	if pp.breakPostFilter {
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("injecting unresolvable for pod %v", pod.Name))
+	}
+
 	return nil, framework.NewStatus(framework.Success, fmt.Sprintf("make room for pod %v to be schedulable", pod.Name))
 }
 
@@ -628,7 +634,7 @@ func TestPreFilterPlugin(t *testing.T) {
 	}
 }
 
-// TestPostFilterPlugin tests invocation of postfilter plugins.
+// TestPostFilterPlugin tests invocation of postFilter plugins.
 func TestPostFilterPlugin(t *testing.T) {
 	var numNodes int32 = 1
 	tests := []struct {
@@ -637,6 +643,9 @@ func TestPostFilterPlugin(t *testing.T) {
 		rejectFilter              bool
 		failScore                 bool
 		rejectPostFilter          bool
+		rejectPostFilter2         bool
+		breakPostFilter           bool
+		breakPostFilter2          bool
 		expectFilterNumCalled     int32
 		expectScoreNumCalled      int32
 		expectPostFilterNumCalled int
@@ -669,7 +678,7 @@ func TestPostFilterPlugin(t *testing.T) {
 			rejectPostFilter:          true,
 			expectFilterNumCalled:     numNodes * 2,
 			expectScoreNumCalled:      1,
-			expectPostFilterNumCalled: 1,
+			expectPostFilterNumCalled: 2,
 		},
 		{
 			name:                      "Score failed and PostFilter failed",
@@ -679,25 +688,53 @@ func TestPostFilterPlugin(t *testing.T) {
 			rejectPostFilter:          true,
 			expectFilterNumCalled:     numNodes * 2,
 			expectScoreNumCalled:      1,
+			expectPostFilterNumCalled: 2,
+		},
+		{
+			name:                      "Filter failed and first PostFilter broken",
+			numNodes:                  numNodes,
+			rejectFilter:              true,
+			breakPostFilter:           true,
+			expectFilterNumCalled:     numNodes * 2,
+			expectScoreNumCalled:      0,
 			expectPostFilterNumCalled: 1,
 		},
+		{
+			name:                      "Filter failed and second PostFilter broken",
+			numNodes:                  numNodes,
+			rejectFilter:              true,
+			rejectPostFilter:          true,
+			rejectPostFilter2:         true,
+			breakPostFilter2:          true,
+			expectFilterNumCalled:     numNodes * 2,
+			expectScoreNumCalled:      0,
+			expectPostFilterNumCalled: 2,
+		},
 	}
+
+	var postFilterPluginName2 = postfilterPluginName + "2"
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a plugin registry for testing. Register a combination of filter and postFilter plugin.
 			var (
-				filterPlugin     = &FilterPlugin{}
-				scorePlugin      = &ScorePlugin{}
-				postFilterPlugin = &PostFilterPlugin{}
+				filterPlugin      = &FilterPlugin{}
+				scorePlugin       = &ScorePlugin{}
+				postFilterPlugin  = &PostFilterPlugin{name: postfilterPluginName}
+				postFilterPlugin2 = &PostFilterPlugin{name: postFilterPluginName2}
 			)
 			filterPlugin.rejectFilter = tt.rejectFilter
 			scorePlugin.failScore = tt.failScore
 			postFilterPlugin.rejectPostFilter = tt.rejectPostFilter
+			postFilterPlugin2.rejectPostFilter = tt.rejectPostFilter2
+			postFilterPlugin.breakPostFilter = tt.breakPostFilter
+			postFilterPlugin2.breakPostFilter = tt.breakPostFilter2
+
 			registry := frameworkruntime.Registry{
-				filterPluginName:     newPlugin(filterPlugin),
-				scorePluginName:      newPlugin(scorePlugin),
-				postfilterPluginName: newPlugin(postFilterPlugin),
+				filterPluginName:      newPlugin(filterPlugin),
+				scorePluginName:       newPlugin(scorePlugin),
+				postfilterPluginName:  newPlugin(postFilterPlugin),
+				postFilterPluginName2: newPlugin(postFilterPlugin2),
 			}
 
 			// Setup plugins for testing.
@@ -723,9 +760,10 @@ func TestPostFilterPlugin(t *testing.T) {
 						PostFilter: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
 								{Name: postfilterPluginName},
+								{Name: postFilterPluginName2},
 							},
 							// Need to disable default in-tree PostFilter plugins, as they will
-							// call RunFilterPlugins and hence impact the "numFilterCalled".
+							// call RunPostFilterPlugins and hence impact the "numPostFilterCalled".
 							Disabled: []configv1.Plugin{
 								{Name: "*"},
 							},
@@ -760,9 +798,6 @@ func TestPostFilterPlugin(t *testing.T) {
 				if numScoreCalled := atomic.LoadInt32(&scorePlugin.numScoreCalled); numScoreCalled < tt.expectScoreNumCalled {
 					t.Errorf("Expected the score plugin to be called at least %v times, but got %v.", tt.expectScoreNumCalled, numScoreCalled)
 				}
-				if postFilterPlugin.numPostFilterCalled < tt.expectPostFilterNumCalled {
-					t.Errorf("Expected the postfilter plugin to be called at least %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
-				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
@@ -773,9 +808,11 @@ func TestPostFilterPlugin(t *testing.T) {
 				if numScoreCalled := atomic.LoadInt32(&scorePlugin.numScoreCalled); numScoreCalled != tt.expectScoreNumCalled {
 					t.Errorf("Expected the score plugin to be called %v times, but got %v.", tt.expectScoreNumCalled, numScoreCalled)
 				}
-				if postFilterPlugin.numPostFilterCalled != tt.expectPostFilterNumCalled {
-					t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
-				}
+			}
+
+			numPostFilterCalled := postFilterPlugin.numPostFilterCalled + postFilterPlugin2.numPostFilterCalled
+			if numPostFilterCalled != tt.expectPostFilterNumCalled {
+				t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, numPostFilterCalled)
 			}
 		})
 	}

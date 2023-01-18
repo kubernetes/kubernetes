@@ -116,7 +116,6 @@ func ephemeralContainerStartSpec(ec *v1.EphemeralContainer) *startSpec {
 // targeting. The target is stored as EphemeralContainer.TargetContainerName, which must be
 // resolved to a ContainerID using podStatus. The target container must already exist, which
 // usually isn't a problem since ephemeral containers aren't allowed at pod creation time.
-// This always returns nil when the EphemeralContainers feature is disabled.
 func (s *startSpec) getTargetID(podStatus *kubecontainer.PodStatus) (*kubecontainer.ContainerID, error) {
 	if s.ephemeralContainer == nil || s.ephemeralContainer.TargetContainerName == "" {
 		return nil, nil

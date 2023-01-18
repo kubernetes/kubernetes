@@ -23,7 +23,6 @@ import (
 
 	v1beta1 "k8s.io/api/authentication/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -32,9 +31,9 @@ type FakeTokenReviews struct {
 	Fake *FakeAuthenticationV1beta1
 }
 
-var tokenreviewsResource = schema.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}
+var tokenreviewsResource = v1beta1.SchemeGroupVersion.WithResource("tokenreviews")
 
-var tokenreviewsKind = schema.GroupVersionKind{Group: "authentication.k8s.io", Version: "v1beta1", Kind: "TokenReview"}
+var tokenreviewsKind = v1beta1.SchemeGroupVersion.WithKind("TokenReview")
 
 // Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, and an error, if there is any.
 func (c *FakeTokenReviews) Create(ctx context.Context, tokenReview *v1beta1.TokenReview, opts v1.CreateOptions) (result *v1beta1.TokenReview, err error) {

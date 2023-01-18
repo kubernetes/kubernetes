@@ -785,31 +785,6 @@ func schedulingGatesInUse(podSpec *api.PodSpec) bool {
 	return len(podSpec.SchedulingGates) != 0
 }
 
-// SeccompAnnotationForField takes a pod seccomp profile field and returns the
-// converted annotation value
-func SeccompAnnotationForField(field *api.SeccompProfile) string {
-	// If only seccomp fields are specified, add the corresponding annotations.
-	// This ensures that the fields are enforced even if the node version
-	// trails the API version
-	switch field.Type {
-	case api.SeccompProfileTypeUnconfined:
-		return v1.SeccompProfileNameUnconfined
-
-	case api.SeccompProfileTypeRuntimeDefault:
-		return v1.SeccompProfileRuntimeDefault
-
-	case api.SeccompProfileTypeLocalhost:
-		if field.LocalhostProfile != nil {
-			return v1.SeccompLocalhostProfileNamePrefix + *field.LocalhostProfile
-		}
-	}
-
-	// we can only reach this code path if the LocalhostProfile is nil but the
-	// provided field type is SeccompProfileTypeLocalhost or if an unrecognized
-	// type is specified
-	return ""
-}
-
 func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 	if spec.Affinity != nil {
 		if spec.Affinity.PodAffinity != nil {

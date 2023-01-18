@@ -19,22 +19,132 @@ package validatingadmissionpolicy
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 )
 
-func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name string, definition *v1alpha1.ValidatingAdmissionPolicy) error {
+type policyController struct {
+	once                        sync.Once
+	context                     context.Context
+	dynamicClient               dynamic.Interface
+	restMapper                  meta.RESTMapper
+	policyDefinitionsController generic.Controller[*v1alpha1.ValidatingAdmissionPolicy]
+	policyBindingController     generic.Controller[*v1alpha1.ValidatingAdmissionPolicyBinding]
+
+	// Provided to the policy's Compile function as an injected dependency to
+	// assist with compiling its expressions to CEL
+	ValidatorCompiler
+
+	// Lock which protects:
+	//  - cachedPolicies
+	//  - paramCRDControllers
+	//  - definitionInfo
+	//  - bindingInfos
+	//  - definitionsToBindings
+	// All other fields should be assumed constant
+	mutex sync.RWMutex
+
+	cachedPolicies []policyData
+
+	// controller and metadata
+	paramsCRDControllers map[v1alpha1.ParamKind]*paramInfo
+
+	// Index for each definition namespace/name, contains all binding
+	// namespace/names known to exist for that definition
+	definitionInfo map[namespacedName]*definitionInfo
+
+	// Index for each bindings namespace/name. Contains compiled templates
+	// for the binding depending on the policy/param combination.
+	bindingInfos map[namespacedName]*bindingInfo
+
+	// Map from namespace/name of a definition to a set of namespace/name
+	// of bindings which depend on it.
+	// All keys must have at least one dependent binding
+	// All binding names MUST exist as a key bindingInfos
+	definitionsToBindings map[namespacedName]sets.Set[namespacedName]
+}
+
+func newPolicyController(
+	restMapper meta.RESTMapper,
+	dynamicClient dynamic.Interface,
+	validatorCompiler ValidatorCompiler,
+	policiesInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicy],
+	bindingsInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicyBinding],
+) *policyController {
+	res := &policyController{}
+	*res = policyController{
+		ValidatorCompiler:     validatorCompiler,
+		definitionInfo:        make(map[namespacedName]*definitionInfo),
+		bindingInfos:          make(map[namespacedName]*bindingInfo),
+		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
+		definitionsToBindings: make(map[namespacedName]sets.Set[namespacedName]),
+		policyDefinitionsController: generic.NewController(
+			policiesInformer,
+			res.reconcilePolicyDefinition,
+			generic.ControllerOptions{
+				Workers: 1,
+				Name:    "cel-policy-definitions",
+			},
+		),
+		policyBindingController: generic.NewController(
+			bindingsInformer,
+			res.reconcilePolicyBinding,
+			generic.ControllerOptions{
+				Workers: 1,
+				Name:    "cel-policy-bindings",
+			},
+		),
+		restMapper:    restMapper,
+		dynamicClient: dynamicClient,
+	}
+	return res
+}
+
+func (c *policyController) Run(ctx context.Context) {
+	// Only support being run once
+	c.once.Do(func() {
+		c.context = ctx
+
+		wg := sync.WaitGroup{}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.policyDefinitionsController.Run(ctx)
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c.policyBindingController.Run(ctx)
+		}()
+
+		<-ctx.Done()
+		wg.Wait()
+	})
+}
+
+func (c *policyController) HasSynced() bool {
+	return c.policyDefinitionsController.HasSynced() && c.policyBindingController.HasSynced()
+}
+
+func (c *policyController) reconcilePolicyDefinition(namespace, name string, definition *v1alpha1.ValidatingAdmissionPolicy) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+
+	c.cachedPolicies = nil // invalidate cachedPolicies
 
 	// Namespace for policydefinition is empty.
 	nn := getNamespaceName(namespace, name)
@@ -75,7 +185,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 	// definition has changed.
 	for key := range c.definitionsToBindings[nn] {
 		bindingInfo := c.bindingInfos[key]
-		bindingInfo.validator.Store(nil)
+		bindingInfo.validator = nil
 		c.bindingInfos[key] = bindingInfo
 	}
 
@@ -121,7 +231,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 
 	// Start watching the param CRD
 	if _, ok := c.paramsCRDControllers[*paramSource]; !ok {
-		instanceContext, instanceCancel := context.WithCancel(c.runningContext)
+		instanceContext, instanceCancel := context.WithCancel(c.context)
 
 		// Watch for new instances of this policy
 		informer := dynamicinformer.NewFilteredDynamicInformer(
@@ -155,9 +265,11 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 	return nil
 }
 
-func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, binding *v1alpha1.ValidatingAdmissionPolicyBinding) error {
+func (c *policyController) reconcilePolicyBinding(namespace, name string, binding *v1alpha1.ValidatingAdmissionPolicyBinding) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+
+	c.cachedPolicies = nil // invalidate cachedPolicies
 
 	// Namespace for PolicyBinding is empty. In the future a namespaced binding
 	// may be added
@@ -208,17 +320,63 @@ func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, 
 	}
 
 	// Remove compiled template for old binding
-	info.validator.Store(nil)
+	info.validator = nil
 	info.lastReconciledValue = binding
 	return nil
 }
 
-func (c *celAdmissionController) reconcileParams(namespace, name string, params *unstructured.Unstructured) error {
+func (c *policyController) reconcileParams(namespace, name string, params *unstructured.Unstructured) error {
 	// Do nothing.
 	// When we add informational type checking we will need to compile in the
 	// reconcile loops instead of lazily so we can add compiler errors / type
 	// checker errors to the status of the resources.
 	return nil
+}
+
+// Fetches the latest set of policy data or recalculates it if it has changed
+// since it was last fetched
+func (c *policyController) latestPolicyData() []policyData {
+	existing := func() []policyData {
+		c.mutex.RLock()
+		defer c.mutex.RUnlock()
+
+		return c.cachedPolicies
+	}()
+
+	if existing != nil {
+		return existing
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	var res []policyData
+	for definitionNN, definitionInfo := range c.definitionInfo {
+		var bindingInfos []bindingInfo
+		for bindingNN := range c.definitionsToBindings[definitionNN] {
+			bindingInfo := c.bindingInfos[bindingNN]
+			if bindingInfo.validator == nil && definitionInfo.configurationError == nil {
+				bindingInfo.validator = c.ValidatorCompiler.Compile(definitionInfo.lastReconciledValue)
+			}
+			bindingInfos = append(bindingInfos, *bindingInfo)
+		}
+
+		var paramController generic.Controller[*unstructured.Unstructured]
+		if paramKind := definitionInfo.lastReconciledValue.Spec.ParamKind; paramKind != nil {
+			if info, ok := c.paramsCRDControllers[*paramKind]; ok {
+				paramController = info.controller
+			}
+		}
+
+		res = append(res, policyData{
+			definitionInfo:  *definitionInfo,
+			paramController: paramController,
+			bindings:        bindingInfos,
+		})
+	}
+
+	c.cachedPolicies = res
+	return res
 }
 
 func getNamespaceName(namespace, name string) namespacedName {

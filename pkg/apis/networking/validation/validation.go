@@ -599,7 +599,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 	}
 
 	if params.Scope != nil || params.Namespace != nil {
-		scope := utilpointer.StringPtrDerefOr(params.Scope, "")
+		scope := utilpointer.StringDeref(params.Scope, "")
 
 		if !supportedIngressClassParametersReferenceScopes.Has(scope) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), scope,

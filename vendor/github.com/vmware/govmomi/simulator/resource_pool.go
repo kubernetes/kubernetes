@@ -18,8 +18,11 @@ package simulator
 
 import (
 	"fmt"
+	"net/url"
+	"path"
 	"strings"
 
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/simulator/esx"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -29,6 +32,11 @@ import (
 
 type ResourcePool struct {
 	mo.ResourcePool
+}
+
+func asResourcePoolMO(obj mo.Reference) (*mo.ResourcePool, bool) {
+	rp, ok := getManagedObject(obj).Addr().Interface().(*mo.ResourcePool)
+	return rp, ok
 }
 
 func NewResourcePool() *ResourcePool {
@@ -186,6 +194,90 @@ func (p *ResourcePool) UpdateConfig(c *types.UpdateConfig) soap.HasFault {
 	return body
 }
 
+func (a *VirtualApp) ImportVApp(ctx *Context, req *types.ImportVApp) soap.HasFault {
+	return (&ResourcePool{ResourcePool: a.ResourcePool}).ImportVApp(ctx, req)
+}
+
+func (p *ResourcePool) ImportVApp(ctx *Context, req *types.ImportVApp) soap.HasFault {
+	body := new(methods.ImportVAppBody)
+
+	spec, ok := req.Spec.(*types.VirtualMachineImportSpec)
+	if !ok {
+		body.Fault_ = Fault(fmt.Sprintf("%T: type not supported", spec), &types.InvalidArgument{InvalidProperty: "spec"})
+		return body
+	}
+
+	dc := ctx.Map.getEntityDatacenter(p)
+	folder := ctx.Map.Get(dc.VmFolder).(*Folder)
+	if req.Folder != nil {
+		if p.Self.Type == "VirtualApp" {
+			body.Fault_ = Fault("", &types.InvalidArgument{InvalidProperty: "pool"})
+			return body
+		}
+		folder = ctx.Map.Get(*req.Folder).(*Folder)
+	}
+
+	res := folder.CreateVMTask(ctx, &types.CreateVM_Task{
+		This:   folder.Self,
+		Config: spec.ConfigSpec,
+		Pool:   p.Self,
+		Host:   req.Host,
+	})
+
+	ctask := ctx.Map.Get(res.(*methods.CreateVM_TaskBody).Res.Returnval).(*Task)
+	ctask.Wait()
+
+	if ctask.Info.Error != nil {
+		body.Fault_ = Fault("", ctask.Info.Error.Fault)
+		return body
+	}
+
+	lease := NewHttpNfcLease(ctx, ctask.Info.Result.(types.ManagedObjectReference))
+	ref := lease.Reference()
+	lease.Info.Lease = ref
+
+	vm := ctx.Map.Get(lease.Info.Entity).(*VirtualMachine)
+	device := object.VirtualDeviceList(vm.Config.Hardware.Device)
+	ndevice := make(map[string]int)
+	for _, d := range device {
+		info, ok := d.GetVirtualDevice().Backing.(types.BaseVirtualDeviceFileBackingInfo)
+		if !ok {
+			continue
+		}
+		var file object.DatastorePath
+		file.FromString(info.GetVirtualDeviceFileBackingInfo().FileName)
+		name := path.Base(file.Path)
+		ds := vm.findDatastore(file.Datastore)
+		lease.files[name] = path.Join(ds.Info.GetDatastoreInfo().Url, file.Path)
+
+		_, disk := d.(*types.VirtualDisk)
+		kind := device.Type(d)
+		n := ndevice[kind]
+		ndevice[kind]++
+
+		lease.Info.DeviceUrl = append(lease.Info.DeviceUrl, types.HttpNfcLeaseDeviceUrl{
+			Key:       fmt.Sprintf("/%s/%s:%d", vm.Self.Value, kind, n),
+			ImportKey: fmt.Sprintf("/%s/%s:%d", vm.Name, kind, n),
+			Url: (&url.URL{
+				Scheme: "https",
+				Host:   "*",
+				Path:   nfcPrefix + path.Join(ref.Value, name),
+			}).String(),
+			SslThumbprint: "",
+			Disk:          types.NewBool(disk),
+			TargetId:      name,
+			DatastoreKey:  "",
+			FileSize:      0,
+		})
+	}
+
+	body.Res = &types.ImportVAppResponse{
+		Returnval: ref,
+	}
+
+	return body
+}
+
 type VirtualApp struct {
 	mo.VirtualApp
 }
@@ -253,10 +345,9 @@ func (p *ResourcePool) CreateVApp(req *types.CreateVApp) soap.HasFault {
 }
 
 func (a *VirtualApp) CreateChildVMTask(ctx *Context, req *types.CreateChildVM_Task) soap.HasFault {
-	ctx.Caller = &a.Self
 	body := &methods.CreateChildVM_TaskBody{}
 
-	folder := Map.Get(*a.ParentFolder).(*Folder)
+	folder := ctx.Map.Get(*a.ParentFolder).(*Folder)
 
 	res := folder.CreateVMTask(ctx, &types.CreateVM_Task{
 		This:   folder.Self,
@@ -272,43 +363,120 @@ func (a *VirtualApp) CreateChildVMTask(ctx *Context, req *types.CreateChildVM_Ta
 	return body
 }
 
-func (a *VirtualApp) DestroyTask(req *types.Destroy_Task) soap.HasFault {
-	return (&ResourcePool{ResourcePool: a.ResourcePool}).DestroyTask(req)
+func (a *VirtualApp) CloneVAppTask(ctx *Context, req *types.CloneVApp_Task) soap.HasFault {
+	task := CreateTask(a, "cloneVapp", func(t *Task) (types.AnyType, types.BaseMethodFault) {
+		folder := req.Spec.VmFolder
+		if folder == nil {
+			folder = a.ParentFolder
+		}
+
+		rspec := req.Spec.ResourceSpec
+		if rspec == nil {
+			s := types.DefaultResourceConfigSpec()
+			rspec = &s
+		}
+
+		res := a.CreateVApp(&types.CreateVApp{
+			This:       a.Self,
+			Name:       req.Name,
+			ResSpec:    *rspec,
+			ConfigSpec: types.VAppConfigSpec{},
+			VmFolder:   folder,
+		})
+
+		if res.Fault() != nil {
+			return nil, res.Fault().VimFault().(types.BaseMethodFault)
+		}
+
+		target := res.(*methods.CreateVAppBody).Res.Returnval
+
+		for _, ref := range a.Vm {
+			vm := ctx.Map.Get(ref).(*VirtualMachine)
+
+			res := vm.CloneVMTask(ctx, &types.CloneVM_Task{
+				This:   ref,
+				Folder: *folder,
+				Name:   req.Name,
+				Spec: types.VirtualMachineCloneSpec{
+					Location: types.VirtualMachineRelocateSpec{
+						Pool: &target,
+						Host: req.Spec.Host,
+					},
+				},
+			})
+
+			ctask := ctx.Map.Get(res.(*methods.CloneVM_TaskBody).Res.Returnval).(*Task)
+			ctask.Wait()
+			if ctask.Info.Error != nil {
+				return nil, ctask.Info.Error.Fault
+			}
+		}
+
+		return target, nil
+	})
+
+	return &methods.CloneVApp_TaskBody{
+		Res: &types.CloneVApp_TaskResponse{
+			Returnval: task.Run(ctx),
+		},
+	}
 }
 
-func (p *ResourcePool) DestroyTask(req *types.Destroy_Task) soap.HasFault {
+func (a *VirtualApp) CreateVApp(req *types.CreateVApp) soap.HasFault {
+	return (&ResourcePool{ResourcePool: a.ResourcePool}).CreateVApp(req)
+}
+
+func (a *VirtualApp) DestroyTask(ctx *Context, req *types.Destroy_Task) soap.HasFault {
+	return (&ResourcePool{ResourcePool: a.ResourcePool}).DestroyTask(ctx, req)
+}
+
+func (p *ResourcePool) DestroyTask(ctx *Context, req *types.Destroy_Task) soap.HasFault {
 	task := CreateTask(p, "destroy", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		if strings.HasSuffix(p.Parent.Type, "ComputeResource") {
 			// Can't destroy the root pool
 			return nil, &types.InvalidArgument{}
 		}
 
-		pp := Map.Get(*p.Parent).(*ResourcePool)
+		parent, _ := asResourcePoolMO(ctx.Map.Get(*p.Parent))
 
-		parent := &pp.ResourcePool
 		// Remove child reference from rp
-		Map.RemoveReference(parent, &parent.ResourcePool, req.This)
+		ctx.WithLock(parent, func() {
+			RemoveReference(&parent.ResourcePool, req.This)
 
-		// The grandchildren become children of the parent (rp)
-		Map.AppendReference(parent, &parent.ResourcePool, p.ResourcePool.ResourcePool...)
+			// The grandchildren become children of the parent (rp)
+			parent.ResourcePool = append(parent.ResourcePool, p.ResourcePool.ResourcePool...)
+		})
 
 		// And VMs move to the parent
 		vms := p.ResourcePool.Vm
 		for _, ref := range vms {
-			vm := Map.Get(ref).(*VirtualMachine)
-			Map.WithLock(vm, func() { vm.ResourcePool = &parent.Self })
+			vm := ctx.Map.Get(ref).(*VirtualMachine)
+			ctx.WithLock(vm, func() { vm.ResourcePool = &parent.Self })
 		}
 
-		Map.AppendReference(parent, &parent.Vm, vms...)
+		ctx.WithLock(parent, func() {
+			parent.Vm = append(parent.Vm, vms...)
+		})
 
-		Map.Remove(req.This)
+		ctx.Map.Remove(ctx, req.This)
 
 		return nil, nil
 	})
 
 	return &methods.Destroy_TaskBody{
 		Res: &types.Destroy_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
+}
+
+func (p *ResourcePool) DestroyChildren(ctx *Context, req *types.DestroyChildren) soap.HasFault {
+	walk(p, func(child types.ManagedObjectReference) {
+		if child.Type != "ResourcePool" {
+			return
+		}
+		ctx.Map.Get(child).(*ResourcePool).DestroyTask(ctx, &types.Destroy_Task{This: child})
+	})
+
+	return &methods.DestroyChildrenBody{Res: new(types.DestroyChildrenResponse)}
 }

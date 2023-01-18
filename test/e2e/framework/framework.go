@@ -27,6 +27,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 	"time"
 
@@ -144,10 +145,19 @@ type Options struct {
 	GroupVersion *schema.GroupVersion
 }
 
-// NewFrameworkWithCustomTimeouts makes a framework with with custom timeouts.
+// NewFrameworkWithCustomTimeouts makes a framework with custom timeouts.
+// For timeout values that are zero the normal default value continues to
+// be used.
 func NewFrameworkWithCustomTimeouts(baseName string, timeouts *TimeoutContext) *Framework {
 	f := NewDefaultFramework(baseName)
-	f.Timeouts = timeouts
+	in := reflect.ValueOf(timeouts).Elem()
+	out := reflect.ValueOf(f.Timeouts).Elem()
+	for i := 0; i < in.NumField(); i++ {
+		value := in.Field(i)
+		if !value.IsZero() {
+			out.Field(i).Set(value)
+		}
+	}
 	return f
 }
 
@@ -169,7 +179,7 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 		BaseName:  baseName,
 		Options:   options,
 		ClientSet: client,
-		Timeouts:  NewTimeoutContextWithDefaults(),
+		Timeouts:  NewTimeoutContext(),
 	}
 
 	// The order is important here: if the extension calls ginkgo.BeforeEach

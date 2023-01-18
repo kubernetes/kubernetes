@@ -57,6 +57,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -363,7 +364,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		if status.target != target {
 			klog.Warningf("Final number of nodes (%v) does not match initial scale-up target (%v).", status.target, target)
 		}
-		framework.ExpectEqual(status.timestamp.Add(freshStatusLimit).Before(time.Now()), false)
+		gomega.Expect(status.timestamp.Add(freshStatusLimit)).To(gomega.BeTemporally(">=", time.Now()))
 		framework.ExpectEqual(status.status, caNoScaleUpStatus)
 		framework.ExpectEqual(status.ready, status.target)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)

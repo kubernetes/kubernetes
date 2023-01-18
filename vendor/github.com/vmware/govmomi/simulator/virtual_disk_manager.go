@@ -17,11 +17,12 @@ limitations under the License.
 package simulator
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/vmware/govmomi/object"
+
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -32,20 +33,18 @@ type VirtualDiskManager struct {
 	mo.VirtualDiskManager
 }
 
-func NewVirtualDiskManager(ref types.ManagedObjectReference) object.Reference {
-	m := &VirtualDiskManager{}
-	m.Self = ref
-	return m
+func (m *VirtualDiskManager) MO() mo.VirtualDiskManager {
+	return m.VirtualDiskManager
 }
 
-func (m *VirtualDiskManager) names(name string) []string {
+func vdmNames(name string) []string {
 	return []string{
 		strings.Replace(name, ".vmdk", "-flat.vmdk", 1),
 		name,
 	}
 }
 
-func (m *VirtualDiskManager) createVirtualDisk(op types.VirtualDeviceConfigSpecFileOperation, req *types.CreateVirtualDisk_Task) types.BaseMethodFault {
+func vdmCreateVirtualDisk(op types.VirtualDeviceConfigSpecFileOperation, req *types.CreateVirtualDisk_Task) types.BaseMethodFault {
 	fm := Map.FileManager()
 
 	file, fault := fm.resolve(req.Datacenter, req.Name)
@@ -55,7 +54,7 @@ func (m *VirtualDiskManager) createVirtualDisk(op types.VirtualDeviceConfigSpecF
 
 	shouldReplace := op == types.VirtualDeviceConfigSpecFileOperationReplace
 	shouldExist := op == ""
-	for _, name := range m.names(file) {
+	for _, name := range vdmNames(file) {
 		_, err := os.Stat(name)
 		if err == nil {
 			if shouldExist {
@@ -83,23 +82,26 @@ func (m *VirtualDiskManager) createVirtualDisk(op types.VirtualDeviceConfigSpecF
 	return nil
 }
 
-func (m *VirtualDiskManager) CreateVirtualDiskTask(req *types.CreateVirtualDisk_Task) soap.HasFault {
+func (m *VirtualDiskManager) CreateVirtualDiskTask(ctx *Context, req *types.CreateVirtualDisk_Task) soap.HasFault {
 	task := CreateTask(m, "createVirtualDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
-		return nil, m.createVirtualDisk(types.VirtualDeviceConfigSpecFileOperationCreate, req)
+		if err := vdmCreateVirtualDisk(types.VirtualDeviceConfigSpecFileOperationCreate, req); err != nil {
+			return "", err
+		}
+		return req.Name, nil
 	})
 
 	return &methods.CreateVirtualDisk_TaskBody{
 		Res: &types.CreateVirtualDisk_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (m *VirtualDiskManager) DeleteVirtualDiskTask(req *types.DeleteVirtualDisk_Task) soap.HasFault {
+func (m *VirtualDiskManager) DeleteVirtualDiskTask(ctx *Context, req *types.DeleteVirtualDisk_Task) soap.HasFault {
 	task := CreateTask(m, "deleteVirtualDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		fm := Map.FileManager()
 
-		for _, name := range m.names(req.Name) {
+		for _, name := range vdmNames(req.Name) {
 			err := fm.deleteDatastoreFile(&types.DeleteDatastoreFile_Task{
 				Name:       name,
 				Datacenter: req.Datacenter,
@@ -115,18 +117,18 @@ func (m *VirtualDiskManager) DeleteVirtualDiskTask(req *types.DeleteVirtualDisk_
 
 	return &methods.DeleteVirtualDisk_TaskBody{
 		Res: &types.DeleteVirtualDisk_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (m *VirtualDiskManager) MoveVirtualDiskTask(req *types.MoveVirtualDisk_Task) soap.HasFault {
+func (m *VirtualDiskManager) MoveVirtualDiskTask(ctx *Context, req *types.MoveVirtualDisk_Task) soap.HasFault {
 	task := CreateTask(m, "moveVirtualDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
-		fm := Map.FileManager()
+		fm := ctx.Map.FileManager()
 
-		dest := m.names(req.DestName)
+		dest := vdmNames(req.DestName)
 
-		for i, name := range m.names(req.SourceName) {
+		for i, name := range vdmNames(req.SourceName) {
 			err := fm.moveDatastoreFile(&types.MoveDatastoreFile_Task{
 				SourceName:            name,
 				SourceDatacenter:      req.SourceDatacenter,
@@ -145,24 +147,24 @@ func (m *VirtualDiskManager) MoveVirtualDiskTask(req *types.MoveVirtualDisk_Task
 
 	return &methods.MoveVirtualDisk_TaskBody{
 		Res: &types.MoveVirtualDisk_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (m *VirtualDiskManager) CopyVirtualDiskTask(req *types.CopyVirtualDisk_Task) soap.HasFault {
+func (m *VirtualDiskManager) CopyVirtualDiskTask(ctx *Context, req *types.CopyVirtualDisk_Task) soap.HasFault {
 	task := CreateTask(m, "copyVirtualDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
 		if req.DestSpec != nil {
-			if Map.IsVPX() {
+			if ctx.Map.IsVPX() {
 				return nil, new(types.NotImplemented)
 			}
 		}
 
-		fm := Map.FileManager()
+		fm := ctx.Map.FileManager()
 
-		dest := m.names(req.DestName)
+		dest := vdmNames(req.DestName)
 
-		for i, name := range m.names(req.SourceName) {
+		for i, name := range vdmNames(req.SourceName) {
 			err := fm.copyDatastoreFile(&types.CopyDatastoreFile_Task{
 				SourceName:            name,
 				SourceDatacenter:      req.SourceDatacenter,
@@ -181,15 +183,22 @@ func (m *VirtualDiskManager) CopyVirtualDiskTask(req *types.CopyVirtualDisk_Task
 
 	return &methods.CopyVirtualDisk_TaskBody{
 		Res: &types.CopyVirtualDisk_TaskResponse{
-			Returnval: task.Run(),
+			Returnval: task.Run(ctx),
 		},
 	}
 }
 
-func (m *VirtualDiskManager) QueryVirtualDiskUuid(req *types.QueryVirtualDiskUuid) soap.HasFault {
+func virtualDiskUUID(dc *types.ManagedObjectReference, file string) string {
+	if dc != nil {
+		file = dc.String() + file
+	}
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(file)).String()
+}
+
+func (m *VirtualDiskManager) QueryVirtualDiskUuid(ctx *Context, req *types.QueryVirtualDiskUuid) soap.HasFault {
 	body := new(methods.QueryVirtualDiskUuidBody)
 
-	fm := Map.FileManager()
+	fm := ctx.Map.FileManager()
 
 	file, fault := fm.resolve(req.Datacenter, req.Name)
 	if fault != nil {
@@ -199,19 +208,19 @@ func (m *VirtualDiskManager) QueryVirtualDiskUuid(req *types.QueryVirtualDiskUui
 
 	_, err := os.Stat(file)
 	if err != nil {
-		fault = fm.fault(file, err, new(types.CannotAccessFile))
-		body.Fault_ = Fault("", fault)
+		fault = fm.fault(req.Name, err, new(types.CannotAccessFile))
+		body.Fault_ = Fault(fmt.Sprintf("File %s was not found", req.Name), fault)
 		return body
 	}
 
 	body.Res = &types.QueryVirtualDiskUuidResponse{
-		Returnval: uuid.NewSHA1(uuid.NameSpaceOID, []byte(file)).String(),
+		Returnval: virtualDiskUUID(req.Datacenter, file),
 	}
 
 	return body
 }
 
-func (m *VirtualDiskManager) SetVirtualDiskUuid(req *types.SetVirtualDiskUuid) soap.HasFault {
+func (m *VirtualDiskManager) SetVirtualDiskUuid(_ *Context, req *types.SetVirtualDiskUuid) soap.HasFault {
 	body := new(methods.SetVirtualDiskUuidBody)
 	// TODO: validate uuid format and persist
 	body.Res = new(types.SetVirtualDiskUuidResponse)

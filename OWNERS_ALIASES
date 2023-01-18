@@ -216,13 +216,6 @@ aliases:
     - cblecker
     - spiffxp
     - dims
-  sig-testing-approvers:
-    - bentheelder
-    - cblecker
-    - spiffxp
-    # emeritus
-    # - ixdy
-    # - krzyzacy
   sig-node-approvers:
     - Random-Liu
     - dchen1107
@@ -286,13 +279,14 @@ aliases:
     - soltysh
     - smarterclayton
   sig-apps-reviewers:
+    - alculquicondor
+    - atiratree
     - janetkuo
     - kow3ns
+    - krmayankk
     - mortent
     - smarterclayton
     - soltysh
-    - krmayankk
-    - alculquicondor
   # sig-apps-emeritus:
   # - tnozicka
 

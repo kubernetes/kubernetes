@@ -2721,6 +2721,10 @@ const (
 	// TerminationByKubelet reason in DisruptionTarget pod condition indicates that the termination
 	// is initiated by kubelet
 	PodReasonTerminationByKubelet = "TerminationByKubelet"
+
+	// PodReasonPreemptionByScheduler reason in DisruptionTarget pod condition indicates that the
+	// disruption was initiated by scheduler's preemption.
+	PodReasonPreemptionByScheduler = "PreemptionByScheduler"
 )
 
 // PodCondition contains details for the current condition of this pod.

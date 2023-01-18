@@ -297,3 +297,8 @@
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/client-go
+  - k8s.io/klog
+  - k8s.io/kms
+  - k8s.io/utils
+

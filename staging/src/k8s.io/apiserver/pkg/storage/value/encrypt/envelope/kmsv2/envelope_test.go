@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
+	kmsservice "k8s.io/kms/service"
 )
 
 const (
@@ -46,7 +47,7 @@ type testEnvelopeService struct {
 	keyVersion  string
 }
 
-func (t *testEnvelopeService) Decrypt(ctx context.Context, uid string, req *DecryptRequest) ([]byte, error) {
+func (t *testEnvelopeService) Decrypt(ctx context.Context, uid string, req *kmsservice.DecryptRequest) ([]byte, error) {
 	if t.disabled {
 		return nil, fmt.Errorf("Envelope service was disabled")
 	}
@@ -59,7 +60,7 @@ func (t *testEnvelopeService) Decrypt(ctx context.Context, uid string, req *Decr
 	return base64.StdEncoding.DecodeString(string(req.Ciphertext))
 }
 
-func (t *testEnvelopeService) Encrypt(ctx context.Context, uid string, data []byte) (*EncryptResponse, error) {
+func (t *testEnvelopeService) Encrypt(ctx context.Context, uid string, data []byte) (*kmsservice.EncryptResponse, error) {
 	if t.disabled {
 		return nil, fmt.Errorf("Envelope service was disabled")
 	}
@@ -74,14 +75,14 @@ func (t *testEnvelopeService) Encrypt(ctx context.Context, uid string, data []by
 	} else {
 		annotations["local-kek.kms.kubernetes.io"] = []byte("encrypted-local-kek")
 	}
-	return &EncryptResponse{Ciphertext: []byte(base64.StdEncoding.EncodeToString(data)), KeyID: t.keyVersion, Annotations: annotations}, nil
+	return &kmsservice.EncryptResponse{Ciphertext: []byte(base64.StdEncoding.EncodeToString(data)), KeyID: t.keyVersion, Annotations: annotations}, nil
 }
 
-func (t *testEnvelopeService) Status(ctx context.Context) (*StatusResponse, error) {
+func (t *testEnvelopeService) Status(ctx context.Context) (*kmsservice.StatusResponse, error) {
 	if t.disabled {
 		return nil, fmt.Errorf("Envelope service was disabled")
 	}
-	return &StatusResponse{KeyID: t.keyVersion}, nil
+	return &kmsservice.StatusResponse{KeyID: t.keyVersion}, nil
 }
 
 func (t *testEnvelopeService) SetDisabledStatus(status bool) {

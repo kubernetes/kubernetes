@@ -35,7 +35,7 @@ import (
 	"github.com/fatih/camelcase"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -209,8 +209,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                          &PriorityClassDescriber{c},
 		{Group: discoveryv1beta1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: discoveryv1.GroupName, Kind: "EndpointSlice"}:                     &EndpointSliceDescriber{c},
-		{Group: policyv1beta1.GroupName, Kind: "PodSecurityPolicy"}:               &PodSecurityPolicyDescriber{c},
-		{Group: autoscalingv2beta2.GroupName, Kind: "HorizontalPodAutoscaler"}:    &HorizontalPodAutoscalerDescriber{c},
+		{Group: autoscalingv2.GroupName, Kind: "HorizontalPodAutoscaler"}:         &HorizontalPodAutoscalerDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "Ingress"}:                     &IngressDescriber{c},
 		{Group: networkingv1beta1.GroupName, Kind: "IngressClass"}:                &IngressClassDescriber{c},
@@ -3953,15 +3952,15 @@ type HorizontalPodAutoscalerDescriber struct {
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	// autoscaling/v2beta2 is introduced since v1.12 and autoscaling/v1 does not have full backward compatibility
-	// with autoscaling/v2beta2, so describer will try to get and describe hpa v2beta2 object firstly, if it fails,
+	// autoscaling/v2 is introduced since v1.23 and autoscaling/v1 does not have full backward compatibility
+	// with autoscaling/v2, so describer will try to get and describe hpa v2 object firstly, if it fails,
 	// describer will fall back to do with hpa v1 object
-	hpaV2beta2, err := d.client.AutoscalingV2beta2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	hpaV2, err := d.client.AutoscalingV2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(d.client.CoreV1(), hpaV2beta2, describerSettings.ChunkSize)
+			events, _ = searchEvents(d.client.CoreV1(), hpaV2, describerSettings.ChunkSize)
 		}
-		return describeHorizontalPodAutoscalerV2beta2(hpaV2beta2, events, d)
+		return describeHorizontalPodAutoscalerV2(hpaV2, events, d)
 	}
 
 	hpaV1, err := d.client.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
@@ -3975,7 +3974,7 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 	return "", err
 }
 
-func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
+func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", hpa.Name)
@@ -3989,7 +3988,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 		w.Write(LEVEL_0, "Metrics:\t( current / target )\n")
 		for i, metric := range hpa.Spec.Metrics {
 			switch metric.Type {
-			case autoscalingv2beta2.ExternalMetricSourceType:
+			case autoscalingv2.ExternalMetricSourceType:
 				if metric.External.Target.AverageValue != nil {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil &&
@@ -4005,15 +4004,15 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					w.Write(LEVEL_1, "%q (target value):\t%s / %s\n", metric.External.Metric.Name, current, metric.External.Target.Value.String())
 
 				}
-			case autoscalingv2beta2.PodsMetricSourceType:
+			case autoscalingv2.PodsMetricSourceType:
 				current := "<unknown>"
 				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Pods != nil {
 					current = hpa.Status.CurrentMetrics[i].Pods.Current.AverageValue.String()
 				}
 				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.Metric.Name, current, metric.Pods.Target.AverageValue.String())
-			case autoscalingv2beta2.ObjectMetricSourceType:
+			case autoscalingv2.ObjectMetricSourceType:
 				w.Write(LEVEL_1, "\"%s\" on %s/%s ", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name)
-				if metric.Object.Target.Type == autoscalingv2beta2.AverageValueMetricType {
+				if metric.Object.Target.Type == autoscalingv2.AverageValueMetricType {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
 						current = hpa.Status.CurrentMetrics[i].Object.Current.AverageValue.String()
@@ -4026,7 +4025,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					}
 					w.Write(LEVEL_0, "(target value):\t%s / %s\n", current, metric.Object.Target.Value.String())
 				}
-			case autoscalingv2beta2.ResourceMetricSourceType:
+			case autoscalingv2.ResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
 				if metric.Resource.Target.AverageValue != nil {
 					current := "<unknown>"
@@ -4046,7 +4045,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					}
 					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
 				}
-			case autoscalingv2beta2.ContainerResourceMetricSourceType:
+			case autoscalingv2.ContainerResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s of container \"%s\" on pods", string(metric.ContainerResource.Name), metric.ContainerResource.Container)
 				if metric.ContainerResource.Target.AverageValue != nil {
 					current := "<unknown>"
@@ -4102,7 +4101,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 	})
 }
 
-func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscalingv2beta2.HPAScalingRules) {
+func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscalingv2.HPAScalingRules) {
 	if rules != nil {
 		w.Write(LEVEL_1, "%s:\n", direction)
 		if rules.StabilizationWindowSeconds != nil {
@@ -4112,7 +4111,7 @@ func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscaling
 			if rules.SelectPolicy != nil {
 				w.Write(LEVEL_2, "Select Policy: %s\n", *rules.SelectPolicy)
 			} else {
-				w.Write(LEVEL_2, "Select Policy: %s\n", autoscalingv2beta2.MaxPolicySelect)
+				w.Write(LEVEL_2, "Select Policy: %s\n", autoscalingv2.MaxChangePolicySelect)
 			}
 			w.Write(LEVEL_2, "Policies:\n")
 			for _, p := range rules.Policies {
@@ -4890,84 +4889,6 @@ func describePriorityClass(pc *schedulingv1.PriorityClass, events *corev1.EventL
 	})
 }
 
-// PodSecurityPolicyDescriber generates information about a PodSecuritypolicyv1beta1.
-type PodSecurityPolicyDescriber struct {
-	clientset.Interface
-}
-
-func (d *PodSecurityPolicyDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	psp, err := d.PolicyV1beta1().PodSecurityPolicies().Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	return describePodSecurityPolicy(psp)
-}
-
-func describePodSecurityPolicy(psp *policyv1beta1.PodSecurityPolicy) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", psp.Name)
-
-		w.Write(LEVEL_0, "\nSettings:\n")
-
-		w.Write(LEVEL_1, "Allow Privileged:\t%t\n", psp.Spec.Privileged)
-		if psp.Spec.AllowPrivilegeEscalation != nil {
-			w.Write(LEVEL_1, "Allow Privilege Escalation:\t%t\n", *psp.Spec.AllowPrivilegeEscalation)
-		} else {
-			w.Write(LEVEL_1, "Allow Privilege Escalation:\t<unset>\n")
-		}
-		w.Write(LEVEL_1, "Default Add Capabilities:\t%v\n", capsToString(psp.Spec.DefaultAddCapabilities))
-		w.Write(LEVEL_1, "Required Drop Capabilities:\t%s\n", capsToString(psp.Spec.RequiredDropCapabilities))
-		w.Write(LEVEL_1, "Allowed Capabilities:\t%s\n", capsToString(psp.Spec.AllowedCapabilities))
-		w.Write(LEVEL_1, "Allowed Volume Types:\t%s\n", fsTypeToString(psp.Spec.Volumes))
-
-		if len(psp.Spec.AllowedFlexVolumes) > 0 {
-			w.Write(LEVEL_1, "Allowed FlexVolume Types:\t%s\n", flexVolumesToString(psp.Spec.AllowedFlexVolumes))
-		}
-
-		if len(psp.Spec.AllowedCSIDrivers) > 0 {
-			w.Write(LEVEL_1, "Allowed CSI Drivers:\t%s\n", csiDriversToString(psp.Spec.AllowedCSIDrivers))
-		}
-
-		if len(psp.Spec.AllowedUnsafeSysctls) > 0 {
-			w.Write(LEVEL_1, "Allowed Unsafe Sysctls:\t%s\n", sysctlsToString(psp.Spec.AllowedUnsafeSysctls))
-		}
-		if len(psp.Spec.ForbiddenSysctls) > 0 {
-			w.Write(LEVEL_1, "Forbidden Sysctls:\t%s\n", sysctlsToString(psp.Spec.ForbiddenSysctls))
-		}
-		w.Write(LEVEL_1, "Allow Host Network:\t%t\n", psp.Spec.HostNetwork)
-		w.Write(LEVEL_1, "Allow Host Ports:\t%s\n", hostPortRangeToString(psp.Spec.HostPorts))
-		w.Write(LEVEL_1, "Allow Host PID:\t%t\n", psp.Spec.HostPID)
-		w.Write(LEVEL_1, "Allow Host IPC:\t%t\n", psp.Spec.HostIPC)
-		w.Write(LEVEL_1, "Read Only Root Filesystem:\t%v\n", psp.Spec.ReadOnlyRootFilesystem)
-
-		w.Write(LEVEL_1, "SELinux Context Strategy: %s\t\n", string(psp.Spec.SELinux.Rule))
-		var user, role, seLinuxType, level string
-		if psp.Spec.SELinux.SELinuxOptions != nil {
-			user = psp.Spec.SELinux.SELinuxOptions.User
-			role = psp.Spec.SELinux.SELinuxOptions.Role
-			seLinuxType = psp.Spec.SELinux.SELinuxOptions.Type
-			level = psp.Spec.SELinux.SELinuxOptions.Level
-		}
-		w.Write(LEVEL_2, "User:\t%s\n", stringOrNone(user))
-		w.Write(LEVEL_2, "Role:\t%s\n", stringOrNone(role))
-		w.Write(LEVEL_2, "Type:\t%s\n", stringOrNone(seLinuxType))
-		w.Write(LEVEL_2, "Level:\t%s\n", stringOrNone(level))
-
-		w.Write(LEVEL_1, "Run As User Strategy: %s\t\n", string(psp.Spec.RunAsUser.Rule))
-		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.RunAsUser.Ranges))
-
-		w.Write(LEVEL_1, "FSGroup Strategy: %s\t\n", string(psp.Spec.FSGroup.Rule))
-		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.FSGroup.Ranges))
-
-		w.Write(LEVEL_1, "Supplemental Groups Strategy: %s\t\n", string(psp.Spec.SupplementalGroups.Rule))
-		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.SupplementalGroups.Ranges))
-
-		return nil
-	})
-}
-
 func stringOrNone(s string) string {
 	return stringOrDefaultValue(s, "<none>")
 }
@@ -4977,70 +4898,6 @@ func stringOrDefaultValue(s, defaultValue string) string {
 		return s
 	}
 	return defaultValue
-}
-
-func fsTypeToString(volumes []policyv1beta1.FSType) string {
-	strVolumes := []string{}
-	for _, v := range volumes {
-		strVolumes = append(strVolumes, string(v))
-	}
-	return stringOrNone(strings.Join(strVolumes, ","))
-}
-
-func flexVolumesToString(flexVolumes []policyv1beta1.AllowedFlexVolume) string {
-	volumes := []string{}
-	for _, flexVolume := range flexVolumes {
-		volumes = append(volumes, "driver="+flexVolume.Driver)
-	}
-	return stringOrDefaultValue(strings.Join(volumes, ","), "<all>")
-}
-
-func csiDriversToString(csiDrivers []policyv1beta1.AllowedCSIDriver) string {
-	drivers := []string{}
-	for _, csiDriver := range csiDrivers {
-		drivers = append(drivers, "driver="+csiDriver.Name)
-	}
-	return stringOrDefaultValue(strings.Join(drivers, ","), "<all>")
-}
-
-func sysctlsToString(sysctls []string) string {
-	return stringOrNone(strings.Join(sysctls, ","))
-}
-
-func hostPortRangeToString(ranges []policyv1beta1.HostPortRange) string {
-	formattedString := ""
-	if ranges != nil {
-		strRanges := []string{}
-		for _, r := range ranges {
-			strRanges = append(strRanges, fmt.Sprintf("%d-%d", r.Min, r.Max))
-		}
-		formattedString = strings.Join(strRanges, ",")
-	}
-	return stringOrNone(formattedString)
-}
-
-func idRangeToString(ranges []policyv1beta1.IDRange) string {
-	formattedString := ""
-	if ranges != nil {
-		strRanges := []string{}
-		for _, r := range ranges {
-			strRanges = append(strRanges, fmt.Sprintf("%d-%d", r.Min, r.Max))
-		}
-		formattedString = strings.Join(strRanges, ",")
-	}
-	return stringOrNone(formattedString)
-}
-
-func capsToString(caps []corev1.Capability) string {
-	formattedString := ""
-	if caps != nil {
-		strCaps := []string{}
-		for _, c := range caps {
-			strCaps = append(strCaps, string(c))
-		}
-		formattedString = strings.Join(strCaps, ",")
-	}
-	return stringOrNone(formattedString)
 }
 
 func policyTypesToString(pts []networkingv1.PolicyType) string {

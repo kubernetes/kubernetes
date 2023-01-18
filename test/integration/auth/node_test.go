@@ -325,8 +325,8 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name: "node1",
 				},
 				Spec: coordination.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("node1"),
-					LeaseDurationSeconds: pointer.Int32Ptr(node1LeaseDurationSeconds),
+					HolderIdentity:       pointer.String("node1"),
+					LeaseDurationSeconds: pointer.Int32(node1LeaseDurationSeconds),
 					RenewTime:            &metav1.MicroTime{Time: time.Now()},
 				},
 			}

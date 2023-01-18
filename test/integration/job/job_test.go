@@ -687,9 +687,6 @@ func TestNonParallelJob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create Job: %v", err)
 	}
-	if !hasJobTrackingAnnotation(jobObj) {
-		t.Error("apiserver created job without tracking annotation")
-	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 		Active: 1,
 		Ready:  pointer.Int32(0),
@@ -728,8 +725,7 @@ func TestNonParallelJob(t *testing.T) {
 
 func TestParallelJob(t *testing.T) {
 	cases := map[string]struct {
-		trackWithFinalizers bool
-		enableReadyPods     bool
+		enableReadyPods bool
 	}{
 		"none": {},
 		"ready pods": {
@@ -820,9 +816,7 @@ func TestParallelJob(t *testing.T) {
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
-			if tc.trackWithFinalizers {
-				validateTerminatedPodsTrackingFinalizerMetric(t, 7)
-			}
+			validateTerminatedPodsTrackingFinalizerMetric(t, 7)
 		})
 	}
 }
@@ -911,9 +905,6 @@ func TestParallelJobWithCompletions(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create Job: %v", err)
 			}
-			if !hasJobTrackingAnnotation(jobObj) {
-				t.Error("apiserver created job without tracking annotation")
-			}
 			want := podsByStatus{Active: 54}
 			if tc.enableReadyPods {
 				want.Ready = pointer.Int32Ptr(0)
@@ -990,9 +981,6 @@ func TestIndexedJob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create Job: %v", err)
 	}
-	if !hasJobTrackingAnnotation(jobObj) {
-		t.Error("apiserver created job without tracking annotation")
-	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 		Active: 3,
 		Ready:  pointer.Int32(0),
@@ -1042,7 +1030,6 @@ func TestIndexedJob(t *testing.T) {
 // We expect that large jobs are more commonly used as Indexed. And they are
 // also faster to track, as they need less API calls.
 func BenchmarkLargeIndexedJob(b *testing.B) {
-	defer featuregatetesting.SetFeatureGateDuringTest(b, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, true)()
 	closeFn, restConfig, clientSet, ns := setup(b, "indexed")
 	restConfig.QPS = 100
 	restConfig.Burst = 100
@@ -1143,9 +1130,6 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 			})
 			if err != nil {
 				t.Fatalf("Failed to create Job: %v", err)
-			}
-			if !hasJobTrackingAnnotation(jobObj) {
-				t.Error("apiserver didn't add the tracking annotation")
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Active: 2,
@@ -1292,9 +1276,6 @@ func TestOrphanPodsFinalizersClearedOnRestart(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Failed to create Job: %v", err)
-	}
-	if !hasJobTrackingAnnotation(jobObj) {
-		t.Error("apiserver didn't add the tracking annotation")
 	}
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 		Active: 1,
@@ -1880,14 +1861,6 @@ func hasJobTrackingFinalizer(obj metav1.Object) bool {
 		}
 	}
 	return false
-}
-
-func hasJobTrackingAnnotation(job *batchv1.Job) bool {
-	if job.Annotations == nil {
-		return false
-	}
-	_, ok := job.Annotations[batchv1.JobTrackingFinalizer]
-	return ok
 }
 
 func setDuringTest(val *int, newVal int) func() {

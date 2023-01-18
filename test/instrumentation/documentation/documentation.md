@@ -1521,7 +1521,7 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <tr class="metric"><td class="metric_name">kubelet_managed_ephemeral_containers</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="gauge">Gauge</td>
-<td class="metric_description">Current number of ephemeral containers in pods managed by this kubelet. Ephemeral containers will be ignored if disabled by the EphemeralContainers feature gate, and this number will be 0.</td>
+<td class="metric_description">Current number of ephemeral containers in pods managed by this kubelet.</td>
 <td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>

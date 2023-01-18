@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/util"
 	"k8s.io/klog/v2"
 	kmsapi "k8s.io/kms/apis/v2alpha1"
+	kmsservice "k8s.io/kms/service"
 )
 
 const (
@@ -45,7 +46,7 @@ type gRPCService struct {
 }
 
 // NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
-func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Duration) (Service, error) {
+func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Duration) (kmsservice.Service, error) {
 	klog.V(4).Infof("Configure KMS provider with endpoint: %s", endpoint)
 
 	addr, err := util.ParseEndpoint(endpoint)
@@ -88,7 +89,7 @@ func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Durat
 }
 
 // Decrypt a given data string to obtain the original byte data.
-func (g *gRPCService) Decrypt(ctx context.Context, uid string, req *DecryptRequest) ([]byte, error) {
+func (g *gRPCService) Decrypt(ctx context.Context, uid string, req *kmsservice.DecryptRequest) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, g.callTimeout)
 	defer cancel()
 
@@ -106,7 +107,7 @@ func (g *gRPCService) Decrypt(ctx context.Context, uid string, req *DecryptReque
 }
 
 // Encrypt bytes to a string ciphertext.
-func (g *gRPCService) Encrypt(ctx context.Context, uid string, plaintext []byte) (*EncryptResponse, error) {
+func (g *gRPCService) Encrypt(ctx context.Context, uid string, plaintext []byte) (*kmsservice.EncryptResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, g.callTimeout)
 	defer cancel()
 
@@ -118,7 +119,7 @@ func (g *gRPCService) Encrypt(ctx context.Context, uid string, plaintext []byte)
 	if err != nil {
 		return nil, err
 	}
-	return &EncryptResponse{
+	return &kmsservice.EncryptResponse{
 		Ciphertext:  response.Ciphertext,
 		KeyID:       response.KeyId,
 		Annotations: response.Annotations,
@@ -126,7 +127,7 @@ func (g *gRPCService) Encrypt(ctx context.Context, uid string, plaintext []byte)
 }
 
 // Status returns the status of the KMSv2 provider.
-func (g *gRPCService) Status(ctx context.Context) (*StatusResponse, error) {
+func (g *gRPCService) Status(ctx context.Context) (*kmsservice.StatusResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, g.callTimeout)
 	defer cancel()
 
@@ -135,5 +136,5 @@ func (g *gRPCService) Status(ctx context.Context) (*StatusResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StatusResponse{Version: response.Version, Healthz: response.Healthz, KeyID: response.KeyId}, nil
+	return &kmsservice.StatusResponse{Version: response.Version, Healthz: response.Healthz, KeyID: response.KeyId}, nil
 }
