@@ -524,14 +524,6 @@ func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// ValidateJobTemplate validates a JobTemplate and returns an ErrorList with any errors.
-func ValidateJobTemplate(job *batch.JobTemplate, opts apivalidation.PodValidationOptions) field.ErrorList {
-	// this method should be identical to ValidateJob
-	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateJobTemplateSpec(&job.Template, field.NewPath("template"), opts)...)
-	return allErrs
-}
-
 // ValidateJobTemplateSpec validates a JobTemplateSpec and returns an ErrorList with any errors.
 func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := validateJobSpec(&spec.Spec, fldPath.Child("spec"), opts)
