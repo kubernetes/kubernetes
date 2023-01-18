@@ -36,6 +36,9 @@ type vmoduleConfigurationPFlag struct {
 
 // String returns the -vmodule parameter (comma-separated list of pattern=N).
 func (wrapper vmoduleConfigurationPFlag) String() string {
+	if wrapper.value == nil {
+		return ""
+	}
 	var patterns []string
 	for _, item := range *wrapper.value {
 		patterns = append(patterns, fmt.Sprintf("%s=%d", item.FilePattern, item.Verbosity))
@@ -82,10 +85,16 @@ type verbosityLevelPflag struct {
 }
 
 func (wrapper verbosityLevelPflag) String() string {
+	if wrapper.value == nil {
+		return "0"
+	}
 	return strconv.FormatInt(int64(*wrapper.value), 10)
 }
 
 func (wrapper verbosityLevelPflag) Get() interface{} {
+	if wrapper.value == nil {
+		return VerbosityLevel(0)
+	}
 	return *wrapper.value
 }
 
