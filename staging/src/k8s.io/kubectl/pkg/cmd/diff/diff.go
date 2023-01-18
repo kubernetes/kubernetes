@@ -117,6 +117,9 @@ type DiffOptions struct {
 	pruner           *pruner
 }
 
+// DiffFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
+// reflect the runtime requirements for the command.  This structure reduces the transformation to wiring and makes
+// the logic itself easy to unit test
 type DiffFlags struct {
 	FilenameOptions resource.FilenameOptions
 
@@ -131,6 +134,7 @@ type DiffFlags struct {
 	Diff             *DiffProgram
 }
 
+// NewDiffFlags returns a default DiffFlags
 func NewDiffFlags(ioStreams genericclioptions.IOStreams) *DiffFlags {
 	return &DiffFlags{
 		Diff: &DiffProgram{
@@ -140,6 +144,7 @@ func NewDiffFlags(ioStreams genericclioptions.IOStreams) *DiffFlags {
 	}
 }
 
+// AddFlags registers flags for a cli
 func (f *DiffFlags) AddFlags(cmd *cobra.Command) {
 	// Flag errors exit with code 1, however according to the diff
 	// command it means changes were found.
@@ -159,6 +164,7 @@ func (f *DiffFlags) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddLabelSelectorFlagVar(cmd, &f.Selector)
 }
 
+// NewCmdDiff creates the `diff` command
 func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	flags := NewDiffFlags(streams)
 	cmd := &cobra.Command{
@@ -632,7 +638,6 @@ func isConflict(err error) bool {
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
-//func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 func (flags *DiffFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string) (*DiffOptions, error) {
 	if len(args) != 0 {
 		return nil, cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
