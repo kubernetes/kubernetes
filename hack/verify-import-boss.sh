@@ -28,7 +28,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/import-boss
+hack/make-rules/build.sh \
+    k8s.io/code-generator/cmd/import-boss
 
 packages=(
   "k8s.io/kubernetes/pkg/..."

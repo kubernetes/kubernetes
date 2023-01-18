@@ -584,7 +584,7 @@ function codegen::openapi() {
 }
 
 function codegen::applyconfigs() {
-    GO111MODULE=on GOPROXY=off go install \
+    hack/make-rules/build.sh \
         k8s.io/kubernetes/pkg/generated/openapi/cmd/models-schema \
         k8s.io/code-generator/cmd/applyconfiguration-gen
 
@@ -625,7 +625,7 @@ function codegen::applyconfigs() {
 }
 
 function codegen::clients() {
-    GO111MODULE=on GOPROXY=off go install \
+    hack/make-rules/build.sh \
         k8s.io/code-generator/cmd/client-gen
 
     local clientgen
@@ -673,7 +673,8 @@ function codegen::clients() {
 }
 
 function codegen::listers() {
-    GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/lister-gen
+    hack/make-rules/build.sh \
+        k8s.io/code-generator/cmd/lister-gen
 
     local listergen
     listergen=$(kube::util::find-binary "lister-gen")
@@ -706,7 +707,7 @@ function codegen::listers() {
 }
 
 function codegen::informers() {
-    GO111MODULE=on GOPROXY=off go install \
+    hack/make-rules/build.sh \
         k8s.io/code-generator/cmd/informer-gen
 
     local informergen

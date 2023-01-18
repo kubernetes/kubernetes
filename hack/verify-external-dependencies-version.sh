@@ -31,9 +31,9 @@ export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
 # Install zeitgeist
-cd "${KUBE_ROOT}/hack/tools"
-GO111MODULE=on go install sigs.k8s.io/zeitgeist
-cd -
+pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  GO111MODULE=on go install sigs.k8s.io/zeitgeist
+popd >/dev/null
 
 # Prefer full path for running zeitgeist
 ZEITGEIST_BIN="$(which zeitgeist)"

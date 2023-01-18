@@ -243,9 +243,7 @@ produceJUnitXMLReport() {
 
   if ! command -v prune-junit-xml >/dev/null 2>&1; then
     kube::log::status "prune-junit-xml not found; installing from hack/tools"
-    pushd "${KUBE_ROOT}/cmd/prune-junit-xml" >/dev/null
-      GO111MODULE=on go install .
-    popd >/dev/null
+    hack/make-rules/build.sh ./cmd/prune-junit-xml
   fi
   prune-junit-xml "${junit_xml_filename}"
 

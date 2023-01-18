@@ -29,7 +29,8 @@ runtime_versions=("v1")
 
 kube::golang::setup_env
 
-GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
+KUBE_VERBOSE=0 hack/make-rules/build.sh \
+    k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 
 if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
   echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
