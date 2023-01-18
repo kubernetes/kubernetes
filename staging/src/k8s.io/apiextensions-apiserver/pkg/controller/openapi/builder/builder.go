@@ -529,22 +529,34 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 			buildDefinitions.Do(generateBuildDefinitionsFunc)
 			return namer.GetDefinitionName(name)
 		},
-		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
-			def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
-				Schema:       *b.schema,
-				Dependencies: []string{objectMetaType},
-			}
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
-				Schema: *b.listSchema,
-			}
-			return def
-		},
+		// GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
+		// 	def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)
+		// 	def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
+		// 		Schema:       *b.schema,
+		// 		Dependencies: []string{objectMetaType},
+		// 	}
+		// 	def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
+		// 		Schema: *b.listSchema,
+		// 	}
+		// 	return def
+		// },
 	}
+	buildDefinitions.Do(generateBuildDefinitionsFunc)
+	c.Definitions = definitions
+	def := make(map[string]common.OpenAPIDefinition)
+	def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
+		Schema:       *b.schema,
+		Dependencies: []string{objectMetaType},
+	}
+	def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
+		Schema: *b.listSchema,
+	}
+	c.AdditionalDefinitions = def
+	return c
 }
 
 func (b *builder) getOpenAPIV3Config() *common.OpenAPIV3Config {
-	return &common.OpenAPIV3Config{
+	c := &common.OpenAPIV3Config{
 		Info: &spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:   "Kubernetes CRD Swagger",
@@ -563,18 +575,30 @@ func (b *builder) getOpenAPIV3Config() *common.OpenAPIV3Config {
 			buildDefinitions.Do(generateBuildDefinitionsFunc)
 			return namer.GetDefinitionName(name)
 		},
-		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
-			def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
-				Schema:       *b.schema,
-				Dependencies: []string{objectMetaType},
-			}
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
-				Schema: *b.listSchema,
-			}
-			return def
-		},
+		// GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
+		// 	def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)
+		// 	def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
+		// 		Schema:       *b.schema,
+		// 		Dependencies: []string{objectMetaType},
+		// 	}
+		// 	def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
+		// 		Schema: *b.listSchema,
+		// 	}
+		// 	return def
+		// },
 	}
+	c.Definitions = definitionsV3
+	def := make(map[string]common.OpenAPIDefinition)
+	def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
+		Schema:       *b.schema,
+		Dependencies: []string{objectMetaType},
+	}
+	def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
+		Schema: *b.listSchema,
+	}
+	c.AdditionalDefinitions = def
+
+	return c
 }
 
 func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, schema *structuralschema.Structural, opts Options) *builder {
