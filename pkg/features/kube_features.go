@@ -1066,7 +1066,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.AdvancedAuditing: {Default: true, PreRelease: featuregate.GA},
+	genericfeatures.AdvancedAuditing: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	genericfeatures.ValidatingAdmissionPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
