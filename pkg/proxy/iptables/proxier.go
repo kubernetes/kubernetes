@@ -265,6 +265,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
 		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
+		needFullSync:             true,
 		syncPeriod:               syncPeriod,
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
@@ -538,7 +539,7 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.forceSyncProxyRules()
+	proxier.syncProxyRules()
 }
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
@@ -574,7 +575,7 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.forceSyncProxyRules()
+	proxier.syncProxyRules()
 }
 
 // OnNodeAdd is called whenever creation of new node object
