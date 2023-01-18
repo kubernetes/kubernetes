@@ -43,7 +43,7 @@ var (
 	gitMinor string // minor version, numeric possibly followed by "+"
 
 	// semantic version, derived by build scripts (see
-	// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/release/versioning.md
+	// https://github.com/kubernetes/design-proposals-archive/blob/main/release/versioning.md
 	// for a detailed discussion of this field)
 	//
 	// TODO: This field is still called "gitVersion" for legacy
