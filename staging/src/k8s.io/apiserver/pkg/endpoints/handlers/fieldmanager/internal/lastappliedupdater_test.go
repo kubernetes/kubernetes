@@ -17,13 +17,12 @@ limitations under the License.
 package internal_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -100,91 +99,114 @@ spec:
 func TestLargeLastApplied(t *testing.T) {
 	tests := []struct {
 		name      string
-		oldObject *corev1.ConfigMap
-		newObject *corev1.ConfigMap
+		oldObject *unstructured.Unstructured
+		newObject *unstructured.Unstructured
 	}{
 		{
 			name: "old object + new object last-applied annotation is too big",
-			oldObject: &corev1.ConfigMap{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "v1",
-					Kind:       "ConfigMap",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "large-update-test-cm",
-					Namespace: "default",
-					Annotations: map[string]string{
-						internal.LastAppliedConfigAnnotation: "nonempty",
-					},
-				},
-				Data: map[string]string{"k": "v"},
-			},
-			newObject: func() *corev1.ConfigMap {
-				cfg := &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "ConfigMap",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "large-update-test-cm",
-						Namespace: "default",
-						Annotations: map[string]string{
-							internal.LastAppliedConfigAnnotation: "nonempty",
-						},
-					},
-					Data: map[string]string{"k": "v"},
+			oldObject: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				err := json.Unmarshal([]byte(`
+{
+   "metadata": {
+      "name": "large-update-test-cm",
+      "namespace": "default",
+      "annotations": {
+         "kubectl.kubernetes.io/last-applied-configuration": "nonempty"
+      }
+   },
+   "apiVersion": "v1",
+   "kind": "ConfigMap",
+   "data": {
+      "k": "v"
+   }
+}`), &u)
+				if err != nil {
+					panic(err)
+				}
+				return u
+			}(),
+			newObject: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				err := json.Unmarshal([]byte(`
+{
+   "metadata": {
+      "name": "large-update-test-cm",
+      "namespace": "default",
+      "annotations": {
+         "kubectl.kubernetes.io/last-applied-configuration": "nonempty"
+      }
+   },
+   "apiVersion": "v1",
+   "kind": "ConfigMap",
+   "data": {
+      "k": "v"
+   }
+}`), &u)
+				if err != nil {
+					panic(err)
 				}
 				for i := 0; i < 9999; i++ {
 					unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
-					cfg.Data[unique] = "A"
+					unstructured.SetNestedField(u.Object, "A", "data", unique)
 				}
-				return cfg
+				return u
 			}(),
 		},
 		{
 			name: "old object + new object annotations + new object last-applied annotation is too big",
-			oldObject: func() *corev1.ConfigMap {
-				cfg := &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "ConfigMap",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "large-update-test-cm",
-						Namespace: "default",
-						Annotations: map[string]string{
-							internal.LastAppliedConfigAnnotation: "nonempty",
-						},
-					},
-					Data: map[string]string{"k": "v"},
+			oldObject: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				err := json.Unmarshal([]byte(`
+{
+   "metadata": {
+      "name": "large-update-test-cm",
+      "namespace": "default",
+      "annotations": {
+         "kubectl.kubernetes.io/last-applied-configuration": "nonempty"
+      }
+   },
+   "apiVersion": "v1",
+   "kind": "ConfigMap",
+   "data": {
+      "k": "v"
+   }
+}`), &u)
+				if err != nil {
+					panic(err)
 				}
 				for i := 0; i < 2000; i++ {
 					unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
-					cfg.Data[unique] = "A"
+					unstructured.SetNestedField(u.Object, "A", "data", unique)
 				}
-				return cfg
+				return u
 			}(),
-			newObject: func() *corev1.ConfigMap {
-				cfg := &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "ConfigMap",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "large-update-test-cm",
-						Namespace: "default",
-						Annotations: map[string]string{
-							internal.LastAppliedConfigAnnotation: "nonempty",
-						},
-					},
-					Data: map[string]string{"k": "v"},
+			newObject: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				err := json.Unmarshal([]byte(`
+{
+   "metadata": {
+      "name": "large-update-test-cm",
+      "namespace": "default",
+      "annotations": {
+         "kubectl.kubernetes.io/last-applied-configuration": "nonempty"
+      }
+   },
+   "apiVersion": "v1",
+   "kind": "ConfigMap",
+   "data": {
+      "k": "v"
+   }
+}`), &u)
+				if err != nil {
+					panic(err)
 				}
 				for i := 0; i < 2000; i++ {
 					unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
-					cfg.Data[unique] = "A"
-					cfg.ObjectMeta.Annotations[unique] = "A"
+					unstructured.SetNestedField(u.Object, "A", "data", unique)
+					unstructured.SetNestedField(u.Object, "A", "metadata", "annotations", unique)
 				}
-				return cfg
+				return u
 			}(),
 		},
 	}
