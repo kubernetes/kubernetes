@@ -27,7 +27,7 @@ import (
 	openapiclient "k8s.io/client-go/openapi"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/explain"
-	explainv2 "k8s.io/kubectl/pkg/explain/v2"
+	openapiv3explain "k8s.io/kubectl/pkg/explain/v2"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -51,6 +51,9 @@ var (
 
 		# Get the documentation of a specific field of a resource
 		kubectl explain pods.spec.containers`))
+
+	plaintextTemplateName          = "plaintext"
+	plaintextOpenAPIV2TemplateName = "plaintext-openapiv2"
 )
 
 type ExplainOptions struct {
@@ -82,7 +85,7 @@ func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *Expl
 		IOStreams:       streams,
 		CmdParent:       parent,
 		EnableOpenAPIV3: cmdutil.ExplainOpenapiV3.IsEnabled(),
-		OutputFormat:    "plaintext",
+		OutputFormat:    plaintextTemplateName,
 	}
 }
 
@@ -107,7 +110,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 
 	// Only enable --output as a valid flag if the feature is enabled
 	if o.EnableOpenAPIV3 {
-		cmd.Flags().StringVar(&o.OutputFormat, "output", o.OutputFormat, "Format in which to render the schema")
+		cmd.Flags().StringVar(&o.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
 	}
 
 	return cmd
@@ -150,13 +153,10 @@ func (o *ExplainOptions) Validate() error {
 
 // Run executes the appropriate steps to print a model's documentation
 func (o *ExplainOptions) Run() error {
-	recursive := o.Recursive
-	apiVersionString := o.APIVersion
-
 	var fullySpecifiedGVR schema.GroupVersionResource
 	var fieldsPath []string
 	var err error
-	if len(apiVersionString) == 0 {
+	if len(o.APIVersion) == 0 {
 		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequestWithMatchingPrefix(o.args[0], o.Mapper)
 		if err != nil {
 			return err
@@ -171,16 +171,47 @@ func (o *ExplainOptions) Run() error {
 		}
 	}
 
+	// Fallback to openapiv2 implementation using special template name
 	if o.EnableOpenAPIV3 {
-		return explainv2.PrintModelDescription(
-			fieldsPath,
-			o.Out,
-			o.OpenAPIV3Client,
-			fullySpecifiedGVR,
-			recursive,
-			o.OutputFormat,
-		)
+		switch o.OutputFormat {
+		case plaintextOpenAPIV2TemplateName:
+			return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
+		case plaintextTemplateName:
+			// Check whether the server reponds to OpenAPIV3.
+			if _, err := o.OpenAPIV3Client.Paths(); err != nil {
+				// Use v2 renderer if server does not support v3
+				return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
+			}
+
+			fallthrough
+		default:
+			if len(o.APIVersion) > 0 {
+				apiVersion, err := schema.ParseGroupVersion(o.APIVersion)
+				if err != nil {
+					return err
+				}
+				fullySpecifiedGVR.Group = apiVersion.Group
+				fullySpecifiedGVR.Version = apiVersion.Version
+			}
+
+			return openapiv3explain.PrintModelDescription(
+				fieldsPath,
+				o.Out,
+				o.OpenAPIV3Client,
+				fullySpecifiedGVR,
+				o.Recursive,
+				o.OutputFormat,
+			)
+		}
 	}
+	return o.renderOpenAPIV2(fullySpecifiedGVR, fieldsPath)
+}
+
+func (o *ExplainOptions) renderOpenAPIV2(
+	fullySpecifiedGVR schema.GroupVersionResource,
+	fieldsPath []string,
+) error {
+	var err error
 
 	gvk, _ := o.Mapper.KindFor(fullySpecifiedGVR)
 	if gvk.Empty() {
@@ -190,8 +221,8 @@ func (o *ExplainOptions) Run() error {
 		}
 	}
 
-	if len(apiVersionString) != 0 {
-		apiVersion, err := schema.ParseGroupVersion(apiVersionString)
+	if len(o.APIVersion) != 0 {
+		apiVersion, err := schema.ParseGroupVersion(o.APIVersion)
 		if err != nil {
 			return err
 		}
@@ -203,5 +234,5 @@ func (o *ExplainOptions) Run() error {
 		return fmt.Errorf("couldn't find resource for %q", gvk)
 	}
 
-	return explain.PrintModelDescription(fieldsPath, o.Out, schema, gvk, recursive)
+	return explain.PrintModelDescription(fieldsPath, o.Out, schema, gvk, o.Recursive)
 }
