@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -13,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from __future__ import print_function
 
 import argparse
 import datetime
@@ -231,7 +229,7 @@ def get_regexs():
 def main():
     regexs = get_regexs()
     refs = get_refs()
-    filenames = get_files(refs.keys())
+    filenames = get_files(list(refs.keys()))
 
     for filename in filenames:
         if not file_passes(filename, refs, regexs):
