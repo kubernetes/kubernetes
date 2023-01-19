@@ -188,6 +188,7 @@ func NewKubeGenericRuntimeManager(
 	insecureContainerLifecycleHTTPClient types.HTTPDoer,
 	imageBackOff *flowcontrol.Backoff,
 	serializeImagePulls bool,
+	maxParallelImagePulls *int32,
 	imagePullQPS float32,
 	imagePullBurst int,
 	imageCredentialProviderConfigFile string,
@@ -275,6 +276,7 @@ func NewKubeGenericRuntimeManager(
 		kubeRuntimeManager,
 		imageBackOff,
 		serializeImagePulls,
+		maxParallelImagePulls,
 		imagePullQPS,
 		imagePullBurst,
 		podPullingTimeRecorder)

@@ -292,6 +292,8 @@ type KubeletConfiguration struct {
 	KubeAPIBurst int32
 	// serializeImagePulls when enabled, tells the Kubelet to pull images one at a time.
 	SerializeImagePulls bool
+	// MaxParallelImagePulls sets the maximum number of image pulls in parallel.
+	MaxParallelImagePulls *int32
 	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
 	// Some default signals are Linux only: nodefs.inodesFree
 	EvictionHard map[string]string
