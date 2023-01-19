@@ -17,12 +17,11 @@ limitations under the License.
 package pod
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"reflect"
-	"text/tabwriter"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -30,6 +29,7 @@ import (
 	"github.com/onsi/gomega/gcustom"
 	"github.com/onsi/gomega/types"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/format"
 )
 
 const (
@@ -138,36 +139,6 @@ func IsTimeout(err error) bool {
 	return false
 }
 
-// errorBadPodsStates create error message of basic info of bad pods for debugging.
-func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState string, timeout time.Duration, err error) error {
-	errStr := fmt.Sprintf("%d / %d pods in namespace %s are NOT in %s state in %v\n", len(badPods), desiredPods, ns, desiredState, timeout)
-
-	// Print bad pods info only if there are fewer than 10 bad pods
-	if len(badPods) > 10 {
-		errStr += "There are too many bad pods. Please check log for details."
-	} else {
-		buf := bytes.NewBuffer(nil)
-		w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
-		fmt.Fprintln(w, "POD\tNODE\tPHASE\tGRACE\tCONDITIONS")
-		for _, badPod := range badPods {
-			grace := ""
-			if badPod.DeletionGracePeriodSeconds != nil {
-				grace = fmt.Sprintf("%ds", *badPod.DeletionGracePeriodSeconds)
-			}
-			podInfo := fmt.Sprintf("%s\t%s\t%s\t%s\t%+v",
-				badPod.ObjectMeta.Name, badPod.Spec.NodeName, badPod.Status.Phase, grace, badPod.Status.Conditions)
-			fmt.Fprintln(w, podInfo)
-		}
-		w.Flush()
-		errStr += buf.String()
-	}
-
-	if err != nil && !IsTimeout(err) {
-		return fmt.Errorf("%s\nLast error: %w", errStr, err)
-	}
-	return TimeoutError(errStr)
-}
-
 // BeRunningNoRetries verifies that a pod starts running. It's a permanent
 // failure when the pod enters some other permanent phase.
 func BeRunningNoRetries() types.GomegaMatcher {
@@ -215,92 +186,108 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 		return nil
 	}
 
-	start := time.Now()
-	framework.Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
-		timeout, minPods, ns)
-	var ignoreNotReady bool
-	badPods := []v1.Pod{}
-	desiredPods := 0
-	notReady := int32(0)
-	var lastAPIError error
+	// We get the new list of pods, replication controllers, and replica
+	// sets in every iteration because more pods come online during startup
+	// and we want to ensure they are also checked.
+	//
+	// This struct gets populated while polling, then gets checked, and in
+	// case of a timeout is included in the failure message.
+	type state struct {
+		ReplicationControllers []v1.ReplicationController
+		ReplicaSets            []appsv1.ReplicaSet
+		Pods                   []v1.Pod
+	}
 
-	if wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (bool, error) {
-		// We get the new list of pods, replication controllers, and
-		// replica sets in every iteration because more pods come
-		// online during startup and we want to ensure they are also
-		// checked.
-		replicas, replicaOk := int32(0), int32(0)
-		// Clear API error from the last attempt in case the following calls succeed.
-		lastAPIError = nil
+	// notReady is -1 for any failure other than a timeout.
+	// Otherwise it is the number of pods that we were still
+	// waiting for.
+	notReady := int32(-1)
+
+	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*state, error) {
+		// Reset notReady at the start of a poll attempt.
+		notReady = -1
 
 		rcList, err := c.CoreV1().ReplicationControllers(ns).List(ctx, metav1.ListOptions{})
-		lastAPIError = err
 		if err != nil {
-			return handleWaitingAPIError(err, false, "listing replication controllers in namespace %s", ns)
+			return nil, fmt.Errorf("listing replication controllers in namespace %s: %w", ns, err)
 		}
-		for _, rc := range rcList.Items {
+		rsList, err := c.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("listing replication sets in namespace %s: %w", ns, err)
+		}
+		podList, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("listing pods in namespace %s: %w", ns, err)
+		}
+		return &state{
+			ReplicationControllers: rcList.Items,
+			ReplicaSets:            rsList.Items,
+			Pods:                   podList.Items,
+		}, nil
+	})).WithTimeout(timeout).Should(framework.MakeMatcher(func(s *state) (func() string, error) {
+		replicas, replicaOk := int32(0), int32(0)
+		for _, rc := range s.ReplicationControllers {
 			replicas += *rc.Spec.Replicas
 			replicaOk += rc.Status.ReadyReplicas
 		}
-
-		rsList, err := c.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{})
-		lastAPIError = err
-		if err != nil {
-			return handleWaitingAPIError(err, false, "listing replication sets in namespace %s", ns)
-		}
-		for _, rs := range rsList.Items {
+		for _, rs := range s.ReplicaSets {
 			replicas += *rs.Spec.Replicas
 			replicaOk += rs.Status.ReadyReplicas
 		}
 
-		podList, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
-		lastAPIError = err
-		if err != nil {
-			return handleWaitingAPIError(err, false, "listing pods in namespace %s", ns)
-		}
 		nOk := int32(0)
 		notReady = int32(0)
-		badPods = []v1.Pod{}
-		desiredPods = len(podList.Items)
-		for _, pod := range podList.Items {
+		failedPods := []v1.Pod{}
+		otherPods := []v1.Pod{}
+		succeededPods := []string{}
+		for _, pod := range s.Pods {
 			res, err := testutils.PodRunningReady(&pod)
 			switch {
 			case res && err == nil:
 				nOk++
 			case pod.Status.Phase == v1.PodSucceeded:
-				framework.Logf("The status of Pod %s is Succeeded, skipping waiting", pod.ObjectMeta.Name)
 				// it doesn't make sense to wait for this pod
-				continue
-			case pod.Status.Phase != v1.PodFailed:
-				framework.Logf("The status of Pod %s is %s (Ready = false), waiting for it to be either Running (with Ready = true) or Failed", pod.ObjectMeta.Name, pod.Status.Phase)
-				notReady++
-				badPods = append(badPods, pod)
-			default:
-				if metav1.GetControllerOf(&pod) == nil {
-					framework.Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
-					badPods = append(badPods, pod)
-				}
+				succeededPods = append(succeededPods, pod.Name)
+			case pod.Status.Phase == v1.PodFailed:
 				// ignore failed pods that are controlled by some controller
+				if metav1.GetControllerOf(&pod) == nil {
+					failedPods = append(failedPods, pod)
+				}
+			default:
+				notReady++
+				otherPods = append(otherPods, pod)
 			}
 		}
-
-		framework.Logf("%d / %d pods in namespace '%s' are running and ready (%d seconds elapsed)",
-			nOk, len(podList.Items), ns, int(time.Since(start).Seconds()))
-		framework.Logf("expected %d pod replicas in namespace '%s', %d are Running and Ready.", replicas, ns, replicaOk)
-
-		if replicaOk == replicas && nOk >= minPods && len(badPods) == 0 {
-			return true, nil
+		done := replicaOk == replicas && nOk >= minPods && (len(failedPods)+len(otherPods)) == 0
+		if done {
+			return nil, nil
 		}
-		ignoreNotReady = (notReady <= allowedNotReadyPods)
-		LogPodStates(badPods)
-		return false, nil
-	}) != nil {
-		if !ignoreNotReady {
-			return errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout, lastAPIError)
-		}
+
+		// Delayed formatting of a failure message.
+		return func() string {
+			var buffer strings.Builder
+			buffer.WriteString(fmt.Sprintf("Expected all pods (need at least %d) in namespace %q to be running and ready (except for %d).\n", minPods, ns, allowedNotReadyPods))
+			buffer.WriteString(fmt.Sprintf("%d / %d pods were running and ready.\n", nOk, len(s.Pods)))
+			buffer.WriteString(fmt.Sprintf("Expected %d pod replicas, %d are Running and Ready.\n", replicas, replicaOk))
+			if len(succeededPods) > 0 {
+				buffer.WriteString(fmt.Sprintf("Pods that completed successfully:\n%s", format.Object(succeededPods, 1)))
+			}
+			if len(failedPods) > 0 {
+				buffer.WriteString(fmt.Sprintf("Pods that failed and were not controlled by some controller:\n%s", format.Object(failedPods, 1)))
+			}
+			if len(otherPods) > 0 {
+				buffer.WriteString(fmt.Sprintf("Pods that were neither completed nor running:\n%s", format.Object(otherPods, 1)))
+			}
+			return buffer.String()
+		}, nil
+	}))
+
+	// An error might not be fatal.
+	if err != nil && notReady >= 0 && notReady <= allowedNotReadyPods {
 		framework.Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
+		return nil
 	}
-	return nil
+	return err
 }
 
 // WaitForPodCondition waits a pods to be matched to the given condition.
