@@ -19,6 +19,7 @@ package pod_test
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
@@ -39,7 +40,6 @@ import (
 // Be careful when moving it around or changing the import statements above.
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
-//
 //
 //
 //
@@ -97,6 +97,9 @@ var (
 func TestFailureOutput(t *testing.T) {
 
 	expected := output.TestResult{
+		NormalizeOutput: func(in string) string {
+			return regexp.MustCompile(`wait.go:[[:digit:]]*`).ReplaceAllString(in, `wait.go`)
+		},
 		Suite: reporters.JUnitTestSuite{
 			Tests:    6,
 			Failures: 6,
@@ -151,6 +154,11 @@ In [It] at: wait_test.go:58 <time>
 `,
 					},
 					SystemErr: `> Enter [It] not found, retry - wait_test.go:57 <time>
+INFO: Failed inside E2E framework:
+    k8s.io/kubernetes/test/e2e/framework/pod.WaitTimeoutForPodRunningInNamespace()
+    	wait.go
+    k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
+    	wait_test.go:58
 [FAILED] Timed out after <after>.
 The function passed to Eventually returned the following error:
 pods "no-such-pod" not found
@@ -308,6 +316,11 @@ In [It] at: wait_test.go:71 <time>
 					},
 					SystemErr: `> Enter [It] not running - wait_test.go:69 <time>
 STEP: waiting for pod pending-pod to run - wait_test.go:70 <time>
+INFO: Failed inside E2E framework:
+    k8s.io/kubernetes/test/e2e/framework/pod.WaitTimeoutForPodRunningInNamespace()
+    	wait.go
+    k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.5()
+    	wait_test.go:71
 [FAILED] Timed out after <after>.
 Expected Pod to be in <v1.PodPhase>: "Running"
 Got instead:
@@ -335,6 +348,11 @@ In [It] at: wait_test.go:75 <time>
 						Type: "failed",
 					},
 					SystemErr: `> Enter [It] failed - wait_test.go:74 <time>
+INFO: Failed inside E2E framework:
+    k8s.io/kubernetes/test/e2e/framework/pod.WaitTimeoutForPodRunningInNamespace()
+    	wait.go
+    k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.6()
+    	wait_test.go:75
 [FAILED] Told to stop trying after <after>.
 Expected pod to reach phase "Running", got final phase "Failed" instead.
 In [It] at: wait_test.go:75 <time>

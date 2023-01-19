@@ -25,6 +25,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// This test is sensitive to line numbering.
+// The following lines can be removed to compensate for import changes.
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+// This must be line #40.
+
 func TestNewGomega(t *testing.T) {
 	if err := Gomega().Expect("hello").To(gomega.Equal("hello")); err != nil {
 		t.Errorf("unexpected failure: %s", err.Error())
@@ -37,5 +51,12 @@ not to equal
     <string>: hello`, err.Error())
 	if !errors.Is(err, ErrFailure) {
 		t.Errorf("expected error that is ErrFailure, got %T: %+v", err, err)
+	}
+	var failure FailureError
+	if !errors.As(err, &failure) {
+		t.Errorf("expected error that can be copied to FailureError, got %T: %+v", err, err)
+	} else {
+		assert.Regexp(t, `^k8s.io/kubernetes/test/e2e/framework.TestNewGomega\(0x[0-9A-Fa-f]*\)
+	.*/test/e2e/framework/expect_test.go:46`, failure.Backtrace())
 	}
 }

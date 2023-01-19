@@ -20,8 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/types"
@@ -91,7 +93,9 @@ func (g gomegaInstance) Consistently(ctx context.Context, args ...interface{}) A
 func newG() (*FailureError, gomega.Gomega) {
 	var failure FailureError
 	g := gomega.NewGomega(func(msg string, callerSkip ...int) {
-		failure = FailureError(msg)
+		failure = FailureError{
+			msg: msg,
+		}
 	})
 
 	return &failure, g
@@ -104,6 +108,7 @@ type assertion struct {
 func (a assertion) Should(matcher types.GomegaMatcher) error {
 	err, g := newG()
 	if !g.Expect(a.actual).Should(matcher) {
+		err.backtrace()
 		return *err
 	}
 	return nil
@@ -112,6 +117,7 @@ func (a assertion) Should(matcher types.GomegaMatcher) error {
 func (a assertion) ShouldNot(matcher types.GomegaMatcher) error {
 	err, g := newG()
 	if !g.Expect(a.actual).ShouldNot(matcher) {
+		err.backtrace()
 		return *err
 	}
 	return nil
@@ -120,6 +126,7 @@ func (a assertion) ShouldNot(matcher types.GomegaMatcher) error {
 func (a assertion) To(matcher types.GomegaMatcher) error {
 	err, g := newG()
 	if !g.Expect(a.actual).To(matcher) {
+		err.backtrace()
 		return *err
 	}
 	return nil
@@ -128,6 +135,7 @@ func (a assertion) To(matcher types.GomegaMatcher) error {
 func (a assertion) ToNot(matcher types.GomegaMatcher) error {
 	err, g := newG()
 	if !g.Expect(a.actual).ToNot(matcher) {
+		err.backtrace()
 		return *err
 	}
 	return nil
@@ -136,6 +144,7 @@ func (a assertion) ToNot(matcher types.GomegaMatcher) error {
 func (a assertion) NotTo(matcher types.GomegaMatcher) error {
 	err, g := newG()
 	if !g.Expect(a.actual).NotTo(matcher) {
+		err.backtrace()
 		return *err
 	}
 	return nil
@@ -175,6 +184,7 @@ func (a asyncAssertion) newAsync() (*FailureError, gomega.AsyncAssertion) {
 func (a asyncAssertion) Should(matcher types.GomegaMatcher) error {
 	err, assertion := a.newAsync()
 	if !assertion.Should(matcher) {
+		err.backtrace()
 		return *err
 	}
 	return nil
@@ -183,6 +193,7 @@ func (a asyncAssertion) Should(matcher types.GomegaMatcher) error {
 func (a asyncAssertion) ShouldNot(matcher types.GomegaMatcher) error {
 	err, assertion := a.newAsync()
 	if !assertion.ShouldNot(matcher) {
+		err.backtrace()
 		return *err
 	}
 	return nil
@@ -201,14 +212,25 @@ func (a asyncAssertion) WithPolling(interval time.Duration) AsyncAssertion {
 // FailureError is an error where the error string is meant to be passed to
 // ginkgo.Fail directly, i.e. adding some prefix like "unexpected error" is not
 // necessary. It is also not necessary to dump the error struct.
-type FailureError string
+type FailureError struct {
+	msg            string
+	fullStackTrace string
+}
 
 func (f FailureError) Error() string {
-	return string(f)
+	return f.msg
+}
+
+func (f FailureError) Backtrace() string {
+	return f.fullStackTrace
 }
 
 func (f FailureError) Is(target error) bool {
 	return target == ErrFailure
+}
+
+func (f *FailureError) backtrace() {
+	f.fullStackTrace = ginkgotypes.NewCodeLocationWithStackTrace(2).FullStackTrace
 }
 
 // ErrFailure is an empty error that can be wrapped to indicate that an error
@@ -220,7 +242,7 @@ func (f FailureError) Is(target error) bool {
 //	if errors.Is(err, ErrFailure) {
 //	    ...
 //	}
-var ErrFailure error = FailureError("")
+var ErrFailure error = FailureError{}
 
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
 func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
@@ -274,7 +296,12 @@ func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	//
 	// Some errors include all relevant information in the Error
 	// string. For those we can skip the redundant log message.
-	if !errors.Is(err, ErrFailure) {
+	// For our own failures we only log the additional stack backtrace
+	// because it is not included in the failure message.
+	var failure FailureError
+	if errors.As(err, &failure) && failure.Backtrace() != "" {
+		Logf("Failed inside E2E framework:\n    %s", strings.ReplaceAll(failure.Backtrace(), "\n", "\n    "))
+	} else if !errors.Is(err, ErrFailure) {
 		Logf("Unexpected error: %s\n%s", prefix, format.Object(err, 1))
 	}
 	Fail(prefix+err.Error(), 1+offset)
