@@ -18,7 +18,6 @@ package pod
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,14 +38,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
-
-// errPodCompleted is returned by PodRunning or PodContainerRunning to indicate that
-// the pod has already reached completed state.
-var errPodCompleted = FinalError(errors.New("pod ran to completion successfully"))
-
-// errPodFailed is returned by PodRunning or PodContainerRunning to indicate that
-// the pod has already reached a permanent failue state.
-var errPodFailed = FinalError(errors.New("pod failed permanently"))
 
 // LabelLogOnPodFailure can be used to mark which Pods will have their logs logged in the case of
 // a test failure. By default, if there are no Pods with this label, only the first 5 Pods will
