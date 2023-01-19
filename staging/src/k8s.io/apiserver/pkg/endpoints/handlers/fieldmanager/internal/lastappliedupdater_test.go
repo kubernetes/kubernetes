@@ -114,7 +114,7 @@ func TestLargeLastApplied(t *testing.T) {
 					Name:      "large-update-test-cm",
 					Namespace: "default",
 					Annotations: map[string]string{
-						corev1.LastAppliedConfigAnnotation: "nonempty",
+						internal.LastAppliedConfigAnnotation: "nonempty",
 					},
 				},
 				Data: map[string]string{"k": "v"},
@@ -129,7 +129,7 @@ func TestLargeLastApplied(t *testing.T) {
 						Name:      "large-update-test-cm",
 						Namespace: "default",
 						Annotations: map[string]string{
-							corev1.LastAppliedConfigAnnotation: "nonempty",
+							internal.LastAppliedConfigAnnotation: "nonempty",
 						},
 					},
 					Data: map[string]string{"k": "v"},
@@ -153,7 +153,7 @@ func TestLargeLastApplied(t *testing.T) {
 						Name:      "large-update-test-cm",
 						Namespace: "default",
 						Annotations: map[string]string{
-							corev1.LastAppliedConfigAnnotation: "nonempty",
+							internal.LastAppliedConfigAnnotation: "nonempty",
 						},
 					},
 					Data: map[string]string{"k": "v"},
@@ -174,7 +174,7 @@ func TestLargeLastApplied(t *testing.T) {
 						Name:      "large-update-test-cm",
 						Namespace: "default",
 						Annotations: map[string]string{
-							corev1.LastAppliedConfigAnnotation: "nonempty",
+							internal.LastAppliedConfigAnnotation: "nonempty",
 						},
 					},
 					Data: map[string]string{"k": "v"},
@@ -220,7 +220,7 @@ func TestLargeLastApplied(t *testing.T) {
 			if annotations == nil {
 				t.Errorf("No annotations on obj: %v", f.Live())
 			}
-			lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
+			lastApplied, ok := annotations[internal.LastAppliedConfigAnnotation]
 			if ok || len(lastApplied) > 0 {
 				t.Errorf("Expected no last applied annotation, but got last applied with length: %d", len(lastApplied))
 			}
@@ -238,7 +238,7 @@ func getLastApplied(obj runtime.Object) (string, error) {
 		return "", fmt.Errorf("no annotations on obj: %v", obj)
 	}
 
-	lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
+	lastApplied, ok := annotations[internal.LastAppliedConfigAnnotation]
 	if !ok {
 		return "", fmt.Errorf("expected last applied annotation, but got none for object: %v", obj)
 	}

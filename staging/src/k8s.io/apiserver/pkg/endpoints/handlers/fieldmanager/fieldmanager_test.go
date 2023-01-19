@@ -817,7 +817,7 @@ func getLastApplied(obj runtime.Object) (string, error) {
 		return "", fmt.Errorf("no annotations on obj: %v", obj)
 	}
 
-	lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
+	lastApplied, ok := annotations[internal.LastAppliedConfigAnnotation]
 	if !ok {
 		return "", fmt.Errorf("expected last applied annotation, but got none for object: %v", obj)
 	}
