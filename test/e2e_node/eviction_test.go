@@ -502,7 +502,7 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
 	})
 
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition)+"; PodDisruptionConditions enabled [NodeFeature:PodDisruptionConditions]", func() {
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition)+"; PodDisruptionConditions enabled 2[NodeFeature:PodDisruptionConditions]", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			pidsConsumed := int64(10000)
 			summary := eventuallyGetSummary(ctx)
