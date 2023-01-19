@@ -83,39 +83,6 @@ func TimeoutError(msg string, observedObjects ...interface{}) *timeoutError {
 	}
 }
 
-// FinalError constructs an error that indicates to a poll function that
-// polling can be stopped immediately because some permanent error has been
-// encountered that is not going to go away.
-//
-// TODO (@pohly): move this into framework once the refactoring from
-// https://github.com/kubernetes/kubernetes/pull/112043 allows it. Right now it
-// leads to circular dependencies.
-func FinalError(err error) error {
-	return &FinalErr{Err: err}
-}
-
-type FinalErr struct {
-	Err error
-}
-
-func (err *FinalErr) Error() string {
-	if err.Err != nil {
-		return fmt.Sprintf("final error: %s", err.Err.Error())
-	}
-	return "final error, exact problem unknown"
-}
-
-func (err *FinalErr) Unwrap() error {
-	return err.Err
-}
-
-// IsFinal checks whether the error was marked as final by wrapping some error
-// with FinalError.
-func IsFinal(err error) bool {
-	var finalErr *FinalErr
-	return errors.As(err, &finalErr)
-}
-
 // maybeTimeoutError returns a TimeoutError if err is a timeout. Otherwise, wrap err.
 // taskFormat and taskArgs should be the task being performed when the error occurred,
 // e.g. "waiting for pod to be running".
@@ -291,53 +258,23 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 }
 
 // WaitForPodCondition waits a pods to be matched to the given condition.
-// If the condition callback returns an error that matches FinalErr (checked with IsFinal),
-// then polling aborts early.
+// The condition callback may use gomega.StopTrying to abort early.
 func WaitForPodCondition(ctx context.Context, c clientset.Interface, ns, podName, conditionDesc string, timeout time.Duration, condition podCondition) error {
-	framework.Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, conditionDesc)
-	var (
-		lastPodError error
-		lastPod      *v1.Pod
-		start        = time.Now()
-	)
-	err := wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (bool, error) {
-		pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
-		lastPodError = err
-		if err != nil {
-			return handleWaitingAPIError(err, true, "getting pod %s", podIdentifier(ns, podName))
-		}
-		lastPod = pod // Don't overwrite if an error occurs after successfully retrieving.
-
-		// log now so that current pod info is reported before calling `condition()`
-		framework.Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
-			podName, pod.Status.Phase, pod.Status.Reason, podutils.IsPodReady(pod), time.Since(start))
-		if done, err := condition(pod); done {
-			if err == nil {
-				framework.Logf("Pod %q satisfied condition %q", podName, conditionDesc)
+	return framework.Gomega().
+		Eventually(ctx, framework.RetryNotFound(framework.GetObject(c.CoreV1().Pods(ns).Get, podName, metav1.GetOptions{}))).
+		WithTimeout(timeout).
+		Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+			done, err := condition(pod)
+			if err != nil {
+				return nil, err
 			}
-			return true, err
-		} else if err != nil {
-			framework.Logf("Error evaluating pod condition %s: %v", conditionDesc, err)
-			if IsFinal(err) {
-				return false, err
+			if done {
+				return nil, nil
 			}
-		}
-		return false, nil
-	})
-	if err == nil {
-		return nil
-	}
-	if IsTimeout(err) {
-		if lastPod != nil {
-			return TimeoutError(fmt.Sprintf("timed out while waiting for pod %s to be %s", podIdentifier(ns, podName), conditionDesc),
-				lastPod,
-			)
-		} else if lastPodError != nil {
-			// If the last API call was an error, propagate that instead of the timeout error.
-			err = lastPodError
-		}
-	}
-	return maybeTimeoutError(err, "waiting for pod %s to be %s", podIdentifier(ns, podName), conditionDesc)
+			return func() string {
+				return fmt.Sprintf("expected pod to be %s, got instead:\n%s", conditionDesc, format.Object(pod, 1))
+			}, nil
+		}))
 }
 
 // WaitForAllPodsCondition waits for the listed pods to match the given condition.
@@ -570,17 +507,11 @@ func WaitForPodNoLongerRunningInNamespace(ctx context.Context, c clientset.Inter
 func WaitTimeoutForPodReadyInNamespace(ctx context.Context, c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(ctx, c, namespace, podName, "running and ready", timeout, func(pod *v1.Pod) (bool, error) {
 		switch pod.Status.Phase {
-		case v1.PodFailed:
-			framework.Logf("The phase of Pod %s is %s which is unexpected, pod status: %#v", pod.Name, pod.Status.Phase, pod.Status)
-			return false, errPodFailed
-		case v1.PodSucceeded:
-			framework.Logf("The phase of Pod %s is %s which is unexpected, pod status: %#v", pod.Name, pod.Status.Phase, pod.Status)
-			return false, errPodCompleted
+		case v1.PodFailed, v1.PodSucceeded:
+			return false, gomega.StopTrying(fmt.Sprintf("The phase of Pod %s is %s which is unexpected.", pod.Name, pod.Status.Phase))
 		case v1.PodRunning:
-			framework.Logf("The phase of Pod %s is %s (Ready = %v)", pod.Name, pod.Status.Phase, podutils.IsPodReady(pod))
 			return podutils.IsPodReady(pod), nil
 		}
-		framework.Logf("The phase of Pod %s is %s, waiting for it to be Running (with Ready = true)", pod.Name, pod.Status.Phase)
 		return false, nil
 	})
 }
