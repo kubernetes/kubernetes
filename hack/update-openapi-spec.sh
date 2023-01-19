@@ -47,12 +47,12 @@ trap cleanup EXIT SIGINT
 
 kube::golang::setup_env
 
-TMP_DIR=$(mktemp -d /tmp/update-openapi-spec.XXXX)
+TMP_DIR=${TMP_DIR:-$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
-API_LOGFILE=${API_LOGFILE:-/tmp/openapi-api-server.log}
+API_LOGFILE=${API_LOGFILE:-${TMP_DIR}/openapi-api-server.log}
 
 kube::etcd::start
 
@@ -60,7 +60,7 @@ echo "dummy_token,admin,admin" > "${TMP_DIR}/tokenauth.csv"
 
 # setup envs for TokenRequest required flags
 SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
-SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
+SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-${TMP_DIR}/kube-serviceaccount.key}
 # Generate ServiceAccount key if needed
 if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
   mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
