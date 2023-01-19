@@ -218,6 +218,11 @@ type Route struct {
 	Name string
 	// TargetNode is the NodeName of the target instance.
 	TargetNode types.NodeName
+	// EnableNodeAddresses is a feature gate for TargetNodeAddresses. If false, ignore TargetNodeAddresses.
+	// Without this, if users haven't updated their cloud-provider, reconcile() will delete and create same route every time.
+	EnableNodeAddresses bool
+	// TargetNodeAddresses are the Node IPs of the target Node.
+	TargetNodeAddresses []v1.NodeAddress
 	// DestinationCIDR is the CIDR format IP range that this routing rule
 	// applies to.
 	DestinationCIDR string
