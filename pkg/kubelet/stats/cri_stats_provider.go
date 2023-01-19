@@ -590,7 +590,6 @@ func (p *criStatsProvider) addProcessStats(
 	processStats := cadvisorInfoToProcessStats(container)
 	// Sum up all of the process stats for each of the containers to obtain the cumulative pod level process count
 	ps.ProcessStats = mergeProcessStats(ps.ProcessStats, processStats)
-	return
 }
 
 func (p *criStatsProvider) makeContainerStats(
