@@ -56,16 +56,10 @@ find_files() {
 
 versioned_api_files=$(find_files) || true
 
-failure_file="${KUBE_ROOT}/hack/.fieldname_docs_failures"
-failing_groups=()
-while IFS='' read -r line; do failing_groups+=("${line}"); done < <(cat "${failure_file}")
-
 for file in ${versioned_api_files}; do
-	package="${file%"/types.go"}"
-    if ! kube::util::array_contains "${package}" "${failing_groups[@]}"; then
-        echo "Checking ${package}"
-        ${fieldnamedocscheck} -s "${file}" || result=$?
-    fi
+  package="${file%"/types.go"}"
+  echo "Checking ${package}"
+  ${fieldnamedocscheck} -s "${file}" || result=$?
 done
 
 exit ${result}
