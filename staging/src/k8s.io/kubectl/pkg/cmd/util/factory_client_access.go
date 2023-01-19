@@ -33,7 +33,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/util/openapi"
-	openapivalidation "k8s.io/kubectl/pkg/util/openapi/validation"
 	"k8s.io/kubectl/pkg/validation"
 )
 
@@ -159,7 +158,7 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 	}
 
 	schema := validation.ConjunctiveSchema{
-		openapivalidation.NewSchemaValidation(resources),
+		validation.NewSchemaValidation(resources),
 		validation.NoDoubleKeySchema{},
 	}
 
