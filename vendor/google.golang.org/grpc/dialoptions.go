@@ -116,8 +116,9 @@ func newFuncDialOption(f func(*dialOptions)) *funcDialOption {
 // be twice the size to keep syscalls low. The default value for this buffer is
 // 32KB.
 //
-// Zero will disable the write buffer such that each write will be on underlying
-// connection. Note: A Send call may not directly translate to a write.
+// Zero or negative values will disable the write buffer such that each write
+// will be on underlying connection. Note: A Send call may not directly
+// translate to a write.
 func WithWriteBufferSize(s int) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.WriteBufferSize = s
@@ -127,8 +128,9 @@ func WithWriteBufferSize(s int) DialOption {
 // WithReadBufferSize lets you set the size of read buffer, this determines how
 // much data can be read at most for each read syscall.
 //
-// The default value for this buffer is 32KB. Zero will disable read buffer for
-// a connection so data framer can access the underlying conn directly.
+// The default value for this buffer is 32KB. Zero or negative values will
+// disable read buffer for a connection so data framer can access the
+// underlying conn directly.
 func WithReadBufferSize(s int) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.ReadBufferSize = s

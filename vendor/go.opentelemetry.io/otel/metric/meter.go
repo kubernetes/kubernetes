@@ -26,6 +26,8 @@ import (
 
 // MeterProvider provides access to named Meter instances, for instrumenting
 // an application or library.
+//
+// Warning: methods may be added to this interface in minor releases.
 type MeterProvider interface {
 	// Meter creates an instance of a `Meter` interface. The instrumentationName
 	// must be the name of the library providing instrumentation. This name may
@@ -36,6 +38,8 @@ type MeterProvider interface {
 }
 
 // Meter provides access to instrument instances for recording metrics.
+//
+// Warning: methods may be added to this interface in minor releases.
 type Meter interface {
 	// AsyncInt64 is the namespace for the Asynchronous Integer instruments.
 	//

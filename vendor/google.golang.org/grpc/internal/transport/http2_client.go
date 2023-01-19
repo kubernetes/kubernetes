@@ -59,11 +59,15 @@ var clientConnectionCounter uint64
 
 // http2Client implements the ClientTransport interface with HTTP2.
 type http2Client struct {
-	lastRead   int64 // Keep this field 64-bit aligned. Accessed atomically.
-	ctx        context.Context
-	cancel     context.CancelFunc
-	ctxDone    <-chan struct{} // Cache the ctx.Done() chan.
-	userAgent  string
+	lastRead  int64 // Keep this field 64-bit aligned. Accessed atomically.
+	ctx       context.Context
+	cancel    context.CancelFunc
+	ctxDone   <-chan struct{} // Cache the ctx.Done() chan.
+	userAgent string
+	// address contains the resolver returned address for this transport.
+	// If the `ServerName` field is set, it takes precedence over `CallHdr.Host`
+	// passed to `NewStream`, when determining the :authority header.
+	address    resolver.Address
 	md         metadata.MD
 	conn       net.Conn // underlying communication channel
 	loopy      *loopyWriter
@@ -238,8 +242,11 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 	go func(conn net.Conn) {
 		defer ctxMonitorDone.Fire() // Signal this goroutine has exited.
 		<-newClientCtx.Done()       // Block until connectCtx expires or the defer above executes.
-		if connectCtx.Err() != nil {
+		if err := connectCtx.Err(); err != nil {
 			// connectCtx expired before exiting the function.  Hard close the connection.
+			if logger.V(logLevel) {
+				logger.Infof("newClientTransport: aborting due to connectCtx: %v", err)
+			}
 			conn.Close()
 		}
 	}(conn)
@@ -314,6 +321,7 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 		cancel:                cancel,
 		userAgent:             opts.UserAgent,
 		registeredCompressors: grpcutil.RegisteredCompressors(),
+		address:               addr,
 		conn:                  conn,
 		remoteAddr:            conn.RemoteAddr(),
 		localAddr:             conn.LocalAddr(),
@@ -440,10 +448,8 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 	go func() {
 		t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
 		err := t.loopy.run()
-		if err != nil {
-			if logger.V(logLevel) {
-				logger.Errorf("transport: loopyWriter.run returning. Err: %v", err)
-			}
+		if logger.V(logLevel) {
+			logger.Infof("transport: loopyWriter exited. Closing connection. Err: %v", err)
 		}
 		// Do not close the transport.  Let reader goroutine handle it since
 		// there might be data in the buffers.
@@ -702,6 +708,18 @@ func (e NewStreamError) Error() string {
 // streams.  All non-nil errors returned will be *NewStreamError.
 func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (*Stream, error) {
 	ctx = peer.NewContext(ctx, t.getPeer())
+
+	// ServerName field of the resolver returned address takes precedence over
+	// Host field of CallHdr to determine the :authority header. This is because,
+	// the ServerName field takes precedence for server authentication during
+	// TLS handshake, and the :authority header should match the value used
+	// for server authentication.
+	if t.address.ServerName != "" {
+		newCallHdr := *callHdr
+		newCallHdr.Host = t.address.ServerName
+		callHdr = &newCallHdr
+	}
+
 	headerFields, err := t.createHeaderFields(ctx, callHdr)
 	if err != nil {
 		return nil, &NewStreamError{Err: err, AllowTransparentRetry: false}
@@ -934,6 +952,9 @@ func (t *http2Client) Close(err error) {
 		t.mu.Unlock()
 		return
 	}
+	if logger.V(logLevel) {
+		logger.Infof("transport: closing: %v", err)
+	}
 	// Call t.onClose ASAP to prevent the client from attempting to create new
 	// streams.
 	t.onClose()
@@ -986,11 +1007,14 @@ func (t *http2Client) GracefulClose() {
 		t.mu.Unlock()
 		return
 	}
+	if logger.V(logLevel) {
+		logger.Infof("transport: GracefulClose called")
+	}
 	t.state = draining
 	active := len(t.activeStreams)
 	t.mu.Unlock()
 	if active == 0 {
-		t.Close(ErrConnClosing)
+		t.Close(connectionErrorf(true, nil, "no active streams left to process while draining"))
 		return
 	}
 	t.controlBuf.put(&incomingGoAway{})

@@ -22,6 +22,8 @@ import (
 )
 
 // InstrumentProvider provides access to individual instruments.
+//
+// Warning: methods may be added to this interface in minor releases.
 type InstrumentProvider interface {
 	// Counter creates an instrument for recording increasing values.
 	Counter(name string, opts ...instrument.Option) (Counter, error)
@@ -32,6 +34,8 @@ type InstrumentProvider interface {
 }
 
 // Counter is an instrument that records increasing values.
+//
+// Warning: methods may be added to this interface in minor releases.
 type Counter interface {
 	// Add records a change to the counter.
 	Add(ctx context.Context, incr float64, attrs ...attribute.KeyValue)
@@ -40,6 +44,8 @@ type Counter interface {
 }
 
 // UpDownCounter is an instrument that records increasing or decreasing values.
+//
+// Warning: methods may be added to this interface in minor releases.
 type UpDownCounter interface {
 	// Add records a change to the counter.
 	Add(ctx context.Context, incr float64, attrs ...attribute.KeyValue)
@@ -48,6 +54,8 @@ type UpDownCounter interface {
 }
 
 // Histogram is an instrument that records a distribution of values.
+//
+// Warning: methods may be added to this interface in minor releases.
 type Histogram interface {
 	// Record adds an additional value to the distribution.
 	Record(ctx context.Context, incr float64, attrs ...attribute.KeyValue)

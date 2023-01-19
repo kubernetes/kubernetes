@@ -280,6 +280,17 @@ func decodeNonProtoField(d *json.Decoder, unmarshaler protojson.UnmarshalOptions
 		return nil
 	}
 	if rv.Kind() == reflect.Slice {
+		if rv.Type().Elem().Kind() == reflect.Uint8 {
+			var sl []byte
+			if err := d.Decode(&sl); err != nil {
+				return err
+			}
+			if sl != nil {
+				rv.SetBytes(sl)
+			}
+			return nil
+		}
+
 		var sl []json.RawMessage
 		if err := d.Decode(&sl); err != nil {
 			return err

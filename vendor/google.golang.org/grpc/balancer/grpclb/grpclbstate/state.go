@@ -16,9 +16,9 @@
  *
  */
 
-// Package state declares grpclb types to be set by resolvers wishing to pass
-// information to grpclb via resolver.State Attributes.
-package state
+// Package grpclbstate declares grpclb types to be set by resolvers wishing to
+// pass information to grpclb via resolver.State Attributes.
+package grpclbstate
 
 import (
 	"google.golang.org/grpc/resolver"
@@ -27,7 +27,7 @@ import (
 // keyType is the key to use for storing State in Attributes.
 type keyType string
 
-const key = keyType("grpc.grpclb.state")
+const key = keyType("grpc.grpclb.grpclbstate")
 
 // State contains gRPCLB-relevant data passed from the name resolver.
 type State struct {

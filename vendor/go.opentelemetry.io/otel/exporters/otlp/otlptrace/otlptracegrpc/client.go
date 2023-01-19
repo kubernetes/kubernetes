@@ -202,11 +202,12 @@ func (c *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 			ResourceSpans: protoSpans,
 		})
 		if resp != nil && resp.PartialSuccess != nil {
-			otel.Handle(internal.PartialSuccessToError(
-				internal.TracingPartialSuccess,
-				resp.PartialSuccess.RejectedSpans,
-				resp.PartialSuccess.ErrorMessage,
-			))
+			msg := resp.PartialSuccess.GetErrorMessage()
+			n := resp.PartialSuccess.GetRejectedSpans()
+			if n != 0 || msg != "" {
+				err := internal.TracePartialSuccessError(n, msg)
+				otel.Handle(err)
+			}
 		}
 		// nil is converted to OK.
 		if status.Code(err) == codes.OK {

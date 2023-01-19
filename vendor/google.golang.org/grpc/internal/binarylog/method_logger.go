@@ -121,7 +121,7 @@ func (ml *TruncatingMethodLogger) truncateMetadata(mdPb *pb.Metadata) (truncated
 			// but not counted towards the size limit.
 			continue
 		}
-		currentEntryLen := uint64(len(entry.Value))
+		currentEntryLen := uint64(len(entry.GetKey())) + uint64(len(entry.GetValue()))
 		if currentEntryLen > bytesLimit {
 			break
 		}

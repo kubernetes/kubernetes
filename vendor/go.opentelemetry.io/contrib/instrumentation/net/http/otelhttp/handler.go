@@ -164,10 +164,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var bw bodyWrapper
-	// if request body is nil we don't want to mutate the body as it will affect
-	// the identity of it in an unforeseeable way because we assert ReadCloser
-	// fulfills a certain interface and it is indeed nil.
-	if r.Body != nil {
+	// if request body is nil or NoBody, we don't want to mutate the body as it
+	// will affect the identity of it in an unforeseeable way because we assert
+	// ReadCloser fulfills a certain interface and it is indeed nil or NoBody.
+	if r.Body != nil && r.Body != http.NoBody {
 		bw.ReadCloser = r.Body
 		bw.record = readRecordFunc
 		r.Body = &bw
@@ -180,7 +180,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rww := &respWriterWrapper{ResponseWriter: w, record: writeRecordFunc, ctx: ctx, props: h.propagators}
+	rww := &respWriterWrapper{
+		ResponseWriter: w,
+		record:         writeRecordFunc,
+		ctx:            ctx,
+		props:          h.propagators,
+		statusCode:     200, // default status code in case the Handler doesn't write anything
+	}
 
 	// Wrap w to use our ResponseWriter methods while also exposing
 	// other interfaces that w may implement (http.CloseNotifier,
@@ -230,10 +236,9 @@ func setAfterServeAttributes(span trace.Span, read, wrote int64, statusCode int,
 	if wrote > 0 {
 		attributes = append(attributes, WroteBytesKey.Int64(wrote))
 	}
-	if statusCode > 0 {
-		attributes = append(attributes, semconv.HTTPAttributesFromHTTPStatusCode(statusCode)...)
-		span.SetStatus(semconv.SpanStatusFromHTTPStatusCodeAndSpanKind(statusCode, trace.SpanKindServer))
-	}
+	attributes = append(attributes, semconv.HTTPAttributesFromHTTPStatusCode(statusCode)...)
+	span.SetStatus(semconv.SpanStatusFromHTTPStatusCodeAndSpanKind(statusCode, trace.SpanKindServer))
+
 	if werr != nil && werr != io.EOF {
 		attributes = append(attributes, WriteErrorKey.String(werr.Error()))
 	}

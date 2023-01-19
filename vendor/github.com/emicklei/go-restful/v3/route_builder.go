@@ -7,6 +7,7 @@ package restful
 import (
 	"fmt"
 	"os"
+	"path"
 	"reflect"
 	"runtime"
 	"strings"
@@ -46,11 +47,12 @@ type RouteBuilder struct {
 // Do evaluates each argument with the RouteBuilder itself.
 // This allows you to follow DRY principles without breaking the fluent programming style.
 // Example:
-// 		ws.Route(ws.DELETE("/{name}").To(t.deletePerson).Do(Returns200, Returns500))
 //
-//		func Returns500(b *RouteBuilder) {
-//			b.Returns(500, "Internal Server Error", restful.ServiceError{})
-//		}
+//	ws.Route(ws.DELETE("/{name}").To(t.deletePerson).Do(Returns200, Returns500))
+//
+//	func Returns500(b *RouteBuilder) {
+//		b.Returns(500, "Internal Server Error", restful.ServiceError{})
+//	}
 func (b *RouteBuilder) Do(oneArgBlocks ...func(*RouteBuilder)) *RouteBuilder {
 	for _, each := range oneArgBlocks {
 		each(b)
@@ -352,7 +354,7 @@ func (b *RouteBuilder) Build() Route {
 }
 
 func concatPath(path1, path2 string) string {
-	return strings.TrimRight(path1, "/") + "/" + strings.TrimLeft(path2, "/")
+	return path.Join(path1, path2)
 }
 
 var anonymousFuncCount int32

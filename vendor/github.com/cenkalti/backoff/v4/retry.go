@@ -5,9 +5,19 @@ import (
 	"time"
 )
 
+// An OperationWithData is executing by RetryWithData() or RetryNotifyWithData().
+// The operation will be retried using a backoff policy if it returns an error.
+type OperationWithData[T any] func() (T, error)
+
 // An Operation is executing by Retry() or RetryNotify().
 // The operation will be retried using a backoff policy if it returns an error.
 type Operation func() error
+
+func (o Operation) withEmptyData() OperationWithData[struct{}] {
+	return func() (struct{}, error) {
+		return struct{}{}, o()
+	}
+}
 
 // Notify is a notify-on-error function. It receives an operation error and
 // backoff delay if the operation failed (with an error).
@@ -28,18 +38,41 @@ func Retry(o Operation, b BackOff) error {
 	return RetryNotify(o, b, nil)
 }
 
+// RetryWithData is like Retry but returns data in the response too.
+func RetryWithData[T any](o OperationWithData[T], b BackOff) (T, error) {
+	return RetryNotifyWithData(o, b, nil)
+}
+
 // RetryNotify calls notify function with the error and wait duration
 // for each failed attempt before sleep.
 func RetryNotify(operation Operation, b BackOff, notify Notify) error {
 	return RetryNotifyWithTimer(operation, b, notify, nil)
 }
 
+// RetryNotifyWithData is like RetryNotify but returns data in the response too.
+func RetryNotifyWithData[T any](operation OperationWithData[T], b BackOff, notify Notify) (T, error) {
+	return doRetryNotify(operation, b, notify, nil)
+}
+
 // RetryNotifyWithTimer calls notify function with the error and wait duration using the given Timer
 // for each failed attempt before sleep.
 // A default timer that uses system timer is used when nil is passed.
 func RetryNotifyWithTimer(operation Operation, b BackOff, notify Notify, t Timer) error {
-	var err error
-	var next time.Duration
+	_, err := doRetryNotify(operation.withEmptyData(), b, notify, t)
+	return err
+}
+
+// RetryNotifyWithTimerAndData is like RetryNotifyWithTimer but returns data in the response too.
+func RetryNotifyWithTimerAndData[T any](operation OperationWithData[T], b BackOff, notify Notify, t Timer) (T, error) {
+	return doRetryNotify(operation, b, notify, t)
+}
+
+func doRetryNotify[T any](operation OperationWithData[T], b BackOff, notify Notify, t Timer) (T, error) {
+	var (
+		err  error
+		next time.Duration
+		res  T
+	)
 	if t == nil {
 		t = &defaultTimer{}
 	}
@@ -52,21 +85,22 @@ func RetryNotifyWithTimer(operation Operation, b BackOff, notify Notify, t Timer
 
 	b.Reset()
 	for {
-		if err = operation(); err == nil {
-			return nil
+		res, err = operation()
+		if err == nil {
+			return res, nil
 		}
 
 		var permanent *PermanentError
 		if errors.As(err, &permanent) {
-			return permanent.Err
+			return res, permanent.Err
 		}
 
 		if next = b.NextBackOff(); next == Stop {
 			if cerr := ctx.Err(); cerr != nil {
-				return cerr
+				return res, cerr
 			}
 
-			return err
+			return res, err
 		}
 
 		if notify != nil {
@@ -77,7 +111,7 @@ func RetryNotifyWithTimer(operation Operation, b BackOff, notify Notify, t Timer
 
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return res, ctx.Err()
 		case <-t.C():
 		}
 	}

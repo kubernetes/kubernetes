@@ -9,7 +9,6 @@ linters:
   disable-all: true
   # Specifically enable linters we want to use.
   enable:
-    - deadcode
     - depguard
     - errcheck
     - godot
@@ -21,10 +20,8 @@ linters:
     - misspell
     - revive
     - staticcheck
-    - structcheck
     - typecheck
     - unused
-    - varcheck
 
 issues:
   # Maximum issues count per one linter.
@@ -114,8 +111,9 @@ linters-settings:
       - name: constant-logical-expr
         disabled: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-as-argument
+      # TODO (#3372) reenable linter when it is compatible. https://github.com/golangci/golangci-lint/issues/3280
       - name: context-as-argument
-        disabled: false
+        disabled: true
         arguments:
           allowTypesBefore: "*testing.T"
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#context-keys-type

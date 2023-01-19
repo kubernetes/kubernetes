@@ -249,6 +249,12 @@ TEXT libc_chroot_trampoline<>(SB),NOSPLIT,$0-0
 GLOBL	·libc_chroot_trampoline_addr(SB), RODATA, $8
 DATA	·libc_chroot_trampoline_addr(SB)/8, $libc_chroot_trampoline<>(SB)
 
+TEXT libc_clock_gettime_trampoline<>(SB),NOSPLIT,$0-0
+	CALL	libc_clock_gettime(SB)
+	RET
+GLOBL	·libc_clock_gettime_trampoline_addr(SB), RODATA, $8
+DATA	·libc_clock_gettime_trampoline_addr(SB)/8, $libc_clock_gettime_trampoline<>(SB)
+
 TEXT libc_close_trampoline<>(SB),NOSPLIT,$0-0
 	CALL	libc_close(SB)
 	RET

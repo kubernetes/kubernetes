@@ -52,19 +52,14 @@ Currently, this project supports the following environments.
 | ------- | ---------- | ------------ |
 | Ubuntu  | 1.19       | amd64        |
 | Ubuntu  | 1.18       | amd64        |
-| Ubuntu  | 1.17       | amd64        |
 | Ubuntu  | 1.19       | 386          |
 | Ubuntu  | 1.18       | 386          |
-| Ubuntu  | 1.17       | 386          |
 | MacOS   | 1.19       | amd64        |
 | MacOS   | 1.18       | amd64        |
-| MacOS   | 1.17       | amd64        |
 | Windows | 1.19       | amd64        |
 | Windows | 1.18       | amd64        |
-| Windows | 1.17       | amd64        |
 | Windows | 1.19       | 386          |
 | Windows | 1.18       | 386          |
-| Windows | 1.17       | 386          |
 
 While this project should work for other systems, no compatibility guarantees
 are made for those systems currently.

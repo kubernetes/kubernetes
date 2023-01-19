@@ -116,12 +116,13 @@ func NewTracerProvider(opts ...TracerProviderOption) *TracerProvider {
 		spanLimits:  o.spanLimits,
 		resource:    o.resource,
 	}
-
 	global.Info("TracerProvider created", "config", o)
 
+	spss := spanProcessorStates{}
 	for _, sp := range o.processors {
-		tp.RegisterSpanProcessor(sp)
+		spss = append(spss, newSpanProcessorState(sp))
 	}
+	tp.spanProcessors.Store(spss)
 
 	return tp
 }
@@ -159,44 +160,38 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 }
 
 // RegisterSpanProcessor adds the given SpanProcessor to the list of SpanProcessors.
-func (p *TracerProvider) RegisterSpanProcessor(s SpanProcessor) {
+func (p *TracerProvider) RegisterSpanProcessor(sp SpanProcessor) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	newSPS := spanProcessorStates{}
-	if old, ok := p.spanProcessors.Load().(spanProcessorStates); ok {
-		newSPS = append(newSPS, old...)
-	}
-	newSpanSync := &spanProcessorState{
-		sp:    s,
-		state: &sync.Once{},
-	}
-	newSPS = append(newSPS, newSpanSync)
+	newSPS = append(newSPS, p.spanProcessors.Load().(spanProcessorStates)...)
+	newSPS = append(newSPS, newSpanProcessorState(sp))
 	p.spanProcessors.Store(newSPS)
 }
 
 // UnregisterSpanProcessor removes the given SpanProcessor from the list of SpanProcessors.
-func (p *TracerProvider) UnregisterSpanProcessor(s SpanProcessor) {
+func (p *TracerProvider) UnregisterSpanProcessor(sp SpanProcessor) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	spss := spanProcessorStates{}
-	old, ok := p.spanProcessors.Load().(spanProcessorStates)
-	if !ok || len(old) == 0 {
+	old := p.spanProcessors.Load().(spanProcessorStates)
+	if len(old) == 0 {
 		return
 	}
+	spss := spanProcessorStates{}
 	spss = append(spss, old...)
 
 	// stop the span processor if it is started and remove it from the list
 	var stopOnce *spanProcessorState
 	var idx int
 	for i, sps := range spss {
-		if sps.sp == s {
+		if sps.sp == sp {
 			stopOnce = sps
 			idx = i
 		}
 	}
 	if stopOnce != nil {
 		stopOnce.state.Do(func() {
-			if err := s.Shutdown(context.Background()); err != nil {
+			if err := sp.Shutdown(context.Background()); err != nil {
 				otel.Handle(err)
 			}
 		})
@@ -213,10 +208,7 @@ func (p *TracerProvider) UnregisterSpanProcessor(s SpanProcessor) {
 // ForceFlush immediately exports all spans that have not yet been exported for
 // all the registered span processors.
 func (p *TracerProvider) ForceFlush(ctx context.Context) error {
-	spss, ok := p.spanProcessors.Load().(spanProcessorStates)
-	if !ok {
-		return fmt.Errorf("failed to load span processors")
-	}
+	spss := p.spanProcessors.Load().(spanProcessorStates)
 	if len(spss) == 0 {
 		return nil
 	}
@@ -237,10 +229,11 @@ func (p *TracerProvider) ForceFlush(ctx context.Context) error {
 
 // Shutdown shuts down the span processors in the order they were registered.
 func (p *TracerProvider) Shutdown(ctx context.Context) error {
-	spss, ok := p.spanProcessors.Load().(spanProcessorStates)
-	if !ok {
-		return fmt.Errorf("failed to load span processors")
+	spss := p.spanProcessors.Load().(spanProcessorStates)
+	if len(spss) == 0 {
+		return nil
 	}
+
 	var retErr error
 	for _, sps := range spss {
 		select {
