@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -475,6 +476,13 @@ func TestKMSMaxTimeout(t *testing.T) {
 func TestKMSPluginHealthz(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
 
+	kmsv2Probe := &kmsv2PluginProbe{
+		name: "foo",
+		ttl:  3 * time.Second,
+	}
+	keyID := "1"
+	kmsv2Probe.keyID.Store(&keyID)
+
 	testCases := []struct {
 		desc    string
 		config  string
@@ -517,10 +525,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 			desc:   "Install multiple healthz with v1 and v2",
 			config: "testdata/valid-configs/kms/multiple-providers-kmsv2.yaml",
 			want: []healthChecker{
-				&kmsv2PluginProbe{
-					name: "foo",
-					ttl:  3 * time.Second,
-				},
+				kmsv2Probe,
 				&kmsPluginProbe{
 					name: "bar",
 					ttl:  3 * time.Second,
@@ -547,7 +552,9 @@ func TestKMSPluginHealthz(t *testing.T) {
 				return
 			}
 
-			_, got, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(testContext(t), config)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel() // cancel this upfront so the kms v2 healthz check poll only runs once
+			_, got, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(ctx, config)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -561,9 +568,11 @@ func TestKMSPluginHealthz(t *testing.T) {
 					p.l = nil
 					p.lastResponse = nil
 				case *kmsv2PluginProbe:
+					waitForOneKMSv2Check(t, p) // make sure the kms v2 healthz check poll is done
 					p.service = nil
 					p.l = nil
 					p.lastResponse = nil
+					p.keyID = kmsv2Probe.keyID
 				default:
 					t.Fatalf("unexpected probe type %T", p)
 				}
@@ -587,6 +596,18 @@ func TestKMSPluginHealthz(t *testing.T) {
 				t.Fatalf("HealthzConfig mismatch (-want +got):\n%s", d)
 			}
 		})
+	}
+}
+
+func waitForOneKMSv2Check(t *testing.T, p *kmsv2PluginProbe) {
+	t.Helper()
+
+	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+		p.l.Lock()
+		defer p.l.Unlock()
+		return !p.lastResponse.received.IsZero(), nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
 

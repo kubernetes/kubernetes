@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/apiserver/pkg/apis/config/validation"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	kmsservice "k8s.io/kms/service"
 )
 
@@ -57,6 +59,7 @@ const (
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
 	kmsTransformerPrefixV1       = "k8s:enc:kms:v1:"
 	kmsTransformerPrefixV2       = "k8s:enc:kms:v2:"
+	kmsPluginHealthzInterval     = 1 * time.Minute
 	kmsPluginHealthzNegativeTTL  = 3 * time.Second
 	kmsPluginHealthzPositiveTTL  = 20 * time.Second
 	kmsAPIVersionV1              = "v1"
@@ -84,6 +87,7 @@ type kmsPluginProbe struct {
 }
 
 type kmsv2PluginProbe struct {
+	keyID        atomic.Pointer[string]
 	name         string
 	ttl          time.Duration
 	service      kmsservice.Service
@@ -272,6 +276,10 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 		h.ttl = kmsPluginHealthzNegativeTTL
 		return fmt.Errorf("failed to perform status section of the healthz check for KMS Provider %s, error: %w", h.name, err)
 	}
+	// we coast on the last valid key ID that we have observed
+	if err := envelopekmsv2.ValidateKeyID(p.KeyID); err == nil {
+		h.keyID.Store(&p.KeyID)
+	}
 
 	if err := isKMSv2ProviderHealthy(h.name, p); err != nil {
 		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
@@ -284,6 +292,15 @@ func (h *kmsv2PluginProbe) check(ctx context.Context) error {
 	return nil
 }
 
+// getCurrentKeyID returns the latest keyID from the last Status() call or err if keyID is empty
+func (h *kmsv2PluginProbe) getCurrentKeyID(ctx context.Context) (string, error) {
+	keyID := *h.keyID.Load()
+	if len(keyID) == 0 {
+		return "", fmt.Errorf("got unexpected empty keyID")
+	}
+	return keyID, nil
+}
+
 // isKMSv2ProviderHealthy checks if the KMSv2-Plugin is healthy.
 func isKMSv2ProviderHealthy(name string, response *kmsservice.StatusResponse) error {
 	var errs []error
@@ -293,7 +310,7 @@ func isKMSv2ProviderHealthy(name string, response *kmsservice.StatusResponse) er
 	if response.Version != envelopekmsv2.KMSAPIVersion {
 		errs = append(errs, fmt.Errorf("expected KMSv2 API version %s, got %s", envelopekmsv2.KMSAPIVersion, response.Version))
 	}
-	if len(response.KeyID) == 0 {
+	if err := envelopekmsv2.ValidateKeyID(response.KeyID); err != nil {
 		errs = append(errs, fmt.Errorf("expected KMSv2 KeyID to be set, got %s", response.KeyID))
 	}
 
@@ -561,10 +578,24 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 			l:            &sync.Mutex{},
 			lastResponse: &kmsPluginHealthzResponse{},
 		}
+		// initialize keyID so that Load always works
+		keyID := ""
+		probe.keyID.Store(&keyID)
+
+		// make sure that the plugin's key ID is reasonably up-to-date
+		go wait.PollImmediateUntilWithContext(
+			ctx,
+			kmsPluginHealthzInterval,
+			func(ctx context.Context) (bool, error) {
+				if err := probe.check(ctx); err != nil {
+					klog.V(2).ErrorS(err, "kms plugin failed health check probe", "name", kmsName)
+				}
+				return false, nil
+			})
 
 		// using AES-GCM by default for encrypting data with KMSv2
 		transformer := value.PrefixTransformer{
-			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewGCMTransformer),
+			Transformer: envelopekmsv2.NewEnvelopeTransformer(envelopeService, probe.getCurrentKeyID, int(*config.CacheSize), aestransformer.NewGCMTransformer),
 			Prefix:      []byte(kmsTransformerPrefixV2 + kmsName + ":"),
 		}
 

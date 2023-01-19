@@ -57,6 +57,7 @@ type Base64Plugin struct {
 	inFailedState      bool
 	ver                string
 	socketPath         string
+	keyID              string
 }
 
 // NewBase64Plugin is a constructor for Base64Plugin.
@@ -67,6 +68,7 @@ func NewBase64Plugin(socketPath string) (*Base64Plugin, error) {
 		mu:         &sync.Mutex{},
 		ver:        kmsapiVersion,
 		socketPath: socketPath,
+		keyID:      "1",
 	}
 
 	kmsapi.RegisterKeyManagementServiceServer(server, result)
@@ -84,6 +86,24 @@ func WaitForBase64PluginToBeUp(plugin *Base64Plugin) error {
 
 	if pollErr == wait.ErrWaitTimeout {
 		return fmt.Errorf("failed to start kms-plugin, error: %v", gRPCErr)
+	}
+
+	return nil
+}
+
+// WaitForBase64PluginToBeUpdated waits until the plugin updates keyID.
+func WaitForBase64PluginToBeUpdated(plugin *Base64Plugin) error {
+	var gRPCErr error
+	var resp *kmsapi.StatusResponse
+
+	updatePollErr := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		resp, gRPCErr = plugin.Status(context.Background(), &kmsapi.StatusRequest{})
+		klog.InfoS("WaitForBase64PluginToBeUpdated", "keyID", resp.KeyId)
+		return gRPCErr == nil && resp.Healthz == "ok" && resp.KeyId == "2", nil
+	})
+
+	if updatePollErr != nil {
+		return fmt.Errorf("failed to update keyID for kmsv2-plugin, error: %w", gRPCErr)
 	}
 
 	return nil
@@ -135,6 +155,14 @@ func (s *Base64Plugin) ExitFailedState() {
 	s.inFailedState = false
 }
 
+// Update keyID for the plugin.
+func (s *Base64Plugin) UpdateKeyID() {
+	klog.Infof("updating keyID")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.keyID = "2"
+}
+
 // Status returns the status of the kms-plugin.
 func (s *Base64Plugin) Status(ctx context.Context, request *kmsapi.StatusRequest) (*kmsapi.StatusResponse, error) {
 	klog.Infof("Received request for Status: %v", request)
@@ -145,7 +173,7 @@ func (s *Base64Plugin) Status(ctx context.Context, request *kmsapi.StatusRequest
 		return nil, status.Error(codes.FailedPrecondition, "failed precondition - key disabled")
 	}
 
-	return &kmsapi.StatusResponse{Version: s.ver, Healthz: "ok", KeyId: "1"}, nil
+	return &kmsapi.StatusResponse{Version: s.ver, Healthz: "ok", KeyId: s.keyID}, nil
 }
 
 // Decrypt performs base64 decoding of the payload of kms.DecryptRequest.
@@ -187,5 +215,5 @@ func (s *Base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptReque
 	buf := make([]byte, base64.StdEncoding.EncodedLen(len(request.Plaintext)))
 	base64.StdEncoding.Encode(buf, request.Plaintext)
 
-	return &kmsapi.EncryptResponse{Ciphertext: buf, KeyId: "1", Annotations: map[string][]byte{"local-kek.kms.kubernetes.io": []byte("encrypted-local-kek")}}, nil
+	return &kmsapi.EncryptResponse{Ciphertext: buf, KeyId: s.keyID, Annotations: map[string][]byte{"local-kek.kms.kubernetes.io": []byte("encrypted-local-kek")}}, nil
 }

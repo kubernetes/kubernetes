@@ -37,6 +37,7 @@ const (
 	testText              = "abcdefghijklmnopqrstuvwxyz"
 	testContextText       = "0123456789"
 	testEnvelopeCacheSize = 10
+	testKeyVersion        = "1"
 )
 
 // testEnvelopeService is a mock Envelope service which can be used to simulate remote Envelope services
@@ -100,7 +101,7 @@ func (t *testEnvelopeService) Rotate() {
 
 func newTestEnvelopeService() *testEnvelopeService {
 	return &testEnvelopeService{
-		keyVersion: "1",
+		keyVersion: testKeyVersion,
 	}
 }
 
@@ -133,7 +134,11 @@ func TestEnvelopeCaching(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
-			envelopeTransformer := NewEnvelopeTransformer(envelopeService, tt.cacheSize, aestransformer.NewGCMTransformer)
+			envelopeTransformer := NewEnvelopeTransformer(envelopeService,
+				func(ctx context.Context) (string, error) {
+					return "", nil
+				},
+				tt.cacheSize, aestransformer.NewGCMTransformer)
 			ctx := context.Background()
 			dataCtx := value.DefaultContext([]byte(testContextText))
 			originalText := []byte(testText)
@@ -173,7 +178,12 @@ func TestEnvelopeCaching(t *testing.T) {
 
 // Makes Envelope transformer hit cache limit, throws error if it misbehaves.
 func TestEnvelopeCacheLimit(t *testing.T) {
-	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
+	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(),
+		func(ctx context.Context) (string, error) {
+			return "", nil
+		},
+		testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
+
 	ctx := context.Background()
 	dataCtx := value.DefaultContext([]byte(testContextText))
 
@@ -202,6 +212,75 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 		if !bytes.Equal(numberText, output) {
 			t.Fatalf("envelopeTransformer transformed data incorrectly using cache. Expected: %v, got %v", numberText, output)
 		}
+	}
+}
+
+// Test keyIDGetter as part of envelopeTransformer, throws error if returned err or staleness is incorrect.
+func TestEnvelopeTransformerKeyIDGetter(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		desc          string
+		expectedStale bool
+		testErr       error
+		testKeyID     string
+	}{
+		{
+			desc:          "keyIDGetter returns err",
+			expectedStale: false,
+			testErr:       fmt.Errorf("failed to perform status section of the healthz check for KMS Provider"),
+			testKeyID:     "",
+		},
+		{
+			desc:          "keyIDGetter returns same keyID",
+			expectedStale: false,
+			testErr:       nil,
+			testKeyID:     testKeyVersion,
+		},
+		{
+			desc:          "keyIDGetter returns different keyID",
+			expectedStale: true,
+			testErr:       nil,
+			testKeyID:     "2",
+		},
+	}
+
+	for _, tt := range testCases {
+		tt := tt
+		t.Run(tt.desc, func(t *testing.T) {
+			t.Parallel()
+			envelopeService := newTestEnvelopeService()
+			envelopeTransformer := NewEnvelopeTransformer(envelopeService,
+				func(ctx context.Context) (string, error) {
+					return tt.testKeyID, tt.testErr
+				},
+				0, aestransformer.NewGCMTransformer)
+
+			ctx := context.Background()
+			dataCtx := value.DefaultContext([]byte(testContextText))
+			originalText := []byte(testText)
+
+			transformedData, err := envelopeTransformer.TransformToStorage(ctx, originalText, dataCtx)
+			if err != nil {
+				t.Fatalf("envelopeTransformer: error while transforming data (%v) to storage: %s", originalText, err)
+			}
+
+			_, stale, err := envelopeTransformer.TransformFromStorage(ctx, transformedData, dataCtx)
+			if tt.testErr != nil {
+				if err == nil {
+					t.Fatalf("envelopeTransformer: expected error: %v, got nil", tt.testErr)
+				}
+				if err.Error() != tt.testErr.Error() {
+					t.Fatalf("envelopeTransformer: expected error: %v, got: %v", tt.testErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("envelopeTransformer: unexpected error: %v", err)
+				}
+				if stale != tt.expectedStale {
+					t.Fatalf("envelopeTransformer TransformFromStorage determined keyID staleness incorrectly, expected: %v, got %v", tt.expectedStale, stale)
+				}
+			}
+		})
 	}
 }
 
@@ -238,7 +317,11 @@ func TestTransformToStorageError(t *testing.T) {
 			t.Parallel()
 			envelopeService := newTestEnvelopeService()
 			envelopeService.SetAnnotations(tt.annotations)
-			envelopeTransformer := NewEnvelopeTransformer(envelopeService, 0, aestransformer.NewGCMTransformer)
+			envelopeTransformer := NewEnvelopeTransformer(envelopeService,
+				func(ctx context.Context) (string, error) {
+					return "", nil
+				},
+				0, aestransformer.NewGCMTransformer)
 			ctx := context.Background()
 			dataCtx := value.DefaultContext([]byte(testContextText))
 
@@ -445,7 +528,7 @@ func TestValidateKeyID(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateKeyID(tt.keyID)
+			err := ValidateKeyID(tt.keyID)
 			if tt.expectedError != "" {
 				if err == nil {
 					t.Fatalf("expected error %q, got nil", tt.expectedError)
