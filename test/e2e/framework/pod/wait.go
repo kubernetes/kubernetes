@@ -208,16 +208,13 @@ func BeInPhase(phase v1.PodPhase) types.GomegaMatcher {
 // example, in cluster startup, because the number of pods increases while
 // waiting. All pods that are in SUCCESS state are not counted.
 //
-// If ignoreLabels is not empty, pods matching this selector are ignored.
-//
 // If minPods or allowedNotReadyPods are -1, this method returns immediately
 // without waiting.
-func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
+func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration) error {
 	if minPods == -1 || allowedNotReadyPods == -1 {
 		return nil
 	}
 
-	ignoreSelector := labels.SelectorFromSet(map[string]string{})
 	start := time.Now()
 	framework.Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
@@ -266,9 +263,6 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 		badPods = []v1.Pod{}
 		desiredPods = len(podList.Items)
 		for _, pod := range podList.Items {
-			if len(ignoreLabels) != 0 && ignoreSelector.Matches(labels.Set(pod.Labels)) {
-				continue
-			}
 			res, err := testutils.PodRunningReady(&pod)
 			switch {
 			case res && err == nil:
