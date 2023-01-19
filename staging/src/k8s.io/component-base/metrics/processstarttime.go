@@ -37,7 +37,7 @@ var processStartTime = NewGaugeVec(
 func RegisterProcessStartTime(registrationFunc func(Registerable) error) error {
 	start, err := getProcessStart()
 	if err != nil {
-		klog.Errorf("Could not get process start time, %v", err)
+		klog.ErrorS("Could not get process start time", "error", err)
 		start = float64(time.Now().Unix())
 	}
 	// processStartTime is a lazy metric which only get initialized after registered.

@@ -39,7 +39,7 @@ func WarnWordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedNam
 	if strings.Contains(name, "_") {
 		nname := strings.Replace(name, "_", "-", -1)
 		if _, alreadyWarned := underscoreWarnings[name]; !alreadyWarned {
-			klog.Warningf("using an underscore in a flag name is not supported. %s has been converted to %s.", name, nname)
+			klog.InfoS("using an underscore in a flag name is not supported. converting flag name", "name", name, "nname", nname)
 			underscoreWarnings[name] = true
 		}
 
@@ -54,13 +54,13 @@ func InitFlags() {
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	pflag.Parse()
 	pflag.VisitAll(func(flag *pflag.Flag) {
-		klog.V(2).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+		klog.V(2).InfoS("FLAG", "flagName", flag.Name, "flagValue", flag.Value)
 	})
 }
 
 // PrintFlags logs the flags in the flagset
 func PrintFlags(flags *pflag.FlagSet) {
 	flags.VisitAll(func(flag *pflag.Flag) {
-		klog.V(1).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+		klog.V(1).InfoS("FLAG", flag.Name, "flagValue", flag.Value)
 	})
 }

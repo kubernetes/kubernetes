@@ -236,9 +236,9 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 		}
 
 		if featureSpec.PreRelease == Deprecated {
-			klog.Warningf("Setting deprecated feature gate %s=%t. It will be removed in a future release.", k, v)
+			klog.InfoS("Setting deprecated feature gate. It will be removed in a future release.", "deprecated-feature-gate", k, "value", v)
 		} else if featureSpec.PreRelease == GA {
-			klog.Warningf("Setting GA feature gate %s=%t. It will be removed in a future release.", k, v)
+			klog.InfoS("Setting GA feature gate. It will be removed in a future release.", "GA-feature-gate", k, "value", v)
 		}
 	}
 
@@ -246,7 +246,7 @@ func (f *featureGate) SetFromMap(m map[string]bool) error {
 	f.known.Store(known)
 	f.enabled.Store(enabled)
 
-	klog.V(1).Infof("feature gates: %v", f.enabled)
+	klog.V(1).InfoS("feature gates status", "feature gates", f.enabled)
 	return nil
 }
 

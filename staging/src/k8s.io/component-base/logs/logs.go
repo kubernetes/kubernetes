@@ -139,7 +139,7 @@ type KlogWriter struct{}
 
 // Write implements the io.Writer interface.
 func (writer KlogWriter) Write(data []byte) (n int, err error) {
-	klog.InfoDepth(1, string(data))
+	klog.InfoSDepth(1, string(data))
 	return len(data), nil
 }
 

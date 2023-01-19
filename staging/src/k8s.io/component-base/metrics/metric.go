@@ -117,7 +117,7 @@ func (r *lazyMetric) preprocessMetric(version semver.Version) {
 		}
 
 		if ShouldShowHidden() {
-			klog.Warningf("Hidden metrics (%s) have been manually overridden, showing this very deprecated metric.", r.fqName)
+			klog.InfoS("Hidden metrics have been manually overridden, showing this very deprecated metric.", "metric", r.fqName)
 			return
 		}
 		if shouldHide(&version, selfVersion) {
