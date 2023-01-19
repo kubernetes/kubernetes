@@ -142,9 +142,9 @@ var (
 // So that we can test the controller without pulling in any CEL functionality
 type fakeCompiler struct {
 	DefaultMatch         bool
-	CompileFuncs         map[string]func(*v1alpha1.ValidatingAdmissionPolicy) Validator
-	DefinitionMatchFuncs map[string]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool
-	BindingMatchFuncs    map[string]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
+	CompileFuncs         map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy) Validator
+	DefinitionMatchFuncs map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool
+	BindingMatchFuncs    map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
 }
 
 var _ ValidatorCompiler = &fakeCompiler{}
@@ -161,7 +161,10 @@ func (f *fakeCompiler) ValidateInitialization() error {
 // resource request
 func (f *fakeCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
 	namespace, name := definition.Namespace, definition.Name
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
 		return fun(definition, a), schema.GroupVersionKind{}, nil
 	}
@@ -174,7 +177,10 @@ func (f *fakeCompiler) DefinitionMatches(a admission.Attributes, o admission.Obj
 // resource request
 func (f *fakeCompiler) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error) {
 	namespace, name := binding.Namespace, binding.Name
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 	if fun, ok := f.BindingMatchFuncs[key]; ok {
 		return fun(binding, a), nil
 	}
@@ -187,8 +193,10 @@ func (f *fakeCompiler) Compile(
 	definition *v1alpha1.ValidatingAdmissionPolicy,
 ) Validator {
 	namespace, name := definition.Namespace, definition.Name
-
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 	if fun, ok := f.CompileFuncs[key]; ok {
 		return fun(definition)
 	}
@@ -198,18 +206,21 @@ func (f *fakeCompiler) Compile(
 
 func (f *fakeCompiler) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, compileFunc func(*v1alpha1.ValidatingAdmissionPolicy) Validator, matchFunc func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool) {
 	namespace, name := definition.Namespace, definition.Name
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 	if compileFunc != nil {
 
 		if f.CompileFuncs == nil {
-			f.CompileFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicy) Validator)
+			f.CompileFuncs = make(map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy) Validator)
 		}
 		f.CompileFuncs[key] = compileFunc
 	}
 
 	if matchFunc != nil {
 		if f.DefinitionMatchFuncs == nil {
-			f.DefinitionMatchFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool)
+			f.DefinitionMatchFuncs = make(map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool)
 		}
 		f.DefinitionMatchFuncs[key] = matchFunc
 	}
@@ -217,11 +228,14 @@ func (f *fakeCompiler) RegisterDefinition(definition *v1alpha1.ValidatingAdmissi
 
 func (f *fakeCompiler) RegisterBinding(binding *v1alpha1.ValidatingAdmissionPolicyBinding, matchFunc func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool) {
 	namespace, name := binding.Namespace, binding.Name
-	key := namespace + "/" + name
+	key := namespacedName{
+		name:      name,
+		namespace: namespace,
+	}
 
 	if matchFunc != nil {
 		if f.BindingMatchFuncs == nil {
-			f.BindingMatchFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool)
+			f.BindingMatchFuncs = make(map[namespacedName]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool)
 		}
 		f.BindingMatchFuncs[key] = matchFunc
 	}
