@@ -126,12 +126,10 @@ type DiffFlags struct {
 	ServerSideApply   bool
 	FieldManager      string
 	ForceConflicts    bool
-	ShowManagedFields bool	
+	ShowManagedFields bool
 
-	Selector         string
-	Prune 					 bool
-	PruneAllowList   string
-	Diff             *DiffProgram
+	Selector string
+	Diff     *DiffProgram
 }
 
 // NewDiffFlags returns a default DiffFlags
@@ -694,20 +692,19 @@ func (flags *DiffFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []
 	return &DiffOptions{
 		FilenameOptions: flags.FilenameOptions,
 
-		ServerSideApply: flags.ServerSideApply,
-		FieldManager: flags.FieldManager,
-		ForceConflicts: flags.ForceConflicts,
+		ServerSideApply:   flags.ServerSideApply,
+		FieldManager:      flags.FieldManager,
+		ForceConflicts:    flags.ForceConflicts,
 		ShowManagedFields: flags.ShowManagedFields,
 
-		Selector: flags.Selector,
-		OpenAPISchema: openAPISchema,
-		DynamicClient: dynamicClient,
-		CmdNamespace: cmdNamespace,
+		Selector:         flags.Selector,
+		OpenAPISchema:    openAPISchema,
+		DynamicClient:    dynamicClient,
+		CmdNamespace:     cmdNamespace,
 		EnforceNamespace: enforceNamespace,
-		Builder: builder,
-		Diff: flags.Diff,
-		pruner: p,
-		
+		Builder:          builder,
+		Diff:             flags.Diff,
+		pruner:           p,
 	}, nil
 }
 
