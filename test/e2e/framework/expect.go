@@ -29,6 +29,54 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
+// MakeMatcher builds a gomega.Matcher based on a single callback function.
+// That function is passed the actual value that is to be checked.
+// There are three possible outcomes of the check:
+//   - An error is returned, which then is converted into a failure
+//     by Gomega.
+//   - A non-nil failure function is returned, which then is called
+//     by Gomega once a failure string is needed. This is useful
+//     to avoid unnecessarily preparing a failure string for intermediate
+//     failures in Eventually or Consistently.
+//   - Both function and error are nil, which means that the check
+//     succeeded.
+func MakeMatcher[T interface{}](match func(actual T) (failure func() string, err error)) types.GomegaMatcher {
+	return &matcher[T]{
+		match: match,
+	}
+}
+
+type matcher[T interface{}] struct {
+	match   func(actual T) (func() string, error)
+	failure func() string
+}
+
+func (m *matcher[T]) Match(actual interface{}) (success bool, err error) {
+	if actual, ok := actual.(T); ok {
+		failure, err := m.match(actual)
+		if err != nil {
+			return false, err
+		}
+		m.failure = failure
+		if failure != nil {
+			return false, nil
+		}
+		return true, nil
+	}
+	var empty T
+	return false, gomega.StopTrying(fmt.Sprintf("internal error: expected %T, got:\n%s", empty, format.Object(actual, 1)))
+}
+
+func (m *matcher[T]) FailureMessage(actual interface{}) string {
+	return m.failure()
+}
+
+func (m matcher[T]) NegatedFailureMessage(actual interface{}) string {
+	return m.failure()
+}
+
+var _ types.GomegaMatcher = &matcher[string]{}
+
 // Gomega returns an interface that can be used like gomega to express
 // assertions. The difference is that failed assertions are returned as an
 // error:
