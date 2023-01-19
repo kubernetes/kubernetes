@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admissionregistration/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,6 +60,11 @@ var (
 		if err := v1alpha1.AddToScheme(res); err != nil {
 			panic(err)
 		}
+
+		if err := fake.AddToScheme(res); err != nil {
+			panic(err)
+		}
+
 		return res
 	}()
 	paramsGVK schema.GroupVersionKind = schema.GroupVersionKind{
@@ -78,6 +84,7 @@ var (
 		res.Add(paramsGVK, meta.RESTScopeNamespace)
 		res.Add(definitionGVK, meta.RESTScopeRoot)
 		res.Add(bindingGVK, meta.RESTScopeRoot)
+		res.Add(v1.SchemeGroupVersion.WithKind("ConfigMap"), meta.RESTScopeNamespace)
 		return res
 	}()
 
@@ -388,30 +395,6 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 	defer c.policyController.mutex.RUnlock()
 
 	switch obj.(type) {
-	case *unstructured.Unstructured:
-		paramSourceGVK := obj.GetObjectKind().GroupVersionKind()
-		paramKind := v1alpha1.ParamKind{
-			APIVersion: paramSourceGVK.GroupVersion().String(),
-			Kind:       paramSourceGVK.Kind,
-		}
-		var paramInformer generic.Informer[*unstructured.Unstructured]
-		if paramInfo, ok := c.policyController.paramsCRDControllers[paramKind]; ok {
-			paramInformer = paramInfo.controller.Informer()
-		} else {
-			// Treat unknown CRD the same as not found
-			return nil, nil
-		}
-
-		// Param type. Just check informer for its GVK
-		item, err := paramInformer.Get(accessor.GetName())
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
-
-		return item, nil
 	case *v1alpha1.ValidatingAdmissionPolicyBinding:
 		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
 		info, ok := c.policyController.bindingInfos[nn]
@@ -429,7 +412,32 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 
 		return info.lastReconciledValue, nil
 	default:
-		panic(fmt.Errorf("unhandled object type: %T", obj))
+		// If test isn't trying to fetch a policy or binding, assume it is
+		// fetching a param
+		paramSourceGVK := obj.GetObjectKind().GroupVersionKind()
+		paramKind := v1alpha1.ParamKind{
+			APIVersion: paramSourceGVK.GroupVersion().String(),
+			Kind:       paramSourceGVK.Kind,
+		}
+
+		var paramInformer generic.Informer[runtime.Object]
+		if paramInfo, ok := c.policyController.paramsCRDControllers[paramKind]; ok {
+			paramInformer = paramInfo.controller.Informer()
+		} else {
+			// Treat unknown CRD the same as not found
+			return nil, nil
+		}
+
+		// Param type. Just check informer for its GVK
+		item, err := paramInformer.Get(accessor.GetName())
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				return nil, nil
+			}
+			return nil, err
+		}
+
+		return item, nil
 	}
 }
 
@@ -1222,4 +1230,87 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 	require.EqualValues(t, 2, evaluations1.Load())
 	require.EqualValues(t, 1, compiles2.Load())
 	require.EqualValues(t, 2, evaluations2.Load())
+}
+
+// Shows that we can refer to native-typed params just fine
+// (as opposed to CRD params)
+func TestNativeTypeParam(t *testing.T) {
+	testContext, testContextCancel := context.WithCancel(context.Background())
+	defer testContextCancel()
+	compiler := &fakeCompiler{
+		// Match everything by default
+		DefaultMatch: true,
+	}
+	handler, _, tracker, controller := setupFakeTest(t, compiler)
+
+	compiles := atomic.Int64{}
+	evaluations := atomic.Int64{}
+
+	// Use ConfigMap native-typed param
+	nativeTypeParamPolicy := *denyPolicy
+	nativeTypeParamPolicy.Spec.ParamKind = &v1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+	}
+
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
+		compiles.Add(1)
+
+		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
+			evaluations.Add(1)
+
+			// show that the passed params was a ConfigMap native type
+			if _, ok := params.(*v1.ConfigMap); ok {
+				return []policyDecision{
+					{
+						action:  actionDeny,
+						message: "correct type",
+					},
+				}, nil
+			}
+			return []policyDecision{
+				{
+					action:  actionDeny,
+					message: "Incorrect param type",
+				},
+			}, nil
+		})
+	}, nil)
+
+	configMapParam := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "replicas-test.example.com",
+			Namespace:       "",
+			ResourceVersion: "1",
+		},
+		Data: map[string]string{
+			"coolkey": "coolvalue",
+		},
+	}
+	require.NoError(t, tracker.Create(definitionsGVR, &nativeTypeParamPolicy, nativeTypeParamPolicy.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBinding, denyBinding.Namespace))
+	require.NoError(t, tracker.Add(configMapParam))
+
+	// Wait for controller to reconcile given objects
+	require.NoError(t,
+		waitForReconcile(
+			testContext, controller,
+			denyBinding, denyPolicy, configMapParam))
+
+	err := handler.Validate(
+		testContext,
+		// Object is irrelevant/unchecked for this test. Just test that
+		// the evaluator is executed, and returns admit meaning the params
+		// passed was a configmap
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, "correct type")
+	require.EqualValues(t, 1, compiles.Load())
+	require.EqualValues(t, 1, evaluations.Load())
 }
