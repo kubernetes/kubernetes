@@ -139,13 +139,21 @@ func getLoopDeviceFromSysfs(path string) (string, error) {
 		}
 
 		// Return the first match.
-		backingFilePath := strings.TrimSpace(string(data))
+		backingFilePath := cleanBackingFilePath(string(data))
 		if backingFilePath == path || backingFilePath == realPath {
 			return fmt.Sprintf("/dev/%s", filepath.Base(device)), nil
 		}
 	}
 
 	return "", errors.New(ErrDeviceNotFound)
+}
+
+// cleanPath remove any trailing substrings that are not part of the backing file path.
+func cleanBackingFilePath(path string) string {
+	// If the block device was deleted, the path will contain a "(deleted)" suffix
+	path = strings.TrimSpace(path)
+	path = strings.TrimSuffix(path, "(deleted)")
+	return strings.TrimSpace(path)
 }
 
 // FindGlobalMapPathUUIDFromPod finds {pod uuid} bind mount under globalMapPath
