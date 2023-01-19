@@ -19,7 +19,6 @@ package internal
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -78,7 +77,7 @@ func hasLastApplied(obj runtime.Object) bool {
 	if annotations == nil {
 		return false
 	}
-	lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
+	lastApplied, ok := annotations[LastAppliedConfigAnnotation]
 	return ok && len(lastApplied) > 0
 }
 
@@ -92,7 +91,7 @@ func buildLastApplied(obj runtime.Object) (string, error) {
 
 	// Remove the annotation from the object before encoding the object
 	var annotations = accessor.GetAnnotations()
-	delete(annotations, corev1.LastAppliedConfigAnnotation)
+	delete(annotations, LastAppliedConfigAnnotation)
 	accessor.SetAnnotations(annotations)
 
 	lastApplied, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)

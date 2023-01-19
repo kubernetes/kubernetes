@@ -19,11 +19,16 @@ package internal
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 )
+
+// LastAppliedConfigAnnotation is the annotation used to store the previous
+// configuration of a resource for use in a three way diff by UpdateApplyAnnotation.
+//
+// This is a copy of the corev1 annotation since we don't want to depend on the whole package.
+const LastAppliedConfigAnnotation = "kubectl.kubernetes.io/last-applied-configuration"
 
 // SetLastApplied sets the last-applied annotation the given value in
 // the object.
@@ -36,9 +41,9 @@ func SetLastApplied(obj runtime.Object, value string) error {
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
-	annotations[corev1.LastAppliedConfigAnnotation] = value
+	annotations[LastAppliedConfigAnnotation] = value
 	if err := apimachineryvalidation.ValidateAnnotationsSize(annotations); err != nil {
-		delete(annotations, corev1.LastAppliedConfigAnnotation)
+		delete(annotations, LastAppliedConfigAnnotation)
 	}
 	accessor.SetAnnotations(annotations)
 	return nil
