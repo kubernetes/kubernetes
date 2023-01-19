@@ -256,7 +256,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 					"InodesUsed":     bounded(0, 1e8),
 				}),
 				"ProcessStats": ptrMatchAllFields(gstruct.Fields{
-					"ProcessCount": bounded(0, 1e8),
+					"ProcessCount": bounded(1, 1e8),
 				}),
 			})
 
