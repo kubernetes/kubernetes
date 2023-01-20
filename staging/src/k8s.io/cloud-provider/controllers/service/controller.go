@@ -60,25 +60,13 @@ const (
 	ToBeDeletedTaint = "ToBeDeletedByClusterAutoscaler"
 )
 
-type cachedService struct {
-	// The cached state of the service
-	state *v1.Service
-}
-
-type serviceCache struct {
-	mu         sync.RWMutex // protects serviceMap
-	serviceMap map[string]*cachedService
-}
-
 // Controller keeps cloud provider service resources
 // (like load balancers) in sync with the registry.
 type Controller struct {
-	cloud       cloudprovider.Interface
-	kubeClient  clientset.Interface
-	clusterName string
-	balancer    cloudprovider.LoadBalancer
-	// TODO(#85155): Stop relying on this and remove the cache completely.
-	cache               *serviceCache
+	cloud               cloudprovider.Interface
+	kubeClient          clientset.Interface
+	clusterName         string
+	balancer            cloudprovider.LoadBalancer
 	serviceLister       corelisters.ServiceLister
 	serviceListerSynced cache.InformerSynced
 	eventBroadcaster    record.EventBroadcaster
@@ -113,7 +101,6 @@ func New(
 		cloud:            cloud,
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
-		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
 		eventBroadcaster: broadcaster,
 		eventRecorder:    recorder,
 		nodeLister:       nodeInformer.Lister(),
@@ -305,63 +292,24 @@ func (c *Controller) init() error {
 	return nil
 }
 
-// processServiceCreateOrUpdate operates loadbalancers for the incoming service accordingly.
-// Returns an error if processing the service update failed.
-func (c *Controller) processServiceCreateOrUpdate(ctx context.Context, service *v1.Service, key string) error {
-	// TODO(@MrHohn): Remove the cache once we get rid of the non-finalizer deletion
-	// path. Ref https://github.com/kubernetes/enhancements/issues/980.
-	cachedService := c.cache.getOrCreate(key)
-	if cachedService.state != nil && cachedService.state.UID != service.UID {
-		// This happens only when a service is deleted and re-created
-		// in a short period, which is only possible when it doesn't
-		// contain finalizer.
-		if err := c.processLoadBalancerDelete(ctx, cachedService.state, key); err != nil {
-			return err
-		}
-	}
-	// Always cache the service, we need the info for service deletion in case
-	// when load balancer cleanup is not handled via finalizer.
-	cachedService.state = service
-	op, err := c.syncLoadBalancerIfNeeded(ctx, service, key)
-	if err != nil {
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "SyncLoadBalancerFailed", "Error syncing load balancer: %v", err)
-		return err
-	}
-	if op == deleteLoadBalancer {
-		// Only delete the cache upon successful load balancer deletion.
-		c.cache.delete(key)
-	}
-
-	return nil
-}
-
-type loadBalancerOperation int
-
-const (
-	deleteLoadBalancer loadBalancerOperation = iota
-	ensureLoadBalancer
-)
-
 // syncLoadBalancerIfNeeded ensures that service's status is synced up with loadbalancer
 // i.e. creates loadbalancer for service if requested and deletes loadbalancer if the service
 // doesn't want a loadbalancer no more. Returns whatever error occurred.
-func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.Service, key string) (loadBalancerOperation, error) {
+func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.Service, key string) error {
 	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
 	// Save the state so we can avoid a write if it doesn't change
 	previousStatus := service.Status.LoadBalancer.DeepCopy()
 	var newStatus *v1.LoadBalancerStatus
-	var op loadBalancerOperation
 	var err error
 
 	if !wantsLoadBalancer(service) || needsCleanup(service) {
 		// Delete the load balancer if service no longer wants one, or if service needs cleanup.
-		op = deleteLoadBalancer
 		newStatus = &v1.LoadBalancerStatus{}
 		_, exists, err := c.balancer.GetLoadBalancer(ctx, c.clusterName, service)
 		if err != nil {
-			return op, fmt.Errorf("failed to check if load balancer exists before cleanup: %v", err)
+			return fmt.Errorf("failed to check if load balancer exists before cleanup: %v", err)
 		}
 		if exists {
 			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
@@ -370,25 +318,24 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 				if err == cloudprovider.ImplementedElsewhere {
 					klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error on deletion", key, c.cloud.ProviderName())
 				} else {
-					return op, fmt.Errorf("failed to delete load balancer: %v", err)
+					return fmt.Errorf("failed to delete load balancer: %v", err)
 				}
 			}
 		}
 		// Always remove finalizer when load balancer is deleted, this ensures Services
 		// can be deleted after all corresponding load balancer resources are deleted.
 		if err := c.removeFinalizer(service); err != nil {
-			return op, fmt.Errorf("failed to remove load balancer cleanup finalizer: %v", err)
+			return fmt.Errorf("failed to remove load balancer cleanup finalizer: %v", err)
 		}
 		c.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
 	} else {
 		// Create or update the load balancer if service wants one.
-		op = ensureLoadBalancer
 		klog.V(2).Infof("Ensuring load balancer for service %s", key)
 		c.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
 		// Always add a finalizer prior to creating load balancers, this ensures Services
 		// can't be deleted until all corresponding load balancer resources are also deleted.
 		if err := c.addFinalizer(service); err != nil {
-			return op, fmt.Errorf("failed to add load balancer cleanup finalizer: %v", err)
+			return fmt.Errorf("failed to add load balancer cleanup finalizer: %v", err)
 		}
 		newStatus, err = c.ensureLoadBalancer(ctx, service)
 		if err != nil {
@@ -397,12 +344,12 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 				// functionality is implemented by a different controller.  In this case, we
 				// return immediately without doing anything.
 				klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error", key, c.cloud.ProviderName())
-				return op, nil
+				return nil
 			}
-			return op, fmt.Errorf("failed to ensure load balancer: %v", err)
+			return fmt.Errorf("failed to ensure load balancer: %v", err)
 		}
 		if newStatus == nil {
-			return op, fmt.Errorf("service status returned by EnsureLoadBalancer is nil")
+			return fmt.Errorf("service status returned by EnsureLoadBalancer is nil")
 		}
 
 		c.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
@@ -414,11 +361,11 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 		//   we remove the finalizer.
 		// - We can't patch status on non-exist service anyway.
 		if !errors.IsNotFound(err) {
-			return op, fmt.Errorf("failed to update load balancer status: %v", err)
+			return fmt.Errorf("failed to update load balancer status: %v", err)
 		}
 	}
 
-	return op, nil
+	return nil
 }
 
 func (c *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service) (*v1.LoadBalancerStatus, error) {
@@ -438,77 +385,13 @@ func (c *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service
 	return c.balancer.EnsureLoadBalancer(ctx, c.clusterName, service, nodes)
 }
 
-// ListKeys implements the interface required by DeltaFIFO to list the keys we
-// already know about.
-func (s *serviceCache) ListKeys() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	keys := make([]string, 0, len(s.serviceMap))
-	for k := range s.serviceMap {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// GetByKey returns the value stored in the serviceMap under the given key
-func (s *serviceCache) GetByKey(key string) (interface{}, bool, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if v, ok := s.serviceMap[key]; ok {
-		return v, true, nil
-	}
-	return nil, false, nil
-}
-
-// ListKeys implements the interface required by DeltaFIFO to list the keys we
-// already know about.
-func (s *serviceCache) allServices() []*v1.Service {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	services := make([]*v1.Service, 0, len(s.serviceMap))
-	for _, v := range s.serviceMap {
-		services = append(services, v.state)
-	}
-	return services
-}
-
-func (s *serviceCache) get(serviceName string) (*cachedService, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	service, ok := s.serviceMap[serviceName]
-	return service, ok
-}
-
-func (s *serviceCache) getOrCreate(serviceName string) *cachedService {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	service, ok := s.serviceMap[serviceName]
-	if !ok {
-		service = &cachedService{}
-		s.serviceMap[serviceName] = service
-	}
-	return service
-}
-
-func (s *serviceCache) set(serviceName string, service *cachedService) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.serviceMap[serviceName] = service
-}
-
-func (s *serviceCache) delete(serviceName string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.serviceMap, serviceName)
-}
-
 // needsCleanup checks if load balancer needs to be cleaned up as indicated by finalizer.
 func needsCleanup(service *v1.Service) bool {
 	if !servicehelper.HasLBFinalizer(service) {
 		return false
 	}
 
-	if service.ObjectMeta.DeletionTimestamp != nil {
+	if !service.DeletionTimestamp.IsZero() {
 		return true
 	}
 
@@ -685,7 +568,11 @@ func (c *Controller) syncNodes(ctx context.Context, workers int) sets.String {
 	}()
 
 	klog.V(2).Infof("Syncing backends for all LB services.")
-	servicesToUpdate := c.cache.allServices()
+	servicesToUpdate, err := c.serviceLister.List(labels.Everything())
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("failed to list services: %v", err))
+		return nil
+	}
 	numServices := len(servicesToUpdate)
 	servicesToRetry := c.updateLoadBalancerHosts(ctx, servicesToUpdate, workers)
 	klog.V(2).Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
@@ -817,49 +704,19 @@ func (c *Controller) syncService(ctx context.Context, key string) error {
 	service, err := c.serviceLister.Services(namespace).Get(name)
 	switch {
 	case errors.IsNotFound(err):
-		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
-		err = c.processServiceDeletion(ctx, key)
+		return nil
 	case err != nil:
 		runtime.HandleError(fmt.Errorf("Unable to retrieve service %v from store: %v", key, err))
 	default:
 		// It is not safe to modify an object returned from an informer.
 		// As reconcilers may modify the service object we need to copy
 		// it first.
-		err = c.processServiceCreateOrUpdate(ctx, service.DeepCopy(), key)
+		if err = c.syncLoadBalancerIfNeeded(ctx, service.DeepCopy(), key); err != nil {
+			c.eventRecorder.Eventf(service, v1.EventTypeWarning, "SyncLoadBalancerFailed", "Error syncing load balancer: %v", err)
+		}
 	}
 
 	return err
-}
-
-func (c *Controller) processServiceDeletion(ctx context.Context, key string) error {
-	cachedService, ok := c.cache.get(key)
-	if !ok {
-		// Cache does not contains the key means:
-		// - We didn't create a Load Balancer for the deleted service at all.
-		// - We already deleted the Load Balancer that was created for the service.
-		// In both cases we have nothing left to do.
-		return nil
-	}
-	klog.V(2).Infof("Service %v has been deleted. Attempting to cleanup load balancer resources", key)
-	if err := c.processLoadBalancerDelete(ctx, cachedService.state, key); err != nil {
-		return err
-	}
-	c.cache.delete(key)
-	return nil
-}
-
-func (c *Controller) processLoadBalancerDelete(ctx context.Context, service *v1.Service, key string) error {
-	// delete load balancer info only if the service type is LoadBalancer
-	if !wantsLoadBalancer(service) {
-		return nil
-	}
-	c.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
-	if err := c.balancer.EnsureLoadBalancerDeleted(ctx, c.clusterName, service); err != nil {
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "DeleteLoadBalancerFailed", "Error deleting load balancer: %v", err)
-		return err
-	}
-	c.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
-	return nil
 }
 
 // addFinalizer patches the service to add finalizer.
