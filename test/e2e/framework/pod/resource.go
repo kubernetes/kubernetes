@@ -30,7 +30,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -58,95 +57,6 @@ func expectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 		framework.Logf("Unexpected error occurred: %v", err)
 	}
 	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
-}
-
-func isElementOf(podUID types.UID, pods *v1.PodList) bool {
-	for _, pod := range pods.Items {
-		if pod.UID == podUID {
-			return true
-		}
-	}
-	return false
-}
-
-// ProxyResponseChecker is a context for checking pods responses by issuing GETs to them (via the API
-// proxy) and verifying that they answer with their own pod name.
-type ProxyResponseChecker struct {
-	c              clientset.Interface
-	ns             string
-	label          labels.Selector
-	controllerName string
-	respondName    bool // Whether the pod should respond with its own name.
-	pods           *v1.PodList
-}
-
-// NewProxyResponseChecker returns a context for checking pods responses.
-func NewProxyResponseChecker(c clientset.Interface, ns string, label labels.Selector, controllerName string, respondName bool, pods *v1.PodList) ProxyResponseChecker {
-	return ProxyResponseChecker{c, ns, label, controllerName, respondName, pods}
-}
-
-// CheckAllResponses issues GETs to all pods in the context and verify they
-// reply with their own pod name.
-func (r ProxyResponseChecker) CheckAllResponses(ctx context.Context) (done bool, err error) {
-	successes := 0
-	options := metav1.ListOptions{LabelSelector: r.label.String()}
-	currentPods, err := r.c.CoreV1().Pods(r.ns).List(ctx, options)
-	expectNoError(err, "Failed to get list of currentPods in namespace: %s", r.ns)
-	for i, pod := range r.pods.Items {
-		// Check that the replica list remains unchanged, otherwise we have problems.
-		if !isElementOf(pod.UID, currentPods) {
-			return false, fmt.Errorf("pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
-		}
-
-		ctxUntil, cancel := context.WithTimeout(ctx, singleCallTimeout)
-		defer cancel()
-
-		body, err := r.c.CoreV1().RESTClient().Get().
-			Namespace(r.ns).
-			Resource("pods").
-			SubResource("proxy").
-			Name(string(pod.Name)).
-			Do(ctxUntil).
-			Raw()
-
-		if err != nil {
-			if ctxUntil.Err() != nil {
-				// We may encounter errors here because of a race between the pod readiness and apiserver
-				// proxy. So, we log the error and retry if this occurs.
-				framework.Logf("Controller %s: Failed to Get from replica %d [%s]: %v\n pod status: %#v", r.controllerName, i+1, pod.Name, err, pod.Status)
-				return false, nil
-			}
-			framework.Logf("Controller %s: Failed to GET from replica %d [%s]: %v\npod status: %#v", r.controllerName, i+1, pod.Name, err, pod.Status)
-			continue
-		}
-		// The response checker expects the pod's name unless !respondName, in
-		// which case it just checks for a non-empty response.
-		got := string(body)
-		what := ""
-		if r.respondName {
-			what = "expected"
-			want := pod.Name
-			if got != want {
-				framework.Logf("Controller %s: Replica %d [%s] expected response %q but got %q",
-					r.controllerName, i+1, pod.Name, want, got)
-				continue
-			}
-		} else {
-			what = "non-empty"
-			if len(got) == 0 {
-				framework.Logf("Controller %s: Replica %d [%s] expected non-empty response",
-					r.controllerName, i+1, pod.Name)
-				continue
-			}
-		}
-		successes++
-		framework.Logf("Controller %s: Got %s result from replica %d [%s]: %q, %d of %d required successes so far",
-			r.controllerName, what, i+1, pod.Name, got, successes, len(r.pods.Items))
-	}
-	if successes < len(r.pods.Items) {
-		return false, nil
-	}
-	return true, nil
 }
 
 // PodsCreated returns a pod list matched by the given name.

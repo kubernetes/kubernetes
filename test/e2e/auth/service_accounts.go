@@ -493,9 +493,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 
 		framework.Logf("created pod")
-		if !e2epod.CheckPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
-			framework.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
-		}
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, time.Minute))
 
 		framework.Logf("pod is ready")
 
