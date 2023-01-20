@@ -715,24 +715,32 @@ func WaitForPodsWithLabelRunningReady(ctx context.Context, c clientset.Interface
 // returning their names if it can do so before timeout.
 func WaitForNRestartablePods(ctx context.Context, ps *testutils.PodStore, expect int, timeout time.Duration) ([]string, error) {
 	var pods []*v1.Pod
-	var errLast error
-	found := wait.PollWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (bool, error) {
-		allPods := ps.List()
+
+	get := func(ctx context.Context) ([]*v1.Pod, error) {
+		return ps.List(), nil
+	}
+
+	match := func(allPods []*v1.Pod) (func() string, error) {
 		pods = FilterNonRestartablePods(allPods)
 		if len(pods) != expect {
-			errLast = fmt.Errorf("expected to find %d pods but found only %d", expect, len(pods))
-			framework.Logf("Error getting pods: %v", errLast)
-			return false, nil
+			return func() string {
+				return fmt.Sprintf("expected to find non-restartable %d pods, but found %d:\n%s", expect, len(pods), format.Object(pods, 1))
+			}, nil
 		}
-		return true, nil
-	}) == nil
+		return nil, nil
+	}
+
+	err := framework.Gomega().
+		Eventually(ctx, framework.HandleRetry(get)).
+		WithTimeout(timeout).
+		Should(framework.MakeMatcher(match))
+	if err != nil {
+		return nil, err
+	}
+
 	podNames := make([]string, len(pods))
 	for i, p := range pods {
-		podNames[i] = p.ObjectMeta.Name
-	}
-	if !found {
-		return podNames, fmt.Errorf("couldn't find %d pods within %v; last error: %v",
-			expect, timeout, errLast)
+		podNames[i] = p.Name
 	}
 	return podNames, nil
 }
