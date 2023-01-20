@@ -521,7 +521,10 @@ kube::golang::setup_env() {
   kube::golang::create_gopath_tree
   export GOPATH="${KUBE_GOPATH}"
 
-  export GOCACHE="${KUBE_GOPATH}/cache"
+  # If these are not set, set them now.  This ensures that any subsequent
+  # scripts we run (which may call this function again) use the same values.
+  export GOCACHE="${GOCACHE:-"${KUBE_GOPATH}/cache/build"}"
+  export GOMODCACHE="${GOMODCACHE:-"${KUBE_GOPATH}/cache/mod"}"
 
   # Make sure our own Go binaries are in PATH.
   export PATH="${KUBE_GOPATH}/bin:${PATH}"
