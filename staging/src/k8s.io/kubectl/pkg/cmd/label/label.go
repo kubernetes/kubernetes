@@ -61,8 +61,6 @@ type LabelFlags struct {
 	RecordFlags *genericclioptions.RecordFlags
 	PrintFlags  *genericclioptions.PrintFlags
 
-	Recorder genericclioptions.Recorder
-
 	Overwrite       bool
 	List            bool
 	Local           bool
@@ -83,9 +81,7 @@ func NewLabelFlags(f cmdutil.Factory, streams genericclioptions.IOStreams) *Labe
 		Factory: f,
 
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		Recorder:    genericclioptions.NoopRecorder{},
-
-		PrintFlags: genericclioptions.NewPrintFlags("labeled").WithTypeSetter(scheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("labeled").WithTypeSetter(scheme.Scheme),
 
 		IOStreams: streams,
 	}
@@ -114,8 +110,7 @@ type LabelOptions struct {
 	// Filename options
 	resource.FilenameOptions
 
-	PrintFlags *genericclioptions.PrintFlags
-	ToPrinter  func(string) (printers.ResourcePrinter, error)
+	ToPrinter func(string) (printers.ResourcePrinter, error)
 
 	// Common user flags
 	overwrite       bool
@@ -202,7 +197,7 @@ func (f *LabelFlags) ToOptions(cmd *cobra.Command, args []string) (*LabelOptions
 	var err error
 
 	f.RecordFlags.Complete(cmd)
-	f.Recorder, err = f.RecordFlags.ToRecorder()
+	recorder, err := f.RecordFlags.ToRecorder()
 	if err != nil {
 		return nil, err
 	}
@@ -244,8 +239,7 @@ func (f *LabelFlags) ToOptions(cmd *cobra.Command, args []string) (*LabelOptions
 	return &LabelOptions{
 		FilenameOptions: f.FilenameOptions,
 
-		PrintFlags: f.PrintFlags,
-		ToPrinter:  toPrinter,
+		ToPrinter: toPrinter,
 
 		overwrite:       f.Overwrite,
 		list:            f.List,
@@ -263,7 +257,7 @@ func (f *LabelFlags) ToOptions(cmd *cobra.Command, args []string) (*LabelOptions
 		newLabels:    newLabels,
 		removeLabels: removeLabels,
 
-		Recorder: f.Recorder,
+		Recorder: recorder,
 
 		namespace:                    namespace,
 		enforceNamespace:             enforceNamespace,

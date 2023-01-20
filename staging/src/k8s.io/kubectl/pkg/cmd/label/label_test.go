@@ -702,11 +702,11 @@ pod/foo not labeled
 
 			flags := NewLabelFlags(tf, iostreams)
 			options, err := flags.ToOptions(cmd, tc.args)
-			if tc.overwrite {
-				options.overwrite = true
-			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.overwrite {
+				options.overwrite = true
 			}
 			if err := options.Validate(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
