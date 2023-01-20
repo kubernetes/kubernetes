@@ -27,7 +27,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -528,13 +527,7 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
-	retryTimeout := 2 * time.Minute
-	retryInterval := 5 * time.Second
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	err = wait.PollWithContext(ctx, retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
-	if err != nil {
-		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
-	}
+	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, true, 2*time.Minute, pods))
 }
 
 // 1. Create a quota restricting pods in the current namespace to 2.

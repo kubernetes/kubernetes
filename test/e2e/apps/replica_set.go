@@ -225,13 +225,7 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
-	retryTimeout := 2 * time.Minute
-	retryInterval := 5 * time.Second
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	err = wait.PollWithContext(ctx, retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
-	if err != nil {
-		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
-	}
+	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, true, 2*time.Minute, pods))
 }
 
 // 1. Create a quota restricting pods in the current namespace to 2.
