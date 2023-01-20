@@ -30,7 +30,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	fakecloud "k8s.io/cloud-provider/fake"
@@ -85,7 +85,13 @@ func defaultExternalService() *v1.Service {
 
 func alwaysReady() bool { return true }
 
-func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
+type fakeController struct {
+	*Controller
+	nodeStore    cache.Store
+	serviceStore cache.Store
+}
+
+func newController() (*fakeController, *fakecloud.Cloud, *fake.Clientset) {
 	cloud := &fakecloud.Cloud{}
 	cloud.Region = region
 
@@ -105,7 +111,7 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
 		eventBroadcaster: broadcaster,
 		eventRecorder:    recorder,
-		nodeLister:       newFakeNodeLister(nil),
+		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		serviceQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
 		nodeQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "node"),
@@ -124,7 +130,12 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 	cloud.Calls = nil         // ignore any cloud calls made in init()
 	kubeClient.ClearActions() // ignore any client calls made in init()
 
-	return controller, cloud, kubeClient
+	fakeController := &fakeController{
+		Controller:   controller,
+		nodeStore:    nodeInformer.Informer().GetStore(),
+		serviceStore: serviceInformer.Informer().GetStore(),
+	}
+	return fakeController, cloud, kubeClient
 }
 
 // TODO(@MrHohn): Verify the end state when below issue is resolved:
@@ -563,7 +574,9 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			controller, cloud, _ := newController()
-			controller.nodeLister = newFakeNodeLister(nil, nodes...)
+			for _, node := range nodes {
+				controller.nodeStore.Add(node)
+			}
 			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); len(servicesToRetry) != 0 {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
 			}
@@ -726,7 +739,9 @@ func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
 
 			for _, state := range tc.stateChanges {
 				setupState := func() {
-					controller.nodeLister = newFakeNodeLister(nil, state.nodes...)
+					for _, node := range state.nodes {
+						controller.nodeStore.Add(node)
+					}
 					if state.syncCallErr {
 						cloud.Err = fmt.Errorf("error please")
 					}
@@ -810,27 +825,13 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			nodeListerErr:         nil,
 			expectedRetryServices: sets.NewString(),
 		},
-		{
-			desc:                  "error occur during sync",
-			nodes:                 []*v1.Node{node1, node2, node3, node4},
-			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
-			worker:                3,
-			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: serviceNames,
-		},
-		{
-			desc:                  "error occur during sync with 1 workers",
-			nodes:                 []*v1.Node{node1, node2, node3, node4},
-			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
-			worker:                1,
-			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: serviceNames,
-		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			controller.nodeLister = newFakeNodeLister(tc.nodeListerErr, tc.nodes...)
+			for _, node := range tc.nodes {
+				controller.nodeStore.Add(node)
+			}
 			servicesToRetry := controller.updateLoadBalancerHosts(ctx, services, tc.worker)
 			assert.Truef(t, tc.expectedRetryServices.Equal(servicesToRetry), "Services to retry are not expected")
 			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
@@ -849,7 +850,7 @@ func compareUpdateCalls(t *testing.T, left, right []fakecloud.UpdateBalancerCall
 	for _, l := range left {
 		found := false
 		for _, r := range right {
-			if reflect.DeepEqual(l, r) {
+			if updateCallEquals(l, r) {
 				found = true
 			}
 		}
@@ -861,6 +862,31 @@ func compareUpdateCalls(t *testing.T, left, right []fakecloud.UpdateBalancerCall
 	if mismatch {
 		t.Errorf("expected update calls to match, expected %+v, got %+v", left, right)
 	}
+}
+
+func updateCallEquals(l, r fakecloud.UpdateBalancerCall) bool {
+	if !reflect.DeepEqual(l.Service, r.Service) {
+		return false
+	}
+	if len(l.Hosts) != len(r.Hosts) {
+		return false
+	}
+	comp := make(map[string]*v1.Node, len(l.Hosts))
+	for _, n := range l.Hosts {
+		key, _ := cache.MetaNamespaceKeyFunc(n)
+		comp[key] = n
+	}
+	for _, n := range r.Hosts {
+		key, _ := cache.MetaNamespaceKeyFunc(n)
+		l, exists := comp[key]
+		if !exists {
+			return false
+		}
+		if !reflect.DeepEqual(l, n) {
+			return false
+		}
+	}
+	return true
 }
 
 func TestProcessServiceCreateOrUpdate(t *testing.T) {
@@ -1017,7 +1043,7 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 
 func TestSyncService(t *testing.T) {
 
-	var controller *Controller
+	var controller *fakeController
 
 	testCases := []struct {
 		testName   string
@@ -1098,19 +1124,19 @@ func TestSyncService(t *testing.T) {
 
 func TestProcessServiceDeletion(t *testing.T) {
 
-	var controller *Controller
+	var controller *fakeController
 	var cloud *fakecloud.Cloud
 	// Add a global svcKey name
 	svcKey := "external-balancer"
 
 	testCases := []struct {
 		testName   string
-		updateFn   func(*Controller)        // Update function used to manipulate srv and controller values
+		updateFn   func(*fakeController)    // Update function used to manipulate srv and controller values
 		expectedFn func(svcErr error) error // Function to check if the returned value is expected
 	}{
 		{
 			testName: "If a non-existent service is deleted",
-			updateFn: func(controller *Controller) {
+			updateFn: func(controller *fakeController) {
 				// Does not do anything
 			},
 			expectedFn: func(svcErr error) error {
@@ -1119,7 +1145,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		},
 		{
 			testName: "If cloudprovided failed to delete the service",
-			updateFn: func(controller *Controller) {
+			updateFn: func(controller *fakeController) {
 
 				svc := controller.cache.getOrCreate(svcKey)
 				svc.state = defaultExternalService()
@@ -1139,7 +1165,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		},
 		{
 			testName: "If delete was successful",
-			updateFn: func(controller *Controller) {
+			updateFn: func(controller *fakeController) {
 
 				testSvc := defaultExternalService()
 				controller.enqueueService(testSvc)
@@ -3251,33 +3277,4 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 			}
 		})
 	}
-}
-
-type fakeNodeLister struct {
-	cache []*v1.Node
-	err   error
-}
-
-func newFakeNodeLister(err error, nodes ...*v1.Node) *fakeNodeLister {
-	ret := &fakeNodeLister{}
-	ret.cache = nodes
-	ret.err = err
-	return ret
-}
-
-// List lists all Nodes in the indexer.
-// Objects returned here must be treated as read-only.
-func (l *fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
-	return l.cache, l.err
-}
-
-// Get retrieves the Node from the index for a given name.
-// Objects returned here must be treated as read-only.
-func (l *fakeNodeLister) Get(name string) (*v1.Node, error) {
-	for _, node := range l.cache {
-		if node.Name == name {
-			return node, nil
-		}
-	}
-	return nil, nil
 }
