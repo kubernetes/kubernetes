@@ -566,29 +566,19 @@ func WaitForPodSuccessInNamespaceSlow(ctx context.Context, c clientset.Interface
 // WaitForPodNotFoundInNamespace returns an error if it takes too long for the pod to fully terminate.
 // Unlike `waitForPodTerminatedInNamespace`, the pod's Phase and Reason are ignored. If the pod Get
 // api returns IsNotFound then the wait stops and nil is returned. If the Get api returns an error other
-// than "not found" then that error is returned and the wait stops.
+// than "not found" and that error is final, that error is returned and the wait stops.
 func WaitForPodNotFoundInNamespace(ctx context.Context, c clientset.Interface, podName, ns string, timeout time.Duration) error {
-	var lastPod *v1.Pod
-	err := wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, func(ctx context.Context) (bool, error) {
+	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*v1.Pod, error) {
 		pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			return true, nil // done
+			return nil, nil
 		}
-		if err != nil {
-			return handleWaitingAPIError(err, true, "getting pod %s", podIdentifier(ns, podName))
-		}
-		lastPod = pod
-		return false, nil
-	})
-	if err == nil {
-		return nil
+		return pod, err
+	})).WithTimeout(timeout).Should(gomega.BeNil())
+	if err != nil {
+		return fmt.Errorf("expected pod to not be found: %w", err)
 	}
-	if IsTimeout(err) && lastPod != nil {
-		return TimeoutError(fmt.Sprintf("timed out while waiting for pod %s to be Not Found", podIdentifier(ns, podName)),
-			lastPod,
-		)
-	}
-	return maybeTimeoutError(err, "waiting for pod %s not found", podIdentifier(ns, podName))
+	return nil
 }
 
 // PodsResponding waits for the pods to response.
