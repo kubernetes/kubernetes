@@ -572,15 +572,3 @@ func IsPodActive(p *v1.Pod) bool {
 		v1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
 }
-
-func podIdentifier(namespace, name string) string {
-	return fmt.Sprintf("%s/%s", namespace, name)
-}
-
-func identifier(pod *v1.Pod) string {
-	id := podIdentifier(pod.Namespace, pod.Name)
-	if pod.UID != "" {
-		id += fmt.Sprintf("(%s)", pod.UID)
-	}
-	return id
-}
