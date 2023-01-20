@@ -582,10 +582,14 @@ func WaitForPodNotFoundInNamespace(ctx context.Context, c clientset.Interface, p
 }
 
 // PodsResponding waits for the pods to response.
-func PodsResponding(ctx context.Context, c clientset.Interface, ns, name string, wantName bool, pods *v1.PodList) error {
+func WaitForPodsResponding(ctx context.Context, c clientset.Interface, ns string, controllerName string, wantName bool, timeout time.Duration, pods *v1.PodList) error {
+	if timeout == 0 {
+		timeout = podRespondingTimeout
+	}
 	ginkgo.By("trying to dial each unique pod")
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	err := wait.PollImmediateWithContext(ctx, framework.PollInterval(), podRespondingTimeout, NewProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": controllerName}))
+
+	err := wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, NewProxyResponseChecker(c, ns, label, controllerName, wantName, pods).CheckAllResponses)
 	return maybeTimeoutError(err, "waiting for pods to be responsive")
 }
 

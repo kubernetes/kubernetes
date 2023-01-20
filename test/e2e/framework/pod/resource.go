@@ -204,10 +204,7 @@ func podRunningMaybeResponding(ctx context.Context, c clientset.Interface, ns, n
 		return fmt.Errorf("failed to wait for pods running: %v", e)
 	}
 	if checkResponding {
-		err = PodsResponding(ctx, c, ns, name, wantName, pods)
-		if err != nil {
-			return fmt.Errorf("failed to wait for pods responding: %v", err)
-		}
+		return WaitForPodsResponding(ctx, c, ns, name, wantName, podRespondingTimeout, pods)
 	}
 	return nil
 }
