@@ -129,29 +129,10 @@ type DiffFlags struct {
 	ShowManagedFields bool
 
 	Selector string
-	Diff     *DiffProgram
-}
-
-// NewDiffFlags returns a default DiffFlags
-func NewDiffFlags(ioStreams genericclioptions.IOStreams) *DiffFlags {
-	return &DiffFlags{
-		Diff: &DiffProgram{
-			Exec:      exec.New(),
-			IOStreams: ioStreams,
-		},
-	}
 }
 
 // AddFlags registers flags for a cli
 func (f *DiffFlags) AddFlags(cmd *cobra.Command) {
-	// Flag errors exit with code 1, however according to the diff
-	// command it means changes were found.
-	// Thus, it should return status code greater than 1.
-	cmd.SetFlagErrorFunc(func(command *cobra.Command, err error) error {
-		cmdutil.CheckDiffErr(cmdutil.UsageErrorf(cmd, err.Error()))
-		return nil
-	})
-
 	usage := "contains the configuration to diff"
 	cmd.Flags().StringArray("prune-allowlist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().Bool("prune", false, "Include resources that would be deleted by pruning. Can be used with -l and default shows all resources would be pruned")
@@ -164,7 +145,7 @@ func (f *DiffFlags) AddFlags(cmd *cobra.Command) {
 
 // NewCmdDiff creates the `diff` command
 func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	flags := NewDiffFlags(streams)
+	flags := &DiffFlags{}
 	cmd := &cobra.Command{
 		Use:                   "diff -f FILENAME",
 		DisableFlagsInUseLine: true,
@@ -172,7 +153,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			options, err := flags.ToOptions(f, cmd, args)
+			options, err := flags.ToOptions(f, cmd, args, streams)
 			cmdutil.CheckDiffErr(err)
 			cmdutil.CheckDiffErr(options.Validate())
 			// `kubectl diff` propagates the error code from
@@ -189,6 +170,14 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			}
 		},
 	}
+
+	// Flag errors exit with code 1, however according to the diff
+	// command it means changes were found.
+	// Thus, it should return status code greater than 1.
+	cmd.SetFlagErrorFunc(func(command *cobra.Command, err error) error {
+		cmdutil.CheckDiffErr(cmdutil.UsageErrorf(cmd, err.Error()))
+		return nil
+	})
 
 	flags.AddFlags(cmd)
 	return cmd
@@ -636,7 +625,7 @@ func isConflict(err error) bool {
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
-func (flags *DiffFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string) (*DiffOptions, error) {
+func (flags *DiffFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string, ioStreams genericclioptions.IOStreams) (*DiffOptions, error) {
 	if len(args) != 0 {
 		return nil, cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
@@ -689,6 +678,11 @@ func (flags *DiffFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	builder := f.NewBuilder()
 
+	diff := &DiffProgram{
+		Exec:      exec.New(),
+		IOStreams: ioStreams,
+	}
+
 	return &DiffOptions{
 		FilenameOptions: flags.FilenameOptions,
 
@@ -703,7 +697,7 @@ func (flags *DiffFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []
 		CmdNamespace:     cmdNamespace,
 		EnforceNamespace: enforceNamespace,
 		Builder:          builder,
-		Diff:             flags.Diff,
+		Diff:             diff,
 		pruner:           p,
 	}, nil
 }
