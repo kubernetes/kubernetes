@@ -277,14 +277,6 @@ const (
 	// which avoids frequent relisting of containers which helps optimize performance.
 	EventedPLEG featuregate.Feature = "EventedPLEG"
 
-	// owner: @andrewsykim @SergeyKanzhelev
-	// GA: v1.20
-	//
-	// Ensure kubelet respects exec probe timeouts. Feature gate exists in-case existing workloads
-	// may depend on old behavior where exec probe timeouts were ignored.
-	// Lock to default and remove after v1.22 based on user feedback that should be reflected in KEP #1972 update
-	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
-
 	// owner: @gjkim42
 	// kep: https://kep.k8s.io/2595
 	// alpha: v1.22
@@ -905,8 +897,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
 
 	EventedPLEG: {Default: false, PreRelease: featuregate.Alpha},
-
-	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 
 	ExpandedDNSConfig: {Default: true, PreRelease: featuregate.Beta},
 
