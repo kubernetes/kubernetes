@@ -131,13 +131,13 @@ func (h *HTTPProxyHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	wg.Add(2)
 
 	go func() {
-		defer h.t.Logf("Server read close, host=%s", req.Host)
 		defer wg.Done()
+		defer h.t.Logf("Server read close, host=%s", req.Host)
 		io.Copy(conn, sconn)
 	}()
 	go func() {
-		defer h.t.Logf("Server write close, host=%s", req.Host)
 		defer wg.Done()
+		defer h.t.Logf("Server write close, host=%s", req.Host)
 		io.Copy(sconn, conn)
 	}()
 
