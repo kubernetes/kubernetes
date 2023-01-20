@@ -32,7 +32,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -889,7 +888,7 @@ func (config *NetworkingTestConfig) DeleteNetProxyPod(ctx context.Context) {
 	framework.ExpectNoError(config.getPodClient().Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0)))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
-	err := e2epod.WaitForPodToDisappear(ctx, config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
+	err := e2epod.WaitForPodNotFoundInNamespace(ctx, config.f.ClientSet, config.Namespace, pod.Name, wait.ForeverTestTimeout)
 	if err != nil {
 		framework.Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}
