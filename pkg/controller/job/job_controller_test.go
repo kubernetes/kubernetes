@@ -237,8 +237,7 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedConditionStatus v1.ConditionStatus
 		expectedConditionReason string
 		expectedCreatedIndexes  sets.Int
-
-		expectedPodPatches int
+		expectedPodPatches      int
 
 		// features
 		jobReadyPodsEnabled bool
