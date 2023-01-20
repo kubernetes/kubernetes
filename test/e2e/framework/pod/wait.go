@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -68,45 +67,6 @@ const (
 )
 
 type podCondition func(pod *v1.Pod) (bool, error)
-
-type timeoutError struct {
-	msg             string
-	observedObjects []interface{}
-}
-
-func (e *timeoutError) Error() string {
-	return e.msg
-}
-
-func TimeoutError(msg string, observedObjects ...interface{}) *timeoutError {
-	return &timeoutError{
-		msg:             msg,
-		observedObjects: observedObjects,
-	}
-}
-
-// maybeTimeoutError returns a TimeoutError if err is a timeout. Otherwise, wrap err.
-// taskFormat and taskArgs should be the task being performed when the error occurred,
-// e.g. "waiting for pod to be running".
-func maybeTimeoutError(err error, taskFormat string, taskArgs ...interface{}) error {
-	if IsTimeout(err) {
-		return TimeoutError(fmt.Sprintf("timed out while "+taskFormat, taskArgs...))
-	} else if err != nil {
-		return fmt.Errorf("error while %s: %w", fmt.Sprintf(taskFormat, taskArgs...), err)
-	} else {
-		return nil
-	}
-}
-
-func IsTimeout(err error) bool {
-	if err == wait.ErrWaitTimeout {
-		return true
-	}
-	if _, ok := err.(*timeoutError); ok {
-		return true
-	}
-	return false
-}
 
 // BeRunningNoRetries verifies that a pod starts running. It's a permanent
 // failure when the pod enters some other permanent phase.
@@ -811,24 +771,4 @@ func WaitForContainerRunning(ctx context.Context, c clientset.Interface, namespa
 		}
 		return false, nil
 	})
-}
-
-// handleWaitingAPIErrror handles an error from an API request in the context of a Wait function.
-// If the error is retryable, sleep the recommended delay and ignore the error.
-// If the error is terminal, return it.
-func handleWaitingAPIError(err error, retryNotFound bool, taskFormat string, taskArgs ...interface{}) (bool, error) {
-	taskDescription := fmt.Sprintf(taskFormat, taskArgs...)
-	if retryNotFound && apierrors.IsNotFound(err) {
-		framework.Logf("Ignoring NotFound error while " + taskDescription)
-		return false, nil
-	}
-	if retry, delay := framework.ShouldRetry(err); retry {
-		framework.Logf("Retryable error while %s, retrying after %v: %v", taskDescription, delay, err)
-		if delay > 0 {
-			time.Sleep(delay)
-		}
-		return false, nil
-	}
-	framework.Logf("Encountered non-retryable error while %s: %v", taskDescription, err)
-	return false, err
 }
