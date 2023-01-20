@@ -38,6 +38,9 @@ message StatusResponse {
     // Any value other than "ok" is failing healthz.  On failure, the associated API server healthz endpoint will contain this value as part of the error message.
     string healthz = 2;
     // the current write key, used to determine staleness of data updated via value.Transformer.TransformFromStorage.
+    // The API server will cache this value and will periodically poll this API to keep the cache up to data.
+    // EncryptRequest.key_id will be set to the cached value to prevent the plugin with using a key that has not yet
+    // been observed by the API server.
     string key_id = 3;
 }
 
@@ -63,6 +66,8 @@ message EncryptRequest {
     bytes plaintext = 1;
     // UID is a unique identifier for the request.
     string uid = 2;
+    // The latest observed write key, used to prevent data being written with a key that is out of sync.
+    string key_id = 3;
 }
 
 message EncryptResponse {
@@ -70,6 +75,7 @@ message EncryptResponse {
     bytes ciphertext = 1;
     // The KMS key ID used to encrypt the data. This must always refer to the KMS KEK and not any local KEKs that may be in use.
     // This can be used to inform staleness of data updated via value.Transformer.TransformFromStorage.
+    // This must match EncryptRequest.key_id or the API server will fail the request.
     string key_id = 2;
     // Additional metadata to be stored with the encrypted data.
     // This metadata can contain the encrypted local KEK that was used to encrypt the DEK.
