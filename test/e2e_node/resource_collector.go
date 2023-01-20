@@ -39,7 +39,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -384,8 +383,7 @@ func deletePodsSync(ctx context.Context, f *framework.Framework, pods []*v1.Pod)
 				framework.Failf("Unexpected error trying to delete pod %s: %v", pod.Name, err)
 			}
 
-			gomega.Expect(e2epod.WaitForPodToDisappear(ctx, f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
-				30*time.Second, 10*time.Minute)).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.ObjectMeta.Name, f.Namespace.Name, 10*time.Minute))
 		}()
 	}
 	wg.Wait()

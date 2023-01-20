@@ -591,42 +591,6 @@ func WaitForPodNotFoundInNamespace(ctx context.Context, c clientset.Interface, p
 	return maybeTimeoutError(err, "waiting for pod %s not found", podIdentifier(ns, podName))
 }
 
-// WaitForPodToDisappear waits the given timeout duration for the specified pod to disappear.
-func WaitForPodToDisappear(ctx context.Context, c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
-	var lastPod *v1.Pod
-	err := wait.PollImmediateWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
-		framework.Logf("Waiting for pod %s to disappear", podName)
-		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := c.CoreV1().Pods(ns).List(ctx, options)
-		if err != nil {
-			return handleWaitingAPIError(err, true, "listing pods")
-		}
-		found := false
-		for i, pod := range pods.Items {
-			if pod.Name == podName {
-				framework.Logf("Pod %s still exists", podName)
-				found = true
-				lastPod = &(pods.Items[i])
-				break
-			}
-		}
-		if !found {
-			framework.Logf("Pod %s no longer exists", podName)
-			return true, nil
-		}
-		return false, nil
-	})
-	if err == nil {
-		return nil
-	}
-	if IsTimeout(err) {
-		return TimeoutError(fmt.Sprintf("timed out while waiting for pod %s to disappear", podIdentifier(ns, podName)),
-			lastPod,
-		)
-	}
-	return maybeTimeoutError(err, "waiting for pod %s to disappear", podIdentifier(ns, podName))
-}
-
 // PodsResponding waits for the pods to response.
 func PodsResponding(ctx context.Context, c clientset.Interface, ns, name string, wantName bool, pods *v1.PodList) error {
 	ginkgo.By("trying to dial each unique pod")
