@@ -34,6 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
@@ -588,9 +589,93 @@ func WaitForPodsResponding(ctx context.Context, c clientset.Interface, ns string
 	}
 	ginkgo.By("trying to dial each unique pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": controllerName}))
+	options := metav1.ListOptions{LabelSelector: label.String()}
 
-	err := wait.PollImmediateWithContext(ctx, framework.PollInterval(), timeout, NewProxyResponseChecker(c, ns, label, controllerName, wantName, pods).CheckAllResponses)
-	return maybeTimeoutError(err, "waiting for pods to be responsive")
+	type response struct {
+		podName  string
+		response string
+	}
+
+	get := func(ctx context.Context) ([]response, error) {
+		currentPods, err := c.CoreV1().Pods(ns).List(ctx, options)
+		if err != nil {
+			return nil, fmt.Errorf("list pods: %w", err)
+		}
+
+		var responses []response
+		for _, pod := range pods.Items {
+			// Check that the replica list remains unchanged, otherwise we have problems.
+			if !isElementOf(pod.UID, currentPods) {
+				return nil, gomega.StopTrying(fmt.Sprintf("Pod with UID %s is no longer a member of the replica set. Must have been restarted for some reason.\nCurrent replica set:\n%s", pod.UID, format.Object(currentPods, 1)))
+			}
+
+			ctxUntil, cancel := context.WithTimeout(ctx, singleCallTimeout)
+			defer cancel()
+
+			body, err := c.CoreV1().RESTClient().Get().
+				Namespace(ns).
+				Resource("pods").
+				SubResource("proxy").
+				Name(string(pod.Name)).
+				Do(ctxUntil).
+				Raw()
+
+			if err != nil {
+				// We may encounter errors here because of a race between the pod readiness and apiserver
+				// proxy. So, we log the error and retry if this occurs.
+				return nil, fmt.Errorf("Controller %s: failed to Get from replica pod %s:\n%s\nPod status:\n%s",
+					controllerName, pod.Name,
+					format.Object(err, 1), format.Object(pod.Status, 1))
+			}
+			responses = append(responses, response{podName: pod.Name, response: string(body)})
+		}
+		return responses, nil
+	}
+
+	match := func(responses []response) (func() string, error) {
+		// The response checker expects the pod's name unless !respondName, in
+		// which case it just checks for a non-empty response.
+		var unexpected []response
+		for _, response := range responses {
+			if wantName {
+				if response.response != response.podName {
+					unexpected = append(unexpected, response)
+				}
+			} else {
+				if len(response.response) == 0 {
+					unexpected = append(unexpected, response)
+				}
+			}
+		}
+		if len(unexpected) > 0 {
+			return func() string {
+				what := "some response"
+				if wantName {
+					what = "the pod's own name as response"
+				}
+				return fmt.Sprintf("Wanted %s, but the following pods replied with something else:\n%s", what, format.Object(unexpected, 1))
+			}, nil
+		}
+		return nil, nil
+	}
+
+	err := framework.Gomega().
+		Eventually(ctx, framework.HandleRetry(get)).
+		WithTimeout(timeout).
+		Should(framework.MakeMatcher(match))
+	if err != nil {
+		return fmt.Errorf("checking pod responses: %w", err)
+	}
+	return nil
+}
+
+func isElementOf(podUID apitypes.UID, pods *v1.PodList) bool {
+	for _, pod := range pods.Items {
+		if pod.UID == podUID {
+			return true
+		}
+	}
+	return false
 }
 
 // WaitForNumberOfPods waits up to timeout to ensure there are exact

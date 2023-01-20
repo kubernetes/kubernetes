@@ -411,7 +411,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(ctx, c, ns, []string{simplePodName}, framework.PodStartTimeout), true)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, simplePodName, ns, framework.PodStartTimeout))
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
@@ -798,9 +798,7 @@ metadata:
 			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
 			framework.ExpectNoError(err)
-			if !e2epod.CheckPodsRunningReady(ctx, c, ns, []string{runTestPod.Name}, time.Minute) {
-				framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
-			}
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, runTestPod.Name, ns, time.Minute))
 
 			gomega.Expect(c.CoreV1().Pods(ns).Delete(ctx, "run-test-3", metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
@@ -1500,7 +1498,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(ctx, c, ns, []string{pausePodName}, framework.PodStartTimeout), true)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, pausePodName, ns, framework.PodStartTimeout))
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
@@ -1539,7 +1537,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
-			framework.ExpectEqual(e2epod.CheckPodsRunningReady(ctx, c, ns, []string{busyboxPodName}, framework.PodStartTimeout), true)
+			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, busyboxPodName, ns, framework.PodStartTimeout))
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
