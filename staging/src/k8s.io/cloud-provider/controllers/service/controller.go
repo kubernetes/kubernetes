@@ -295,7 +295,7 @@ func (c *Controller) init() error {
 // syncLoadBalancerIfNeeded ensures that service's status is synced up with loadbalancer
 // i.e. creates loadbalancer for service if requested and deletes loadbalancer if the service
 // doesn't want a loadbalancer no more. Returns whatever error occurred.
-func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.Service, key string) error {
+func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.Service) error {
 	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
@@ -303,6 +303,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 	previousStatus := service.Status.LoadBalancer.DeepCopy()
 	var newStatus *v1.LoadBalancerStatus
 	var err error
+	key, _ := cache.MetaNamespaceKeyFunc(service)
 
 	if !wantsLoadBalancer(service) || needsCleanup(service) {
 		// Delete the load balancer if service no longer wants one, or if service needs cleanup.
@@ -711,7 +712,7 @@ func (c *Controller) syncService(ctx context.Context, key string) error {
 		// It is not safe to modify an object returned from an informer.
 		// As reconcilers may modify the service object we need to copy
 		// it first.
-		if err = c.syncLoadBalancerIfNeeded(ctx, service.DeepCopy(), key); err != nil {
+		if err = c.syncLoadBalancerIfNeeded(ctx, service.DeepCopy()); err != nil {
 			c.eventRecorder.Eventf(service, v1.EventTypeWarning, "SyncLoadBalancerFailed", "Error syncing load balancer: %v", err)
 		}
 	}

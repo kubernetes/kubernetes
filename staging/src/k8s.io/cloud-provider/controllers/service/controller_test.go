@@ -373,13 +373,12 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			defer cancel()
 			controller, cloud, client := newController()
 			cloud.Exists = tc.lbExists
-			key := fmt.Sprintf("%s/%s", tc.service.Namespace, tc.service.Name)
 			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(ctx, tc.service, metav1.CreateOptions{}); err != nil {
-				t.Fatalf("Failed to prepare service %s for testing: %v", key, err)
+				t.Fatalf("Failed to prepare service for testing: %v", err)
 			}
 			client.ClearActions()
 
-			if err := controller.syncLoadBalancerIfNeeded(ctx, tc.service, key); err != nil {
+			if err := controller.syncLoadBalancerIfNeeded(ctx, tc.service); err != nil {
 				t.Errorf("Got error: %v, want nil", err)
 			}
 
@@ -875,14 +874,12 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 
 	testCases := []struct {
 		testName   string
-		key        string
 		updateFn   func(*v1.Service) *v1.Service //Manipulate the structure
 		svc        *v1.Service
 		expectedFn func(*v1.Service, error) error //Error comparison function
 	}{
 		{
 			testName: "If updating a valid service",
-			key:      "validKey",
 			svc:      defaultExternalService(),
 			updateFn: func(svc *v1.Service) *v1.Service {
 				return svc
@@ -893,7 +890,6 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 		},
 		{
 			testName: "If Updating Loadbalancer IP",
-			key:      "default/sync-test-name",
 			svc:      newService("sync-test-name", types.UID("sync-test-uid"), v1.ServiceTypeLoadBalancer),
 			updateFn: func(svc *v1.Service) *v1.Service {
 
@@ -935,9 +931,9 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 		defer cancel()
 		newSvc := tc.updateFn(tc.svc)
 		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(ctx, tc.svc, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to prepare service %s for testing: %v", tc.key, err)
+			t.Fatalf("Failed to prepare service for testing: %v", err)
 		}
-		obtErr := controller.syncLoadBalancerIfNeeded(ctx, newSvc, tc.key)
+		obtErr := controller.syncLoadBalancerIfNeeded(ctx, newSvc)
 		if err := tc.expectedFn(newSvc, obtErr); err != nil {
 			t.Errorf("%v processServiceCreateOrUpdate() %v", tc.testName, err)
 		}
