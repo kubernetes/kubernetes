@@ -107,13 +107,14 @@ func (g *gRPCService) Decrypt(ctx context.Context, uid string, req *kmsservice.D
 }
 
 // Encrypt bytes to a string ciphertext.
-func (g *gRPCService) Encrypt(ctx context.Context, uid string, plaintext []byte) (*kmsservice.EncryptResponse, error) {
+func (g *gRPCService) Encrypt(ctx context.Context, uid, keyID string, plaintext []byte) (*kmsservice.EncryptResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, g.callTimeout)
 	defer cancel()
 
 	request := &kmsapi.EncryptRequest{
 		Plaintext: plaintext,
 		Uid:       uid,
+		KeyId:     keyID,
 	}
 	response, err := g.kmsClient.Encrypt(ctx, request)
 	if err != nil {

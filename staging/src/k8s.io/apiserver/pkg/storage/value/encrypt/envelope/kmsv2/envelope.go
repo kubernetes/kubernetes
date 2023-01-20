@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -148,11 +149,26 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 		return nil, err
 	}
 
+	// enforce that the last observed key ID is used by the KMS plugin
+	keyID, err := t.keyIDGetter(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	uid := string(uuid.NewUUID())
-	klog.V(6).InfoS("encrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()))
-	resp, err := t.envelopeService.Encrypt(ctx, uid, newKey)
+	klog.V(6).InfoS("encrypting content using envelope service",
+		"uid", uid,
+		"key", string(dataCtx.AuthenticatedData()),
+		"keyID", keyID,
+	)
+	resp, err := t.envelopeService.Encrypt(ctx, uid, keyID, newKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt DEK, error: %w", err)
+	}
+	if resp.KeyID != keyID {
+		keyIDErr := fmt.Errorf("encryption response key ID does not match observed key ID")
+		klog.ErrorS(keyIDErr, "keyID mismatch", "observed keyID", keyID, "response keyID", resp.KeyID)
+		return nil, keyIDErr
 	}
 
 	transformer, err := t.addTransformer(resp.Ciphertext, newKey)
@@ -170,12 +186,6 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 		EncryptedDEK:  resp.Ciphertext,
 		EncryptedData: result,
 		Annotations:   resp.Annotations,
-	}
-
-	// Check keyID freshness and write to log if key IDs are different
-	statusKeyID, err := t.keyIDGetter(ctx)
-	if err == nil && encObject.KeyID != statusKeyID {
-		klog.V(2).InfoS("observed different key IDs when encrypting content using kms v2 envelope service", "uid", uid, "encObject.KeyID", encObject.KeyID, "statusKeyID", statusKeyID)
 	}
 
 	// Serialize the EncryptedObject to a byte array.

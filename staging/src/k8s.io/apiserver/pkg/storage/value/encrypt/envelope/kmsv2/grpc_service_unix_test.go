@@ -75,7 +75,7 @@ func TestKMSPluginLateStart(t *testing.T) {
 
 	data := []byte("test data")
 	uid := string(uuid.NewUUID())
-	_, err = service.Encrypt(ctx, uid, data)
+	_, err = service.Encrypt(ctx, uid, "TODO_KEYID", data)
 	if err != nil {
 		t.Fatalf("failed when execute encrypt, error: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestTimeouts(t *testing.T) {
 			}()
 
 			kubeAPIServerWG.Wait()
-			_, err = service.Encrypt(ctx, uid, data)
+			_, err = service.Encrypt(ctx, uid, "TODO_KEYID", data)
 
 			if err == nil && tt.wantErr != "" {
 				t.Fatalf("got nil, want %s", tt.wantErr)
@@ -217,7 +217,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 	}
 	defer destroyService(service)
 
-	_, err = service.Encrypt(ctx, uid, data)
+	_, err = service.Encrypt(ctx, uid, "TODO_KEYID", data)
 	if err != nil {
 		t.Fatalf("failed when execute encrypt, error: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 		// Call service to encrypt data.
 		t.Log("Sending encrypt request")
 		wg1.Done()
-		_, err := service.Encrypt(ctx, uid, data)
+		_, err := service.Encrypt(ctx, uid, "TODO_KEYID", data)
 		if err != nil {
 			encryptErr = fmt.Errorf("failed when executing encrypt, error: %v", err)
 		}
@@ -287,7 +287,7 @@ func TestGRPCService(t *testing.T) {
 	// Call service to encrypt data.
 	data := []byte("test data")
 	uid := string(uuid.NewUUID())
-	resp, err := service.Encrypt(ctx, uid, data)
+	resp, err := service.Encrypt(ctx, uid, "TODO_KEYID", data)
 	if err != nil {
 		t.Fatalf("failed when execute encrypt, error: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestGRPCServiceConcurrentAccess(t *testing.T) {
 			// Call service to encrypt data.
 			data := []byte("test data")
 			uid := string(uuid.NewUUID())
-			resp, err := service.Encrypt(ctx, uid, data)
+			resp, err := service.Encrypt(ctx, uid, "TODO_KEYID", data)
 			if err != nil {
 				t.Errorf("failed when execute encrypt, error: %v", err)
 			}

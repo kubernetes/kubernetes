@@ -23,7 +23,7 @@ type Service interface {
 	// Decrypt a given bytearray to obtain the original data as bytes.
 	Decrypt(ctx context.Context, uid string, req *DecryptRequest) ([]byte, error)
 	// Encrypt bytes to a ciphertext.
-	Encrypt(ctx context.Context, uid string, data []byte) (*EncryptResponse, error)
+	Encrypt(ctx context.Context, uid, keyID string, data []byte) (*EncryptResponse, error)
 	// Status returns the status of the KMS.
 	Status(ctx context.Context) (*StatusResponse, error)
 }

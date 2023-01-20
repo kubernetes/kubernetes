@@ -128,7 +128,7 @@ func (s *GRPCService) Decrypt(ctx context.Context, req *kmsapi.DecryptRequest) (
 func (s *GRPCService) Encrypt(ctx context.Context, req *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
 	klog.V(4).InfoS("encrypt request received", "id", req.Uid)
 
-	encRes, err := s.kmsService.Encrypt(ctx, req.Uid, req.Plaintext)
+	encRes, err := s.kmsService.Encrypt(ctx, req.Uid, req.KeyId, req.Plaintext)
 	if err != nil {
 		return nil, err
 	}

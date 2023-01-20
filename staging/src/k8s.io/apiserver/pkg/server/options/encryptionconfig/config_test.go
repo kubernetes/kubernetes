@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -76,13 +77,13 @@ func (t *testKMSv2EnvelopeService) Decrypt(ctx context.Context, uid string, req 
 	return base64.StdEncoding.DecodeString(string(req.Ciphertext))
 }
 
-func (t *testKMSv2EnvelopeService) Encrypt(ctx context.Context, uid string, data []byte) (*kmsservice.EncryptResponse, error) {
+func (t *testKMSv2EnvelopeService) Encrypt(ctx context.Context, uid, keyID string, data []byte) (*kmsservice.EncryptResponse, error) {
 	if t.err != nil {
 		return nil, t.err
 	}
 	return &kmsservice.EncryptResponse{
 		Ciphertext: []byte(base64.StdEncoding.EncodeToString(data)),
-		KeyID:      "1",
+		KeyID:      keyID,
 	}, nil
 }
 

@@ -149,7 +149,7 @@ func newClient(t *testing.T, address string) kmsapi.KeyManagementServiceClient {
 
 type testService struct {
 	decrypt func(ctx context.Context, uid string, req *DecryptRequest) ([]byte, error)
-	encrypt func(ctx context.Context, uid string, data []byte) (*EncryptResponse, error)
+	encrypt func(ctx context.Context, uid, keyID string, data []byte) (*EncryptResponse, error)
 	status  func(ctx context.Context) (*StatusResponse, error)
 }
 
@@ -159,8 +159,8 @@ func (s *testService) Decrypt(ctx context.Context, uid string, req *DecryptReque
 	return s.decrypt(ctx, uid, req)
 }
 
-func (s *testService) Encrypt(ctx context.Context, uid string, data []byte) (*EncryptResponse, error) {
-	return s.encrypt(ctx, uid, data)
+func (s *testService) Encrypt(ctx context.Context, uid, keyID string, data []byte) (*EncryptResponse, error) {
+	return s.encrypt(ctx, uid, keyID, data)
 }
 
 func (s *testService) Status(ctx context.Context) (*StatusResponse, error) {
@@ -185,10 +185,10 @@ func newBase64Service(keyID string) *testService {
 		return base64.StdEncoding.DecodeString(string(req.Ciphertext))
 	}
 
-	encrypt := func(_ context.Context, _ string, data []byte) (*EncryptResponse, error) {
+	encrypt := func(_ context.Context, _, _ string, data []byte) (*EncryptResponse, error) {
 		return &EncryptResponse{
 			Ciphertext: []byte(base64.StdEncoding.EncodeToString(data)),
-			KeyID:      keyID,
+			KeyID:      keyID, // TODO check
 		}, nil
 	}
 

@@ -61,7 +61,7 @@ func (t *testEnvelopeService) Decrypt(ctx context.Context, uid string, req *kmss
 	return base64.StdEncoding.DecodeString(string(req.Ciphertext))
 }
 
-func (t *testEnvelopeService) Encrypt(ctx context.Context, uid string, data []byte) (*kmsservice.EncryptResponse, error) {
+func (t *testEnvelopeService) Encrypt(ctx context.Context, uid, keyID string, data []byte) (*kmsservice.EncryptResponse, error) {
 	if t.disabled {
 		return nil, fmt.Errorf("Envelope service was disabled")
 	}
@@ -76,6 +76,7 @@ func (t *testEnvelopeService) Encrypt(ctx context.Context, uid string, data []by
 	} else {
 		annotations["local-kek.kms.kubernetes.io"] = []byte("encrypted-local-kek")
 	}
+	// TODO check keyVersion
 	return &kmsservice.EncryptResponse{Ciphertext: []byte(base64.StdEncoding.EncodeToString(data)), KeyID: t.keyVersion, Annotations: annotations}, nil
 }
 
