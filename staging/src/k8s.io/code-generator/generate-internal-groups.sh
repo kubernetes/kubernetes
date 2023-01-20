@@ -58,14 +58,12 @@ function codegen::join() { local IFS="$1"; shift; echo "$*"; }
 
 # enumerate group versions
 ALL_FQ_APIS=() # e.g. k8s.io/kubernetes/pkg/apis/apps k8s.io/api/apps/v1
-INT_FQ_APIS=() # e.g. k8s.io/kubernetes/pkg/apis/apps
 EXT_FQ_APIS=() # e.g. k8s.io/api/apps/v1
 for GVs in ${GROUPS_WITH_VERSIONS}; do
   IFS=: read -r G Vs <<<"${GVs}"
 
   if [ -n "${INT_APIS_PKG}" ]; then
     ALL_FQ_APIS+=("${INT_APIS_PKG}/${G}")
-    INT_FQ_APIS+=("${INT_APIS_PKG}/${G}")
   fi
 
   # enumerate versions
@@ -98,15 +96,6 @@ fi
 
 if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
-  if [ -n "${INT_APIS_PKG}" ]; then
-    IFS=" " read -r -a APIS <<< "$(printf '%s/ ' "${INT_FQ_APIS[@]}")"
-    "${GOPATH}/bin/client-gen" \
-        --clientset-name "${CLIENTSET_NAME_INTERNAL:-internalversion}" \
-        --input-base "" \
-        --input "$(codegen::join , "${APIS[@]}")" \
-        --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" \
-        "$@"
-  fi
   "${GOPATH}/bin/client-gen" \
       --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" \
       --input-base "" \
@@ -118,7 +107,7 @@ fi
 if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
   echo "Generating listers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/listers"
   "${GOPATH}/bin/lister-gen" \
-      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" \
+      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
       --output-package "${OUTPUT_PKG}/listers" \
       "$@"
 fi
@@ -126,9 +115,8 @@ fi
 if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
   "${GOPATH}/bin/informer-gen" \
-      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" \
+      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
       --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
-      --internal-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_INTERNAL:-internalversion}" \
       --listers-package "${OUTPUT_PKG}/listers" \
       --output-package "${OUTPUT_PKG}/informers" \
       "$@"
