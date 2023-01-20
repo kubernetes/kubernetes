@@ -140,9 +140,9 @@ func calcRestartCountByLogDir(path string) (int, error) {
 		return 0, err
 	}
 	if len(files) == 0 {
-		return 0, err
+		return 0, nil
 	}
-	restartCountLogFileRegex := regexp.MustCompile(`(\d+).log(\..*)?`)
+	restartCountLogFileRegex := regexp.MustCompile(`^(\d+)\.log(\..*)?`)
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -153,7 +153,9 @@ func calcRestartCountByLogDir(path string) (int, error) {
 		}
 		count, err := strconv.Atoi(matches[1])
 		if err != nil {
-			return restartCount, err
+			// unlikely kubelet created this file,
+			// likely custom file with random numbers as a name
+			continue
 		}
 		count++
 		if count > restartCount {
@@ -200,7 +202,8 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		logDir := BuildContainerLogsDirectory(pod.Namespace, pod.Name, pod.UID, container.Name)
 		restartCount, err = calcRestartCountByLogDir(logDir)
 		if err != nil {
-			klog.InfoS("Log directory exists but could not calculate restartCount", "logDir", logDir, "err", err)
+			klog.InfoS("Cannot calculate restartCount from the log directory", "logDir", logDir, "err", err)
+			restartCount = 0
 		}
 	}
 

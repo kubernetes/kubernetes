@@ -476,6 +476,48 @@ func TestRestartCountByLogDir(t *testing.T) {
 			filenames:    []string{"5.log.rotated", "6.log", "7.log"},
 			restartCount: 8,
 		},
+		// no restart count log files
+		{
+			filenames:    []string{},
+			restartCount: 0,
+		},
+		{
+			filenames:    []string{"a.log.rotated", "b.log.rotated", "12log.rotated"},
+			restartCount: 0,
+		},
+		// log extension twice
+		{
+			filenames:    []string{"145.log.log.rotated"},
+			restartCount: 146,
+		},
+		// too big of the integer
+		{
+			filenames:    []string{"92233720368547758089223372036854775808.log.rotated"},
+			restartCount: 0,
+		},
+		// mix of log files
+		{
+			filenames:    []string{"9223372036854775808.log.rotated", "23.log", "23a.log", "1aaa.log.rotated", "2.log", "3.log.rotated"},
+			restartCount: 24,
+		},
+		// prefixed
+		{
+			filenames:    []string{"rotated.23.log"},
+			restartCount: 0,
+		},
+		{
+			filenames:    []string{"mylog42.log"},
+			restartCount: 0,
+		},
+		{
+			filenames:    []string{"-42.log"},
+			restartCount: 0,
+		},
+		// same restart count multiple times
+		{
+			filenames:    []string{"6.log", "6.log.rotated", "6.log.rotated.rotated"},
+			restartCount: 7,
+		},
 	} {
 		tempDirPath, err := os.MkdirTemp("", "test-restart-count-")
 		assert.NoError(t, err, "create tempdir error")
@@ -484,8 +526,10 @@ func TestRestartCountByLogDir(t *testing.T) {
 			err = os.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
 			assert.NoError(t, err, "could not write log file")
 		}
-		count, _ := calcRestartCountByLogDir(tempDirPath)
-		assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
+		count, err := calcRestartCountByLogDir(tempDirPath)
+		if assert.NoError(t, err) {
+			assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
+		}
 	}
 }
 
