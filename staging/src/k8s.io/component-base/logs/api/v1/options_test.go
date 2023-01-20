@@ -114,11 +114,11 @@ func TestFlagSet(t *testing.T) {
 		//     --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
 		// -v, --v Level                        number for the log level verbosity
 		//     --vmodule pattern=N,...          comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
-		assert.Regexp(t, `.*--logging-format.*default.*text.*
+		assert.Regexp(t, `^.*--logging-format.*default.*text.*
 .*--log-flush-frequency.*default 5s.*
 .*-v.*--v.*
 .*--vmodule.*pattern=N.*
-`, buffer.String())
+$`, buffer.String())
 	})
 
 	t.Run("flag", func(t *testing.T) {
@@ -141,7 +141,7 @@ func TestFlagSet(t *testing.T) {
 		//   	number for the log level verbosity
 		// -vmodule value
 		//   	comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
-		assert.Regexp(t, `.*-log-flush-frequency.*
+		assert.Regexp(t, `^.*-log-flush-frequency.*
 .*default 5s.*
 .*-logging-format.*
 .*default.*text.*
@@ -149,7 +149,7 @@ func TestFlagSet(t *testing.T) {
 .*
 .*-vmodule.*
 .*
-`, buffer.String())
+$`, buffer.String())
 	})
 
 }
