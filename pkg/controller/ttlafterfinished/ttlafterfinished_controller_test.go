@@ -17,6 +17,7 @@ limitations under the License.
 package ttlafterfinished
 
 import (
+	"k8s.io/klog/v2"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -161,8 +163,11 @@ func TestTimeLeft(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+
 		job := newJob(tc.completionTime, tc.failedTime, tc.ttl)
-		gotTimeLeft, gotExpireAt, gotErr := timeLeft(job, tc.since)
+		_, ctx := ktesting.NewTestContext(t)
+		logger := klog.FromContext(ctx)
+		gotTimeLeft, gotExpireAt, gotErr := timeLeft(logger, job, tc.since)
 		if tc.expectErr != (gotErr != nil) {
 			t.Errorf("%s: expected error is %t, got %t, error: %v", tc.name, tc.expectErr, gotErr != nil, gotErr)
 		}
