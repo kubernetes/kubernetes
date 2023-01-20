@@ -34,12 +34,12 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/go-cmp/cmp"
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
-	"github.com/opencontainers/selinux/go-selinux"
+	selinux "github.com/opencontainers/selinux/go-selinux"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/client-go/informers"
 
-	"k8s.io/mount-utils"
+	mount "k8s.io/mount-utils"
 	"k8s.io/utils/integer"
 	netutils "k8s.io/utils/net"
 
@@ -63,7 +63,7 @@ import (
 	"k8s.io/component-helpers/apimachinery/lease"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
+	klog "k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -2640,6 +2640,18 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// to the pod manager.
 		kl.podManager.UpdatePod(pod)
 
+		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		if wasMirror {
+			if pod == nil {
+				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
+				continue
+			}
+			// Static pods should be reconciled the same way as regular pods
+		}
+
+		// TODO: reconcile being calculated in the config manager is questionable, and avoiding
+		// extra syncs may no longer be necessary. Reevaluate whether Reconcile and Sync can be
+		// merged (after resolving the next two TODOs).
 		sidecarsStatus := status.GetSidecarsStatus(pod)
 		klog.Infof("Pod: %s, status: Present=%v,Ready=%v,ContainersWaiting=%v", format.Pod(pod), sidecarsStatus.SidecarsPresent, sidecarsStatus.SidecarsReady, sidecarsStatus.ContainersWaiting)
 
@@ -2648,14 +2660,22 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// be different than Sync, or if there is a better place for it. For instance, we have
 		// needsReconcile in kubelet/config, here, and in status_manager.
 		if status.NeedToReconcilePodReadiness(pod) {
-			mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-			kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+			kl.podWorkers.UpdatePod(UpdatePodOptions{
+				Pod:        pod,
+				MirrorPod:  mirrorPod,
+				UpdateType: kubetypes.SyncPodSync,
+				StartTime:  start,
+			})
 		} else if sidecarsStatus.ContainersWaiting {
 			// if containers aren't running and the sidecars are all ready trigger a sync so that the containers get started
 			if sidecarsStatus.SidecarsPresent && sidecarsStatus.SidecarsReady {
 				klog.Infof("Pod: %s: sidecars: sidecars are ready, dispatching work", format.Pod(pod))
-				mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-				kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+				kl.podWorkers.UpdatePod(UpdatePodOptions{
+					Pod:        pod,
+					MirrorPod:  mirrorPod,
+					UpdateType: kubetypes.SyncPodSync,
+					StartTime:  start,
+				})
 			}
 		}
 

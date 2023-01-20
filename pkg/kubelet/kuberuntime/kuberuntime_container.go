@@ -740,12 +740,6 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	}
 	m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, message)
 
-	if gracePeriodOverride != nil {
-		gracePeriod = *gracePeriodOverride
-		klog.V(3).InfoS("Killing container with a grace period override", "pod", klog.KObj(pod), "podUID", pod.UID,
-			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
-	}
-
 	// Run the pre-stop lifecycle hooks if applicable and if there is enough time to run it
 	if containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil && gracePeriod > 0 {
 		gracePeriod = gracePeriod - m.executePreStopHook(ctx, pod, containerID, containerSpec, gracePeriod)
@@ -754,6 +748,11 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
 	if gracePeriod < minimumGracePeriodInSeconds {
 		gracePeriod = minimumGracePeriodInSeconds
+	}
+	if gracePeriodOverride != nil {
+		gracePeriod = *gracePeriodOverride
+		klog.V(3).InfoS("Killing container with a grace period override", "pod", klog.KObj(pod), "podUID", pod.UID,
+			"containerName", containerName, "containerID", containerID.String(), "gracePeriod", gracePeriod)
 	}
 
 	klog.V(2).InfoS("Killing container with a grace period", "pod", klog.KObj(pod), "podUID", pod.UID,
@@ -778,6 +777,12 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 		sidecars    []*kubecontainer.Container
 		nonSidecars []*kubecontainer.Container
 	)
+
+	if gracePeriodOverride == nil {
+		minGracePeriod := int64(minimumGracePeriodInSeconds)
+		gracePeriodOverride = &minGracePeriod
+	}
+
 	for _, container := range runningPod.Containers {
 		if isSidecar(pod, container.Name) {
 			sidecars = append(sidecars, container)
@@ -788,7 +793,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
 	// non-sidecars first
 	start := time.Now()
-	klog.Infof("Pod: %s, killContainersWithSyncResult: killing %d non-sidecars, %s termination period", runningPod.Name, len(nonSidecars), gracePeriodOverride)
+	klog.Infof("Pod: %s, killContainersWithSyncResult: killing %d non-sidecars, %d termination period", runningPod.Name, len(nonSidecars), *gracePeriodOverride)
 	nonSidecarsWg := sync.WaitGroup{}
 	nonSidecarsWg.Add(len(nonSidecars))
 	for _, container := range nonSidecars {

@@ -47,7 +47,7 @@ jobs:
         done
     - uses: actions/upload-artifact@v4
       with:
-        name: k8s_output_${{ matrix.platform }}
+        name: k8s_output_$TARGET_PLATFORM
         path: _output/release-tars
   release:
     runs-on: ubuntu-latest
