@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -182,8 +181,7 @@ func (c *PodClient) DeleteSync(ctx context.Context, name string, options metav1.
 	if err != nil && !apierrors.IsNotFound(err) {
 		framework.Failf("Failed to delete pod %q: %v", name, err)
 	}
-	gomega.Expect(WaitForPodToDisappear(ctx, c.f.ClientSet, namespace, name, labels.Everything(),
-		2*time.Second, timeout)).To(gomega.Succeed(), "wait for pod %q to disappear", name)
+	framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c.f.ClientSet, namespace, name, timeout), "wait for pod %q to disappear", name)
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
