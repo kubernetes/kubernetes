@@ -26,6 +26,8 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::golang::setup_env
+
 # Generates types_swagger_doc_generated file for the given group version.
 # $1: Name of the group version
 # $2: Path to the directory where types.go for that group version exists. This
@@ -57,7 +59,11 @@ gen_types_swagger_doc() {
 EOF
   } > "${TMPFILE}"
 
-  _output/bin/genswaggertypedocs -s \
+  local genswaggertypedocs
+  genswaggertypedocs=$(kube::util::find-binary "genswaggertypedocs")
+
+  "${genswaggertypedocs}" \
+    -s \
     "${gv_dir}/types.go" \
     -f - \
     >>  "${TMPFILE}"
@@ -76,7 +82,7 @@ for group_version in "${GROUP_VERSIONS[@]}"; do
 done
 
 # Ensure we have the latest genswaggertypedocs built
-hack/make-rules/build.sh ./cmd/genswaggertypedocs
+GO111MODULE=on GOPROXY=off go install ./cmd/genswaggertypedocs
 
 # Regenerate files.
 for group_version in "${GROUP_VERSIONS[@]}"; do

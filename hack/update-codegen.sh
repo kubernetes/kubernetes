@@ -33,7 +33,6 @@ GENERATED_FILE_PREFIX="${GENERATED_FILE_PREFIX:-zz_generated.}"
 UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS:-}"
 
 OUT_DIR="_output"
-BIN_DIR="${OUT_DIR}/bin"
 PRJ_SRC_PATH="k8s.io/kubernetes"
 BOILERPLATE_FILENAME="vendor/k8s.io/code-generator/hack/boilerplate.go.txt"
 APPLYCONFIG_PKG="k8s.io/client-go/applyconfigurations"
@@ -116,13 +115,15 @@ fi
 #     // +k8s:prerelease-lifecycle-gen=true
 function codegen::prerelease() {
     # Build the tool.
-    hack/make-rules/build.sh k8s.io/code-generator/cmd/prerelease-lifecycle-gen
+    GO111MODULE=on GOPROXY=off go install \
+        k8s.io/code-generator/cmd/prerelease-lifecycle-gen
 
     # The result file, in each pkg, of prerelease-lifecycle generation.
     local output_base="${GENERATED_FILE_PREFIX}prerelease-lifecycle"
 
     # The tool used to generate prerelease-lifecycle code.
-    local gen_prerelease_bin="${BIN_DIR}/prerelease-lifecycle-gen"
+    local gen_prerelease_bin
+    gen_prerelease_bin="$(kube::util::find-binary "prerelease-lifecycle-gen")"
 
     # Find all the directories that request prerelease-lifecycle generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -175,13 +176,15 @@ function codegen::prerelease() {
 #               scheme
 function codegen::deepcopy() {
     # Build the tool.
-    hack/make-rules/build.sh k8s.io/code-generator/cmd/deepcopy-gen
+    GO111MODULE=on GOPROXY=off go install \
+        k8s.io/code-generator/cmd/deepcopy-gen
 
     # The result file, in each pkg, of deep-copy generation.
     local output_base="${GENERATED_FILE_PREFIX}deepcopy"
 
     # The tool used to generate deep copies.
-    local gen_deepcopy_bin="${BIN_DIR}/deepcopy-gen"
+    local gen_deepcopy_bin
+    gen_deepcopy_bin="$(kube::util::find-binary "deepcopy-gen")"
 
     # Find all the directories that request deep-copy generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -241,13 +244,15 @@ function codegen::deepcopy() {
 #                  for having a defaulter generated
 function codegen::defaults() {
     # Build the tool.
-    hack/make-rules/build.sh k8s.io/code-generator/cmd/defaulter-gen
+    GO111MODULE=on GOPROXY=off go install \
+        k8s.io/code-generator/cmd/defaulter-gen
 
     # The result file, in each pkg, of defaulter generation.
     local output_base="${GENERATED_FILE_PREFIX}defaults"
 
     # The tool used to generate defaulters.
-    local gen_defaulter_bin="${BIN_DIR}/defaulter-gen"
+    local gen_defaulter_bin
+    gen_defaulter_bin="$(kube::util::find-binary "defaulter-gen")"
 
     # All directories that request any form of defaulter generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -312,13 +317,15 @@ function codegen::defaults() {
 # IDL.
 function codegen::conversions() {
     # Build the tool.
-    hack/make-rules/build.sh k8s.io/code-generator/cmd/conversion-gen
+    GO111MODULE=on GOPROXY=off go install \
+        k8s.io/code-generator/cmd/conversion-gen
 
     # The result file, in each pkg, of conversion generation.
     local output_base="${GENERATED_FILE_PREFIX}conversion"
 
     # The tool used to generate conversions.
-    local gen_conversion_bin="${BIN_DIR}/conversion-gen"
+    local gen_conversion_bin
+    gen_conversion_bin="$(kube::util::find-binary "conversion-gen")"
 
     # All directories that request any form of conversion generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -433,13 +440,15 @@ function indirect_array() {
 #     // +k8s:openapi-gen=true
 function codegen::openapi() {
     # Build the tool.
-    hack/make-rules/build.sh k8s.io/kube-openapi/cmd/openapi-gen
+    GO111MODULE=on GOPROXY=off go install \
+        k8s.io/kube-openapi/cmd/openapi-gen
 
     # The result file, in each pkg, of open-api generation.
     local output_base="${GENERATED_FILE_PREFIX}openapi"
 
     # The tool used to generate open apis.
-    local gen_openapi_bin="${BIN_DIR}/openapi-gen"
+    local gen_openapi_bin
+    gen_openapi_bin="$(kube::util::find-binary "openapi-gen")"
 
     # Standard dirs which all targets need.
     local apimachinery_dirs=(
@@ -557,7 +566,7 @@ function codegen::openapi() {
             done
         fi
 
-        ./hack/run-in-gopath.sh ${gen_openapi_bin} \
+        ./hack/run-in-gopath.sh "${gen_openapi_bin}" \
             --v "${KUBE_VERBOSE}" \
             --logtostderr \
             -h "${BOILERPLATE_FILENAME}" \
@@ -673,7 +682,8 @@ function codegen::clients() {
 }
 
 function codegen::listers() {
-    GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/lister-gen
+    GO111MODULE=on GOPROXY=off go install \
+        k8s.io/code-generator/cmd/lister-gen
 
     local listergen
     listergen=$(kube::util::find-binary "lister-gen")
