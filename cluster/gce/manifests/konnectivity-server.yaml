@@ -20,7 +20,7 @@ spec:
       {{ disallow_privilege_escalation}}
       {{ capabilities }}
         {{ drop_capabilities }}
-    image: registry.k8s.io/kas-network-proxy/proxy-server:v0.0.35
+    image: registry.k8s.io/kas-network-proxy/proxy-server:v0.1.1
     resources:
       requests:
         cpu: 25m

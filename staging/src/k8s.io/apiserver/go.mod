@@ -50,7 +50,7 @@ require (
 	k8s.io/kms v0.0.0
 	k8s.io/kube-openapi v0.0.0-20230109183929-3758b55a6596
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.35
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.1.1
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 	sigs.k8s.io/yaml v1.3.0
