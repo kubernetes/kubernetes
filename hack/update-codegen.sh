@@ -41,65 +41,40 @@ if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: starting generated_files"
 fi
 
-# This is a partial 'find' command.  The caller is expected to pass the
-# remaining arguments.
-#
-# Example:
-#   kfind -type f -name foobar.go
-function kfind() {
-    # We want to include the "special" vendor directories which are actually
-    # part of the Kubernetes source tree (./staging/*) but we need them to be
-    # named as their ./vendor/* equivalents.  Also, we do not want all of
-    # ./vendor nor ./hack/tools/vendor nor even all of ./vendor/k8s.io.
-    find -H .                      \
-        \(                         \
-        -not \(                    \
-            \(                     \
-                -name '_*' -o      \
-                -name '.[^.]*' -o  \
-                \(                 \
-                  -name 'vendor'   \
-                  -type d          \
-                \) -o              \
-                \(                 \
-                  -name 'testdata' \
-                  -type d          \
-                \)                 \
-            \) -prune              \
-        \)                         \
-        \)                         \
-        "$@"                       \
-        | sed 's|^./staging/src|vendor|'
+function git_find() {
+    # Similar to find but faster and easier to understand.  We want to include
+    # modified and untracked files because this might be running against code
+    # which is not tracked by git yet.
+    git ls-files -cmo --exclude-standard "$@"
 }
 
-function find_all_go_dirs() {
-    kfind -type f -name \*.go  \
-        | sed 's|/[^/]*$||'    \
-        | sed 's|^./||'        \
-        | LC_ALL=C sort -u
+function git_grep() {
+    # We want to include modified and untracked files because this might be
+    # running against code which is not tracked by git yet.
+    git grep --untracked "$@"
 }
-
-# This variable holds a list of every directory that contains Go files in this
-# project.  Other rules and variables can use this as a starting point to
-# reduce filesystem accesses.
-if [[ "${DBG_CODEGEN}" == 1 ]]; then
-    kube::log::status "DBG: finding all *.go dirs"
-fi
-ALL_GO_DIRS=()
-kube::util::read-array ALL_GO_DIRS < <(find_all_go_dirs)
-if [[ "${DBG_CODEGEN}" == 1 ]]; then
-    kube::log::status "DBG: found ${#ALL_GO_DIRS[@]} *.go dirs"
-fi
 
 # Generate a list of all files that have a `+k8s:` comment-tag.  This will be
 # used to derive lists of files/dirs for generation tools.
+#
+# We want to include the "special" vendor directories which are actually part
+# of the Kubernetes source tree (staging/*) but we need them to be named as
+# their vendor/* equivalents.  We do not want all of vendor nor
+# hack/tools/vendor nor even all of vendor/k8s.io - just the subset that lives
+# in staging.
 if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: finding all +k8s: tags"
 fi
 ALL_K8S_TAG_FILES=()
 kube::util::read-array ALL_K8S_TAG_FILES < <(
-    find "${ALL_GO_DIRS[@]}" -maxdepth 1 -type f -name \*.go -print0 \
-        | xargs -0 grep --color=never -l '^// *+k8s:')
+    git_grep -l \
+        -e '^// *+k8s:'                `# match +k8s: tags` \
+        -- \
+        ':!:vendor/*'                  `# not under vendor` \
+        ':!:*/testdata/*'              `# not under any testdata` \
+        ':(glob)**/*.go'               `# in any *.go file` \
+        | sed 's|^staging/src|vendor|' `# see comments above` \
+    )
 if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: found ${#ALL_K8S_TAG_FILES[@]} +k8s: tagged files"
 fi
@@ -150,6 +125,8 @@ function codegen::prerelease() {
             kube::log::status "DBG:     $dir"
         done
     fi
+
+    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_prerelease_bin}" \
         --v "${KUBE_VERBOSE}" \
@@ -211,6 +188,8 @@ function codegen::deepcopy() {
             kube::log::status "DBG:     $dir"
         done
     fi
+
+    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_deepcopy_bin}" \
         --v "${KUBE_VERBOSE}" \
@@ -279,6 +258,8 @@ function codegen::defaults() {
             kube::log::status "DBG:     $dir"
         done
     fi
+
+    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_defaulter_bin}" \
         --v "${KUBE_VERBOSE}" \
@@ -358,6 +339,8 @@ function codegen::conversions() {
             kube::log::status "DBG:     $dir"
         done
     fi
+
+    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
 
     ./hack/run-in-gopath.sh "${gen_conversion_bin}" \
         --v "${KUBE_VERBOSE}" \
@@ -527,6 +510,8 @@ function codegen::openapi() {
             "${apimachinery_dirs[@]}"
         )
 
+    git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
+
     for prefix in "${targets[@]}"; do
         local report_file="${OUT_DIR}/${prefix}_violations.report"
         # When UPDATE_API_KNOWN_VIOLATIONS is set to be true, let the generator to write
@@ -602,14 +587,12 @@ function codegen::applyconfigs() {
     local applyconfigurationgen
     applyconfigurationgen=$(kube::util::find-binary "applyconfiguration-gen")
 
-    # because client-gen doesn't do policy/v1alpha1, we have to skip it too
     local ext_apis=()
     kube::util::read-array ext_apis < <(
-      cd "${KUBE_ROOT}/staging/src"
-      find k8s.io/api -name types.go -print0 \
-          | xargs -0 -n1 dirname \
-          | grep -v pkg.apis.policy.v1alpha1 \
-          | LC_ALL=C sort -u)
+        cd "${KUBE_ROOT}/staging/src"
+        git_find -z ':(glob)k8s.io/api/**/types.go' \
+            | xargs -0 -n1 dirname \
+            | LC_ALL=C sort -u)
     ext_apis+=("k8s.io/apimachinery/pkg/apis/meta/v1")
 
     kube::log::status "Generating apply-config code for ${#ext_apis[@]} targets"
@@ -619,6 +602,12 @@ function codegen::applyconfigs() {
             kube::log::status "DBG:     $api"
         done
     fi
+
+    git_grep -l --null \
+        -e '^// Code generated by applyconfiguration-gen. DO NOT EDIT.$' \
+        -- \
+        ':(glob)staging/src/k8s.io/client-go/**/*.go' \
+        | xargs -0 rm -f
 
     "${applyconfigurationgen}" \
         --openapi-schema <("${modelsschema}") \
@@ -666,6 +655,12 @@ function codegen::clients() {
         done
     fi
 
+    git_grep -l --null \
+        -e '^// Code generated by client-gen. DO NOT EDIT.$' \
+        -- \
+        ':(glob)staging/src/k8s.io/client-go/**/*.go' \
+        | xargs -0 rm -f
+
     "${clientgen}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-base "${KUBE_ROOT}/vendor" \
@@ -691,7 +686,7 @@ function codegen::listers() {
     local ext_apis=()
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
-        find k8s.io/api -name types.go -print0 \
+        git_find -z ':(glob)k8s.io/api/**/types.go' \
             | xargs -0 -n1 dirname \
             | LC_ALL=C sort -u)
 
@@ -702,6 +697,12 @@ function codegen::listers() {
             kube::log::status "DBG:     $api"
         done
     fi
+
+    git_grep -l --null \
+        -e '^// Code generated by lister-gen. DO NOT EDIT.$' \
+        -- \
+        ':(glob)staging/src/k8s.io/client-go/**/*.go' \
+        | xargs -0 rm -f
 
     "${listergen}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
@@ -722,13 +723,11 @@ function codegen::informers() {
     local informergen
     informergen=$(kube::util::find-binary "informer-gen")
 
-    # because client-gen doesn't do policy/v1alpha1, we have to skip it too
     local ext_apis=()
     kube::util::read-array ext_apis < <(
         cd "${KUBE_ROOT}/staging/src"
-        find k8s.io/api -name types.go -print0 \
+        git_find -z ':(glob)k8s.io/api/**/types.go' \
             | xargs -0 -n1 dirname \
-            | grep -v pkg.apis.policy.v1alpha1 \
             | LC_ALL=C sort -u)
 
     kube::log::status "Generating informer code for ${#ext_apis[@]} targets"
@@ -738,6 +737,12 @@ function codegen::informers() {
             kube::log::status "DBG:     $api"
         done
     fi
+
+    git_grep -l --null \
+        -e '^// Code generated by informer-gen. DO NOT EDIT.$' \
+        -- \
+        ':(glob)staging/src/k8s.io/client-go/**/*.go' \
+        | xargs -0 rm -f
 
     "${informergen}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \

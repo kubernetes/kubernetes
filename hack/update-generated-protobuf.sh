@@ -27,12 +27,24 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 # source tree.  This is managed in kube::build::copy_output in build/common.sh.
 # If the output set is changed update that function.
 
-APIROOTS=${APIROOTS:-$(git grep --files-with-matches -e '// +k8s:protobuf-gen=package' cmd pkg staging | \
-	xargs -n 1 dirname | \
-	sed 's,^,k8s.io/kubernetes/,;s,k8s.io/kubernetes/staging/src/,,' | \
-	sort | uniq
+APIROOTS=${APIROOTS:-$( \
+    git grep --untracked --null -l \
+        -e '// +k8s:protobuf-gen=package' \
+        -- \
+        cmd pkg staging \
+        | xargs -0 -n1 dirname \
+        | sed 's,^,k8s.io/kubernetes/,;s,k8s.io/kubernetes/staging/src/,,' \
+        | sort -u
 )}
 
-"${KUBE_ROOT}/build/run.sh" hack/update-generated-protobuf-dockerized.sh "${APIROOTS}" "$@"
+function git_find() {
+    # Similar to find but faster and easier to understand.  We want to include
+    # modified and untracked files because this might be running against code
+    # which is not tracked by git yet.
+    git ls-files -cmo --exclude-standard ':!:vendor/*' "$@"
+}
 
-# ex: ts=2 sw=2 et filetype=sh
+git_find -z ':(glob)**/generated.proto' | xargs -0 rm -f
+git_find -z ':(glob)**/generated.pb.go' | xargs -0 rm -f
+
+"${KUBE_ROOT}/build/run.sh" hack/update-generated-protobuf-dockerized.sh "${APIROOTS}" "$@"
