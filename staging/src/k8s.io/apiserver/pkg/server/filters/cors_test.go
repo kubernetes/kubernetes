@@ -205,6 +205,113 @@ func TestCORSAllowedMethods(t *testing.T) {
 
 }
 
+func TestCORSWithMultipleOrigins(t *testing.T) {
+	tests := []struct {
+		name                string
+		allowedOrigins      []string
+		origin              func(*http.Request)
+		allowOriginExpected string
+	}{
+		{
+			name:           "multiple origins in one Origin header",
+			allowedOrigins: []string{"foo.com"},
+			origin: func(r *http.Request) {
+				r.Header.Set("Origin", "http://foo.com http://bar.com")
+			},
+			// this fails today since req.Header.Get("Origin") returns
+			//  "http://foo.com http://bar.com"
+			// and the CORS filter sends
+			//  "access-control-allow-origin" = "http://foo.com http://bar.com"
+			// and the browser will fail
+			allowOriginExpected: "http://foo.com",
+		},
+		{
+			name:           "multiple origins in one Origin header",
+			allowedOrigins: []string{"bar.com"},
+			origin: func(r *http.Request) {
+				r.Header.Set("Origin", "http://foo.com http://bar.com")
+				r.Header.Add("Origin", "http://baz.com")
+			},
+			// this fails today, same as above
+			allowOriginExpected: "http://bar.com",
+		},
+		{
+			name:           "multiple Origin headers",
+			allowedOrigins: []string{"foo.com"},
+			origin: func(r *http.Request) {
+				r.Header.Set("Origin", "http://foo.com")
+				r.Header.Add("Origin", "http://bar.com")
+			},
+			// the first matching origin should be returned
+			allowOriginExpected: "http://foo.com",
+		},
+		{
+			name:           "multiple Origin headers",
+			allowedOrigins: []string{"bar.com"},
+			origin: func(r *http.Request) {
+				r.Header.Set("Origin", "http://foo.com")
+				r.Header.Add("Origin", "http://bar.com")
+			},
+			// this fails today since the CORS filter uses
+			//  req.Header.Get("Origin")
+			// which will return http://foo.com
+			allowOriginExpected: "http://bar.com",
+		},
+		{
+			name:           "multiple Origin headers",
+			allowedOrigins: []string{"bar.com", "foo.com"},
+			origin: func(r *http.Request) {
+				r.Header.Set("Origin", "http://foo.com")
+				r.Header.Add("Origin", "http://bar.com")
+			},
+			// the first matching origin should be returned
+			allowOriginExpected: "http://foo.com",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var firstOriginsGot string
+			var allOriginsGot []string
+			before := func(handler http.Handler) http.HandlerFunc {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					firstOriginsGot = r.Header.Get("Origin")
+					allOriginsGot = r.Header.Values("Origin")
+
+					handler.ServeHTTP(w, r)
+				})
+			}
+			handler := WithCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
+				test.allowedOrigins, nil, nil, nil, "true")
+			handler = before(handler)
+
+			server := httptest.NewUnstartedServer(handler)
+			server.EnableHTTP2 = true
+			server.StartTLS()
+			defer server.Close()
+
+			request, err := http.NewRequest("GET", server.URL+"/version", nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			test.origin(request)
+
+			client := server.Client()
+			response, err := client.Do(request)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			t.Logf(`Request - Header.Get("Origin") returned: %q Header.Values("Origin") returned: %#v`, firstOriginsGot, allOriginsGot)
+
+			allowOriginGot := response.Header.Values("Access-Control-Allow-Origin")
+			expected := []string{test.allowOriginExpected}
+			if !reflect.DeepEqual(expected, allowOriginGot) {
+				t.Errorf("expected Access-Control-Allow-Origin: %v, but got: %v", expected, allowOriginGot)
+			}
+		})
+	}
+}
+
 func TestCompileRegex(t *testing.T) {
 	uncompiledRegexes := []string{"endsWithMe$", "^startingWithMe"}
 	regexes, err := compileRegexps(uncompiledRegexes)
