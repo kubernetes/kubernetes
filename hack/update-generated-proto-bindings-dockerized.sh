@@ -23,8 +23,9 @@ set -o pipefail
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd -P)"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
-if [ "$#" = 0 ]; then
+if [ "$#" == 0 ]; then
     echo "usage: $0 <api_dir>..."
     exit 1
 fi
@@ -32,9 +33,17 @@ fi
 for api; do
     # This can't use `git ls-files` because it runs in a container without the
     # .git dir synced.
-    find "${api}" -type f -name "api.proto" \
-        | while read -r F; do
-            D="$(dirname "${F}")"
-            kube::protoc::generate_proto "${KUBE_ROOT}/${D}"
-        done
+    protos=()
+    kube::util::read-array protos < <( \
+        find "${api}" -type f -name "api.proto")
+
+    if [ "${#protos[@]}" == 0 ]; then
+        echo "ERROR: no 'api.proto' files under '${api}'"
+        exit 1
+    fi
+
+    for file in "${protos[@]}"; do
+        dir="$(dirname "${file}")"
+        kube::protoc::generate_proto "${dir}"
+    done
 done

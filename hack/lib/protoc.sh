@@ -64,7 +64,7 @@ function kube::protoc::protoc() {
     # isn't).  The inputs to this function do not all have a common root, so
     # this works best for all inputs.
     PATH="${gogopath}:${PATH}" protoc \
-      --proto_path="${package}" \
+      --proto_path="$(pwd -P)" \
       --proto_path="${KUBE_ROOT}/vendor" \
       --gogo_out=paths=source_relative,plugins=grpc:. \
       api.proto
