@@ -36,8 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/env"
 )
 
-var etcdURL = ""
-
 const installEtcd = `
 Cannot find etcd, cannot run integration tests
 Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions.
@@ -70,7 +68,7 @@ func startEtcd() (func(), error) {
 		os.Setenv("ETCD_UNSUPPORTED_ARCH", "arm64")
 	}
 
-	etcdURL = env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
+	etcdURL := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
 	conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
 	if err == nil {
 		klog.Infof("etcd already running at %s", etcdURL)
@@ -84,8 +82,7 @@ func startEtcd() (func(), error) {
 		return nil, err
 	}
 
-	etcdURL = currentURL
-	os.Setenv("KUBE_INTEGRATION_ETCD_URL", etcdURL)
+	os.Setenv("KUBE_INTEGRATION_ETCD_URL", currentURL)
 
 	return stop, nil
 }
@@ -221,5 +218,5 @@ func EtcdMain(tests func() int) {
 
 // GetEtcdURL returns the URL of the etcd instance started by EtcdMain.
 func GetEtcdURL() string {
-	return etcdURL
+	return env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
 }
