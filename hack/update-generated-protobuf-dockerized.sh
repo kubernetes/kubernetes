@@ -16,7 +16,7 @@
 
 # This script genertates `*/api.pb.go` from the protobuf file `*/api.proto`.
 # Usage: 
-#     hack/update-generated-protobuf-dockerized.sh "${APIROOTS}"
+#     hack/update-generated-protobuf-dockerized.sh "${APIROOTS[@]}"
 #     An example APIROOT is: "k8s.io/api/admissionregistration/v1"
 
 set -o errexit
@@ -43,11 +43,6 @@ fi
 
 gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 
-while IFS=$'\n' read -r line; do
-  APIROOTS+=( "$line" );
-done <<< "${1}"
-shift
-
 # requires the 'proto' tag to build (will remove when ready)
 # searches for the protoc-gen-gogo extension in the output directory
 # satisfies import of github.com/gogo/protobuf/gogoproto/gogo.proto and the
@@ -56,6 +51,5 @@ PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   "${gotoprotobuf}" \
   --proto-import="${KUBE_ROOT}/vendor" \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \
-  --packages="$(IFS=, ; echo "${APIROOTS[*]}")" \
-  --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
-  "$@"
+  --packages="$(IFS=, ; echo "$*")" \
+  --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt"
