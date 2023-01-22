@@ -26,6 +26,9 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
+	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -163,6 +166,38 @@ func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState stri
 		return fmt.Errorf("%s\nLast error: %w", errStr, err)
 	}
 	return TimeoutError(errStr)
+}
+
+// BeRunningNoRetries verifies that a pod starts running. It's a permanent
+// failure when the pod enters some other permanent phase.
+func BeRunningNoRetries() types.GomegaMatcher {
+	return gomega.And(
+		// This additional matcher checks for the final error condition.
+		gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case v1.PodFailed, v1.PodSucceeded:
+				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead.", v1.PodRunning, pod.Status.Phase))
+			default:
+				return true, nil
+			}
+		}),
+		BeInPhase(v1.PodRunning),
+	)
+}
+
+// BeInPhase matches if pod.status.phase is the expected phase.
+func BeInPhase(phase v1.PodPhase) types.GomegaMatcher {
+	// A simple implementation of this would be:
+	// return gomega.HaveField("Status.Phase", phase)
+	//
+	// But that produces a fairly generic
+	//     Value for field 'Status.Phase' failed to satisfy matcher.
+	// failure message and doesn't show the pod. We can do better than
+	// that with a custom matcher.
+
+	return gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
+		return pod.Status.Phase == phase, nil
+	}).WithTemplate("Expected Pod {{.To}} be in {{format .Data}}\nGot instead:\n{{.FormattedActual}}").WithTemplateData(phase)
 }
 
 // WaitForPodsRunningReady waits up to timeout to ensure that all pods in
@@ -817,7 +852,7 @@ func handleWaitingAPIError(err error, retryNotFound bool, taskFormat string, tas
 		framework.Logf("Ignoring NotFound error while " + taskDescription)
 		return false, nil
 	}
-	if retry, delay := shouldRetry(err); retry {
+	if retry, delay := framework.ShouldRetry(err); retry {
 		framework.Logf("Retryable error while %s, retrying after %v: %v", taskDescription, delay, err)
 		if delay > 0 {
 			time.Sleep(delay)
@@ -826,19 +861,4 @@ func handleWaitingAPIError(err error, retryNotFound bool, taskFormat string, tas
 	}
 	framework.Logf("Encountered non-retryable error while %s: %v", taskDescription, err)
 	return false, err
-}
-
-// Decide whether to retry an API request. Optionally include a delay to retry after.
-func shouldRetry(err error) (retry bool, retryAfter time.Duration) {
-	// if the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
-	if delay, shouldRetry := apierrors.SuggestsClientDelay(err); shouldRetry {
-		return shouldRetry, time.Duration(delay) * time.Second
-	}
-
-	// these errors indicate a transient error that should be retried.
-	if apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
-		return true, 0
-	}
-
-	return false, 0
 }

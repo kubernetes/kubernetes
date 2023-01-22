@@ -57,16 +57,24 @@ var _ = ginkgo.Describe("pod", func() {
 	ginkgo.It("not running", func(ctx context.Context) {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, podName, podNamespace, timeout), "wait for pod %s running", podName /* tests printf formatting */)
 	})
+
+	ginkgo.It("failed", func(ctx context.Context) {
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, failedPodName, podNamespace, timeout))
+	})
 })
 
 const (
-	podName      = "pending-pod"
-	podNamespace = "default"
-	timeout      = 5 * time.Second
+	podName       = "pending-pod"
+	podNamespace  = "default"
+	failedPodName = "failed-pod"
+	timeout       = 5 * time.Second
 )
 
 var (
-	clientSet = fake.NewSimpleClientset(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}})
+	clientSet = fake.NewSimpleClientset(
+		&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}},
+		&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: failedPodName, Namespace: podNamespace}, Status: v1.PodStatus{Phase: v1.PodFailed}},
+	)
 )
 
 func TestFailureOutput(t *testing.T) {
@@ -79,8 +87,8 @@ func TestFailureOutput(t *testing.T) {
 			return trimDuplicateLines(output, "INFO: ")
 		},
 		Suite: reporters.JUnitTestSuite{
-			Tests:    2,
-			Failures: 2,
+			Tests:    3,
+			Failures: 3,
 			Errors:   0,
 			Disabled: 0,
 			Skipped:  0,
@@ -221,6 +229,30 @@ INFO: Unexpected error: wait for pod pending-pod running:
 [FAILED] wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running
 In [It] at: wait_test.go:58 <time>
 < Exit [It] not running - wait_test.go:57 <time>
+`,
+				},
+				{
+					Name:   "[It] pod failed",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Description: `[FAILED] error while waiting for pod default/failed-pod to be running: final error: pod failed permanently
+In [It] at: wait_test.go:62 <time>
+`,
+						Type: "failed",
+					},
+					SystemErr: `> Enter [It] failed - wait_test.go:61 <time>
+INFO: Waiting up to 5s for pod "failed-pod" in namespace "default" to be "running"
+    <*fmt.wrapError>: {
+        msg: "error while waiting for pod default/failed-pod to be running: final error: pod failed permanently",
+        err: <*pod.FinalErr>{
+            Err: <*errors.errorString>{
+                s: "pod failed permanently",
+            },
+        },
+    }
+[FAILED] error while waiting for pod default/failed-pod to be running: final error: pod failed permanently
+In [It] at: wait_test.go:62 <time>
+< Exit [It] failed - wait_test.go:61 <time>
 `,
 				},
 			},
