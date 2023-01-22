@@ -14,18 +14,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script generates `*/api.pb.go` from the protobuf file `*/api.proto`.
-# Example:
-#   kube::protoc::generate_proto "${DEVICE_PLUGIN_ALPHA}"
+# This script generates `*/api.pb.go` files from protobuf files `*/api.proto`.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd -P)"
-DEVICE_PLUGIN_ALPHA="${KUBE_ROOT}/staging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1alpha/"
-DEVICE_PLUGIN_V1BETA1="${KUBE_ROOT}/staging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1/"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
-kube::protoc::generate_proto "${DEVICE_PLUGIN_ALPHA}"
-kube::protoc::generate_proto "${DEVICE_PLUGIN_V1BETA1}"
+source "${KUBE_ROOT}/hack/lib/util.sh"
+
+if [ "$#" == 0 ]; then
+    echo "usage: $0 <api_dir>..."
+    exit 1
+fi
+
+for api; do
+    # This can't use `git ls-files` because it runs in a container without the
+    # .git dir synced.
+    protos=()
+    kube::util::read-array protos < <( \
+        find "${api}" -type f -name "api.proto")
+
+    if [ "${#protos[@]}" == 0 ]; then
+        echo "ERROR: no 'api.proto' files under '${api}'"
+        exit 1
+    fi
+
+    for file in "${protos[@]}"; do
+        dir="$(dirname "${file}")"
+        kube::protoc::generate_proto "${dir}"
+    done
+done

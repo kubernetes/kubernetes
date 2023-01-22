@@ -777,6 +777,43 @@ function codegen::subprojects() {
     done
 }
 
+function codegen::protobindings() {
+    # Each element of this array is a directory containing subdirectories which
+    # eventually contain a file named "api.proto".
+    local apis=(
+        "staging/src/k8s.io/cri-api/pkg/apis/runtime"
+
+        "staging/src/k8s.io/kubelet/pkg/apis/podresources"
+
+        "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
+
+        "staging/src/k8s.io/kms/apis"
+        "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
+
+        "staging/src/k8s.io/kubelet/pkg/apis/dra"
+
+        "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"
+        "pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis"
+    )
+
+    kube::log::status "Generating protobuf bindings for ${#apis[@]} targets"
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: generating protobuf bindings for:"
+        for dir in "${apis[@]}"; do
+            kube::log::status "DBG:     $dir"
+        done
+    fi
+
+    for api in "${apis[@]}"; do
+        git ls-files -z -cmo --exclude-standard ":(glob)${api}"/'**/api.pb.go' \
+            | xargs -0 rm -f
+    done
+
+    # NOTE: All output from this script needs to be copied back to the calling
+    # source tree.  This is managed in kube::build::copy_output in build/common.sh.
+    # If the output set is changed update that function.
+    build/run.sh hack/update-generated-proto-bindings-dockerized.sh "${apis[@]}"
+}
 
 #
 # main
