@@ -18,6 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Short-circuit if protoc.sh has already been sourced
+[[ $(type -t kube::protoc::loaded) == function ]] && return 0
+
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "${KUBE_ROOT}/hack/lib/init.sh"
@@ -133,4 +136,9 @@ function kube::protoc::install() {
     kube::log::info "protoc v${PROTOC_VERSION} installed. To use:"
     kube::log::info "export PATH=\"$(pwd)/protoc:\${PATH}\""
   )
+}
+
+# Marker function to indicate protoc.sh has been fully sourced
+kube::protoc::loaded() {
+  return 0
 }
