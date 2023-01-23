@@ -3264,32 +3264,4 @@
     was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
-- testname: 'Server side field validation, typed object'
-  codename: '[sig-api-machinery] Field validation should detect unknown/duplicate fields [Conformance]'
-  description: It should reject the request if a typed object has unknown or duplicate fields.
-  release: v1.27
-- testname: 'Server side field validation, typed unknown metadata'
-  codename: '[sig-api-machinery] Field validation should detect unknown metadata fields [Conformance]'
-  description: It should reject the request if a typed object has unknown fields in the metadata.
-  release: v1.27
-- testname: 'Server side field validation, valid CR with validation schema'
-  codename: '[sig-api-machinery] Field validation should allow valid CRs for CRDs with validation schema [Conformance]'
-  description: When a CRD has a validation schema, it should succeed when a valid CR is applied.
-  release: v1.27
-- testname: 'Server side field validation, unknown fields CR no validation schema'
-  codename: '[sig-api-machinery] Field validation should allow CRs with unknown fields for CRDs without validation schema [Conformance]'
-  description: When a CRD does not have a validation schema, it should succeed when a CR with unknown fields is applied.
-  release: v1.27
-- testname: 'Server side field validation, unknown fields CR fails validation'
-  codename: '[sig-api-machinery] Field validation should reject CRs with unknown fields for CRDs with validation schema [Conformance]'
-  description: When a CRD does have a validation schema, it should reject CRs with unknown fields.
-  release: v1.27
-- testname: 'Server side field validation, unknown metadata'
-  codename: '[sig-api-machinery] Field validation should reject CRs with unknown metadata [Conformance]'
-  description: The server should reject CRs with unknown metadata fields in both the root and embedded objects of a CR.
-  release: v1.27
-- testname: 'Server side field validation, CR duplicates'
-  codename: '[sig-api-machinery] Field validation should reject CRs with duplicate fields [Conformance]'
-  description: The server should reject CRs with duplicate fields even when preserving unknown fields.
-  release: v1.27
 

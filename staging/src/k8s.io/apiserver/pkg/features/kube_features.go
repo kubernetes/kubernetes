@@ -242,7 +242,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
-	ServerSideFieldValidation: {Default: true, PreRelease: featuregate.Beta},
+	ServerSideFieldValidation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
 
