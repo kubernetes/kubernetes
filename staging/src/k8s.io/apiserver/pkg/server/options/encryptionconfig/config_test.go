@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -461,7 +461,10 @@ func TestKMSMaxTimeout(t *testing.T) {
 				}
 			}
 
-			_, _, kmsUsed, _ := getTransformerOverridesAndKMSPluginHealthzCheckers(testContext(t), &testCase.config)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel() // cancel this upfront so the kms v2 checks do not block
+
+			_, _, kmsUsed, _ := getTransformerOverridesAndKMSPluginHealthzCheckers(ctx, &testCase.config)
 			if kmsUsed == nil {
 				t.Fatal("kmsUsed should not be nil")
 			}
@@ -553,7 +556,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
-			cancel() // cancel this upfront so the kms v2 healthz check poll only runs once
+			cancel() // cancel this upfront so the kms v2 healthz check poll does not run
 			_, got, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(ctx, config)
 			if err != nil {
 				t.Fatal(err)
@@ -568,7 +571,6 @@ func TestKMSPluginHealthz(t *testing.T) {
 					p.l = nil
 					p.lastResponse = nil
 				case *kmsv2PluginProbe:
-					waitForOneKMSv2Check(t, p) // make sure the kms v2 healthz check poll is done
 					p.service = nil
 					p.l = nil
 					p.lastResponse = nil
@@ -596,18 +598,6 @@ func TestKMSPluginHealthz(t *testing.T) {
 				t.Fatalf("HealthzConfig mismatch (-want +got):\n%s", d)
 			}
 		})
-	}
-}
-
-func waitForOneKMSv2Check(t *testing.T, p *kmsv2PluginProbe) {
-	t.Helper()
-
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
-		p.l.Lock()
-		defer p.l.Unlock()
-		return !p.lastResponse.received.IsZero(), nil
-	}); err != nil {
-		t.Fatal(err)
 	}
 }
 
