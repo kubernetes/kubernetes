@@ -582,8 +582,11 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserverconfig.KMSConfig
 		keyID := ""
 		probe.keyID.Store(&keyID)
 
+		// prime keyID by running the check inline once (this prevents unit tests from flaking)
+		// ignore the error here since we want to support the plugin starting up async with the API server
+		_ = probe.check(ctx)
 		// make sure that the plugin's key ID is reasonably up-to-date
-		go wait.PollImmediateUntilWithContext(
+		go wait.PollUntilWithContext(
 			ctx,
 			kmsPluginHealthzInterval,
 			func(ctx context.Context) (bool, error) {
