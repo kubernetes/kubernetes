@@ -24,6 +24,7 @@ KUBE_VERBOSE="${KUBE_VERBOSE:-1}"
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/protoc.sh"
 cd "${KUBE_ROOT}"
 
 kube::golang::setup_env
@@ -115,7 +116,12 @@ function codegen::protobuf() {
         ':(glob)**/generated.pb.go' \
         | xargs -0 rm -f
 
-    build/run.sh hack/update-generated-protobuf-dockerized.sh "${apis[@]}"
+    if kube::protoc::check_protoc >/dev/null; then
+      hack/update-generated-protobuf-dockerized.sh "${apis[@]}"
+    else
+      kube::log::status "protoc ${PROTOC_VERSION} not found (can install with hack/install-protoc.sh); generating containerized..."
+      build/run.sh hack/update-generated-protobuf-dockerized.sh "${apis[@]}"
+    fi
 }
 
 # Generates types_swagger_doc_generated file for the given group version.
@@ -918,10 +924,15 @@ function codegen::protobindings() {
             | xargs -0 rm -f
     done
 
-    # NOTE: All output from this script needs to be copied back to the calling
-    # source tree.  This is managed in kube::build::copy_output in build/common.sh.
-    # If the output set is changed update that function.
-    build/run.sh hack/update-generated-proto-bindings-dockerized.sh "${apis[@]}"
+    if kube::protoc::check_protoc >/dev/null; then
+      hack/update-generated-proto-bindings-dockerized.sh "${apis[@]}"
+    else
+      kube::log::status "protoc ${PROTOC_VERSION} not found (can install with hack/install-protoc.sh); generating containerized..."
+      # NOTE: All output from this script needs to be copied back to the calling
+      # source tree.  This is managed in kube::build::copy_output in build/common.sh.
+      # If the output set is changed update that function.
+      build/run.sh hack/update-generated-proto-bindings-dockerized.sh "${apis[@]}"
+    fi
 }
 
 #
