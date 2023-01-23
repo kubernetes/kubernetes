@@ -22,6 +22,8 @@ set -o pipefail
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+PROTOC_VERSION=3.19.4
+
 # Generates $1/api.pb.go from the protobuf file $1/api.proto
 # and formats it correctly
 # $1: Full path to the directory where the api.proto file is
@@ -36,17 +38,15 @@ function kube::protoc::generate_proto() {
   kube::protoc::format "${package}"
 }
 
-# Checks that the current protoc version is at least version 3.0.0-beta1
+# Checks that the current protoc version matches the required version and
 # exit 1 if it's not the case
 function kube::protoc::check_protoc() {
-  if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
-    echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
-    echo "install the platform appropriate Protobuf package for your OS: "
-    echo
-    echo "  https://github.com/protocolbuffers/protobuf/releases"
-    echo
-    echo "WARNING: Protobuf changes are not being validated"
-    exit 1
+  if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc ${PROTOC_VERSION}"* ]]; then
+    echo "Generating protobuf requires protoc ${PROTOC_VERSION}."
+    echo "Run hack/install-protoc.sh or download and install the"
+    echo "platform-appropriate Protobuf package for your OS from"
+    echo "https://github.com/protocolbuffers/protobuf/releases"
+    return 1
   fi
 }
 
