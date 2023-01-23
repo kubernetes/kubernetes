@@ -110,9 +110,9 @@ func (r *draPluginClient) NodePrepareResource(
 	klog.V(4).InfoS(
 		log("calling NodePrepareResource rpc"),
 		"namespace", namespace,
-		"claim UID", claimUID,
-		"claim name", claimName,
-		"resource handle", resourceHandle)
+		"claimUID", claimUID,
+		"claimName", claimName,
+		"resourceHandle", resourceHandle)
 
 	if r.nodeV1ClientCreator == nil {
 		return nil, errors.New("failed to call NodePrepareResource. nodeV1ClientCreator is nil")
@@ -144,9 +144,9 @@ func (r *draPluginClient) NodeUnprepareResource(
 	klog.V(4).InfoS(
 		log("calling NodeUnprepareResource rpc"),
 		"namespace", namespace,
-		"claim UID", claimUID,
-		"claim name", claimName,
-		"cdi devices", cdiDevices)
+		"claimUID", claimUID,
+		"claimname", claimName,
+		"cdiDevices", cdiDevices)
 
 	if r.nodeV1ClientCreator == nil {
 		return nil, errors.New("nodeV1ClientCreate is nil")

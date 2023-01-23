@@ -55,7 +55,7 @@ func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolve
 			return
 		}
 		http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
-		klog.ErrorS(nil, "apiserver panic'd", "method", req.Method, "URI", req.RequestURI, "audit-ID", audit.GetAuditIDTruncated(req.Context()))
+		klog.ErrorS(nil, "apiserver panic'd", "method", req.Method, "URI", req.RequestURI, "auditID", audit.GetAuditIDTruncated(req.Context()))
 	})
 }
 

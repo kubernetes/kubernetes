@@ -287,7 +287,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 	}
 	if needUpdate {
 		if node.Spec.PodCIDR != "" {
-			klog.ErrorS(nil, "PodCIDR being reassigned!", "nodeName", node.Name, "node.Spec.PodCIDRs", node.Spec.PodCIDRs, "cidrStrings", cidrStrings)
+			klog.ErrorS(nil, "PodCIDR being reassigned!", "nodeName", node.Name, "podCIDRs", node.Spec.PodCIDRs, "cidrStrings", cidrStrings)
 			// We fall through and set the CIDR despite this error. This
 			// implements the same logic as implemented in the
 			// rangeAllocator.
@@ -326,20 +326,20 @@ func needPodCIDRsUpdate(node *v1.Node, podCIDRs []*net.IPNet) (bool, error) {
 	}
 	_, nodePodCIDR, err := netutils.ParseCIDRSloppy(node.Spec.PodCIDR)
 	if err != nil {
-		klog.ErrorS(err, "Found invalid node.Spec.PodCIDR", "node.Spec.PodCIDR", node.Spec.PodCIDR)
+		klog.ErrorS(err, "Found invalid node.Spec.PodCIDR", "podCIDR", node.Spec.PodCIDR)
 		// We will try to overwrite with new CIDR(s)
 		return true, nil
 	}
 	nodePodCIDRs, err := netutils.ParseCIDRs(node.Spec.PodCIDRs)
 	if err != nil {
-		klog.ErrorS(err, "Found invalid node.Spec.PodCIDRs", "node.Spec.PodCIDRs", node.Spec.PodCIDRs)
+		klog.ErrorS(err, "Found invalid node.Spec.PodCIDRs", "podCIDRs", node.Spec.PodCIDRs)
 		// We will try to overwrite with new CIDR(s)
 		return true, nil
 	}
 
 	if len(podCIDRs) == 1 {
 		if cmp.Equal(nodePodCIDR, podCIDRs[0]) {
-			klog.V(4).InfoS("Node already has allocated CIDR. It matches the proposed one.", "nodeName", node.Name, "podCIDRs[0]", podCIDRs[0])
+			klog.V(4).InfoS("Node already has allocated CIDR. It matches the proposed one.", "nodeName", node.Name, "podCIDR", podCIDRs[0])
 			return false, nil
 		}
 	} else if len(nodePodCIDRs) == len(podCIDRs) {

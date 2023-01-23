@@ -175,7 +175,7 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 	// Check keyID freshness and write to log if key IDs are different
 	statusKeyID, err := t.keyIDGetter(ctx)
 	if err == nil && encObject.KeyID != statusKeyID {
-		klog.V(2).InfoS("observed different key IDs when encrypting content using kms v2 envelope service", "uid", uid, "encObject.KeyID", encObject.KeyID, "statusKeyID", statusKeyID)
+		klog.V(2).InfoS("observed different key IDs when encrypting content using kms v2 envelope service", "uid", uid, "objectKeyID", encObject.KeyID, "statusKeyID", statusKeyID)
 	}
 
 	// Serialize the EncryptedObject to a byte array.
