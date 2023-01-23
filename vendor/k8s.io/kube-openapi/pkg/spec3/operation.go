@@ -73,7 +73,7 @@ type OperationProps struct {
 	// Deprecated declares this operation to be deprecated
 	Deprecated bool `json:"deprecated,omitempty"`
 	// SecurityRequirement holds a declaration of which security mechanisms can be used for this operation
-	SecurityRequirement []*SecurityRequirement `json:"security,omitempty"`
+	SecurityRequirement []map[string][]string `json:"security,omitempty"`
 	// Servers contains an alternative server array to service this operation
 	Servers []*Server `json:"servers,omitempty"`
 }

@@ -58,7 +58,7 @@ type EncodingProps struct {
 	// Describes how a specific property value will be serialized depending on its type
 	Style string `json:"style,omitempty"`
 	// When this is true, property values of type array or object generate separate parameters for each value of the array, or key-value-pair of the map. For other types of properties this property has no effect
-	Explode string `json:"explode,omitempty"`
+	Explode bool `json:"explode,omitempty"`
 	// AllowReserved determines whether the parameter value SHOULD allow reserved characters, as defined by RFC3986
 	AllowReserved bool `json:"allowReserved,omitempty"`
 }
