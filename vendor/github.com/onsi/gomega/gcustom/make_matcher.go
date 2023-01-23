@@ -41,7 +41,7 @@ func ParseTemplate(templ string) (*template.Template, error) {
 /*
 MakeMatcher builds a Gomega-compatible matcher from a function (the matchFunc).
 
-matchFunc must return (bool, error) and take a single argument.  If you want to perform type-checking yourself pass in a matchFunc of type `func(actual any) (bool, error)`.  If you want to only operate on a specific type, pass in `func(actual DesiredType) (bool, error)`; MakeMatcher will take care of checking typues for you and notifying the user if they use the matcher with an invalid type.
+matchFunc must return (bool, error) and take a single argument.  If you want to perform type-checking yourself pass in a matchFunc of type `func(actual any) (bool, error)`.  If you want to only operate on a specific type, pass in `func(actual DesiredType) (bool, error)`; MakeMatcher will take care of checking types for you and notifying the user if they use the matcher with an invalid type.
 
 MakeMatcher(matchFunc) builds a matcher with generic failure messages that look like:
 
@@ -68,7 +68,7 @@ where templateString is a string that is compiled by WithTemplate into a matcher
 
 	template, err = gcustom.ParseTemplate(templateString) //use gcustom's ParseTemplate to get some additional functions mixed in
 	matcher := MakeMatcher(matchFunc, template)
-	matcher := MakeMatcher(matchFunc).WithPrcompiled(template)
+	matcher := MakeMatcher(matchFunc).WithPrecompiled(template)
 
 When a simple message string is provided the positive failure message will look like:
 
@@ -161,7 +161,7 @@ Templates are provided the following variables and functions:
 {{.To}} - is set to "to" if this is a positive failure message and "not to" if this is a negated failure message
 {{.Actual}} - the actual passed in to the matcher
 {{.FormattedActual}} - a string representing the formatted actual.  This can be multiple lines and is always generated with an indentation of 1
-{{format <object> <optional-indentaiton}} - a function that allows you to use Gomega's default formatting from within the template.  The passed-in <object> is formatted and <optional-indentation> can be set to an integer to control indentation.
+{{format <object> <optional-indentation}} - a function that allows you to use Gomega's default formatting from within the template.  The passed-in <object> is formatted and <optional-indentation> can be set to an integer to control indentation.
 
 In addition, you can provide custom data to the template by calling WithTemplate(templateString, data) (where data can be anything).  This is provided to the template as {{.Data}}.
 
@@ -169,17 +169,17 @@ Here's a simple example of all these pieces working together:
 
 	func HaveWidget(widget Widget) OmegaMatcher {
 		return MakeMatcher(func(machine Machine) (bool, error) {
-			return maching.HasWidget(widget), nil
+			return machine.HasWidget(widget), nil
 		}).WithTemplate("Expected:\n{{.FormattedActual}}\n{{.To}} have widget named {{.Data.Name}}:\n{{format .Data 1}}", widget)
 	}
 
-	Expect(maching).To(HaveWidget(Widget{Name: "sprocket", Version: 2}))
+	Expect(machine).To(HaveWidget(Widget{Name: "sprocket", Version: 2}))
 
 Would generate a failure message that looks like:
 
 	Expected:
 		<formatted machine>
-	to have widget named sprocker:
+	to have widget named sprocket:
 		<formatted sprocket>
 */
 func (c CustomGomegaMatcher) WithTemplate(templ string, data ...any) CustomGomegaMatcher {
@@ -205,7 +205,6 @@ WithTemplateData() returns a CustomGomegaMatcher configured to provide it's temp
 
 MakeMatcher(matchFunc).WithTemplate(templateString, data)
 MakeMatcher(matchFunc).WithTemplate(templateString).WithTemplateData(data)
-
 */
 func (c CustomGomegaMatcher) WithTemplateData(data any) CustomGomegaMatcher {
 	c.templateData = data
