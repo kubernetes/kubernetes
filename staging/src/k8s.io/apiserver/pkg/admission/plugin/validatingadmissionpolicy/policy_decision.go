@@ -24,33 +24,33 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type policyDecisionAction string
+type PolicyDecisionAction string
 
 const (
-	actionAdmit policyDecisionAction = "admit"
-	actionDeny  policyDecisionAction = "deny"
+	ActionAdmit PolicyDecisionAction = "admit"
+	ActionDeny  PolicyDecisionAction = "deny"
 )
 
-type policyDecisionEvaluation string
+type PolicyDecisionEvaluation string
 
 const (
-	evalAdmit policyDecisionEvaluation = "admit"
-	evalError policyDecisionEvaluation = "error"
-	evalDeny  policyDecisionEvaluation = "deny"
+	EvalAdmit PolicyDecisionEvaluation = "admit"
+	EvalError PolicyDecisionEvaluation = "error"
+	EvalDeny  PolicyDecisionEvaluation = "deny"
 )
 
-type policyDecision struct {
-	action     policyDecisionAction
-	evaluation policyDecisionEvaluation
-	message    string
-	reason     metav1.StatusReason
-	elapsed    time.Duration
+type PolicyDecision struct {
+	Action     PolicyDecisionAction
+	Evaluation PolicyDecisionEvaluation
+	Message    string
+	Reason     metav1.StatusReason
+	Elapsed    time.Duration
 }
 
-type policyDecisionWithMetadata struct {
-	policyDecision
-	definition *v1alpha1.ValidatingAdmissionPolicy
-	binding    *v1alpha1.ValidatingAdmissionPolicyBinding
+type PolicyDecisionWithMetadata struct {
+	PolicyDecision
+	Definition *v1alpha1.ValidatingAdmissionPolicy
+	Binding    *v1alpha1.ValidatingAdmissionPolicyBinding
 }
 
 func reasonToCode(r metav1.StatusReason) int32 {
