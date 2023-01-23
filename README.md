@@ -4,9 +4,9 @@
 
 <img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
 
-----
+---
 
-Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
+Kubernetes, also known as K8s, is an open source cloud for managing [containerized applications]
 across multiple hosts. It provides basic mechanisms for deployment, maintenance,
 and scaling of applications.
 
@@ -21,7 +21,7 @@ and microservices-oriented, consider joining the CNCF.
 For details about who's involved and how Kubernetes plays a role,
 read the CNCF [announcement].
 
-----
+---
 
 ## To start using K8s
 
@@ -71,20 +71,20 @@ That said, if you have questions, reach out to us
 [one way or another][communication].
 
 [announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
-[Borg]: https://research.google.com/pubs/pub43438.html
-[CNCF]: https://www.cncf.io/about
+[borg]: https://research.google.com/pubs/pub43438.html
+[cncf]: https://www.cncf.io/about
 [communication]: https://git.k8s.io/community/communication
 [community repository]: https://git.k8s.io/community
 [containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
 [developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
-[Docker environment]: https://docs.docker.com/engine
-[Go environment]: https://go.dev/doc/install
+[docker environment]: https://docs.docker.com/engine
+[go environment]: https://go.dev/doc/install
 [interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
 [kubernetes.io]: https://kubernetes.io
-[Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
+[scalable microservices with kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug/
 
-## Community Meetings 
+## Community Meetings
 
 The [Calendar](https://www.kubernetes.dev/resources/calendar/) has the list of all the meetings in Kubernetes community in a single location.
 
@@ -92,7 +92,7 @@ The [Calendar](https://www.kubernetes.dev/resources/calendar/) has the list of a
 
 The [User Case Studies](https://kubernetes.io/case-studies/) website has real-world use cases of organizations across industries that are deploying/migrating to Kubernetes.
 
-## Governance 
+## Governance
 
 Kubernetes project is governed by a framework of principles, values, policies and processes to help our community and constituents towards our shared goals.
 
@@ -100,6 +100,6 @@ The [Kubernetes Community](https://github.com/kubernetes/community/blob/master/g
 
 The [Kubernetes Steering community repo](https://github.com/kubernetes/steering) is used by the Kubernetes Steering Committee, which oversees governance of the Kubernetes project.
 
-## Roadmap 
+## Roadmap
 
 The [Kubernetes Enhancements repo](https://github.com/kubernetes/enhancements) provides information about Kubernetes releases, as well as feature tracking and backlogs.
