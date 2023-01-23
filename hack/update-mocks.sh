@@ -49,8 +49,10 @@ function git_find() {
     # modified and untracked files because this might be running against code
     # which is not tracked by git yet.
     git ls-files -cmo --exclude-standard \
-        ':!:vendor/*' \
-        ':!:third_party/*' \
+        ':!:vendor/*'        `# catches vendor/...` \
+        ':!:*/vendor/*'      `# catches any subdir/vendor/...` \
+        ':!:third_party/*'   `# catches third_party/...` \
+        ':!:*/third_party/*' `# catches third_party/...` \
         ':!:*/testdata/*' \
         "$@"
 }
