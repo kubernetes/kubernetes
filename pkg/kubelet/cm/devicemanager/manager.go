@@ -271,7 +271,7 @@ func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 
 // checkpointFile returns device plugin checkpoint file path.
 func (m *ManagerImpl) checkpointFile() string {
-	return filepath.Join(m.checkpointdir, kubeletDeviceManagerCheckpoint)
+	return filepath.Join(m.checkpointdir, KubeletDeviceManagerCheckpoint)
 }
 
 // Start starts the Device Plugin Manager and start initialization of
@@ -432,9 +432,9 @@ func (m *ManagerImpl) writeCheckpoint() error {
 	data := checkpoint.New(m.podDevices.toCheckpointData(),
 		registeredDevs)
 	m.mutex.Unlock()
-	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
+	err := m.checkpointManager.CreateCheckpoint(KubeletDeviceManagerCheckpoint, data)
 	if err != nil {
-		err2 := fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
+		err2 := fmt.Errorf("failed to write checkpoint file %q: %v", KubeletDeviceManagerCheckpoint, err)
 		klog.InfoS("Failed to write checkpoint file", "err", err)
 		return err2
 	}
@@ -452,7 +452,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 	if err != nil {
 		if err == errors.ErrCheckpointNotFound {
 			// no point in trying anything else
-			klog.InfoS("Failed to read data from checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint, "err", err)
+			klog.InfoS("Failed to read data from checkpoint", "checkpoint", KubeletDeviceManagerCheckpoint, "err", err)
 			return nil
 		}
 
@@ -465,7 +465,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 			// a tiny fraction of time, so what matters most is the current checkpoint read error.
 			return err
 		}
-		klog.InfoS("Read data from a V1 checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint)
+		klog.InfoS("Read data from a V1 checkpoint", "checkpoint", KubeletDeviceManagerCheckpoint)
 	}
 
 	m.mutex.Lock()
@@ -487,7 +487,7 @@ func (m *ManagerImpl) getCheckpointV2() (checkpoint.DeviceManagerCheckpoint, err
 	registeredDevs := make(map[string][]string)
 	devEntries := make([]checkpoint.PodDevicesEntry, 0)
 	cp := checkpoint.New(devEntries, registeredDevs)
-	err := m.checkpointManager.GetCheckpoint(kubeletDeviceManagerCheckpoint, cp)
+	err := m.checkpointManager.GetCheckpoint(KubeletDeviceManagerCheckpoint, cp)
 	return cp, err
 }
 
@@ -495,7 +495,7 @@ func (m *ManagerImpl) getCheckpointV1() (checkpoint.DeviceManagerCheckpoint, err
 	registeredDevs := make(map[string][]string)
 	devEntries := make([]checkpoint.PodDevicesEntryV1, 0)
 	cp := checkpoint.NewV1(devEntries, registeredDevs)
-	err := m.checkpointManager.GetCheckpoint(kubeletDeviceManagerCheckpoint, cp)
+	err := m.checkpointManager.GetCheckpoint(KubeletDeviceManagerCheckpoint, cp)
 	return cp, err
 }
 

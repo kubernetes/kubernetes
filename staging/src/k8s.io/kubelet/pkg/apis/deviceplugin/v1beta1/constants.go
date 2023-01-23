@@ -28,8 +28,10 @@ const (
 	// Only privileged pods have access to this path
 	// Note: Placeholder until we find a "standard path"
 	DevicePluginPath = "/var/lib/kubelet/device-plugins/"
+	// KubeletSocketFilename is the file name of the Kubelet registry socket
+	KubeletSocketFilename = "kubelet.sock"
 	// KubeletSocket is the path of the Kubelet registry socket
-	KubeletSocket = DevicePluginPath + "kubelet.sock"
+	KubeletSocket = DevicePluginPath + KubeletSocketFilename
 
 	// DevicePluginPathWindows Avoid failed to run Kubelet: bad socketPath,
 	// must be an absolute path: /var/lib/kubelet/device-plugins/kubelet.sock
@@ -37,7 +39,7 @@ const (
 	// https://github.com/kubernetes/kubernetes/pull/93285#discussion_r458140701
 	DevicePluginPathWindows = "\\var\\lib\\kubelet\\device-plugins\\"
 	// KubeletSocketWindows is the path of the Kubelet registry socket on windows
-	KubeletSocketWindows = DevicePluginPathWindows + "kubelet.sock"
+	KubeletSocketWindows = DevicePluginPathWindows + KubeletSocketFilename
 
 	// KubeletPreStartContainerRPCTimeoutInSecs is the timeout duration in secs for PreStartContainer RPC
 	// Timeout duration in secs for PreStartContainer RPC

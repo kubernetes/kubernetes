@@ -165,6 +165,7 @@ func newTestPluginManager(sockDir string) PluginManager {
 	pm := NewPluginManager(
 		sockDir,
 		&record.FakeRecorder{},
+		[]string{},
 	)
 	return pm
 }

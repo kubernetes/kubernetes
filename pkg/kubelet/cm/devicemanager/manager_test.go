@@ -285,10 +285,12 @@ func setupDevicePlugin(t *testing.T, devs []*pluginapi.Device, pluginSocketName 
 	return p
 }
 
-func setupPluginManager(t *testing.T, pluginSocketName string, m Manager) pluginmanager.PluginManager {
+func setupPluginManager(t *testing.T, socketName string, pluginSocketName string, m Manager) pluginmanager.PluginManager {
+	_, socketFilename := filepath.Split(socketName)
 	pluginManager := pluginmanager.NewPluginManager(
-		filepath.Dir(pluginSocketName), /* sockDir */
+		filepath.Dir(pluginSocketName),
 		&record.FakeRecorder{},
+		[]string{socketFilename, KubeletDeviceManagerCheckpoint},
 	)
 
 	runPluginManager(pluginManager)
@@ -310,7 +312,7 @@ func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, soc
 func setupInProbeMode(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub, pluginmanager.PluginManager) {
 	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
-	pm := setupPluginManager(t, pluginSocketName, m)
+	pm := setupPluginManager(t, socketName, pluginSocketName, m)
 	return m, updateChan, p, pm
 }
 
@@ -1382,8 +1384,6 @@ func makeDevice(devOnNUMA checkpoint.DevicesPerNUMA, topology bool) map[string]p
 	return res
 }
 
-const deviceManagerCheckpointFilename = "kubelet_internal_checkpoint"
-
 var oldCheckpoint string = `{"Data":{"PodDeviceEntries":[{"PodUID":"13ac2284-0d19-44b7-b94f-055b032dba9b","ContainerName":"centos","ResourceName":"example.com/deviceA","DeviceIDs":["DevA3"],"AllocResp":"CiIKHUVYQU1QTEVDT01ERVZJQ0VBX0RFVkEzX1RUWTEwEgEwGhwKCi9kZXYvdHR5MTASCi9kZXYvdHR5MTAaAnJ3"},{"PodUID":"86b9a017-c9ca-4069-815f-46ca3e53c1e4","ContainerName":"centos","ResourceName":"example.com/deviceA","DeviceIDs":["DevA4"],"AllocResp":"CiIKHUVYQU1QTEVDT01ERVZJQ0VBX0RFVkE0X1RUWTExEgEwGhwKCi9kZXYvdHR5MTESCi9kZXYvdHR5MTEaAnJ3"}],"RegisteredDevices":{"example.com/deviceA":["DevA1","DevA2","DevA3","DevA4"]}},"Checksum":405612085}`
 
 func TestReadPreNUMACheckpoint(t *testing.T) {
@@ -1391,7 +1391,7 @@ func TestReadPreNUMACheckpoint(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 
-	err = os.WriteFile(filepath.Join(socketDir, deviceManagerCheckpointFilename), []byte(oldCheckpoint), 0644)
+	err = os.WriteFile(filepath.Join(socketDir, KubeletDeviceManagerCheckpoint), []byte(oldCheckpoint), 0644)
 	require.NoError(t, err)
 
 	topologyStore := topologymanager.NewFakeManager()

@@ -64,6 +64,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
@@ -73,6 +74,7 @@ import (
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cloudresource"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -798,9 +800,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if err != nil {
 		return nil, err
 	}
+
+	// NewPluginManager takes a string array of filenames to ignore when checking for new device plugin sockets
+	// Given that the Kubelet registry socket and the Kubelet internal checkpoint are in the same directory, we need to pass their filenames so that they are ignored
 	klet.pluginManager = pluginmanager.NewPluginManager(
 		klet.getPluginsRegistrationDir(), /* sockDir */
 		kubeDeps.Recorder,
+		[]string{v1beta1.KubeletSocketFilename, devicemanager.KubeletDeviceManagerCheckpoint},
 	)
 
 	// If the experimentalMounterPathFlag is set, we do not want to

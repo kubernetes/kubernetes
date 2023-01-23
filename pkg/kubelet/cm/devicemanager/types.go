@@ -104,5 +104,5 @@ const (
 // take effect.
 const endpointStopGracePeriod = time.Duration(5) * time.Minute
 
-// kubeletDeviceManagerCheckpoint is the file name of device plugin checkpoint
-const kubeletDeviceManagerCheckpoint = "kubelet_internal_checkpoint"
+// KubeletDeviceManagerCheckpoint is the file name of device plugin checkpoint
+const KubeletDeviceManagerCheckpoint = "kubelet_internal_checkpoint"

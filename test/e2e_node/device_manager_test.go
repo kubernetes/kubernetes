@@ -31,6 +31,7 @@ import (
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -46,12 +47,11 @@ import (
 
 const (
 	devicePluginDir = "/var/lib/kubelet/device-plugins"
-	checkpointName  = "kubelet_internal_checkpoint"
 )
 
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeature:DeviceManager]", func() {
-	checkpointFullPath := filepath.Join(devicePluginDir, checkpointName)
+	checkpointFullPath := filepath.Join(devicePluginDir, devicemanager.KubeletDeviceManagerCheckpoint)
 	f := framework.NewDefaultFramework("devicemanager-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
@@ -103,7 +103,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			killKubelet("SIGSTOP")
 
 			ginkgo.By("rewriting the kubelet checkpoint file as v1")
-			err := rewriteCheckpointAsV1(devicePluginDir, checkpointName)
+			err := rewriteCheckpointAsV1(devicePluginDir, devicemanager.KubeletDeviceManagerCheckpoint)
 			// make sure we remove any leftovers
 			defer os.Remove(checkpointFullPath)
 			framework.ExpectNoError(err)
@@ -223,7 +223,7 @@ var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeatur
 			killKubelet("SIGSTOP")
 
 			ginkgo.By("rewriting the kubelet checkpoint file as v1")
-			err = rewriteCheckpointAsV1(devicePluginDir, checkpointName)
+			err = rewriteCheckpointAsV1(devicePluginDir, devicemanager.KubeletDeviceManagerCheckpoint)
 			// make sure we remove any leftovers
 			defer os.Remove(checkpointFullPath)
 			framework.ExpectNoError(err)

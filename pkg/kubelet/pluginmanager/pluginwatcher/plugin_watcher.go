@@ -19,6 +19,7 @@ package pluginwatcher
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
@@ -32,6 +33,7 @@ import (
 // Watcher is the plugin watcher
 type Watcher struct {
 	path                string
+	ignoreFiles         []string
 	fs                  utilfs.Filesystem
 	fsWatcher           *fsnotify.Watcher
 	desiredStateOfWorld cache.DesiredStateOfWorld
@@ -41,6 +43,16 @@ type Watcher struct {
 func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld) *Watcher {
 	return &Watcher{
 		path:                sockDir,
+		fs:                  &utilfs.DefaultFs{},
+		desiredStateOfWorld: desiredStateOfWorld,
+	}
+}
+
+// NewWatcherWithIgnoreFiles provides a new watcher with the ignoreFiles list taken as an argument
+func NewWatcherWithIgnoreFiles(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld, ignoreFiles []string) *Watcher {
+	return &Watcher{
+		path:                sockDir,
+		ignoreFiles:         ignoreFiles,
 		fs:                  &utilfs.DefaultFs{},
 		desiredStateOfWorld: desiredStateOfWorld,
 	}
@@ -130,6 +142,15 @@ func (w *Watcher) traversePluginDir(dir string) error {
 			return nil
 		}
 
+		// skip path if it is in the ignoreFiles array
+		_, curFile := filepath.Split(path)
+		for _, file := range w.ignoreFiles {
+			if file == curFile {
+				klog.V(5).InfoS("Ignoring file (name in ignoreFiles)", "path", path)
+				return nil
+			}
+		}
+
 		mode := info.Mode()
 		if mode.IsDir() {
 			if err := w.fsWatcher.Add(path); err != nil {
@@ -161,6 +182,13 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	fi, err := getStat(event)
 	if err != nil {
 		return fmt.Errorf("stat file %s failed: %v", event.Name, err)
+	}
+
+	for _, file := range w.ignoreFiles {
+		if file == fi.Name() {
+			klog.V(5).InfoS("Ignoring file (name in ignoreFiles)", "path", fi.Name())
+			return nil
+		}
 	}
 
 	if strings.HasPrefix(fi.Name(), ".") {

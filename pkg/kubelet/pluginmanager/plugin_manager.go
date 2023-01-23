@@ -53,7 +53,8 @@ const (
 // PluginManager interface.
 func NewPluginManager(
 	sockDir string,
-	recorder record.EventRecorder) PluginManager {
+	recorder record.EventRecorder,
+	watcherIgnoreFiles []string) PluginManager {
 	asw := cache.NewActualStateOfWorld()
 	dsw := cache.NewDesiredStateOfWorld()
 	reconciler := reconciler.NewReconciler(
@@ -68,9 +69,10 @@ func NewPluginManager(
 	)
 
 	pm := &pluginManager{
-		desiredStateOfWorldPopulator: pluginwatcher.NewWatcher(
+		desiredStateOfWorldPopulator: pluginwatcher.NewWatcherWithIgnoreFiles(
 			sockDir,
 			dsw,
+			watcherIgnoreFiles,
 		),
 		reconciler:          reconciler,
 		desiredStateOfWorld: dsw,
