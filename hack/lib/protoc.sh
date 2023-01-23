@@ -94,3 +94,43 @@ function kube::protoc::diff() {
     exit 1
   fi
 }
+
+function kube::protoc::install() {
+  # run in a subshell to isolate caller from directory changes
+  (
+    local os
+    local arch
+    local download_folder
+    local download_file
+
+    os=$(kube::util::host_os)
+    arch=$(kube::util::host_arch)
+    download_folder="protoc-v${PROTOC_VERSION}-${os}-${arch}"
+    download_file="${download_folder}.zip"
+
+    cd "${KUBE_ROOT}/third_party" || return 1
+    if [[ $(readlink protoc) != "${download_folder}" ]]; then
+      local url
+      if [[ ${os} == "darwin" ]]; then
+        # TODO: switch to universal binary when updating to 3.20+
+        url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-osx-x86_64.zip"
+      elif [[ ${os} == "linux" && ${arch} == "amd64" ]]; then
+        url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip"
+      elif [[ ${os} == "linux" && ${arch} == "arm64" ]]; then
+        url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-aarch_64.zip"
+      else
+        kube::log::info "This install script does not support ${os}/${arch}"
+        return 1
+      fi
+      kube::util::download_file "${url}" "${download_file}"
+      unzip -o "${download_file}" -d "${download_folder}"
+      ln -fns "${download_folder}" protoc
+      mv protoc/bin/protoc protoc/protoc
+      chmod -R +rX protoc/protoc
+      rm -fr protoc/include
+      rm "${download_file}"
+    fi
+    kube::log::info "protoc v${PROTOC_VERSION} installed. To use:"
+    kube::log::info "export PATH=\"$(pwd)/protoc:\${PATH}\""
+  )
+}
