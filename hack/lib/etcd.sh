@@ -51,9 +51,7 @@ kube::etcd::validate() {
 
   # need set the env of "ETCD_UNSUPPORTED_ARCH" on unstable arch.
   arch=$(uname -m)
-  if [[ $arch =~ aarch* ]]; then
-	  export ETCD_UNSUPPORTED_ARCH=arm64
-  elif [[ $arch =~ arm* ]]; then
+  if [[ $arch =~ arm* ]]; then
 	  export ETCD_UNSUPPORTED_ARCH=arm
   fi
   # validate installed version is at least equal to minimum
