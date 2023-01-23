@@ -28,6 +28,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -40,7 +41,6 @@ import (
 // Be careful when moving it around or changing the import statements above.
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
-//
 //
 //
 //
@@ -74,6 +74,24 @@ var _ = ginkgo.Describe("pod", func() {
 	ginkgo.It("failed", func(ctx context.Context) {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, clientSet, failedPodName, podNamespace, timeout))
 	})
+
+	ginkgo.It("gets reported with API error", func(ctx context.Context) {
+		called := false
+		getPod := func(ctx context.Context) (*v1.Pod, error) {
+			if called {
+				ginkgo.By("returning fake API error")
+				return nil, apierrors.NewTooManyRequests("fake API error", 10)
+			}
+			called = true
+			pod, err := clientSet.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			ginkgo.By("returning pod")
+			return pod, err
+		}
+		gomega.Eventually(ctx, framework.HandleRetry(getPod)).WithTimeout(5 * timeout).Should(e2epod.BeInPhase(v1.PodRunning))
+	})
 })
 
 func getNoSuchPod(ctx context.Context) (*v1.Pod, error) {
@@ -101,8 +119,8 @@ func TestFailureOutput(t *testing.T) {
 			return regexp.MustCompile(`wait.go:[[:digit:]]*`).ReplaceAllString(in, `wait.go`)
 		},
 		Suite: reporters.JUnitTestSuite{
-			Tests:    6,
-			Failures: 6,
+			Tests:    7,
+			Failures: 7,
 			Errors:   0,
 			Disabled: 0,
 			Skipped:  0,
@@ -357,6 +375,73 @@ INFO: Failed inside E2E framework:
 Expected pod to reach phase "Running", got final phase "Failed" instead.
 In [It] at: wait_test.go:75 <time>
 < Exit [It] failed - wait_test.go:74 <time>
+`,
+				},
+				{
+					Name:   "[It] pod gets reported with API error",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Description: `[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+fake API error
+    <*errors.StatusError>: {
+        ErrStatus: 
+            code: 429
+            details:
+              retryAfterSeconds: 10
+            message: fake API error
+            metadata: {}
+            reason: TooManyRequests
+            status: Failure,
+    }
+At one point, however, the function did return successfully.
+Yet, Eventually failed because the matcher was not satisfied:
+Expected Pod to be in <v1.PodPhase>: "Running"
+Got instead:
+    <*v1.Pod>: 
+        metadata:
+          creationTimestamp: null
+          name: pending-pod
+          namespace: default
+        spec:
+          containers: null
+        status:
+          phase: Pending
+In [It] at: wait_test.go:93 <time>
+`,
+						Type: "failed",
+					},
+					SystemErr: `> Enter [It] gets reported with API error - wait_test.go:78 <time>
+STEP: returning pod - wait_test.go:90 <time>
+STEP: returning fake API error - wait_test.go:82 <time>
+[FAILED] Timed out after <after>.
+The function passed to Eventually returned the following error:
+fake API error
+    <*errors.StatusError>: {
+        ErrStatus: 
+            code: 429
+            details:
+              retryAfterSeconds: 10
+            message: fake API error
+            metadata: {}
+            reason: TooManyRequests
+            status: Failure,
+    }
+At one point, however, the function did return successfully.
+Yet, Eventually failed because the matcher was not satisfied:
+Expected Pod to be in <v1.PodPhase>: "Running"
+Got instead:
+    <*v1.Pod>: 
+        metadata:
+          creationTimestamp: null
+          name: pending-pod
+          namespace: default
+        spec:
+          containers: null
+        status:
+          phase: Pending
+In [It] at: wait_test.go:93 <time>
+< Exit [It] gets reported with API error - wait_test.go:78 <time>
 `,
 				},
 			},
