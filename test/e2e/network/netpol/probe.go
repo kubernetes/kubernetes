@@ -33,6 +33,7 @@ type probeConnectivityArgs struct {
 	addrTo              string
 	protocol            v1.Protocol
 	toPort              int
+	expectConnectivity  bool
 	timeoutSeconds      int
 	pollIntervalSeconds int
 	pollTimeoutSeconds  int
@@ -45,13 +46,13 @@ type Prober interface {
 
 // ProbeJob packages the data for the input of a pod->pod connectivity probe
 type ProbeJob struct {
-	PodFrom           TestPod
-	PodTo             TestPod
-	PodToServiceIP    string
-	ToPort            int
-	ToPodDNSDomain    string
-	Protocol          v1.Protocol
-	UseMaxPollTimeout bool
+	PodFrom            TestPod
+	PodTo              TestPod
+	PodToServiceIP     string
+	ToPort             int
+	ToPodDNSDomain     string
+	Protocol           v1.Protocol
+	ExpectConnectivity bool
 }
 
 // ProbeJobResults packages the data for the results of a pod->pod connectivity probe
@@ -72,18 +73,17 @@ func ProbePodToPodConnectivity(prober Prober, allPods []TestPod, dnsDomain strin
 	}
 	for _, podFrom := range allPods {
 		for _, podTo := range allPods {
-			useMaxPollTimeout := false
-			// we only want to use max poll timeout for the probes where we expect connectivity from "podFrom" to "podTo".
-			if testCase.Reachability.Expected.Get(podFrom.PodString().String(), podTo.PodString().String()) {
-				useMaxPollTimeout = true
-			}
+			// set connectivity expectation for the probe job, this allows to retry probe when observed value
+			// don't match expected value.
+			expectConnectivity := testCase.Reachability.Expected.Get(podFrom.PodString().String(), podTo.PodString().String())
+
 			jobs <- &ProbeJob{
-				PodFrom:           podFrom,
-				PodTo:             podTo,
-				ToPort:            testCase.ToPort,
-				ToPodDNSDomain:    dnsDomain,
-				Protocol:          testCase.Protocol,
-				UseMaxPollTimeout: useMaxPollTimeout,
+				PodFrom:            podFrom,
+				PodTo:              podTo,
+				ToPort:             testCase.ToPort,
+				ToPodDNSDomain:     dnsDomain,
+				Protocol:           testCase.Protocol,
+				ExpectConnectivity: expectConnectivity,
 			}
 		}
 	}
@@ -136,9 +136,10 @@ func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobR
 			addrTo:              job.PodTo.ServiceIP,
 			protocol:            job.Protocol,
 			toPort:              job.ToPort,
+			expectConnectivity:  job.ExpectConnectivity,
 			timeoutSeconds:      getProbeTimeoutSeconds(),
 			pollIntervalSeconds: getPollIntervalSeconds(),
-			pollTimeoutSeconds:  getPollTimeoutSeconds(job.UseMaxPollTimeout),
+			pollTimeoutSeconds:  getPollTimeoutSeconds(),
 		})
 		result := &ProbeJobResults{
 			Job:         job,
