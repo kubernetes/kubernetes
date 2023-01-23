@@ -166,7 +166,7 @@ func (c *celAdmissionController) Validate(
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
-	var deniedDecisions []PolicyDecisionWithMetadata
+	var deniedDecisions []policyDecisionWithMetadata
 
 	addConfigError := func(err error, definition *v1alpha1.ValidatingAdmissionPolicy, binding *v1alpha1.ValidatingAdmissionPolicyBinding) {
 		// we always default the FailurePolicy if it is unset and validate it in API level
@@ -189,22 +189,22 @@ func (c *celAdmissionController) Validate(
 			} else {
 				message = fmt.Errorf("failed to configure binding: %w", err).Error()
 			}
-			deniedDecisions = append(deniedDecisions, PolicyDecisionWithMetadata{
+			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
 				PolicyDecision: PolicyDecision{
 					Action:  ActionDeny,
 					Message: message,
 				},
-				Definition: definition,
-				Binding:    binding,
+				definition: definition,
+				binding:    binding,
 			})
 		default:
-			deniedDecisions = append(deniedDecisions, PolicyDecisionWithMetadata{
+			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
 				PolicyDecision: PolicyDecision{
 					Action:  ActionDeny,
 					Message: fmt.Errorf("unrecognized failure policy: '%v'", policy).Error(),
 				},
-				Definition: definition,
-				Binding:    binding,
+				definition: definition,
+				binding:    binding,
 			})
 		}
 	}
@@ -307,9 +307,9 @@ func (c *celAdmissionController) Validate(
 						celmetrics.Metrics.ObserveAdmissionWithError(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
 					}
 				case ActionDeny:
-					deniedDecisions = append(deniedDecisions, PolicyDecisionWithMetadata{
-						Definition:     definition,
-						Binding:        binding,
+					deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
+						definition:     definition,
+						binding:        binding,
 						PolicyDecision: decision,
 					})
 					celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
@@ -325,10 +325,10 @@ func (c *celAdmissionController) Validate(
 		// TODO: refactor admission.NewForbidden so the name extraction is reusable but the code/reason is customizable
 		var message string
 		deniedDecision := deniedDecisions[0]
-		if deniedDecision.Binding != nil {
-			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' with binding '%s' denied request: %s", deniedDecision.Definition.Name, deniedDecision.Binding.Name, deniedDecision.Message)
+		if deniedDecision.binding != nil {
+			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' with binding '%s' denied request: %s", deniedDecision.definition.Name, deniedDecision.binding.Name, deniedDecision.Message)
 		} else {
-			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' denied request: %s", deniedDecision.Definition.Name, deniedDecision.Message)
+			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' denied request: %s", deniedDecision.definition.Name, deniedDecision.Message)
 		}
 		err := admission.NewForbidden(a, errors.New(message)).(*k8serrors.StatusError)
 		reason := deniedDecision.Reason

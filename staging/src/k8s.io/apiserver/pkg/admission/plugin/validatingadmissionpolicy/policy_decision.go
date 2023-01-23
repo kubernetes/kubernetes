@@ -47,10 +47,10 @@ type PolicyDecision struct {
 	Elapsed    time.Duration
 }
 
-type PolicyDecisionWithMetadata struct {
+type policyDecisionWithMetadata struct {
 	PolicyDecision
-	Definition *v1alpha1.ValidatingAdmissionPolicy
-	Binding    *v1alpha1.ValidatingAdmissionPolicyBinding
+	definition *v1alpha1.ValidatingAdmissionPolicy
+	binding    *v1alpha1.ValidatingAdmissionPolicyBinding
 }
 
 func reasonToCode(r metav1.StatusReason) int32 {
