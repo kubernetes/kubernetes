@@ -87,7 +87,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 			} else {
 				testRootDir = tempDir
 			}
-			podManager := kubepod.NewBasicPodManager(nil)
+			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 			m := NewManager(
 				status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, testRootDir),

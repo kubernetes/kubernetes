@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -1613,8 +1612,7 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 		return true, pv, nil
 	})
 
-	fakePodManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient())
+	fakePodManager := kubepod.NewBasicPodManager()
 
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr, seLinuxTranslator)

@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -85,7 +84,7 @@ func (m *manager) testSyncBatch() {
 }
 
 func newTestManager(kubeClient clientset.Interface) *manager {
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager()
 	podManager.AddPod(getTestPod())
 	podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
 	testRootDir := ""
@@ -981,7 +980,7 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
 			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, "").(*manager)
 

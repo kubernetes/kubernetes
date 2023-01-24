@@ -611,9 +611,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.startupManager = proberesults.NewManager()
 	klet.podCache = kubecontainer.NewCache()
 
-	// podManager is also responsible for keeping secretManager and configMapManager contents up-to-date.
-	mirrorPodClient := kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
-	klet.podManager = kubepod.NewBasicPodManager(mirrorPodClient)
+	klet.mirrorPodClient = kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
+	klet.podManager = kubepod.NewBasicPodManager()
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker, klet.getRootDir())
 
@@ -957,6 +956,9 @@ type Kubelet struct {
 	// podManager is a facade that abstracts away the various sources of pods
 	// this Kubelet services.
 	podManager kubepod.Manager
+	// mirrorPodClient is used to create and delete mirror pods in the API for static
+	// pods.
+	mirrorPodClient kubepod.MirrorClient
 
 	// Needed to observe and respond to situations that could impact node stability
 	evictionManager eviction.Manager
@@ -1829,7 +1831,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				klog.InfoS("Trying to delete pod", "pod", klog.KObj(pod), "podUID", mirrorPod.ObjectMeta.UID)
 				podFullName := kubecontainer.GetPodFullName(pod)
 				var err error
-				deleted, err = kl.podManager.DeleteMirrorPod(podFullName, &mirrorPod.ObjectMeta.UID)
+				deleted, err = kl.mirrorPodClient.DeleteMirrorPod(podFullName, &mirrorPod.ObjectMeta.UID)
 				if deleted {
 					klog.InfoS("Deleted mirror pod because it is outdated", "pod", klog.KObj(mirrorPod))
 				} else if err != nil {
@@ -1843,7 +1845,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				klog.V(4).InfoS("No need to create a mirror pod, since node has been removed from the cluster", "node", klog.KRef("", string(kl.nodeName)))
 			} else {
 				klog.V(4).InfoS("Creating a mirror pod for static pod", "pod", klog.KObj(pod))
-				if err := kl.podManager.CreateMirrorPod(pod); err != nil {
+				if err := kl.mirrorPodClient.CreateMirrorPod(pod); err != nil {
 					klog.ErrorS(err, "Failed creating a mirror pod for", "pod", klog.KObj(pod))
 				}
 			}

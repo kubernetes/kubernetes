@@ -72,8 +72,7 @@ func TestRunOnce(t *testing.T) {
 	}, nil).AnyTimes()
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
-	podManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient())
+	podManager := kubepod.NewBasicPodManager()
 	fakeRuntime := &containertest.FakeRuntime{}
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	basePath, err := utiltesting.MkTmpdir("kubelet")
@@ -87,6 +86,7 @@ func TestRunOnce(t *testing.T) {
 		cadvisor:         cadvisor,
 		nodeLister:       testNodeLister{},
 		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, basePath),
+		mirrorPodClient:  podtest.NewFakeMirrorClient(),
 		podManager:       podManager,
 		podWorkers:       &fakePodWorkers{},
 		os:               &containertest.FakeOS{},
