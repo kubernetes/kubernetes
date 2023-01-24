@@ -935,7 +935,11 @@ type Kubelet struct {
 	runtimeCache    kubecontainer.RuntimeCache
 	kubeClient      clientset.Interface
 	heartbeatClient clientset.Interface
-	rootDirectory   string
+	// mirrorPodClient is used to create and delete mirror pods in the API for static
+	// pods.
+	mirrorPodClient kubepod.MirrorClient
+
+	rootDirectory string
 
 	lastObservedNodeAddressesMux sync.RWMutex
 	lastObservedNodeAddresses    []v1.NodeAddress
@@ -943,8 +947,89 @@ type Kubelet struct {
 	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails more than once. optional.
 	onRepeatedHeartbeatFailure func()
 
-	// podWorkers handle syncing Pods in response to events.
+	// podManager stores the desired set of admitted pods and mirror pods that the kubelet should be
+	// running. The actual set of running pods is stored on the podWorkers. The manager is populated
+	// by the kubelet config loops which abstracts receiving configuration from many different sources
+	// (api for regular pods, local filesystem or http for static pods). The manager may be consulted
+	// by other components that need to see the set of desired pods. Note that not all desired pods are
+	// running, and not all running pods are in the podManager - for instance, force deleting a pod
+	// from the apiserver will remove it from the podManager, but the pod may still be terminating and
+	// tracked by the podWorkers. Components that need to know the actual consumed resources of the
+	// node or are driven by podWorkers and the sync*Pod methods (status, volume, stats) should also
+	// consult the podWorkers when reconciling.
+	//
+	// TODO: review all kubelet components that need the actual set of pods (vs the desired set)
+	// and update them to use podWorkers instead of podManager. This may introduce latency in some
+	// methods, but avoids race conditions and correctly accounts for terminating pods that have
+	// been force deleted or static pods that have been updated.
+	// https://github.com/kubernetes/kubernetes/issues/116970
+	podManager kubepod.Manager
+
+	// podWorkers is responsible for driving the lifecycle state machine of each pod. The worker is
+	// notified of config changes, updates, periodic reconciliation, container runtime updates, and
+	// evictions of all desired pods and will invoke reconciliation methods per pod in separate
+	// goroutines. The podWorkers are authoritative in the kubelet for what pods are actually being
+	// run and their current state:
+	//
+	// * syncing: pod should be running (syncPod)
+	// * terminating: pod should be stopped (syncTerminatingPod)
+	// * terminated: pod should have all resources cleaned up (syncTerminatedPod)
+	//
+	// and invoke the handler methods that correspond to each state. Components within the
+	// kubelet that need to know the phase of the pod in order to correctly set up or tear down
+	// resources must consult the podWorkers.
+	//
+	// Once a pod has been accepted by the pod workers, no other pod with that same UID (and
+	// name+namespace, for static pods) will be started until the first pod has fully terminated
+	// and been cleaned up by SyncKnownPods. This means a pod may be desired (in API), admitted
+	// (in pod manager), and requested (by invoking UpdatePod) but not start for an arbitrarily
+	// long interval because a prior pod is still terminating.
+	//
+	// As an event-driven (by UpdatePod) controller, the podWorkers must periodically be resynced
+	// by the kubelet invoking SyncKnownPods with the desired state (admitted pods in podManager).
+	// Since the podManager may be unaware of some running pods due to force deletion, the
+	// podWorkers are responsible for triggering a sync of pods that are no longer desired but
+	// must still run to completion.
 	podWorkers PodWorkers
+
+	// evictionManager observes the state of the node for situations that could impact node stability
+	// and evicts pods (sets to phase Failed with reason Evicted) to reduce resource pressure. The
+	// eviction manager acts on the actual state of the node and considers the podWorker to be
+	// authoritative.
+	evictionManager eviction.Manager
+
+	// probeManager tracks the set of running pods and ensures any user-defined periodic checks are
+	// run to introspect the state of each pod.  The probe manager acts on the actual state of the node
+	// and is notified of pods by the podWorker. The probe manager is the authoritative source of the
+	// most recent probe status and is responsible for notifying the status manager, which
+	// synthesizes them into the overall pod status.
+	probeManager prober.Manager
+
+	// secretManager caches the set of secrets used by running pods on this node. The podWorkers
+	// notify the secretManager when pods are started and terminated, and the secretManager must
+	// then keep the needed secrets up-to-date as they change.
+	secretManager secret.Manager
+
+	// configMapManager caches the set of config maps used by running pods on this node. The
+	// podWorkers notify the configMapManager when pods are started and terminated, and the
+	// configMapManager must then keep the needed config maps up-to-date as they change.
+	configMapManager configmap.Manager
+
+	// volumeManager observes the set of running pods and is responsible for attaching, mounting,
+	// unmounting, and detaching as those pods move through their lifecycle. It periodically
+	// synchronizes the set of known volumes to the set of actually desired volumes and cleans up
+	// any orphaned volumes. The volume manager considers the podWorker to be authoritative for
+	// which pods are running.
+	volumeManager volumemanager.VolumeManager
+
+	// statusManager receives updated pod status updates from the podWorker and updates the API
+	// status of those pods to match. The statusManager is authoritative for the synthesized
+	// status of the pod from the kubelet's perspective (other components own the individual
+	// elements of status) and should be consulted by components in preference to assembling
+	// that status themselves. Note that the status manager is downstream of the pod worker
+	// and components that need to check whether a pod is still running should instead directly
+	// consult the pod worker.
+	statusManager status.Manager
 
 	// resyncInterval is the interval between periodic full reconciliations of
 	// pods on this node.
@@ -952,16 +1037,6 @@ type Kubelet struct {
 
 	// sourcesReady records the sources seen by the kubelet, it is thread-safe.
 	sourcesReady config.SourcesReady
-
-	// podManager is a facade that abstracts away the various sources of pods
-	// this Kubelet services.
-	podManager kubepod.Manager
-	// mirrorPodClient is used to create and delete mirror pods in the API for static
-	// pods.
-	mirrorPodClient kubepod.MirrorClient
-
-	// Needed to observe and respond to situations that could impact node stability
-	evictionManager eviction.Manager
 
 	// Optional, defaults to /logs/ from /var/log
 	logServer http.Handler
@@ -1003,8 +1078,6 @@ type Kubelet struct {
 	// Volume plugins.
 	volumePluginMgr *volume.VolumePluginMgr
 
-	// Handles container probing.
-	probeManager prober.Manager
 	// Manages container health check results.
 	livenessManager  proberesults.Manager
 	readinessManager proberesults.Manager
@@ -1026,26 +1099,12 @@ type Kubelet struct {
 	// Manager for container logs.
 	containerLogManager logs.ContainerLogManager
 
-	// Secret manager.
-	secretManager secret.Manager
-
-	// ConfigMap manager.
-	configMapManager configmap.Manager
-
 	// Cached MachineInfo returned by cadvisor.
 	machineInfoLock sync.RWMutex
 	machineInfo     *cadvisorapi.MachineInfo
 
 	// Handles certificate rotations.
 	serverCertificateManager certificate.Manager
-
-	// Syncs pods statuses with apiserver; also used as a cache of statuses.
-	statusManager status.Manager
-
-	// VolumeManager runs a set of asynchronous loops that figure out which
-	// volumes need to be attached/mounted/unmounted/detached based on the pods
-	// scheduled on this node and makes it so.
-	volumeManager volumemanager.VolumeManager
 
 	// Cloud provider interface.
 	cloud cloudprovider.Interface
@@ -1112,10 +1171,12 @@ type Kubelet struct {
 	// nodeLeaseController claims and renews the node lease for this Kubelet
 	nodeLeaseController lease.Controller
 
-	// Generates pod events.
+	// pleg observes the state of the container runtime and notifies the kubelet of changes to containers, which
+	// notifies the podWorkers to reconcile the state of the pod (for instance, if a container dies and needs to
+	// be restarted).
 	pleg pleg.PodLifecycleEventGenerator
 
-	// Evented PLEG
+	// eventedPleg supplements the pleg to deliver edge-driven container changes with low-latency.
 	eventedPleg pleg.PodLifecycleEventGenerator
 
 	// Store kubecontainer.PodStatus for all pods.
@@ -2136,6 +2197,15 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 // Get pods which should be resynchronized. Currently, the following pod should be resynchronized:
 //   - pod whose work is ready.
 //   - internal modules that request sync of a pod.
+//
+// This method does not return orphaned pods (those known only to the pod worker that may have
+// been deleted from configuration). Those pods are synced by HandlePodCleanups as a consequence
+// of driving the state machine to completion.
+//
+// TODO: Consider synchronizing all pods which have not recently been acted on to be resilient
+// to bugs that might prevent updates from being delivered (such as the previous bug with
+// orphaned pods). Instead of asking the work queue for pending work, consider asking the
+// PodWorker which pods should be synced.
 func (kl *Kubelet) getPodsToSync() []*v1.Pod {
 	allPods := kl.podManager.GetPods()
 	podUIDs := kl.workQueue.GetWork()

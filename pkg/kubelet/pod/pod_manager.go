@@ -43,8 +43,6 @@ import (
 // pod. When a static pod gets deleted, the associated orphaned mirror pod
 // will also be removed.
 type Manager interface {
-	// GetPods returns the regular pods bound to the kubelet and their spec.
-	GetPods() []*v1.Pod
 	// GetPodByFullName returns the (non-mirror) pod that matches full name, as well as
 	// whether the pod was found.
 	GetPodByFullName(podFullName string) (*v1.Pod, bool)
@@ -64,9 +62,14 @@ type Manager interface {
 	// and a mirror pod can be found, return it. If a mirror pod is provided and
 	// the pod can be found, return it and true for wasMirror.
 	GetPodAndMirrorPod(*v1.Pod) (pod, mirrorPod *v1.Pod, wasMirror bool)
+
+	// GetPods returns the regular pods bound to the kubelet and their spec.
+	GetPods() []*v1.Pod
+
 	// GetPodsAndMirrorPods returns the set of pods, the set of mirror pods, and
 	// the pod fullnames of any orphaned mirror pods.
 	GetPodsAndMirrorPods() (allPods []*v1.Pod, allMirrorPods []*v1.Pod, orphanedMirrorPodFullnames []string)
+
 	// SetPods replaces the internal pods with the new pods.
 	// It is currently only used for testing.
 	SetPods(pods []*v1.Pod)
@@ -78,6 +81,7 @@ type Manager interface {
 	// this means deleting the mappings related to mirror pods.  For non-
 	// mirror pods, this means deleting from indexes for all non-mirror pods.
 	DeletePod(pod *v1.Pod)
+
 	// TranslatePodUID returns the actual UID of a pod. If the UID belongs to
 	// a mirror pod, returns the UID of its static pod. Otherwise, returns the
 	// original UID.
