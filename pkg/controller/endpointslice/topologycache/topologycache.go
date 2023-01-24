@@ -88,12 +88,12 @@ func (t *TopologyCache) GetOverloadedServices() []string {
 
 // AddHints adds or updates topology hints on EndpointSlices and returns updated
 // lists of EndpointSlices to create and update.
-func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*EventBuilder) {
+func (t *TopologyCache) AddHints(logger klog.Logger, si *SliceInfo) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*EventBuilder) {
 	totalEndpoints := si.getTotalReadyEndpoints()
 	allocations, allocationsEvent := t.getAllocations(totalEndpoints)
 	events := []*EventBuilder{}
 	if allocationsEvent != nil {
-		klog.InfoS(allocationsEvent.Message+", removing hints", "serviceKey", si.ServiceKey, "addressType", si.AddressType)
+		logger.Info(allocationsEvent.Message+", removing hints", "key", si.ServiceKey, "addressType", si.AddressType)
 		allocationsEvent.Message = FormatWithAddressType(allocationsEvent.Message, si.AddressType)
 		events = append(events, allocationsEvent)
 		t.RemoveHints(si.ServiceKey, si.AddressType)
@@ -116,7 +116,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 				continue
 			}
 			if endpoint.Zone == nil || *endpoint.Zone == "" {
-				klog.InfoS("Endpoint found without zone specified, removing hints", "serviceKey", si.ServiceKey, "addressType", si.AddressType)
+				logger.Info("Endpoint found without zone specified, removing hints", "key", si.ServiceKey, "addressType", si.AddressType)
 				events = append(events, &EventBuilder{
 					EventType: v1.EventTypeWarning,
 					Reason:    "TopologyAwareHintsDisabled",
@@ -136,14 +136,14 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 	givingZones, receivingZones := getGivingAndReceivingZones(allocations, allocatedHintsByZone)
 
 	// step 3. Redistribute endpoints based on data from step 2.
-	redistributions := redistributeHints(allocatableSlices, givingZones, receivingZones)
+	redistributions := redistributeHints(logger, allocatableSlices, givingZones, receivingZones)
 
 	for zone, diff := range redistributions {
 		allocatedHintsByZone[zone] += diff
 	}
 
 	if len(allocatedHintsByZone) == 0 {
-		klog.V(2).InfoS("No hints allocated for zones, removing them", "serviceKey", si.ServiceKey, "addressType", si.AddressType)
+		logger.V(2).Info("No hints allocated for zones, removing them", "key", si.ServiceKey, "addressType", si.AddressType)
 		events = append(events, &EventBuilder{
 			EventType: v1.EventTypeWarning,
 			Reason:    "TopologyAwareHintsDisabled",
@@ -159,7 +159,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 
 	// if hints were not enabled before, we publish an event to indicate we enabled them.
 	if !hintsEnabled {
-		klog.InfoS("Topology Aware Hints has been enabled, adding hints.", "serviceKey", si.ServiceKey, "addressType", si.AddressType)
+		logger.Info("Topology Aware Hints has been enabled, adding hints.", "key", si.ServiceKey, "addressType", si.AddressType)
 		events = append(events, &EventBuilder{
 			EventType: v1.EventTypeNormal,
 			Reason:    "TopologyAwareHintsEnabled",
@@ -201,7 +201,7 @@ func (t *TopologyCache) RemoveHints(serviceKey string, addrType discovery.Addres
 }
 
 // SetNodes updates the Node distribution for the TopologyCache.
-func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
+func (t *TopologyCache) SetNodes(logger klog.Logger, nodes []*v1.Node) {
 	cpuByZone := map[string]*resource.Quantity{}
 	sufficientNodeInfo := true
 
@@ -209,11 +209,11 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 
 	for _, node := range nodes {
 		if hasExcludedLabels(node.Labels) {
-			klog.V(2).Infof("Ignoring node %s because it has an excluded label", node.Name)
+			logger.V(2).Info("Ignoring node because it has an excluded label", "node", klog.KObj(node))
 			continue
 		}
 		if !isNodeReady(node) {
-			klog.V(2).Infof("Ignoring node %s because it is not ready: %v", node.Name, node.Status.Conditions)
+			logger.V(2).Info("Ignoring node because it is not ready", "node", klog.KObj(node))
 			continue
 		}
 
@@ -229,7 +229,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 		if !ok || zone == "" || nodeCPU.IsZero() {
 			cpuByZone = map[string]*resource.Quantity{}
 			sufficientNodeInfo = false
-			klog.Warningf("Can't get CPU or zone information for %s node", node.Name)
+			logger.Info("Can't get CPU or zone information for node", "node", klog.KObj(node))
 			break
 		}
 
@@ -245,7 +245,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 	defer t.lock.Unlock()
 
 	if totalCPU.IsZero() || !sufficientNodeInfo || len(cpuByZone) < 2 {
-		klog.V(2).Infof("Insufficient node info for topology hints (%d zones, %s CPU, %t)", len(cpuByZone), totalCPU.String(), sufficientNodeInfo)
+		logger.V(2).Info("Insufficient node info for topology hints", "totalZones", len(cpuByZone), "totalCPU", totalCPU.String(), "sufficientNodeInfo", sufficientNodeInfo)
 		t.sufficientNodeInfo = false
 		t.cpuByZone = nil
 		t.cpuRatiosByZone = nil

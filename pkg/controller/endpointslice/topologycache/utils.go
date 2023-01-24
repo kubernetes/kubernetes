@@ -77,7 +77,7 @@ func FormatWithAddressType(s string, addressType discovery.AddressType) string {
 // It allocates endpoints from the provided givingZones to the provided
 // receivingZones. This returns a map that represents the changes in allocated
 // endpoints by zone.
-func redistributeHints(slices []*discovery.EndpointSlice, givingZones, receivingZones map[string]int) map[string]int {
+func redistributeHints(logger klog.Logger, slices []*discovery.EndpointSlice, givingZones, receivingZones map[string]int) map[string]int {
 	redistributions := map[string]int{}
 
 	for _, slice := range slices {
@@ -91,7 +91,7 @@ func redistributeHints(slices []*discovery.EndpointSlice, givingZones, receiving
 			}
 			if endpoint.Zone == nil || *endpoint.Zone == "" {
 				// This should always be caught earlier in AddHints()
-				klog.Warningf("Endpoint found without zone specified")
+				logger.Info("Endpoint found without zone specified")
 				continue
 			}
 

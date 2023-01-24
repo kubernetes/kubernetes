@@ -77,7 +77,7 @@ func podToEndpoint(pod *v1.Pod, node *v1.Node, service *v1.Service, addressType 
 
 // getEndpointPorts returns a list of EndpointPorts generated from a Service
 // and Pod.
-func getEndpointPorts(service *v1.Service, pod *v1.Pod) []discovery.EndpointPort {
+func getEndpointPorts(logger klog.Logger, service *v1.Service, pod *v1.Pod) []discovery.EndpointPort {
 	endpointPorts := []discovery.EndpointPort{}
 
 	// Allow headless service not to have ports.
@@ -92,7 +92,7 @@ func getEndpointPorts(service *v1.Service, pod *v1.Pod) []discovery.EndpointPort
 		portProto := servicePort.Protocol
 		portNum, err := podutil.FindPort(pod, servicePort)
 		if err != nil {
-			klog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
+			logger.V(4).Info("Failed to find port for service", "service", klog.KObj(service), "err", err)
 			continue
 		}
 
@@ -128,7 +128,7 @@ func getEndpointAddresses(podStatus v1.PodStatus, service *v1.Service, addressTy
 
 // newEndpointSlice returns an EndpointSlice generated from a service and
 // endpointMeta.
-func newEndpointSlice(service *v1.Service, endpointMeta *endpointMeta) *discovery.EndpointSlice {
+func newEndpointSlice(logger klog.Logger, service *v1.Service, endpointMeta *endpointMeta) *discovery.EndpointSlice {
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
 	ownerRef := metav1.NewControllerRef(service, gvk)
 	epSlice := &discovery.EndpointSlice{
@@ -143,7 +143,7 @@ func newEndpointSlice(service *v1.Service, endpointMeta *endpointMeta) *discover
 		Endpoints:   []discovery.Endpoint{},
 	}
 	// add parent service labels
-	epSlice.Labels, _ = setEndpointSliceLabels(epSlice, service)
+	epSlice.Labels, _ = setEndpointSliceLabels(logger, epSlice, service)
 
 	return epSlice
 }
@@ -238,7 +238,7 @@ func serviceControllerKey(endpointSlice *discovery.EndpointSlice) (string, error
 // setEndpointSliceLabels returns a map with the new endpoint slices labels and true if there was an update.
 // Slices labels must be equivalent to the Service labels except for the reserved IsHeadlessService, LabelServiceName and LabelManagedBy labels
 // Changes to IsHeadlessService, LabelServiceName and LabelManagedBy labels on the Service do not result in updates to EndpointSlice labels.
-func setEndpointSliceLabels(epSlice *discovery.EndpointSlice, service *v1.Service) (map[string]string, bool) {
+func setEndpointSliceLabels(logger klog.Logger, epSlice *discovery.EndpointSlice, service *v1.Service) (map[string]string, bool) {
 	updated := false
 	epLabels := make(map[string]string)
 	svcLabels := make(map[string]string)
@@ -255,7 +255,7 @@ func setEndpointSliceLabels(epSlice *discovery.EndpointSlice, service *v1.Servic
 
 	for key, value := range service.Labels {
 		if isReservedLabelKey(key) {
-			klog.Warningf("Service %s/%s using reserved endpoint slices label, skipping label %s: %s", service.Namespace, service.Name, key, value)
+			logger.Info("Service using reserved endpoint slices label", "service", klog.KObj(service), "skipping", key, "label", value)
 			continue
 		}
 		// copy service labels
@@ -302,7 +302,7 @@ func (sl endpointSliceEndpointLen) Less(i, j int) bool {
 }
 
 // returns a map of address types used by a service
-func getAddressTypesForService(service *v1.Service) sets.Set[discovery.AddressType] {
+func getAddressTypesForService(logger klog.Logger, service *v1.Service) sets.Set[discovery.AddressType] {
 	serviceSupportedAddresses := sets.New[discovery.AddressType]()
 	// TODO: (khenidak) when address types are removed in favor of
 	// v1.IPFamily this will need to be removed, and work directly with
@@ -345,7 +345,7 @@ func getAddressTypesForService(service *v1.Service) sets.Set[discovery.AddressTy
 			addrType = discovery.AddressTypeIPv6
 		}
 		serviceSupportedAddresses.Insert(addrType)
-		klog.V(2).Infof("couldn't find ipfamilies for service: %v/%v. This could happen if controller manager is connected to an old apiserver that does not support ip families yet. EndpointSlices for this Service will use %s as the IP Family based on familyOf(ClusterIP:%v).", service.Namespace, service.Name, addrType, service.Spec.ClusterIP)
+		logger.V(2).Info("Couldn't find ipfamilies for service. This could happen if controller manager is connected to an old apiserver that does not support ip families yet. EndpointSlices for this Service will use addressType as the IP Family based on familyOf(ClusterIP).", "service", klog.KObj(service), "addressType", addrType, "clusterIP", service.Spec.ClusterIP)
 		return serviceSupportedAddresses
 	}
 
@@ -356,7 +356,7 @@ func getAddressTypesForService(service *v1.Service) sets.Set[discovery.AddressTy
 	// since kubelet will need to restart in order to start patching pod status with multiple ips
 	serviceSupportedAddresses.Insert(discovery.AddressTypeIPv4)
 	serviceSupportedAddresses.Insert(discovery.AddressTypeIPv6)
-	klog.V(2).Infof("couldn't find ipfamilies for headless service: %v/%v likely because controller manager is likely connected to an old apiserver that does not support ip families yet. The service endpoint slice will use dual stack families until api-server default it correctly", service.Namespace, service.Name)
+	logger.V(2).Info("Couldn't find ipfamilies for headless service, likely because controller manager is likely connected to an old apiserver that does not support ip families yet. The service endpoint slice will use dual stack families until api-server default it correctly", "service", klog.KObj(service))
 	return serviceSupportedAddresses
 }
 

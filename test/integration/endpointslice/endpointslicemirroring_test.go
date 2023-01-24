@@ -47,6 +47,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
 
@@ -58,6 +59,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		1*time.Second)
 
 	epsController := endpointslice.NewController(
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),
@@ -75,11 +77,10 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informers.Start(ctx.Done())
 	go epController.Run(ctx, 5)
-	go epsController.Run(5, ctx.Done())
+	go epsController.Run(ctx, 5)
 	go epsmController.Run(5, ctx.Done())
 
 	testCases := []struct {

@@ -38,6 +38,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
@@ -481,6 +482,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	svc, epMeta := newServiceAndEndpointMeta("foo", namespace)
 	emptySlice := newEmptyEndpointSlice(1, namespace, epMeta, svc)
 	emptySlice.ObjectMeta.Labels = map[string]string{"bar": "baz"}
+	logger, _ := ktesting.NewTestContext(t)
 
 	testCases := []struct {
 		desc        string
@@ -495,7 +497,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 		},
 		{
 			desc:        "Existing placeholder that's the same",
-			existing:    newEndpointSlice(&svc, &endpointMeta{ports: []discovery.EndpointPort{}, addressType: discovery.AddressTypeIPv4}),
+			existing:    newEndpointSlice(logger, &svc, &endpointMeta{ports: []discovery.EndpointPort{}, addressType: discovery.AddressTypeIPv4}),
 			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 0},
 		},
 		{
@@ -1608,6 +1610,7 @@ func TestReconcilerPodMissingNode(t *testing.T) {
 			client := newClientset()
 			setupMetrics()
 			r := newReconciler(client, tc.existingNodes, defaultMaxEndpointsPerSlice)
+			logger, _ := ktesting.NewTestContext(t)
 
 			svc := service.DeepCopy()
 			svc.Spec.PublishNotReadyAddresses = tc.publishNotReady
@@ -1620,7 +1623,7 @@ func TestReconcilerPodMissingNode(t *testing.T) {
 					t.Errorf("Expected no error creating endpoint slice")
 				}
 			}
-			err := r.reconcile(svc, pods, existingSlices, time.Now())
+			err := r.reconcile(logger, svc, pods, existingSlices, time.Now())
 			if err == nil && tc.expectError {
 				t.Errorf("Expected error but no error received")
 			}
@@ -1833,19 +1836,20 @@ func TestReconcileTopology(t *testing.T) {
 			client := newClientset()
 			cmc := newCacheMutationCheck(tc.existingSlices)
 			createEndpointSlices(t, client, ns, tc.existingSlices)
+			logger, _ := ktesting.NewTestContext(t)
 
 			setupMetrics()
 			r := newReconciler(client, tc.nodes, defaultMaxEndpointsPerSlice)
 			if tc.topologyCacheEnabled {
 				r.topologyCache = topologycache.NewTopologyCache()
-				r.topologyCache.SetNodes(tc.nodes)
+				r.topologyCache.SetNodes(logger, tc.nodes)
 			}
 
 			service := svc.DeepCopy()
 			service.Annotations = map[string]string{
 				corev1.DeprecatedAnnotationTopologyAwareHints: tc.hintsAnnotation,
 			}
-			r.reconcile(service, tc.pods, tc.existingSlices, time.Now())
+			r.reconcile(logger, service, tc.pods, tc.existingSlices, time.Now())
 
 			cmc.Check(t)
 			expectMetrics(t, tc.expectedMetrics)
@@ -2034,8 +2038,9 @@ func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string)
 }
 
 func reconcileHelper(t *testing.T, r *reconciler, service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time) {
+	logger, _ := ktesting.NewTestContext(t)
 	t.Helper()
-	err := r.reconcile(service, pods, existingSlices, triggerTime)
+	err := r.reconcile(logger, service, pods, existingSlices, triggerTime)
 	if err != nil {
 		t.Fatalf("Expected no error reconciling Endpoint Slices, got: %v", err)
 	}

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/pointer"
 )
 
@@ -206,8 +207,9 @@ func TestNewEndpointSlice(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			svc := tc.updateSvc(service)
-			generatedSlice := newEndpointSlice(&svc, &endpointMeta)
+			generatedSlice := newEndpointSlice(logger, &svc, &endpointMeta)
 			assert.EqualValues(t, tc.expectedSlice, generatedSlice)
 		})
 	}
@@ -587,7 +589,8 @@ func TestGetEndpointPorts(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			actualPorts := getEndpointPorts(tc.service, tc.pod)
+			logger, _ := ktesting.NewTestContext(t)
+			actualPorts := getEndpointPorts(logger, tc.service, tc.pod)
 
 			if len(actualPorts) != len(tc.expectedPorts) {
 				t.Fatalf("Expected %d ports, got %d", len(tc.expectedPorts), len(actualPorts))
@@ -875,8 +878,9 @@ func TestSetEndpointSliceLabels(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			svc := tc.updateSvc(service)
-			labels, updated := setEndpointSliceLabels(tc.epSlice, &svc)
+			labels, updated := setEndpointSliceLabels(logger, tc.epSlice, &svc)
 			assert.EqualValues(t, updated, tc.expectedUpdate)
 			assert.EqualValues(t, tc.expectedLabels, labels)
 		})
@@ -1113,7 +1117,8 @@ func TestSupportedServiceAddressType(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			addressTypes := getAddressTypesForService(&testCase.service)
+			logger, _ := ktesting.NewTestContext(t)
+			addressTypes := getAddressTypesForService(logger, &testCase.service)
 			if len(addressTypes) != len(testCase.expectedAddressTypes) {
 				t.Fatalf("expected count address types %v got %v", len(testCase.expectedAddressTypes), len(addressTypes))
 			}
