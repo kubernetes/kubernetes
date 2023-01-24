@@ -89,8 +89,6 @@ type Manager interface {
 	// GetUIDTranslations returns the mappings of static pod UIDs to mirror pod
 	// UIDs and mirror pod UIDs to static pod UIDs.
 	GetUIDTranslations() (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
-
-	MirrorClient
 }
 
 // basicManager is a functional Manager.
@@ -112,15 +110,11 @@ type basicManager struct {
 
 	// Mirror pod UID to pod UID map.
 	translationByUID map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID
-
-	// A mirror pod client to create/delete mirror pods.
-	MirrorClient
 }
 
 // NewBasicPodManager returns a functional Manager.
-func NewBasicPodManager(client MirrorClient) Manager {
+func NewBasicPodManager() Manager {
 	pm := &basicManager{}
-	pm.MirrorClient = client
 	pm.SetPods(nil)
 	return pm
 }

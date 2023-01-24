@@ -30,7 +30,7 @@ import (
 // Stub out mirror client for testing purpose.
 func newTestManager() (*basicManager, *podtest.FakeMirrorClient) {
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
-	manager := NewBasicPodManager(fakeMirrorClient).(*basicManager)
+	manager := NewBasicPodManager().(*basicManager)
 	return manager, fakeMirrorClient
 }
 
