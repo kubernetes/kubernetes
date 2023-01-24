@@ -597,7 +597,11 @@ func TestDispatchWorkOfCompletedPod(t *testing.T) {
 		},
 	}
 	for _, pod := range pods {
-		kubelet.dispatchWork(pod, kubetypes.SyncPodSync, nil, time.Now())
+		kubelet.podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodSync,
+			StartTime:  time.Now(),
+		})
 		if !got {
 			t.Errorf("Should not skip completed pod %q", pod.Name)
 		}
@@ -651,7 +655,11 @@ func TestDispatchWorkOfActivePod(t *testing.T) {
 	}
 
 	for _, pod := range pods {
-		kubelet.dispatchWork(pod, kubetypes.SyncPodSync, nil, time.Now())
+		kubelet.podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodSync,
+			StartTime:  time.Now(),
+		})
 		if !got {
 			t.Errorf("Should not skip active pod %q", pod.Name)
 		}

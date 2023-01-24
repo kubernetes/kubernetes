@@ -2442,32 +2442,6 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 	handler.HandlePodSyncs([]*v1.Pod{pod})
 }
 
-// dispatchWork starts the asynchronous sync of the pod in a pod worker.
-// If the pod has completed termination, dispatchWork will perform no action.
-func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mirrorPod *v1.Pod, start time.Time) {
-	// Run the sync in an async worker.
-	kl.podWorkers.UpdatePod(UpdatePodOptions{
-		Pod:        pod,
-		MirrorPod:  mirrorPod,
-		UpdateType: syncType,
-		StartTime:  start,
-	})
-	// Note the number of containers for new pods.
-	if syncType == kubetypes.SyncPodCreate {
-		metrics.ContainersPerPodCount.Observe(float64(len(pod.Spec.Containers)))
-	}
-}
-
-// TODO: handle mirror pods in a separate component (issue #17251)
-func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
-	// Mirror pod ADD/UPDATE/DELETE operations are considered an UPDATE to the
-	// corresponding static pod. Send update to the pod worker if the static
-	// pod exists.
-	if pod, ok := kl.podManager.GetPodByMirrorPod(mirrorPod); ok {
-		kl.dispatchWork(pod, kubetypes.SyncPodUpdate, mirrorPod, start)
-	}
-}
-
 // HandlePodAdditions is the callback in SyncHandler for pods being added from
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
@@ -2485,8 +2459,18 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// the apiserver and no action (other than cleanup) is required.
 		kl.podManager.AddPod(pod)
 
-		if kubetypes.IsMirrorPod(pod) {
-			kl.handleMirrorPod(pod, start)
+		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		if wasMirror {
+			if pod == nil {
+				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
+				continue
+			}
+			kl.podWorkers.UpdatePod(UpdatePodOptions{
+				Pod:        pod,
+				MirrorPod:  mirrorPod,
+				UpdateType: kubetypes.SyncPodUpdate,
+				StartTime:  start,
+			})
 			continue
 		}
 
@@ -2530,8 +2514,12 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				}
 			}
 		}
-		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
+		kl.podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			MirrorPod:  mirrorPod,
+			UpdateType: kubetypes.SyncPodCreate,
+			StartTime:  start,
+		})
 	}
 }
 
@@ -2541,12 +2529,21 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.UpdatePod(pod)
-		if kubetypes.IsMirrorPod(pod) {
-			kl.handleMirrorPod(pod, start)
-			continue
+
+		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		if wasMirror {
+			if pod == nil {
+				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
+				continue
+			}
 		}
-		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubetypes.SyncPodUpdate, mirrorPod, start)
+
+		kl.podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			MirrorPod:  mirrorPod,
+			UpdateType: kubetypes.SyncPodUpdate,
+			StartTime:  start,
+		})
 	}
 }
 
@@ -2556,10 +2553,22 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.DeletePod(pod)
-		if kubetypes.IsMirrorPod(pod) {
-			kl.handleMirrorPod(pod, start)
+
+		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		if wasMirror {
+			if pod == nil {
+				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
+				continue
+			}
+			kl.podWorkers.UpdatePod(UpdatePodOptions{
+				Pod:        pod,
+				MirrorPod:  mirrorPod,
+				UpdateType: kubetypes.SyncPodUpdate,
+				StartTime:  start,
+			})
 			continue
 		}
+
 		// Deletion is allowed to fail because the periodic cleanup routine
 		// will trigger deletion again.
 		if err := kl.deletePod(pod); err != nil {
@@ -2569,7 +2578,8 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 }
 
 // HandlePodReconcile is the callback in the SyncHandler interface for pods
-// that should be reconciled.
+// that should be reconciled. Pods are reconciled when only the status of the
+// pod is updated in the API.
 func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
@@ -2577,13 +2587,37 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// to the pod manager.
 		kl.podManager.UpdatePod(pod)
 
+		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		if wasMirror {
+			if pod == nil {
+				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
+				continue
+			}
+			// Static pods should be reconciled the same way as regular pods
+		}
+
+		// TODO: reconcile being calculated in the config manager is questionable, and avoiding
+		// extra syncs may no longer be necessary. Reevaluate whether Reconcile and Sync can be
+		// merged (after resolving the next two TODOs).
+
 		// Reconcile Pod "Ready" condition if necessary. Trigger sync pod for reconciliation.
+		// TODO: this should be unnecessary today - determine what is the cause for this to
+		// be different than Sync, or if there is a better place for it. For instance, we have
+		// needsReconcile in kubelet/config, here, and in status_manager.
 		if status.NeedToReconcilePodReadiness(pod) {
-			mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-			kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+			kl.podWorkers.UpdatePod(UpdatePodOptions{
+				Pod:        pod,
+				MirrorPod:  mirrorPod,
+				UpdateType: kubetypes.SyncPodSync,
+				StartTime:  start,
+			})
 		}
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
+		// TODO: this is questionable - status read is async and during eviction we already
+		// expect to not have some container info. The pod worker knows whether a pod has
+		// been evicted, so if this is about minimizing the time to react to an eviction we
+		// can do better. If it's about preserving pod status info we can also do better.
 		if eviction.PodIsEvicted(pod.Status) {
 			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
 				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
@@ -2597,8 +2631,24 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
-		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		kl.dispatchWork(pod, kubetypes.SyncPodSync, mirrorPod, start)
+		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		if wasMirror {
+			if pod == nil {
+				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
+				continue
+			}
+			// Syncing a mirror pod is a programmer error since the intent of sync is to
+			// batch notify all pending work. We should make it impossible to double sync,
+			// but for now log a programmer error to prevent accidental introduction.
+			klog.V(3).InfoS("Programmer error, HandlePodSyncs does not expect to receive mirror pods", "podUID", pod.UID, "mirrorPodUID", mirrorPod.UID)
+			continue
+		}
+		kl.podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			MirrorPod:  mirrorPod,
+			UpdateType: kubetypes.SyncPodSync,
+			StartTime:  start,
+		})
 	}
 }
 

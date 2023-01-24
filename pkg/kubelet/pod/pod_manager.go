@@ -60,6 +60,10 @@ type Manager interface {
 	// GetMirrorPodByPod returns the mirror pod for the given static pod and
 	// whether it was known to the pod manager.
 	GetMirrorPodByPod(*v1.Pod) (*v1.Pod, bool)
+	// GetPodAndMirrorPod returns the complement for a pod - if a pod was provided
+	// and a mirror pod can be found, return it. If a mirror pod is provided and
+	// the pod can be found, return it and true for wasMirror.
+	GetPodAndMirrorPod(*v1.Pod) (pod, mirrorPod *v1.Pod, wasMirror bool)
 	// GetPodsAndMirrorPods returns the set of pods, the set of mirror pods, and
 	// the pod fullnames of any orphaned mirror pods.
 	GetPodsAndMirrorPods() (allPods []*v1.Pod, allMirrorPods []*v1.Pod, orphanedMirrorPodFullnames []string)
@@ -323,4 +327,16 @@ func (pm *basicManager) GetPodByMirrorPod(mirrorPod *v1.Pod) (*v1.Pod, bool) {
 	defer pm.lock.RUnlock()
 	pod, ok := pm.podByFullName[kubecontainer.GetPodFullName(mirrorPod)]
 	return pod, ok
+}
+
+func (pm *basicManager) GetPodAndMirrorPod(aPod *v1.Pod) (pod, mirrorPod *v1.Pod, wasMirror bool) {
+	pm.lock.RLock()
+	defer pm.lock.RUnlock()
+
+	fullName := kubecontainer.GetPodFullName(aPod)
+	if kubetypes.IsMirrorPod(aPod) {
+		return pm.podByFullName[fullName], aPod, true
+	}
+	return aPod, pm.mirrorPodByFullName[fullName], false
+
 }
