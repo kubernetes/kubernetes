@@ -26,8 +26,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -293,6 +293,31 @@ func (c *celAdmissionController) Validate(
 					continue
 				}
 			}
+
+			// Ensure param is populated with its GVK for consistency
+			// (CRD dynamic informer always returns objects with kind/apiversion,
+			// but native types do not include populated TypeMeta.
+			if param != nil {
+				if paramGVK := param.GetObjectKind(); paramGVK.GroupVersionKind().Empty() {
+					// https://github.com/kubernetes/client-go/issues/413#issue-324586398
+					gvks, _, err := k8sscheme.Scheme.ObjectKinds(param)
+					if err != nil {
+						return fmt.Errorf("missing apiVersion or kind and cannot assign it; %w", err)
+					}
+
+					for _, gvk := range gvks {
+						if len(gvk.Kind) == 0 {
+							continue
+						}
+						if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+							continue
+						}
+						paramGVK.SetGroupVersionKind(gvk)
+						break
+					}
+				}
+			}
+
 			decisions, err := bindingInfo.validator.Validate(a, o, param, matchKind)
 			if err != nil {
 				// runtime error. Apply failure policy
