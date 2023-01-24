@@ -35,7 +35,7 @@ func TestAdmission(t *testing.T) {
 	pod := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
-			InitContainers: []api.Container{
+			InitContainers: []api.InitContainer{
 				{Name: "init1", Image: "image"},
 				{Name: "init2", Image: "image", ImagePullPolicy: api.PullNever},
 				{Name: "init3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
@@ -71,7 +71,7 @@ func TestValidate(t *testing.T) {
 	pod := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
-			InitContainers: []api.Container{
+			InitContainers: []api.InitContainer{
 				{Name: "init1", Image: "image"},
 				{Name: "init2", Image: "image", ImagePullPolicy: api.PullNever},
 				{Name: "init3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},

@@ -222,7 +222,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -249,7 +249,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -276,7 +276,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -303,7 +303,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -330,7 +330,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -357,7 +357,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -384,7 +384,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -411,7 +411,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -438,7 +438,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -465,7 +465,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -492,7 +492,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -519,7 +519,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -546,7 +546,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -575,7 +575,7 @@ func TestSetImageRemote(t *testing.T) {
 											Image: "nginx",
 										},
 									},
-									InitContainers: []corev1.Container{
+									InitContainers: []corev1.InitContainer{
 										{
 											Name:  "busybox",
 											Image: "busybox",
@@ -604,7 +604,7 @@ func TestSetImageRemote(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -689,7 +689,7 @@ func TestSetImageRemoteWithSpecificContainers(t *testing.T) {
 									Image: "nginx",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "busybox",
 									Image: "busybox",
@@ -716,7 +716,7 @@ func TestSetImageRemoteWithSpecificContainers(t *testing.T) {
 									Image: "busybox",
 								},
 							},
-							InitContainers: []corev1.Container{
+							InitContainers: []corev1.InitContainer{
 								{
 									Name:  "nginx",
 									Image: "nginx",

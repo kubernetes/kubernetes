@@ -167,7 +167,7 @@ func TestFsUserFrom(t *testing.T) {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							SecurityContext: &v1.SecurityContext{
 								RunAsUser: utilptr.Int64Ptr(1000),
@@ -193,7 +193,7 @@ func TestFsUserFrom(t *testing.T) {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							SecurityContext: &v1.SecurityContext{
 								RunAsUser: utilptr.Int64Ptr(999),
@@ -221,7 +221,7 @@ func TestFsUserFrom(t *testing.T) {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							SecurityContext: &v1.SecurityContext{
 								RunAsUser: utilptr.Int64Ptr(1000),
@@ -682,7 +682,7 @@ func TestGetPodVolumeNames(t *testing.T) {
 			name: "pod with init containers",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Name: "initContainer",
 							VolumeMounts: []v1.VolumeMount{
@@ -726,7 +726,7 @@ func TestGetPodVolumeNames(t *testing.T) {
 			name: "pod with multiple containers",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Name: "initContainer1",
 							VolumeMounts: []v1.VolumeMount{
@@ -833,7 +833,7 @@ func TestGetPodVolumeNames(t *testing.T) {
 							Level: "s0:c1,c2",
 						},
 					},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Name: "initContainer1",
 							SecurityContext: &v1.SecurityContext{

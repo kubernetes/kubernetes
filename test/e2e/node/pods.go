@@ -240,7 +240,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				},
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyOnFailure,
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Name:  "foo",
 							Image: image,
@@ -533,7 +533,7 @@ func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
 			Spec: v1.PodSpec{
 				RestartPolicy:                 v1.RestartPolicyNever,
 				TerminationGracePeriodSeconds: &one,
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						Name:  "fail",
 						Image: imageutils.GetE2EImage(imageutils.BusyBox),

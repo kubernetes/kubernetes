@@ -336,7 +336,7 @@ func TestGetContainerSpec(t *testing.T) {
 					Containers: []v1.Container{
 						{Name: "plain-ole-container"},
 					},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{Name: "init-container"},
 					},
 				},
@@ -351,7 +351,7 @@ func TestGetContainerSpec(t *testing.T) {
 					Containers: []v1.Container{
 						{Name: "plain-ole-container"},
 					},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{Name: "init-container"},
 					},
 				},
@@ -366,7 +366,7 @@ func TestGetContainerSpec(t *testing.T) {
 					Containers: []v1.Container{
 						{Name: "plain-ole-container"},
 					},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{Name: "init-container"},
 					},
 					EphemeralContainers: []v1.EphemeralContainer{
@@ -532,7 +532,7 @@ func TestHasPrivilegedContainer(t *testing.T) {
 	for k, v := range tests {
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{SecurityContext: v.securityContext},
 				},
 			},

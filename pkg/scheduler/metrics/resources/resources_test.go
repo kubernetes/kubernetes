@@ -52,7 +52,7 @@ func Test_podResourceCollector_Handler(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 			Spec: v1.PodSpec{
 				NodeName: "node-one",
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							"cpu":    resource.MustParse("2"),
@@ -133,7 +133,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 					Spec: v1.PodSpec{
-						InitContainers: []v1.Container{},
+						InitContainers: []v1.InitContainer{},
 						Containers:     []v1.Container{},
 					},
 				},
@@ -169,7 +169,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 					},
 				},
 			},
-			expected: `      
+			expected: `
 				# HELP kube_pod_resource_limit [ALPHA] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
 				# TYPE kube_pod_resource_limit gauge
 				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 1
@@ -222,7 +222,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo-pending"},
 					Spec: v1.PodSpec{
 						NodeName: "node-one",
-						InitContainers: []v1.Container{
+						InitContainers: []v1.InitContainer{
 							{Resources: v1.ResourceRequirements{Requests: v1.ResourceList{"cpu": resource.MustParse("1")}}},
 						},
 						Containers: []v1.Container{
@@ -251,7 +251,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 					Spec: v1.PodSpec{
-						InitContainers: []v1.Container{
+						InitContainers: []v1.InitContainer{
 							{Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									"cpu":                    resource.MustParse("0"),
@@ -312,7 +312,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 					Spec: v1.PodSpec{
 						NodeName: "node-one",
-						InitContainers: []v1.Container{
+						InitContainers: []v1.InitContainer{
 							{Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									"cpu":    resource.MustParse("2"),
@@ -362,7 +362,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"},
 					Spec: v1.PodSpec{
 						NodeName: "node-one",
-						InitContainers: []v1.Container{
+						InitContainers: []v1.InitContainer{
 							{Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									"cpu":    resource.MustParse("2"),
@@ -432,7 +432,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 					},
 				},
 			},
-			expected: `            
+			expected: `
 				# HELP kube_pod_resource_limit [ALPHA] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
 				# TYPE kube_pod_resource_limit gauge
 				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 3.25
@@ -454,7 +454,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 							"memory": resource.MustParse("0.75G"),
 							"custom": resource.MustParse("0.5"),
 						},
-						InitContainers: []v1.Container{
+						InitContainers: []v1.InitContainer{
 							{Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
 									"cpu":    resource.MustParse("2"),

@@ -1082,7 +1082,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 			UID: uuid.NewUUID(),
 		},
 		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{
+			InitContainers: []v1.InitContainer{
 				{
 					Name: string(uuid.NewUUID()),
 					Resources: v1.ResourceRequirements{

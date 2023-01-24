@@ -84,7 +84,7 @@ func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.Pod
 			RestartPolicy:  api.RestartPolicyOnFailure,
 			DNSPolicy:      api.DNSClusterFirst,
 			Containers:     []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-			InitContainers: []api.Container{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+			InitContainers: []api.InitContainer{{Name: "def", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 		},
 	}
 }

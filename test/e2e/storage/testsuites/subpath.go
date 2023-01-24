@@ -544,7 +544,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 			Namespace: f.Namespace.Name,
 		},
 		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{
+			InitContainers: []v1.InitContainer{
 				{
 					Name:            fmt.Sprintf("init-volume-%s", suffix),
 					Image:           e2epod.GetDefaultTestImage(),

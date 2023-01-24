@@ -353,7 +353,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 	// testing InitContainers
 	pod = &api.Pod{
 		Spec: api.PodSpec{
-			InitContainers: []api.Container{
+			InitContainers: []api.InitContainer{
 				{},
 			},
 		},
@@ -439,7 +439,7 @@ func TestRespectsExistingMount(t *testing.T) {
 	// check init containers
 	pod = &api.Pod{
 		Spec: api.PodSpec{
-			InitContainers: []api.Container{
+			InitContainers: []api.InitContainer{
 				{
 					VolumeMounts: []api.VolumeMount{
 						expectedVolumeMount,
@@ -523,7 +523,7 @@ func TestAllowsReferencedSecret(t *testing.T) {
 
 	pod2 = &api.Pod{
 		Spec: api.PodSpec{
-			InitContainers: []api.Container{
+			InitContainers: []api.InitContainer{
 				{
 					Name: "container-1",
 					Env: []api.EnvVar{
@@ -600,7 +600,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 
 	pod2 = &api.Pod{
 		Spec: api.PodSpec{
-			InitContainers: []api.Container{
+			InitContainers: []api.InitContainer{
 				{
 					Name: "container-1",
 					Env: []api.EnvVar{

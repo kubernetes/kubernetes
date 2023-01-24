@@ -234,7 +234,7 @@ current-context: local-context
 							},
 						},
 					},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Name:    "init-log-file",
 							Image:   "debian",

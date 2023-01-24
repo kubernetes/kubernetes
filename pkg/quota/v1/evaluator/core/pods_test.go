@@ -42,7 +42,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 		"init container resource missing": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					InitContainers: []api.Container{{
+					InitContainers: []api.InitContainer{{
 						Name: "dummy",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
@@ -57,7 +57,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 		"multiple init container resource missing": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					InitContainers: []api.Container{{
+					InitContainers: []api.InitContainer{{
 						Name: "foo",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
@@ -157,7 +157,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 		"init container CPU": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					InitContainers: []api.Container{{
+					InitContainers: []api.InitContainer{{
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
 							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
@@ -176,7 +176,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 		"init container MEM": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					InitContainers: []api.Container{{
+					InitContainers: []api.InitContainer{{
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceMemory: resource.MustParse("1m")},
 							Limits:   api.ResourceList{api.ResourceMemory: resource.MustParse("2m")},
@@ -195,7 +195,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 		"init container local ephemeral storage": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					InitContainers: []api.Container{{
+					InitContainers: []api.InitContainer{{
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("32Mi")},
 							Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("64Mi")},
@@ -214,7 +214,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 		"init container hugepages": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					InitContainers: []api.Container{{
+					InitContainers: []api.InitContainer{{
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("100Mi")},
 						},
@@ -231,7 +231,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 		"init container extended resources": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					InitContainers: []api.Container{{
+					InitContainers: []api.InitContainer{{
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceName("example.com/dongle"): resource.MustParse("3")},
 							Limits:   api.ResourceList{api.ResourceName("example.com/dongle"): resource.MustParse("3")},
@@ -357,7 +357,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 		"init container maximums override sum of containers": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
-					InitContainers: []api.Container{
+					InitContainers: []api.InitContainer{
 						{
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{

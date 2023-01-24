@@ -426,7 +426,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 		"InitContainerAndContainerHasProperValues": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
@@ -451,7 +451,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 		"InitContainerAndContainerHasDifferentPageSizes": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
@@ -526,7 +526,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 		"InitContainerAndContainerHasProperValuesMultipleSizes": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{

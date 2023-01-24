@@ -470,7 +470,7 @@ func TestPodRequestsAndLimitsWithoutOverhead(t *testing.T) {
 							},
 						},
 					},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Name: "small-init",
 							Resources: v1.ResourceRequirements{
@@ -562,7 +562,7 @@ func getPod(cname string, resources podResources) *v1.Pod {
 					Resources: r,
 				},
 			},
-			InitContainers: []v1.Container{
+			InitContainers: []v1.InitContainer{
 				{
 					Name:      "init-" + cname,
 					Resources: r,

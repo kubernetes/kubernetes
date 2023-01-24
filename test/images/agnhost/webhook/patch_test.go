@@ -68,12 +68,12 @@ func TestPatches(t *testing.T) {
 			patch: podsInitContainerPatch,
 			initial: corev1.Pod{
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{},
+					InitContainers: []corev1.InitContainer{},
 				},
 			},
 			expected: &corev1.Pod{
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
+					InitContainers: []corev1.InitContainer{
 						{
 							Image:     "webhook-added-image",
 							Name:      "webhook-added-init-container",

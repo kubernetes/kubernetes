@@ -759,7 +759,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							InitContainers: []v1.Container{
+							InitContainers: []v1.InitContainer{
 								{
 									Name:  "install",
 									Image: "busybox",
@@ -782,7 +782,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							InitContainers: []v1.Container{
+							InitContainers: []v1.InitContainer{
 								{
 									Name:  "fun",
 									Image: "alpine",
@@ -826,7 +826,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							InitContainers: []v1.Container{
+							InitContainers: []v1.InitContainer{
 								{
 									Name:  "fun",
 									Image: "alpine",
@@ -859,7 +859,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							InitContainers: []v1.Container{
+							InitContainers: []v1.InitContainer{
 								{
 									Name:  "fun",
 									Image: "alpine",
@@ -901,7 +901,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							InitContainers: []v1.Container{
+							InitContainers: []v1.InitContainer{
 								{
 									Name:  "fun",
 									Image: "alpine",
@@ -961,7 +961,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							InitContainers: []v1.Container{
+							InitContainers: []v1.InitContainer{
 								{
 									Name:  "fun",
 									Image: "alpine",

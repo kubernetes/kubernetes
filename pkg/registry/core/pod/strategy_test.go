@@ -500,7 +500,7 @@ func TestCheckLogLocation(t *testing.T) {
 						{Name: "container1"},
 						{Name: "container2"},
 					},
-					InitContainers: []api.Container{
+					InitContainers: []api.InitContainer{
 						{Name: "initcontainer1"},
 					},
 				},
@@ -518,7 +518,7 @@ func TestCheckLogLocation(t *testing.T) {
 						{Name: "container1"},
 						{Name: "container2"},
 					},
-					InitContainers: []api.Container{
+					InitContainers: []api.InitContainer{
 						{Name: "initcontainer1"},
 					},
 					EphemeralContainers: []api.EphemeralContainer{
@@ -846,7 +846,7 @@ func TestPodStrategyValidate(t *testing.T) {
 				Spec: api.PodSpec{
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					InitContainers: []api.Container{{
+					InitContainers: []api.InitContainer{{
 						Name:                     containerName,
 						Image:                    "image",
 						ImagePullPolicy:          "IfNotPresent",
@@ -874,7 +874,7 @@ func TestPodStrategyValidate(t *testing.T) {
 				Spec: api.PodSpec{
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					InitContainers: []api.Container{{
+					InitContainers: []api.InitContainer{{
 						Name:                     containerName,
 						Image:                    "image",
 						ImagePullPolicy:          "IfNotPresent",

@@ -188,7 +188,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyNever,
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						Name:    "init1",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
@@ -265,7 +265,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 			Spec: v1.PodSpec{
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						Name:    "init1",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
@@ -345,7 +345,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 				},
 			},
 			Spec: v1.PodSpec{
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						Name:    "init1",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
@@ -469,7 +469,7 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 			},
 			Spec: v1.PodSpec{
 				RestartPolicy: v1.RestartPolicyNever,
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						Name:    "init1",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),

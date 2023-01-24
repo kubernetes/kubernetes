@@ -485,7 +485,7 @@ func testPodWithTwoContainersAndTwoInitContainers() *corev1.Pod {
 			Namespace: "test",
 		},
 		Spec: corev1.PodSpec{
-			InitContainers: []corev1.Container{
+			InitContainers: []corev1.InitContainer{
 				{Name: "foo-2-and-2-initc1"},
 				{Name: "foo-2-and-2-initc2"},
 			},
@@ -609,7 +609,7 @@ func testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers() *corev1.Pod {
 			Namespace: "test",
 		},
 		Spec: corev1.PodSpec{
-			InitContainers: []corev1.Container{
+			InitContainers: []corev1.InitContainer{
 				{Name: "foo-2-and-2-and-1-initc1"},
 				{Name: "foo-2-and-2-and-1-initc2"},
 			},

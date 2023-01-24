@@ -8746,7 +8746,7 @@ func TestValidatePodSpec(t *testing.T) {
 				{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 			},
 			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			InitContainers: []core.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			InitContainers: []core.InitContainer{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy:  core.RestartPolicyAlways,
 			NodeSelector: map[string]string{
 				"key": "value",
@@ -8761,7 +8761,7 @@ func TestValidatePodSpec(t *testing.T) {
 				{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 			},
 			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			InitContainers: []core.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			InitContainers: []core.InitContainer{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy:  core.RestartPolicyAlways,
 			NodeSelector: map[string]string{
 				"key": "value",
@@ -8923,7 +8923,7 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 		"bad init container": {
 			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			InitContainers: []core.Container{{}},
+			InitContainers: []core.InitContainer{{}},
 			RestartPolicy:  core.RestartPolicyAlways,
 			DNSPolicy:      core.DNSClusterFirst,
 		},
@@ -9609,7 +9609,7 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 			Spec: core.PodSpec{
-				InitContainers: []core.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				InitContainers: []core.InitContainer{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				RestartPolicy:  core.RestartPolicyAlways,
 				DNSPolicy:      core.DNSClusterFirst,
@@ -9655,7 +9655,7 @@ func TestValidatePod(t *testing.T) {
 		"valid extended resources for init container": {
 			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
 			Spec: core.PodSpec{
-				InitContainers: []core.Container{
+				InitContainers: []core.InitContainer{
 					{
 						Name:            "valid-extended",
 						Image:           "image",
@@ -9679,7 +9679,7 @@ func TestValidatePod(t *testing.T) {
 		"valid extended resources for regular container": {
 			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
 			Spec: core.PodSpec{
-				InitContainers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				InitContainers: []core.InitContainer{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				Containers: []core.Container{
 					{
 						Name:            "valid-extended",
@@ -10460,7 +10460,7 @@ func TestValidatePod(t *testing.T) {
 					},
 				},
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					InitContainers: []core.InitContainer{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 					Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 					RestartPolicy:  core.RestartPolicyAlways,
 					DNSPolicy:      core.DNSClusterFirst,
@@ -10592,7 +10592,7 @@ func TestValidatePod(t *testing.T) {
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						{
 							Name:            "invalid",
 							Image:           "image",
@@ -10640,7 +10640,7 @@ func TestValidatePod(t *testing.T) {
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						{
 							Name:            "invalid",
 							Image:           "image",
@@ -11008,7 +11008,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Name: "foo",
 				},
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						{
 							Image: "foo:V1",
 						},
@@ -11018,7 +11018,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						{
 							Image: "foo:V2",
 						},
@@ -11101,7 +11101,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						{
 							Name:                     "container",
 							Image:                    "foo:V1",
@@ -11114,7 +11114,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						{
 							Name:                     "container",
 							Image:                    "foo:V2",
@@ -11160,7 +11160,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						{
 							Name:                     "container",
 							TerminationMessagePolicy: "File",
@@ -11172,7 +11172,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						{
 							Name:                     "container",
 							Image:                    "foo:V2",
@@ -20909,7 +20909,7 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 							TerminationMessagePolicy: core.TerminationMessageFallbackToLogsOnError,
 						},
 					},
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						{
 							Name: "init-test",
 							SecurityContext: &core.SecurityContext{
@@ -21286,7 +21286,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 						},
 					},
 				}},
-				InitContainers: []core.Container{{
+				InitContainers: []core.InitContainer{{
 					Name: containerName,
 					SecurityContext: &core.SecurityContext{
 						WindowsOptions: &core.WindowsSecurityContextOptions{
@@ -21312,7 +21312,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 						},
 					},
 				}},
-				InitContainers: []core.Container{{
+				InitContainers: []core.InitContainer{{
 					Name: containerName,
 					SecurityContext: &core.SecurityContext{
 						WindowsOptions: &core.WindowsSecurityContextOptions{
@@ -21338,7 +21338,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 						},
 					},
 				}},
-				InitContainers: []core.Container{{
+				InitContainers: []core.InitContainer{{
 					Name: containerName,
 					SecurityContext: &core.SecurityContext{
 						WindowsOptions: &core.WindowsSecurityContextOptions{
@@ -21364,7 +21364,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 						},
 					},
 				}},
-				InitContainers: []core.Container{{
+				InitContainers: []core.InitContainer{{
 					Name: containerName,
 				}},
 			},
@@ -21388,7 +21388,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 						},
 					},
 				}},
-				InitContainers: []core.Container{{
+				InitContainers: []core.InitContainer{{
 					Name: containerName,
 					SecurityContext: &core.SecurityContext{
 						WindowsOptions: &core.WindowsSecurityContextOptions{
@@ -21447,7 +21447,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 						},
 					},
 				}},
-				InitContainers: []core.Container{{
+				InitContainers: []core.InitContainer{{
 					Name: containerName,
 				}},
 			},
@@ -21471,7 +21471,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 						},
 					},
 				}},
-				InitContainers: []core.Container{{
+				InitContainers: []core.InitContainer{{
 					Name: containerName,
 				}},
 			},
@@ -21803,7 +21803,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		},
 		"init container": {
 			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			InitContainers: []core.Container{{Name: "ctr-init", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			InitContainers: []core.InitContainer{{Name: "ctr-init", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
 			RestartPolicy:  core.RestartPolicyAlways,
 			DNSPolicy:      core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{

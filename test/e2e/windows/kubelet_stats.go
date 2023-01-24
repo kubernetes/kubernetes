@@ -257,7 +257,7 @@ func newKubeletStatsTestPods(numPods int, image imageutils.Config, nodeName stri
 						},
 					},
 				},
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						Image: image.GetE2EImage(),
 						Name:  "init-container",

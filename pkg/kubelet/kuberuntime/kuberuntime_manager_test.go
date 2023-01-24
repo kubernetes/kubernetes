@@ -718,7 +718,7 @@ func TestPruneInitContainers(t *testing.T) {
 			Namespace: "new",
 		},
 		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{init1, init2},
+			InitContainers: []v1.InitContainer{init1, init2},
 		},
 	}
 

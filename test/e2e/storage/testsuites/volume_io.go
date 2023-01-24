@@ -192,7 +192,7 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 			},
 		},
 		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{
+			InitContainers: []v1.InitContainer{
 				{
 					Name:  config.Prefix + "-io-init",
 					Image: e2epod.GetDefaultTestImage(),

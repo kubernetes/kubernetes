@@ -100,14 +100,14 @@ func TestAdmit(t *testing.T) {
 			description: "pod with init container without any extended resources, expect no change in tolerations",
 			requestedPod: core.Pod{
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						containerRequestingMemory,
 					},
 				},
 			},
 			expectedPod: core.Pod{
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						containerRequestingMemory,
 					},
 				},
@@ -141,14 +141,14 @@ func TestAdmit(t *testing.T) {
 			description: "pod with init container with extended resource, expect toleration to be added",
 			requestedPod: core.Pod{
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						containerRequestingExtendedResource2,
 					},
 				},
 			},
 			expectedPod: core.Pod{
 				Spec: core.PodSpec{
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						containerRequestingExtendedResource2,
 					},
 					Tolerations: []core.Toleration{
@@ -209,7 +209,7 @@ func TestAdmit(t *testing.T) {
 						containerRequestingMemory,
 						containerRequestingExtendedResource1,
 					},
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						containerRequestingCPU,
 						containerRequestingExtendedResource2,
 					},
@@ -221,7 +221,7 @@ func TestAdmit(t *testing.T) {
 						containerRequestingMemory,
 						containerRequestingExtendedResource1,
 					},
-					InitContainers: []core.Container{
+					InitContainers: []core.InitContainer{
 						containerRequestingCPU,
 						containerRequestingExtendedResource2,
 					},

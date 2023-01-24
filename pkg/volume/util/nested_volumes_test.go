@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -165,7 +165,7 @@ func TestGetNestedMountpoints(t *testing.T) {
 							},
 						},
 					},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							VolumeMounts: []v1.VolumeMount{
 								{MountPath: "/mnt/dir", Name: "vol1"},

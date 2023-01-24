@@ -556,7 +556,7 @@ func TestSetResourcesRemoteWithSpecificContainers(t *testing.T) {
 			Spec: appsv1.DeploymentSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
-						InitContainers: []corev1.Container{
+						InitContainers: []corev1.InitContainer{
 							{
 								Name:  "init",
 								Image: "redis",

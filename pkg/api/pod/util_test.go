@@ -56,7 +56,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -75,7 +75,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -94,7 +94,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -113,7 +113,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -132,7 +132,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2", SecurityContext: &api.SecurityContext{}},
 				},
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2", SecurityContext: &api.SecurityContext{}},
 				},
@@ -151,7 +151,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2", SecurityContext: &api.SecurityContext{}},
 				},
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2", SecurityContext: &api.SecurityContext{}},
 				},
@@ -218,7 +218,7 @@ func TestPodSecrets(t *testing.T) {
 								Name: "Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef"}}}}}}},
 			ImagePullSecrets: []api.LocalObjectReference{{
 				Name: "Spec.ImagePullSecrets"}},
-			InitContainers: []api.Container{{
+			InitContainers: []api.InitContainer{{
 				EnvFrom: []api.EnvFromSource{{
 					SecretRef: &api.SecretEnvSource{
 						LocalObjectReference: api.LocalObjectReference{
@@ -424,7 +424,7 @@ func TestPodConfigmaps(t *testing.T) {
 							ConfigMapKeyRef: &api.ConfigMapKeySelector{
 								LocalObjectReference: api.LocalObjectReference{
 									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}}},
-			InitContainers: []api.Container{{
+			InitContainers: []api.InitContainer{{
 				EnvFrom: []api.EnvFromSource{{
 					ConfigMapRef: &api.ConfigMapEnvSource{
 						LocalObjectReference: api.LocalObjectReference{
@@ -602,7 +602,7 @@ func TestDropProcMount(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy:  api.RestartPolicyNever,
 				Containers:     []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &procMount}}},
-				InitContainers: []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &procMount}}},
+				InitContainers: []api.InitContainer{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &procMount}}},
 			},
 		}
 	}
@@ -611,7 +611,7 @@ func TestDropProcMount(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy:  api.RestartPolicyNever,
 				Containers:     []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &defaultProcMount}}},
-				InitContainers: []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &defaultProcMount}}},
+				InitContainers: []api.InitContainer{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &defaultProcMount}}},
 			},
 		}
 	}
@@ -620,7 +620,7 @@ func TestDropProcMount(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy:  api.RestartPolicyNever,
 				Containers:     []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: nil}}},
-				InitContainers: []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: nil}}},
+				InitContainers: []api.InitContainer{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: nil}}},
 			},
 		}
 	}
@@ -796,7 +796,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 					},
 				},
 			},
-			InitContainers: []api.Container{
+			InitContainers: []api.InitContainer{
 				{
 					Resources: api.ResourceRequirements{
 						Claims: []api.ResourceClaim{{Name: "my-claim"}},
@@ -825,7 +825,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 	podWithoutClaims := &api.Pod{
 		Spec: api.PodSpec{
 			Containers:          []api.Container{{}},
-			InitContainers:      []api.Container{{}},
+			InitContainers:      []api.InitContainer{{}},
 			EphemeralContainers: []api.EphemeralContainer{{}},
 		},
 	}

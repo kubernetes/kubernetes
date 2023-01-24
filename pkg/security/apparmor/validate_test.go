@@ -109,7 +109,7 @@ func TestValidateValidHost(t *testing.T) {
 			},
 		},
 		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{
+			InitContainers: []v1.InitContainer{
 				{Name: "init"},
 			},
 			Containers: []v1.Container{

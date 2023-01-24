@@ -175,7 +175,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			pod, err := test.options.findAttachablePod(&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "test"},
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
+					InitContainers: []corev1.InitContainer{
 						{
 							Name: "initfoo",
 						},
@@ -458,7 +458,7 @@ func attachPod() *corev1.Pod {
 					Name: "bar",
 				},
 			},
-			InitContainers: []corev1.Container{
+			InitContainers: []corev1.InitContainer{
 				{
 					Name: "initfoo",
 				},

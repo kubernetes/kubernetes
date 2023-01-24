@@ -220,7 +220,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -239,7 +239,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -258,7 +258,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -277,7 +277,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -296,7 +296,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2", SecurityContext: &v1.SecurityContext{}},
 				},
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{Name: "i1"},
 					{Name: "i2", SecurityContext: &v1.SecurityContext{}},
 				},
@@ -315,7 +315,7 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2", SecurityContext: &v1.SecurityContext{}},
 				},
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{Name: "i1"},
 					{Name: "i2", SecurityContext: &v1.SecurityContext{}},
 				},
@@ -382,7 +382,7 @@ func TestPodSecrets(t *testing.T) {
 								Name: "Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef"}}}}}}},
 			ImagePullSecrets: []v1.LocalObjectReference{{
 				Name: "Spec.ImagePullSecrets"}},
-			InitContainers: []v1.Container{{
+			InitContainers: []v1.InitContainer{{
 				EnvFrom: []v1.EnvFromSource{{
 					SecretRef: &v1.SecretEnvSource{
 						LocalObjectReference: v1.LocalObjectReference{
@@ -588,7 +588,7 @@ func TestPodConfigmaps(t *testing.T) {
 							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 								LocalObjectReference: v1.LocalObjectReference{
 									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}}},
-			InitContainers: []v1.Container{{
+			InitContainers: []v1.InitContainer{{
 				EnvFrom: []v1.EnvFromSource{{
 					ConfigMapRef: &v1.ConfigMapEnvSource{
 						LocalObjectReference: v1.LocalObjectReference{

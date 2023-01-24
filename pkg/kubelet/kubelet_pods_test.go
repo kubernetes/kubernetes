@@ -1966,7 +1966,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
-		InitContainers: []v1.Container{
+		InitContainers: []v1.InitContainer{
 			{Name: "containerX"},
 		},
 		Containers: []v1.Container{
@@ -2169,7 +2169,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
-		InitContainers: []v1.Container{
+		InitContainers: []v1.InitContainer{
 			{Name: "containerX"},
 		},
 		Containers: []v1.Container{

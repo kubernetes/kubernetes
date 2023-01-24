@@ -682,7 +682,7 @@ func TestContainerCombinations(t *testing.T) {
 							SecurityContext: &api.SecurityContext{},
 						},
 					},
-					InitContainers: []api.Container{
+					InitContainers: []api.InitContainer{
 						{
 							Image:           "bad",
 							SecurityContext: &api.SecurityContext{},
@@ -705,7 +705,7 @@ func TestContainerCombinations(t *testing.T) {
 							SecurityContext: &api.SecurityContext{},
 						},
 					},
-					InitContainers: []api.Container{
+					InitContainers: []api.InitContainer{
 						{
 							Image:           "good",
 							SecurityContext: &api.SecurityContext{},
@@ -728,7 +728,7 @@ func TestContainerCombinations(t *testing.T) {
 							SecurityContext: &api.SecurityContext{},
 						},
 					},
-					InitContainers: []api.Container{
+					InitContainers: []api.InitContainer{
 						{
 							Image:           "good",
 							SecurityContext: &api.SecurityContext{},

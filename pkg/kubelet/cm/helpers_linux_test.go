@@ -260,7 +260,7 @@ func TestResourceConfigForPod(t *testing.T) {
 							Resources: getResourceRequirements(getResourceList("100m", "100m"), getResourceList("", "")),
 						},
 					},
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: getResourceRequirements(getResourceList("100m", "100m"), getResourceList("100m", "100Mi")),
 						},

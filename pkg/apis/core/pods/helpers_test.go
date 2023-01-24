@@ -52,7 +52,7 @@ func TestVisitContainersWithPath(t *testing.T) {
 			"init containers",
 			field.NewPath("spec"),
 			&api.PodSpec{
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -67,7 +67,7 @@ func TestVisitContainersWithPath(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -96,7 +96,7 @@ func TestVisitContainersWithPath(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},
@@ -115,7 +115,7 @@ func TestVisitContainersWithPath(t *testing.T) {
 					{Name: "c1"},
 					{Name: "c2"},
 				},
-				InitContainers: []api.Container{
+				InitContainers: []api.InitContainer{
 					{Name: "i1"},
 					{Name: "i2"},
 				},

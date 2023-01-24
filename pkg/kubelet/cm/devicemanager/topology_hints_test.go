@@ -676,7 +676,7 @@ func TestGetPodDeviceRequest(t *testing.T) {
 			description: "Init container requests device plugin resource",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
@@ -696,7 +696,7 @@ func TestGetPodDeviceRequest(t *testing.T) {
 			description: "Init containers request device plugin resource",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
@@ -745,7 +745,7 @@ func TestGetPodDeviceRequest(t *testing.T) {
 			description: "Init containers and user containers request the same amount of device plugin resources",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
@@ -798,7 +798,7 @@ func TestGetPodDeviceRequest(t *testing.T) {
 			description: "Init containers request more device plugin resources than user containers",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
@@ -850,7 +850,7 @@ func TestGetPodDeviceRequest(t *testing.T) {
 			description: "User containers request more device plugin resources than init containers",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
@@ -1517,7 +1517,7 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					UID: "fakePod",
 				},
 				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
+					InitContainers: []v1.InitContainer{
 						{
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{

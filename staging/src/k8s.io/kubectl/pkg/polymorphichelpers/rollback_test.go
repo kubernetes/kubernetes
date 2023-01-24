@@ -85,7 +85,7 @@ func TestStatefulSetApplyRevision(t *testing.T) {
 							Annotations: map[string]string{"version": "v3"},
 						},
 						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{{Name: "i0"}},
+							InitContainers: []corev1.InitContainer{{Name: "i0"}},
 							Containers:     []corev1.Container{{Name: "c0"}},
 							Volumes:        []corev1.Volume{{Name: "v0"}},
 							NodeSelector:   map[string]string{"1dsa": "n0"},
@@ -99,7 +99,7 @@ func TestStatefulSetApplyRevision(t *testing.T) {
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{{Name: "c1"}},
 							// keep diversity field, eg: nil or empty slice
-							InitContainers: []corev1.Container{},
+							InitContainers: []corev1.InitContainer{},
 						},
 					},
 				},
@@ -111,7 +111,7 @@ func TestStatefulSetApplyRevision(t *testing.T) {
 				Spec: appsv1.StatefulSetSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{{Name: "i0"}},
+							InitContainers: []corev1.InitContainer{{Name: "i0"}},
 						},
 					},
 				},
@@ -123,7 +123,7 @@ func TestStatefulSetApplyRevision(t *testing.T) {
 							Annotations: map[string]string{"version": "v3"},
 						},
 						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{{Name: "i1"}},
+							InitContainers: []corev1.InitContainer{{Name: "i1"}},
 							Containers:     []corev1.Container{{Name: "c1"}},
 							Volumes:        []corev1.Volume{{Name: "v1"}},
 						},
@@ -141,7 +141,7 @@ func TestStatefulSetApplyRevision(t *testing.T) {
 						},
 						Spec: corev1.PodSpec{
 							Containers:     []corev1.Container{{Name: "c1"}},
-							InitContainers: []corev1.Container{{Name: "i0"}},
+							InitContainers: []corev1.InitContainer{{Name: "i0"}},
 							Volumes:        []corev1.Volume{{Name: "v0"}},
 						},
 					},
@@ -154,7 +154,7 @@ func TestStatefulSetApplyRevision(t *testing.T) {
 							Annotations: map[string]string{"version": "v2"},
 						},
 						Spec: corev1.PodSpec{
-							InitContainers: []corev1.Container{{Name: "i1"}},
+							InitContainers: []corev1.InitContainer{{Name: "i1"}},
 							Containers:     []corev1.Container{{Name: "c1"}},
 							Volumes:        []corev1.Volume{{Name: "v1"}},
 						},

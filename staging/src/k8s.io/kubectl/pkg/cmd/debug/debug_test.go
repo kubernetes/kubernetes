@@ -167,7 +167,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 			},
 			pod: &corev1.Pod{
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
+					InitContainers: []corev1.InitContainer{
 						{
 							Name: "init-container-1",
 						},
@@ -684,7 +684,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 					Name: "target",
 				},
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
+					InitContainers: []corev1.InitContainer{
 						{
 							Name: "init-container-1",
 						},
@@ -704,7 +704,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 					Name: "debugger",
 				},
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
+					InitContainers: []corev1.InitContainer{
 						{
 							Name: "init-container-1",
 						},

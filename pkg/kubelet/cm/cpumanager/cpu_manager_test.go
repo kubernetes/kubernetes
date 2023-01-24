@@ -174,7 +174,7 @@ func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) 
 			UID:  "podUID",
 		},
 		Spec: v1.PodSpec{
-			InitContainers: []v1.Container{},
+			InitContainers: []v1.InitContainer{},
 			Containers:     []v1.Container{},
 		},
 	}
@@ -800,7 +800,7 @@ func TestReconcileState(t *testing.T) {
 						UID:  "fakePodUID",
 					},
 					Spec: v1.PodSpec{
-						InitContainers: []v1.Container{
+						InitContainers: []v1.InitContainer{
 							{
 								Name: "fakeContainerName",
 							},

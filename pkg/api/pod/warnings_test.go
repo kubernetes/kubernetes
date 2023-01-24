@@ -66,7 +66,7 @@ func BenchmarkNoWarnings(b *testing.B) {
 				{Name: "secret1"},
 				{Name: "secret2"},
 			},
-			InitContainers: []api.Container{
+			InitContainers: []api.InitContainer{
 				{Name: "init1", Env: env, Resources: api.ResourceRequirements{Requests: resources, Limits: resources}},
 				{Name: "init2", Env: env, Resources: api.ResourceRequirements{Requests: resources, Limits: resources}},
 			},
@@ -113,7 +113,7 @@ func BenchmarkWarnings(b *testing.B) {
 				{Name: "secret1"},
 				{Name: ""},
 			},
-			InitContainers: []api.Container{
+			InitContainers: []api.InitContainer{
 				{Name: "init1", Env: env, Resources: api.ResourceRequirements{Requests: resources, Limits: resources}},
 				{Name: "init2", Env: env, Resources: api.ResourceRequirements{Requests: resources, Limits: resources}},
 			},
@@ -270,7 +270,7 @@ func TestWarnings(t *testing.T) {
 		{
 			name: "duplicate env",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				InitContainers: []api.Container{{Env: []api.EnvVar{
+				InitContainers: []api.InitContainer{{Env: []api.EnvVar{
 					{Name: "a"},
 					{Name: "a"},
 					{Name: "a"},
@@ -291,7 +291,7 @@ func TestWarnings(t *testing.T) {
 		{
 			name: "fractional resources",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				InitContainers: []api.Container{{
+				InitContainers: []api.InitContainer{{
 					Resources: api.ResourceRequirements{Requests: resources, Limits: resources},
 				}},
 				Containers: []api.Container{{

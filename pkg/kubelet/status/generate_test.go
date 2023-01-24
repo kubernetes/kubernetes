@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -321,12 +321,12 @@ func TestGeneratePodReadyCondition(t *testing.T) {
 func TestGeneratePodInitializedCondition(t *testing.T) {
 	noInitContainer := &v1.PodSpec{}
 	oneInitContainer := &v1.PodSpec{
-		InitContainers: []v1.Container{
+		InitContainers: []v1.InitContainer{
 			{Name: "1234"},
 		},
 	}
 	twoInitContainer := &v1.PodSpec{
-		InitContainers: []v1.Container{
+		InitContainers: []v1.InitContainer{
 			{Name: "1234"},
 			{Name: "5678"},
 		},

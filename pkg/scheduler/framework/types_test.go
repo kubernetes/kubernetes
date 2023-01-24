@@ -625,7 +625,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 						},
 					},
 				},
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						Resources: v1.ResourceRequirements{
 							Requests: v1.ResourceList{
@@ -789,7 +789,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 								},
 							},
 						},
-						InitContainers: []v1.Container{
+						InitContainers: []v1.InitContainer{
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{

@@ -51,10 +51,10 @@ const (
 		throw "Contents of /etc/configmap/text.txt are not as expected"
 	}
 	if (-not(Test-Path $env:CONTAINER_SANDBOX_MOUNT_POINT\etc\hostpath)) {
-		throw "Cannot find hostpath volume" 
+		throw "Cannot find hostpath volume"
 	}
 	if (-not(Test-Path $env:CONTAINER_SANDBOX_MOUNT_POINT\etc\downwardapi\podname)) {
-		throw "Cannot find podname file in downward-api volume" 
+		throw "Cannot find podname file in downward-api volume"
 	}
 	$c = Get-Content -Path $env:CONTAINER_SANDBOX_MOUNT_POINT\etc\downwardapi\podname
 	if ($c -ne "host-process-volume-mounts") {
@@ -159,7 +159,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 					},
 				},
 				HostNetwork: true,
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Name:    "configure-node",
@@ -541,7 +541,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 					},
 				},
 				HostNetwork: true,
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						SecurityContext: &v1.SecurityContext{
 							WindowsOptions: &v1.WindowsSecurityContextOptions{
@@ -809,7 +809,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 					},
 				},
 				HostNetwork: true,
-				InitContainers: []v1.Container{
+				InitContainers: []v1.InitContainer{
 					{
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Name:    "setup",
