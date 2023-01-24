@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status/state"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
@@ -68,11 +67,26 @@ type podStatusSyncRequest struct {
 	status versionedPodStatus
 }
 
+// podManager abstracts access to information about pods on the Kubelet.
+type podManager interface {
+	// GetPodByUID retrieves the latest state of the pod.
+	GetPodByUID(types.UID) (*v1.Pod, bool)
+	// GetMirrorPodByPod returns the mirror pod for the given static pod and whether it was known
+	// to the pod manager.
+	GetMirrorPodByPod(*v1.Pod) (*v1.Pod, bool)
+	// TranslatePodUID converts an external UID representation (which may include mirror pods) into
+	// the internal mapping for a pod.
+	TranslatePodUID(uid types.UID) kubetypes.ResolvedPodUID
+	// GetUIDTranslations returns bulk mappings between pod and mirror pod UIDs to assist in status
+	// resync.
+	GetUIDTranslations() (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
+}
+
 // Updates pod statuses in apiserver. Writes only when new status has changed.
 // All methods are thread-safe.
 type manager struct {
 	kubeClient clientset.Interface
-	podManager kubepod.Manager
+	podManager podManager
 	// Map from pod UID to sync status of the corresponding pod.
 	podStatuses      map[types.UID]versionedPodStatus
 	podStatusesLock  sync.RWMutex
@@ -89,8 +103,9 @@ type manager struct {
 	stateFileDirectory string
 }
 
-// PodStatusProvider knows how to provide status for a pod. It's intended to be used by other components
-// that need to introspect status.
+// PodStatusProvider knows how to provide status for a pod. It is intended to be used by other components
+// that need to introspect the authoritative status of a pod.  The PodStatusProvider represents the actual
+// status of a running pod as the kubelet sees it.
 type PodStatusProvider interface {
 	// GetPodStatus returns the cached status for the provided pod UID, as well as whether it
 	// was a cache hit.
@@ -153,7 +168,7 @@ type Manager interface {
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper, stateFileDirectory string) Manager {
+func NewManager(kubeClient clientset.Interface, podManager podManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper, stateFileDirectory string) Manager {
 	return &manager{
 		kubeClient:              kubeClient,
 		podManager:              podManager,

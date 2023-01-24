@@ -38,7 +38,6 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
@@ -155,6 +154,13 @@ type podStateProvider interface {
 	ShouldPodRuntimeBeRemoved(k8stypes.UID) bool
 }
 
+// podManager is the subset of methods the volume manager needs to observe
+// the actual state of the kubelet
+type podManager interface {
+	GetPodByUID(k8stypes.UID) (*v1.Pod, bool)
+	GetPods() []*v1.Pod
+}
+
 // NewVolumeManager returns a new concrete instance implementing the
 // VolumeManager interface.
 //
@@ -166,7 +172,7 @@ type podStateProvider interface {
 func NewVolumeManager(
 	controllerAttachDetachEnabled bool,
 	nodeName k8stypes.NodeName,
-	podManager pod.Manager,
+	podManager podManager,
 	podStateProvider podStateProvider,
 	kubeClient clientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,

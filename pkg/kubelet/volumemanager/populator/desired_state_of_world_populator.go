@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -76,6 +75,12 @@ type podStateProvider interface {
 	ShouldPodRuntimeBeRemoved(types.UID) bool
 }
 
+// podManager knows about the pod state the populator should be working towards
+type podManager interface {
+	GetPodByUID(types.UID) (*v1.Pod, bool)
+	GetPods() []*v1.Pod
+}
+
 // NewDesiredStateOfWorldPopulator returns a new instance of
 // DesiredStateOfWorldPopulator.
 //
@@ -90,7 +95,7 @@ type podStateProvider interface {
 func NewDesiredStateOfWorldPopulator(
 	kubeClient clientset.Interface,
 	loopSleepDuration time.Duration,
-	podManager pod.Manager,
+	podManager podManager,
 	podStateProvider podStateProvider,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
@@ -121,7 +126,7 @@ func NewDesiredStateOfWorldPopulator(
 type desiredStateOfWorldPopulator struct {
 	kubeClient               clientset.Interface
 	loopSleepDuration        time.Duration
-	podManager               pod.Manager
+	podManager               podManager
 	podStateProvider         podStateProvider
 	desiredStateOfWorld      cache.DesiredStateOfWorld
 	actualStateOfWorld       cache.ActualStateOfWorld
