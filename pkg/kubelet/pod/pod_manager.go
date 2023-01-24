@@ -86,9 +86,6 @@ type Manager interface {
 	// GetUIDTranslations returns the mappings of static pod UIDs to mirror pod
 	// UIDs and mirror pod UIDs to static pod UIDs.
 	GetUIDTranslations() (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
-	// IsMirrorPodOf returns true if mirrorPod is a correct representation of
-	// pod; false otherwise.
-	IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool
 
 	MirrorClient
 }
@@ -292,7 +289,8 @@ func (pm *basicManager) GetOrphanedMirrorPodNames() []string {
 	return podFullNames
 }
 
-func (pm *basicManager) IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool {
+// IsMirrorPodOf returns true if pod and mirrorPod are associated with each other.
+func IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool {
 	// Check name and namespace first.
 	if pod.Name != mirrorPod.Name || pod.Namespace != mirrorPod.Namespace {
 		return false
