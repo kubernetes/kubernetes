@@ -52,6 +52,7 @@ type TestServer struct {
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
+//
 //	files that because Golang testing's call to os.Exit will not give a stop channel go routine
 //	enough time to remove temporary files.
 func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
@@ -190,7 +191,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	return result, nil
 }
 
-// StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
+// StartTestServerOrDie calls StartTestServer panic if it does not succeed.
 func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
 	result, err := StartTestServer(ctx, flags)
 	if err == nil {

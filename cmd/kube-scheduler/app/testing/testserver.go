@@ -152,7 +152,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	return result, nil
 }
 
-// StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.
+// StartTestServerOrDie calls StartTestServer panic if it does not succeed.
 func StartTestServerOrDie(ctx context.Context, flags []string) *TestServer {
 	result, err := StartTestServer(ctx, flags)
 	if err == nil {
