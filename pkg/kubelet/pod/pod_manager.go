@@ -60,8 +60,9 @@ type Manager interface {
 	// GetMirrorPodByPod returns the mirror pod for the given static pod and
 	// whether it was known to the pod manager.
 	GetMirrorPodByPod(*v1.Pod) (*v1.Pod, bool)
-	// GetPodsAndMirrorPods returns the both regular and mirror pods.
-	GetPodsAndMirrorPods() ([]*v1.Pod, []*v1.Pod)
+	// GetPodsAndMirrorPods returns the set of pods, the set of mirror pods, and
+	// the pod fullnames of any orphaned mirror pods.
+	GetPodsAndMirrorPods() (allPods []*v1.Pod, allMirrorPods []*v1.Pod, orphanedMirrorPodFullnames []string)
 	// SetPods replaces the internal pods with the new pods.
 	// It is currently only used for testing.
 	SetPods(pods []*v1.Pod)
@@ -73,8 +74,6 @@ type Manager interface {
 	// this means deleting the mappings related to mirror pods.  For non-
 	// mirror pods, this means deleting from indexes for all non-mirror pods.
 	DeletePod(pod *v1.Pod)
-	// GetOrphanedMirrorPodNames returns names of orphaned mirror pods
-	GetOrphanedMirrorPodNames() []string
 	// TranslatePodUID returns the actual UID of a pod. If the UID belongs to
 	// a mirror pod, returns the UID of its static pod. Otherwise, returns the
 	// original UID.
@@ -211,12 +210,18 @@ func (pm *basicManager) GetPods() []*v1.Pod {
 	return podsMapToPods(pm.podByUID)
 }
 
-func (pm *basicManager) GetPodsAndMirrorPods() ([]*v1.Pod, []*v1.Pod) {
+func (pm *basicManager) GetPodsAndMirrorPods() (allPods []*v1.Pod, allMirrorPods []*v1.Pod, orphanedMirrorPodFullnames []string) {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
-	pods := podsMapToPods(pm.podByUID)
-	mirrorPods := mirrorPodsMapToMirrorPods(pm.mirrorPodByUID)
-	return pods, mirrorPods
+	allPods = podsMapToPods(pm.podByUID)
+	allMirrorPods = mirrorPodsMapToMirrorPods(pm.mirrorPodByUID)
+
+	for podFullName := range pm.mirrorPodByFullName {
+		if _, ok := pm.podByFullName[podFullName]; !ok {
+			orphanedMirrorPodFullnames = append(orphanedMirrorPodFullnames, podFullName)
+		}
+	}
+	return allPods, allMirrorPods, orphanedMirrorPodFullnames
 }
 
 func (pm *basicManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
@@ -275,18 +280,6 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 		podToMirror[v] = k
 	}
 	return podToMirror, mirrorToPod
-}
-
-func (pm *basicManager) GetOrphanedMirrorPodNames() []string {
-	pm.lock.RLock()
-	defer pm.lock.RUnlock()
-	var podFullNames []string
-	for podFullName := range pm.mirrorPodByFullName {
-		if _, ok := pm.podByFullName[podFullName]; !ok {
-			podFullNames = append(podFullNames, podFullName)
-		}
-	}
-	return podFullNames
 }
 
 // IsMirrorPodOf returns true if pod and mirrorPod are associated with each other.
