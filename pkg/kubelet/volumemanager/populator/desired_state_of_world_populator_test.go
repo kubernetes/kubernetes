@@ -323,17 +323,22 @@ func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
 	}
 }
 
+type mutablePodManager interface {
+	GetPodByName(string, string) (*v1.Pod, bool)
+	DeletePod(*v1.Pod)
+}
+
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	dswp, fakePodState, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
 	podName := util.GetUniquePodName(pod)
 
 	//let the pod be terminated
-	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	podGet, exist := dswp.podManager.(mutablePodManager).GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-	dswp.podManager.DeletePod(pod)
+	dswp.podManager.(mutablePodManager).DeletePod(pod)
 
 	dswp.findAndRemoveDeletedPods()
 
@@ -389,7 +394,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 
 	//let the pod be terminated
-	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	podGet, exist := dswp.podManager.(mutablePodManager).GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
@@ -451,12 +456,12 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 	podName := util.GetUniquePodName(pod)
 
 	//let the pod be terminated
-	podGet, exist := dswp.podManager.GetPodByName(pod.Namespace, pod.Name)
+	podGet, exist := dswp.podManager.(mutablePodManager).GetPodByName(pod.Namespace, pod.Name)
 	if !exist {
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-	dswp.podManager.DeletePod(pod)
+	dswp.podManager.(mutablePodManager).DeletePod(pod)
 	fakePodState.removed = map[kubetypes.UID]struct{}{pod.UID: {}}
 
 	// Add the volume to ASW by reconciling.
