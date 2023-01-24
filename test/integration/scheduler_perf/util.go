@@ -30,6 +30,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,11 +39,14 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -76,7 +80,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 
@@ -84,6 +88,13 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
+
+			// Enable DRA API group.
+			if enabledFeatures[features.DynamicResourceAllocation] {
+				opts.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
+					resourcev1alpha2.SchemeGroupVersion.String(): "true",
+				}
+			}
 		},
 	})
 	b.Cleanup(tearDownFn)
@@ -114,7 +125,18 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
 	_, informerFactory := util.StartScheduler(ctx, client, cfg, config)
-	util.StartFakePVController(ctx, client)
+	util.StartFakePVController(ctx, client, informerFactory)
+
+	runResourceClaimController := func() {}
+	if enabledFeatures[features.DynamicResourceAllocation] {
+		// Testing of DRA with inline resource claims depends on this
+		// controller for creating and removing ResourceClaims.
+		runResourceClaimController = util.CreateResourceClaimController(ctx, b, client, informerFactory)
+	}
+
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+	go runResourceClaimController()
 
 	return informerFactory, client, dynClient
 }

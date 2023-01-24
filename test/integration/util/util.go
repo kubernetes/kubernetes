@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -102,10 +103,22 @@ func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConf
 	return sched, informerFactory
 }
 
+func CreateResourceClaimController(ctx context.Context, tb testing.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
+	podInformer := informerFactory.Core().V1().Pods()
+	claimInformer := informerFactory.Resource().V1alpha2().ResourceClaims()
+	claimTemplateInformer := informerFactory.Resource().V1alpha2().ResourceClaimTemplates()
+	claimController, err := resourceclaim.NewController(clientSet, podInformer, claimInformer, claimTemplateInformer)
+	if err != nil {
+		tb.Fatalf("Error creating claim controller: %v", err)
+	}
+	return func() {
+		go claimController.Run(ctx, 5 /* workers */)
+	}
+}
+
 // StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
 // TODO(mborsz): Use a real PV controller here.
-func StartFakePVController(ctx context.Context, clientSet clientset.Interface) {
-	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+func StartFakePVController(ctx context.Context, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) {
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
 
 	syncPV := func(obj *v1.PersistentVolume) {
@@ -137,8 +150,6 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface) {
 			syncPV(obj.(*v1.PersistentVolume))
 		},
 	})
-
-	informerFactory.Start(ctx.Done())
 }
 
 // TestContext store necessary context info
