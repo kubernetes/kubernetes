@@ -120,6 +120,22 @@ func (mr *MockManagerMockRecorder) GetMirrorPodByPod(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMirrorPodByPod", reflect.TypeOf((*MockManager)(nil).GetMirrorPodByPod), arg0)
 }
 
+// GetPodAndMirrorPod mocks base method.
+func (m *MockManager) GetPodAndMirrorPod(arg0 *v1.Pod) (*v1.Pod, *v1.Pod, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPodAndMirrorPod", arg0)
+	ret0, _ := ret[0].(*v1.Pod)
+	ret1, _ := ret[1].(*v1.Pod)
+	ret2, _ := ret[2].(bool)
+	return ret0, ret1, ret2
+}
+
+// GetPodAndMirrorPod indicates an expected call of GetPodAndMirrorPod.
+func (mr *MockManagerMockRecorder) GetPodAndMirrorPod(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodAndMirrorPod", reflect.TypeOf((*MockManager)(nil).GetPodAndMirrorPod), arg0)
+}
+
 // GetPodByFullName mocks base method.
 func (m *MockManager) GetPodByFullName(arg0 string) (*v1.Pod, bool) {
 	m.ctrl.T.Helper()
