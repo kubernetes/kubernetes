@@ -39,8 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/builder3"
@@ -347,10 +345,6 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		route.Consumes(runtime.ContentTypeJSON, runtime.ContentTypeYAML)
 	}
 
-	var disabledParams []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation) {
-		disabledParams = []string{"fieldValidation"}
-	}
 	// Build option parameters
 	switch actionVerb {
 	case "get":
@@ -360,9 +354,9 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		endpoints.AddObjectParams(b.ws, route, &metav1.ListOptions{})
 	case "put", "patch":
 		// TODO: PatchOption added in feature branch but not in master yet
-		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{}, disabledParams...)
+		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{})
 	case "post":
-		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{}, disabledParams...)
+		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{})
 	case "delete":
 		endpoints.AddObjectParams(b.ws, route, &metav1.DeleteOptions{})
 		route.Reads(&metav1.DeleteOptions{}).ParameterNamed("body").Required(false)
