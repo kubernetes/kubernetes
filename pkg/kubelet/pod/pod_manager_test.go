@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
@@ -154,7 +154,7 @@ func TestDeletePods(t *testing.T) {
 		t.Fatalf("Run DeletePod() error, expected %d pods, got %d pods; ", len(expectedPods)-1, len(actualPods))
 	}
 
-	orphanedMirrorPodNames := podManager.GetOrphanedMirrorPodNames()
+	_, _, orphanedMirrorPodNames := podManager.GetPodsAndMirrorPods()
 	expectedOrphanedMirrorPodNameNum := 1
 	if len(orphanedMirrorPodNames) != expectedOrphanedMirrorPodNameNum {
 		t.Fatalf("Run getOrphanedMirrorPodNames() error, expected %d orphaned mirror pods, got %d orphaned mirror pods; ", expectedOrphanedMirrorPodNameNum, len(orphanedMirrorPodNames))
