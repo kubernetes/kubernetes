@@ -24,6 +24,9 @@ import (
 )
 
 const (
+	// NOTE: when you add a new profile string, remember to add to to the
+	// --profile flag's help text
+
 	// ProfileLegacy represents the legacy debugging profile which is backwards-compatible with 1.23 behavior.
 	ProfileLegacy = "legacy"
 	// ProfileGeneral contains a reasonable set of defaults tailored for each debugging journey.
