@@ -298,7 +298,11 @@ func (c *celAdmissionController) Validate(
 			// (CRD dynamic informer always returns objects with kind/apiversion,
 			// but native types do not include populated TypeMeta.
 			if param != nil {
-				if paramGVK := param.GetObjectKind(); paramGVK.GroupVersionKind().Empty() {
+				if param.GetObjectKind().GroupVersionKind().Empty() {
+					// Very unfortunate. Unfortunately object is shared and cannot
+					// modify GVK async
+					param = param.DeepCopyObject()
+
 					// https://github.com/kubernetes/client-go/issues/413#issue-324586398
 					gvks, _, err := k8sscheme.Scheme.ObjectKinds(param)
 					if err != nil {
@@ -312,7 +316,7 @@ func (c *celAdmissionController) Validate(
 						if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
 							continue
 						}
-						paramGVK.SetGroupVersionKind(gvk)
+						param.GetObjectKind().SetGroupVersionKind(gvk)
 						break
 					}
 				}
