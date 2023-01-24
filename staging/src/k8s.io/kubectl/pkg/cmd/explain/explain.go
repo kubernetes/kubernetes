@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/discovery"
+	openapiclient "k8s.io/client-go/openapi"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/explain"
 	explainv2 "k8s.io/kubectl/pkg/explain/v2"
@@ -74,7 +74,7 @@ type ExplainOptions struct {
 	OutputFormat string
 
 	// Client capable of fetching openapi documents from the user's cluster
-	DiscoveryClient discovery.DiscoveryInterface
+	OpenAPIV3Client openapiclient.Client
 }
 
 func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *ExplainOptions {
@@ -125,13 +125,12 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	// Only openapi v3 needs the discovery client.
+	// Only openapi v3 needs the openapiv3client
 	if o.EnableOpenAPIV3 {
-		discoveryClient, err := f.ToDiscoveryClient()
+		o.OpenAPIV3Client, err = f.OpenAPIV3Client()
 		if err != nil {
 			return err
 		}
-		o.DiscoveryClient = discoveryClient
 	}
 
 	o.args = args
@@ -176,7 +175,7 @@ func (o *ExplainOptions) Run() error {
 		return explainv2.PrintModelDescription(
 			fieldsPath,
 			o.Out,
-			o.DiscoveryClient.OpenAPIV3(),
+			o.OpenAPIV3Client,
 			fullySpecifiedGVR,
 			recursive,
 			o.OutputFormat,

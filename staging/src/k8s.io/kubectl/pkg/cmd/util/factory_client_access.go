@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	openapiclient "k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi/cached"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -210,4 +211,13 @@ func (f *factoryImpl) openAPIGetter() discovery.OpenAPISchemaInterface {
 	})
 
 	return f.oapi
+}
+
+func (f *factoryImpl) OpenAPIV3Client() (openapiclient.Client, error) {
+	discovery, err := f.clientGetter.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	return discovery.OpenAPIV3(), nil
 }
