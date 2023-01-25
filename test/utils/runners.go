@@ -1336,9 +1336,29 @@ func MakePodSpec() v1.PodSpec {
 	}
 }
 
-func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1.Pod) error {
-	if err := CreatePodWithRetries(client, namespace, podTemplate); err != nil {
+func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1.Pod, counter int) error {
+	var pod *v1.Pod
+	if err := InjectCounter(counter, podTemplate, &pod); err != nil {
+		return fmt.Errorf("injecting --counter: %v", err)
+	}
+
+	if err := CreatePodWithRetries(client, namespace, pod); err != nil {
 		return fmt.Errorf("error creating pod: %v", err)
+	}
+	return nil
+}
+
+// InjectCounter marshals the object with JSON, replaces the `--counter` string (chosen
+// that way because it is valid inside most fields as suffix which unlikely to occur
+// by chance), and umarshals the modified object.
+func InjectCounter(counter int, in, out interface{}) error {
+	buffer, err := json.Marshal(in)
+	if err != nil {
+		return fmt.Errorf("marshaling before replacing --counter: %v", err)
+	}
+	str := strings.ReplaceAll(string(buffer), "--counter", fmt.Sprintf("%d", counter))
+	if err := json.Unmarshal([]byte(str), out); err != nil {
+		return fmt.Errorf("unmarshaling after replacing --counter: %v", err)
 	}
 	return nil
 }
@@ -1350,7 +1370,7 @@ func CreatePod(ctx context.Context, client clientset.Interface, namespace string
 		// client-go writes into the object that is passed to Create,
 		// causing a data race unless we create a new copy for each
 		// parallel call.
-		if err := makeCreatePod(client, namespace, podTemplate.DeepCopy()); err != nil {
+		if err := makeCreatePod(client, namespace, podTemplate.DeepCopy(), i); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = err
@@ -1437,7 +1457,7 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 				},
 			},
 		}
-		if err := makeCreatePod(client, namespace, pod); err != nil {
+		if err := makeCreatePod(client, namespace, pod, i); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = err
