@@ -132,10 +132,10 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	t = SetOldTransportDefaults(t)
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
-		klog.Info("HTTP2 has been explicitly disabled")
+		klog.Background().Info("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
 		if err := configureHTTP2Transport(t); err != nil {
-			klog.Warningf("Transport failed http2 configuration: %v", err)
+			klog.Background().Info("Transport failed http2 configuration", "err", err)
 		}
 	}
 	return t
@@ -148,8 +148,7 @@ func readIdleTimeoutSeconds() int {
 	if s := os.Getenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS"); len(s) > 0 {
 		i, err := strconv.Atoi(s)
 		if err != nil {
-			klog.Warningf("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS(%q): %v."+
-				" Default value %d is used", s, err, ret)
+			klog.Background().Info("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS, the default value is used", "timeoutSeconds", s, "err", err, "defaultRet", ret)
 			return ret
 		}
 		ret = i
@@ -162,8 +161,7 @@ func pingTimeoutSeconds() int {
 	if s := os.Getenv("HTTP2_PING_TIMEOUT_SECONDS"); len(s) > 0 {
 		i, err := strconv.Atoi(s)
 		if err != nil {
-			klog.Warningf("Illegal HTTP2_PING_TIMEOUT_SECONDS(%q): %v."+
-				" Default value %d is used", s, err, ret)
+			klog.Background().Info("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS, the default value is used", "timeoutSeconds", s, "err", err, "defaultRet", ret)
 			return ret
 		}
 		ret = i
@@ -256,7 +254,7 @@ func CloseIdleConnectionsFor(transport http.RoundTripper) {
 	case RoundTripperWrapper:
 		CloseIdleConnectionsFor(transport.WrappedRoundTripper())
 	default:
-		klog.Warningf("unknown transport type: %T", transport)
+		klog.Background().Info("unknown transport type", "transport", transport)
 	}
 }
 

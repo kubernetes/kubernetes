@@ -116,7 +116,8 @@ func identifier(encodeGV runtime.GroupVersioner, encoder runtime.Encoder) runtim
 	}
 	identifier, err := json.Marshal(result)
 	if err != nil {
-		klog.Fatalf("Failed marshaling identifier for codec: %v", err)
+		klog.Background().Error(err, "Failed marshaling identifier for codec")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	identifiersMap.Store(result, runtime.Identifier(identifier))
 	return runtime.Identifier(identifier)
@@ -222,7 +223,7 @@ func (c *codec) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.Memor
 				return encoder.EncodeWithAllocator(obj, w, memAlloc)
 			}
 		} else {
-			klog.V(6).Infof("a memory allocator was provided but the encoder %s doesn't implement the runtime.EncoderWithAllocator, using regular encoder.Encode method", c.encoder.Identifier())
+			klog.Background().V(6).Info("a memory allocator was provided but the encoder doesn't implement the runtime.EncoderWithAllocator, using regular encoder.Encode method", "encoder", c.encoder.Identifier())
 		}
 	}
 	switch obj := obj.(type) {

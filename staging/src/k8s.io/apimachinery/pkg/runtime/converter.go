@@ -249,10 +249,12 @@ func (c *unstructuredConverter) FromUnstructuredWithValidation(u map[string]inte
 		newObj := reflect.New(t.Elem()).Interface()
 		newErr := fromUnstructuredViaJSON(u, newObj)
 		if (err != nil) != (newErr != nil) {
-			klog.Fatalf("FromUnstructured unexpected error for %v: error: %v", u, err)
+			klog.Background().Error(err, "FromUnstructured unexpected error", "obj", u)
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 		if err == nil && !c.comparison.DeepEqual(obj, newObj) {
-			klog.Fatalf("FromUnstructured mismatch\nobj1: %#v\nobj2: %#v", obj, newObj)
+			klog.Background().Error(err, "FromUnstructured mismatch", "obj1", obj, "obj2", newObj)
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 	}
 	if err != nil {
@@ -589,10 +591,12 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 		newUnstr := map[string]interface{}{}
 		newErr := toUnstructuredViaJSON(obj, &newUnstr)
 		if (err != nil) != (newErr != nil) {
-			klog.Fatalf("ToUnstructured unexpected error for %v: error: %v; newErr: %v", obj, err, newErr)
+			klog.Background().Error(err, "ToUnstructured unexpected error", "object", obj, "newErr", newErr)
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 		if err == nil && !c.comparison.DeepEqual(u, newUnstr) {
-			klog.Fatalf("ToUnstructured mismatch\nobj1: %#v\nobj2: %#v", u, newUnstr)
+			klog.Background().Error(nil, "ToUnstructured mismatch", "obj1", u, "obj2", newUnstr)
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 	}
 	if err != nil {

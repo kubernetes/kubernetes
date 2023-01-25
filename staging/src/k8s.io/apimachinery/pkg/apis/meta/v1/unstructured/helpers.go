@@ -474,7 +474,8 @@ func NewJSONFallbackEncoder(encoder runtime.Encoder) runtime.Encoder {
 	}
 	identifier, err := gojson.Marshal(result)
 	if err != nil {
-		klog.Fatalf("Failed marshaling identifier for jsonFallbackEncoder: %v", err)
+		klog.Background().Error(err, "Failed marshaling identifier for jsonFallbackEncoder")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return &jsonFallbackEncoder{
 		encoder:    encoder,

@@ -70,7 +70,8 @@ func identifier(options SerializerOptions) runtime.Identifier {
 	}
 	identifier, err := json.Marshal(result)
 	if err != nil {
-		klog.Fatalf("Failed marshaling identifier for json Serializer: %v", err)
+		klog.Background().Error(err, "Failed marshaling identifier for json Serializer")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return runtime.Identifier(identifier)
 }

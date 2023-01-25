@@ -600,7 +600,7 @@ func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 	var ret []metav1.OwnerReference
 	s := a.ownerReferences
 	if s.Kind() != reflect.Pointer || s.Elem().Kind() != reflect.Slice {
-		klog.Errorf("expect %v to be a pointer to slice", s)
+		klog.Background().Error(nil, "expect the ownerReference to be a pointer to slice", "ownerReference", s)
 		return ret
 	}
 	s = s.Elem()
@@ -608,7 +608,7 @@ func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 	ret = make([]metav1.OwnerReference, s.Len(), s.Len()+1)
 	for i := 0; i < s.Len(); i++ {
 		if err := extractFromOwnerReference(s.Index(i), &ret[i]); err != nil {
-			klog.Errorf("extractFromOwnerReference failed: %v", err)
+			klog.Background().Error(err, "extractFromOwnerReference failed")
 			return ret
 		}
 	}
@@ -618,13 +618,13 @@ func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 func (a genericAccessor) SetOwnerReferences(references []metav1.OwnerReference) {
 	s := a.ownerReferences
 	if s.Kind() != reflect.Pointer || s.Elem().Kind() != reflect.Slice {
-		klog.Errorf("expect %v to be a pointer to slice", s)
+		klog.Background().Error(nil, "expect the ownerReference to be a pointer to slice", "ownerReference", s)
 	}
 	s = s.Elem()
 	newReferences := reflect.MakeSlice(s.Type(), len(references), len(references))
 	for i := 0; i < len(references); i++ {
 		if err := setOwnerReference(newReferences.Index(i), &references[i]); err != nil {
-			klog.Errorf("setOwnerReference failed: %v", err)
+			klog.Background().Error(err, "setOwnerReference failed")
 			return
 		}
 	}

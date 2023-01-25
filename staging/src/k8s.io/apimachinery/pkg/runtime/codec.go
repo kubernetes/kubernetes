@@ -226,7 +226,8 @@ func identifier(e Encoder) Identifier {
 	}
 	identifier, err := json.Marshal(result)
 	if err != nil {
-		klog.Fatalf("Failed marshaling identifier for base64Serializer: %v", err)
+		klog.Background().Error(err, "Failed marshaling identifier for base64Serializer")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return Identifier(identifier)
 }
@@ -390,7 +391,8 @@ func (v multiGroupVersioner) Identifier() string {
 	}
 	identifier, err := json.Marshal(result)
 	if err != nil {
-		klog.Fatalf("Failed marshaling Identifier for %#v: %v", v, err)
+		klog.Background().Error(err, "Failed marshaling identifier", "GroupVersioner", v)
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return string(identifier)
 }

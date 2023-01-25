@@ -57,7 +57,7 @@ const (
 // Deprecated: use FromInt32 instead.
 func FromInt(val int) IntOrString {
 	if val > math.MaxInt32 || val < math.MinInt32 {
-		klog.Errorf("value: %d overflows int32\n%s\n", val, debug.Stack())
+		klog.Background().Error(nil, "value overflows int32", "value", val, "debugStack", debug.Stack())
 	}
 	return IntOrString{Type: Int, IntVal: int32(val)}
 }

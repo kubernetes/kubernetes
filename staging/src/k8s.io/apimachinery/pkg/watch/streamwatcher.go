@@ -108,10 +108,10 @@ func (sw *StreamWatcher) receive() {
 			case io.EOF:
 				// watch closed normally
 			case io.ErrUnexpectedEOF:
-				klog.V(1).Infof("Unexpected EOF during watch stream event decoding: %v", err)
+				klog.Background().V(1).Info("Unexpected EOF during watch stream event decoding", "err", err)
 			default:
 				if net.IsProbableEOF(err) || net.IsTimeout(err) {
-					klog.V(5).Infof("Unable to decode an event from the watch stream: %v", err)
+					klog.Background().V(5).Info("Unable to decode an event from the watch stream", "err", err)
 				} else {
 					select {
 					case <-sw.done:

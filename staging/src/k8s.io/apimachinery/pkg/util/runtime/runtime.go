@@ -74,9 +74,9 @@ func logPanic(r interface{}) {
 	stacktrace := make([]byte, size)
 	stacktrace = stacktrace[:runtime.Stack(stacktrace, false)]
 	if _, ok := r.(string); ok {
-		klog.Errorf("Observed a panic: %s\n%s", r, stacktrace)
+		klog.Background().Error(nil, "Observed a panic", "r", r, "stacktrace", stacktrace)
 	} else {
-		klog.Errorf("Observed a panic: %#v (%v)\n%s", r, r, stacktrace)
+		klog.Background().Error(nil, "Observed a panic", "r", r, "r", r, "stacktrace", stacktrace)
 	}
 }
 
@@ -112,7 +112,7 @@ func HandleError(err error) {
 
 // logError prints an error with the call stack of the location it was reported
 func logError(err error) {
-	klog.ErrorDepth(2, err)
+	klog.Background().Error(err, "")
 }
 
 type rudimentaryErrorBackoff struct {

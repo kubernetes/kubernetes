@@ -152,7 +152,7 @@ func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager st
 				name = accessor.GetName()
 			}
 
-			klog.ErrorS(err, "[SHOULD NOT HAPPEN] failed to update managedFields", "versionKind",
+			klog.Background().Error(err, "[SHOULD NOT HAPPEN] failed to update managedFields", "versionKind",
 				newObj.GetObjectKind().GroupVersionKind(), "namespace", ns, "name", name)
 		})
 		// Explicitly remove managedFields on failure, so that

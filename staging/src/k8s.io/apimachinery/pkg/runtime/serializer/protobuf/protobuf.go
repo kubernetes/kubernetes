@@ -183,7 +183,7 @@ func (s *Serializer) encode(obj runtime.Object, w io.Writer, memAlloc runtime.Me
 
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.MemoryAllocator) error {
 	if memAlloc == nil {
-		klog.Error("a mandatory memory allocator wasn't provided, this might have a negative impact on performance, check invocations of EncodeWithAllocator method, falling back on runtime.SimpleAllocator")
+		klog.Background().Error(nil, "a mandatory memory allocator wasn't provided, this might have a negative impact on performance, check invocations of EncodeWithAllocator method, falling back on runtime.SimpleAllocator")
 		memAlloc = &runtime.SimpleAllocator{}
 	}
 	prefixSize := uint64(len(s.prefix))
@@ -429,7 +429,7 @@ func (s *RawSerializer) encode(obj runtime.Object, w io.Writer, memAlloc runtime
 
 func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.MemoryAllocator) error {
 	if memAlloc == nil {
-		klog.Error("a mandatory memory allocator wasn't provided, this might have a negative impact on performance, check invocations of EncodeWithAllocator method, falling back on runtime.SimpleAllocator")
+		klog.Background().Error(nil, "a mandatory memory allocator wasn't provided, this might have a negative impact on performance, check invocations of EncodeWithAllocator method, falling back on runtime.SimpleAllocator")
 		memAlloc = &runtime.SimpleAllocator{}
 	}
 	switch t := obj.(type) {
