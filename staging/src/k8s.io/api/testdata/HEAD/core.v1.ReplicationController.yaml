@@ -1095,7 +1095,20 @@ spec:
         projected:
           defaultMode: 2
           sources:
-          - configMap:
+          - clusterTrustBundle:
+              labelSelector:
+                matchExpressions:
+                - key: keyValue
+                  operator: operatorValue
+                  values:
+                  - valuesValue
+                matchLabels:
+                  matchLabelsKey: matchLabelsValue
+              name: nameValue
+              optional: true
+              path: pathValue
+              signerName: signerNameValue
+            configMap:
               items:
               - key: keyValue
                 mode: 3

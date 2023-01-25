@@ -228,6 +228,19 @@ func (ClientIPConfig) SwaggerDoc() map[string]string {
 	return map_ClientIPConfig
 }
 
+var map_ClusterTrustBundleProjection = map[string]string{
+	"":              "ClusterTrustBundleProjection describes how to select a set of ClusterTrustBundle objects and project their contents into the pod filesystem.",
+	"name":          "Select a single ClusterTrustBundle by object name.  Mutually-exclusive with signerName and labelSelector.",
+	"signerName":    "Select all ClusterTrustBundles that match this signer name. Mutually-exclusive with name.  The contents of all selected ClusterTrustBundles will be unified and deduplicated.",
+	"labelSelector": "Select all ClusterTrustBundles that match this label selector.  Only has effect if signerName is set.  Mutually-exclusive with name.  If unset, interpreted as \"match nothing\".  If set but empty, interpreted as \"match everything\".",
+	"optional":      "If true, don't block pod startup if the referenced ClusterTrustBundle(s) aren't available.  If using name, then the named ClusterTrustBundle is allowed not to exist.  If using signerName, then the combination of signerName and labelSelector is allowed to match zero ClusterTrustBundles.",
+	"path":          "Relative path from the volume root to write the bundle.",
+}
+
+func (ClusterTrustBundleProjection) SwaggerDoc() map[string]string {
+	return map_ClusterTrustBundleProjection
+}
+
 var map_ComponentCondition = map[string]string{
 	"":        "Information about the condition of a component.",
 	"type":    "Type of condition for a component. Valid value: \"Healthy\"",
@@ -2593,6 +2606,7 @@ var map_VolumeProjection = map[string]string{
 	"downwardAPI":         "downwardAPI information about the downwardAPI data to project",
 	"configMap":           "configMap information about the configMap data to project",
 	"serviceAccountToken": "serviceAccountToken is information about the serviceAccountToken data to project",
+	"clusterTrustBundle":  "ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field of ClusterTrustBundle objects in an auto-updating file.\n\nAlpha, gated by the ClusterTrustBundleProjection feature gate.\n\nClusterTrustBundle objects can either be selected by name, or by the combination of signer name and a label selector.\n\nKubelet performs aggressive normalization of the PEM contents written into the pod filesystem.  Esoteric PEM features such as inter-block comments and block headers are stripped.  Certificates are deduplicated. The ordering of certificates within the file is arbitrary, and Kubelet may change the order over time.",
 }
 
 func (VolumeProjection) SwaggerDoc() map[string]string {

@@ -341,6 +341,26 @@
                     "audience": "audienceValue",
                     "expirationSeconds": 2,
                     "path": "pathValue"
+                  },
+                  "clusterTrustBundle": {
+                    "name": "nameValue",
+                    "signerName": "signerNameValue",
+                    "labelSelector": {
+                      "matchLabels": {
+                        "matchLabelsKey": "matchLabelsValue"
+                      },
+                      "matchExpressions": [
+                        {
+                          "key": "keyValue",
+                          "operator": "operatorValue",
+                          "values": [
+                            "valuesValue"
+                          ]
+                        }
+                      ]
+                    },
+                    "optional": true,
+                    "path": "pathValue"
                   }
                 }
               ],

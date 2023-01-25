@@ -1865,7 +1865,7 @@ type ClusterTrustBundleProjection struct {
 	// signerName and labelSelector is allowed to match zero
 	// ClusterTrustBundles.
 	// +optional
-	Optional *bool `json:"optional,omitempty"`
+	Optional *bool `json:"optional,omitempty" protobuf:"varint,5,opt,name=optional"`
 
 	// Relative path from the volume root to write the bundle.
 	Path string `json:"path" protobuf:"bytes,4,rep,name=path"`
