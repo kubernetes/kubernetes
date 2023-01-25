@@ -750,8 +750,7 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			b.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	finalFunc, podInformer, client, dynClient := mustSetupScheduler(ctx, b, cfg)
-	b.Cleanup(finalFunc)
+	podInformer, client, dynClient := mustSetupScheduler(ctx, b, cfg)
 
 	var mu sync.Mutex
 	var dataItems []DataItem
