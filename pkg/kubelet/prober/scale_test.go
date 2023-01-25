@@ -21,6 +21,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os/exec"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -64,6 +68,19 @@ func TestTCPPortExhaustion(t *testing.T) {
 		numTestPods   = 1
 		numContainers = 600
 	)
+
+	if runtime.GOOS != "linux" {
+		t.Skip("unsupported OS for testing port exhaustion")
+	}
+
+	valid, err := isValidEphemeralPortRange()
+	if err != nil {
+		t.Errorf("error finding ephemeral port range: %v", err)
+	} else {
+		if !valid {
+			t.Skip("skipping test as the OS has a large ephemeral port range")
+		}
+	}
 
 	if testing.Short() {
 		t.Skip("skipping TCP port exhaustion in short mode")
@@ -268,4 +285,41 @@ func (f *fakePod) stop() {
 
 func (f *fakePod) connections() int {
 	return int(atomic.LoadInt64(&f.numConnection))
+}
+
+// isValidEphemeralPortRange returns true if the environment the test is running
+// has a valid range for the test to succeed
+// The default port range on a normal Linux system has 28321 free ephemeral ports per
+// tuple srcIP,srcPort:dstIP:dstPort:Proto: /proc/sys/net/ipv4/ip_local_port_range 32768 60999
+// this method returns true/false based on the number of free ephemeral ports as the test will
+// fail when the range is greater than the default above
+func isValidEphemeralPortRange() (bool, error) {
+	portRangeKey := "net.ipv4.ip_local_port_range"
+	cmd := exec.Command("sysctl", "-n", portRangeKey)
+	out, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+	val := strings.TrimSpace(string(out))
+
+	portRange := strings.Split(val, "\t")
+	if len(portRange) != 2 {
+		return false, fmt.Errorf("invalid ephemeral port range: %s", val)
+	}
+	min, err := strconv.Atoi(portRange[0])
+	if err != nil {
+		return false, fmt.Errorf("problem parsing min port value %s for ephemeral range: %w",
+			portRange[0], err)
+	}
+	max, err := strconv.Atoi(portRange[1])
+	if err != nil {
+		return false, fmt.Errorf("problem parsing max port value %s for ephemeral range: %w",
+			portRange[1], err)
+	}
+
+	if max > min && max-min <= 28321 {
+		return true, nil
+	} else {
+		return false, nil
+	}
 }
