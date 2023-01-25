@@ -47,6 +47,7 @@ func Run(ctx context.Context) {
 	klog.TODO().Info("Now the default logger is set, but using the one from the context is still better.")
 
 	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Log less important message at V=5 through context")
 
 	// This intentionally uses the same key/value multiple times. Only the
 	// second example could be detected via static code analysis.
