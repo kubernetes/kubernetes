@@ -40,8 +40,6 @@ func Run(ctx context.Context) {
 	err := errors.New("fail")
 	klog.Errorf("Log using Errorf, err: %v", err)
 	klog.ErrorS(err, "Log using ErrorS")
-	data := SensitiveData{Key: "secret"}
-	klog.Infof("Log with sensitive key, data: %q", data)
 	klog.V(1).Info("Log less important message")
 
 	// This is the fallback that can be used if neither logger nor context
@@ -49,14 +47,9 @@ func Run(ctx context.Context) {
 	klog.TODO().Info("Now the default logger is set, but using the one from the context is still better.")
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Log sensitive data through context", "data", data)
 
 	// This intentionally uses the same key/value multiple times. Only the
 	// second example could be detected via static code analysis.
 	klog.LoggerWithValues(klog.LoggerWithName(logger, "myname"), "duration", time.Hour).Info("runtime", "duration", time.Minute)
 	logger.Info("another runtime", "duration", time.Hour, "duration", time.Minute)
-}
-
-type SensitiveData struct {
-	Key string `json:"key" datapolicy:"secret-key"`
 }
