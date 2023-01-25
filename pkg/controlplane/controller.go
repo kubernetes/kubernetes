@@ -46,6 +46,7 @@ import (
 
 const (
 	kubernetesServiceName = "kubernetes"
+	endpointPortName      = "https"
 )
 
 // Controller is the controller manager for the core bootstrap Kubernetes
@@ -156,7 +157,7 @@ func (c *Controller) Start() {
 	}
 
 	// Reconcile during first run removing itself until server is ready.
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, endpointPortName)
 	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err == nil {
 		klog.Error("Found stale data, removed previous endpoints on kubernetes service, apiserver didn't exit successfully previously")
 	} else if !storage.IsNotFound(err) {
@@ -208,7 +209,7 @@ func (c *Controller) Stop() {
 	if c.runner != nil {
 		c.runner.Stop()
 	}
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, endpointPortName)
 	finishedReconciling := make(chan struct{})
 	go func() {
 		defer close(finishedReconciling)
@@ -270,11 +271,11 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 
-	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https")
+	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, endpointPortName)
 	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
 	}
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, endpointPortName)
 	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
 		return err
 	}
@@ -290,7 +291,7 @@ func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort i
 		Protocol:   corev1.ProtocolTCP,
 		Port:       int32(servicePort),
 		Name:       servicePortName,
-		TargetPort: intstr.FromInt(targetServicePort),
+		TargetPort: intstr.FromString(servicePortName),
 	}}
 	serviceType := corev1.ServiceTypeClusterIP
 	if nodePort > 0 {
