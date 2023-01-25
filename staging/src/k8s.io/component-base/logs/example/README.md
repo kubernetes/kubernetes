@@ -1,6 +1,9 @@
 # Example
 
-This directory includes example logger setup allowing users to easily check and test impact of logging configuration. 
+This directory includes example logger binaries which show how to use
+component-base/logs and what effect the different command line options have.
+Like most Kubernetes components, `cmd` uses Cobra and pflags. `stdlib` uses
+just plain Go libraries. `test` contains a unit test with per-test output.
 
 Below we can see examples of how some features work.
 
