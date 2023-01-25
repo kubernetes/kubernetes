@@ -1354,7 +1354,8 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 }
 
 // getPhase returns the phase of a pod given its container info.
-func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
+func getPhase(pod *v1.Pod, info []v1.ContainerStatus) v1.PodPhase {
+	spec := pod.Spec
 	pendingInitialization := 0
 	failedInitialization := 0
 	for _, container := range spec.InitContainers {
@@ -1431,6 +1432,18 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 		// one container is running
 		return v1.PodRunning
 	case running == 0 && stopped > 0 && unknown == 0:
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+			// Ensure all deleted running pods are transitioned to a terminal phase.
+			// The pod is deleted so its containers won't be restarted regardless of the restart policy.
+			if pod.DeletionTimestamp != nil {
+				// All containers are terminated in success
+				if stopped == succeeded {
+					return v1.PodSucceeded
+				}
+				// There is at least one failure
+				return v1.PodFailed
+			}
+		}
 		// All containers are terminated
 		if spec.RestartPolicy == v1.RestartPolicyAlways {
 			// All containers are in the process of restarting
@@ -1494,7 +1507,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
-	s.Phase = getPhase(&pod.Spec, allStatus)
+	s.Phase = getPhase(pod, allStatus)
 	klog.V(4).InfoS("Got phase for pod", "pod", klog.KObj(pod), "oldPhase", oldPodStatus.Phase, "phase", s.Phase)
 
 	// Perform a three-way merge between the statuses from the status manager,

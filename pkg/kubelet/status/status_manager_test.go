@@ -1284,6 +1284,45 @@ func TestDeletePods(t *testing.T) {
 	verifyActions(t, m, []core.Action{getAction(), patchAction(), deleteAction()})
 }
 
+func TestDeletePodsWithFinalizer(t *testing.T) {
+	testCases := map[string]struct {
+		podPhase                      v1.PodPhase
+		wantActions                   []core.Action
+		enablePodDisruptionConditions bool
+	}{
+		"Running pod with finalizer; PodDisruptionConditions enabled": {
+			podPhase:                      v1.PodRunning,
+			wantActions:                   []core.Action{getAction(), patchAction()},
+			enablePodDisruptionConditions: true,
+		},
+		"Running pod with finalizer; PodDisruptionConditions disabled": {
+			podPhase:                      v1.PodRunning,
+			wantActions:                   []core.Action{getAction(), patchAction(), deleteAction()},
+			enablePodDisruptionConditions: false,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
+			pod := getTestPod()
+			pod.Finalizers = append(pod.Finalizers, "example.com/test-finalizer")
+			t.Logf("Set the deletion timestamp.")
+			pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+			client := fake.NewSimpleClientset(pod)
+			m := newTestManager(client)
+			m.podDeletionSafety.(*statustest.FakePodDeletionSafetyProvider).Reclaimed = true
+			m.podManager.AddPod(pod)
+			status := getRandomPodStatus()
+			status.Phase = tc.podPhase
+			now := metav1.Now()
+			status.StartTime = &now
+			m.SetPodStatus(pod, status)
+			t.Logf("Verify the expected actions")
+			verifyActions(t, m, tc.wantActions)
+		})
+	}
+}
+
 func TestDeletePodWhileReclaiming(t *testing.T) {
 	pod := getTestPod()
 	t.Logf("Set the deletion timestamp.")

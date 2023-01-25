@@ -1960,7 +1960,95 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
+	}
+}
+
+func TestDeletedPodPhaseWithRestartAlways(t *testing.T) {
+	desiredState := v1.PodSpec{
+		NodeName: "machine",
+		Containers: []v1.Container{
+			{Name: "containerA"},
+			{Name: "containerB"},
+		},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+
+	now := metav1.Now()
+	tests := []struct {
+		pod                           *v1.Pod
+		status                        v1.PodPhase
+		enablePodDisruptionConditions bool
+		test                          string
+	}{
+		{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &now,
+				},
+				Spec:   desiredState,
+				Status: v1.PodStatus{},
+			},
+			v1.PodPending,
+			true,
+			"waiting",
+		},
+		{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &now,
+				},
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			true,
+			"all running",
+		},
+		{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &now,
+				},
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodSucceeded,
+			true,
+			"all succeeded",
+		},
+		{
+			&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &now,
+				},
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						failedState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodFailed,
+			true,
+			"one failed, one succeeded",
+		},
+	}
+	for _, test := range tests {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2063,7 +2151,7 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 	}
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(&test.pod.Spec, statusInfo)
+		status := getPhase(test.pod, statusInfo)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2163,7 +2251,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2266,7 +2354,7 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 	}
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(&test.pod.Spec, statusInfo)
+		status := getPhase(test.pod, statusInfo)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2379,7 +2467,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2515,7 +2603,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		expectedPodHasNetworkCondition v1.PodCondition
 	}{
 		{
-			name: "pod disruption condition is copied over; PodDisruptionConditions enabled",
+			name: "pod disruption condition is copied over and the phase is set to failed when deleted; PodDisruptionConditions enabled",
 			pod: &v1.Pod{
 				Spec: desiredState,
 				Status: v1.PodStatus{
@@ -2545,13 +2633,13 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			},
 			enablePodDisruptionConditions: true,
 			expected: v1.PodStatus{
-				Phase:    v1.PodRunning,
+				Phase:    v1.PodFailed,
 				HostIP:   "127.0.0.1",
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
 					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
-					{Type: v1.PodReady, Status: v1.ConditionTrue},
-					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
 				ContainerStatuses: []v1.ContainerStatus{
