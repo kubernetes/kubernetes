@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
@@ -745,13 +746,25 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 		expectFn func(t *testing.T, status v1.PodStatus)
 	}{
 		{pod: newPod(0, 1, func(pod *v1.Pod) { pod.Status.Phase = v1.PodFailed })},
-		{pod: newPod(0, 1, func(pod *v1.Pod) { pod.Status.Phase = v1.PodRunning })},
-		{pod: newPod(0, 1, func(pod *v1.Pod) {
-			pod.Status.Phase = v1.PodRunning
-			pod.Status.ContainerStatuses = []v1.ContainerStatus{
-				{Name: "0", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "Test", ExitCode: 2}}},
-			}
-		})},
+		{
+			pod: newPod(0, 1, func(pod *v1.Pod) {
+				pod.Status.Phase = v1.PodRunning
+			}),
+			expectFn: func(t *testing.T, status v1.PodStatus) {
+				status.Phase = v1.PodFailed
+			},
+		},
+		{
+			pod: newPod(0, 1, func(pod *v1.Pod) {
+				pod.Status.Phase = v1.PodRunning
+				pod.Status.ContainerStatuses = []v1.ContainerStatus{
+					{Name: "0", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "Test", ExitCode: 2}}},
+				}
+			}),
+			expectFn: func(t *testing.T, status v1.PodStatus) {
+				status.Phase = v1.PodFailed
+			},
+		},
 		{
 			name: "last termination state set",
 			pod: newPod(0, 1, func(pod *v1.Pod) {
@@ -991,6 +1004,99 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 				if len(diff) == 0 {
 					t.Fatalf("diff returned no results for failed DeepEqual: %#v != %#v", expected.Status, status)
 				}
+				t.Fatalf("unexpected status: %s", diff)
+			}
+		})
+	}
+}
+
+func TestTerminatePod_EnsurePodPhaseIsTerminal(t *testing.T) {
+	now := metav1.Now()
+	testCases := map[string]struct {
+		enablePodDisruptionConditions bool
+		status                        v1.PodStatus
+		wantStatus                    v1.PodStatus
+	}{
+		"Pending pod; PodDisruptionConditions enabled": {
+			enablePodDisruptionConditions: true,
+			status: v1.PodStatus{
+				Phase: v1.PodPending,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+		"Pending pod; PodDisruptionConditions disabled": {
+			enablePodDisruptionConditions: false,
+			status: v1.PodStatus{
+				Phase: v1.PodPending,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodPending,
+			},
+		},
+		"Running pod; PodDisruptionConditions enabled": {
+			enablePodDisruptionConditions: true,
+			status: v1.PodStatus{
+				Phase: v1.PodRunning,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+		"Succeeded pod; PodDisruptionConditions enabled": {
+			enablePodDisruptionConditions: true,
+			status: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+			},
+		},
+		"Failed pod; PodDisruptionConditions enabled": {
+			enablePodDisruptionConditions: true,
+			status: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+		"Unknown pod; PodDisruptionConditions enabled": {
+			enablePodDisruptionConditions: true,
+			status: v1.PodStatus{
+				Phase: v1.PodUnknown,
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+		"Unknown phase pod; PodDisruptionConditions enabled": {
+			enablePodDisruptionConditions: true,
+			status: v1.PodStatus{
+				Phase: v1.PodPhase("SomeUnknownPhase"),
+			},
+			wantStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
+			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient())
+			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
+			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, "").(*manager)
+
+			pod := getTestPod()
+			pod.DeletionTimestamp = &now
+			pod.Status = tc.status
+
+			syncer.SetPodStatus(pod, pod.Status)
+
+			syncer.TerminatePod(pod)
+			gotStatus := expectPodStatus(t, syncer, pod.DeepCopy())
+			if diff := cmp.Diff(tc.wantStatus, gotStatus, cmpopts.IgnoreFields(v1.PodStatus{}, "StartTime")); diff != "" {
 				t.Fatalf("unexpected status: %s", diff)
 			}
 		})
@@ -1269,19 +1375,61 @@ func expectPodStatus(t *testing.T, m *manager, pod *v1.Pod) v1.PodStatus {
 }
 
 func TestDeletePods(t *testing.T) {
-	pod := getTestPod()
-	t.Logf("Set the deletion timestamp.")
-	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	client := fake.NewSimpleClientset(pod)
-	m := newTestManager(client)
-	m.podDeletionSafety.(*statustest.FakePodDeletionSafetyProvider).Reclaimed = true
-	m.podManager.AddPod(pod)
-	status := getRandomPodStatus()
-	now := metav1.Now()
-	status.StartTime = &now
-	m.SetPodStatus(pod, status)
-	t.Logf("Expect to see a delete action.")
-	verifyActions(t, m, []core.Action{getAction(), patchAction(), deleteAction()})
+	testCases := map[string]struct {
+		podPhase                      v1.PodPhase
+		wantActions                   []core.Action
+		enablePodDisruptionConditions bool
+	}{
+		"Pending pod; PodDisruptionConditions enabled": {
+			podPhase:                      v1.PodPending,
+			enablePodDisruptionConditions: true,
+			wantActions:                   []core.Action{getAction(), patchAction()},
+		},
+		"Pending pod; PodDisruptionConditions disabled": {
+			podPhase:                      v1.PodPending,
+			enablePodDisruptionConditions: false,
+			wantActions:                   []core.Action{getAction(), patchAction(), deleteAction()},
+		},
+		"Running pod; PodDisruptionConditions enabled": {
+			podPhase:                      v1.PodRunning,
+			enablePodDisruptionConditions: true,
+			wantActions:                   []core.Action{getAction(), patchAction()},
+		},
+		"Running pod; PodDisruptionConditions disabled": {
+			podPhase:                      v1.PodRunning,
+			enablePodDisruptionConditions: false,
+			wantActions:                   []core.Action{getAction(), patchAction(), deleteAction()},
+		},
+		"Failed pod; PodDisruptionConditions enabled": {
+			podPhase:                      v1.PodFailed,
+			enablePodDisruptionConditions: true,
+			wantActions:                   []core.Action{getAction(), patchAction(), deleteAction()},
+		},
+		"Failed pod; PodDisruptionConditions disabled": {
+			podPhase:                      v1.PodFailed,
+			enablePodDisruptionConditions: false,
+			wantActions:                   []core.Action{getAction(), patchAction(), deleteAction()},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
+			pod := getTestPod()
+			t.Logf("Set the deletion timestamp.")
+			pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+			client := fake.NewSimpleClientset(pod)
+			m := newTestManager(client)
+			m.podDeletionSafety.(*statustest.FakePodDeletionSafetyProvider).Reclaimed = true
+			m.podManager.AddPod(pod)
+			status := getRandomPodStatus()
+			status.Phase = tc.podPhase
+			now := metav1.Now()
+			status.StartTime = &now
+			m.SetPodStatus(pod, status)
+			t.Logf("Verify the expected actions")
+			verifyActions(t, m, tc.wantActions)
+		})
+	}
 }
 
 func TestDeletePodWhileReclaiming(t *testing.T) {

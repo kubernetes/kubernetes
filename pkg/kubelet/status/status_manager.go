@@ -420,6 +420,8 @@ func findContainerStatus(status *v1.PodStatus, containerID string) (containerSta
 // the pod as successful. If we have not yet initialized the pod in the presence of init containers,
 // the init container failure status is sufficient to describe the pod as failing, and we do not need
 // to override waiting containers (unless there is evidence the pod previously started those containers).
+// It also makes sure that pods are transitioned to a terminal phase (Failed or Succeeded) before
+// their deletion.
 func (m *manager) TerminatePod(pod *v1.Pod) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
@@ -461,6 +463,21 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 				ExitCode: 137,
 			},
 		}
+	}
+
+	// ensure a terminal phase is set
+	switch status.Phase {
+	case v1.PodSucceeded, v1.PodFailed:
+		// do nothing, already terminal
+	case v1.PodPending, v1.PodUnknown:
+		klog.V(3).InfoS("Marking pod as failed before its final deletion", "phase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
+		status.Phase = v1.PodFailed
+	case v1.PodRunning:
+		klog.InfoS("Pod should have already been marked as terminal, programmer error", "pod", klog.KObj(pod), "podUID", pod.UID)
+		status.Phase = v1.PodFailed
+	default:
+		klog.ErrorS(fmt.Errorf("unknown phase: %v", status.Phase), "Unknown phase, programmer error", "pod", klog.KObj(pod), "podUID", pod.UID)
+		status.Phase = v1.PodFailed
 	}
 
 	klog.V(5).InfoS("TerminatePod calling updateStatusInternal", "pod", klog.KObj(pod), "podUID", pod.UID)
@@ -853,6 +870,13 @@ func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
 	if pod.DeletionTimestamp == nil || kubetypes.IsMirrorPod(pod) {
 		return false
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		// Delay deletion of pods until the phase is terminal.
+		if !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
+			klog.V(3).InfoS("Delaying pod deletion as the phase is non-terminal", "phase", status.Phase, "pod", klog.KObj(pod), "podUID", pod.UID)
+			return false
+		}
 	}
 	return m.podDeletionSafety.PodResourcesAreReclaimed(pod, status)
 }
