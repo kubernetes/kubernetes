@@ -128,3 +128,49 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 	}
 	t.Logf("Created service: %s", svcNodePort.Name)
 }
+
+// Regresion test for https://issues.k8s.io/115316
+func TestServiceCIDR28bits(t *testing.T) {
+	serviceCIDR := "10.0.0.0/28"
+
+	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.ServiceClusterIPRanges = serviceCIDR
+		},
+	})
+	defer tearDownFn()
+
+	// Wait until the default "kubernetes" service is created.
+	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-regression", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-1234",
+		},
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{
+				Port: int32(80),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	_, err := client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+}
