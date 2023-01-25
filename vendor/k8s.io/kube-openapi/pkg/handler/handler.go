@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/munnerz/goautoneg"
