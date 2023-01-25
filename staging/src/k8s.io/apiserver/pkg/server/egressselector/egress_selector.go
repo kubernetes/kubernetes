@@ -36,7 +36,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	egressmetrics "k8s.io/apiserver/pkg/server/egressselector/metrics"
-	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
@@ -45,7 +45,7 @@ import (
 var directDialer utilnet.DialFunc = http.DefaultTransport.(*http.Transport).DialContext
 
 func init() {
-	client.Metrics.RegisterMetrics(compbasemetrics.NewKubeRegistry().Registerer())
+	client.Metrics.RegisterMetrics(legacyregistry.Registerer())
 }
 
 // EgressSelector is the map of network context type to context dialer, for network egress.
