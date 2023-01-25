@@ -795,7 +795,17 @@ func Test_calculateRangeOffset(t *testing.T) {
 		{
 			name: "small mask IPv4",
 			cidr: "192.168.1.1/28",
+			want: 0,
+		},
+		{
+			name: "small mask IPv4",
+			cidr: "192.168.1.1/27",
 			want: 16,
+		},
+		{
+			name: "small mask IPv6",
+			cidr: "fd00::1/124",
+			want: 0,
 		},
 		{
 			name: "small mask IPv6",
