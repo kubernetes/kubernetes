@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -243,7 +244,7 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 	} else {
 		instanceContext, instanceCancel := context.WithCancel(c.context)
 
-		var informer informers.GenericInformer
+		var informer cache.SharedIndexInformer
 
 		// Informer Factory is optional
 		if c.client != nil {
@@ -255,14 +256,41 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 			dynamicFactory := informers.NewSharedInformerFactory(c.client, 10*time.Minute)
 
 			// Look for a typed informer. If it does not exist
-			informer, err = dynamicFactory.ForResource(paramsGVR.Resource)
+			genericInformer, err := dynamicFactory.ForResource(paramsGVR.Resource)
 
 			// Ignore error. We fallback to dynamic informer if there is no
 			// typed informer
 			if err != nil {
 				informer = nil
 			} else {
-				dynamicFactory.Start(instanceContext.Done())
+				informer = genericInformer.Informer()
+
+				// Set transformer on the informer to workaround inconsistency
+				// where typed objects have TypeMeta wiped out but dynamic
+				// objects keep kind/apiVersion fields
+				informer.SetTransform(func(i interface{}) (interface{}, error) {
+					// Ensure param is populated with its GVK for consistency
+					// (CRD dynamic informer always returns objects with kind/apiversion,
+					// but native types do not include populated TypeMeta.
+					if param := i.(runtime.Object); param != nil {
+						if param.GetObjectKind().GroupVersionKind().Empty() {
+							// https://github.com/kubernetes/client-go/issues/413#issue-324586398
+							gvks, _, _ := k8sscheme.Scheme.ObjectKinds(param)
+							for _, gvk := range gvks {
+								if len(gvk.Kind) == 0 {
+									continue
+								}
+								if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+									continue
+								}
+								param.GetObjectKind().SetGroupVersionKind(gvk)
+								break
+							}
+						}
+					}
+
+					return i, nil
+				})
 			}
 		}
 
@@ -280,13 +308,11 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 				10*time.Minute,
 				cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 				nil,
-			)
-
-			go informer.Informer().Run(instanceContext.Done())
+			).Informer()
 		}
 
 		controller := generic.NewController(
-			generic.NewInformer[runtime.Object](informer.Informer()),
+			generic.NewInformer[runtime.Object](informer),
 			c.reconcileParams,
 			generic.ControllerOptions{
 				Workers: 1,
@@ -301,6 +327,7 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 		}
 
 		go controller.Run(instanceContext)
+		go informer.Run(instanceContext.Done())
 	}
 
 	return nil
