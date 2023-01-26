@@ -669,6 +669,16 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			resizeOptions.DeviceStagePath = deviceMountPath
 		}
 
+		if volumeDeviceMounter != nil && resizeOptions.DeviceStagePath == "" {
+			deviceStagePath, err := volumeDeviceMounter.GetDeviceMountPath(volumeToMount.VolumeSpec)
+			if err != nil {
+				// On failure, return error. Caller will log and retry.
+				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.GetDeviceMountPath failed for expansion", err)
+				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+			}
+			resizeOptions.DeviceStagePath = deviceStagePath
+		}
+
 		// No mapping is needed for hostUID/hostGID if userns is not used.
 		// Therefore, just assign the container users to host UID/GID.
 		hostUID := util.FsUserFrom(volumeToMount.Pod)
