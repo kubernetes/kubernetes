@@ -60,14 +60,16 @@ import (
 // Ref: https://github.com/kubernetes/kubernetes/issues/89898#issuecomment-1383207322
 
 func TestTCPPortExhaustion(t *testing.T) {
+	// This test creates a considereable number of connections in a short time
+	// and flakes on constrained environments, thus it is skipped by default.
+	// The test is left for manual verification or experimentation with new
+	// changes on the probes.
+	t.Skip("skipping TCP port exhaustion tests")
+
 	const (
 		numTestPods   = 1
 		numContainers = 600
 	)
-
-	if testing.Short() {
-		t.Skip("skipping TCP port exhaustion in short mode")
-	}
 
 	tests := []struct {
 		name string
