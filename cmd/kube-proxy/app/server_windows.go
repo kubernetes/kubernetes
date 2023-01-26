@@ -36,13 +36,13 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 // NewProxyServer returns a new ProxyServer.
@@ -71,7 +71,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	}
 
 	// Create event recorder
-	hostname, err := utilnode.GetHostname(config.HostnameOverride)
+	hostname, err := nodeutil.GetHostname(config.HostnameOverride)
 	if err != nil {
 		return nil, err
 	}

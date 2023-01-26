@@ -17,20 +17,20 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
-// GetHostname returns OS's hostname if 'hostnameOverride' is empty; otherwise, return 'hostnameOverride'
-// NOTE: This function copied from pkg/util/node package to avoid external kubeadm dependency
+// GetHostname returns OS's hostname if 'hostnameOverride' is empty; otherwise, it returns
+// 'hostnameOverride'. In either case, the value is canonicalized (trimmed and
+// lowercased).
 func GetHostname(hostnameOverride string) (string, error) {
 	hostName := hostnameOverride
 	if len(hostName) == 0 {
 		nodeName, err := os.Hostname()
 		if err != nil {
-			return "", errors.Wrap(err, "couldn't determine hostname")
+			return "", fmt.Errorf("couldn't determine hostname: %w", err)
 		}
 		hostName = nodeName
 	}
@@ -39,7 +39,7 @@ func GetHostname(hostnameOverride string) (string, error) {
 	// For linux, the hostname is read from file /proc/sys/kernel/hostname directly
 	hostName = strings.TrimSpace(hostName)
 	if len(hostName) == 0 {
-		return "", errors.New("empty hostname is invalid")
+		return "", fmt.Errorf("empty hostname is invalid")
 	}
 
 	return strings.ToLower(hostName), nil

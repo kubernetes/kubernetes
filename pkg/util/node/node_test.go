@@ -198,38 +198,6 @@ func TestGetNodeHostIPs(t *testing.T) {
 	}
 }
 
-func TestGetHostname(t *testing.T) {
-	testCases := []struct {
-		hostName         string
-		expectedHostName string
-		expectError      bool
-	}{
-		{
-			hostName:    "   ",
-			expectError: true,
-		},
-		{
-			hostName:         " abc  ",
-			expectedHostName: "abc",
-			expectError:      false,
-		},
-	}
-
-	for idx, test := range testCases {
-		hostName, err := GetHostname(test.hostName)
-		if err != nil && !test.expectError {
-			t.Errorf("[%d]: unexpected error: %s", idx, err)
-		}
-		if err == nil && test.expectError {
-			t.Errorf("[%d]: expected error, got none", idx)
-		}
-		if test.expectedHostName != hostName {
-			t.Errorf("[%d]: expected output %q, got %q", idx, test.expectedHostName, hostName)
-		}
-
-	}
-}
-
 func TestIsNodeReady(t *testing.T) {
 	testCases := []struct {
 		name   string
