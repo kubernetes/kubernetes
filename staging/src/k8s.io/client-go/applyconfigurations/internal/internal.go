@@ -11661,6 +11661,8 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha1.ResourceClaimConsumerReference
           elementRelationship: associative
+          keys:
+          - uid
 - name: io.k8s.api.resource.v1alpha1.ResourceClaimTemplate
   map:
     fields:
