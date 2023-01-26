@@ -41280,7 +41280,10 @@ func schema_k8sio_api_resource_v1alpha1_ResourceClaimStatus(ref common.Reference
 					"reservedFor": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "set",
+								"x-kubernetes-list-map-keys": []interface{}{
+									"uid",
+								},
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
