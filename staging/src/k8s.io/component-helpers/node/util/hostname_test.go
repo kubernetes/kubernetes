@@ -17,11 +17,10 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
 func TestGetHostname(t *testing.T) {
@@ -55,7 +54,7 @@ func TestGetHostname(t *testing.T) {
 			desc:        "hostname contains only spaces",
 			hostname:    " ",
 			result:      "",
-			expectedErr: errors.New("empty hostname is invalid"),
+			expectedErr: fmt.Errorf("empty hostname is invalid"),
 		},
 		{
 			desc:        "empty parameter",

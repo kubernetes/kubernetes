@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
-	"strings"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -41,26 +39,6 @@ const (
 	// on the node it is (was) running.
 	NodeUnreachablePodMessage = "Node %v which was running pod %v is unresponsive"
 )
-
-// GetHostname returns OS's hostname if 'hostnameOverride' is empty; otherwise, return 'hostnameOverride'.
-func GetHostname(hostnameOverride string) (string, error) {
-	hostName := hostnameOverride
-	if len(hostName) == 0 {
-		nodeName, err := os.Hostname()
-		if err != nil {
-			return "", fmt.Errorf("couldn't determine hostname: %v", err)
-		}
-		hostName = nodeName
-	}
-
-	// Trim whitespaces first to avoid getting an empty hostname
-	// For linux, the hostname is read from file /proc/sys/kernel/hostname directly
-	hostName = strings.TrimSpace(hostName)
-	if len(hostName) == 0 {
-		return "", fmt.Errorf("empty hostname is invalid")
-	}
-	return strings.ToLower(hostName), nil
-}
 
 // NoMatchError is a typed implementation of the error interface. It indicates a failure to get a matching Node.
 type NoMatchError struct {
