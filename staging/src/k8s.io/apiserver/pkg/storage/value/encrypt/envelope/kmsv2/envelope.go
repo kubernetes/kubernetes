@@ -22,7 +22,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -36,7 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/klog/v2"
 	kmsservice "k8s.io/kms/service"
-	"k8s.io/utils/lru"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -48,6 +47,8 @@ const (
 	keyIDMaxSize = 1 * 1024 // 1 kB
 	// encryptedDEKMaxSize is the maximum size of the encrypted DEK.
 	encryptedDEKMaxSize = 1 * 1024 // 1 kB
+	// cacheTTL is the default time-to-live for the cache entry.
+	cacheTTL = 1 * time.Hour
 )
 
 type KeyIDGetterFunc func(context.Context) (keyID string, err error)
@@ -57,36 +58,25 @@ type envelopeTransformer struct {
 
 	keyIDGetter KeyIDGetterFunc
 
-	// transformers is a thread-safe LRU cache which caches decrypted DEKs indexed by their encrypted form.
-	transformers *lru.Cache
-
 	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
 	baseTransformerFunc func(cipher.Block) value.Transformer
-
-	cacheSize    int
-	cacheEnabled bool
+	// cache is a thread-safe expiring lru cache which caches decrypted DEKs indexed by their encrypted form.
+	cache *simpleCache
 }
 
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
-// the data items they encrypt. A cache (of size cacheSize) is maintained to store the most recently
-// used decrypted DEKs in memory.
-func NewEnvelopeTransformer(envelopeService kmsservice.Service, keyIDGetter KeyIDGetterFunc, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) value.Transformer {
-	var cache *lru.Cache
+// the data items they encrypt.
+func NewEnvelopeTransformer(envelopeService kmsservice.Service, keyIDGetter KeyIDGetterFunc, baseTransformerFunc func(cipher.Block) value.Transformer) value.Transformer {
+	return newEnvelopeTransformerWithClock(envelopeService, keyIDGetter, baseTransformerFunc, cacheTTL, clock.RealClock{})
+}
 
-	if cacheSize > 0 {
-		// TODO(aramase): Switch to using expiring cache: kubernetes/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/cache/expiring.go.
-		// It handles scans a lot better, doesn't have to be right sized, and don't have a global lock on reads.
-		cache = lru.New(cacheSize)
-	}
-
+func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, keyIDGetter KeyIDGetterFunc, baseTransformerFunc func(cipher.Block) value.Transformer, cacheTTL time.Duration, clock clock.Clock) value.Transformer {
 	return &envelopeTransformer{
 		envelopeService:     envelopeService,
 		keyIDGetter:         keyIDGetter,
-		transformers:        cache,
+		cache:               newSimpleCache(clock, cacheTTL),
 		baseTransformerFunc: baseTransformerFunc,
-		cacheEnabled:        cacheSize > 0,
-		cacheSize:           cacheSize,
 	}
 }
 
@@ -101,11 +91,10 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 	}
 
 	// Look up the decrypted DEK from cache or Envelope.
-	transformer := t.getTransformer(encryptedObject.EncryptedDEK)
+	transformer := t.cache.get(encryptedObject.EncryptedDEK)
 	if transformer == nil {
-		if t.cacheEnabled {
-			value.RecordCacheMiss()
-		}
+		value.RecordCacheMiss()
+
 		uid := string(uuid.NewUUID())
 		klog.V(6).InfoS("Decrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()))
 		key, err := t.envelopeService.Decrypt(ctx, uid, &kmsservice.DecryptRequest{
@@ -189,26 +178,9 @@ func (t *envelopeTransformer) addTransformer(encKey []byte, key []byte) (value.T
 		return nil, err
 	}
 	transformer := t.baseTransformerFunc(block)
-	// Use base64 of encKey as the key into the cache because hashicorp/golang-lru
-	// cannot hash []uint8.
-	if t.cacheEnabled {
-		t.transformers.Add(base64.StdEncoding.EncodeToString(encKey), transformer)
-		metrics.RecordDekCacheFillPercent(float64(t.transformers.Len()) / float64(t.cacheSize))
-	}
+	// TODO(aramase): Add metrics for cache fill percentage with custom cache implementation.
+	t.cache.set(encKey, transformer)
 	return transformer, nil
-}
-
-// getTransformer fetches the transformer corresponding to encKey from cache, if it exists.
-func (t *envelopeTransformer) getTransformer(encKey []byte) value.Transformer {
-	if !t.cacheEnabled {
-		return nil
-	}
-
-	_transformer, found := t.transformers.Get(base64.StdEncoding.EncodeToString(encKey))
-	if found {
-		return _transformer.(value.Transformer)
-	}
-	return nil
 }
 
 // doEncode encodes the EncryptedObject to a byte array.
