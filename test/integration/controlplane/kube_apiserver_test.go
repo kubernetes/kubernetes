@@ -445,6 +445,15 @@ func getServiceTargetPorts(services *corev1.Service) []int {
 	return ports
 }
 
+// getServiceTargetPortNames returns all the targetPorts declared in a service object
+func getServiceTargetPortNames(services *corev1.Service) []string {
+	ports := make([]string, 0)
+	for _, port := range services.Spec.Ports {
+		ports = append(ports, port.TargetPort.String())
+	}
+	return ports
+}
+
 func verifyEndpointsWithIPs(servers []*kubeapiservertesting.TestServer, ips []string) bool {
 	listenAddresses := make([]string, 0)
 	for _, server := range servers {
@@ -673,9 +682,9 @@ func TestAPIServerDefaultPort(t *testing.T) {
 	}
 }
 
-// TestMultiMasterAdvertisePort tests that when using the --advertise-port the targetPort in the kubernetes.default.svc server
+// TestAPIServerAdvertisePort tests that when using the --advertise-port the targetPort in the kubernetes.default.svc server
 // and also as port in the kubernetes.default.svc endpoints and it's the value specified there
-func TestAPIServerAdvertisePort(t *testing.T) {
+func TestAPIServerAdvertisePortOverride(t *testing.T) {
 	etcd := framework.SharedEtcd()
 	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
@@ -684,7 +693,7 @@ func TestAPIServerAdvertisePort(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
 		"--endpoint-reconciler-type", "lease",
 		"--advertise-address", fmt.Sprintf("10.0.1.1"),
-		"--advertise-port", "8443",
+		"--advertise-port", "12345",
 	}, etcd)
 	defer server.TearDownFn()
 
@@ -700,8 +709,8 @@ func TestAPIServerAdvertisePort(t *testing.T) {
 			t.Logf("error fetching services: %v", err)
 			return false, nil
 		}
-		if e, a := []int{server.ServerOpts.SecureServing.BindPort}, getServiceTargetPorts(services); !reflect.DeepEqual(e, a) {
-			t.Logf("error comparing target port in services with bind port set: Bind port %v vs targetPort %v", server.ServerOpts.SecureServing.BindPort, a)
+		if e, a := []string{"https"}, getServiceTargetPortNames(services); !reflect.DeepEqual(e, a) {
+			t.Logf("error comparing target port in services with bind port set: Bind port %v vs targetPort %v", e, a)
 			return false, nil
 		}
 		endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
@@ -709,12 +718,102 @@ func TestAPIServerAdvertisePort(t *testing.T) {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
 		}
-		if e, a := []int{server.ServerOpts.SecureServing.BindPort}, getEndpointPorts(endpoints); !reflect.DeepEqual(e, a) {
-			t.Logf("error comparing target port in endpoints with bind port set: Bind port %v vs targetPort %v", server.ServerOpts.SecureServing.BindPort, a)
+		if e, a := []int{12345}, getEndpointPorts(endpoints); !reflect.DeepEqual(e, a) {
+			t.Logf("error comparing target port in endpoints with bind port set: Bind port %v vs targetPort %v", e, a)
 			return false, nil
 		}
 		return true, nil
 	}); err != nil {
 		t.Fatalf("did not find only lease endpoints: %v", err)
 	}
+}
+
+func TestMultiAPIServerAdvertisePortOverride(t *testing.T) {
+	apiServerCount := 3
+	advertisePort := 12345
+
+	var servers = make([]*kubeapiservertesting.TestServer, apiServerCount)
+	etcd := framework.SharedEtcd()
+
+	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+
+	wg := sync.WaitGroup{}
+	// start apiServerCount api servers
+	for i := 0; i < apiServerCount; i++ {
+		// start count api server
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
+				"--endpoint-reconciler-type", "master-count",
+				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
+				// kube-apiserver doesn't actually support having different values for advertise-port (or the bind port)
+				// so we don't vary the advertise port by apiserver here.
+				"--advertise-port", fmt.Sprintf("%d", advertisePort),
+				"--apiserver-count", fmt.Sprintf("%v", apiServerCount),
+			}, etcd)
+			servers[i] = server
+		}(i)
+	}
+	wg.Wait()
+
+	// Tear down all servers at the end of the test
+	defer func() {
+		for _, server := range servers {
+			server.TearDownFn()
+		}
+	}()
+
+	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
+		client, err := kubernetes.NewForConfig(servers[0].ClientConfig)
+		if err != nil {
+			t.Logf("create client error: %v", err)
+			return false, nil
+		}
+		services, err := client.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching services: %v", err)
+			return false, nil
+		}
+		if e, a := []string{"https"}, getServiceTargetPortNames(services); !reflect.DeepEqual(e, a) {
+			t.Logf("error comparing target port in services with bind port set: Bind port %v vs targetPort %v", e, a)
+			return false, nil
+		}
+		endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching endpoints: %v", err)
+			return false, nil
+		}
+
+		var expectedIPPorts []string
+		for _, server := range servers {
+			expectedIPPorts = append(expectedIPPorts, fmt.Sprintf("%s:%d", server.ServerOpts.GenericServerRunOptions.AdvertiseAddress.String(), advertisePort))
+		}
+		if ipPorts := getEndpointIPPorts(endpoints); !reflect.DeepEqual(expectedIPPorts, ipPorts) {
+			t.Logf("error comparing target ip:ports in endpoints: endpoints contain %v vs expected: %v", ipPorts, expectedIPPorts)
+			return false, nil
+		}
+
+		return true, nil
+	}); err != nil {
+		t.Fatalf("did not find only lease endpoints: %v", err)
+	}
+}
+
+// return the unique endpoint IPs
+func getEndpointIPPorts(endpoints *corev1.Endpoints) []string {
+	endpointMap := make(map[string]bool)
+	ips := make([]string, 0)
+	for _, subset := range endpoints.Subsets {
+		for _, address := range subset.Addresses {
+			for _, port := range subset.Ports {
+				ipPort := fmt.Sprintf("%s:%d", address.IP, port.Port)
+				if _, ok := endpointMap[ipPort]; !ok {
+					endpointMap[ipPort] = true
+					ips = append(ips, ipPort)
+				}
+			}
+		}
+	}
+	return ips
 }

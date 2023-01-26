@@ -73,11 +73,14 @@ type Controller struct {
 	SystemNamespaces         []string
 	SystemNamespacesInterval time.Duration
 
-	PublicIP net.IP
-
 	// ServiceIP indicates where the kubernetes service will live.  It may not be nil.
-	ServiceIP                 net.IP
-	ServicePort               int
+	ServiceIP net.IP
+	// Port that the Kubernetes service will route traffic for (e.g. service.spec.ports[].port)
+	ServicePort int
+
+	// IP address that clients of this apiserver should send traffic to (registered in Endpoint resources)
+	PublicIP net.IP
+	// Port number of this apiserver instance (used as the targetPort)
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
@@ -90,6 +93,10 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
 	}
+	// Allow overriding what's published in the Endpoint resource
+	if c.GenericConfig.PublicPort > 0 {
+		publicServicePort = c.GenericConfig.PublicPort
+	}
 
 	// The "kubernetes.default" Service is SingleStack based on the configured ServiceIPRange.
 	// If the bootstrap controller reconcile the kubernetes.default Service and Endpoints, it must
@@ -100,10 +107,6 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		if netutils.IsIPv4CIDR(&c.ExtraConfig.ServiceIPRange) != netutils.IsIPv4(c.GenericConfig.PublicAddress) {
 			return nil, fmt.Errorf("service IP family %q must match public address family %q", c.ExtraConfig.ServiceIPRange.String(), c.GenericConfig.PublicAddress.String())
 		}
-	}
-
-	if c.GenericConfig.PublicPort > 0 {
-		publicServicePort = int(c.GenericConfig.PublicPort)
 	}
 
 	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, corev1.NamespaceNodeLease}
@@ -271,7 +274,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 
-	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, endpointPortName)
+	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.KubernetesServiceNodePort, endpointPortName)
 	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
 	}
@@ -284,7 +287,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 
 // createPortAndServiceSpec creates an array of service ports.
 // If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
-func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string) ([]corev1.ServicePort, corev1.ServiceType) {
+func createPortAndServiceSpec(servicePort int, nodePort int, servicePortName string) ([]corev1.ServicePort, corev1.ServiceType) {
 	// Use the Cluster IP type for the service port if NodePort isn't provided.
 	// Otherwise, we will be binding the master service to a NodePort.
 	servicePorts := []corev1.ServicePort{{
