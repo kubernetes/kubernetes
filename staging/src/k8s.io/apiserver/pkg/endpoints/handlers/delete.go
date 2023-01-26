@@ -183,12 +183,10 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			return
 		}
 
-		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
-		// timeout inside the parent context is lower than requestTimeoutUpperBound.
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
-		defer cancel()
-
-		ctx = request.WithNamespace(ctx, namespace)
+		// DELETECOLLECTION can be a lengthy operation,
+		// we should not impose any 34s timeout here.
+		// NOTE: This is similar to LIST which does not enforce a 34s timeout.
+		ctx := request.WithNamespace(req.Context(), namespace)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
