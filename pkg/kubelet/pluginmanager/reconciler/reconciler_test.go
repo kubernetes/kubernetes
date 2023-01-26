@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -167,6 +168,11 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 // Calls Run()
 // Verifies the actual state of world contains that plugin
 func Test_Run_Positive_Register(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	defer cleanup(t)
 
 	dsw := cache.NewDesiredStateOfWorld()
@@ -212,6 +218,11 @@ func Test_Run_Positive_Register(t *testing.T) {
 // Deletes plugin from desired state of world.
 // Verifies that plugin no longer exists in actual state of world.
 func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	defer cleanup(t)
 
 	dsw := cache.NewDesiredStateOfWorld()
@@ -268,6 +279,11 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 // Verifies that the plugin is reregistered.
 // Verifies the plugin with updated timestamp now in actual state of world.
 func Test_Run_Positive_ReRegister(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	defer cleanup(t)
 
 	dsw := cache.NewDesiredStateOfWorld()

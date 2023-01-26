@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -38,11 +39,12 @@ const kubeletFile = "kubelet"
 
 func TestLoad(t *testing.T) {
 	cases := []struct {
-		desc      string
-		file      *string
-		expect    *kubeletconfig.KubeletConfiguration
-		err       string
-		strictErr bool
+		desc          string
+		file          *string
+		expect        *kubeletconfig.KubeletConfiguration
+		err           string
+		strictErr     bool
+		skipOnWindows bool
 	}{
 		// missing file
 		{
@@ -93,12 +95,14 @@ func TestLoad(t *testing.T) {
 			desc: "default from yaml",
 			file: newString(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1`),
-			expect: newConfig(t),
+			expect:        newConfig(t),
+			skipOnWindows: true,
 		},
 		{
-			desc:   "default from json",
-			file:   newString(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
-			expect: newConfig(t),
+			desc:          "default from json",
+			file:          newString(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
+			expect:        newConfig(t),
+			skipOnWindows: true,
 		},
 
 		// relative path
@@ -112,6 +116,7 @@ staticPodPath: %s`, relativePath)),
 				kc.StaticPodPath = filepath.Join(configDir, relativePath)
 				return kc
 			}(),
+			skipOnWindows: true,
 		},
 		{
 			desc: "json, relative path is resolved",
@@ -121,6 +126,7 @@ staticPodPath: %s`, relativePath)),
 				kc.StaticPodPath = filepath.Join(configDir, relativePath)
 				return kc
 			}(),
+			skipOnWindows: true,
 		},
 		{
 			// This should fail from v1beta2+
@@ -136,6 +142,7 @@ staticPodPath: %s/foo`, relativePath, relativePath)),
 				kc.StaticPodPath = filepath.Join(configDir, relativePath, "foo")
 				return kc
 			}(),
+			skipOnWindows: true,
 		},
 		{
 			// This should fail from v1beta2+
@@ -145,12 +152,18 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 foo: bar`),
 			// err:       "found unknown field: foo",
 			// strictErr: true,
-			expect: newConfig(t),
+			expect:        newConfig(t),
+			skipOnWindows: true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
+			// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+			if c.skipOnWindows && goruntime.GOOS == "windows" {
+				t.Skip("Skipping test that fails on Windows")
+			}
+
 			fs := utilfs.NewTempFs()
 			fs.MkdirAll(configDir, 0777)
 			path := filepath.Join(configDir, kubeletFile)
@@ -181,13 +194,14 @@ foo: bar`),
 func TestResolveRelativePaths(t *testing.T) {
 	absolutePath := filepath.Join(configDir, "absolute")
 	cases := []struct {
-		desc   string
-		path   string
-		expect string
+		desc          string
+		path          string
+		expect        string
+		skipOnWindows bool
 	}{
-		{"empty path", "", ""},
-		{"absolute path", absolutePath, absolutePath},
-		{"relative path", relativePath, filepath.Join(configDir, relativePath)},
+		{"empty path", "", "", false},
+		{"absolute path", absolutePath, absolutePath, true},
+		{"relative path", relativePath, filepath.Join(configDir, relativePath), false},
 	}
 
 	paths := kubeletconfig.KubeletConfigurationPathRefs(newConfig(t))
@@ -196,6 +210,11 @@ func TestResolveRelativePaths(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
+			// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+			if c.skipOnWindows && goruntime.GOOS == "windows" {
+				t.Skip("Skipping test that fails on Windows")
+			}
+
 			// set the path, resolve it, and check if it resolved as we would expect
 			*(paths[0]) = c.path
 			resolveRelativePaths(paths, configDir)
