@@ -1211,16 +1211,18 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 	indexedCompletion := batch.IndexedCompletion
 	mockErr := errors.New("mock error")
 	cases := map[string]struct {
-		job                  batch.Job
-		pods                 []*v1.Pod
-		finishedCond         *batch.JobCondition
-		expectedRmFinalizers sets.String
-		needsFlush           bool
-		statusUpdateErr      error
-		podControlErr        error
-		wantErr              error
-		wantRmFinalizers     int
-		wantStatusUpdates    []batch.JobStatus
+		job                     batch.Job
+		pods                    []*v1.Pod
+		finishedCond            *batch.JobCondition
+		expectedRmFinalizers    sets.String
+		needsFlush              bool
+		statusUpdateErr         error
+		podControlErr           error
+		wantErr                 error
+		wantRmFinalizers        int
+		wantStatusUpdates       []batch.JobStatus
+		wantSucceededPodsMetric int
+		wantFailedPodsMetric    int
 	}{
 		"no updates": {},
 		"new active": {
@@ -1261,6 +1263,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					Failed:                  3,
 				},
 			},
+			wantSucceededPodsMetric: 2,
+			wantFailedPodsMetric:    3,
 		},
 		"past and new finished pods": {
 			job: batch.Job{
@@ -1301,6 +1305,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					Failed:                  6,
 				},
 			},
+			wantSucceededPodsMetric: 3,
+			wantFailedPodsMetric:    3,
 		},
 		"expecting removed finalizers": {
 			job: batch.Job{
@@ -1340,6 +1346,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					Failed:                  6,
 				},
 			},
+			wantSucceededPodsMetric: 3,
+			wantFailedPodsMetric:    3,
 		},
 		"succeeding job": {
 			pods: []*v1.Pod{
@@ -1363,6 +1371,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					CompletionTime:          &succeededCond.LastTransitionTime,
 				},
 			},
+			wantSucceededPodsMetric: 1,
+			wantFailedPodsMetric:    1,
 		},
 		"failing job": {
 			pods: []*v1.Pod{
@@ -1387,6 +1397,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					Conditions:              []batch.JobCondition{*failedCond},
 				},
 			},
+			wantSucceededPodsMetric: 1,
+			wantFailedPodsMetric:    2,
 		},
 		"deleted job": {
 			job: batch.Job{
@@ -1419,6 +1431,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					Failed:                  1,
 				},
 			},
+			wantSucceededPodsMetric: 1,
+			wantFailedPodsMetric:    1,
 		},
 		"status update error": {
 			pods: []*v1.Pod{
@@ -1507,6 +1521,62 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				},
 			},
+			wantSucceededPodsMetric: 2,
+		},
+		"indexed job prev successful pods outside current completions index range with no new succeeded pods": {
+			job: batch.Job{
+				Spec: batch.JobSpec{
+					CompletionMode: &indexedCompletion,
+					Completions:    pointer.Int32(2),
+					Parallelism:    pointer.Int32(2),
+				},
+				Status: batch.JobStatus{
+					Active:           2,
+					Succeeded:        1,
+					CompletedIndexes: "3",
+				},
+			},
+			pods: []*v1.Pod{
+				buildPod().phase(v1.PodRunning).trackingFinalizer().index("0").Pod,
+				buildPod().phase(v1.PodRunning).trackingFinalizer().index("1").Pod,
+			},
+			wantRmFinalizers: 0,
+			wantStatusUpdates: []batch.JobStatus{
+				{
+					Active:                  2,
+					Succeeded:               0,
+					CompletedIndexes:        "",
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+				},
+			},
+		},
+		"indexed job prev successful pods outside current completions index range with new succeeded pods in range": {
+			job: batch.Job{
+				Spec: batch.JobSpec{
+					CompletionMode: &indexedCompletion,
+					Completions:    pointer.Int32(2),
+					Parallelism:    pointer.Int32(2),
+				},
+				Status: batch.JobStatus{
+					Active:           2,
+					Succeeded:        1,
+					CompletedIndexes: "3",
+				},
+			},
+			pods: []*v1.Pod{
+				buildPod().phase(v1.PodRunning).trackingFinalizer().index("0").Pod,
+				buildPod().phase(v1.PodSucceeded).trackingFinalizer().index("1").Pod,
+			},
+			wantRmFinalizers: 1,
+			wantStatusUpdates: []batch.JobStatus{
+				{
+					Active:                  2,
+					Succeeded:               1,
+					CompletedIndexes:        "1",
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+				},
+			},
+			wantSucceededPodsMetric: 1,
 		},
 		"indexed job new failed pods": {
 			job: batch.Job{
@@ -1539,6 +1609,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				},
 			},
+			wantFailedPodsMetric: 3,
 		},
 		"indexed job past and new pods": {
 			job: batch.Job{
@@ -1577,6 +1648,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				},
 			},
+			wantSucceededPodsMetric: 1,
+			wantFailedPodsMetric:    2,
 		},
 		"too many finished": {
 			job: batch.Job{
@@ -1617,6 +1690,8 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					Failed:    1,
 				},
 			},
+			wantSucceededPodsMetric: 499,
+			wantFailedPodsMetric:    1,
 		},
 		"too many indexed finished": {
 			job: batch.Job{
@@ -1640,6 +1715,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					Succeeded:               500,
 				},
 			},
+			wantSucceededPodsMetric: 500,
 		},
 		"pod flips from failed to succeeded": {
 			job: batch.Job{
@@ -1666,6 +1742,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					Conditions:              []batch.JobCondition{*failedCond},
 				},
 			},
+			wantFailedPodsMetric: 2,
 		},
 	}
 	for name, tc := range cases {
@@ -1685,7 +1762,10 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				job.Status.UncountedTerminatedPods = &batch.UncountedTerminatedPods{}
 			}
 			uncounted := newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods)
-			succeededIndexes := succeededIndexesFromJob(job)
+			var succeededIndexes orderedIntervals
+			if isIndexedJob(job) {
+				succeededIndexes = succeededIndexesFromString(job.Status.CompletedIndexes, int(*job.Spec.Completions))
+			}
 			err := manager.trackJobStatusAndRemoveFinalizers(context.TODO(), job, tc.pods, succeededIndexes, *uncounted, tc.expectedRmFinalizers, tc.finishedCond, tc.needsFlush)
 			if !errors.Is(err, tc.wantErr) {
 				t.Errorf("Got error %v, want %v", err, tc.wantErr)
@@ -1703,17 +1783,15 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Obtaining succeeded job_pods_finished_total: %v", err)
 				}
-				newSucceeded := job.Status.Succeeded - tc.job.Status.Succeeded
-				if float64(newSucceeded) != v {
-					t.Errorf("Metric reports %.0f succeeded pods, want %d", v, newSucceeded)
+				if float64(tc.wantSucceededPodsMetric) != v {
+					t.Errorf("Metric reports %.0f succeeded pods, want %d", v, tc.wantSucceededPodsMetric)
 				}
 				v, err = metricstestutil.GetCounterMetricValue(metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Failed))
 				if err != nil {
 					t.Fatalf("Obtaining failed job_pods_finished_total: %v", err)
 				}
-				newFailed := job.Status.Failed - tc.job.Status.Failed
-				if float64(newFailed) != v {
-					t.Errorf("Metric reports %.0f failed pods, want %d", v, newFailed)
+				if float64(tc.wantFailedPodsMetric) != v {
+					t.Errorf("Metric reports %.0f failed pods, want %d", v, tc.wantFailedPodsMetric)
 				}
 			}
 		})
