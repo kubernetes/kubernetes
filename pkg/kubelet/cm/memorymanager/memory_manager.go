@@ -65,6 +65,10 @@ type Manager interface {
 	// This must be called at some point prior to the AddContainer() call for a container, e.g. at pod admission time.
 	Allocate(pod *v1.Pod, container *v1.Container) error
 
+	// Allocate is called to pre-allocate memory resources during Pod admission.
+	// This must be called at some point prior to the AddContainer() call for a container, e.g. at pod admission time.
+	AllocateInitContainer(pod *v1.Pod, container *v1.InitContainer) error
+
 	// RemoveContainer is called after Kubelet decides to kill or delete a
 	// container. After this call, any memory allocated to the container is freed.
 	RemoveContainer(containerID string) error
@@ -230,6 +234,11 @@ func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.
 
 	klog.InfoS("Memory affinity", "pod", klog.KObj(pod), "containerName", container.Name, "numaNodes", numaNodes)
 	return numaNodes
+}
+
+// Allocate is called to pre-allocate memory resources during Pod admission.
+func (m *manager) AllocateInitContainer(pod *v1.Pod, container *v1.InitContainer) error {
+	return m.Allocate(pod, container)
 }
 
 // Allocate is called to pre-allocate memory resources during Pod admission.

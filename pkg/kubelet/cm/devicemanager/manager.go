@@ -299,6 +299,11 @@ func (m *ManagerImpl) Stop() error {
 	return m.server.Stop()
 }
 
+func (m *ManagerImpl) AllocateInitContainer(pod *v1.Pod, container *v1.InitContainer) error {
+	//TODO(SergeyKanzhelev): proper implementation
+	return m.Allocate(pod, container)
+}
+
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {

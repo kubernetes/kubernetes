@@ -61,6 +61,11 @@ type Manager interface {
 	// e.g. at pod admission time.
 	Allocate(pod *v1.Pod, container *v1.Container) error
 
+	// Called to trigger the allocation of CPUs to a container. This must be
+	// called at some point prior to the AddContainer() call for a container,
+	// e.g. at pod admission time.
+	AllocateInitContainer(pod *v1.Pod, container *v1.InitContainer) error
+
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the CPU allocation during the container removal
 	AddContainer(p *v1.Pod, c *v1.Container, containerID string)
@@ -241,6 +246,11 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	// all pods in sync with and guaranteed CPUs handed out among them.
 	go wait.Until(func() { m.reconcileState() }, m.reconcilePeriod, wait.NeverStop)
 	return nil
+}
+
+func (m *manager) AllocateInitContainer(p *v1.Pod, c *v1.InitContainer) error {
+	// TODO(SergeyKanzhelev): proper implementation is needed
+	return m.Allocate(p, c)
 }
 
 func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {

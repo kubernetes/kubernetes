@@ -41,6 +41,11 @@ func (m *fakeManager) Policy() Policy {
 	return NewPolicyNone()
 }
 
+func (m *fakeManager) AllocateInitContainer(pod *v1.Pod, container *v1.InitContainer) error {
+	klog.InfoS("AllocateInitContainer", "pod", klog.KObj(pod), "containerName", container.Name)
+	return nil
+}
+
 func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
 	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil

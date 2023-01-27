@@ -705,7 +705,28 @@ type resourceAllocator struct {
 func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
 
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+	for _, container := range pod.Spec.InitContainers {
+		err := m.deviceManager.AllocateInitContainer(pod, &container)
+		if err != nil {
+			return admission.GetPodAdmitResult(err)
+		}
+
+		if m.cpuManager != nil {
+			err = m.cpuManager.AllocateInitContainer(pod, &container)
+			if err != nil {
+				return admission.GetPodAdmitResult(err)
+			}
+		}
+
+		if m.memoryManager != nil {
+			err = m.memoryManager.AllocateInitContainer(pod, &container)
+			if err != nil {
+				return admission.GetPodAdmitResult(err)
+			}
+		}
+	}
+
+	for _, container := range pod.Spec.Containers {
 		err := m.deviceManager.Allocate(pod, &container)
 		if err != nil {
 			return admission.GetPodAdmitResult(err)

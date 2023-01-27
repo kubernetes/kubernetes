@@ -40,6 +40,13 @@ type Manager interface {
 	// (environment variables, mount points and device files).
 	Allocate(pod *v1.Pod, container *v1.Container) error
 
+	// Allocate configures and assigns devices to a container in a pod. From
+	// the requested device resources, Allocate will communicate with the
+	// owning device plugin to allow setup procedures to take place, and for
+	// the device plugin to provide runtime settings to use the device
+	// (environment variables, mount points and device files).
+	AllocateInitContainer(pod *v1.Pod, container *v1.InitContainer) error
+
 	// UpdatePluginResources updates node resources based on devices already
 	// allocated to pods. The node object is provided for the device manager to
 	// update the node capacity to reflect the currently available devices.
