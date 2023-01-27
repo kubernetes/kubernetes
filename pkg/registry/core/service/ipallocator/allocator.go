@@ -116,6 +116,11 @@ func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorWithOffsetFactory)
 	base.Add(base, big.NewInt(1))
 	max--
 
+	// cidr with whole mask can be negative
+	if max < 0 {
+		max = 0
+	}
+
 	r := Range{
 		net:     cidr,
 		base:    base,
@@ -393,7 +398,10 @@ func calculateRangeOffset(cidr *net.IPNet) int {
 	)
 
 	cidrSize := netutils.RangeSize(cidr)
-	if cidrSize < min {
+	// available addresses are always less than the cidr size
+	// A /28 CIDR returns 16 addresses, but 2 of them, the network
+	// and broadcast addresses are not available.
+	if cidrSize <= min {
 		return 0
 	}
 
