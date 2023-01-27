@@ -968,6 +968,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			uidsWithFinalizer.Insert(uid)
 		}
 	}
+
 	// Shallow copy, as it will only be used to detect changes in the counters.
 	oldCounters := job.Status
 	if cleanUncountedPodsWithoutFinalizers(&job.Status, uidsWithFinalizer) {
@@ -1041,10 +1042,14 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			break
 		}
 	}
-	if len(newSucceededIndexes) > 0 {
+	if isIndexed {
 		succeededIndexes = succeededIndexes.withOrderedIndexes(newSucceededIndexes)
+		succeededIndexesStr := succeededIndexes.String()
+		if succeededIndexesStr != job.Status.CompletedIndexes {
+			needsFlush = true
+		}
 		job.Status.Succeeded = int32(succeededIndexes.total())
-		job.Status.CompletedIndexes = succeededIndexes.String()
+		job.Status.CompletedIndexes = succeededIndexesStr
 	}
 	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
 		if finishedCond != nil && finishedCond.Type == batch.JobFailureTarget {
@@ -1680,7 +1685,7 @@ func isPodFailed(p *v1.Pod, job *batch.Job) bool {
 		return true
 	}
 	// Count deleted Pods as failures to account for orphan Pods that
-	//  never have a chance to reach the Failed phase.
+	// never have a chance to reach the Failed phase.
 	return p.DeletionTimestamp != nil && p.Status.Phase != v1.PodSucceeded
 }
 
@@ -1695,9 +1700,24 @@ func findConditionByType(list []batch.JobCondition, cType batch.JobConditionType
 
 func recordJobPodFinished(job *batch.Job, oldCounters batch.JobStatus) {
 	completionMode := completionModeStr(job)
-	diff := job.Status.Succeeded - oldCounters.Succeeded
+	var diff int
+
+	// Updating succeeded metric must be handled differently
+	// for Indexed Jobs to handle the case where the job has
+	// been scaled down by reducing completions & parallelism
+	// in tandem, and now a previously completed index is
+	// now out of range (i.e. index >= spec.Completions).
+	if isIndexedJob(job) {
+		if job.Status.CompletedIndexes != oldCounters.CompletedIndexes {
+			diff = succeededIndexesFromString(job.Status.CompletedIndexes, int(*job.Spec.Completions)).total() - succeededIndexesFromString(oldCounters.CompletedIndexes, int(*job.Spec.Completions)).total()
+		}
+	} else {
+		diff = int(job.Status.Succeeded) - int(oldCounters.Succeeded)
+	}
 	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Succeeded).Add(float64(diff))
-	diff = job.Status.Failed - oldCounters.Failed
+
+	// Update failed metric.
+	diff = int(job.Status.Failed - oldCounters.Failed)
 	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Failed).Add(float64(diff))
 }
 
