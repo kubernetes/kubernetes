@@ -18,6 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Short-circuit if init.sh has already been sourced
+[[ $(type -t kube::init::loaded) == function ]] && return 0
+
 # Unset CDPATH so that path interpolation can work correctly
 # https://github.com/kubernetes/kubernetes/issues/52255
 unset CDPATH
@@ -210,4 +213,9 @@ kube::realpath() {
     return 1
   fi
   kube::readlinkdashf "${1}"
+}
+
+# Marker function to indicate init.sh has been fully sourced
+kube::init::loaded() {
+  return 0
 }
