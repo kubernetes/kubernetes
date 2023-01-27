@@ -42,26 +42,8 @@ func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runt
 		// do nothing to the copied pod
 		return nil
 	case *corev1.Node:
-		const volumeName = "host-root"
-		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
-			Name: volumeName,
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{Path: "/"},
-			},
-		})
-
-		for i := range pod.Spec.Containers {
-			container := &pod.Spec.Containers[i]
-			if container.Name != containerName {
-				continue
-			}
-			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-				MountPath: "/host",
-				Name:      volumeName,
-			})
-		}
-
-		setHostNamespace(pod, true)
+		MountRootPartition(pod, containerName)
+		UseHostNamespaces(pod)
 		return nil
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileLegacy, target)
@@ -79,182 +61,214 @@ const (
 	styleNode
 )
 
-func getDebugStyle(pod *corev1.Pod, target runtime.Object) debugStyle {
+func getDebugStyle(pod *corev1.Pod, target runtime.Object) (debugStyle, error) {
 	switch target.(type) {
 	case *corev1.Pod:
 		if asserted, ok := target.(*corev1.Pod); ok {
 			if pod != asserted { // comparing addresses
-				return stylePodCopy
+				return stylePodCopy, nil
 			}
 		}
-		return styleEphemeral
+		return styleEphemeral, nil
 	case *corev1.Node:
-		return styleNode
+		return styleNode, nil
 	}
-	return debugStyle(-1) // unknown
+	return debugStyle(-1), fmt.Errorf("objects of type %T are not supported", target)
 }
 
 func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	switch getDebugStyle(pod, target) {
+	style, err := getDebugStyle(pod, target)
+	if err != nil {
+		return fmt.Errorf("general profile: %s", err)
+	}
+
+	switch style {
+	case styleNode:
+		MountRootPartition(pod, containerName)
+		ClearSecurityContext(pod, containerName, Containers)
+		UseHostNamespaces(pod)
+
 	case stylePodCopy:
-		// For copy of pod: sets SYS_PTRACE in debugging container, sets shareProcessNamespace
-		pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
-		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
-			c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
-		})
-		removeProbes(pod.Spec.Containers)
+		RemoveLabelsAndProbes(pod)
+		AllowProcessTracing(pod, containerName, Containers)
+		ShareProcessNamespace(pod)
 
 	case styleEphemeral:
-		// For ephemeral container: sets SYS_PTRACE in ephemeral container
-		modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
-			c.SecurityContext = addCapability(c.SecurityContext, "SYS_PTRACE")
-		})
-
-	case styleNode:
-		// empty securityContext; uses host namespaces, mounts root partition
-		const volumeName = "host-root"
-		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
-			Name: volumeName,
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{Path: "/"},
-			},
-		})
-		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
-			c.VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
-				MountPath: "/host",
-				Name:      volumeName,
-			})
-		})
-		pod.Spec.SecurityContext = nil
-		setHostNamespace(pod, true)
-	default:
-		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileGeneral, target)
+		AllowProcessTracing(pod, containerName, EphemeralContainers)
 	}
 
 	return nil
 }
 
 func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	switch getDebugStyle(pod, target) {
+	style, err := getDebugStyle(pod, target)
+	if err != nil {
+		return fmt.Errorf("baseline profile: %s", err)
+	}
+
+	ClearSecurityContext(pod, containerName, Containers|EphemeralContainers)
+
+	switch style {
 	case stylePodCopy:
-		// For copy of pod: empty securityContext; sets shareProcessNamespace
-		pod.Spec.SecurityContext = nil
-		pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
-		setHostNamespace(pod, false)
-		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
-			c.SecurityContext = nil
-		})
-		removeProbes(pod.Spec.Containers)
+		RemoveLabelsAndProbes(pod)
+		ShareProcessNamespace(pod)
 
-	case styleEphemeral:
-		// For ephemeral container: empty securityContext
-		modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
-			c.SecurityContext = nil
-		})
-
-	case styleNode:
-		// empty securityContext; uses isolated namespaces
-		pod.Spec.SecurityContext = nil
-		setHostNamespace(pod, false)
-
-	default:
-		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileBaseline, target)
+	case styleEphemeral, styleNode:
+		// no additional modifications needed
 	}
 
 	return nil
 }
 
 func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	// drops privilege and run as non-root
-	sc := &corev1.SecurityContext{
-		RunAsNonRoot: pointer.BoolPtr(true),
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{"ALL"},
-		},
+	style, err := getDebugStyle(pod, target)
+	if err != nil {
+		return fmt.Errorf("restricted profile: %s", err)
 	}
 
-	switch getDebugStyle(pod, target) {
+	DisallowRoot(pod, containerName, Containers|EphemeralContainers)
+	DropCapabilities(pod, containerName, Containers|EphemeralContainers)
+
+	switch style {
+	case styleNode:
+		ClearSecurityContext(pod, containerName, Containers)
+
 	case stylePodCopy:
-		// For copy of pod: empty securityContext; sets shareProcessNamespace
-		pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
-		modifyContainer(pod.Spec.Containers, containerName, func(c *corev1.Container) {
-			c.SecurityContext = sc
-		})
-		removeProbes(pod.Spec.Containers)
+		ShareProcessNamespace(pod)
 
 	case styleEphemeral:
-		modifyEphemeralContainer(pod.Spec.EphemeralContainers, containerName, func(c *corev1.EphemeralContainer) {
-			c.SecurityContext = sc
-		})
-
-	case styleNode:
-		// no additional settings required other than the common
-		// settings applied below
-
-	default:
-		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileRestricted, target)
+		// no additional modifications needed
 	}
-
-	// common settings, empty securityContext and uses isolated namespaces
-	pod.Spec.SecurityContext = nil
-	setHostNamespace(pod, false)
 
 	return nil
 }
 
-func setHostNamespace(pod *corev1.Pod, enabled bool) {
-	pod.Spec.HostNetwork = enabled
-	pod.Spec.HostPID = enabled
-	pod.Spec.HostIPC = enabled
+// ContainerType signifies container type
+type ContainerType int
+
+const (
+	// Containers is for normal containers
+	Containers ContainerType = 1 << iota
+	// EphemeralContainers is for ephemeral containers
+	EphemeralContainers
+)
+
+// RemoveLabelsAndProbes removes labels from the pod and remove probes
+// from all containers of the pod.
+func RemoveLabelsAndProbes(p *corev1.Pod) {
+	p.Labels = nil
+	for i := range p.Spec.Containers {
+		p.Spec.Containers[i].LivenessProbe = nil
+		p.Spec.Containers[i].ReadinessProbe = nil
+	}
 }
 
-func addCapability(s *corev1.SecurityContext, c corev1.Capability) *corev1.SecurityContext {
-	if s == nil {
-		return &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{c},
-			},
-		}
-	}
-
-	if s.Capabilities == nil {
-		s.Capabilities = &corev1.Capabilities{
-			Add: []corev1.Capability{c},
-		}
-		return s
-	}
-
-	s.Capabilities.Add = append(s.Capabilities.Add, c)
-	return s
+// MountRootPartition mounts the host's root path at "/host" in the container.
+func MountRootPartition(p *corev1.Pod, containerName string) {
+	const volumeName = "host-root"
+	p.Spec.Volumes = append(p.Spec.Volumes, corev1.Volume{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+		},
+	})
+	modifyContainer(p, containerName, Containers, func(c *corev1.Container) {
+		c.VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
+			MountPath: "/host",
+			Name:      volumeName,
+		})
+	})
 }
 
-// removeProbes remove liveness and readiness probes from the supplied list of
-// containers.
-func removeProbes(cs []corev1.Container) {
-	for i := range cs {
-		cs[i].LivenessProbe = nil
-		cs[i].ReadinessProbe = nil
-	}
+// UseHostNamespaces configures the pod to use the host's network, PID, and IPC
+// namespaces.
+func UseHostNamespaces(p *corev1.Pod) {
+	p.Spec.HostNetwork = true
+	p.Spec.HostPID = true
+	p.Spec.HostIPC = true
+}
+
+// ShareProcessNamespace configures all containers in the pod to share the
+// process namespace.
+func ShareProcessNamespace(p *corev1.Pod) {
+	p.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
+}
+
+// ClearSecurityContext clears the security context for the container.
+func ClearSecurityContext(p *corev1.Pod, containerName string, mask ContainerType) {
+	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
+		c.SecurityContext = nil
+	})
+}
+
+// DisallowRoot configures the container to run as a non-root user.
+func DisallowRoot(p *corev1.Pod, containerName string, mask ContainerType) {
+	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
+		c.SecurityContext = &corev1.SecurityContext{
+			RunAsNonRoot: pointer.BoolPtr(true),
+		}
+	})
+}
+
+// DropCapabilities drops all Capabilities for the container
+func DropCapabilities(p *corev1.Pod, containerName string, mask ContainerType) {
+	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			}
+			return
+		}
+		if c.SecurityContext.Capabilities == nil {
+			c.SecurityContext.Capabilities = &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			}
+			return
+		}
+		c.SecurityContext.Capabilities.Drop = append(c.SecurityContext.Capabilities.Drop, "ALL")
+	})
+}
+
+// AllowProcessTracing grants the SYS_PTRACE capability to the container.
+func AllowProcessTracing(p *corev1.Pod, containerName string, mask ContainerType) {
+	modifyContainer(p, containerName, mask, func(c *corev1.Container) {
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{"SYS_PTRACE"},
+				},
+			}
+			return
+		}
+		if c.SecurityContext.Capabilities == nil {
+			c.SecurityContext.Capabilities = &corev1.Capabilities{
+				Drop: []corev1.Capability{"SYS_PTRACE"},
+			}
+			return
+		}
+		c.SecurityContext.Capabilities.Drop = append(c.SecurityContext.Capabilities.Drop, "SYS_PTRACE")
+	})
 }
 
 // modifyContainer performs the modifier function m against a container from cs
-// which has the name of containerName.
-func modifyContainer(cs []corev1.Container, containerName string, m func(*corev1.Container)) {
-	for i, c := range cs {
-		if c.Name != containerName {
-			continue
+// which has the name of containerName and the type satisfying the mask.
+func modifyContainer(pod *corev1.Pod, containerName string, mask ContainerType, m func(*corev1.Container)) {
+	if mask&Containers != 0 {
+		for i, c := range pod.Spec.Containers {
+			if c.Name != containerName {
+				continue
+			}
+			m(&pod.Spec.Containers[i])
 		}
-		m(&cs[i])
 	}
-}
-
-// modifyEphemeralContainer performs the modifer functino m against a container
-// from cs which has the name of containerName.
-func modifyEphemeralContainer(cs []corev1.EphemeralContainer, containerName string, m func(*corev1.EphemeralContainer)) {
-	for i, c := range cs {
-		if c.Name != containerName {
-			continue
+	if mask&EphemeralContainers != 0 {
+		for i, c := range pod.Spec.EphemeralContainers {
+			if c.Name != containerName {
+				continue
+			}
+			m((*corev1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
 		}
-		m(&cs[i])
 	}
 }
