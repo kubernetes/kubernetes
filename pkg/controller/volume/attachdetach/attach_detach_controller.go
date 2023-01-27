@@ -181,6 +181,7 @@ func NewAttachDetachController(
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
 		adc.nodeStatusUpdater,
+		adc.nodeLister,
 		recorder)
 
 	csiTranslator := csitrans.New()
