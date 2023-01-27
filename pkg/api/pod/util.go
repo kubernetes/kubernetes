@@ -54,6 +54,10 @@ func AllFeatureEnabledContainers() ContainerType {
 // if visiting should continue.
 type ContainerVisitor func(container *api.Container, containerType ContainerType) (shouldContinue bool)
 
+// ContainerResourcesVisitor is called with each container spec, and returns true
+// if visiting should continue.
+type ContainerResourcesVisitor func(containerName string, resources *api.ResourceRequirements, containerType ContainerType) (shouldContinue bool)
+
 // VisitContainers invokes the visitor function with a pointer to every container
 // spec in the given pod spec with type set in mask. If visitor returns false,
 // visiting is short-circuited. VisitContainers returns true if visiting completes,
@@ -76,6 +80,35 @@ func VisitContainers(podSpec *api.PodSpec, mask ContainerType, visitor Container
 	if mask&EphemeralContainers != 0 {
 		for i := range podSpec.EphemeralContainers {
 			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// VisitContainerResources invokes the visitor function with a pointer to every container
+// spec in the given pod spec with type set in mask. If visitor returns false,
+// visiting is short-circuited. VisitContainers returns true if visiting completes,
+// false if visiting was short-circuited.
+func VisitContainerResources(podSpec *api.PodSpec, mask ContainerType, visitor ContainerResourcesVisitor) bool {
+	if mask&InitContainers != 0 {
+		for _, c := range podSpec.InitContainers {
+			if !visitor(c.Name, &c.Resources, InitContainers) {
+				return false
+			}
+		}
+	}
+	if mask&Containers != 0 {
+		for _, c := range podSpec.Containers {
+			if !visitor(c.Name, &c.Resources, Containers) {
+				return false
+			}
+		}
+	}
+	if mask&EphemeralContainers != 0 {
+		for _, c := range podSpec.EphemeralContainers {
+			if !visitor(c.Name, &c.Resources, EphemeralContainers) {
 				return false
 			}
 		}

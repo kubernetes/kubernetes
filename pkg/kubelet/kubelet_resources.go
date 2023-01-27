@@ -19,9 +19,9 @@ package kubelet
 import (
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
@@ -45,13 +45,13 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(pod *v1.Pod, container *v1.Con
 	klog.InfoS("Allocatable", "allocatable", allocatable)
 	outputPod := pod.DeepCopy()
 	for idx := range outputPod.Spec.Containers {
-		resource.MergeContainerResourceLimits(&outputPod.Spec.Containers[idx], allocatable)
+		resource.MergeContainerResourceLimits(&outputPod.Spec.Containers[idx].Resources, allocatable)
 	}
 
 	var outputContainer *v1.Container
 	if container != nil {
 		outputContainer = container.DeepCopy()
-		resource.MergeContainerResourceLimits(outputContainer, allocatable)
+		resource.MergeContainerResourceLimits(&outputContainer.Resources, allocatable)
 	}
 	return outputPod, outputContainer, nil
 }

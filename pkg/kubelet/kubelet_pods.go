@@ -846,7 +846,7 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 func containerResourceRuntimeValue(fs *v1.ResourceFieldSelector, pod *v1.Pod, container *v1.Container) (string, error) {
 	containerName := fs.ContainerName
 	if len(containerName) == 0 {
-		return resource.ExtractContainerResourceValue(fs, container)
+		return resource.ExtractContainerResourceValue(fs, &container.Resources)
 	}
 	return resource.ExtractResourceValueByContainerName(fs, pod, containerName)
 }

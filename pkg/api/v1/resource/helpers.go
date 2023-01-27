@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
@@ -172,31 +173,57 @@ func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 // ExtractResourceValueByContainerName extracts the value of a resource
 // by providing container name
 func ExtractResourceValueByContainerName(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string) (string, error) {
-	container, err := findContainerInPod(pod, containerName)
-	if err != nil {
-		return "", err
+	found := false
+	var result string
+	var err error
+	podutil.VisitContainerResources(&pod.Spec, podutil.Containers | podutil.InitContainers, func(c string, resources *v1.ResourceRequirements , containerType podutil.ContainerType) bool {
+		if c == containerName {
+			found = true
+
+			result, err = ExtractContainerResourceValue(fs, resources)
+
+			return false
+		}
+		return true
+	})
+
+	if !found {
+		return "", fmt.Errorf("container %q not found in pod %q", containerName, pod.Name)
 	}
-	return ExtractContainerResourceValue(fs, container)
+
+	return result, err
 }
 
 // ExtractResourceValueByContainerNameAndNodeAllocatable extracts the value of a resource
 // by providing container name and node allocatable
 func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList) (string, error) {
-	realContainer, err := findContainerInPod(pod, containerName)
-	if err != nil {
-		return "", err
+	found := false
+	var result string
+	var err error
+	podutil.VisitContainerResources(&pod.Spec, podutil.Containers | podutil.InitContainers, func(c string, realResources *v1.ResourceRequirements , containerType podutil.ContainerType) bool {
+		if c == containerName {
+			found = true
+			resources := realResources.DeepCopy()
+
+			MergeContainerResourceLimits(resources, nodeAllocatable)
+
+			result, err = ExtractContainerResourceValue(fs, resources)
+
+			return false
+		}
+		return true
+	})
+
+	if !found {
+		return "", fmt.Errorf("container %q not found in pod %q", containerName, pod.Name)
 	}
 
-	container := realContainer.DeepCopy()
-
-	MergeContainerResourceLimits(container, nodeAllocatable)
-
-	return ExtractContainerResourceValue(fs, container)
+	return result, err
 }
 
 // ExtractContainerResourceValue extracts the value of a resource
 // in an already known container
-func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.Container) (string, error) {
+func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, resources *v1.ResourceRequirements) (string, error) {
 	divisor := resource.Quantity{}
 	if divisor.Cmp(fs.Divisor) == 0 {
 		divisor = resource.MustParse("1")
@@ -206,30 +233,30 @@ func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.C
 
 	switch fs.Resource {
 	case "limits.cpu":
-		return convertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
+		return convertResourceCPUToString(resources.Limits.Cpu(), divisor)
 	case "limits.memory":
-		return convertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
+		return convertResourceMemoryToString(resources.Limits.Memory(), divisor)
 	case "limits.ephemeral-storage":
-		return convertResourceEphemeralStorageToString(container.Resources.Limits.StorageEphemeral(), divisor)
+		return convertResourceEphemeralStorageToString(resources.Limits.StorageEphemeral(), divisor)
 	case "requests.cpu":
-		return convertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
+		return convertResourceCPUToString(resources.Requests.Cpu(), divisor)
 	case "requests.memory":
-		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
+		return convertResourceMemoryToString(resources.Requests.Memory(), divisor)
 	case "requests.ephemeral-storage":
-		return convertResourceEphemeralStorageToString(container.Resources.Requests.StorageEphemeral(), divisor)
+		return convertResourceEphemeralStorageToString(resources.Requests.StorageEphemeral(), divisor)
 	}
 	// handle extended standard resources with dynamic names
 	// example: requests.hugepages-<pageSize> or limits.hugepages-<pageSize>
 	if strings.HasPrefix(fs.Resource, "requests.") {
 		resourceName := v1.ResourceName(strings.TrimPrefix(fs.Resource, "requests."))
 		if IsHugePageResourceName(resourceName) {
-			return convertResourceHugePagesToString(container.Resources.Requests.Name(resourceName, resource.BinarySI), divisor)
+			return convertResourceHugePagesToString(resources.Requests.Name(resourceName, resource.BinarySI), divisor)
 		}
 	}
 	if strings.HasPrefix(fs.Resource, "limits.") {
 		resourceName := v1.ResourceName(strings.TrimPrefix(fs.Resource, "limits."))
 		if IsHugePageResourceName(resourceName) {
-			return convertResourceHugePagesToString(container.Resources.Limits.Name(resourceName, resource.BinarySI), divisor)
+			return convertResourceHugePagesToString(resources.Limits.Name(resourceName, resource.BinarySI), divisor)
 		}
 	}
 	return "", fmt.Errorf("unsupported container resource : %v", fs.Resource)
@@ -263,34 +290,19 @@ func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity
 	return strconv.FormatInt(m, 10), nil
 }
 
-// findContainerInPod finds a container by its name in the provided pod
-func findContainerInPod(pod *v1.Pod, containerName string) (*v1.Container, error) {
-	for _, container := range pod.Spec.Containers {
-		if container.Name == containerName {
-			return &container, nil
-		}
-	}
-	for _, container := range pod.Spec.InitContainers {
-		if container.Name == containerName {
-			return &container, nil
-		}
-	}
-	return nil, fmt.Errorf("container %s not found", containerName)
-}
-
 // MergeContainerResourceLimits checks if a limit is applied for
 // the container, and if not, it sets the limit to the passed resource list.
-func MergeContainerResourceLimits(container *v1.Container,
+func MergeContainerResourceLimits(resources *v1.ResourceRequirements,
 	allocatable v1.ResourceList) {
-	if container.Resources.Limits == nil {
-		container.Resources.Limits = make(v1.ResourceList)
+	if resources.Limits == nil {
+		resources.Limits = make(v1.ResourceList)
 	}
 	// NOTE: we exclude hugepages-* resources because hugepages are never overcommitted.
 	// This means that the container always has a limit specified.
 	for _, resource := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage} {
-		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
+		if quantity, exists := resources.Limits[resource]; !exists || quantity.IsZero() {
 			if cap, exists := allocatable[resource]; exists {
-				container.Resources.Limits[resource] = cap.DeepCopy()
+				resources.Limits[resource] = cap.DeepCopy()
 			}
 		}
 	}

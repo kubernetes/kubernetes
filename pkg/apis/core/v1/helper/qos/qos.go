@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -41,12 +42,9 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 	limits := v1.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
-	allContainers := []v1.Container{}
-	allContainers = append(allContainers, pod.Spec.Containers...)
-	allContainers = append(allContainers, pod.Spec.InitContainers...)
-	for _, container := range allContainers {
+	podutil.VisitContainerResources(&pod.Spec, podutil.Containers | podutil.InitContainers, func(name string, resources *v1.ResourceRequirements, containerType podutil.ContainerType) bool {
 		// process requests
-		for name, quantity := range container.Resources.Requests {
+		for name, quantity := range resources.Requests {
 			if !isSupportedQoSComputeResource(name) {
 				continue
 			}
@@ -62,7 +60,7 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 		}
 		// process limits
 		qosLimitsFound := sets.NewString()
-		for name, quantity := range container.Resources.Limits {
+		for name, quantity := range resources.Limits {
 			if !isSupportedQoSComputeResource(name) {
 				continue
 			}
@@ -81,7 +79,8 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 		if !qosLimitsFound.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
 			isGuaranteed = false
 		}
-	}
+		return true
+	})
 	if len(requests) == 0 && len(limits) == 0 {
 		return v1.PodQOSBestEffort
 	}
