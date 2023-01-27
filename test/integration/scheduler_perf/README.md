@@ -100,3 +100,22 @@ performance.
 
 During interactive debugging sessions it is possible to enable per-test output
 via -use-testing-log.
+
+### Visualization
+
+Some support for visualizing progress over time is built into the
+benchmarks. The measurement operation which creates pods writes .dat files like
+this:
+
+     test/integration/scheduler_perf/SchedulingBasic_5000Nodes_2023-03-17T14:52:09Z.dat
+
+This file is in a text format that [gnuplot](http://www.gnuplot.info/) can
+read. A wrapper script selects some suitable parameters:
+
+     test/integration/scheduler_perf/gnuplot.sh test/integration/scheduler_perf/*.dat
+
+It plots in an interactive window by default. To write into a file, use
+
+    test/integration/scheduler_perf/gnuplot.sh \
+       -e "set term png; set output <output>.png" \
+       test/integration/scheduler_perf/*.dat

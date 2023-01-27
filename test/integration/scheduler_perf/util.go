@@ -59,6 +59,8 @@ const (
 
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
 
+var runID = time.Now().Format(dateFormat)
+
 func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 	gvk := kubeschedulerconfigv1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
 	cfg := config.KubeSchedulerConfiguration{}
@@ -148,12 +150,22 @@ type DataItem struct {
 	Unit string `json:"unit"`
 	// Labels is the labels of the data item.
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// progress contains number of scheduled pods over time.
+	progress []podScheduling
+	start    time.Time
 }
 
 // DataItems is the data point set. It is the struct that perf dashboard expects.
 type DataItems struct {
 	Version   string     `json:"version"`
 	DataItems []DataItem `json:"dataItems"`
+}
+
+type podScheduling struct {
+	ts        time.Time
+	attempts  int
+	completed int
 }
 
 // makeBasePod creates a Pod object to be used as a template.
@@ -186,6 +198,17 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 		return fmt.Errorf("indenting error: %v", err)
 	}
 	return os.WriteFile(destFile, formatted.Bytes(), 0644)
+}
+
+func dataFilename(destFile string) (string, error) {
+	if *dataItemsDir != "" {
+		// Ensure the "dataItemsDir" path is valid.
+		if err := os.MkdirAll(*dataItemsDir, 0750); err != nil {
+			return "", fmt.Errorf("dataItemsDir path %v does not exist and cannot be created: %v", *dataItemsDir, err)
+		}
+		destFile = path.Join(*dataItemsDir, destFile)
+	}
+	return destFile, nil
 }
 
 type labelValues struct {
@@ -292,6 +315,9 @@ type throughputCollector struct {
 	schedulingThroughputs []float64
 	labels                map[string]string
 	namespaces            []string
+
+	progress []podScheduling
+	start    time.Time
 }
 
 func newThroughputCollector(tb testing.TB, podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string) *throughputCollector {
@@ -337,8 +363,20 @@ func (tc *throughputCollector) run(ctx context.Context) {
 				// sampling and creating pods get started independently.
 				lastScheduledCount = scheduled
 				lastSampleTime = now
+				tc.start = now
 				continue
 			}
+
+			// Record the metric sample.
+			counters, err := testutil.GetCounterValuesFromGatherer(legacyregistry.DefaultGatherer, "scheduler_schedule_attempts_total", map[string]string{"profile": "default-scheduler"}, "result")
+			if err != nil {
+				klog.Error(err)
+			}
+			tc.progress = append(tc.progress, podScheduling{
+				ts:        now,
+				attempts:  int(counters["unschedulable"] + counters["error"] + counters["scheduled"]),
+				completed: int(counters["scheduled"]),
+			})
 
 			newScheduled := scheduled - lastScheduledCount
 			if newScheduled == 0 {
@@ -379,7 +417,11 @@ func (tc *throughputCollector) run(ctx context.Context) {
 }
 
 func (tc *throughputCollector) collect() []DataItem {
-	throughputSummary := DataItem{Labels: tc.labels}
+	throughputSummary := DataItem{
+		Labels:   tc.labels,
+		progress: tc.progress,
+		start:    tc.start,
+	}
 	if length := len(tc.schedulingThroughputs); length > 0 {
 		sort.Float64s(tc.schedulingThroughputs)
 		sum := 0.0

@@ -700,6 +700,30 @@ func BenchmarkPerfScheduling(b *testing.B) {
 					// Reset metrics to prevent metrics generated in current workload gets
 					// carried over to the next workload.
 					legacyregistry.Reset()
+
+					// Exactly one result is expected to contain the progress information.
+					for _, item := range results {
+						if len(item.progress) == 0 {
+							continue
+						}
+
+						destFile, err := dataFilename(strings.ReplaceAll(fmt.Sprintf("%s_%s_%s.dat", tc.Name, w.Name, runID), "/", "_"))
+						if err != nil {
+							b.Fatalf("prepare data file: %v", err)
+						}
+						f, err := os.Create(destFile)
+						if err != nil {
+							b.Fatalf("create data file: %v", err)
+						}
+
+						// Print progress over time.
+						for _, sample := range item.progress {
+							fmt.Fprintf(f, "%.1fs %d %d\n", sample.ts.Sub(item.start).Seconds(), sample.completed, sample.attempts)
+						}
+						if err := f.Close(); err != nil {
+							b.Fatalf("closing data file: %v", err)
+						}
+					}
 				})
 			}
 		})
