@@ -2103,7 +2103,7 @@ func (og *operationGenerator) expandVolumeDuringMount(volumeToMount VolumeToMoun
 				volumePlugin:       expandablePlugin,
 				actualStateOfWorld: actualStateOfWorld,
 			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+			if og.checkForRecoveryFromExpansion(pvc, volumeToMount) {
 				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
 				resizeFinished, err, _ := nodeExpander.expandOnPlugin()
 				return resizeFinished, err
@@ -2165,7 +2165,8 @@ func (og *operationGenerator) nodeExpandVolume(
 				volumePlugin:       expandableVolumePlugin,
 				actualStateOfWorld: actualStateOfWorld,
 			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+
+			if og.checkForRecoveryFromExpansion(pvc, volumeToMount) {
 				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
 				resizeFinished, err, _ := nodeExpander.expandOnPlugin()
 				return resizeFinished, err
@@ -2175,6 +2176,26 @@ func (og *operationGenerator) nodeExpandVolume(
 		}
 	}
 	return true, nil
+}
+
+func (og *operationGenerator) checkForRecoveryFromExpansion(pvc *v1.PersistentVolumeClaim, volumeToMount VolumeToMount) bool {
+	resizeStatus := pvc.Status.ResizeStatus
+	allocatedResource := pvc.Status.AllocatedResources
+	featureGateStatus := utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure)
+
+	if !featureGateStatus {
+		return false
+	}
+
+	// Even though RecoverVolumeExpansionFailure feature gate is enabled, it appears that we are running with older version
+	// of resize controller, which will not populate allocatedResource and resizeStatus. This can happen because of version skew
+	// and hence we are going to keep expanding using older logic.
+	if resizeStatus == nil && allocatedResource == nil {
+		_, detailedMsg := volumeToMount.GenerateMsg("MountVolume.NodeExpandVolume running with", "older external resize controller")
+		klog.Warningf(detailedMsg)
+		return false
+	}
+	return true
 }
 
 // legacyCallNodeExpandOnPlugin is old version of calling node expansion on plugin, which does not support
