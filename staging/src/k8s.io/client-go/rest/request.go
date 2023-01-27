@@ -24,6 +24,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"path"
@@ -929,9 +930,27 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(ctx)
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), newDNSMetricsTrace(ctx)))
 	req.Header = r.headers
 	return req, nil
+}
+
+// newDNSMetricsTrace returns an HTTP trace that tracks time spend on DNS lookups per network/host.
+// This metric is available in client as "rest_client_dns_resolution_duration_seconds".
+func newDNSMetricsTrace(ctx context.Context) *httptrace.ClientTrace {
+	var (
+		dnsStart time.Time
+		dnsHost  string
+	)
+	return &httptrace.ClientTrace{
+		DNSStart: func(info httptrace.DNSStartInfo) {
+			dnsStart = time.Now()
+			dnsHost = info.Host
+		},
+		DNSDone: func(info httptrace.DNSDoneInfo) {
+			metrics.ResolverLatency.Observe(ctx, dnsHost, time.Since(dnsStart))
+		},
+	}
 }
 
 // request connects to the server and invokes the provided function when a server response is
