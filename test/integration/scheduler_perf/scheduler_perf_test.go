@@ -832,12 +832,19 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			var collectors []testDataCollector
 			var collectorCtx context.Context
 			var collectorCancel func()
+			var collectorWG sync.WaitGroup
 			if concreteOp.CollectMetrics {
 				collectorCtx, collectorCancel = context.WithCancel(ctx)
 				defer collectorCancel()
 				collectors = getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", b.Name(), namespace), namespace, tc.MetricsCollectorConfig)
 				for _, collector := range collectors {
-					go collector.run(collectorCtx)
+					// Need loop-local variable for function below.
+					collector := collector
+					collectorWG.Add(1)
+					go func() {
+						defer collectorWG.Done()
+						collector.run(collectorCtx)
+					}()
 				}
 			}
 			if err := createPods(ctx, b, namespace, concreteOp, client); err != nil {
@@ -861,6 +868,7 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 				// same time, so if we're here, it means that all pods have been
 				// scheduled.
 				collectorCancel()
+				collectorWG.Wait()
 				mu.Lock()
 				for _, collector := range collectors {
 					dataItems = append(dataItems, collector.collect()...)
