@@ -124,7 +124,7 @@ const (
 )
 
 // PlatformType is a specific supported infrastructure provider.
-// +kubebuilder:validation:Enum="";AWS;Azure;BareMetal;GCP;Libvirt;OpenStack;None;VSphere;oVirt;IBMCloud;KubeVirt;EquinixMetal;PowerVS;AlibabaCloud;Nutanix
+// +kubebuilder:validation:Enum="";AWS;Azure;BareMetal;GCP;Libvirt;OpenStack;None;VSphere;oVirt;IBMCloud;KubeVirt;EquinixMetal;PowerVS;AlibabaCloud;Nutanix;External
 type PlatformType string
 
 const (
@@ -172,6 +172,9 @@ const (
 
 	// NutanixPlatformType represents Nutanix infrastructure.
 	NutanixPlatformType PlatformType = "Nutanix"
+
+	// ExternalPlatformType represents generic infrastructure provider. Platform-specific components should be supplemented separately.
+	ExternalPlatformType PlatformType = "External"
 )
 
 // IBMCloudProviderType is a specific supported IBM Cloud provider cluster type
@@ -188,6 +191,50 @@ const (
 	// This is utilized in IBM Cloud Satellite environments.
 	IBMCloudProviderTypeUPI IBMCloudProviderType = "UPI"
 )
+
+// CloudControllerManagerState defines whether Cloud Controller Manager presence is expected or not
+type CloudControllerManagerState string
+
+const (
+	// Cloud Controller Manager is enabled and expected to be installed.
+	// This value indicates that new nodes should be tainted as uninitialized when created,
+	// preventing them from running workloads until they are initialized by the cloud controller manager.
+	CloudControllerManagerExternal CloudControllerManagerState = "External"
+
+	// Cloud Controller Manager is disabled and not expected to be installed.
+	// This value indicates that new nodes should not be tainted
+	// and no extra node initialization is expected from the cloud controller manager.
+	CloudControllerManagerNone CloudControllerManagerState = "None"
+)
+
+// CloudControllerManagerSpec holds Cloud Controller Manager (a.k.a. CCM or CPI) related settings
+type CloudControllerManagerSpec struct {
+	// state determines whether or not an external Cloud Controller Manager is expected to
+	// be installed within the cluster.
+	// https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/#running-cloud-controller-manager
+	//
+	// When set to "External", new nodes will be tainted as uninitialized when created,
+	// preventing them from running workloads until they are initialized by the cloud controller manager.
+	// When omitted or set to "None", new nodes will be not tainted
+	// and no extra initialization from the cloud controller manager is expected.
+	// +kubebuilder:validation:Enum="";External;None
+	// +optional
+	State CloudControllerManagerState `json:"state"`
+}
+
+// ExternalPlatformSpec holds the desired state for the generic External infrastructure provider.
+type ExternalPlatformSpec struct {
+	// PlatformName holds the arbitrary string representing the infrastructure provider name, expected to be set at the installation time.
+	// This field is solely for informational and reporting purposes and is not expected to be used for decision-making.
+	// +kubebuilder:default:="Unknown"
+	// +default="Unknown"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == 'Unknown' || self == oldSelf",message="platform name cannot be changed once set"
+	// +optional
+	PlatformName string `json:"platformName,omitempty"`
+	// CloudControllerManager contains settings specific to the external Cloud Controller Manager (a.k.a. CCM or CPI)
+	// +optional
+	CloudControllerManager CloudControllerManagerSpec `json:"cloudControllerManager"`
+}
 
 // PlatformSpec holds the desired state specific to the underlying infrastructure provider
 // of the current cluster. Since these are used at spec-level for the underlying cluster, it
@@ -256,7 +303,15 @@ type PlatformSpec struct {
 	// Nutanix contains settings specific to the Nutanix infrastructure provider.
 	// +optional
 	Nutanix *NutanixPlatformSpec `json:"nutanix,omitempty"`
+
+	// ExternalPlatformType represents generic infrastructure provider.
+	// Platform-specific components should be supplemented separately.
+	// +optional
+	External *ExternalPlatformSpec `json:"external,omitempty"`
 }
+
+// ExternalPlatformStatus holds the current status of the generic External infrastructure provider.
+type ExternalPlatformStatus struct{}
 
 // PlatformStatus holds the current status specific to the underlying infrastructure provider
 // of the current cluster. Since these are used at status-level for the underlying cluster, it
@@ -326,6 +381,10 @@ type PlatformStatus struct {
 	// Nutanix contains settings specific to the Nutanix infrastructure provider.
 	// +optional
 	Nutanix *NutanixPlatformStatus `json:"nutanix,omitempty"`
+
+	// External contains settings specific to the generic External infrastructure provider.
+	// +optional
+	External *ExternalPlatformStatus `json:"external,omitempty"`
 }
 
 // AWSServiceEndpoint store the configuration of a custom url to

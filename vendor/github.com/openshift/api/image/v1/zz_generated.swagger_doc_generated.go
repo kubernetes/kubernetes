@@ -47,6 +47,7 @@ var map_ImageBlobReferences = map[string]string{
 	"imageMissing": "imageMissing is true if the image is referenced by the image stream but the image object has been deleted from the API by an administrator. When this field is set, layers and config fields may be empty and callers that depend on the image metadata should consider the image to be unavailable for download or viewing.",
 	"layers":       "layers is the list of blobs that compose this image, from base layer to top layer. All layers referenced by this array will be defined in the blobs map. Some images may have zero layers.",
 	"config":       "config, if set, is the blob that contains the image config. Some images do not have separate config blobs and this field will be set to nil if so.",
+	"manifests":    "manifests is the list of other image names that this image points to. For a single architecture image, it is empty. For a multi-arch image, it consists of the digests of single architecture images, such images shouldn't have layers nor config.",
 }
 
 func (ImageBlobReferences) SwaggerDoc() map[string]string {

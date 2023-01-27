@@ -76,6 +76,28 @@ spec:
                     equinixMetal:
                       description: EquinixMetal contains settings specific to the Equinix Metal infrastructure provider.
                       type: object
+                    external:
+                      description: ExternalPlatformType represents generic infrastructure provider. Platform-specific components should be supplemented separately.
+                      properties:
+                        cloudControllerManager:
+                          description: CloudControllerManager contains settings specific to the external Cloud Controller Manager (a.k.a. CCM or CPI)
+                          properties:
+                            state:
+                              description: "state determines whether or not an external Cloud Controller Manager is expected to be installed within the cluster. https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/#running-cloud-controller-manager \n When set to \"External\", new nodes will be tainted as uninitialized when created, preventing them from running workloads until they are initialized by the cloud controller manager. When omitted or set to \"None\", new nodes will be not tainted and no extra initialization from the cloud controller manager is expected."
+                              enum:
+                                - ""
+                                - External
+                                - None
+                              type: string
+                          type: object
+                        platformName:
+                          default: Unknown
+                          description: PlatformName holds the arbitrary string representing the infrastructure provider name, expected to be set at the installation time. This field is solely for informational and reporting purposes and is not expected to be used for decision-making.
+                          type: string
+                          x-kubernetes-validations:
+                            - message: platform name cannot be changed once set
+                              rule: oldSelf == 'Unknown' || self == oldSelf
+                      type: object
                     gcp:
                       description: GCP contains settings specific to the Google Cloud Platform infrastructure provider.
                       type: object
@@ -194,6 +216,7 @@ spec:
                         - PowerVS
                         - AlibabaCloud
                         - Nutanix
+                        - External
                       type: string
                     vsphere:
                       description: VSphere contains settings specific to the VSphere infrastructure provider.
@@ -401,6 +424,7 @@ spec:
                     - PowerVS
                     - AlibabaCloud
                     - Nutanix
+                    - External
                   type: string
                 platformStatus:
                   description: platformStatus holds status information specific to the underlying infrastructure provider.
@@ -547,6 +571,9 @@ spec:
                         ingressIP:
                           description: ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names.
                           type: string
+                      type: object
+                    external:
+                      description: External contains settings specific to the generic External infrastructure provider.
                       type: object
                     gcp:
                       description: GCP contains settings specific to the Google Cloud Platform infrastructure provider.
@@ -722,6 +749,7 @@ spec:
                         - PowerVS
                         - AlibabaCloud
                         - Nutanix
+                        - External
                       type: string
                     vsphere:
                       description: VSphere contains settings specific to the VSphere infrastructure provider.

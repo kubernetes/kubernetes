@@ -160,6 +160,7 @@ spec:
                       description: perspectives allows enabling/disabling of perspective(s) that user can see in the Perspective switcher dropdown.
                       type: array
                       items:
+                        description: Perspective defines a perspective that cluster admins want to show/hide in the perspective switcher dropdown
                         type: object
                         required:
                           - id
@@ -168,6 +169,30 @@ spec:
                           id:
                             description: 'id defines the id of the perspective. Example: "dev", "admin". The available perspective ids can be found in the code snippet section next to the yaml editor. Incorrect or unknown ids will be ignored.'
                             type: string
+                          pinnedResources:
+                            description: pinnedResources defines the list of default pinned resources that users will see on the perspective navigation if they have not customized these pinned resources themselves. The list of available Kubernetes resources could be read via `kubectl api-resources`. The console will also provide a configuration UI and a YAML snippet that will list the available resources that can be pinned to the navigation. Incorrect or unknown resources will be ignored.
+                            type: array
+                            maxItems: 100
+                            items:
+                              description: PinnedResourceReference includes the group, version and type of resource
+                              type: object
+                              required:
+                                - group
+                                - resource
+                                - version
+                              properties:
+                                group:
+                                  description: 'group is the API Group of the Resource. Enter empty string for the core group. This value should consist of only lowercase alphanumeric characters, hyphens and periods. Example: "", "apps", "build.openshift.io", etc.'
+                                  type: string
+                                  pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                                resource:
+                                  description: 'resource is the type that is being referenced. It is normally the plural form of the resource kind in lowercase. This value should consist of only lowercase alphanumeric characters and hyphens. Example: "deployments", "deploymentconfigs", "pods", etc.'
+                                  type: string
+                                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                                version:
+                                  description: 'version is the API Version of the Resource. This value should consist of only lowercase alphanumeric characters. Example: "v1", "v1beta1", etc.'
+                                  type: string
+                                  pattern: ^[a-z0-9]+$
                           visibility:
                             description: visibility defines the state of perspective along with access review checks if needed for that perspective.
                             type: object
@@ -245,6 +270,9 @@ spec:
                             x-kubernetes-validations:
                               - rule: 'self.state == ''AccessReview'' ?  has(self.accessReview) : !has(self.accessReview)'
                                 message: accessReview configuration is required when state is AccessReview, and forbidden otherwise
+                        x-kubernetes-validations:
+                          - rule: 'has(self.id) && self.id != ''dev''? !has(self.pinnedResources) : true'
+                            message: pinnedResources is allowed only for dev and forbidden for other perspectives
                       x-kubernetes-list-map-keys:
                         - id
                       x-kubernetes-list-type: map

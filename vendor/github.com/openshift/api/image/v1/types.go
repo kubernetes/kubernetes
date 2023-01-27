@@ -605,6 +605,12 @@ type ImageBlobReferences struct {
 	// not have separate config blobs and this field will be set to nil if so.
 	// +optional
 	Config *string `json:"config" protobuf:"bytes,2,opt,name=config"`
+	// manifests is the list of other image names that this image points
+	// to. For a single architecture image, it is empty. For a multi-arch
+	// image, it consists of the digests of single architecture images,
+	// such images shouldn't have layers nor config.
+	// +optional
+	Manifests []string `json:"manifests,omitempty" protobuf:"bytes,4,rep,name=manifests"`
 }
 
 // ImageLayerData contains metadata about an image layer.

@@ -12,3 +12,47 @@ tests:
       apiVersion: config.openshift.io/v1
       kind: Infrastructure
       spec: {}
+  onUpdate:
+    - name: Should be able to change External platformName from unknown to something else
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: Unknown
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: M&PCloud
+      expected: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: M&PCloud
+    - name: Should not be able to change External platformName once it was set
+      initial: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: M&PCloud
+      updated: |
+        apiVersion: config.openshift.io/v1
+        kind: Infrastructure
+        spec:
+          platformSpec:
+            type: External
+            external:
+              platformName: SomeOtherCoolplatformName
+      expectedError: " spec.platformSpec.external.platformName: Invalid value: \"string\": platform name cannot be changed once set"

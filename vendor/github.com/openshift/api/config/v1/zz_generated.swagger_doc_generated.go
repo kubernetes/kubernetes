@@ -1091,6 +1091,15 @@ func (BareMetalPlatformStatus) SwaggerDoc() map[string]string {
 	return map_BareMetalPlatformStatus
 }
 
+var map_CloudControllerManagerSpec = map[string]string{
+	"":      "CloudControllerManagerSpec holds Cloud Controller Manager (a.k.a. CCM or CPI) related settings",
+	"state": "state determines whether or not an external Cloud Controller Manager is expected to be installed within the cluster. https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/#running-cloud-controller-manager\n\nWhen set to \"External\", new nodes will be tainted as uninitialized when created, preventing them from running workloads until they are initialized by the cloud controller manager. When omitted or set to \"None\", new nodes will be not tainted and no extra initialization from the cloud controller manager is expected.",
+}
+
+func (CloudControllerManagerSpec) SwaggerDoc() map[string]string {
+	return map_CloudControllerManagerSpec
+}
+
 var map_EquinixMetalPlatformSpec = map[string]string{
 	"": "EquinixMetalPlatformSpec holds the desired state of the Equinix Metal infrastructure provider. This only includes fields that can be modified in the cluster.",
 }
@@ -1107,6 +1116,24 @@ var map_EquinixMetalPlatformStatus = map[string]string{
 
 func (EquinixMetalPlatformStatus) SwaggerDoc() map[string]string {
 	return map_EquinixMetalPlatformStatus
+}
+
+var map_ExternalPlatformSpec = map[string]string{
+	"":                       "ExternalPlatformSpec holds the desired state for the generic External infrastructure provider.",
+	"platformName":           "PlatformName holds the arbitrary string representing the infrastructure provider name, expected to be set at the installation time. This field is solely for informational and reporting purposes and is not expected to be used for decision-making.",
+	"cloudControllerManager": "CloudControllerManager contains settings specific to the external Cloud Controller Manager (a.k.a. CCM or CPI)",
+}
+
+func (ExternalPlatformSpec) SwaggerDoc() map[string]string {
+	return map_ExternalPlatformSpec
+}
+
+var map_ExternalPlatformStatus = map[string]string{
+	"": "ExternalPlatformStatus holds the current status of the generic External infrastructure provider.",
+}
+
+func (ExternalPlatformStatus) SwaggerDoc() map[string]string {
+	return map_ExternalPlatformStatus
 }
 
 var map_GCPPlatformSpec = map[string]string{
@@ -1311,6 +1338,7 @@ var map_PlatformSpec = map[string]string{
 	"powervs":      "PowerVS contains settings specific to the IBM Power Systems Virtual Servers infrastructure provider.",
 	"alibabaCloud": "AlibabaCloud contains settings specific to the Alibaba Cloud infrastructure provider.",
 	"nutanix":      "Nutanix contains settings specific to the Nutanix infrastructure provider.",
+	"external":     "ExternalPlatformType represents generic infrastructure provider. Platform-specific components should be supplemented separately.",
 }
 
 func (PlatformSpec) SwaggerDoc() map[string]string {
@@ -1333,6 +1361,7 @@ var map_PlatformStatus = map[string]string{
 	"powervs":      "PowerVS contains settings specific to the Power Systems Virtual Servers infrastructure provider.",
 	"alibabaCloud": "AlibabaCloud contains settings specific to the Alibaba Cloud infrastructure provider.",
 	"nutanix":      "Nutanix contains settings specific to the Nutanix infrastructure provider.",
+	"external":     "External contains settings specific to the generic External infrastructure provider.",
 }
 
 func (PlatformStatus) SwaggerDoc() map[string]string {
