@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// For each of these resources, a pod that doesn't request the resource explicitly
+// For each of these resources, a container that doesn't request the resource explicitly
 // will be treated as having requested the amount indicated below, for the purpose
 // of computing priority only. This ensures that when scheduling zero-request pods, such
 // pods will not all be scheduled to the node with the smallest in-use request,
