@@ -661,7 +661,32 @@ func BenchmarkPerfScheduling(b *testing.B) {
 					for feature, flag := range tc.FeatureGates {
 						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 					}
-					dataItems.DataItems = append(dataItems.DataItems, runWorkload(ctx, b, tc, w)...)
+					results := runWorkload(ctx, b, tc, w)
+					dataItems.DataItems = append(dataItems.DataItems, results...)
+
+					if len(results) > 0 {
+						// The default ns/op is not
+						// useful because it includes
+						// the time spent on
+						// initialization and shutdown. Here we suppress it.
+						b.ReportMetric(0, "ns/op")
+
+						// Instead, report the same
+						// results that also get stored
+						// in the JSON file.
+						for _, result := range results {
+							// For some metrics like
+							// scheduler_framework_extension_point_duration_seconds
+							// the actual value has some
+							// other unit. We patch the key
+							// to make it look right.
+							metric := strings.ReplaceAll(result.Labels["Metric"], "_seconds", "_"+result.Unit)
+							for key, value := range result.Data {
+								b.ReportMetric(value, metric+"/"+key)
+							}
+						}
+					}
+
 					// Reset metrics to prevent metrics generated in current workload gets
 					// carried over to the next workload.
 					legacyregistry.Reset()
