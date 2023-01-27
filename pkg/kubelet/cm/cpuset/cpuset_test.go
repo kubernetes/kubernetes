@@ -18,6 +18,7 @@ package cpuset
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -90,6 +91,7 @@ func TestCPUSetEqual(t *testing.T) {
 		{New(), New()},
 		{New(5), New(5)},
 		{New(1, 2, 3, 4, 5), New(1, 2, 3, 4, 5)},
+		{New(5, 4, 3, 2, 1), New(1, 2, 3, 4, 5)},
 	}
 
 	shouldNotEqual := []struct {
@@ -139,7 +141,13 @@ func TestCPUSetIsSubsetOf(t *testing.T) {
 	shouldNotBeSubset := []struct {
 		s1 CPUSet
 		s2 CPUSet
-	}{}
+	}{
+		// A set with more elements is not a subset.
+		{New(5), New()},
+
+		// Disjoint set is not a subset.
+		{New(6), New(5)},
+	}
 
 	for _, c := range shouldBeSubset {
 		if !c.s1.IsSubsetOf(c.s2) {
@@ -255,17 +263,26 @@ func TestCPUSetDifference(t *testing.T) {
 func TestCPUSetList(t *testing.T) {
 	testCases := []struct {
 		set      CPUSet
-		expected []int
+		expected []int // must be sorted
 	}{
 		{New(), []int{}},
 		{New(5), []int{5}},
 		{New(1, 2, 3, 4, 5), []int{1, 2, 3, 4, 5}},
+		{New(5, 4, 3, 2, 1), []int{1, 2, 3, 4, 5}},
 	}
 
 	for _, c := range testCases {
 		result := c.set.List()
 		if !reflect.DeepEqual(result, c.expected) {
-			t.Fatalf("expected set as slice to be [%v] (got [%v]), s: [%v]", c.expected, result, c.set)
+			t.Fatalf("unexpected List() contents. got [%v] want [%v] (set: [%v])", result, c.expected, c.set)
+		}
+
+		// We cannot rely on internal storage order details for a unit test.
+		// The best we can do is to sort the output of 'UnsortedList'.
+		result = c.set.UnsortedList()
+		sort.Ints(result)
+		if !reflect.DeepEqual(result, c.expected) {
+			t.Fatalf("unexpected UnsortedList() contents. got [%v] want [%v] (set: [%v])", result, c.expected, c.set)
 		}
 	}
 }
@@ -328,5 +345,14 @@ func TestParse(t *testing.T) {
 		if err == nil {
 			t.Fatalf("expected parse failure of \"%s\", but it succeeded as \"%s\"", c, result.String())
 		}
+	}
+}
+
+func TestClone(t *testing.T) {
+	original := New(1, 2, 3, 4, 5)
+	clone := original.Clone()
+
+	if !original.Equals(clone) {
+		t.Errorf("expected clone [%v] to equal original [%v]", clone, original)
 	}
 }
