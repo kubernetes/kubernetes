@@ -93,4 +93,14 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		framework.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
+
+	ginkgo.It("should grab all metrics slis from API server.", func(ctx context.Context) {
+		ginkgo.By("Connecting to /metrics/slis endpoint")
+		response, err := grabber.GrabMetricsSLIsFromAPIServer(ctx)
+		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
+			e2eskipper.Skipf("%v", err)
+		}
+		framework.ExpectNoError(err)
+		gomega.Expect(response).NotTo(gomega.BeEmpty())
+	})
 })
