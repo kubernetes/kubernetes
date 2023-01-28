@@ -19,13 +19,13 @@ package nodeports
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -147,8 +147,8 @@ func TestNodePorts(t *testing.T) {
 			cycleState := framework.NewCycleState()
 			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
 			if test.wantPreFilterStatus != nil {
-				if !reflect.DeepEqual(preFilterStatus, test.wantPreFilterStatus) {
-					t.Errorf("preFilterStatus does not match: %v, want: %v", preFilterStatus, test.wantPreFilterStatus)
+				if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
+					t.Errorf("preFilter: status does not match (-want,+got):\n%s", diff)
 					return
 				}
 				return
@@ -158,8 +158,8 @@ func TestNodePorts(t *testing.T) {
 				return
 			}
 			filterStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(filterStatus, test.wantFilterStatus) {
-				t.Errorf("status does not match: %v, want: %v", filterStatus, test.wantFilterStatus)
+			if diff := cmp.Diff(test.wantFilterStatus, filterStatus); diff != "" {
+				t.Errorf("filter: status does not match (-want,+got):\n%s", diff)
 				return
 			}
 		})
@@ -175,8 +175,9 @@ func TestPreFilterDisabled(t *testing.T) {
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, fmt.Errorf("not found")))
-	if !reflect.DeepEqual(gotStatus, wantStatus) {
-		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	if diff := cmp.Diff(gotStatus, wantStatus); diff != "" {
+		t.Errorf("status does not match (-want,+got):\n%s", diff)
+		return
 	}
 }
 
@@ -265,8 +266,9 @@ func TestGetContainerPorts(t *testing.T) {
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			result := getContainerPorts(test.pod1, test.pod2)
-			if !reflect.DeepEqual(test.expected, result) {
-				t.Errorf("Got different result than expected.\nDifference detected on:\n%s", diff.ObjectGoPrintSideBySide(test.expected, result))
+			if diff := cmp.Diff(test.expected, result); diff != "" {
+				t.Errorf("container ports: container ports does not match (-want,+got):\n%s", diff)
+				return
 			}
 		})
 	}
