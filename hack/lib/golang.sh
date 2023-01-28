@@ -470,7 +470,21 @@ kube::golang::create_gopath_tree() {
 }
 
 # Ensure the go tool exists and is a viable version.
+# Inputs:
+#   env-var GO_VERSION is the desired go version to use, downloading it if needed (defaults to content of .go-version)
+#   env-var FORCE_HOST_GO set to a non-empty value uses the go version in the $PATH and skips ensuring $GO_VERSION is used
 kube::golang::verify_go_version() {
+  # default GO_VERSION to content of .go-version
+  GO_VERSION="${GO_VERSION:-"$(cat "${KUBE_ROOT}/.go-version")"}"
+  # only setup go if we haven't set FORCE_HOST_GO, or `go version` doesn't match GO_VERSION
+  if ! ([ -n "${FORCE_HOST_GO:-}" ] || \
+      (command -v go >/dev/null && [ "$(go version | cut -d' ' -f3)" = "go${GO_VERSION}" ])); then
+      export GIMME_ENV_PREFIX=${GIMME_ENV_PREFIX:-"${KUBE_OUTPUT}/.gimme/envs"}
+      export GIMME_VERSION_PREFIX=${GIMME_VERSION_PREFIX:-"${KUBE_OUTPUT}/.gimme/versions"}
+      # eval because the output of this is shell to set PATH etc.
+      eval "$("${KUBE_ROOT}/third_party/gimme/gimme" "${GO_VERSION}")"
+  fi
+
   if [[ -z "$(command -v go)" ]]; then
     kube::log::usage_from_stdin <<EOF
 Can't find 'go' in PATH, please fix and retry.
