@@ -299,7 +299,7 @@ var _ = SIGDescribe("Job", func() {
 			}
 		}
 		if !exists {
-			framework.Failf("Expected suspended job to exist. It was not found.")
+			framework.Failf("Job was expected to be completed or failed")
 		}
 
 		ginkgo.By("Updating the job with suspend=false")
@@ -357,7 +357,7 @@ var _ = SIGDescribe("Job", func() {
 			}
 		}
 		if !exists {
-			framework.Failf("Expected suspended job to exist. It was not found.")
+			framework.Failf("Job was expected to be completed or failed")
 		}
 	})
 

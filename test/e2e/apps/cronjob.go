@@ -24,6 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -308,7 +309,9 @@ var _ = SIGDescribe("CronJob", func() {
 		cronJob.Spec.TimeZone = &badTimeZone
 		_, err := createCronJob(ctx, f.ClientSet, f.Namespace.Name, cronJob)
 		framework.ExpectError(err, "CronJob creation should fail with invalid time zone error")
-		framework.ExpectEqual(apierrors.IsInvalid(err), true, "CronJob creation should fail with invalid time zone error")
+		if !apierrors.IsInvalid(err) {
+			framework.Failf("Failed to create CronJob, invalid time zone.")
+		}
 	})
 
 	/*
@@ -387,8 +390,9 @@ var _ = SIGDescribe("CronJob", func() {
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-cjWatch.ResultChan():
+
 				if !ok {
-					framework.Fail("watch channel should not close")
+					framework.Fail("Watch channel is closed.")
 				}
 				framework.ExpectEqual(evt.Type, watch.Modified)
 				watchedCronJob, isCronJob := evt.Object.(*batchv1.CronJob)
@@ -439,6 +443,7 @@ var _ = SIGDescribe("CronJob", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
+
 		if !updatedStatus.Status.LastScheduleTime.Equal(&now2) {
 			framework.Failf("updated object status expected to have updated lastScheduleTime %#v, got %#v", statusToUpdate.Status.LastScheduleTime, updatedStatus.Status.LastScheduleTime)
 		}
@@ -454,9 +459,8 @@ var _ = SIGDescribe("CronJob", func() {
 		// CronJob resource delete operations
 		expectFinalizer := func(cj *batchv1.CronJob, msg string) {
 			framework.ExpectNotEqual(cj.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, cronjob: %+v", msg, cj))
-			if len(cj.Finalizers) == 0 {
-				framework.Failf("expected finalizers on cronjob, got none on step: %q, cronjob: %+v", msg, cj)
-			}
+			gomega.Expect(len(cj.Finalizers)).To(gomega.BeNumerically(">", 0), "expected finalizers on cronjob, got none on step: %q, cronjob: %+v", msg, cj)
+
 		}
 
 		ginkgo.By("deleting")
@@ -469,10 +473,8 @@ var _ = SIGDescribe("CronJob", func() {
 		// If controller does not support finalizers, we expect a 404.  Otherwise we validate finalizer behavior.
 		if err == nil {
 			expectFinalizer(cj, "deleting cronjob")
-		} else {
-			if !apierrors.IsNotFound(err) {
-				framework.Failf("expected 404, got %v", err)
-			}
+		} else if !apierrors.IsNotFound(err) {
+			framework.Failf("expected 404, got %v", err)
 		}
 
 		ginkgo.By("deleting a collection")
@@ -481,10 +483,7 @@ var _ = SIGDescribe("CronJob", func() {
 		cjs, err = cjClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		// Should have <= 2 items since some cronjobs might not have been deleted yet due to finalizers
-		if len(cjs.Items) > 2 {
-			framework.Logf("got unexpected filtered list: %v", cjs.Items)
-			framework.Fail("filtered list should be <= 2")
-		}
+		gomega.Expect(len(cjs.Items)).To(gomega.BeNumerically("<=", 2), "filtered list length should be <= 2, got:\n%s", format.Object(cjs.Items, 1))
 		// Validate finalizers
 		for _, cj := range cjs.Items {
 			expectFinalizer(&cj, "deleting cronjob collection")
