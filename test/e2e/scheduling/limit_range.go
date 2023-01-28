@@ -318,7 +318,9 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err, "Failed to patch limitRange %q", lrName)
 		framework.ExpectEqual(patchedLimitRange.Labels[lrName], "patched", "%q label didn't have value 'patched' for this limitRange. Current labels: %v", lrName, patchedLimitRange.Labels)
 		checkMinLimitRange := apiequality.Semantic.DeepEqual(patchedLimitRange.Spec.Limits[0].Min, newMin)
-		framework.ExpectEqual(checkMinLimitRange, true, "LimitRange does not have the correct min limitRange. Currently is %#v ", patchedLimitRange.Spec.Limits[0].Min)
+		if !checkMinLimitRange {
+			framework.Failf("LimitRange does not have the correct min limitRange. Currently is %#v ", patchedLimitRange.Spec.Limits[0].Min)
+		}
 		framework.Logf("LimitRange %q has been patched", lrName)
 
 		ginkgo.By(fmt.Sprintf("Delete LimitRange %q by Collection with labelSelector: %q", lrName, patchedLabelSelector))
