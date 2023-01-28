@@ -349,25 +349,37 @@ func deployCustomResourceWebhookAndService(ctx context.Context, f *framework.Fra
 func verifyV1Object(crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v1"))
 	hostPort, exists := obj.Object["hostPort"]
-	framework.ExpectEqual(exists, true)
+	if !exists {
+		framework.Failf("Object is missing 'hostPort' key.")
+	}
 
 	gomega.Expect(hostPort).To(gomega.BeEquivalentTo("localhost:8080"))
 	_, hostExists := obj.Object["host"]
-	framework.ExpectEqual(hostExists, false)
+	if hostExists {
+		framework.Failf("Object should not have 'host' key.")
+	}
 	_, portExists := obj.Object["port"]
-	framework.ExpectEqual(portExists, false)
+	if portExists {
+		framework.Failf("Object should not have 'port' key.")
+	}
 }
 
 func verifyV2Object(crd *apiextensionsv1.CustomResourceDefinition, obj *unstructured.Unstructured) {
 	gomega.Expect(obj.GetAPIVersion()).To(gomega.BeEquivalentTo(crd.Spec.Group + "/v2"))
 	_, hostPortExists := obj.Object["hostPort"]
-	framework.ExpectEqual(hostPortExists, false)
+	if hostPortExists {
+		framework.Failf("Object should not have 'hostPort' key.")
+	}
 
 	host, hostExists := obj.Object["host"]
-	framework.ExpectEqual(hostExists, true)
+	if !hostExists {
+		framework.Failf("Object is missing 'host' key.")
+	}
 	gomega.Expect(host).To(gomega.BeEquivalentTo("localhost"))
 	port, portExists := obj.Object["port"]
-	framework.ExpectEqual(portExists, true)
+	if !portExists {
+		framework.Failf("Object is missing 'port' key.")
+	}
 	gomega.Expect(port).To(gomega.BeEquivalentTo("8080"))
 }
 
