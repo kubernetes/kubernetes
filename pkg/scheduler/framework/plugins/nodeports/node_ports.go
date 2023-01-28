@@ -78,7 +78,8 @@ func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 // PreFilter invoked at the prefilter extension point.
 func (pl *NodePorts) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	s := getContainerPorts(pod)
-	if len(s) != 0 {
+	// Skip if a pod has no ports.
+	if len(s) == 0 {
 		return nil, framework.NewStatus(framework.Skip)
 	}
 	cycleState.Write(preFilterStateKey, preFilterState(s))
