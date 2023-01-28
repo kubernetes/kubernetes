@@ -426,7 +426,9 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundFinalizer, true, "Finalizer %q was not found. Namespace %q has %#v", fakeFinalizer, updatedNamespace.Spec.Finalizers)
+		if !foundFinalizer {
+			framework.Failf("Finalizer %q was not found. Namespace %q has %#v", fakeFinalizer, updatedNamespace.Name, updatedNamespace.Spec.Finalizers)
+		}
 		framework.Logf("Namespace %q has %#v", updatedNamespace.Name, updatedNamespace.Spec.Finalizers)
 
 		ginkgo.By(fmt.Sprintf("Removing e2e finalizer from namespace %q", ns))
@@ -453,7 +455,9 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundFinalizer, false, "Finalizer %q was found. Namespace %q has %#v", fakeFinalizer, updatedNamespace.Spec.Finalizers)
+		if foundFinalizer {
+			framework.Failf("Finalizer %q was found. Namespace %q has %#v", fakeFinalizer, updatedNamespace.Name, updatedNamespace.Spec.Finalizers)
+		}
 		framework.Logf("Namespace %q has %#v", updatedNamespace.Name, updatedNamespace.Spec.Finalizers)
 	})
 
