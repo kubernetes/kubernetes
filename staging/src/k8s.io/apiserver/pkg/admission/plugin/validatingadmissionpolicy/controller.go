@@ -25,13 +25,12 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -65,7 +64,7 @@ type celAdmissionController struct {
 // against all of its registered bindings.
 type policyData struct {
 	definitionInfo
-	paramController generic.Controller[*unstructured.Unstructured]
+	paramController generic.Controller[runtime.Object]
 	bindings        []bindingInfo
 }
 
@@ -96,7 +95,7 @@ type bindingInfo struct {
 
 type paramInfo struct {
 	// Controller which is watching this param CRD
-	controller generic.Controller[*unstructured.Unstructured]
+	controller generic.Controller[runtime.Object]
 
 	// Function to call to stop the informer and clean up the controller
 	stop func()
@@ -116,6 +115,7 @@ func NewAdmissionController(
 		definitions: atomic.Value{},
 		policyController: newPolicyController(
 			restMapper,
+			client,
 			dynamicClient,
 			&CELValidatorCompiler{
 				Matcher: matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client),
@@ -241,7 +241,7 @@ func (c *celAdmissionController) Validate(
 				continue
 			}
 
-			var param *unstructured.Unstructured
+			var param runtime.Object
 
 			// If definition has paramKind, paramRef is required in binding.
 			// If definition has no paramKind, paramRef set in binding will be ignored.
@@ -292,6 +292,7 @@ func (c *celAdmissionController) Validate(
 					continue
 				}
 			}
+
 			decisions, err := bindingInfo.validator.Validate(a, o, param, matchKind)
 			if err != nil {
 				// runtime error. Apply failure policy

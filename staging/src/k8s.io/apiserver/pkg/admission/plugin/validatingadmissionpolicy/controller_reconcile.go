@@ -25,13 +25,16 @@ import (
 	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	celmetrics "k8s.io/apiserver/pkg/admission/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -74,10 +77,13 @@ type policyController struct {
 	// All keys must have at least one dependent binding
 	// All binding names MUST exist as a key bindingInfos
 	definitionsToBindings map[namespacedName]sets.Set[namespacedName]
+
+	client kubernetes.Interface
 }
 
 func newPolicyController(
 	restMapper meta.RESTMapper,
+	client kubernetes.Interface,
 	dynamicClient dynamic.Interface,
 	validatorCompiler ValidatorCompiler,
 	policiesInformer generic.Informer[*v1alpha1.ValidatingAdmissionPolicy],
@@ -108,6 +114,7 @@ func newPolicyController(
 		),
 		restMapper:    restMapper,
 		dynamicClient: dynamicClient,
+		client:        client,
 	}
 	return res
 }
@@ -237,18 +244,75 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 	} else {
 		instanceContext, instanceCancel := context.WithCancel(c.context)
 
-		// Watch for new instances of this policy
-		informer := dynamicinformer.NewFilteredDynamicInformer(
-			c.dynamicClient,
-			paramsGVR.Resource,
-			corev1.NamespaceAll,
-			30*time.Second, // TODO: do we really need to ever resync these?
-			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-			nil,
-		)
+		var informer cache.SharedIndexInformer
+
+		// Informer Factory is optional
+		if c.client != nil {
+			// Create temporary informer factory
+			// Cannot use the k8s shared informer factory for dynamic params informer.
+			// Would leak unnecessary informers when we are done since we would have to
+			// call informerFactory.Start() with a longer-lived stopCh than necessary.
+			// SharedInformerFactory does not support temporary usage.
+			dynamicFactory := informers.NewSharedInformerFactory(c.client, 10*time.Minute)
+
+			// Look for a typed informer. If it does not exist
+			genericInformer, err := dynamicFactory.ForResource(paramsGVR.Resource)
+
+			// Ignore error. We fallback to dynamic informer if there is no
+			// typed informer
+			if err != nil {
+				informer = nil
+			} else {
+				informer = genericInformer.Informer()
+
+				// Set transformer on the informer to workaround inconsistency
+				// where typed objects have TypeMeta wiped out but dynamic
+				// objects keep kind/apiVersion fields
+				informer.SetTransform(func(i interface{}) (interface{}, error) {
+					// Ensure param is populated with its GVK for consistency
+					// (CRD dynamic informer always returns objects with kind/apiversion,
+					// but native types do not include populated TypeMeta.
+					if param := i.(runtime.Object); param != nil {
+						if param.GetObjectKind().GroupVersionKind().Empty() {
+							// https://github.com/kubernetes/client-go/issues/413#issue-324586398
+							gvks, _, _ := k8sscheme.Scheme.ObjectKinds(param)
+							for _, gvk := range gvks {
+								if len(gvk.Kind) == 0 {
+									continue
+								}
+								if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+									continue
+								}
+								param.GetObjectKind().SetGroupVersionKind(gvk)
+								break
+							}
+						}
+					}
+
+					return i, nil
+				})
+			}
+		}
+
+		if informer == nil {
+			// Dynamic JSON informer fallback.
+			// Cannot use shared dynamic informer since it would be impossible
+			// to clean CRD informers properly with multiple dependents
+			// (cannot start ahead of time, and cannot track dependencies via stopCh)
+			informer = dynamicinformer.NewFilteredDynamicInformer(
+				c.dynamicClient,
+				paramsGVR.Resource,
+				corev1.NamespaceAll,
+				// Use same interval as is used for k8s typed sharedInformerFactory
+				// https://github.com/kubernetes/kubernetes/blob/7e0923899fed622efbc8679cca6b000d43633e38/cmd/kube-apiserver/app/server.go#L430
+				10*time.Minute,
+				cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+				nil,
+			).Informer()
+		}
 
 		controller := generic.NewController(
-			generic.NewInformer[*unstructured.Unstructured](informer.Informer()),
+			generic.NewInformer[runtime.Object](informer),
 			c.reconcileParams,
 			generic.ControllerOptions{
 				Workers: 1,
@@ -262,8 +326,8 @@ func (c *policyController) reconcilePolicyDefinition(namespace, name string, def
 			dependentDefinitions: sets.New(nn),
 		}
 
-		go informer.Informer().Run(instanceContext.Done())
 		go controller.Run(instanceContext)
+		go informer.Run(instanceContext.Done())
 	}
 
 	return nil
@@ -329,7 +393,7 @@ func (c *policyController) reconcilePolicyBinding(namespace, name string, bindin
 	return nil
 }
 
-func (c *policyController) reconcileParams(namespace, name string, params *unstructured.Unstructured) error {
+func (c *policyController) reconcileParams(namespace, name string, params runtime.Object) error {
 	// Do nothing.
 	// When we add informational type checking we will need to compile in the
 	// reconcile loops instead of lazily so we can add compiler errors / type
@@ -365,7 +429,7 @@ func (c *policyController) latestPolicyData() []policyData {
 			bindingInfos = append(bindingInfos, *bindingInfo)
 		}
 
-		var paramController generic.Controller[*unstructured.Unstructured]
+		var paramController generic.Controller[runtime.Object]
 		if paramKind := definitionInfo.lastReconciledValue.Spec.ParamKind; paramKind != nil {
 			if info, ok := c.paramsCRDControllers[*paramKind]; ok {
 				paramController = info.controller
