@@ -38,7 +38,7 @@ const (
 	DefaultVolumePluginDir       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
-	DefaultMemoryThrottlingFactor = 0.8
+	DefaultMemoryThrottlingFactor = 0.9
 )
 
 var (
