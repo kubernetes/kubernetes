@@ -54,6 +54,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&IPAddress{},
 		&IPAddressList{},
+		&ServiceCIDR{},
+		&ServiceCIDRList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

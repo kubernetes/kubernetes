@@ -81,3 +81,74 @@ type IPAddressList struct {
 	// items is the list of IPAddresses.
 	Items []IPAddress `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.27
+
+// ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::/64).
+// This range is used by the cluster to allocate the ClusterIPs associated to the Services object. 
+type ServiceCIDR struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// spec is the desired state of the ServiceCIDR.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Spec ServiceCIDRSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	// status represents the current state of the ServiceCIDR.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Status ServiceCIDRStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.
+type ServiceCIDRSpec struct {
+	// IPv4 defines an IPv4 IP block in CIDR notation (e.g. "192.168.0.0/24").
+	// This field is immutable.
+	// +optional
+	IPv4 string `json:"ipv4,omitempty" protobuf:"bytes,1,opt,name=ipv4"`
+	// IPv6 defines an IPv6 IP block in CIDR notation (e.g. "2001:db8::/64").
+	// This field is immutable.
+	// +optional
+	IPv6 string `json:"ipv6,omitempty" protobuf:"bytes,2,opt,name=ipv6"`
+}
+
+const (
+	// ServiceCIDRConditionReady represents status of a ServiceCIDR that is ready to be used by the
+	// apiserver to allocate ClusterIPs for Services.
+	ServiceCIDRConditionReady = "Ready"
+	// ServiceCIDRReasonTerminating represents a reason where a ServiceCIDR is not ready because it is
+	// being deleted.
+	ServiceCIDRReasonTerminating = "Terminating"
+)
+
+// ServiceCIDRStatus describes the current state of the ServiceCIDR.
+type ServiceCIDRStatus struct {
+	// conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR.
+	// Current service state
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.27
+
+// ServiceCIDRList contains a list of ServiceCIDR objects.
+type ServiceCIDRList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// items is the list of ServiceCIDRs.
+	Items           []ServiceCIDR `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
