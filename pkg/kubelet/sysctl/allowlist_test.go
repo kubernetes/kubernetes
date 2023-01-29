@@ -17,6 +17,8 @@ limitations under the License.
 package sysctl
 
 import (
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"testing"
 )
 
@@ -66,6 +68,9 @@ func TestAllowlist(t *testing.T) {
 		{sysctl: "kernel.msgmax", hostIPC: true},
 		{sysctl: "kernel.sem", hostIPC: true},
 	}
+	pod := &v1.Pod{}
+	pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+	attrs := &lifecycle.PodAdmitAttributes{Pod: pod}
 
 	w, err := NewAllowlist(append(SafeSysctlAllowlist(), "kernel.msg*", "kernel.sem"))
 	if err != nil {
@@ -76,11 +81,32 @@ func TestAllowlist(t *testing.T) {
 		if err := w.validateSysctl(test.sysctl, test.hostNet, test.hostIPC); err != nil {
 			t.Errorf("expected to be allowlisted: %+v, got: %v", test, err)
 		}
+		pod.Spec.HostNetwork = test.hostNet
+		pod.Spec.HostIPC = test.hostIPC
+		pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{v1.Sysctl{test.sysctl, test.sysctl}}
+		status := w.Admit(attrs)
+		if !status.Admit {
+			t.Errorf("expected to be allowlisted: %+v, got: %+v", test, status)
+		}
 	}
 
 	for _, test := range invalid {
 		if err := w.validateSysctl(test.sysctl, test.hostNet, test.hostIPC); err == nil {
 			t.Errorf("expected to be rejected: %+v", test)
 		}
+		pod.Spec.HostNetwork = test.hostNet
+		pod.Spec.HostIPC = test.hostIPC
+		pod.Spec.SecurityContext.Sysctls = []v1.Sysctl{v1.Sysctl{test.sysctl, test.sysctl}}
+		status := w.Admit(attrs)
+		if status.Admit {
+			t.Errorf("expected to be rejected: %+v", test)
+		}
+	}
+
+	// test for: len(pod.Spec.SecurityContext.Sysctls) == 0
+	pod.Spec.SecurityContext.Sysctls = nil
+	status := w.Admit(attrs)
+	if !status.Admit {
+		t.Errorf("expected to be allowlisted,got %+v", status)
 	}
 }
