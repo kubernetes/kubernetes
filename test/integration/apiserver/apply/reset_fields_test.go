@@ -65,6 +65,7 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	// standard for []metav1.Condition
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("networking.k8s.io", "v1alpha1", "servicecidrs"):                           `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 }
 
 // resetFieldsStatusDefault conflicts with statusDefault
@@ -81,6 +82,9 @@ var noConflicts = map[string]struct{}{
 	// storageVersions are skipped because their spec is empty
 	// and thus they can never have a conflict.
 	"storageversions": {},
+	// servicecidrs are skipped because their spec is inmutable
+	// and thus they can never have a conflict.
+	"servicecidrs": {},
 	// namespaces only have a spec.finalizers field which is also skipped,
 	// thus it will never have a conflict.
 	"namespaces": {},
@@ -134,6 +138,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("extensions", "v1beta1", "ingresses"):                                      `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                               `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                                    `{"spec": {"defaultBackend": {"service": {"name": "service2"}}}}`,
+	gvr("networking.k8s.io", "v1alpha1", "servicecidrs"):                           `{}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                                    `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                               `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("storage.k8s.io", "v1alpha1", "volumeattachments"):                         `{"metadata": {"name": "va3"}, "spec": {"nodeName": "localhost2"}}`,
