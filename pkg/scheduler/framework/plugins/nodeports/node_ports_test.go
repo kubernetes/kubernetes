@@ -18,6 +18,7 @@ package nodeports
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -174,9 +175,13 @@ func TestPreFilterDisabled(t *testing.T) {
 	p, _ := New(nil, nil)
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, fmt.Errorf("not found")))
-	if diff := cmp.Diff(gotStatus, wantStatus); diff != "" {
-		t.Errorf("status does not match (-want,+got):\n%s", diff)
+	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, errors.New("not found")))
+	if gotStatus.AsError().Error() != wantStatus.AsError().Error() {
+		t.Error("err does not match")
+		return
+	}
+	if gotStatus.Message() != wantStatus.Message() {
+		t.Error("message does not match")
 		return
 	}
 }
