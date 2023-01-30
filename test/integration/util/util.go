@@ -67,9 +67,7 @@ type ShutdownFunc func()
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler, podInformer and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-
+func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer) {
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1()})
@@ -97,24 +95,16 @@ func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config
 	informerFactory.WaitForCacheSync(ctx.Done())
 	go sched.Run(ctx)
 
-	shutdownFunc := func() {
-		klog.Infof("destroying scheduler")
-		cancel()
-		klog.Infof("destroyed scheduler")
-	}
-	return sched, informerFactory.Core().V1().Pods(), shutdownFunc
+	return sched, informerFactory.Core().V1().Pods()
 }
 
 // StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
 // TODO(mborsz): Use a real PV controller here.
-func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
-	ctx, cancel := context.WithCancel(context.Background())
-
+func StartFakePVController(ctx context.Context, clientSet clientset.Interface) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
 
 	syncPV := func(obj *v1.PersistentVolume) {
-		ctx := context.Background()
 		if obj.Spec.ClaimRef != nil {
 			claimRef := obj.Spec.ClaimRef
 			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
@@ -145,7 +135,6 @@ func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
 	})
 
 	informerFactory.Start(ctx.Done())
-	return ShutdownFunc(cancel)
 }
 
 // TestContext store necessary context info
