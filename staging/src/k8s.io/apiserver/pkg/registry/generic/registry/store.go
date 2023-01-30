@@ -1283,12 +1283,12 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 		resourceVersion = options.ResourceVersion
 		predicate.AllowWatchBookmarks = options.AllowWatchBookmarks
 	}
-	return e.WatchPredicate(ctx, predicate, resourceVersion)
+	return e.WatchPredicate(ctx, predicate, resourceVersion, options.SendInitialEvents)
 }
 
 // WatchPredicate starts a watch for the items that matches.
-func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
-	storageOpts := storage.ListOptions{ResourceVersion: resourceVersion, Predicate: p, Recursive: true}
+func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate, resourceVersion string, sendInitialEvents *bool) (watch.Interface, error) {
+	storageOpts := storage.ListOptions{ResourceVersion: resourceVersion, Predicate: p, Recursive: true, SendInitialEvents: sendInitialEvents}
 
 	// if we're not already namespace-scoped, see if the field selector narrows the scope of the watch
 	if requestNamespace, _ := genericapirequest.NamespaceFrom(ctx); len(requestNamespace) == 0 {
