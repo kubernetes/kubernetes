@@ -56,7 +56,9 @@ func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
 			TLSClientConfig:   config,
 			DisableKeepAlives: true,
 			Proxy:             http.ProxyURL(nil),
+			DialContext:       probe.ProbeDialer().DialContext,
 		})
+
 	return httpProber{transport, followNonLocalRedirects}
 }
 
