@@ -1381,6 +1381,11 @@ func schemaHasRecurse(s *apiextensions.JSONSchemaProps, pred func(s *apiextensio
 	return SchemaHas(schema, pred)
 }
 
+// SchemaHas recursively traverses the Schema and calls the `pred`
+// predicate to see if the schema contains specific values.
+//
+// The predicate MUST NOT keep a copy of the json schema NOR modify the
+// schema.
 func SchemaHas(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
 	if s == nil {
 		return false
