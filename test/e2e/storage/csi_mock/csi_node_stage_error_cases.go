@@ -155,14 +155,14 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 
 				ginkgo.By("Waiting for expected CSI calls")
 				// Watch for all calls up to deletePod = true
-				ctx, cancel := context.WithTimeout(ctx, csiPodRunningTimeout)
+				timeoutCtx, cancel := context.WithTimeout(ctx, csiPodRunningTimeout)
 				defer cancel()
 				for {
-					if ctx.Err() != nil {
+					if timeoutCtx.Err() != nil {
 						framework.Failf("timed out waiting for the CSI call that indicates that the pod can be deleted: %v", test.expectedCalls)
 					}
 					time.Sleep(1 * time.Second)
-					_, index, err := compareCSICalls(ctx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
+					_, index, err := compareCSICalls(timeoutCtx, trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					framework.ExpectNoError(err, "while waiting for initial CSI calls")
 					if index == 0 {
 						// No CSI call received yet
