@@ -192,14 +192,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 		ginkgo.By("Run a high priority pod that has same requirements as that of lower priority pod")
 		// Create a high priority pod and make sure it is scheduled on the same node as the low priority pod.
-		runPausePodWithTimeout(ctx, f, pausePodConfig{
+		runPausePod(ctx, f, pausePodConfig{
 			Name:              "preemptor-pod",
 			PriorityClassName: highPriorityClassName,
 			Resources: &v1.ResourceRequirements{
 				Requests: podRes,
 				Limits:   podRes,
 			},
-		}, framework.PodStartShortTimeout)
+		})
 
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(ctx, pods[0].Name, metav1.GetOptions{})
 		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
@@ -290,7 +290,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				framework.Failf("Error cleanup pod `%s/%s`: %v", metav1.NamespaceSystem, "critical-pod", err)
 			}
 		}()
-		runPausePodWithTimeout(ctx, f, pausePodConfig{
+		runPausePod(ctx, f, pausePodConfig{
 			Name:              "critical-pod",
 			Namespace:         metav1.NamespaceSystem,
 			PriorityClassName: scheduling.SystemClusterCritical,
@@ -298,7 +298,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				Requests: podRes,
 				Limits:   podRes,
 			},
-		}, framework.PodStartShortTimeout)
+		})
 
 		defer func() {
 			// Clean-up the critical pod

@@ -952,12 +952,8 @@ func createPausePod(ctx context.Context, f *framework.Framework, conf pausePodCo
 }
 
 func runPausePod(ctx context.Context, f *framework.Framework, conf pausePodConfig) *v1.Pod {
-	return runPausePodWithTimeout(ctx, f, conf, framework.PollShortTimeout)
-}
-
-func runPausePodWithTimeout(ctx context.Context, f *framework.Framework, conf pausePodConfig, timeout time.Duration) *v1.Pod {
 	pod := createPausePod(ctx, f, conf)
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, timeout))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStartShort))
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
