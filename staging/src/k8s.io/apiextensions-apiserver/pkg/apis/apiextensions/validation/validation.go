@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -1364,6 +1365,22 @@ func HasSchemaWith(spec *apiextensions.CustomResourceDefinitionSpec, pred func(s
 	return false
 }
 
+var schemaPool = sync.Pool{
+	New: func() any {
+		return new(apiextensions.JSONSchemaProps)
+	},
+}
+
+func schemaHasRecurse(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
+	if s == nil {
+		return false
+	}
+	schema := schemaPool.Get().(*apiextensions.JSONSchemaProps)
+	defer schemaPool.Put(schema)
+	*schema = *s
+	return SchemaHas(schema, pred)
+}
+
 func SchemaHas(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
 	if s == nil {
 		return false
@@ -1374,60 +1391,60 @@ func SchemaHas(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSON
 	}
 
 	if s.Items != nil {
-		if s.Items != nil && SchemaHas(s.Items.Schema, pred) {
+		if s.Items != nil && schemaHasRecurse(s.Items.Schema, pred) {
 			return true
 		}
 		for i := range s.Items.JSONSchemas {
-			if SchemaHas(&s.Items.JSONSchemas[i], pred) {
+			if schemaHasRecurse(&s.Items.JSONSchemas[i], pred) {
 				return true
 			}
 		}
 	}
 	for i := range s.AllOf {
-		if SchemaHas(&s.AllOf[i], pred) {
+		if schemaHasRecurse(&s.AllOf[i], pred) {
 			return true
 		}
 	}
 	for i := range s.AnyOf {
-		if SchemaHas(&s.AnyOf[i], pred) {
+		if schemaHasRecurse(&s.AnyOf[i], pred) {
 			return true
 		}
 	}
 	for i := range s.OneOf {
-		if SchemaHas(&s.OneOf[i], pred) {
+		if schemaHasRecurse(&s.OneOf[i], pred) {
 			return true
 		}
 	}
-	if SchemaHas(s.Not, pred) {
+	if schemaHasRecurse(s.Not, pred) {
 		return true
 	}
 	for _, s := range s.Properties {
-		if SchemaHas(&s, pred) {
+		if schemaHasRecurse(&s, pred) {
 			return true
 		}
 	}
 	if s.AdditionalProperties != nil {
-		if SchemaHas(s.AdditionalProperties.Schema, pred) {
+		if schemaHasRecurse(s.AdditionalProperties.Schema, pred) {
 			return true
 		}
 	}
 	for _, s := range s.PatternProperties {
-		if SchemaHas(&s, pred) {
+		if schemaHasRecurse(&s, pred) {
 			return true
 		}
 	}
 	if s.AdditionalItems != nil {
-		if SchemaHas(s.AdditionalItems.Schema, pred) {
+		if schemaHasRecurse(s.AdditionalItems.Schema, pred) {
 			return true
 		}
 	}
 	for _, s := range s.Definitions {
-		if SchemaHas(&s, pred) {
+		if schemaHasRecurse(&s, pred) {
 			return true
 		}
 	}
 	for _, d := range s.Dependencies {
-		if SchemaHas(d.Schema, pred) {
+		if schemaHasRecurse(d.Schema, pred) {
 			return true
 		}
 	}
