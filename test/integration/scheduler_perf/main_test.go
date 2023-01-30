@@ -17,11 +17,18 @@ limitations under the License.
 package benchmark
 
 import (
+	"flag"
 	"testing"
 
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestMain(m *testing.M) {
+	// Run with -v=2, this is the default log level in production.
+	ktesting.DefaultConfig = ktesting.NewConfig(ktesting.Verbosity(2))
+	ktesting.DefaultConfig.AddFlags(flag.CommandLine)
+	flag.Parse()
+
 	framework.EtcdMain(m.Run)
 }
