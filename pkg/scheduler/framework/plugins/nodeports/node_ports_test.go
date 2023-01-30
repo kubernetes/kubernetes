@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -150,7 +151,6 @@ func TestNodePorts(t *testing.T) {
 			if test.wantPreFilterStatus != nil {
 				if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 					t.Errorf("preFilter: status does not match (-want,+got):\n%s", diff)
-					return
 				}
 				return
 			}
@@ -176,12 +176,11 @@ func TestPreFilterDisabled(t *testing.T) {
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, errors.New("not found")))
-	if gotStatus.AsError().Error() != wantStatus.AsError().Error() {
-		t.Error("err does not match")
-		return
-	}
-	if gotStatus.Message() != wantStatus.Message() {
-		t.Error("message does not match")
+	cmpopt := cmp.Comparer(func(s1, s2 *framework.Status) bool {
+		return reflect.DeepEqual(s1, s2)
+	})
+	if diff := cmp.Diff(wantStatus, gotStatus, cmpopt); diff != "" {
+		t.Errorf("diff = %s\n", diff)
 		return
 	}
 }
