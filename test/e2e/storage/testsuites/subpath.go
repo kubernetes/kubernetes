@@ -162,8 +162,8 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		e2epod.SetNodeSelection(&l.formatPod.Spec, l.config.ClientNodeSelection)
 
 		l.subPathDir = filepath.Join(volumePath, subPath)
-		l.filePathInSubpath = filepath.Join(volumePath, fileName)
-		l.filePathInVolume = filepath.Join(l.subPathDir, fileName)
+		l.filePathInVolume = filepath.Join(volumePath, fileName)
+		l.filePathInSubpath = filepath.Join(l.subPathDir, fileName)
 	}
 
 	cleanup := func(ctx context.Context) {
@@ -391,7 +391,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		// Read it from inside the subPath from container 0
 		l.pod.Spec.Containers[0].VolumeMounts[0].ReadOnly = true
-		testReadFile(ctx, f, volumePath, l.pod, 0)
+		testReadFile(ctx, f, l.filePathInSubpath, l.pod, 0)
 	})
 
 	ginkgo.It("should support existing directories when readOnly specified in the volumeSource", func(ctx context.Context) {
