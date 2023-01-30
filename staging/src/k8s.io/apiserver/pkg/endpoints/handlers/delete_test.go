@@ -20,9 +20,12 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +34,7 @@ import (
 	auditapis "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/utils/pointer"
 )
 
@@ -203,4 +207,71 @@ func TestDeleteCollection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeleteCollectionWithNoContextDeadlineEnforced(t *testing.T) {
+	var invokedGot, hasDeadlineGot int32
+	fakeDeleterFn := func(ctx context.Context, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions, _ *metainternalversion.ListOptions) (runtime.Object, error) {
+		// we expect CollectionDeleter to be executed once
+		atomic.AddInt32(&invokedGot, 1)
+
+		// we don't expect any context deadline to be set
+		if _, hasDeadline := ctx.Deadline(); hasDeadline {
+			atomic.AddInt32(&hasDeadlineGot, 1)
+		}
+		return nil, nil
+	}
+
+	// do the minimum setup to ensure that it gets as far as CollectionDeleter
+	scope := &RequestScope{
+		Namer: &mockNamer{},
+		Serializer: &fakeSerializer{
+			serializer: runtime.NewCodec(runtime.NoopEncoder{}, runtime.NoopDecoder{}),
+		},
+	}
+	handler := DeleteCollection(fakeCollectionDeleterFunc(fakeDeleterFn), false, scope, nil)
+
+	request, err := http.NewRequest("GET", "/test", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// the request context should not have any deadline by default
+	if _, hasDeadline := request.Context().Deadline(); hasDeadline {
+		t.Fatalf("expected request context to not have any deadline")
+	}
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if atomic.LoadInt32(&invokedGot) != 1 {
+		t.Errorf("expected collection deleter to be invoked")
+	}
+	if atomic.LoadInt32(&hasDeadlineGot) > 0 {
+		t.Errorf("expected context to not have any deadline")
+	}
+}
+
+type fakeCollectionDeleterFunc func(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error)
+
+func (f fakeCollectionDeleterFunc) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+	return f(ctx, deleteValidation, options, listOptions)
+}
+
+type fakeSerializer struct {
+	serializer runtime.Serializer
+}
+
+func (n *fakeSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
+	return []runtime.SerializerInfo{
+		{
+			MediaType:        "application/json",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "json",
+		},
+	}
+}
+func (n *fakeSerializer) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+	return n.serializer
+}
+func (n *fakeSerializer) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	return n.serializer
 }
