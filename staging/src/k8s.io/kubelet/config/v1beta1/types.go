@@ -150,6 +150,7 @@ type KubeletConfiguration struct {
 	// +optional
 	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile,omitempty"`
 	// tlsCipherSuites is the list of allowed cipher suites for the server.
+	// Note that TLS 1.3 ciphersuites are not configurable.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	// Default: nil
 	// +optional

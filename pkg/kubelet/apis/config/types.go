@@ -123,6 +123,7 @@ type KubeletConfiguration struct {
 	// tlsPrivateKeyFile is the file containing x509 private key matching tlsCertFile
 	TLSPrivateKeyFile string
 	// TLSCipherSuites is the list of allowed cipher suites for the server.
+	// Note that TLS 1.3 ciphersuites are not configurable.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	TLSCipherSuites []string
 	// TLSMinVersion is the minimum TLS version supported.
