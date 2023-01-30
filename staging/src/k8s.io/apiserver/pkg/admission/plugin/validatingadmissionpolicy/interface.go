@@ -27,7 +27,7 @@ import (
 // matchKind provides the GroupVersionKind that the object should be
 // validated by CEL expressions as.
 type Validator interface {
-	Validate(a admission.Attributes, o admission.ObjectInterfaces, versionedParams runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error)
+	Validate(a admission.Attributes, o admission.ObjectInterfaces, versionedParams runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error)
 }
 
 // ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`

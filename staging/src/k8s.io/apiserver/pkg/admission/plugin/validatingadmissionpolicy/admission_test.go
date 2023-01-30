@@ -656,21 +656,21 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 	require.ErrorContains(t, err, `Denied`)
 }
 
-type validatorFunc func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error)
+type validatorFunc func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error)
 
-func (f validatorFunc) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
+func (f validatorFunc) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
 	return f(a, o, params, matchKind)
 }
 
 type testValidator struct {
 }
 
-func (v testValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
+func (v testValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
 	// Policy always denies
-	return []policyDecision{
+	return []PolicyDecision{
 		{
-			action:  actionDeny,
-			message: "Denied",
+			Action:  ActionDeny,
+			Message: "Denied",
 		},
 	}, nil
 }
@@ -1142,11 +1142,11 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 	compiler.RegisterDefinition(&policy1, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		compiles1.Add(1)
 
-		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
+		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
 			evaluations1.Add(1)
-			return []policyDecision{
+			return []PolicyDecision{
 				{
-					action: actionAdmit,
+					Action: ActionAdmit,
 				},
 			}, nil
 		})
@@ -1155,12 +1155,12 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 	compiler.RegisterDefinition(&policy2, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		compiles2.Add(1)
 
-		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
+		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
 			evaluations2.Add(1)
-			return []policyDecision{
+			return []PolicyDecision{
 				{
-					action:  actionDeny,
-					message: "Policy2Denied",
+					Action:  ActionDeny,
+					Message: "Policy2Denied",
 				},
 			}, nil
 		})
@@ -1256,22 +1256,22 @@ func TestNativeTypeParam(t *testing.T) {
 	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		compiles.Add(1)
 
-		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
+		return validatorFunc(func(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]PolicyDecision, error) {
 			evaluations.Add(1)
 
 			// show that the passed params was a ConfigMap native type
 			if _, ok := params.(*v1.ConfigMap); ok {
-				return []policyDecision{
+				return []PolicyDecision{
 					{
-						action:  actionDeny,
-						message: "correct type",
+						Action:  ActionDeny,
+						Message: "correct type",
 					},
 				}, nil
 			}
-			return []policyDecision{
+			return []PolicyDecision{
 				{
-					action:  actionDeny,
-					message: "Incorrect param type",
+					Action:  ActionDeny,
+					Message: "Incorrect param type",
 				},
 			}, nil
 		})
