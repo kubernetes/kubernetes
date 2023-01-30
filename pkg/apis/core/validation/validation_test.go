@@ -41,6 +41,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -52,6 +53,11 @@ const (
 	dnsSubdomainLabelErrMsg = "a lowercase RFC 1123 subdomain"
 	envVarNameErrMsg        = "a valid environment variable name must consist of"
 )
+
+type topologyPair struct {
+	key   string
+	value string
+}
 
 func line() string {
 	_, _, line, ok := runtime.Caller(1)
@@ -1088,6 +1094,29 @@ func simpleVolumeNodeAffinity(key, value string) *core.VolumeNodeAffinity {
 	}
 }
 
+func multipleVolumeNodeAffinity(terms [][]topologyPair) *core.VolumeNodeAffinity {
+	nodeSelectorTerms := []core.NodeSelectorTerm{}
+	for _, term := range terms {
+		matchExpressions := []core.NodeSelectorRequirement{}
+		for _, topology := range term {
+			matchExpressions = append(matchExpressions, core.NodeSelectorRequirement{
+				Key:      topology.key,
+				Operator: core.NodeSelectorOpIn,
+				Values:   []string{topology.value},
+			})
+		}
+		nodeSelectorTerms = append(nodeSelectorTerms, core.NodeSelectorTerm{
+			MatchExpressions: matchExpressions,
+		})
+	}
+
+	return &core.VolumeNodeAffinity{
+		Required: &core.NodeSelector{
+			NodeSelectorTerms: nodeSelectorTerms,
+		},
+	}
+}
+
 func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure bool
@@ -1109,6 +1138,268 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar2")),
 		},
+		"affinity-non-beta-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo2", "bar")),
+		},
+		"affinity-zone-beta-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+		},
+		"affinity-zone-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelTopologyZone, "bar")),
+		},
+		"affinity-zone-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-zone-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelTopologyZone, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaZone, "bar")),
+		},
+		"affinity-region-beta-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+		},
+		"affinity-region-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelTopologyRegion, "bar")),
+		},
+		"affinity-region-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-region-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelTopologyRegion, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelFailureDomainBetaRegion, "bar")),
+		},
+		"affinity-os-beta-label-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+		},
+		"affinity-os-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelOSStable, "bar")),
+		},
+		"affinity-os-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-os-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelOSStable, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+		},
+		"affinity-arch-beta-label-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+		},
+		"affinity-arch-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelArchStable, "bar")),
+		},
+		"affinity-arch-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-arch-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelArchStable, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+		},
+		"affinity-instanceType-beta-label-unchanged": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+		},
+		"affinity-instanceType-beta-label-to-GA": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceTypeStable, "bar")),
+		},
+		"affinity-instanceType-beta-label-to-non-GA": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
+		},
+		"affinity-instanceType-GA-label-changed": {
+			isExpectedFailure: true,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceTypeStable, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "bar")),
+		},
+		"affinity-same-terms-expressions-length-beta-to-GA-partially-changed": {
+			isExpectedFailure: false,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+				{
+					topologyPair{kubeletapis.LabelOS, "bar"},
+					topologyPair{kubeletapis.LabelArch, "bar"},
+					topologyPair{v1.LabelInstanceType, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+				{
+					topologyPair{kubeletapis.LabelOS, "bar"},
+					topologyPair{v1.LabelArchStable, "bar"},
+					topologyPair{v1.LabelInstanceTypeStable, "bar"},
+				},
+			})),
+		},
+		"affinity-same-terms-expressions-length-beta-to-non-GA-partially-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{"foo", "bar"},
+				},
+			})),
+		},
+		"affinity-same-terms-expressions-length-GA-partially-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelOSStable, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelOSStable, "bar"},
+				},
+			})),
+		},
+		"affinity-same-terms-expressions-length-beta-fully-changed": {
+			isExpectedFailure: false,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+				{
+					topologyPair{kubeletapis.LabelOS, "bar"},
+					topologyPair{kubeletapis.LabelArch, "bar"},
+					topologyPair{v1.LabelInstanceType, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelTopologyRegion, "bar"},
+				},
+				{
+					topologyPair{v1.LabelOSStable, "bar"},
+					topologyPair{v1.LabelArchStable, "bar"},
+					topologyPair{v1.LabelInstanceTypeStable, "bar"},
+				},
+			})),
+		},
+		"affinity-same-terms-expressions-length-beta-GA-mixed-fully-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+					topologyPair{v1.LabelTopologyZone, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{"foo", "bar"},
+				},
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar2"},
+				},
+			})),
+		},
+		"affinity-same-terms-length-different-expressions-length-beta-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+					topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
+				},
+			})),
+		},
+		"affinity-different-terms-expressions-length-beta-changed": {
+			isExpectedFailure: true,
+			oldPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
+				},
+			})),
+			newPV: testVolumeWithNodeAffinity(multipleVolumeNodeAffinity([][]topologyPair{
+				{
+					topologyPair{v1.LabelTopologyZone, "bar"},
+				},
+				{
+					topologyPair{v1.LabelArchStable, "bar"},
+				},
+			})),
+		},
 		"nil-to-obj": {
 			isExpectedFailure: false,
 			oldPV:             testVolumeWithNodeAffinity(nil),
@@ -1122,6 +1413,8 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
+		originalNewPV := scenario.newPV.DeepCopy()
+		originalOldPV := scenario.oldPV.DeepCopy()
 		opts := ValidationOptionsForPersistentVolume(scenario.newPV, scenario.oldPV)
 		errs := ValidatePersistentVolumeUpdate(scenario.newPV, scenario.oldPV, opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
@@ -1129,6 +1422,12 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+		if diff := cmp.Diff(originalNewPV, scenario.newPV); len(diff) > 0 {
+			t.Errorf("newPV was modified: %s", diff)
+		}
+		if diff := cmp.Diff(originalOldPV, scenario.oldPV); len(diff) > 0 {
+			t.Errorf("oldPV was modified: %s", diff)
 		}
 	}
 }
