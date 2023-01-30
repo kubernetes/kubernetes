@@ -239,10 +239,11 @@ func TestGCOrphaned(t *testing.T) {
 			pods: []*v1.Pod{
 				makePod("a", "deleted", v1.PodFailed),
 				makePod("b", "deleted", v1.PodSucceeded),
+				makePod("c", "deleted", v1.PodRunning),
 			},
 			itemsInQueue:                  1,
-			deletedPodNames:               sets.NewString("a", "b"),
-			patchedPodNames:               sets.NewString("a", "b"),
+			deletedPodNames:               sets.NewString("a", "b", "c"),
+			patchedPodNames:               sets.NewString("c"),
 			enablePodDisruptionConditions: true,
 		},
 		{
