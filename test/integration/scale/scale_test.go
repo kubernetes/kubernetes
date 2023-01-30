@@ -19,6 +19,7 @@ package scale
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -31,14 +32,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/kubernetes"
 	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	daemonstorage "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
-	deploystorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
-	repsetstorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
-	statsetstorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
-	repcontstorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -144,12 +139,24 @@ func TestScaleSubresources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kindRestMapping := map[string]interface{}{
-		"replicationcontrollers": &repcontstorage.ScaleREST{},
-		"replicasets":            &repsetstorage.ScaleREST{},
-		"deployments":            &deploystorage.ScaleREST{},
-		"statefulsets":           &statsetstorage.ScaleREST{},
-		"daemonsets":             &daemonstorage.ScaleREST{},
+	// collect supported verbs per resource
+	resListResp, err := clientSet.Discovery().RESTClient().Get().AbsPath("/apis/apps/v1").Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resourceList, ok := resListResp.(*metav1.APIResourceList)
+	if !ok {
+		t.Fatal("type of resource list response is invalid")
+	}
+
+	supportedVerbs := map[string]map[string]bool{}
+	for _, res := range resourceList.APIResources {
+		supportedVerbs[res.Name] = map[string]bool{}
+
+		for _, verb := range res.Verbs {
+			supportedVerbs[res.Name][verb] = true
+		}
 	}
 
 	// Ensure scale subresources return and accept expected kinds
@@ -181,12 +188,10 @@ func TestScaleSubresources(t *testing.T) {
 			continue
 		}
 
-		restObj, ok := kindRestMapping[resourceParts[0]]
-		if !ok {
-			t.Fatalf("error finding REST object for %s", resourceParts[0])
-		}
-		if _, ok := restObj.(rest.Updater); !ok {
-			continue
+		if verbs, ok := supportedVerbs[fmt.Sprintf("%s/scale", resourceParts[0])]; ok {
+			if _, up := verbs["update"]; !up {
+				continue
+			}
 		}
 
 		updateData, err := clientSet.CoreV1().RESTClient().Put().AbsPath(urlPath).Body(getData).DoRaw(context.TODO())

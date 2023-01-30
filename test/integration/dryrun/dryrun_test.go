@@ -18,6 +18,7 @@ package dryrun
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,18 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	daemonstorage "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
-	deploystorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
-	repsetstorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
-	statsetstorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
-	repcontstorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -247,14 +242,6 @@ func TestDryRun(t *testing.T) {
 
 	dryrunData := etcd.GetEtcdStorageData()
 
-	scaleRestMapping := map[string]interface{}{
-		"ReplicationController": &repcontstorage.ScaleREST{},
-		"ReplicaSet":            &repsetstorage.ScaleREST{},
-		"Deployment":            &deploystorage.ScaleREST{},
-		"StatefulSet":           &statsetstorage.ScaleREST{},
-		"DaemonSet":             &daemonstorage.ScaleREST{},
-	}
-
 	// dry run specific stub overrides
 	for resource, stub := range map[schema.GroupVersionResource]string{
 		// need to change event's namespace field to match dry run test
@@ -263,6 +250,26 @@ func TestDryRun(t *testing.T) {
 		data := dryrunData[resource]
 		data.Stub = stub
 		dryrunData[resource] = data
+	}
+
+	// collect supported verbs per resource
+	resListResp, err := client.Discovery().RESTClient().Get().AbsPath("/apis/apps/v1").Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resourceList, ok := resListResp.(*metav1.APIResourceList)
+	if !ok {
+		t.Fatal("type of resource list response is invalid")
+	}
+
+	supportedVerbs := map[string]map[string]bool{}
+	for _, res := range resourceList.APIResources {
+		supportedVerbs[res.Name] = map[string]bool{}
+
+		for _, verb := range res.Verbs {
+			supportedVerbs[res.Name][verb] = true
+		}
 	}
 
 	// gather resources to test
@@ -305,8 +312,8 @@ func TestDryRun(t *testing.T) {
 			DryRunPatchTest(t, rsc, name)
 
 			runScaleTest := true
-			if restObj, ok := scaleRestMapping[kind]; ok {
-				_, runScaleTest = restObj.(rest.Updater)
+			if verbs, ok := supportedVerbs[fmt.Sprintf("%s/scale", gvResource.Resource)]; ok {
+				_, runScaleTest = verbs["update"]
 			}
 			if runScaleTest {
 				DryRunScalePatchTest(t, rsc, name)
