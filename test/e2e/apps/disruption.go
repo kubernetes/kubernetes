@@ -426,9 +426,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
-			err = e2edaemonset.CheckDaemonStatus(f, defaultName)
+			err = e2edaemonset.CheckDaemonStatus(context.TODO(), f, defaultName)
 			framework.ExpectNoError(err)
-			err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
+			err = wait.PollImmediateWithContext(context.TODO(), dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 			framework.ExpectNoError(err)
 		})
 
@@ -446,14 +446,14 @@ var _ = SIGDescribe("DisruptionController", func() {
 			{
 				name: "minAvailable",
 				createPDB: func(Npods int) {
-					createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(Npods-1), defaultLabels)
+					createPDBMinAvailableOrDie(context.TODO(), cs, ns, defaultName, intstr.FromInt(Npods-1), defaultLabels)
 				},
 			},
 
 			{
 				name: "maxUnavailable",
 				createPDB: func(_ int) {
-					createPDBMaxUnavailableOrDie(cs, ns, defaultName, intstr.FromString("10%"))
+					createPDBMaxUnavailableOrDie(context.TODO(), cs, ns, defaultName, intstr.FromString("10%"))
 				},
 			},
 		}
@@ -461,7 +461,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		for _, pdbCase := range pdbCases {
 			ginkgo.It("should account pods of a DaemonSet in case of "+pdbCase.name,
 				func() {
-					podList := listDaemonPods(cs, ns, defaultLabels)
+					podList := listDaemonPods(context.TODO(), cs, ns, defaultLabels)
 					Npods := len(podList.Items)
 
 					ginkgo.By("Creating PDB for " + strconv.Itoa(Npods) + " pods.")
@@ -485,7 +485,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 					}, timeout, timeout/100).Should(gomega.BeTrue(), "PDB shouldn't allow disruptions")
 
 					ginkgo.By("Deleting PDB.")
-					deletePDBOrDie(cs, ns, defaultName)
+					deletePDBOrDie(context.TODO(), cs, ns, defaultName)
 				})
 
 		}

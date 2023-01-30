@@ -36,11 +36,11 @@ import (
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	daemonStorage "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
-	deployStorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
-	repSetStorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
-	statSetStorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
-	repContStorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
+	daemonstorage "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
+	deploystorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
+	repsetstorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
+	statsetstorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
+	repcontstorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -248,11 +248,11 @@ func TestDryRun(t *testing.T) {
 	dryrunData := etcd.GetEtcdStorageData()
 
 	scaleRestMapping := map[string]interface{}{
-		"ReplicationController": &repContStorage.ScaleREST{},
-		"ReplicaSet":            &repSetStorage.ScaleREST{},
-		"Deployment":            &deployStorage.ScaleREST{},
-		"StatefulSet":           &statSetStorage.ScaleREST{},
-		"DaemonSet":             &daemonStorage.ScaleREST{},
+		"ReplicationController": &repcontstorage.ScaleREST{},
+		"ReplicaSet":            &repsetstorage.ScaleREST{},
+		"Deployment":            &deploystorage.ScaleREST{},
+		"StatefulSet":           &statsetstorage.ScaleREST{},
+		"DaemonSet":             &daemonstorage.ScaleREST{},
 	}
 
 	// dry run specific stub overrides

@@ -1006,9 +1006,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
-			err = e2edaemonset.CheckDaemonStatus(f, defaultName)
+			err = e2edaemonset.CheckDaemonStatus(context.TODO(), f, defaultName)
 			framework.ExpectNoError(err)
-			err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
+			err = wait.PollImmediateWithContext(context.TODO(), dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Get the DaemonSet to find the number of replicas.")

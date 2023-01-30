@@ -34,11 +34,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/kubernetes"
 	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	daemonStorage "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
-	deployStorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
-	repSetStorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
-	statSetStorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
-	repContStorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
+	daemonstorage "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
+	deploystorage "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
+	repsetstorage "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
+	statsetstorage "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
+	repcontstorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -145,11 +145,11 @@ func TestScaleSubresources(t *testing.T) {
 	}
 
 	kindRestMapping := map[string]interface{}{
-		"replicationcontrollers": &repContStorage.ScaleREST{},
-		"replicasets":            &repSetStorage.ScaleREST{},
-		"deployments":            &deployStorage.ScaleREST{},
-		"statefulsets":           &statSetStorage.ScaleREST{},
-		"daemonsets":             &daemonStorage.ScaleREST{},
+		"replicationcontrollers": &repcontstorage.ScaleREST{},
+		"replicasets":            &repsetstorage.ScaleREST{},
+		"deployments":            &deploystorage.ScaleREST{},
+		"statefulsets":           &statsetstorage.ScaleREST{},
+		"daemonsets":             &daemonstorage.ScaleREST{},
 	}
 
 	// Ensure scale subresources return and accept expected kinds
