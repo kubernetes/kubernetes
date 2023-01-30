@@ -109,7 +109,7 @@ func (g *Gomega) makeAsyncAssertion(asyncAssertionType AsyncAssertionType, offse
 		}
 	}
 
-	return NewAsyncAssertion(asyncAssertionType, actual, g, timeoutInterval, pollingInterval, ctx, offset)
+	return NewAsyncAssertion(asyncAssertionType, actual, g, timeoutInterval, pollingInterval, 1, ctx, offset)
 }
 
 func (g *Gomega) SetDefaultEventuallyTimeout(t time.Duration) {
