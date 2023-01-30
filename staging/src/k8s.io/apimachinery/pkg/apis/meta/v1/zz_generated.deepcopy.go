@@ -602,6 +602,11 @@ func (in *ListOptions) DeepCopyInto(out *ListOptions) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.SendInitialEvents != nil {
+		in, out := &in.SendInitialEvents, &out.SendInitialEvents
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
