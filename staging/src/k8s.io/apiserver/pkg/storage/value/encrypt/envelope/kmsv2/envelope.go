@@ -38,6 +38,11 @@ import (
 	"k8s.io/utils/clock"
 )
 
+func init() {
+	value.RegisterMetrics()
+	metrics.RegisterMetrics()
+}
+
 const (
 	// KMSAPIVersion is the version of the KMS API.
 	KMSAPIVersion = "v2alpha1"
@@ -52,11 +57,13 @@ const (
 )
 
 type KeyIDGetterFunc func(context.Context) (keyID string, err error)
+type ProbeHealthzCheckFunc func(context.Context) (err error)
 
 type envelopeTransformer struct {
-	envelopeService kmsservice.Service
-
-	keyIDGetter KeyIDGetterFunc
+	envelopeService   kmsservice.Service
+	providerName      string
+	keyIDGetter       KeyIDGetterFunc
+	probeHealthzCheck ProbeHealthzCheckFunc
 
 	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
 	baseTransformerFunc func(cipher.Block) value.Transformer
@@ -67,14 +74,16 @@ type envelopeTransformer struct {
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
 // the data items they encrypt.
-func NewEnvelopeTransformer(envelopeService kmsservice.Service, keyIDGetter KeyIDGetterFunc, baseTransformerFunc func(cipher.Block) value.Transformer) value.Transformer {
-	return newEnvelopeTransformerWithClock(envelopeService, keyIDGetter, baseTransformerFunc, cacheTTL, clock.RealClock{})
+func NewEnvelopeTransformer(envelopeService kmsservice.Service, providerName string, keyIDGetter KeyIDGetterFunc, probeHealthzCheck ProbeHealthzCheckFunc, baseTransformerFunc func(cipher.Block) value.Transformer) value.Transformer {
+	return newEnvelopeTransformerWithClock(envelopeService, providerName, keyIDGetter, probeHealthzCheck, baseTransformerFunc, cacheTTL, clock.RealClock{})
 }
 
-func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, keyIDGetter KeyIDGetterFunc, baseTransformerFunc func(cipher.Block) value.Transformer, cacheTTL time.Duration, clock clock.Clock) value.Transformer {
+func newEnvelopeTransformerWithClock(envelopeService kmsservice.Service, providerName string, keyIDGetter KeyIDGetterFunc, probeHealthzCheck ProbeHealthzCheckFunc, baseTransformerFunc func(cipher.Block) value.Transformer, cacheTTL time.Duration, clock clock.Clock) value.Transformer {
 	return &envelopeTransformer{
 		envelopeService:     envelopeService,
+		providerName:        providerName,
 		keyIDGetter:         keyIDGetter,
+		probeHealthzCheck:   probeHealthzCheck,
 		cache:               newSimpleCache(clock, cacheTTL),
 		baseTransformerFunc: baseTransformerFunc,
 	}
@@ -111,6 +120,8 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 			return nil, false, err
 		}
 	}
+	// It's possible to record empty keyID
+	metrics.RecordKeyID(metrics.FromStorageLabel, t.providerName, encryptedObject.KeyID)
 
 	out, stale, err := transformer.TransformFromStorage(ctx, encryptedObject.EncryptedData, dataCtx)
 	if err != nil {
@@ -125,6 +136,7 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 	if err != nil {
 		return nil, false, err
 	}
+
 	return out, encryptedObject.KeyID != keyID, nil
 
 }
@@ -154,6 +166,8 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 		return nil, err
 	}
 
+	metrics.RecordKeyID(metrics.ToStorageLabel, t.providerName, resp.KeyID)
+
 	encObject := &kmstypes.EncryptedObject{
 		KeyID:         resp.KeyID,
 		EncryptedDEK:  resp.Ciphertext,
@@ -164,7 +178,12 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 	// Check keyID freshness and write to log if key IDs are different
 	statusKeyID, err := t.keyIDGetter(ctx)
 	if err == nil && encObject.KeyID != statusKeyID {
-		klog.V(2).InfoS("observed different key IDs when encrypting content using kms v2 envelope service", "uid", uid, "objectKeyID", encObject.KeyID, "statusKeyID", statusKeyID)
+		klog.V(2).InfoS("observed different key IDs when encrypting content using kms v2 envelope service", "uid", uid, "objectKeyID", encObject.KeyID, "statusKeyID", statusKeyID, "providerName", t.providerName)
+
+		// trigger health probe check immediately to ensure keyID freshness
+		if err := t.probeHealthzCheck(ctx); err != nil {
+			klog.V(2).ErrorS(err, "kms plugin failed health check probe", "name", t.providerName)
+		}
 	}
 
 	// Serialize the EncryptedObject to a byte array.

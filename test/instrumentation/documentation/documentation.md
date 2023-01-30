@@ -822,7 +822,7 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">Latencies in seconds of value transformation operations.</td>
-<td class="metric_labels_varying"><div class="metric_label">transformation_type</div></td>
+<td class="metric_labels_varying"><<div class="metric_label">status</div><div class="metric_label">transformation_type</div><div class="metric_label">transformer_prefix</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_storage_transformation_operations_total</td>

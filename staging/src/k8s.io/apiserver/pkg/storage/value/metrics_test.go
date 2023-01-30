@@ -21,6 +21,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -106,6 +107,113 @@ func TestTotals(t *testing.T) {
 			tt.prefix.TransformToStorage(context.Background(), []byte("value"), nil)
 			tt.prefix.TransformFromStorage(context.Background(), []byte("k8s:enc:kms:v1:value"), nil)
 			defer transformerOperationsTotal.Reset()
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestLatency(t *testing.T) {
+	testCases := []struct {
+		desc               string
+		prefix             string
+		transformationType string
+		elapsed            time.Duration
+		metrics            []string
+		want               string
+	}{
+		{
+			desc:               "transformation latency",
+			prefix:             "k8s:enc:kms:v1:",
+			transformationType: "from_storage",
+			elapsed:            time.Duration(10) * time.Second,
+			metrics: []string{
+				"apiserver_storage_transformation_duration_seconds",
+			},
+			want: `
+			# HELP apiserver_storage_transformation_duration_seconds [ALPHA] Latencies in seconds of value transformation operations.
+			# TYPE apiserver_storage_transformation_duration_seconds histogram
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="5e-06"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="1e-05"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="2e-05"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="4e-05"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="8e-05"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.00016"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.00032"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.00064"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.00128"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.00256"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.00512"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.01024"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.02048"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.04096"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.08192"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.16384"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.32768"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="0.65536"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="1.31072"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="2.62144"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="5.24288"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="10.48576"} 1
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="20.97152"} 1
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="41.94304"} 1
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="83.88608"} 1
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:",le="+Inf"} 1
+			apiserver_storage_transformation_duration_seconds_sum{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 10
+			apiserver_storage_transformation_duration_seconds_count{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				`,
+		},
+		{
+			desc:               "transformation latency 2",
+			prefix:             "k8s:enc:kms:v2:",
+			transformationType: "from_storage",
+			elapsed:            time.Duration(5) * time.Second,
+			metrics: []string{
+				"apiserver_storage_transformation_duration_seconds",
+			},
+			want: `
+			# HELP apiserver_storage_transformation_duration_seconds [ALPHA] Latencies in seconds of value transformation operations.
+			# TYPE apiserver_storage_transformation_duration_seconds histogram
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="5e-06"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="1e-05"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="2e-05"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="4e-05"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="8e-05"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.00016"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.00032"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.00064"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.00128"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.00256"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.00512"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.01024"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.02048"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.04096"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.08192"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.16384"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.32768"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="0.65536"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="1.31072"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="2.62144"} 0
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="5.24288"} 1
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="10.48576"} 1
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="20.97152"} 1
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="41.94304"} 1
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="83.88608"} 1
+			apiserver_storage_transformation_duration_seconds_bucket{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:",le="+Inf"} 1
+			apiserver_storage_transformation_duration_seconds_sum{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:"} 5
+			apiserver_storage_transformation_duration_seconds_count{transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v2:"} 1
+				`,
+		},
+	}
+
+	RegisterMetrics()
+	transformerLatencies.Reset()
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			RecordTransformation(tt.transformationType, tt.prefix, tt.elapsed, nil)
+			defer transformerLatencies.Reset()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
 				t.Fatal(err)
 			}

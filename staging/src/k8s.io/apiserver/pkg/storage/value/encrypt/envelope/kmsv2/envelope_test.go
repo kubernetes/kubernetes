@@ -31,6 +31,9 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	kmsservice "k8s.io/kms/service"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -38,6 +41,7 @@ import (
 const (
 	testText        = "abcdefghijklmnopqrstuvwxyz"
 	testContextText = "0123456789"
+	testKeyHash     = "sha256:6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
 	testKeyVersion  = "1"
 	testCacheTTL    = 10 * time.Second
 )
@@ -132,13 +136,16 @@ func TestEnvelopeCaching(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
 			fakeClock := testingclock.NewFakeClock(time.Now())
-			envelopeTransformer := newEnvelopeTransformerWithClock(envelopeService,
+			envelopeTransformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
 				func(ctx context.Context) (string, error) {
 					return "", nil
 				},
+				func(ctx context.Context) error {
+					return nil
+				},
 				aestransformer.NewGCMTransformer, tt.cacheTTL, fakeClock)
 
-			ctx := context.Background()
+			ctx := testContext(t)
 			dataCtx := value.DefaultContext([]byte(testContextText))
 			originalText := []byte(testText)
 
@@ -211,13 +218,16 @@ func TestEnvelopeTransformerKeyIDGetter(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			t.Parallel()
 			envelopeService := newTestEnvelopeService()
-			envelopeTransformer := NewEnvelopeTransformer(envelopeService,
+			envelopeTransformer := NewEnvelopeTransformer(envelopeService, testProviderName,
 				func(ctx context.Context) (string, error) {
 					return tt.testKeyID, tt.testErr
 				},
+				func(ctx context.Context) error {
+					return nil
+				},
 				aestransformer.NewGCMTransformer)
 
-			ctx := context.Background()
+			ctx := testContext(t)
 			dataCtx := value.DefaultContext([]byte(testContextText))
 			originalText := []byte(testText)
 
@@ -279,12 +289,15 @@ func TestTransformToStorageError(t *testing.T) {
 			t.Parallel()
 			envelopeService := newTestEnvelopeService()
 			envelopeService.SetAnnotations(tt.annotations)
-			envelopeTransformer := NewEnvelopeTransformer(envelopeService,
+			envelopeTransformer := NewEnvelopeTransformer(envelopeService, testProviderName,
 				func(ctx context.Context) (string, error) {
 					return "", nil
 				},
+				func(ctx context.Context) error {
+					return nil
+				},
 				aestransformer.NewGCMTransformer)
-			ctx := context.Background()
+			ctx := testContext(t)
 			dataCtx := value.DefaultContext([]byte(testContextText))
 
 			_, err := envelopeTransformer.TransformToStorage(ctx, []byte(testText), dataCtx)
@@ -552,6 +565,66 @@ func TestValidateEncryptedDEK(t *testing.T) {
 				if err != nil {
 					t.Fatalf("expected no error, got %q", err)
 				}
+			}
+		})
+	}
+}
+
+func TestEnvelopeMetrics(t *testing.T) {
+	envelopeService := newTestEnvelopeService()
+	envelopeTransformer := NewEnvelopeTransformer(envelopeService, testProviderName,
+		func(ctx context.Context) (string, error) {
+			return testKeyVersion, nil
+		},
+		func(ctx context.Context) error {
+			return fmt.Errorf("health check probe called when encryption keyID is different")
+		},
+		aestransformer.NewGCMTransformer)
+
+	dataCtx := value.DefaultContext([]byte(testContextText))
+
+	kmsv2Transformer := value.PrefixTransformer{Prefix: []byte("k8s:enc:kms:v2:"), Transformer: envelopeTransformer}
+
+	testCases := []struct {
+		desc                  string
+		keyVersionFromEncrypt string
+		prefix                value.Transformer
+		metrics               []string
+		want                  string
+	}{
+		{
+			desc:                  "keyIDHash total",
+			keyVersionFromEncrypt: testKeyVersion,
+			prefix:                value.NewPrefixTransformers(nil, kmsv2Transformer),
+			metrics: []string{
+				"apiserver_envelope_encryption_key_id_hash_total",
+			},
+			want: fmt.Sprintf(`
+				# HELP apiserver_envelope_encryption_key_id_hash_total [ALPHA] Number of times a keyID is used split by transformation type and provider.
+				# TYPE apiserver_envelope_encryption_key_id_hash_total counter
+				apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+        		apiserver_envelope_encryption_key_id_hash_total{key_id_hash="%s",provider_name="%s",transformation_type="%s"} 1
+				`, testKeyHash, testProviderName, metrics.FromStorageLabel, testKeyHash, testProviderName, metrics.ToStorageLabel),
+		},
+	}
+
+	metrics.DekCacheInterArrivals.Reset()
+	metrics.KeyIDHashTotal.Reset()
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			defer metrics.DekCacheInterArrivals.Reset()
+			defer metrics.KeyIDHashTotal.Reset()
+			ctx := testContext(t)
+			envelopeService.keyVersion = tt.keyVersionFromEncrypt
+			transformedData, err := tt.prefix.TransformToStorage(ctx, []byte(testText), dataCtx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.prefix.TransformFromStorage(ctx, transformedData, dataCtx)
+
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}
