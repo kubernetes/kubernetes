@@ -60,6 +60,7 @@ type CSILimits struct {
 	translator InTreeToCSITranslator
 }
 
+var _ framework.PreFilterPlugin = &CSILimits{}
 var _ framework.FilterPlugin = &CSILimits{}
 var _ framework.EnqueueExtensions = &CSILimits{}
 
@@ -78,6 +79,26 @@ func (pl *CSILimits) EventsToRegister() []framework.ClusterEvent {
 		{Resource: framework.CSINode, ActionType: framework.Add},
 		{Resource: framework.Pod, ActionType: framework.Delete},
 	}
+}
+
+// PreFilter invoked at the prefilter extension point
+//
+// If the pod haven't those types of volumes, we'll skip the Filter phase
+func (pl *CSILimits) PreFilter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	volumes := pod.Spec.Volumes
+	for i := range volumes {
+		vol := &volumes[i]
+		if vol.PersistentVolumeClaim != nil || vol.Ephemeral != nil || pl.translator.IsInlineMigratable(vol) {
+			return nil, nil
+		}
+	}
+
+	return nil, framework.NewStatus(framework.Skip)
+}
+
+// PreFilterExtensions returns prefilter extensions, pod add and remove.
+func (pl *CSILimits) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
 }
 
 // Filter invoked at the filter extension point.
