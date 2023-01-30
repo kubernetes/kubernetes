@@ -38,9 +38,11 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/hash"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -56,7 +58,12 @@ func generatePodName(name string, nodeName types.NodeName) string {
 func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
-		hash.DeepHashObject(hasher, pod)
+		if utilfeature.DefaultFeatureGate.Enabled(features.StaticPodUID) {
+			deepHashPod(hasher, pod)
+		} else {
+			hash.DeepHashObject(hasher, pod)
+		}
+
 		// DeepHashObject resets the hash, so we should write the pod source
 		// information AFTER it.
 		if isFile {

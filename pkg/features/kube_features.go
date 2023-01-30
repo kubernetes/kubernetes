@@ -731,6 +731,15 @@ const (
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
 
+	// owner: @wzshiming
+	// ga: v1.27
+	//
+	// Use the new UID calculation method to calculate static pods
+	// This feature gates.
+	// - Turning it on/off actively will result in the re-creation of static Pods
+	// - When on, upgrading the Kubelet will not result in the re-creation of static Pods due to the addition of new fields
+	StaticPodUID featuregate.Feature = "StaticPodUID"
+
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433
 	// alpha: v1.21
@@ -1029,6 +1038,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StatefulSetAutoDeletePVC: {Default: false, PreRelease: featuregate.Alpha},
 
 	StatefulSetStartOrdinal: {Default: false, PreRelease: featuregate.Alpha},
+
+	StaticPodUID: {Default: true, PreRelease: featuregate.GA},
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
 
