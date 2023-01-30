@@ -348,13 +348,13 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 	// Build option parameters
 	switch actionVerb {
 	case "get":
-		// TODO: CRD support for export is still under consideration
 		endpoints.AddObjectParams(b.ws, route, &metav1.GetOptions{})
 	case "list", "deletecollection":
 		endpoints.AddObjectParams(b.ws, route, &metav1.ListOptions{})
-	case "put", "patch":
-		// TODO: PatchOption added in feature branch but not in master yet
+	case "put":
 		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{})
+	case "patch":
+		endpoints.AddObjectParams(b.ws, route, &metav1.PatchOptions{})
 	case "post":
 		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{})
 	case "delete":
