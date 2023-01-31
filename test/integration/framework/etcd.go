@@ -27,6 +27,7 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"testing"
 	"time"
 
 	"google.golang.org/grpc/grpclog"
@@ -63,7 +64,7 @@ func getAvailablePort() (int, error) {
 
 // startEtcd executes an etcd instance. The returned function will signal the
 // etcd process and wait for it to exit.
-func startEtcd() (func(), error) {
+func startEtcd(output io.Writer) (func(), error) {
 	if runtime.GOARCH == "arm64" {
 		os.Setenv("ETCD_UNSUPPORTED_ARCH", "arm64")
 	}
@@ -77,7 +78,7 @@ func startEtcd() (func(), error) {
 	}
 	klog.V(1).Infof("could not connect to etcd: %v", err)
 
-	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil)
+	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil, output)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +89,7 @@ func startEtcd() (func(), error) {
 }
 
 // RunCustomEtcd starts a custom etcd instance for test purposes.
-func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn func(), err error) {
+func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url string, stopFn func(), err error) {
 	// TODO: Check for valid etcd version.
 	etcdPath, err := getEtcdPath()
 	if err != nil {
@@ -124,8 +125,13 @@ func RunCustomEtcd(dataDir string, customFlags []string) (url string, stopFn fun
 	}
 	args = append(args, customFlags...)
 	cmd := exec.CommandContext(ctx, etcdPath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if output == nil {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	} else {
+		cmd.Stdout = output
+		cmd.Stderr = output
+	}
 	stop := func() {
 		// try to exit etcd gracefully
 		defer cancel()
@@ -183,13 +189,20 @@ func EtcdMain(tests func() int) {
 	flag.Parse()
 
 	before := runtime.NumGoroutine()
-	stop, err := startEtcd()
+	stop, err := startEtcd(nil)
 	if err != nil {
 		klog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)
 	}
 	result := tests()
 	stop() // Don't defer this. See os.Exit documentation.
 
+	if err := checkGoroutines(before); err != nil {
+		klog.Fatalf("EtcdMain: %v", err)
+	}
+	os.Exit(result)
+}
+
+func checkGoroutines(before int) error {
 	checkNumberOfGoroutines := func() (bool, error) {
 		// We leave some room for leaked goroutines as there are
 		// still some leaks, mostly:
@@ -211,12 +224,34 @@ func EtcdMain(tests func() int) {
 		after := runtime.NumGoroutine()
 		stacktraces := make([]byte, 1<<20)
 		runtime.Stack(stacktraces, true)
-		klog.Fatalf("unexpected number of goroutines: before: %d after %d\n%sd", before, after, string(stacktraces))
+		return fmt.Errorf("unexpected number of goroutines: before: %d after %d\n%sd", before, after, string(stacktraces))
 	}
-	os.Exit(result)
+	return nil
 }
 
-// GetEtcdURL returns the URL of the etcd instance started by EtcdMain.
+// GetEtcdURL returns the URL of the etcd instance started by EtcdMain or StartEtcd.
 func GetEtcdURL() string {
 	return env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
+}
+
+// StartEtcd starts an etcd instance inside a test. It will abort the test if
+// startup fails and clean up after the test automatically. Stdout and stderr
+// of the etcd binary go to the provided writer.
+//
+// When cleaning up, it will check for leaked goroutines.
+//
+// Starting etcd multiple times per test run instead of once with EtcdMain
+// provides better separation between different tests.
+func StartEtcd(tb testing.TB, etcdOutput io.Writer) {
+	before := runtime.NumGoroutine()
+	stop, err := startEtcd(etcdOutput)
+	if err != nil {
+		tb.Fatalf("unable to start etcd: %v", err)
+	}
+	tb.Cleanup(func() {
+		stop()
+		if err := checkGoroutines(before); err != nil {
+			tb.Error(err.Error())
+		}
+	})
 }
